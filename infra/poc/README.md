@@ -71,3 +71,16 @@ connections from the internet or other VLANs.
 none), `BRANCH`, `REPO_URL`, `APP_DIR`.
 
 Both scripts check before changing anything and are safe to re-run.
+
+## Updating to a new version
+
+```bash
+cd /opt/hoa-portal && git pull --ff-only && sudo bash infra/poc/start-portal.sh
+```
+
+Migrations run automatically. If the POC was seeded before Milestone 2, add
+the demo data for the new modules once:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web python manage.py seed_demo_operations
+```

@@ -105,6 +105,26 @@ board is emailed.
 5. The person signs in with their password (or an emailed code), enters the
    enrollment code, then enrolls a new passkey or authenticator app.
 
+## Monthly routine (board or manager)
+
+1. **Dues**: Finance → Owner accounts → "Post monthly dues" on or after the
+   1st. Safe to press twice (a lot is never charged twice for a month).
+   To automate, set the rule "Post monthly dues automatically" to yes.
+2. **Payments**: record each check on the lot's account page (check number
+   only, never account numbers). Prepayments simply leave a credit.
+3. **Invoices**: enter with the PDF attached, submit; board members other
+   than the entrant approve (two at $500 and over); record payment.
+4. **Collections**: Finance → Collections lists balances over 30 days.
+   Reminders, payment plans and referrals are recorded by hand. Late fees
+   are switched off until the PA law review.
+5. **Reports**: Reports page; every report downloads as CSV.
+
+## Filling in the governing rules
+
+Board → Community settings. Every value needs a citation (Declaration,
+bylaws, or the board resolution that set it). Demo data cites "DEMO -
+replace": replace every one before real use.
+
 ## Break-glass (sysadmin, on the server)
 
 For data fixes the portal cannot do. Each requires your sysadmin login email

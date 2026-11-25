@@ -173,6 +173,34 @@ The portal image itself is still built from reviewed code.
   (`MFA_TOTP_TOLERANCE = 1`, RFC 6238 s.5.2). allauth's default of 0 rejected
   codes typed as the window rolled over (found on the POC).
 
+## D16. Milestone 2 build (2026-11-25, directed overnight)
+
+- Scope and user decisions: `docs/milestone-2-plan.md`.
+- One workflow engine (`core.workflow`) for ARC, violations, records
+  requests, work orders, invoices, collections and resale certificates;
+  every step is an append-only WorkflowEvent plus an audit event.
+- Files attached to workflow objects are append-only `documents.Attachment`
+  rows using the same validation and scanning as the library, served only
+  after the owning object's scoped lookup. Downloads stream through Django;
+  no signed storage URLs reach the browser.
+- PDFs (decision letters, notices, statements, resale certificates) come
+  from a ~90-line text PDF writer (`core.pdf`) rather than a dependency.
+- Ledger: one account per lot, append-only scoped entries in cents;
+  prepayment is a credit balance drawn down by monthly charges; aging
+  applies credits oldest-first; corrections are reversals. New owners see a
+  brought-forward balance, not the previous owner's history.
+- Late fees cannot be posted (LEDGER_LATE_FEES_ENABLED=false) pending the
+  PA law review. Collections are tracking only.
+- Formal votes freeze quorum/pass rules and their citations when opened
+  and are labelled not for binding use until counsel review. Ballots are
+  append-only; secret ballots hide voter choices in the UI (the database
+  still links ballot to lot to enforce one vote per lot).
+- Invoices: threshold rule invoice.dual_approval_cents ($500), two
+  distinct board approvers at or above it, the entrant never approves.
+- Resale certificate content is a draft for counsel to check against
+  68 Pa.C.S. § 5407.
+- Manager role added (data entry and workflow steps only).
+
 ## Dependencies
 
 | Package | Why |
