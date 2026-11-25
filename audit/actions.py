@@ -102,6 +102,11 @@ _SPECS = [
     ),
     _spec("export.own_data", "Downloaded own data"),
     _spec("preview.owner_started", "Homeowner view started", "lot_id"),
+    _spec("account.number_set", "Account number set"),
+    _spec("account.contact_added", "Account contact added", "person_id", "kind"),
+    _spec("account.contact_ended", "Account contact ended", "person_id", "kind"),
+    _spec("contact.method_added", "Contact detail added", "kind"),
+    _spec("contact.method_removed", "Contact detail removed", "kind"),
     _spec(
         "branding.login_background_set", "Sign-in background uploaded", "variant", "width", "height"
     ),

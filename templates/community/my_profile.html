@@ -12,6 +12,17 @@
         <form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save changes</button></div></form>
       {% else %}{% include "partials/empty.html" with icon="user" title="Not linked yet" text="Your login isn't linked to a person record yet. Ask a board member." %}{% endif %}
     </section>
-    <aside><section class="card"><h3>Your data</h3><p class="small muted">A JSON file of everything the portal holds about you.</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
+    <aside>{% if person %}<section class="card"><h3>More ways to reach you</h3>
+      <p class="small muted">Extra emails, phones or mailing addresses. Tick "send notices" on an email to get association notices there too.</p>
+      {% if methods %}<ul class="list">{% for m in methods %}<li><span class="grow">{{ m.get_kind_display }}{% if m.label %} ({{ m.label }}){% endif %}: {{ m.value }}{% if m.notices %} <span class="badge ok">notices</span>{% endif %}</span>
+        <form method="post" action="{% url 'contact_method_remove' m.pk %}">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form></li>{% endfor %}</ul>{% endif %}
+      <form method="post" action="{% url 'contact_method_add' %}">{% csrf_token %}
+        <p><label>Kind <select name="kind">{% for value, label in method_kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></p>
+        <p><label>Details <input type="text" name="value" maxlength="300" required></label></p>
+        <p><label>Label (optional) <input type="text" name="label" maxlength="60" placeholder="Work, cell..."></label></p>
+        <p><label><input type="checkbox" name="notices"> Send notices here (emails only)</label></p>
+        <div class="form-actions"><button type="submit" class="secondary">Add</button></div>
+      </form></section>{% endif %}
+      <section class="card"><h3>Your data</h3><p class="small muted">A JSON file of everything the portal holds about you.</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
   </div>
 {% endblock %}

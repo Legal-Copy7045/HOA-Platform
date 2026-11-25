@@ -15,6 +15,11 @@
   </div>
 
   {% with o=dash.owner s=dash.staff %}
+  {% if user|can:"history.view_own" and not o and not s %}
+    <section class="card"><h2>Your records</h2>
+      <p class="muted">You no longer own a lot here, so your login is read-only. You can still see your own account statements and requests from your time as an owner.</p>
+      <a class="btn" href="{% url 'my_history' %}">{% icon "clock" %} View my history</a></section>
+  {% endif %}
   {% if o %}
     <div class="grid grid-4">
       {% for a in o.accounts %}
@@ -24,9 +29,9 @@
           <div class="hint">{% if a.balance > 0 %}due{% elif a.balance < 0 %}in credit{% else %}paid up{% endif %}</div>
         </a>
       {% endfor %}
-      <a class="stat" href="{% url 'arc_list' %}"><div class="label">Architectural requests</div><div class="value">{{ o.open_arc }}</div><div class="hint">open</div></a>
+      {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}"><div class="label">Architectural requests</div><div class="value">{{ o.open_arc }}</div><div class="hint">open</div></a>{% endif %}
       <a class="stat {% if o.notices %}tone-warning{% endif %}" href="{% url 'violations' %}"><div class="label">Notices</div><div class="value">{{ o.notices }}</div><div class="hint">about your lot</div></a>
-      <a class="stat {% if o.votes %}tone-success{% endif %}" href="{% url 'votes' %}"><div class="label">Open votes</div><div class="value">{{ o.votes }}</div><div class="hint">waiting for your ballot</div></a>
+      {% if user|can:"vote.cast" %}<a class="stat {% if o.votes %}tone-success{% endif %}" href="{% url 'votes' %}"><div class="label">Open votes</div><div class="value">{{ o.votes }}</div><div class="hint">waiting for your ballot</div></a>{% endif %}
     </div>
   {% endif %}
 
@@ -52,7 +57,7 @@
         {% endif %}
       </section>
 
-      <section class="card">
+      {% if user|can:"announcement.view" %}<section class="card">
         <div class="card-head"><h2>Latest news</h2><a href="{% url 'announcements' %}" class="small">All announcements</a></div>
         {% with news=dash.news %}
         {% if news %}
@@ -64,11 +69,11 @@
           </ul>
         {% else %}{% include "partials/empty.html" with icon="megaphone" title="No announcements yet" %}{% endif %}
         {% endwith %}
-      </section>
+      </section>{% endif %}
     </div>
 
     <aside>
-      <section class="card">
+      {% if user|can:"calendar.view" %}<section class="card">
         <div class="card-head"><h2>Coming up</h2><a href="{% url 'calendar' %}" class="small">Calendar</a></div>
         {% with events=dash.events %}
         {% if events %}
@@ -79,12 +84,12 @@
           </ul>
         {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
         {% endwith %}
-      </section>
+      </section>{% endif %}
       {% if o %}
         <section class="card">
           <h2>Quick actions</h2>
           <ul class="list">
-            <li><a class="title" href="{% url 'arc_list' %}">{% icon "pencil" %} Request approval for a project</a></li>
+            {% if user|can:"arc.submit" %}<li><a class="title" href="{% url 'arc_list' %}">{% icon "pencil" %} Request approval for a project</a></li>{% endif %}
             <li><a class="title" href="{% url 'documents' %}">{% icon "folder" %} Governing documents</a></li>
             <li><a class="title" href="{% url 'my_profile' %}">{% icon "user" %} Update my contact details</a></li>
             <li><a class="title" href="{% url 'mfa_index' %}">{% icon "lock" %} Passkeys and security</a></li>

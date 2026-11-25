@@ -246,3 +246,7 @@ change earlier ones:
 
 Development only: pytest, pytest-django, pytest-cov, factory-boy, ruff, bandit,
 pip-audit, pip-tools.
+
+## D18. Accounts, account contacts and former owners (2026-11-25)
+
+The owner asked for accounts that hold several people, belong to a lot, and go dormant on sale, and for sellers to keep a read-only login for their history. An account is one ownership period of a lot (re-recording owners, such as adding a spouse, keeps the account; a sale opens a new one). Contacts not on the deed get access from their kind (authorized, view-only, tenant), never from self-service. Former owners see only their own era: statements cut at the sale date, and their own ARC requests, notices and resale requests. This relaxes the M1 rule "ending an ownership removes access" to "removes access to everything except one's own history", which the owner approved.

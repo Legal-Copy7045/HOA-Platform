@@ -41,6 +41,8 @@ def _address(number: int) -> str:
     if number <= 22:
         return f"{100 + (number - 1) * 2} {STREETS[0]}"
     return f"{151 + (number - 23) * 2} {STREETS[1]}"
+
+
 FIRST = [
     "Avery",
     "Blake",
@@ -179,12 +181,20 @@ class Command(BaseCommand):
                 )
             services.grant_role(person=person(), role=Role.AUDITOR, actor=SYSTEM)
 
+            # People on accounts who are not on the deed (Milestone 3).
+            from community.models import Account
+
+            for lot_number, kind in ((3, "authorized"), (3, "view_only"), (40, "tenant")):
+                account = Account.objects.get(lot__number=lot_number, closed_on__isnull=True)
+                services.add_account_contact(account, person=person(), kind=kind, actor=SYSTEM)
+
         from django.core.management import call_command
 
         call_command("seed_demo_operations", stdout=self.stdout)
         self.stdout.write(
             self.style.SUCCESS(
                 "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "
-                f"transferred, {len(board)} board seat(s), 2 ARC reviewers, 1 auditor."
+                f"transferred (its seller is a former owner), {len(board)} board seat(s), "
+                "2 ARC reviewers, 1 auditor, contacts on lots 3 and 40 (tenant)."
             )
         )

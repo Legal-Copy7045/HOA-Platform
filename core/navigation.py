@@ -17,6 +17,7 @@ SECTIONS = [
             ("My account", "my_account", "wallet", "ledger.view_own"),
             ("Architectural requests", "arc_list", "pencil", "arc.submit"),
             ("Notices about my lot", "violations", "flag", "lot.view_own"),
+            ("My history", "my_history", "clock", "history.view_own"),
         ],
     ),
     (

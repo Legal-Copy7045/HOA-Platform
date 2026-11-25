@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from audit.services import record_event
+from community.account_views import my_account_people
 from community.models import Lot
 from core import policy
 from core.money import MoneyField
@@ -80,7 +81,7 @@ def _flash(request, fn, ok):
 def _ownership_start(user, lot_id):
     """When this owner's unbroken ownership began (also right for the
     homeowner view, which has the previewed lot's owner scope)."""
-    return dict(policy.roles_for(user).owned_since).get(lot_id)
+    return policy.roles_for(user).lot_since.get(lot_id)
 
 
 @login_required
@@ -88,10 +89,18 @@ def my_account(request):
     policy.require(request.user, "ledger.view_own")
     accounts = []
     for lot in Lot.objects.for_user(request.user).filter(
-        pk__in=policy.roles_for(request.user).owned_lot_ids
+        pk__in=policy.roles_for(request.user).account_lot_ids
     ):
         since = _ownership_start(request.user, lot.pk)
-        accounts.append({"lot": lot, "statement": services.owner_statement(lot.pk, since)})
+        statement = services.owner_statement(lot.pk, since)
+        accounts.append(
+            {
+                "lot": lot,
+                "statement": statement,
+                "upcoming": services.upcoming_charges(statement.balance),
+                **my_account_people(request.user, lot.pk),
+            }
+        )
     return render(
         request, "ledger/my_account.html", {"accounts": accounts, "online": provider().available}
     )
@@ -100,7 +109,7 @@ def my_account(request):
 @login_required
 def my_statement_pdf(request, lot_id):
     policy.require(request.user, "ledger.view_own")
-    if lot_id not in policy.roles_for(request.user).owned_lot_ids:
+    if lot_id not in policy.roles_for(request.user).account_lot_ids:
         raise Http404
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=lot_id)
     record_event(

@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from community import branding_views, views
+from community import account_views, branding_views, views
 
 urlpatterns = [
     path("board/branding/", branding_views.branding_settings, name="branding_settings"),
@@ -10,6 +10,26 @@ urlpatterns = [
         name="login_background_image",
     ),
     path("my-lot/", views.my_lot, name="my_lot"),
+    path("my-history/", account_views.my_history, name="my_history"),
+    path("account/contacts/add/", account_views.contact_method_add, name="contact_method_add"),
+    path(
+        "account/contacts/<int:pk>/remove/",
+        account_views.contact_method_remove,
+        name="contact_method_remove",
+    ),
+    path(
+        "board/accounts/<int:pk>/number/", account_views.account_number, name="lot_account_number"
+    ),
+    path(
+        "board/accounts/<int:pk>/people/add/",
+        account_views.account_contact_add,
+        name="lot_account_contact_add",
+    ),
+    path(
+        "board/account-people/<int:pk>/end/",
+        account_views.account_contact_end,
+        name="lot_account_contact_end",
+    ),
     path("lots/", views.lot_list, name="lot_list"),
     path("lots/<int:pk>/", views.lot_detail, name="lot_detail"),
     path("lots/<int:pk>/transfer/", views.lot_transfer, name="lot_transfer"),

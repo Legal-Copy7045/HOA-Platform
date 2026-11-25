@@ -1,7 +1,7 @@
 {% load portal %}{% with p=request.path %}
 <nav class="subnav" aria-label="Governance">
   <a href="{% url 'meetings' %}"{% if "/meetings" in p %} aria-current="page"{% endif %}>Meetings</a>
-  <a href="{% url 'votes' %}"{% if "/votes" in p %} aria-current="page"{% endif %}>Votes and polls</a>
+  {% if user|can:"vote.view" %}<a href="{% url 'votes' %}"{% if "/votes" in p %} aria-current="page"{% endif %}>Votes and polls</a>{% endif %}
   <a href="{% url 'resolutions' %}"{% if "/resolutions" in p %} aria-current="page"{% endif %}>Resolutions and policies</a>
   {% if user|can:"records_request.manage" or user|can:"records_request.submit" %}<a href="{% url 'records_requests' %}"{% if "/records" in p %} aria-current="page"{% endif %}>Records requests</a>{% endif %}
 </nav>

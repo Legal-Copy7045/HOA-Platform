@@ -162,7 +162,7 @@ class ScopedModel(models.Model):
         condition = models.Q(pk__in=[])
         if cls.scope_lot_path is not None:
             key = f"{cls.scope_lot_path}__in" if cls.scope_lot_path else "pk__in"
-            condition |= models.Q(**{key: roles.owned_lot_ids})
+            condition |= models.Q(**{key: roles.account_lot_ids})
         if cls.scope_person_path is not None and roles.person_id is not None:
             key = cls.scope_person_path or "pk"
             condition |= models.Q(**{key: roles.person_id})
@@ -179,12 +179,22 @@ class ScopedModel(models.Model):
 
 
 def owner_era_q(roles, *, lot_path: str = "lot", created_field: str = "created_at") -> models.Q:
-    """Rows about the owner's lots created since *this* owner's ownership began.
+    """Rows about this person's account lots created since their access began,
+    plus rows from a former ownership period (read-only history).
 
     A buyer must not read the seller's ARC requests, notices or resale
-    paperwork (security review 2026-11, finding A4).
+    paperwork; the seller keeps their own (security review 2026-11, A4;
+    Milestone 3 former owners).
     """
     condition = models.Q(pk__in=[])
-    for lot_id, since in roles.owned_since:
+    for lot_id, since in roles.lot_since.items():
         condition |= models.Q(**{f"{lot_path}_id": lot_id, f"{created_field}__date__gte": since})
+    for lot_id, start, end in roles.former_periods:
+        condition |= models.Q(
+            **{
+                f"{lot_path}_id": lot_id,
+                f"{created_field}__date__gte": start,
+                f"{created_field}__date__lt": end,
+            }
+        )
     return condition

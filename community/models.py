@@ -87,7 +87,7 @@ class Person(NeverDeleteMixin, ScopedModel):
     def scope_for_owner(cls, queryset, roles):
         """Owners see themselves and their current co-owners - not past owners."""
         co_owners = Ownership.objects.unscoped("co-owner lookup").active()
-        co_owners = co_owners.filter(lot_id__in=roles.owned_lot_ids).values("person_id")
+        co_owners = co_owners.filter(lot_id__in=roles.account_lot_ids).values("person_id")
         return queryset.filter(models.Q(pk=roles.person_id) | models.Q(pk__in=co_owners))
 
     def __str__(self) -> str:
@@ -101,6 +101,62 @@ class OwnershipType(models.TextChoices):
     ENTITY = "entity", "Entity (company, estate)"
 
 
+class AccountQuerySet(ScopedQuerySet):
+    def active(self, on: datetime.date | None = None) -> AccountQuerySet:
+        return self.filter(_active_q("opened_on", "closed_on", on or today()))
+
+
+class Account(ScopedModel):
+    """One ownership period of one lot: the owners on the deed share it,
+    with its account number and balance. It goes dormant when the lot is
+    sold; the lot keeps its history and a new account starts."""
+
+    lot = models.ForeignKey(Lot, on_delete=models.PROTECT, related_name="accounts")
+    number = models.CharField(max_length=40, unique=True)
+    opened_on = models.DateField()
+    closed_on = models.DateField(
+        null=True, blank=True, help_text="Exclusive: the last day is the day before."
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    objects = AccountQuerySet.as_manager()
+    scope_lot_path = "lot"
+
+    class Meta:
+        ordering = ["lot__number", "-opened_on", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(closed_on__isnull=True) | Q(closed_on__gte=F("opened_on")),
+                name="account_close_not_before_open",
+            ),
+            models.UniqueConstraint(
+                fields=["lot"],
+                condition=Q(closed_on__isnull=True),
+                name="account_one_active_per_lot",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Account {self.number}"
+
+    @property
+    def is_active(self) -> bool:
+        return self.closed_on is None or self.closed_on > today()
+
+    @property
+    def status_label(self) -> str:
+        return "Active" if self.is_active else "Dormant"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Current account(s) of the lots this person can see, plus the
+        dormant accounts they were an owner on (read-only history)."""
+        own = Q(lot_id__in=roles.account_lot_ids)
+        past = Q(pk__in=list(roles.former_account_ids))
+        return queryset.filter(own | past)
+
+
 class OwnershipQuerySet(ScopedQuerySet):
     def active(self, on: datetime.date | None = None) -> OwnershipQuerySet:
         return self.filter(_active_q("start_date", "end_date", on or today()))
@@ -109,6 +165,9 @@ class OwnershipQuerySet(ScopedQuerySet):
 class Ownership(NeverDeleteMixin, ScopedModel):
     person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="ownerships")
     lot = models.ForeignKey(Lot, on_delete=models.PROTECT, related_name="ownerships")
+    account = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.PROTECT, related_name="ownerships"
+    )
     ownership_type = models.CharField(max_length=16, choices=OwnershipType.choices)
     start_date = models.DateField()
     end_date = models.DateField(
@@ -146,8 +205,9 @@ class Ownership(NeverDeleteMixin, ScopedModel):
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):
-        """Owners see current ownerships of their lots, not the lot's past owners."""
-        return queryset.filter(lot_id__in=roles.owned_lot_ids).active()
+        """Owners and account contacts see the current owners of their lots,
+        not the lot's past owners."""
+        return queryset.filter(lot_id__in=roles.account_lot_ids).active()
 
     def is_active(self, on: datetime.date | None = None) -> bool:
         on = on or today()
@@ -498,3 +558,91 @@ class LoginBackground(models.Model):
 
     def __str__(self) -> str:
         return f"login background #{self.pk}"
+
+
+class ContactKind(models.TextChoices):
+    AUTHORIZED = "authorized", "Authorized contact"
+    VIEW_ONLY = "view_only", "View-only contact"
+    TENANT = "tenant", "Tenant"
+
+
+CONTACT_KIND_HELP = {
+    ContactKind.AUTHORIZED: "Sees the account and raises requests; does not vote or apply for ARC.",
+    ContactKind.VIEW_ONLY: "Sees the account and notices; cannot act.",
+    ContactKind.TENANT: (
+        "Lives there: community documents, news and their own requests; no balance."
+    ),
+}
+
+
+class AccountContactQuerySet(ScopedQuerySet):
+    def active(self, on: datetime.date | None = None) -> AccountContactQuerySet:
+        return self.filter(_active_q("start_date", "end_date", on or today()))
+
+
+class AccountContact(NeverDeleteMixin, ScopedModel):
+    """Someone on an account who is not on the deed: what they may do comes
+    from their kind. Ends when the account goes dormant or the board ends it."""
+
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="contacts")
+    person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="account_contacts")
+    kind = models.CharField(max_length=12, choices=ContactKind.choices)
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    objects = AccountContactQuerySet.as_manager()
+    scope_lot_path = "account__lot"
+
+    class Meta:
+        ordering = ["account", "kind", "start_date"]
+        constraints = [
+            ExclusionConstraint(
+                name="account_contact_no_overlap",
+                expressions=[
+                    (F("person"), RangeOperators.EQUAL),
+                    (F("account"), RangeOperators.EQUAL),
+                    (DateRange("start_date", "end_date"), RangeOperators.OVERLAPS),
+                ],
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_kind_display()} #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.filter(account__lot_id__in=roles.account_lot_ids).active()
+
+
+class ContactMethodKind(models.TextChoices):
+    EMAIL = "email", "Email"
+    PHONE = "phone", "Phone"
+    ADDRESS = "address", "Mailing address"
+
+
+class ContactMethod(ScopedModel):
+    """An extra way to reach a person (a second email, a mobile, an
+    absentee owner's mailing address), each with its own notice consent."""
+
+    person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="contact_methods")
+    kind = models.CharField(max_length=8, choices=ContactMethodKind.choices)
+    label = models.CharField(max_length=60, blank=True, help_text='e.g. "Work", "Spouse"')
+    value = models.CharField(max_length=300)
+    notices = models.BooleanField(
+        default=False, help_text="Send association notices here too (email) / by post (address)."
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "person"
+
+    class Meta:
+        ordering = ["person", "kind", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.get_kind_display()} for person #{self.person_id}"

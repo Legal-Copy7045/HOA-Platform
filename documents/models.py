@@ -81,7 +81,7 @@ class Document(ScopedModel):
     def scope_for_owner(cls, queryset, roles):
         """Owners: current owner-wide documents, plus documents for lots they own."""
         visible = models.Q(visibility=Visibility.OWNERS) | models.Q(
-            visibility=Visibility.LOT, lot_id__in=roles.owned_lot_ids
+            visibility=Visibility.LOT, lot_id__in=roles.account_lot_ids
         )
         return queryset.filter(visible, archived=False, current_version__isnull=False)
 

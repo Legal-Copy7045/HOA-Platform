@@ -29,13 +29,24 @@ ARC_REVIEWER = "arc_reviewer"
 AUDITOR = "auditor"
 SYSADMIN = "sysadmin"
 MANAGER = "manager"  # management-company staff: data entry, never approvals or votes
+# People on an account who are not on the deed (Milestone 3 accounts).
+AUTHORIZED = "authorized_contact"  # sees the account, raises requests
+VIEW_ONLY = "view_only_contact"  # sees the account and notices, cannot act
+TENANT = "tenant"  # community documents and news, their own requests
+FORMER_OWNER = "former_owner"  # read-only: their own records from their time
+ACCOUNT_VIEWERS = frozenset({OWNER, AUTHORIZED, VIEW_ONLY})
+RESIDENTS = ACCOUNT_VIEWERS | {TENANT}
+# Groups whose actions concern only their own lot or records.
+SELF_SERVICE = RESIDENTS | {FORMER_OWNER}
 
 MEMBERS = frozenset({OWNER, BOARD, ARC_REVIEWER, AUDITOR, MANAGER})
+# Community pages (news, calendar, documents, meetings, policies).
+COMMUNITY = MEMBERS | RESIDENTS
 
 # action -> role groups allowed to perform it. Keep this the only such table.
 PERMISSIONS: dict[str, frozenset[str]] = {
     # Reading
-    "lot.view_own": frozenset({OWNER}),
+    "lot.view_own": ACCOUNT_VIEWERS,
     "lot.view_all": frozenset({BOARD, AUDITOR, MANAGER}),
     # Homeowner view: see the portal as one lot's owner sees it (read-only).
     "portal.preview_as_owner": frozenset({BOARD, MANAGER}),
@@ -66,23 +77,23 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "mfa_reset.start": frozenset({BOARD}),
     "mfa_reset.approve": frozenset({BOARD}),
     # Communications
-    "announcement.view": MEMBERS,
+    "announcement.view": COMMUNITY,
     "announcement.publish": frozenset({BOARD, MANAGER}),
-    "calendar.view": MEMBERS,
+    "calendar.view": COMMUNITY,
     "calendar.manage": frozenset({BOARD, MANAGER}),
     "task.manage": frozenset({BOARD, MANAGER}),
     # Documents
-    "document.view_owner": MEMBERS,
+    "document.view_owner": COMMUNITY,
     "document.view_board": frozenset({BOARD, AUDITOR, MANAGER}),
     "document.manage": frozenset({BOARD, MANAGER}),
     # Governance
-    "meeting.view": MEMBERS,
+    "meeting.view": COMMUNITY,
     "meeting.manage": frozenset({BOARD, MANAGER}),
-    "resolution.view": MEMBERS,
+    "resolution.view": COMMUNITY,
     "resolution.record": frozenset({BOARD}),
     "records_request.submit": frozenset({OWNER}),
     "records_request.manage": frozenset({BOARD, MANAGER}),
-    "vote.view": MEMBERS,
+    "vote.view": MEMBERS | {AUTHORIZED, VIEW_ONLY},
     "vote.cast": frozenset({OWNER}),
     "vote.manage": frozenset({BOARD}),
     # Architectural review
@@ -102,7 +113,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "invoice.approve": frozenset({BOARD}),
     "invoice.record_payment": frozenset({BOARD, MANAGER}),
     "finance.view": frozenset({BOARD, AUDITOR, MANAGER}),
-    "ledger.view_own": frozenset({OWNER}),
+    "ledger.view_own": ACCOUNT_VIEWERS,
+    "history.view_own": frozenset({FORMER_OWNER}),
+    "account.manage": frozenset({BOARD, MANAGER}),
     "ledger.manage": frozenset({BOARD, MANAGER}),
     "budget.manage": frozenset({BOARD}),
     "collections.manage": frozenset({BOARD, MANAGER}),
@@ -139,6 +152,21 @@ class Roles:
     # (lot_id, start date of the current ownership) for each owned lot, so lot
     # records from before this owner's time can be hidden (review A4).
     owned_since: tuple[tuple[int, datetime.date], ...] = ()
+    # Lots whose account this person may see: owners plus authorized and
+    # view-only contacts (tenants see community pages only).
+    account_lot_ids: frozenset[int] = frozenset()
+    # (lot_id, since) for account contacts: the account's opening date.
+    contact_since: tuple[tuple[int, datetime.date], ...] = ()
+    tenant_lot_ids: frozenset[int] = frozenset()
+    # Former owners: (lot_id, start, end) of each past ownership period, and
+    # the dormant accounts they were on (read-only history).
+    former_periods: tuple[tuple[int, datetime.date, datetime.date], ...] = ()
+    former_account_ids: frozenset[int] = frozenset()
+
+    @property
+    def lot_since(self) -> dict[int, datetime.date]:
+        """When this person's view of each account lot begins."""
+        return {**dict(self.contact_since), **dict(self.owned_since)}
 
     def has(self, group: str) -> bool:
         return group in self.groups
@@ -169,6 +197,7 @@ def _preview_roles(preview, on) -> Roles:
         person_id,
         frozenset(),
         ((preview.lot_id, since),),
+        account_lot_ids=frozenset({preview.lot_id}),
     )
 
 
@@ -202,7 +231,67 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         offices = frozenset(
             OfficeHolding.objects.filter(person=person).active(on).values_list("office", flat=True)
         )
-    return Roles(frozenset(groups), lots, person.pk, offices, tuple(sorted(since.items())))
+        contacts = _account_contacts(person, on)
+        former = _former_ownerships(person, lots | frozenset(contacts["account"]), on)
+    if contacts["authorized"]:
+        groups.add(AUTHORIZED)
+    if contacts["view_only"]:
+        groups.add(VIEW_ONLY)
+    if contacts["tenant"]:
+        groups.add(TENANT)
+    if former["periods"]:
+        groups.add(FORMER_OWNER)
+    contact_since = {k: v for k, v in contacts["since"].items() if k not in lots}
+    return Roles(
+        frozenset(groups),
+        lots,
+        person.pk,
+        offices,
+        tuple(sorted(since.items())),
+        account_lot_ids=lots | frozenset(contacts["account"]),
+        contact_since=tuple(sorted(contact_since.items())),
+        tenant_lot_ids=frozenset(contacts["tenant"]),
+        former_periods=tuple(sorted(former["periods"])),
+        former_account_ids=frozenset(former["accounts"]),
+    )
+
+
+def _account_contacts(person, on) -> dict:
+    """Lots where this person is an account contact or tenant, by kind."""
+    from community.models import AccountContact, ContactKind
+
+    out = {"authorized": set(), "view_only": set(), "tenant": set(), "account": set(), "since": {}}
+    rows = (
+        AccountContact.objects.filter(person=person)
+        .active(on)
+        .filter(account__closed_on__isnull=True)
+        .values_list("kind", "account__lot_id", "account__opened_on")
+    )
+    for kind, lot_id, opened_on in rows:
+        if kind == ContactKind.TENANT:
+            out["tenant"].add(lot_id)
+            continue
+        out["authorized" if kind == ContactKind.AUTHORIZED else "view_only"].add(lot_id)
+        out["account"].add(lot_id)
+        out["since"][lot_id] = min(opened_on, out["since"].get(lot_id, opened_on))
+    return out
+
+
+def _former_ownerships(person, current_lots, on) -> dict:
+    """Ended ownerships of lots this person no longer sees: read-only history."""
+    from community.models import Ownership
+
+    on = on or datetime.date.today()
+    periods, accounts = set(), set()
+    for lot_id, start, end, account_id in Ownership.objects.filter(
+        person=person, end_date__isnull=False, end_date__lte=on
+    ).values_list("lot_id", "start_date", "end_date", "account_id"):
+        if lot_id in current_lots:
+            continue
+        periods.add((lot_id, start, end))
+        if account_id:
+            accounts.add(account_id)
+    return {"periods": periods, "accounts": accounts}
 
 
 def _continuous_ownership_starts(person, lots) -> dict[int, datetime.date]:
@@ -285,8 +374,8 @@ def thinly_covered_actions(minimum: int = 2) -> dict[str, int]:
     with_mfa = people_with_mfa()
     result = {}
     for action, groups in PERMISSIONS.items():
-        if groups == {OWNER} or OWNER in groups:
-            continue  # owner actions concern one's own lot
+        if groups & SELF_SERVICE:
+            continue  # owner/resident actions concern one's own lot or records
         able = people_able_to(action)
         if with_mfa is not None:
             able &= with_mfa

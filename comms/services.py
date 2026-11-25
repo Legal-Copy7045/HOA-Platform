@@ -60,10 +60,16 @@ def mark_read(announcement: Announcement, user) -> None:
 def recipients_for(audience: str) -> list[str]:
     """Emails of active logins who can see this audience."""
     from accounts.models import User
+    from community.services import notice_emails_for_users
     from core import policy
 
     action = "announcement.view" if audience == Audience.MEMBERS else "document.view_board"
-    return [u.email for u in User.objects.filter(is_active=True) if policy.can(u, action)]
+    users = [u for u in User.objects.filter(is_active=True) if policy.can(u, action)]
+    out = [u.email for u in users]
+    if audience == Audience.MEMBERS:
+        # Extra addresses people asked to get notices at (their own choice).
+        out += [e for e in notice_emails_for_users(users) if e not in out]
+    return out
 
 
 def create_event(

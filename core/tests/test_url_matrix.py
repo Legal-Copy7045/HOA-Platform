@@ -19,6 +19,7 @@ from accounts import services as account_services
 from accounts.models import Invitation, MfaReset, VerificationMethod
 from community import services
 from community.models import (
+    Account,
     BoardSeat,
     Office,
     OfficeHolding,
@@ -44,7 +45,13 @@ PUBLIC = {
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")
-OWN_ACCOUNT = {"enroll_with_code", "my_profile", "export_my_data", "owner_preview_stop"}
+OWN_ACCOUNT = {
+    "enroll_with_code",
+    "my_profile",
+    "export_my_data",
+    "owner_preview_stop",
+    "contact_method_add",
+}
 # Text from board-only or other-lot fixtures that must never reach owner A.
 BOARD_ONLY_MARKERS = (
     b"Board only: legal matter",
@@ -82,6 +89,11 @@ PROTECTED = {
     "lot_list": ("GET", None),
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
+    "lot_account_number": ("POST", "account_b"),
+    "lot_account_contact_add": ("POST", "account_b"),
+    "lot_account_contact_end": ("POST", "account_contact_b"),
+    "contact_method_remove": ("POST", "contact_method_b"),
+    "my_history": ("GET", None),
     "board_home": ("GET", None),
     "owner_preview_start": ("POST", None),
     "branding_settings": ("GET", None),
@@ -286,7 +298,20 @@ def world():
         resale_b = ledger.request_resale(
             lot=lot_b, requester_name="Lot B Buyer Agent", actor=owner_b
         )
+        account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
+        contact_b = services.add_account_contact(
+            account_b,
+            person=services.record_person(display_name="Lot B tenant", actor=SYSTEM),
+            kind="tenant",
+            actor=SYSTEM,
+        )
+        method_b = services.add_contact_method(
+            person_b, kind="phone", value="555-0100", actor=SYSTEM
+        )
     targets = {
+        "account_b": account_b.pk,
+        "account_contact_b": contact_b.pk,
+        "contact_method_b": method_b.pk,
         "lot": lot_b.pk,
         "person": person_b.pk,
         "ownership": Ownership.objects.unscoped("t").get(person=person_b).pk,

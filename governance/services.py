@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import record_event
+from community import services as community_services
 from community.models import ContactProfile, Lot, Ownership, Person
 from community.rules import rule, rule_with_citation
 from core.policy import SYSTEM, can, require
@@ -92,11 +93,13 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
         )
         for person in owners:
             if person.pk in consent and (person.email or person.user_id):
+                to = [person.user.email if person.user_id else person.email]
+                to += [e for e in community_services.notice_emails(person) if e not in to]
                 send_mail(
                     f"[{settings.SITE_NAME}] Meeting notice: {single_line(meeting.title)}",
                     body,
                     None,
-                    [person.user.email if person.user_id else person.email],
+                    to,
                 )
                 emailed += 1
             else:

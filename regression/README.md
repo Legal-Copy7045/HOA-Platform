@@ -47,7 +47,7 @@ four cores.
 |---|---|---|
 | ci | `CI-` | ruff lint and format, bandit, migration check, pip-audit, `check --deploy` with production settings, repo hygiene (no `.env` tracked, CI actions pinned, permissions, no `pull_request_target`) |
 | unit | `UNIT-` | the whole pytest suite; one result per test |
-| page | `PAGE-` | seeds the fictional demo community into a fresh database, then crawls the portal in Chromium as board, owner, manager and auditor: every page type loads, has no console or CSP errors, fits a phone; every board page the owner did not reach refuses the owner |
+| page | `PAGE-` | seeds the fictional demo community into a fresh database, then crawls the portal in Chromium as board, owner, manager, auditor, tenant and former owner: every page type loads, has no console or CSP errors, fits a phone; every board page the owner did not reach refuses the owner |
 | live | `LIVE-` | read-only: the POC answers over HTTPS behind Cloudflare Access, plain HTTP does not serve it, DNS is proxied, TLS 1.2+, the tunnel is healthy, an Access application covers the host. Host from `LIVE_HOST`, never the repo; Cloudflare API reads only |
 | manual | `MAN-` | `manual.yaml`, listed as "needs a person" |
 

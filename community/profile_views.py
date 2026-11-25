@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
 from community import services
-from community.models import ContactProfile, Person
+from community.models import ContactMethod, ContactMethodKind, ContactProfile, Person
 from core import policy
 
 
@@ -47,7 +47,17 @@ def my_profile(request):
         else:
             messages.success(request, "Profile saved.")
         return redirect("my_profile")
-    return render(request, "community/my_profile.html", {"form": form, "person": person})
+    methods = ContactMethod.objects.for_user(request.user).filter(person=person) if person else []
+    return render(
+        request,
+        "community/my_profile.html",
+        {
+            "form": form,
+            "person": person,
+            "methods": methods,
+            "method_kinds": ContactMethodKind.choices,
+        },
+    )
 
 
 @login_required

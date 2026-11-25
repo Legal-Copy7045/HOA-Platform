@@ -60,7 +60,7 @@ class Violation(ScopedModel):
         from core.scoping import owner_era_q
 
         unresolved = models.Q(
-            lot_id__in=roles.owned_lot_ids,
+            lot_id__in=roles.account_lot_ids,
             state__in=[ViolationState.NOTICED, ViolationState.RESPONDED, ViolationState.HEARING],
         )
         # Only violations a notice was actually sent for (one dismissed

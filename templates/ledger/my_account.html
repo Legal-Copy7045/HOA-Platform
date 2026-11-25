@@ -18,6 +18,18 @@
         {% for e in a.statement.entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}</td><td class="num">{{ e.amount_cents|cents }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No activity yet.</td></tr>{% endfor %}
         </tbody>
       </table></div>
+      {% if a.upcoming %}<h3>Upcoming charges</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Due</th><th>Description</th><th class="num">Amount</th></tr></thead>
+        <tbody>{% for c in a.upcoming %}<tr><td class="nowrap">{{ c.due_on|date:"M j, Y" }}</td><td>{{ c.description }}{% if c.covered_by_credit %} <span class="badge ok">covered by credit</span>{% endif %}</td><td class="num">{{ c.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
+      </table></div>{% endif %}
+      {% if a.account %}<h3>On this account</h3>
+      <p class="small muted">Account {{ a.account.number }}</p>
+      <ul class="list">
+        {% for p in a.owners %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow">{{ p.display_name }} <span class="small muted">Owner</span></div></li>{% endfor %}
+        {% for c in a.contacts %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow">{{ c.person.display_name }} <span class="small muted">{{ c.get_kind_display }}</span></div></li>{% endfor %}
+      </ul>
+      <p class="small muted">To add or remove someone, ask the board.</p>{% endif %}
       <div class="form-actions">
         <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
         <button type="button" class="btn" disabled>Pay online</button>

@@ -37,13 +37,13 @@ def owner_panel(user, roles) -> dict:
     from ledger.services import owner_statement
 
     accounts = []
-    since = dict(roles.owned_since)
-    for lot in Lot.objects.for_user(user).filter(pk__in=roles.owned_lot_ids):
+    since = roles.lot_since
+    for lot in Lot.objects.for_user(user).filter(pk__in=roles.account_lot_ids):
         start = since.get(lot.pk)
         accounts.append({"lot": lot, "balance": owner_statement(lot.pk, start).balance})
     open_arc = (
         ArcRequest.objects.for_user(user)
-        .filter(lot_id__in=roles.owned_lot_ids)
+        .filter(lot_id__in=roles.account_lot_ids)
         .exclude(state__in=["completed", "withdrawn", "denied", "appeal_decided"])
         .count()
     )
@@ -309,7 +309,7 @@ def staff_panel(user, roles) -> dict:
 def build(user) -> dict:
     roles = policy.roles_for(user)
     data = {"roles": roles}
-    if policy.OWNER in roles.groups:
+    if roles.groups & policy.ACCOUNT_VIEWERS:
         data["owner"] = owner_panel(user, roles)
     if roles.groups & {policy.BOARD, policy.MANAGER, policy.AUDITOR, policy.ARC_REVIEWER}:
         data["staff"] = staff_panel(user, roles)

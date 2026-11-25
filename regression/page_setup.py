@@ -68,7 +68,16 @@ def sessions(out: str) -> None:
         # first, so "owner is refused board page" tests someone else's lot.
         first = owned.select_related("person", "lot").order_by("-lot__number").first()
         owner, owner_lot = first.person, first.lot
+        from community.models import AccountContact
+
+        tenant = AccountContact.objects.active().filter(kind="tenant").first().person
+        sellers = Ownership.objects.filter(end_date__isnull=False).exclude(
+            person__in=Ownership.objects.active().values("person")
+        )
+        former = sellers.select_related("person").first().person
     result = {
+        "tenant": login(tenant, "reg-tenant@example.com"),
+        "former_owner": login(former, "reg-former@example.com"),
         "board": login(board, "reg-board@example.com"),
         "owner": login(owner, "reg-owner@example.com"),
         "manager": login(

@@ -11,6 +11,7 @@
       {% if can_manage %}<details class="row-menu"><summary>End ownership</summary><form method="post" action="{% url 'ownership_end' o.pk %}" class="inline-form" data-confirm="End this ownership? The person loses access to this lot from that date.">{% csrf_token %}<input type="date" name="end_date" required aria-label="End date"><button type="submit" class="danger small">End</button></form></details>{% endif %}
     </li>{% endfor %}</ul>{% else %}<p class="muted">No current owner recorded.</p>{% endif %}
   </section>
+  {% if can_manage_accounts %}{% include "community/_accounts.html" %}{% endif %}
   {% if can_manage %}
     <details class="panel"><summary>Transfer this lot</summary><div class="panel-body">
       <p class="muted small">Ends every current ownership on the transfer date and records the new owners. Previous owners lose access from that date.</p>

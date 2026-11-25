@@ -16,15 +16,22 @@ import datetime
 from collections.abc import Sequence
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.http import HttpRequest
 from django.utils import timezone
 
 from audit.models import Channel
 from audit.services import record_event
 from community.models import (
+    Account,
+    AccountContact,
     AppointedBy,
     BoardSeat,
+    ContactKind,
+    ContactMethod,
+    ContactMethodKind,
     Lot,
     Office,
     OfficeHolding,
@@ -37,8 +44,8 @@ from community.models import (
     SeatType,
     today,
 )
-from core.policy import SYSTEM, require
-from core.scoping import system_access
+from core.policy import SYSTEM, can, require
+from core.scoping import internal, system_access
 
 
 class CommunityError(ValueError):
@@ -123,6 +130,7 @@ def record_ownership(
             ownership = Ownership.objects.create(
                 person=person,
                 lot=lot,
+                account=_account_for(lot, start_date),
                 start_date=start_date,
                 ownership_type=ownership_type,
                 recorded_by=_user(actor),
@@ -162,6 +170,7 @@ def end_ownership(
             raise CommunityError("An ownership cannot end before it starts.")
         ownership.end_date = end_date
         ownership.save(update_fields=["end_date"])
+        _close_account_if_empty(ownership.account_id, end_date)
         _audit(
             "ownership.ended",
             actor=actor,
@@ -201,8 +210,13 @@ def transfer_lot(
     with transaction.atomic(), system_access("transfer_lot"):
         Lot.objects.select_for_update().get(pk=lot.pk)
         current = list(Ownership.objects.select_for_update().filter(lot=lot).active(transfer_date))
+        continuing = {o.person_id for o in current} & {p.pk for p in new_owners}
         for ownership in current:
             end_ownership(ownership, end_date=transfer_date, actor=actor, request=request)
+        if continuing:
+            # Re-recording the same household (adding a spouse, a trust): the
+            # account carries on. A sale gives the buyers a new account.
+            _reopen_account(current[0].account_id)
         created = [
             record_ownership(
                 person=person,
@@ -227,6 +241,204 @@ def transfer_lot(
             },
         )
     return created
+
+
+# --- Accounts (Milestone 3) -------------------------------------------------------
+
+
+@internal("community accounts")
+def _next_account_number(lot: Lot) -> str:
+    seq = Account.objects.filter(lot=lot).count() + 1
+    number = f"{lot.number:03d}-{seq:02d}"
+    while Account.objects.filter(number=number).exists():
+        seq += 1
+        number = f"{lot.number:03d}-{seq:02d}"
+    return number
+
+
+@internal("community accounts")
+def _account_for(lot: Lot, on: datetime.date) -> Account:
+    """The lot's account open on ``on``, or a new one starting then."""
+    account = (
+        Account.objects.select_for_update()
+        .filter(lot=lot, opened_on__lte=on)
+        .filter(Q(closed_on__isnull=True) | Q(closed_on__gt=on))
+        .first()
+    )
+    if account is None:
+        account = Account.objects.create(lot=lot, number=_next_account_number(lot), opened_on=on)
+    return account
+
+
+@internal("community accounts")
+def _close_account_if_empty(account_id: int | None, on: datetime.date) -> None:
+    if account_id is None:
+        return
+    still_owned = Ownership.objects.filter(account_id=account_id).active(on).exists()
+    if still_owned:
+        return
+    Account.objects.filter(pk=account_id, closed_on__isnull=True).update(closed_on=on)
+    # Contacts and tenants of a dormant account lose access with it.
+    AccountContact.objects.filter(account_id=account_id, end_date__isnull=True).update(end_date=on)
+
+
+@internal("community accounts")
+def _reopen_account(account_id: int | None) -> None:
+    if account_id is not None:
+        Account.objects.filter(pk=account_id).update(closed_on=None)
+
+
+def set_account_number(account: Account, number: str, *, actor, request=None) -> Account:
+    """Use the management company's account number (shown on statements)."""
+    _authorize(actor, "account.manage")
+    number = (number or "").strip()
+    if not number or len(number) > 40:
+        raise CommunityError("Enter the account number (up to 40 characters).")
+    with system_access("set account number"):
+        if Account.objects.filter(number=number).exclude(pk=account.pk).exists():
+            raise CommunityError("Another account already has that number.")
+        Account.objects.filter(pk=account.pk).update(number=number)
+    _audit("account.number_set", actor=actor, request=request, target=account, metadata={})
+    account.number = number
+    return account
+
+
+def add_account_contact(
+    account: Account,
+    *,
+    person: Person,
+    kind: str,
+    start_date: datetime.date | None = None,
+    actor,
+    request=None,
+) -> AccountContact:
+    """Add an authorized contact, a view-only contact or a tenant. Access
+    comes from the kind; a login still needs a board invitation."""
+    _authorize(actor, "account.manage")
+    if kind not in ContactKind.values:
+        raise CommunityError("Choose what kind of contact this is.")
+    _refuse_self_grant(actor, person, "an account contact")
+    if not account.is_active:
+        raise CommunityError("This account is dormant; contacts go on the current account.")
+    with system_access("add account contact"):
+        if Ownership.objects.filter(account=account, person=person).active().exists():
+            raise CommunityError("That person is already an owner on this account.")
+        try:
+            with transaction.atomic():
+                contact = AccountContact.objects.create(
+                    account=account,
+                    person=person,
+                    kind=kind,
+                    start_date=start_date or today(),
+                    recorded_by=_user(actor),
+                )
+        except IntegrityError as exc:
+            raise CommunityError("That person is already on this account.") from exc
+    _audit(
+        "account.contact_added",
+        actor=actor,
+        request=request,
+        target=account,
+        metadata={"person_id": person.pk, "kind": kind},
+    )
+    return contact
+
+
+def end_account_contact(contact: AccountContact, *, actor, request=None) -> AccountContact:
+    _authorize(actor, "account.manage")
+    with system_access("end account contact"):
+        AccountContact.objects.filter(pk=contact.pk, end_date__isnull=True).update(end_date=today())
+    _audit(
+        "account.contact_ended",
+        actor=actor,
+        request=request,
+        target=contact.account,
+        metadata={"person_id": contact.person_id, "kind": contact.kind},
+    )
+    return contact
+
+
+def add_contact_method(
+    person: Person, *, kind: str, value: str, label: str = "", notices: bool = False, actor
+) -> ContactMethod:
+    """The person themselves (or the board) adds a second email, phone or
+    mailing address."""
+    if actor is not SYSTEM and not (_person_of(actor) == person.pk or can(actor, "person.manage")):
+        raise PermissionDenied("contact_method")
+    _refuse_read_only(actor)
+    value = (value or "").strip()
+    if kind not in ContactMethodKind.values or not value or len(value) > 300:
+        raise CommunityError("Choose a kind and enter the details.")
+    if kind == ContactMethodKind.EMAIL:
+        from django.core.validators import validate_email
+
+        try:
+            validate_email(value)
+        except ValidationError as exc:
+            raise CommunityError("Enter a valid email address.") from exc
+    with system_access("add contact method"):
+        if ContactMethod.objects.filter(person=person).count() >= 10:
+            raise CommunityError("Ten extra contact details is the most.")
+        method = ContactMethod.objects.create(
+            person=person, kind=kind, value=value, label=label.strip()[:60], notices=notices
+        )
+    _audit(
+        "contact.method_added", actor=actor, request=None, target=person, metadata={"kind": kind}
+    )
+    return method
+
+
+def remove_contact_method(method: ContactMethod, *, actor) -> None:
+    if actor is not SYSTEM and not (
+        _person_of(actor) == method.person_id or can(actor, "person.manage")
+    ):
+        raise PermissionDenied("contact_method")
+    _refuse_read_only(actor)
+    with system_access("remove contact method"):
+        ContactMethod.objects.filter(pk=method.pk).delete()
+    _audit(
+        "contact.method_removed",
+        actor=actor,
+        request=None,
+        target=method.person,
+        metadata={"kind": method.kind},
+    )
+
+
+def notice_emails(person: Person) -> list[str]:
+    """Extra email addresses this person asked to receive notices at."""
+    with system_access("notice emails"):
+        return list(
+            ContactMethod.objects.filter(
+                person=person, kind=ContactMethodKind.EMAIL, notices=True
+            ).values_list("value", flat=True)
+        )
+
+
+def notice_emails_for_users(users) -> list[str]:
+    """Consented extra notice emails of the people behind these logins."""
+    with system_access("notice emails for users"):
+        return list(
+            ContactMethod.objects.filter(
+                person__user__in=list(users), kind=ContactMethodKind.EMAIL, notices=True
+            ).values_list("value", flat=True)
+        )
+
+
+def _refuse_read_only(actor) -> None:
+    """Former owners keep a read-only login: they change nothing."""
+    if actor is SYSTEM:
+        return
+    from core.policy import FORMER_OWNER, roles_for
+
+    groups = roles_for(actor).groups
+    if FORMER_OWNER in groups and not (groups - {FORMER_OWNER}):
+        raise PermissionDenied("read_only")
+
+
+def _person_of(user) -> int | None:
+    with system_access("person of user"):
+        return Person.objects.filter(user=user).values_list("pk", flat=True).first()
 
 
 # --- Board seats ----------------------------------------------------------------
@@ -733,6 +945,7 @@ def update_my_profile(
     request: HttpRequest | None = None,
 ):
     """Anyone with a linked Person edits only their own profile."""
+    _refuse_read_only(user)
     from community.models import ContactProfile
 
     with transaction.atomic(), system_access("update_my_profile"):

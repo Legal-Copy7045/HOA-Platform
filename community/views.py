@@ -56,7 +56,7 @@ def _invalid(request, form, to: str) -> object:
 def my_lot(request):
     policy.require(request.user, "lot.view_own")
     roles = policy.roles_for(request.user)
-    lots = Lot.objects.for_user(request.user).filter(pk__in=roles.owned_lot_ids)
+    lots = Lot.objects.for_user(request.user).filter(pk__in=roles.account_lot_ids)
     owners = Ownership.objects.for_user(request.user).select_related("person")
     return render(
         request,
@@ -92,10 +92,16 @@ def lot_detail(request, pk):
     lot = _scoped(Lot, request, pk)
     ownerships = Ownership.objects.for_user(request.user).filter(lot=lot).select_related("person")
     can_manage = policy.can(request.user, "ownership.manage")
+    from community.account_views import account_context
+
+    accounts = (
+        account_context(request.user, lot) if policy.can(request.user, "account.manage") else {}
+    )
     return render(
         request,
         "community/lot_detail.html",
         {
+            **accounts,
             "lot": lot,
             "current": [o for o in ownerships if o.is_active()],
             "history": [o for o in ownerships if not o.is_active()] if can_manage else [],

@@ -84,7 +84,65 @@ def owner_statement(lot_id: int, since: datetime.date) -> OwnerStatement:
     return OwnerStatement(forward, entries, forward + sum(e.amount_cents for e in entries))
 
 
+@internal("ledger service")
+def period_statement(
+    lot_id: int, start: datetime.date, end: datetime.date | None
+) -> OwnerStatement:
+    """What a former owner sees: only the entries posted while they owned the
+    lot, with the balance brought forward from before their time and the
+    balance on the day they sold. Nothing from after the sale."""
+    forward = (
+        LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lt=start).aggregate(
+            s=Sum("amount_cents")
+        )["s"]
+        or 0
+    )
+    entries = LedgerEntry.objects.filter(lot_id=lot_id, posted_on__gte=start)
+    if end is not None:
+        entries = entries.filter(posted_on__lt=end)
+    entries = list(entries)
+    return OwnerStatement(forward, entries, forward + sum(e.amount_cents for e in entries))
+
+
 # --- Posting ---------------------------------------------------------------------------
+
+
+@dataclass
+class UpcomingCharge:
+    due_on: datetime.date
+    description: str
+    amount_cents: int
+    covered_by_credit: bool
+
+
+def upcoming_charges(balance_cents: int, *, months: int = 3, on=None) -> list[UpcomingCharge]:
+    """The next monthly dues, from the dues rule. A credit on the account is
+    shown being used up month by month (nothing here posts anything)."""
+    amount = rule("dues.monthly_cents") or 0
+    if not amount:
+        return []
+    on = on or timezone.localdate()
+    day = min(rule("dues.due_day") or 1, 28)
+    credit = -balance_cents if balance_cents < 0 else 0
+    year, month = on.year, on.month
+    if on.day >= day:
+        month += 1
+    out = []
+    for _ in range(months):
+        if month > 12:
+            year, month = year + 1, 1
+        covered = credit >= amount
+        credit = max(credit - amount, 0)
+        out.append(
+            UpcomingCharge(
+                datetime.date(year, month, day),
+                f"Monthly dues {_period(year, month)}",
+                amount,
+                covered,
+            )
+        )
+        month += 1
+    return out
 
 
 def _period(year: int, month: int) -> str:

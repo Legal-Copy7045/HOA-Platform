@@ -103,14 +103,21 @@ def test_ending_ownership_removes_access_on_the_next_query(world):
     assert visible(Lot, owner_a) == {world["lot_a"].pk}
     ownership = Ownership.objects.unscoped("test").get(person__user=owner_a)
     services.end_ownership(ownership, actor=world["board"])
+    own_person = {ownership.person_id}
     for model in SCOPED_MODELS:
-        assert visible(model, owner_a) == set(), model.__name__
+        # A former owner keeps read-only sight of their own person record
+        # (Milestone 3) and nothing about the lot.
+        expected = own_person if model is Person else set()
+        assert visible(model, owner_a) == expected, model.__name__
     assert not policy.can(owner_a, "lot.view_own")
+    assert policy.can(owner_a, "history.view_own")
 
 
-def test_former_owner_sees_nothing(world):
+def test_former_owner_sees_nothing_of_the_lot(world):
+    former = Person.objects.unscoped("test").get(user=world["former"])
     for model in SCOPED_MODELS:
-        assert visible(model, world["former"]) == set(), model.__name__
+        expected = {former.pk} if model is Person else set()
+        assert visible(model, world["former"]) == expected, model.__name__
 
 
 def test_transfer_moves_access_to_buyer_immediately(world):
@@ -294,7 +301,7 @@ MEMBER_READS = {
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
         ("sysadmin", {"system.view_status", "invite.resend", "invite.revoke", "branding.manage"}),
-        ("former", set()),
+        ("former", {"history.view_own"}),
     ],
 )
 def test_permission_matrix(world, who, allowed):

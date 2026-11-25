@@ -30,3 +30,9 @@
 - feature: "Sign-in page background (desktop and phone), uploaded on the Branding page; images re-encoded"
   since: M3
   match: ["^unit:community/tests/test_branding"]
+- feature: "Accounts: numbered per ownership period, dormant on sale; authorized, view-only and tenant contacts; extra contact details and notice emails"
+  since: M3
+  match: ["^unit:community/tests/test_accounts.py::test_(recording|a_second|a_sale|account_number|authorized|view_only|tenant|contact_sees|ending|board_adds|owners_cannot_add|no_contacts|my_account|owner_adds|owner_cannot_remove|invalid_extra|meeting_notice)"]
+- feature: "Former owners: read-only login showing only their own records from their time"
+  since: M3
+  match: ["^unit:community/tests/test_accounts.py::test_(former_owner|owners_cannot_open_my_history)"]
