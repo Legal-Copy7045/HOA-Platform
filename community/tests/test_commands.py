@@ -161,7 +161,11 @@ def test_seed_demo_builds_the_fictional_community(settings):
         assert all(
             e.endswith("@example.com") for e in Person.objects.values_list("email", flat=True)
         )
-        assert not Person.objects.filter(user__isnull=False).exists()
+        # Only a few demo people get logins (authors of demo records): fictional
+        # @example.com addresses with no usable password.
+        demo_logins = User.objects.filter(person__isnull=False)
+        assert all(u.email.endswith("@example.com") for u in demo_logins)
+        assert not any(u.has_usable_password() for u in demo_logins)
     with pytest.raises(CommandError, match="already exist"):
         run("seed_demo")
 
@@ -185,3 +189,44 @@ def test_print_invitation_link_replaces_a_lost_bootstrap_link(client):
     assert client.get(new).status_code == 302
     with pytest.raises(CommandError):
         run("print_invitation_link", email="nobody@example.com")
+
+
+def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
+    """The whole demo community renders on every board and owner page."""
+    from django.urls import reverse
+
+    from ledger.models import LedgerEntry
+    from operations.models import Invoice, Vendor
+
+    settings.SEED_DEMO_ALLOWED = True
+    run("seed_demo")
+    assert Vendor.objects.count() == 3
+    assert Invoice.objects.filter(state="paid").exists()
+    with system_access("t"):
+        assert LedgerEntry.objects.filter(kind="assessment").exists()
+    with pytest.raises(CommandError, match="already exists"):
+        run("seed_demo_operations")
+    client.force_login(make_member(board=True))
+    for name in (
+        "board_home",
+        "community_settings",
+        "ledger_home",
+        "collections",
+        "invoices",
+        "work_orders",
+        "vendors",
+        "budgets",
+        "reports",
+        "arc_list",
+        "violations",
+        "meetings",
+        "votes",
+        "resolutions",
+        "records_requests",
+        "announcements",
+        "calendar",
+        "documents",
+        "resales",
+        "tasks",
+    ):
+        assert client.get(reverse(name)).status_code == 200, name

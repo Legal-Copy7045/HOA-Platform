@@ -176,6 +176,9 @@ class Command(BaseCommand):
                 )
             services.grant_role(person=person(), role=Role.AUDITOR, actor=SYSTEM)
 
+        from django.core.management import call_command
+
+        call_command("seed_demo_operations", stdout=self.stdout)
         self.stdout.write(
             self.style.SUCCESS(
                 "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "
