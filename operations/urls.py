@@ -14,6 +14,8 @@ urlpatterns = [
     ),
     path("requests/", rv.requests_list, name="requests"),
     path("requests/<int:pk>/", rv.request_detail, name="request_detail"),
+    path("requests/<int:pk>/photos/", rv.request_attach, name="request_attach"),
+    path("requests/<int:pk>/photos/<int:file_id>/", rv.request_file, name="request_file"),
     re_path(
         r"^requests/(?P<pk>[0-9]+)/do/(?P<action>[a-z_]+)/$",
         rv.request_action,

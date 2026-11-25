@@ -609,6 +609,24 @@ def assign_request(req: OwnerRequest, person, *, actor, request=None) -> OwnerRe
     return req
 
 
+def can_add_request_photos(actor, req: OwnerRequest) -> bool:
+    """The person who raised an open request may add photos, while they may
+    still raise requests for that home (not view-only, not a former owner);
+    staff who work requests may too."""
+    from core.policy import can
+
+    if actor is SYSTEM or not getattr(actor, "is_authenticated", False):
+        return False
+    if can(actor, "request.manage"):
+        return req.state not in (RequestState.WITHDRAWN, RequestState.CLOSED)
+    return (
+        req.is_open
+        and req.requested_by_id == actor.pk
+        and can(actor, "request.submit")
+        and _may_raise_for(actor, req.lot_id)
+    )
+
+
 def request_to_work_order(req: OwnerRequest, *, actor, request=None) -> WorkOrder:
     """A maintenance or common-area report becomes a work order (once)."""
     require(actor, "workorder.manage")
