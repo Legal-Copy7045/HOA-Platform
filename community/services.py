@@ -44,7 +44,7 @@ from community.models import (
     SeatType,
     today,
 )
-from core.policy import SYSTEM, can, require
+from core.policy import SYSTEM, can, require, roles_for
 from core.scoping import internal, system_access
 
 
@@ -1041,3 +1041,125 @@ def directory_entries():
                 }
             )
     return entries
+
+
+# --- Owner-requested account changes (board approval) ---------------------------------
+
+
+def request_account_change(
+    account: Account,
+    *,
+    action: str,
+    kind: str = "",
+    name: str = "",
+    email: str = "",
+    contact: AccountContact | None = None,
+    reason: str = "",
+    actor,
+    request=None,
+):
+    """An owner on the deed asks to add or remove a contact on their account."""
+    from community.models import AccountChangeAction, AccountChangeRequest
+
+    require(actor, "account.request_change")
+    if actor is not SYSTEM and account.lot_id not in roles_for(actor).owned_lot_ids:
+        raise PermissionDenied("account_change")
+    if not account.is_active:
+        raise CommunityError("This account is dormant.")
+    fields = {"reason": (reason or "").strip()[:2000]}
+    if action == AccountChangeAction.ADD:
+        name = " ".join((name or "").split())[:200]
+        email = (email or "").strip()
+        if kind not in ContactKind.values or not name:
+            raise CommunityError("Enter their name and choose what they may do.")
+        if email:
+            from django.core.validators import validate_email
+
+            try:
+                validate_email(email)
+            except ValidationError as exc:
+                raise CommunityError("Enter a valid email address, or leave it blank.") from exc
+        fields.update(kind=kind, name=name, email=email)
+    elif action == AccountChangeAction.REMOVE:
+        if contact is None or contact.account_id != account.pk or contact.end_date is not None:
+            raise CommunityError("Choose someone currently on this account.")
+        fields.update(contact=contact, kind=contact.kind)
+    else:
+        raise CommunityError("Choose add or remove.")
+    with transaction.atomic(), system_access("request account change"):
+        pending = AccountChangeRequest.objects.filter(account=account, state="pending")
+        if pending.count() >= 10:
+            raise CommunityError("There are already several changes waiting for the board.")
+        change = AccountChangeRequest.objects.create(
+            account=account, action=action, requested_by=actor, **fields
+        )
+        _audit(
+            "account.change_requested",
+            actor=actor,
+            request=request,
+            target=account,
+            metadata={"action": action, "kind": fields.get("kind", "")},
+        )
+        _board_notice("account_change_requested")
+    return change
+
+
+def decide_account_change(change, *, approve: bool, note: str = "", actor, request=None):
+    """A board member other than the requester approves (the change is made
+    through add/end_account_contact, as that board member) or declines."""
+    from community.models import AccountChangeAction, AccountChangeRequest
+
+    require(actor, "account.approve_change")
+    with transaction.atomic(), system_access("decide account change"):
+        change = AccountChangeRequest.objects.select_for_update().get(pk=change.pk)
+        if change.state != "pending":
+            raise CommunityError("This request has already been decided.")
+        if actor is not SYSTEM and change.requested_by_id == actor.pk:
+            raise CommunityError("Another board member must decide a change you asked for.")
+        if approve:
+            account = Account.objects.get(pk=change.account_id)
+            if change.action == AccountChangeAction.ADD:
+                person = record_person(
+                    display_name=change.name, email=change.email, actor=actor, request=request
+                )
+                add_account_contact(
+                    account, person=person, kind=change.kind, actor=actor, request=request
+                )
+            else:
+                contact = AccountContact.objects.get(pk=change.contact_id)
+                end_account_contact(contact, actor=actor, request=request)
+        AccountChangeRequest.objects.filter(pk=change.pk).update(
+            state="approved" if approve else "declined",
+            decided_by=None if actor is SYSTEM else actor,
+            decided_at=timezone.now(),
+            decision_note=(note or "").strip()[:2000],
+        )
+        _audit(
+            "account.change_decided",
+            actor=actor,
+            request=request,
+            target=change.account,
+            metadata={"action": change.action, "decision": "approved" if approve else "declined"},
+        )
+    change.refresh_from_db()
+    return change
+
+
+def withdraw_account_change(change, *, actor, request=None):
+    from community.models import AccountChangeRequest
+
+    if actor is not SYSTEM and change.requested_by_id != actor.pk:
+        raise PermissionDenied("account_change")
+    with system_access("withdraw account change"):
+        updated = AccountChangeRequest.objects.filter(pk=change.pk, state="pending").update(
+            state="withdrawn"
+        )
+    if not updated:
+        raise CommunityError("Only a waiting request can be withdrawn.")
+    _audit(
+        "account.change_withdrawn",
+        actor=actor,
+        request=request,
+        target=change.account,
+        metadata={"action": change.action},
+    )

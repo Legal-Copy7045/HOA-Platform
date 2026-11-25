@@ -286,6 +286,7 @@ MEMBER_READS = {
                 "resale.request",
                 "request.submit",
                 "request.view_own",
+                "account.request_change",
             },
         ),
         (

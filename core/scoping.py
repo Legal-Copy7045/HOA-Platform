@@ -198,3 +198,15 @@ def owner_era_q(roles, *, lot_path: str = "lot", created_field: str = "created_a
             }
         )
     return condition
+
+
+def own_records(queryset, user):
+    """Narrow an already scoped queryset to what this person sees as an owner,
+    for the homeowner side of someone who is also on the board ("mine")."""
+    from core import policy
+
+    return queryset.model.scope_for_owner(queryset, policy.roles_for(user))
+
+
+def wants_mine(request) -> bool:
+    return request.GET.get("mine") == "1"

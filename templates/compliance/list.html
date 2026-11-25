@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Violations · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if mine %}Notices about my home{% else %}Violations{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Violations</h1><p class="subtitle">Notices of covenant or rule issues, with the date by which they should be fixed.</p></div></div>
+  <div class="page-head"><div><h1>{% if mine %}Notices about my home{% else %}Violations{% endif %}</h1><p class="subtitle">Notices of covenant or rule issues, with the date by which they should be fixed.</p></div>
+    {% if staff and user|can:"lot.view_own" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'violations' %}">All violations</a>{% else %}<a class="btn secondary" href="{% url 'violations' %}?mine=1">{% icon "home" %} About my home</a>{% endif %}</div>{% endif %}</div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Lot</th><th>Category</th><th>Status</th><th>Cure by</th></tr></thead>
     <tbody>{% for v in rows %}<tr><td><a href="{% url 'violation_detail' v.pk %}">V-{{ v.pk }}</a></td><td>Lot {{ v.lot.number }}</td><td>{{ v.get_category_display }}</td><td>{% status v.state %}</td><td class="nowrap">{{ v.cure_by|date:"M j, Y"|default:"" }}</td></tr>

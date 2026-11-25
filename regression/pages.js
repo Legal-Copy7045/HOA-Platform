@@ -15,7 +15,13 @@ const SKIP = [/logout/, /\.pdf$/, /format=csv/, /download/, /\/files?\//, /\/let
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 const MAX_PAGES = 120;
 
-const pattern = (path) => path.replace(/\/\d+(?=\/|$)/g, '/{id}').replace(/\?.*$/, '');
+// Query strings are dropped, except ?mine=1: the homeowner and board sides of
+// the same list are different pages (a board member who owns a home sees both).
+const pattern = (path) => {
+  const [p, q = ''] = path.split('?');
+  const mine = /(^|&)mine=1(&|$)/.test(q) ? '?mine=1' : '';
+  return p.replace(/\/\d+(?=\/|$)/g, '/{id}') + mine;
+};
 const results = [];
 const add = (check, ok, detail = '') => results.push({ check, status: ok ? 'pass' : 'fail', detail });
 
@@ -43,7 +49,8 @@ async function crawl(browser, role) {
       const resp = await page.goto(base + path, { waitUntil: 'load' });
       status = resp ? resp.status() : 0;
     } catch (e) { errors.push(String(e).slice(0, 200)); }
-    const finalPath = new URL(page.url()).pathname;
+    const finalUrl = new URL(page.url());
+    const finalPath = finalUrl.pathname + finalUrl.search;
     const redirectedAway = pattern(finalPath) !== key && path !== '/';
     add(`${role}: ${key} loads`, status === 200 && !redirectedAway,
       `HTTP ${status}${redirectedAway ? ` -> ${finalPath}` : ''}`);
@@ -74,7 +81,9 @@ async function crawl(browser, role) {
     await ctx.addCookies([{ name: 'sessionid', value: sessions.owner, url: base }]);
     const page = await ctx.newPage();
     for (const [key, path] of reached.board) {
-      if (reached.owner.has(key) || key === '/') continue;
+      // A list the owner reached as "?mine=1" is the same page (shared
+      // list, owner side) - not a board page.
+      if (reached.owner.has(key) || reached.owner.has(`${key}?mine=1`) || key === '/') continue;
       const resp = await page.goto(base + path);
       const status = resp ? resp.status() : 0;
       add(`owner is refused board page ${key}`, status === 403 || status === 404, `HTTP ${status}`);

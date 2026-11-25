@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Architectural review · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if mine %}My architectural requests{% else %}Architectural review{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Architectural review</h1><p class="subtitle">Exterior changes need approval before work starts. Start a request, attach plans and photos, then submit it to the committee.</p></div></div>
+  <div class="page-head"><div><h1>{% if mine %}My architectural requests{% else %}Architectural review{% endif %}</h1><p class="subtitle">{% if mine %}Exterior changes need approval before work starts. Start a request, attach plans and photos, then submit it to the committee.{% else %}Every request from the community, for review.{% endif %}</p></div>
+    {% if can_view_all and user|can:"arc.submit" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'arc_list' %}">Board review list</a>{% else %}<a class="btn secondary" href="{% url 'arc_list' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Project</th><th>Lot</th><th>Status</th><th>Decision due</th></tr></thead>
     <tbody>{% for r in rows %}<tr><td><a href="{% url 'arc_detail' r.pk %}">ARC-{{ r.pk }}</a></td><td><a href="{% url 'arc_detail' r.pk %}">{{ r.title }}</a></td><td>Lot {{ r.lot.number }}</td><td>{% status r.state %}</td><td class="nowrap">{{ r.review_due_on|date:"M j, Y"|default:"" }}</td></tr>

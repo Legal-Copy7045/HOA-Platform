@@ -1,18 +1,41 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}My lot · {{ SITE_NAME }}{% endblock %}
+{% block title %}My home · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>My lot</h1></div></div>
-  {% for lot, ownerships in lots %}
+  <div class="page-head"><div><h1>My home</h1><p class="subtitle">Your lot, the people on your account, and changes you have asked the board to make.</p></div></div>
+  {% for lot, ownerships, acct in lots %}
     <section class="card">
-      <div class="card-head"><div><h2>{{ lot }}</h2><div class="muted">{% icon "pin" %} {{ lot.street_address }}</div></div></div>
-      <h3>Owners on record</h3>
+      <div class="card-head"><div><h2>{{ lot }}</h2><div class="muted">{% icon "pin" %} {{ lot.street_address }}</div></div>{% if acct.account %}<span class="badge">Account {{ acct.account.number }}</span>{% endif %}</div>
+      <h3>Owners on the deed</h3>
       <ul class="list">{% for o in ownerships %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow"><div class="title">{{ o.person.display_name }}</div><div class="small muted">{{ o.get_ownership_type_display }} · since {{ o.start_date|date:"M j, Y" }}</div></div></li>{% endfor %}</ul>
+      <p class="small muted">Owners change only with the deed (a sale or a new deed recorded by the board).</p>
+      {% if acct %}
+        <h3>Other people on the account</h3>
+        <ul class="list">{% for c in acct.contacts %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow"><div class="title">{{ c.person.display_name }}</div><div class="small muted">{{ c.get_kind_display }} · since {{ c.start_date|date:"M j, Y" }}</div></div>
+          {% if acct.can_request %}<details class="row-menu"><summary>Ask to remove</summary><form method="post" action="{% url 'account_change_request' acct.account.pk %}" class="inline-form">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="contact" value="{{ c.pk }}"><input type="text" name="reason" maxlength="500" placeholder="Reason (optional)" aria-label="Reason"><button type="submit" class="danger small">Send to board</button></form></details>{% endif %}
+        </li>{% empty %}<li class="muted small">Nobody else yet.</li>{% endfor %}</ul>
+        {% if acct.can_request %}
+          <details class="panel"><summary>Ask to add someone</summary><div class="panel-body">
+            <ul class="small muted">{% for value, label, help in contact_kinds %}<li><strong>{{ label }}</strong>: {{ help }}</li>{% endfor %}</ul>
+            <form method="post" action="{% url 'account_change_request' acct.account.pk %}">{% csrf_token %}<input type="hidden" name="action" value="add">
+              <p><label>Their name <input type="text" name="name" maxlength="200" required></label></p>
+              <p><label>Their email (for a sign-in invitation; optional) <input type="email" name="email" maxlength="254"></label></p>
+              <p><label>What they may do <select name="kind">{% for value, label, help in contact_kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></p>
+              <p><label>Reason (optional) <input type="text" name="reason" maxlength="500"></label></p>
+              <div class="form-actions"><button type="submit">Send to the board</button></div>
+            </form>
+            <p class="small muted">A board member approves the change. Once approved, the board can send them an invitation to sign in.</p></div></details>
+        {% endif %}
+        {% if acct.changes %}<h3>Changes you asked for</h3>
+          <ul class="list">{% for ch in acct.changes %}<li><div class="grow"><div class="title">{{ ch.get_action_display }}: {% if ch.action == "add" %}{{ ch.name }} ({{ ch.get_kind_display }}){% else %}{{ ch.contact.person.display_name }}{% endif %}</div>
+            <div class="small muted">{{ ch.created_at|date:"M j, Y" }} · {{ ch.get_state_display }}{% if ch.decision_note %} · {{ ch.decision_note }}{% endif %}</div></div>
+            {% if ch.state == "pending" and ch.requested_by_id == user.pk %}<form method="post" action="{% url 'account_change_withdraw' ch.pk %}">{% csrf_token %}<button type="submit" class="secondary small">Withdraw</button></form>{% endif %}</li>{% endfor %}</ul>{% endif %}
+      {% endif %}
     </section>
   {% endfor %}
   <div class="grid grid-3">
-    <a class="stat" href="{% url 'arc_list' %}"><div class="label">{% icon "pencil" %} Architectural requests</div><div class="hint">Apply for exterior changes and track decisions</div></a>
-    <a class="stat" href="{% url 'violations' %}"><div class="label">{% icon "flag" %} Notices about my lot</div><div class="hint">Covenant notices and your responses</div></a>
+    {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}?mine=1"><div class="label">{% icon "pencil" %} Architectural requests</div><div class="hint">Apply for exterior changes and track decisions</div></a>{% endif %}
+    <a class="stat" href="{% url 'violations' %}?mine=1"><div class="label">{% icon "flag" %} Notices about my home</div><div class="hint">Covenant notices and your responses</div></a>
     <a class="stat" href="{% url 'documents' %}"><div class="label">{% icon "folder" %} Documents</div><div class="hint">Governing documents, minutes and forms</div></a>
   </div>
 {% endblock %}

@@ -127,3 +127,26 @@ class Decision(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"decision #{self.pk}"
+
+
+class ArcProjectType(models.Model):
+    """A kind of project owners choose when they apply (fence, shed, paint...).
+    Board-configured; what each type needs comes from the Declaration or the
+    ARC guidelines, cited here."""
+
+    name = models.CharField(max_length=60, unique=True)
+    guidance = models.TextField(
+        blank=True, help_text="What to include: drawings, materials, colours, a plot plan..."
+    )
+    citation = models.CharField(max_length=200, blank=True)
+    active = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=100)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Project types are retired, not deleted (requests refer to them).")

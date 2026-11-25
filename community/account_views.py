@@ -120,6 +120,16 @@ def contact_method_remove(request, pk):
     return redirect("my_profile")
 
 
+def pending_changes_for_lot(user, lot):
+    from community.models import AccountChangeRequest
+
+    return (
+        AccountChangeRequest.objects.for_user(user)
+        .filter(account__lot=lot, state="pending")
+        .select_related("contact__person", "requested_by")
+    )
+
+
 def account_context(user, lot) -> dict:
     """Current and dormant accounts of a lot, with their people (board view)."""
     with system_access("accounts on the lot page"):
@@ -136,6 +146,8 @@ def account_context(user, lot) -> dict:
         "contact_kinds": [(k.value, k.label, CONTACT_KIND_HELP[k]) for k in ContactKind],
         "people_choices": people,
         "can_manage_accounts": policy.can(user, "account.manage"),
+        "pending_changes": pending_changes_for_lot(user, lot),
+        "can_approve_changes": policy.can(user, "account.approve_change"),
     }
 
 
@@ -150,6 +162,89 @@ def my_account_people(user, lot_id) -> dict:
             AccountContact.objects.filter(account=account).active().select_related("person")
         )
     return {"account": account, "owners": owners, "contacts": contacts}
+
+
+@login_required
+@require_POST
+def account_change_request(request, pk):
+    """Owner: ask the board to add or remove someone on their account."""
+    from community.models import AccountChangeAction
+
+    policy.require(request.user, "account.request_change")
+    account = get_object_or_404(Account.objects.for_user(request.user), pk=pk)
+    contact = None
+    action = request.POST.get("action", "")
+    if action == AccountChangeAction.REMOVE:
+        contact = get_object_or_404(
+            AccountContact.objects.for_user(request.user), pk=request.POST.get("contact")
+        )
+    _flash(
+        request,
+        lambda: services.request_account_change(
+            account,
+            action=action,
+            kind=request.POST.get("kind", ""),
+            name=request.POST.get("name", ""),
+            email=request.POST.get("email", ""),
+            contact=contact,
+            reason=request.POST.get("reason", ""),
+            actor=request.user,
+            request=request,
+        ),
+        "Sent to the board for approval. You'll see the result here.",
+    )
+    return redirect("my_lot")
+
+
+@login_required
+@require_POST
+def account_change_withdraw(request, pk):
+    from community.models import AccountChangeRequest
+
+    change = get_object_or_404(AccountChangeRequest.objects.for_user(request.user), pk=pk)
+    _flash(
+        request,
+        lambda: services.withdraw_account_change(change, actor=request.user, request=request),
+        "Request withdrawn.",
+    )
+    return redirect("my_lot")
+
+
+@login_required
+@require_POST
+def account_change_decide(request, pk, decision):
+    from community.models import AccountChangeRequest
+
+    policy.require(request.user, "account.approve_change")
+    change = get_object_or_404(AccountChangeRequest.objects.for_user(request.user), pk=pk)
+    _flash(
+        request,
+        lambda: services.decide_account_change(
+            change,
+            approve=decision == "approve",
+            note=request.POST.get("note", ""),
+            actor=request.user,
+            request=request,
+        ),
+        "Approved: the account is updated." if decision == "approve" else "Declined.",
+    )
+    return redirect("lot_detail", pk=change.account.lot_id)
+
+
+def owner_account_panel(user, lot_id) -> dict:
+    """My home: who is on the account and the owner's change requests."""
+    from community.models import AccountChangeRequest
+
+    data = my_account_people(user, lot_id)
+    if not data:
+        return {}
+    data["changes"] = AccountChangeRequest.objects.for_user(user).filter(account=data["account"])[
+        :10
+    ]
+    data["can_request"] = lot_id in policy.roles_for(user).owned_lot_ids and policy.can(
+        user, "account.request_change"
+    )
+    return data
 
 
 @login_required

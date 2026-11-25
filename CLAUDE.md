@@ -40,6 +40,7 @@ This file is the source of truth for architecture and rules. If a task conflicts
 - Permissions live in one map in `core/policy.py`. For now every board member can perform every board action. Every action must remain performable by at least two people with MFA; the app warns when it is not.
 - No self-grants. Granting sysadmin needs a nominator and a different approving board member; revoking needs one. Invitations grant nothing: they only link a login to an existing Person.
 - Owner access derives from an active `Ownership` record (person to lot, with start and end dates). Ending an ownership removes access automatically; history stays on the lot.
+- Board members are homeowners first: their ownership is recorded like anyone's (register import, or by another board member), and board rights from the seat stack on top. The menu shows a Homeowner section and a Board section; ending a seat removes only the board side.
 - Accounts (Milestone 3): an `Account` is one ownership period of a lot (numbered; dormant once the lot is sold). People not on the deed attach as `AccountContact` with a kind: authorized (sees the account, raises requests), view_only (sees, cannot act), tenant (community pages and own requests, no balance or votes). Contacts are added only by the board or manager.
 - Former owners keep a read-only login that shows only their own records from their ownership period (`/my-history/`, `history.view_own`); services refuse any change from them (`community.services._refuse_read_only`). Nothing after the sale, and no current community pages.
 - Every model that belongs to a lot or person must be reachable only through a scoped manager/queryset (e.g. `Model.objects.for_user(user)`). The default manager must not return unscoped data to owner-facing views. Views must never fetch by bare primary key without scoping.
@@ -107,6 +108,9 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Web/worker refuse to run as the DB owner: `python manage.py check_db_role` (run by the entrypoint)
 - File store write/read/delete probe: `python manage.py check_storage`
 - What the database holds (counts only, no personal data): `python manage.py data_status`
+- Load the lot and owner register (go-live; check, then `--commit`): `python manage.py import_register register.csv` (template `docs/examples/register-template.csv`; real file never in the repo)
+- On a fictional-data POC, attach yourself to a demo lot: `python manage.py demo_make_me_owner --email you@... --lot N`
+- Lists with an owner side and a board side use `?mine=1` (`core.scoping.own_records`); the Homeowner menu links there
 - Threads on requests, ARC, violations and work orders: `comms.threads` (subject fetched through its own scoping; `internal` notes staff-only and hidden from recused reviewers; emails carry a link only). Render with `{% thread_panel kind obj %}`; follow-up dates with `{% follow_up_form kind obj %}`
 - New governing rule: add its `RuleSpec` in `community/rules.py` and its PA guidance in `community/pa_law.py` (a test fails otherwise); add a `fallback` only where the statute itself supplies the value
 - My items queue (`core/my_items.py`): add new "waiting on someone" work there, from scoped queries

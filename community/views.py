@@ -56,13 +56,24 @@ def _invalid(request, form, to: str) -> object:
 def my_lot(request):
     policy.require(request.user, "lot.view_own")
     roles = policy.roles_for(request.user)
+    from community.account_views import owner_account_panel
+    from community.models import CONTACT_KIND_HELP, ContactKind
+
     lots = Lot.objects.for_user(request.user).filter(pk__in=roles.account_lot_ids)
-    owners = Ownership.objects.for_user(request.user).select_related("person")
+    owners = Ownership.objects.for_user(request.user).active().select_related("person")
     return render(
         request,
         "community/my_lot.html",
         {
-            "lots": [(lot, [o for o in owners if o.lot_id == lot.pk]) for lot in lots],
+            "lots": [
+                (
+                    lot,
+                    [o for o in owners if o.lot_id == lot.pk],
+                    owner_account_panel(request.user, lot.pk),
+                )
+                for lot in lots
+            ],
+            "contact_kinds": [(k.value, k.label, CONTACT_KIND_HELP[k]) for k in ContactKind],
         },
     )
 

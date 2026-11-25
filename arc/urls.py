@@ -3,6 +3,7 @@ from django.urls import path, re_path
 from arc import views
 
 urlpatterns = [
+    path("board/arc-types/", views.project_types, name="arc_project_types"),
     path("arc/", views.arc_list, name="arc_list"),
     path("arc/<int:pk>/", views.arc_detail, name="arc_detail"),
     re_path(r"^arc/(?P<pk>[0-9]+)/do/(?P<action>[a-z_]+)/$", views.arc_action, name="arc_action"),

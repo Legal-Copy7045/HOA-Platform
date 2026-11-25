@@ -39,3 +39,12 @@
 - feature: "Community settings show PA law guidance (source, statute, example); statutory fallbacks for meeting notice, quorum and resale deadline"
   since: M3
   match: ["^unit:community/tests/test_pa_law"]
+- feature: "Separate Homeowner and Board menus (Dashboard, My home, own ARC/notices/requests); owners ask the board to add or remove people on their account; POC command to test as an owner"
+  since: M3
+  match: ["^unit:community/tests/test_owner_side.py::test_(menu|board_owner|owner_only|my_lot_moved|owner_asks|requester_on|only_owners|other_owners|owner_withdraws|demo_make)"]
+- feature: "ARC project types configured by the board; owners choose one"
+  since: M3
+  match: ["^unit:community/tests/test_owner_side.py::test_(board_configures|retired_types)"]
+- feature: "Lot and owner register import (check, then commit; links the first officer by email); board members are homeowners first and keep it after leaving the board"
+  since: M3
+  match: ["^unit:community/tests/test_register_and_board_owners"]

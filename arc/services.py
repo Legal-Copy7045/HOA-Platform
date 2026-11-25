@@ -186,6 +186,10 @@ def create_request(
         raise ArcError("You can only apply for a lot you own.")
     if not title.strip() or not description.strip():
         raise ArcError("Describe the project.")
+    project_type = (project_type or "").strip()
+    types = active_project_types()
+    if types and project_type not in {t.name for t in types}:
+        raise ArcError("Choose the kind of project.")
     with system_access("create arc request"):
         applicant = Person.objects.get(user=actor)
         drafts = ArcRequest.objects.filter(applicant=applicant, state=ArcState.DRAFT).count()
@@ -443,3 +447,56 @@ def decision_letter(req: ArcRequest, decision: Decision) -> bytes:
 def assert_decision_action_not_generic(action: str) -> None:
     if action in DECISION_ACTIONS:
         raise WorkflowError("Use the decision form for this step.")
+
+
+# --- Project types (board-configured) ---------------------------------------------------
+
+from arc.models import ArcProjectType  # noqa: E402
+
+
+def active_project_types():
+    return list(ArcProjectType.objects.filter(active=True))
+
+
+def save_project_type(
+    *,
+    name: str,
+    guidance: str = "",
+    citation: str = "",
+    active: bool = True,
+    sort_order: int = 100,
+    project_type: ArcProjectType | None = None,
+    actor,
+    request=None,
+) -> ArcProjectType:
+    """Add or change a project type. Renaming keeps old requests' recorded name."""
+    require(actor, "arc.configure")
+    name = " ".join((name or "").split())[:60]
+    if not name:
+        raise ArcError("A project type needs a name.")
+    from django.db import IntegrityError
+
+    fields = {
+        "name": name,
+        "guidance": (guidance or "").strip()[:4000],
+        "citation": " ".join((citation or "").split())[:200],
+        "active": bool(active),
+        "sort_order": max(0, min(int(sort_order or 100), 999)),
+    }
+    try:
+        with transaction.atomic():
+            if project_type is None:
+                project_type = ArcProjectType.objects.create(**fields)
+            else:
+                ArcProjectType.objects.filter(pk=project_type.pk).update(**fields)
+                project_type.refresh_from_db()
+    except IntegrityError as exc:
+        raise ArcError("A project type with that name already exists.") from exc
+    record_event(
+        "arc.project_type_saved",
+        actor=actor,
+        request=request,
+        target=project_type,
+        metadata={"active": project_type.active},
+    )
+    return project_type

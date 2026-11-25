@@ -51,9 +51,23 @@ def violations(request):
         else:
             messages.error(request, "Check the form.")
         return redirect("violations")
+    from core.scoping import own_records, wants_mine
+
+    staff = policy.can(request.user, "violation.view_all")
+    mine = wants_mine(request) or not staff
     rows = Violation.objects.for_user(request.user).select_related("lot")
+    if mine and staff:
+        rows = own_records(rows, request.user)
     return render(
-        request, "compliance/list.html", {"rows": rows, "form": form, "can_manage": can_manage}
+        request,
+        "compliance/list.html",
+        {
+            "rows": rows,
+            "form": form,
+            "can_manage": can_manage and not mine,
+            "mine": mine,
+            "staff": staff,
+        },
     )
 
 

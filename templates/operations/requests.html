@@ -3,14 +3,15 @@
 {% block title %}Requests · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>{% if staff %}Owner requests{% else %}My requests{% endif %}</h1>
-    <p class="subtitle">{% if staff %}Questions and reports from owners, contacts and tenants. Each type has a response target set in Community settings.{% else %}Ask a question or report a problem. We'll reply here and email you a link.{% endif %}</p></div></div>
+    <p class="subtitle">{% if staff %}Questions and reports from owners, contacts and tenants. Each type has a response target set in Community settings.{% else %}Ask a question or report a problem. We'll reply here and email you a link.{% endif %}</p></div>
+    {% if is_staff and user|can:"request.submit" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'requests' %}">All owner requests</a>{% else %}<a class="btn secondary" href="{% url 'requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
   <div class="split">
     <div>
       <nav class="subnav" aria-label="Filter">
-        <a href="?show=open"{% if show == "open" %} aria-current="page"{% endif %}>Open</a>
-        <a href="?show=closed"{% if show == "closed" %} aria-current="page"{% endif %}>Closed</a>
-        <a href="?show=all"{% if show == "all" %} aria-current="page"{% endif %}>All</a>
-        {% if staff %}<a href="?show={{ show }}&amp;mine=1"{% if request.GET.mine == "1" %} aria-current="page"{% endif %}>Assigned to me</a>{% endif %}
+        <a href="?show=open{% if mine %}&amp;mine=1{% endif %}"{% if show == "open" %} aria-current="page"{% endif %}>Open</a>
+        <a href="?show=closed{% if mine %}&amp;mine=1{% endif %}"{% if show == "closed" %} aria-current="page"{% endif %}>Closed</a>
+        <a href="?show=all{% if mine %}&amp;mine=1{% endif %}"{% if show == "all" %} aria-current="page"{% endif %}>All</a>
+        {% if staff %}<a href="?show={{ show }}&amp;assigned=1"{% if request.GET.assigned == "1" %} aria-current="page"{% endif %}>Assigned to me</a>{% endif %}
       </nav>
       <section class="card">
         {% if page.object_list %}

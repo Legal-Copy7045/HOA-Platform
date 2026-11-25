@@ -302,6 +302,29 @@ class Command(BaseCommand):
             internal=True,
             actor=b1,
         )
+        # ARC project types owners choose from (Milestone 3).
+        from arc import services as arc_services
+
+        for order, (name, guidance) in enumerate(
+            [
+                ("Fence", "Plot plan with location, height, material and colour."),
+                ("Shed or outbuilding", "Plot plan, size, materials and colours."),
+                ("Deck or patio", "Drawing with dimensions, materials and setbacks."),
+                ("Exterior paint or colour change", "Colour samples for body, trim and doors."),
+                ("Roofing", "Material and colour."),
+                ("Landscaping or hardscaping", "Sketch of the area and plant list."),
+                ("Solar panels", "Panel layout and mounting details."),
+                ("Other", "Describe the project and attach drawings or photos."),
+            ]
+        ):
+            arc_services.save_project_type(
+                name=name,
+                guidance=guidance,
+                citation="ARC guidelines (demo)",
+                sort_order=(order + 1) * 10,
+                actor=b1,
+            )
+
         # Committees with a space (Milestone 3).
         social = governance.create_committee(
             name="Social",

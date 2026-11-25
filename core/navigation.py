@@ -11,20 +11,20 @@ from core.my_items import MY_ITEMS_PERMISSIONS
 # (label, url name, icon, permission or tuple of alternatives; None = everyone)
 SECTIONS = [
     (
-        "My home",
+        "",
         [
-            ("Home", "home", "home", None),
-            (
-                "My items",
-                "my_items",
-                "inbox",
-                MY_ITEMS_PERMISSIONS,
-            ),
-            ("My lot", "my_lot", "pin", "lot.view_own"),
+            ("Dashboard", "home", "home", None),
+            ("My items", "my_items", "inbox", MY_ITEMS_PERMISSIONS),
+        ],
+    ),
+    (
+        "Homeowner",
+        [
+            ("My home", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
-            ("Architectural requests", "arc_list", "pencil", "arc.submit"),
-            ("Notices about my lot", "violations", "flag", "lot.view_own"),
-            ("My requests", "requests", "mail", "request.view_own"),
+            ("My architectural requests", "arc_list?mine=1", "pencil", "arc.submit"),
+            ("Notices about my home", "violations?mine=1", "flag", "lot.view_own"),
+            ("My requests", "requests?mine=1", "mail", "request.view_own"),
             ("My history", "my_history", "clock", "history.view_own"),
         ],
     ),
@@ -54,6 +54,7 @@ SECTIONS = [
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
             ("Tasks", "tasks", "list", "task.manage"),
             ("Community settings", "community_settings", "sliders", "lot.view_all"),
+            ("ARC request types", "arc_project_types", "pencil", "arc.configure"),
         ],
     ),
     (
@@ -109,15 +110,20 @@ def build(request) -> dict:
         for label, name, icon, permission in items:
             if name in seen or not _allowed(roles.groups, permission):
                 continue
+            url_name, _, query = name.partition("?")
             try:
-                url = reverse(name)
+                url = reverse(url_name) + (f"?{query}" if query else "")
             except NoReverseMatch:
                 continue
             seen.add(name)
             item = {"label": label, "url": url, "icon": icon, "current": False}
-            matches = (url == "/" and path == "/") or (url != "/" and path.startswith(url))
-            if matches and len(url) > len(best[0]):
-                best = (url, item)
+            base, _, query = url.partition("?")
+            here_mine = request.GET.get("mine") == "1"
+            matches = (base == "/" and path == "/") or (
+                base != "/" and path.startswith(base) and (("mine=1" in query) == here_mine)
+            )
+            if matches and len(base) > len(best[0]):
+                best = (base, item)
             visible.append(item)
         if visible:
             sections.append({"title": title, "items": visible})

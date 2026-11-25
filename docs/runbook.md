@@ -31,7 +31,26 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
 
    Open the printed link, choose a password, then enroll a passkey or an
    authenticator app. Save the recovery codes it shows.
-3. Optional demo data (fictional, POC only):
+3. Load the lot and owner register (real deployments). Every board member,
+   you included, is in it as a homeowner; the board seat is added on top.
+   Use the email you bootstrapped with so your own ownership attaches to
+   your login. Start from `docs/examples/register-template.csv`, keep the
+   real file off the repository, check first, then write:
+
+   ```bash
+   dc exec web python manage.py import_register /tmp/register.csv
+   dc exec web python manage.py import_register /tmp/register.csv --commit
+   ```
+
+   Delete the file from the server afterwards. Later changes of owner go
+   through a transfer on the lot page; a board member's own ownership is
+   recorded by another board member (no self-grants).
+
+   On a POC seeded with fictional data instead, attach yourself to a demo lot
+   to test the homeowner side with your own login:
+   `dc exec web python manage.py demo_make_me_owner --email you@example.org --lot 5`
+
+4. Optional demo data (fictional, POC only, instead of step 3):
 
    ```bash
    dc exec web python manage.py seed_demo
@@ -41,7 +60,7 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
    instead, nothing is saved (it runs as one transaction). Check what the
    database holds with `dc exec web python manage.py data_status`.
 
-4. Invite a second board member as soon as possible: the board page warns
+5. Invite a second board member as soon as possible: the board page warns
    until at least two people with MFA can perform every action.
 
 ## Deploying an update

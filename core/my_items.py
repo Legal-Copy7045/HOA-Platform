@@ -34,6 +34,7 @@ class Item:
 # Who has a queue page (staff); owners see items waiting on them on Home.
 MY_ITEMS_PERMISSIONS = (
     "request.manage",
+    "account.approve_change",
     "invoice.approve",
     "arc.intake",
     "arc.decide",
@@ -137,6 +138,26 @@ def items_for(user) -> list[Item]:
                         "warning",
                     )
                 )
+
+    if can(user, "account.approve_change"):
+        from community.models import AccountChangeRequest
+
+        for ch in (
+            AccountChangeRequest.objects.for_user(user)
+            .filter(state="pending")
+            .exclude(requested_by=user)
+            .select_related("account__lot")
+        ):
+            out.append(
+                Item(
+                    "Approvals",
+                    f"Lot {ch.account.lot.number}: {ch.get_action_display().lower()}"
+                    " on the account",
+                    "An owner asked for this change",
+                    reverse("lot_detail", args=[ch.account.lot_id]) + "#accounts",
+                    "warning",
+                )
+            )
 
     # Architectural review: intake, and requests I must still take a position on.
     if can(user, "arc.view_all"):

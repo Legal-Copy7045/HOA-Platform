@@ -4,6 +4,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from comms import threads
@@ -44,14 +45,19 @@ def requests_list(request):
         qs = qs.filter(state__in=OPEN_REQUEST_STATES)
     elif show == "closed":
         qs = qs.exclude(state__in=OPEN_REQUEST_STATES)
-    if staff and request.GET.get("mine") == "1":
+    from core.scoping import own_records, wants_mine
+
+    mine = wants_mine(request) or not staff
+    if mine and staff:
+        qs = own_records(qs, user)
+    if staff and not mine and request.GET.get("assigned") == "1":
         person = Person.objects.for_user(user).filter(user=user).first()
         qs = qs.filter(assignee=person)
     kind = request.GET.get("type")
     if kind in RequestType.values:
         qs = qs.filter(request_type=kind)
     form = None
-    if policy.can(user, "request.submit"):
+    if mine and policy.can(user, "request.submit"):
         lots = services.request_lots(user)
         if lots:
             form = RequestForm(request.POST or None, lots=lots)
@@ -71,15 +77,20 @@ def requests_list(request):
                 else:
                     messages.success(request, "Request sent. You'll get an email when we reply.")
                     return redirect("request_detail", pk=req.pk)
+            if request.method == "POST":
+                return redirect(reverse("requests") + "?mine=1")
     elif request.method == "POST":
         policy.require(user, "request.submit")
+        return redirect(reverse("requests") + "?mine=1")
     return render(
         request,
         "operations/requests.html",
         {
             "page": paginate(request, qs),
             "show": show,
-            "staff": staff,
+            "staff": staff and not mine,
+            "is_staff": staff,
+            "mine": mine,
             "form": form,
             "types": RequestType.choices,
             "type": kind,

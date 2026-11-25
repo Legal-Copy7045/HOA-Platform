@@ -18,7 +18,7 @@ from documents.services import DocumentError
 class NewRequestForm(forms.Form):
     lot = forms.ModelChoiceField(queryset=Lot.objects.none())
     title = forms.CharField(max_length=200, help_text="e.g. 'Rear fence, 4 ft black aluminium'")
-    project_type = forms.CharField(max_length=60, required=False)
+    project_type = forms.ChoiceField(label="Kind of project", required=False)
     description = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 5}),
         help_text="Materials, colours, dimensions, location, contractor.",
@@ -30,6 +30,18 @@ class NewRequestForm(forms.Form):
         self.fields["lot"].queryset = Lot.objects.for_user(user).filter(
             pk__in=policy.roles_for(user).owned_lot_ids
         )
+        types = services.active_project_types()
+        if types:
+            self.fields["project_type"].required = True
+            self.fields["project_type"].choices = [("", "Choose...")] + [
+                (t.name, t.name) for t in types
+            ]
+            guidance = "; ".join(f"{t.name}: {t.guidance}" for t in types if t.guidance)
+            self.fields["project_type"].help_text = guidance[:600]
+        else:
+            self.fields["project_type"] = forms.CharField(
+                max_length=60, required=False, label="Kind of project"
+            )
 
 
 class DecisionForm(forms.Form):
@@ -80,11 +92,22 @@ def arc_list(request):
         else:
             messages.error(request, "Check the form.")
         return redirect("arc_list")
+    from core.scoping import own_records, wants_mine
+
+    mine = wants_mine(request) or not can_view_all
     rows = ArcRequest.objects.for_user(request.user).select_related("lot")
+    if mine and can_view_all:
+        rows = own_records(rows, request.user)
     return render(
         request,
         "arc/list.html",
-        {"rows": rows, "form": form, "can_submit": can_submit, "can_view_all": can_view_all},
+        {
+            "rows": rows,
+            "form": form,
+            "can_submit": can_submit and mine,
+            "can_view_all": can_view_all,
+            "mine": mine,
+        },
     )
 
 
@@ -256,3 +279,35 @@ def arc_affected(request, pk):
     else:
         messages.success(request, "Affected lots recorded.")
     return redirect("arc_detail", pk=req.pk)
+
+
+@login_required
+def project_types(request):
+    """Board: the project types owners choose from."""
+    from arc.models import ArcProjectType
+
+    policy.require(request.user, "arc.configure")
+    if request.method == "POST":
+        existing = None
+        if request.POST.get("pk"):
+            existing = get_object_or_404(ArcProjectType, pk=request.POST["pk"])
+        try:
+            services.save_project_type(
+                name=request.POST.get("name", ""),
+                guidance=request.POST.get("guidance", ""),
+                citation=request.POST.get("citation", ""),
+                active=request.POST.get("active") == "on",
+                sort_order=request.POST.get("sort_order") or 100,
+                project_type=existing,
+                actor=request.user,
+                request=request,
+            )
+        except (services.ArcError, ValueError) as exc:
+            messages.error(
+                request,
+                str(exc) if isinstance(exc, services.ArcError) else "Check the order number.",
+            )
+        else:
+            messages.success(request, "Project type saved.")
+        return redirect("arc_project_types")
+    return render(request, "arc/project_types.html", {"types": ArcProjectType.objects.all()})

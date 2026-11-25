@@ -103,6 +103,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "arc.intake": frozenset({BOARD, ARC_REVIEWER, MANAGER}),
     "arc.decide": frozenset({ARC_REVIEWER}),
     "arc.appeal_decide": frozenset({BOARD}),
+    "arc.configure": frozenset({BOARD}),
     # Compliance
     "violation.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
     "violation.manage": frozenset({BOARD, MANAGER}),
@@ -123,6 +124,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "ledger.view_own": ACCOUNT_VIEWERS,
     "history.view_own": frozenset({FORMER_OWNER}),
     "account.manage": frozenset({BOARD, MANAGER}),
+    # Owners (on the deed) ask to add or remove people; the board approves.
+    "account.request_change": frozenset({OWNER}),
+    "account.approve_change": frozenset({BOARD}),
     # Committees: the board creates them and appoints members; members work
     # in their own committee's space (checked per committee in governance).
     "committee.view": frozenset({BOARD, MANAGER, AUDITOR, COMMITTEE_MEMBER}),

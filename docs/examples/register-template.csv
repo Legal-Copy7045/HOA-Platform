@@ -1,0 +1,5 @@
+lot,street_address,owner_name,owner_email,owner_since,ownership_type
+1,100 Example Lane,Pat Example,pat@example.com,2019-06-14,sole
+2,102 Example Lane,Sam Sample,sam@example.com,2021-03-02,joint
+2,102 Example Lane,Alex Sample,,2021-03-02,joint
+3,104 Example Lane,Example Family Trust,,2015-09-30,trust

@@ -1,4 +1,5 @@
 from django.urls import path, re_path
+from django.views.generic import RedirectView
 
 from community import account_views, branding_views, views
 
@@ -9,8 +10,24 @@ urlpatterns = [
         branding_views.login_background_image,
         name="login_background_image",
     ),
-    path("my-lot/", views.my_lot, name="my_lot"),
+    path("my-home/", views.my_lot, name="my_lot"),
+    path("my-lot/", RedirectView.as_view(pattern_name="my_lot", permanent=False)),
     path("my-history/", account_views.my_history, name="my_history"),
+    path(
+        "my-home/accounts/<int:pk>/change/",
+        account_views.account_change_request,
+        name="account_change_request",
+    ),
+    path(
+        "my-home/changes/<int:pk>/withdraw/",
+        account_views.account_change_withdraw,
+        name="account_change_withdraw",
+    ),
+    re_path(
+        r"^board/account-changes/(?P<pk>[0-9]+)/(?P<decision>approve|decline)/$",
+        account_views.account_change_decide,
+        name="account_change_decide",
+    ),
     path("account/contacts/add/", account_views.contact_method_add, name="contact_method_add"),
     path(
         "account/contacts/<int:pk>/remove/",

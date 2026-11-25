@@ -68,6 +68,7 @@ BOARD_ONLY_MARKERS = (
     b"Lot B leaking gutter",
     b"Board note on lot B",
     b"Lot B pond",
+    b"Lot B nephew",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -94,6 +95,10 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "account_change_request": ("POST", "account_b"),
+    "account_change_withdraw": ("POST", "change_b"),
+    "account_change_decide": ("POST", "change_b"),
+    "arc_project_types": ("GET", None),
     "committees": ("GET", None),
     "committee_detail": ("GET", "committee_b"),
     "committee_action": ("POST", "committee_b"),
@@ -340,6 +345,9 @@ def world():
         task_b = gov.add_committee_task(committee_b, title="Lot B pond task", actor=owner_b)
         membership_b = CommitteeMembership.objects.unscoped("t").get(person=person_b)
         account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
+        change_b = services.request_account_change(
+            account_b, action="add", name="Lot B nephew", kind="view_only", actor=owner_b
+        )
         contact_b = services.add_account_contact(
             account_b,
             person=services.record_person(display_name="Lot B tenant", actor=SYSTEM),
@@ -351,6 +359,7 @@ def world():
         )
     targets = {
         "account_b": account_b.pk,
+        "change_b": change_b.pk,
         "request_b": request_b.pk,
         "committee_b": committee_b.pk,
         "topic_b": topic_b.pk,
@@ -434,6 +443,8 @@ def _url(name, key, targets):
         kwargs["file_id"] = targets["violation_b_file"]
     elif name == "request_action":
         kwargs["action"] = "withdraw"
+    elif name == "account_change_decide":
+        kwargs["decision"] = "approve"
     elif name == "committee_action":
         kwargs["action"] = "topic"
     elif name == "committee_task_close":

@@ -646,3 +646,61 @@ class ContactMethod(ScopedModel):
 
     def __str__(self) -> str:
         return f"{self.get_kind_display()} for person #{self.person_id}"
+
+
+class AccountChangeAction(models.TextChoices):
+    ADD = "add", "Add someone"
+    REMOVE = "remove", "Remove someone"
+
+
+class AccountChangeState(models.TextChoices):
+    PENDING = "pending", "Waiting for the board"
+    APPROVED = "approved", "Approved"
+    DECLINED = "declined", "Declined"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+
+
+class AccountChangeRequest(NeverDeleteMixin, ScopedModel):
+    """An owner asks to add or remove a contact on their account; a board
+    member (not the requester) approves or declines. Approval makes the
+    change through the normal services, so it is audited the same way."""
+
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="change_requests")
+    action = models.CharField(max_length=8, choices=AccountChangeAction.choices)
+    kind = models.CharField(max_length=12, choices=ContactKind.choices, blank=True)
+    # For "add": who to add (a new person record is created on approval).
+    name = models.CharField(max_length=200, blank=True)
+    email = models.EmailField(blank=True)
+    # For "remove": which contact.
+    contact = models.ForeignKey(
+        AccountContact, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    reason = models.TextField(blank=True)
+    state = models.CharField(
+        max_length=10, choices=AccountChangeState.choices, default=AccountChangeState.PENDING
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True)
+
+    objects = ScopedQuerySet.as_manager()
+    scope_lot_path = "account__lot"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Owners of the account's lot see its change requests."""
+        return queryset.filter(
+            account__lot_id__in=roles.owned_lot_ids, account__closed_on__isnull=True
+        )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Account change #{self.pk}"

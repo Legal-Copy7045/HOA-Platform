@@ -112,6 +112,13 @@ _SPECS = [
     _spec("request.work_order_created", "Work order created from a request", "work_order_id"),
     _spec("thread.message_posted", "Thread message posted", "kind", "object_id", "internal"),
     _spec("followup.set", "Follow-up date set", "kind", "object_id", "on"),
+    _spec("account.change_requested", "Account change requested", "action", "kind"),
+    _spec("account.change_decided", "Account change decided", "action", "decision"),
+    _spec("account.change_withdrawn", "Account change withdrawn", "action"),
+    _spec("arc.project_type_saved", "ARC project type saved", "active"),
+    _spec(
+        "register.imported", "Lot and owner register imported", "lots", "owners", "people_created"
+    ),
     _spec("committee.created", "Committee created"),
     _spec("committee.retired", "Committee retired"),
     _spec("committee.reactivated", "Committee reactivated"),
