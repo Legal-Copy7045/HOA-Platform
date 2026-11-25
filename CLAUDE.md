@@ -103,6 +103,7 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Workflows: declare transitions with `core.workflow.Workflow`; decisions that create records go through a service, not the generic action URL
 - Break-glass (sysadmin, audited): `breakglass_end_ownership`, `breakglass_end_role`, `breakglass_lock_user`, `breakglass_enrollment_code` (only while fewer than two other board members can sign in), `rescan_files`, each with `--actor` and `--reason`
 - Web/worker refuse to run as the DB owner: `python manage.py check_db_role` (run by the entrypoint)
+- File store write/read/delete probe: `python manage.py check_storage`
 - Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
 - Security review findings and fixes: `docs/security-review-2026-11.md`
 - POC VM: see `infra/poc/README.md` and `docs/runbook.md`

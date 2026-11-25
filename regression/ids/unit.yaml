@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-714
+# highest issued: UNIT-716
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -715,3 +715,5 @@ UNIT-711: "community/tests/test_branding.py::test_only_the_current_picture_is_se
 UNIT-712: "community/tests/test_branding.py::test_phone_picture_is_used_on_small_screens"
 UNIT-713: "community/tests/test_branding.py::test_phone_picture_alone_serves_both"
 UNIT-714: "community/tests/test_branding.py::test_unknown_variant_is_refused"
+UNIT-715: "core/tests/test_logging.py::test_storage_error_codes_are_logged_without_the_message"
+UNIT-716: "core/tests/test_logging.py::test_uploads_send_checksums_only_when_required"

@@ -74,6 +74,20 @@ dc exec web python manage.py check_coverage
 systemctl list-timers hoa-cloudflared-update.timer
 ```
 
+File store (writes, reads and deletes a small probe file; prints the store's
+error code if it fails):
+
+```bash
+dc exec web python manage.py check_storage
+```
+
+When something fails, the error log names the exception and, for the file
+store or other APIs, its short error code (`exc_code`), never the message:
+
+```bash
+dc logs --since 2h web | grep '"level": "ERROR"' | tail -3
+```
+
 ## Email (Hostinger)
 
 1. Create a dedicated mailbox, e.g. `portal@oakcreekhoa.com`.

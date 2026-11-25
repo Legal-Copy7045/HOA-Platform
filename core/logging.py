@@ -35,6 +35,9 @@ class JsonFormatter(logging.Formatter):
             # Type and frame locations only: exception messages and source lines can
             # echo user input or data.
             payload["exc_type"] = record.exc_info[0].__name__
+            code = _error_code(record.exc_info[1])
+            if code:
+                payload["exc_code"] = code
             payload["exc_frames"] = [
                 f"{frame.filename}:{frame.lineno} in {frame.name}"
                 for frame in traceback.extract_tb(record.exc_info[2])
@@ -64,3 +67,13 @@ def _request_summary(request) -> dict:
         "view": getattr(match, "view_name", None),
         "request_id": getattr(request, "request_id", None),
     }
+
+
+def _error_code(exc) -> str:
+    """A storage or API error's short code (e.g. "AccessDenied"): says what
+    went wrong without the message, which can echo data."""
+    response = getattr(exc, "response", None)
+    if not isinstance(response, dict):
+        return ""
+    code = str((response.get("Error") or {}).get("Code") or "")
+    return code if code.replace(".", "").replace("_", "").isalnum() and len(code) <= 64 else ""

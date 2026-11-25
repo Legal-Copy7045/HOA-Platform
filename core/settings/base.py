@@ -8,6 +8,7 @@ choice; local.py relaxes only what plain-HTTP localhost development needs.
 from pathlib import Path
 
 import environ
+from botocore.config import Config as BotoConfig
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -233,6 +234,13 @@ STORAGES = {
             "querystring_auth": True,
             "querystring_expire": env.int("S3_SIGNED_URL_TTL_SECONDS", default=300),
             "file_overwrite": False,
+            # Send upload checksums only when the store requires them. Newer
+            # boto3 adds one to every upload by default, which S3-compatible
+            # stores such as SeaweedFS can reject (POC, 2026-11).
+            "client_config": BotoConfig(
+                request_checksum_calculation=env("S3_CHECKSUMS", default="when_required"),
+                response_checksum_validation=env("S3_CHECKSUMS", default="when_required"),
+            ),
         },
     },
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
