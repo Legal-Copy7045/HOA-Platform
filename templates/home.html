@@ -1,27 +1,98 @@
 {% extends "base.html" %}
+{% load portal %}
+{% block title %}Home · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>{{ SITE_NAME }} portal</h1>
-  {% if user.is_authenticated %}
-    <ul class="tiles">
-      {% if can.lot_view_own %}<li><a href="{% url 'my_lot' %}">My lot</a> <span class="muted">your lot and its owners</span></li>{% endif %}
-      {% if can.lot_view_all %}<li><a href="{% url 'lot_list' %}">All lots</a> <span class="muted">every lot and its current owners</span></li>{% endif %}
-      {% if can.person_manage %}<li><a href="{% url 'board_home' %}">Board</a> <span class="muted">people, ownership, seats, roles, invitations, approvals</span></li>{% endif %}
-      {% if can.audit_view_sysadmin_activity %}<li><a href="{% url 'sysadmin_activity' %}">Sysadmin activity</a> <span class="muted">everything system administrators did</span></li>{% endif %}
-      {% if can.system_view_status %}<li><a href="{% url 'system_status' %}">System status</a></li>{% endif %}
-      {% if can.invite_send and not can.person_manage %}<li><a href="{% url 'invitations' %}">Invitations</a></li>{% endif %}
-      <li><a href="{% url 'announcements' %}">Announcements</a> <span class="muted">news from the board</span></li>
-      <li><a href="{% url 'documents' %}">Documents</a> <span class="muted">governing documents, minutes, policies, forms</span></li>
-      <li><a href="{% url 'meetings' %}">Meetings</a> · <a href="{% url 'votes' %}">Votes</a> · <a href="{% url 'resolutions' %}">Resolutions and policies</a> · <a href="{% url 'records_requests' %}">Records requests</a></li>
-      <li><a href="{% url 'calendar' %}">Calendar</a> <span class="muted">meetings and events</span></li>
-      {% if can.lot_view_own %}<li><a href="{% url 'directory' %}">Owner directory</a> <span class="muted">neighbours who chose to be listed</span></li>{% endif %}
-      <li><a href="{% url 'my_profile' %}">My profile</a> <span class="muted">contact details, email notices, directory listing, download my data</span></li>
-      <li><a href="{% url 'mfa_index' %}">Security</a> <span class="muted">passkeys, authenticator app, recovery codes</span></li>
-    </ul>
-    {% if not can.lot_view_own and not can.lot_view_all and not can.person_manage and not can.system_view_status %}
-      <p class="muted">Your account isn't linked to a lot or a role yet. Ask a board member if that's unexpected.</p>
-    {% endif %}
-  {% else %}
-    <p>This portal is for owners and board members of {{ SITE_NAME }}. Accounts are by invitation.</p>
-    <p><a class="button" href="{% url 'account_login' %}">Sign in</a></p>
+{% if not user.is_authenticated %}
+  <h1>Welcome</h1>
+  <p class="muted">This portal is for owners and board members of {{ SITE_NAME }}. Accounts are by invitation from the board.</p>
+  <p><a class="btn" href="{% url 'account_login' %}">Sign in</a></p>
+{% else %}
+  <div class="page-head">
+    <div>
+      <h1>{{ greeting }}, {{ nav.display_name|cut:" (demo)" }}</h1>
+      <p class="subtitle">{% now "l, F j" %}</p>
+    </div>
+  </div>
+
+  {% with o=dash.owner s=dash.staff %}
+  {% if o %}
+    <div class="grid grid-4">
+      {% for a in o.accounts %}
+        <a class="stat {% if a.balance > 0 %}tone-warning{% else %}tone-success{% endif %}" href="{% url 'my_account' %}">
+          <div class="label">Lot {{ a.lot.number }} account</div>
+          <div class="value">{% if a.balance > 0 %}{{ a.balance|cents }}{% elif a.balance < 0 %}{{ a.balance|cents|cut:"-" }}{% else %}$0.00{% endif %}</div>
+          <div class="hint">{% if a.balance > 0 %}due{% elif a.balance < 0 %}in credit{% else %}paid up{% endif %}</div>
+        </a>
+      {% endfor %}
+      <a class="stat" href="{% url 'arc_list' %}"><div class="label">Architectural requests</div><div class="value">{{ o.open_arc }}</div><div class="hint">open</div></a>
+      <a class="stat {% if o.notices %}tone-warning{% endif %}" href="{% url 'violations' %}"><div class="label">Notices</div><div class="value">{{ o.notices }}</div><div class="hint">about your lot</div></a>
+      <a class="stat {% if o.votes %}tone-success{% endif %}" href="{% url 'votes' %}"><div class="label">Open votes</div><div class="value">{{ o.votes }}</div><div class="hint">waiting for your ballot</div></a>
+    </div>
   {% endif %}
+
+  {% if s and s.stats %}
+    <div class="grid grid-4">
+      {% for st in s.stats %}
+        <a class="stat {% if st.tone %}tone-{{ st.tone }}{% endif %}" href="{{ st.url }}"><div class="label">{{ st.label }}</div><div class="value">{% if st.money %}{{ st.value|cents }}{% else %}{{ st.value }}{% endif %}</div>{% if st.hint %}<div class="hint">{{ st.hint }}</div>{% endif %}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="split">
+    <div>
+      <section class="card">
+        <div class="card-head"><h2>Needs your attention</h2></div>
+        {% if s.todos or o.todos %}
+          <ul class="list">
+            {% for t in s.todos %}{% include "partials/todo.html" %}{% endfor %}
+            {% for t in o.todos %}{% include "partials/todo.html" %}{% endfor %}
+          </ul>
+        {% else %}
+          {% include "partials/empty.html" with icon="check-circle" title="You're all caught up" text="Nothing needs you right now." %}
+        {% endif %}
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Latest news</h2><a href="{% url 'announcements' %}" class="small">All announcements</a></div>
+        {% with news=dash.news %}
+        {% if news %}
+          <ul class="list">
+            {% for a, read in news %}
+              <li>{% if not read %}<span class="dot-unread" title="Unread"></span>{% endif %}
+                <div class="grow"><a class="title" href="{% url 'announcement_detail' a.pk %}">{{ a.title }}</a>{% if a.urgent %} <span class="status tone-danger">Urgent</span>{% endif %}<div class="small muted">{{ a.published_at|date:"M j" }}</div></div></li>
+            {% endfor %}
+          </ul>
+        {% else %}{% include "partials/empty.html" with icon="megaphone" title="No announcements yet" %}{% endif %}
+        {% endwith %}
+      </section>
+    </div>
+
+    <aside>
+      <section class="card">
+        <div class="card-head"><h2>Coming up</h2><a href="{% url 'calendar' %}" class="small">Calendar</a></div>
+        {% with events=dash.events %}
+        {% if events %}
+          <ul class="list">
+            {% for e in events %}
+              <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><div class="title">{{ e.title }}</div><div class="small muted">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
+            {% endfor %}
+          </ul>
+        {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
+        {% endwith %}
+      </section>
+      {% if o %}
+        <section class="card">
+          <h2>Quick actions</h2>
+          <ul class="list">
+            <li><a class="title" href="{% url 'arc_list' %}">{% icon "pencil" %} Request approval for a project</a></li>
+            <li><a class="title" href="{% url 'documents' %}">{% icon "folder" %} Governing documents</a></li>
+            <li><a class="title" href="{% url 'my_profile' %}">{% icon "user" %} Update my contact details</a></li>
+            <li><a class="title" href="{% url 'mfa_index' %}">{% icon "lock" %} Passkeys and security</a></li>
+          </ul>
+        </section>
+      {% endif %}
+    </aside>
+  </div>
+  {% endwith %}
+{% endif %}
 {% endblock %}

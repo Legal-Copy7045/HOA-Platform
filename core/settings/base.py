@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.forms",
     "django.contrib.postgres",
     "simple_history",
     "procrastinate.contrib.django",
@@ -102,10 +103,14 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.site",
+                "core.context_processors.navigation",
             ],
         },
     },
 ]
+
+# Forms render through our templates (templates/django/forms/).
+FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 # --- Database ---------------------------------------------------------------
 # DATABASE_URL is the *runtime* (app role) connection. Migrations run in a

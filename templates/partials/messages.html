@@ -1,0 +1,5 @@
+{% load portal %}{% if messages %}
+<ul class="messages" role="status">
+  {% for message in messages %}<li class="message {{ message.tags }}">{% if message.tags == "error" %}{% icon "alert" %}{% elif message.tags == "warning" %}{% icon "alert" %}{% elif message.tags == "success" %}{% icon "check" %}{% else %}{% icon "info" %}{% endif %}<span>{{ message }}</span></li>{% endfor %}
+</ul>
+{% endif %}

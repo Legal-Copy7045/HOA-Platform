@@ -17,3 +17,111 @@ def cents(value) -> str:
     from core.money import format_cents
 
     return format_cents(value) if value is not None else ""
+
+
+@register.simple_tag
+def icon(name: str, extra_class: str = ""):
+    """{% icon "home" %} -> inline <svg> using the self-hosted sprite."""
+    from django.templatetags.static import static
+    from django.utils.html import format_html
+
+    return format_html(
+        '<svg class="icon {}" aria-hidden="true" focusable="false"><use href="{}#{}"></use></svg>',
+        extra_class,
+        static("img/icons.svg"),
+        name,
+    )
+
+
+# Workflow and record states -> (label, tone). Unknown states fall back to a
+# readable label and a neutral tone.
+_TONES = {
+    "success": {
+        "approved",
+        "approved_with_conditions",
+        "paid",
+        "completed",
+        "fulfilled",
+        "issued",
+        "cured",
+        "closed",
+        "held",
+        "adopted",
+        "accepted",
+        "dismissed",
+        "appeal_decided",
+        "done",
+        "clean",
+    },
+    "warning": {
+        "pending_approval",
+        "submitted",
+        "in_review",
+        "in_progress",
+        "noticed",
+        "responded",
+        "hearing",
+        "appeal",
+        "assigned",
+        "reminder_sent",
+        "second_reminder",
+        "payment_plan",
+        "awaiting_approval",
+        "awaiting_code",
+        "open",
+        "pending",
+        "queued",
+        "scheduled",
+        "draft",
+    },
+    "danger": {
+        "denied",
+        "rejected",
+        "upheld",
+        "referred",
+        "expired",
+        "code_expired",
+        "code_locked",
+        "infected",
+        "overdue",
+    },
+    "neutral": {"void", "withdrawn", "cancelled", "revoked", "dropped", "unscanned"},
+}
+_LABELS = {
+    "pending_approval": "Awaiting approval",
+    "in_review": "In review",
+    "noticed": "Notice sent",
+    "approved_with_conditions": "Approved with conditions",
+    "appeal_decided": "Appeal decided",
+    "reminder_sent": "Reminder sent",
+    "second_reminder": "Second reminder",
+    "payment_plan": "Payment plan",
+    "awaiting_approval": "Awaiting approval",
+    "awaiting_code": "Awaiting code",
+    "code_expired": "Code expired",
+    "code_locked": "Locked",
+    "in_progress": "In progress",
+    "submitted": "Submitted",
+    "referred": "Referred to counsel",
+}
+
+
+def status_parts(state: str, label: str | None = None) -> tuple[str, str]:
+    state = (state or "").lower()
+    tone = next((t for t, states in _TONES.items() if state in states), "neutral")
+    text = label or _LABELS.get(state) or state.replace("_", " ").capitalize()
+    return text, tone
+
+
+@register.simple_tag
+def status(state: str, label: str = ""):
+    """{% status obj.state %} -> a coloured, human-readable badge."""
+    from django.utils.html import format_html
+
+    text, tone = status_parts(state, label or None)
+    return format_html('<span class="status tone-{}">{}</span>', tone, text)
+
+
+@register.filter
+def state_label(state: str) -> str:
+    return status_parts(state)[0]

@@ -4,6 +4,7 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.http import HttpRequest, JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from core import policy
@@ -20,21 +21,16 @@ def healthz(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"status": "ok"})
 
 
-HOME_ACTIONS = (
-    "lot.view_own",
-    "lot.view_all",
-    "person.manage",
-    "audit.view_sysadmin_activity",
-    "system.view_status",
-    "invite.send",
-)
-
-
 def home(request):
-    context = {}
-    if request.user.is_authenticated:
-        context["can"] = {a.replace(".", "_"): policy.can(request.user, a) for a in HOME_ACTIONS}
-    return render(request, "home.html", context)
+    if not request.user.is_authenticated:
+        return render(request, "home.html", {})
+    from core import dashboard
+
+    hour = timezone.localtime().hour
+    greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
+    return render(
+        request, "home.html", {"dash": dashboard.build(request.user), "greeting": greeting}
+    )
 
 
 @login_required
