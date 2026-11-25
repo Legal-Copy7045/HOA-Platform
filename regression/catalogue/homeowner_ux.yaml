@@ -1,0 +1,19 @@
+# Homeowner ARC, neighbor acknowledgements, requests, notices and documents (UX review 2026-11-25).
+- feature: "Invalid forms come back with what was typed, a summary naming the fields, errors at each field and the panel open (meetings, resolutions, votes, vendors, work orders, invoices, contracts, violations, documents, ARC, requests)"
+  since: M4
+  match: ["^unit:core/tests/test_form_rerender.py::test_", "^unit:documents/tests/test_library_ux.py::test_invalid_upload"]
+- feature: "ARC for owners: edit a draft (owner only, draft only, audited, earlier wording kept append-only), Kind first with its guidance, 'Where on your lot', draft checklist with the send step inside, disabled steps with the reason, several files at once with thumbnails, plain messages and history labels"
+  since: M4
+  match: ["^unit:arc/tests/test_owner_ux.py::test_"]
+- feature: "Neighbor review page: plans above the form, choice cards, input kept on error, comment required to object, 'Please respond by' (board rule) and who to contact, why they were asked; applicant panel with More options"
+  since: M4
+  match: ["^unit:arc/tests/test_signoff_ux.py::test_"]
+- feature: "Owner requests: form first, addresses not lot numbers, request-type descriptions, input kept on error, optional photos scoped to the request"
+  since: M4
+  match: ["^unit:operations/tests/test_request_ux.py::test_"]
+- feature: "Notices for owners: plain wording, one reply box (formal response, then Messages for questions), owner photo of the fix while open"
+  since: M4
+  match: ["^unit:compliance/tests/test_owner_notices.py::test_"]
+- feature: "Documents: Governing documents pinned first, 'Updated <date>', breadcrumb above the title, link to ask for a records inspection"
+  since: M4
+  match: ["^unit:documents/tests/test_library_ux.py::test_"]

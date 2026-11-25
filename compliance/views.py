@@ -11,7 +11,6 @@ from compliance.models import Violation, ViolationCategory
 from core import policy
 from core.workflow import WorkflowError
 from documents import attachments
-from documents.services import DocumentError
 
 
 class ReportForm(forms.Form):
@@ -119,13 +118,27 @@ def violation_detail(request, pk):
             "responses": v.responses.all()
             if policy.can(request.user, "lot.view_all")
             else v.responses.filter(person_id=policy.roles_for(request.user).person_id),
-            "photos": attachments.attachments_for(v),
+            "photos": _photos(v),
             "can_respond": any(
                 t.action == "respond" for t in services.VIOLATION.available(v, request.user)
             ),
             "can_manage": policy.can(request.user, "violation.manage"),
+            "can_add_fix_photo": services.owner_may_add_photo(request.user, v),
+            "owner_view": v.lot_id in policy.roles_for(request.user).account_lot_ids
+            or not policy.can(request.user, "violation.view_all"),
         },
     )
+
+
+def _photos(v):
+    from documents.services import scan_allows_download
+
+    files = list(attachments.attachments_for(v))
+    for f in files:
+        f.thumbnail = f.content_type.startswith("image/") and scan_allows_download(
+            attachments.current_scan(f)
+        )
+    return files
 
 
 @login_required
@@ -160,18 +173,22 @@ def violation_respond(request, pk):
 @login_required
 @require_POST
 def violation_photo(request, pk):
+    """Board or manager: evidence photos. An owner of the lot: photos of the
+    fix, while the notice is open."""
     v = _get(request, pk)
-    policy.require(request.user, "violation.manage")
-    try:
-        attachments.attach(
-            v,
-            request.FILES["file"],
-            actor=request.user,
-            request=request,
-            label=request.POST.get("label", ""),
+    owner = services.owner_may_add_photo(request.user, v)
+    if not owner:
+        policy.require(request.user, "violation.manage")
+    uploads = request.FILES.getlist("file")
+    if not uploads:
+        messages.error(request, "Choose a photo first.")
+    else:
+        label = (
+            "Owner photo of the fix"
+            if owner and not policy.can(request.user, "violation.manage")
+            else request.POST.get("label", "")
         )
-    except (DocumentError, KeyError) as exc:
-        messages.error(request, str(exc) or "Choose a photo.")
+        attachments.attach_many(request, v, uploads, actor=request.user, label=label)
     return redirect("violation_detail", pk=v.pk)
 
 

@@ -49,3 +49,11 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: owner ARC on a phone
+  check: "On a phone, an owner asks for approval of a project: Kind's guidance appears when a kind is picked, 'If other, where?' shows only for Other, the camera and photo library are offered for plans and photos, several photos upload at once with thumbnails, and the checklist sends the request."
+  steps: "Sign in as a demo owner on an iPhone and an Android phone; My architectural requests; Ask for approval of a project; pick a kind and Other; save; add three photos at once; send."
+  last: ""
+- key: neighbor review page on a phone
+  check: "A signed-in neighbor sees the plans above the answer, large choice cards, and the comment becomes required when 'I object' is picked (before sending)."
+  steps: "As the neighbor, open the emailed link on a phone; pick 'I object' and try to send with no comment; then pick 'no objection' and send."
+  last: ""

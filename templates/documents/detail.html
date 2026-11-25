@@ -5,7 +5,7 @@
   <div class="crumbs"><a href="{% url 'documents' %}">Documents</a> / {{ document.get_category_display }}</div>
   <div class="page-head">
     <div><h1>{{ document.title }}</h1><div class="meta"><span>{{ document.get_category_display }}</span><span>{% icon "lock" %}{{ document.get_visibility_display }}{% if document.lot %} (lot {{ document.lot.number }}){% endif %}</span>{% if document.archived %}<span class="status tone-neutral">Archived</span>{% endif %}</div></div>
-    {% if document.current_version %}<div class="actions"><a class="btn" href="{% url 'document_download' document.pk %}">{% icon "download" %} Download v{{ document.current_version.number }}</a></div>{% endif %}
+    {% if document.current_version %}<div class="actions"><a class="btn" href="{% url 'document_download' document.pk %}">{% icon "download" %} Download</a></div>{% endif %}
   </div>
   {% if document.description %}<section class="card prose">{{ document.description|linebreaks }}</section>{% endif %}
   {% if versions %}

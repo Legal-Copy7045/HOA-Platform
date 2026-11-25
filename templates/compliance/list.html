@@ -2,14 +2,14 @@
 {% load portal %}
 {% block title %}{% if mine %}Notices about my home{% else %}Violations{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{% if mine %}Notices about my home{% else %}Violations{% endif %}</h1><p class="subtitle">Notices of covenant or rule issues, with the date by which they should be fixed.</p></div>
+  <div class="page-head"><div><h1>{% if mine %}Notices about my home{% else %}Violations{% endif %}</h1><p class="subtitle">{% if mine %}Notices from the association about something at your home to fix, and the date to fix it by.{% else %}Notices of covenant or rule issues, with the date by which they should be fixed.{% endif %}</p></div>
     {% if staff and user|can:"lot.view_own" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'violations' %}">All violations</a>{% else %}<a class="btn secondary" href="{% url 'violations' %}?mine=1">{% icon "home" %} About my home</a>{% endif %}</div>{% endif %}</div>
-  {% include "partials/list_tools.html" %}
+  {% if not mine %}{% include "partials/list_tools.html" %}{% endif %}
   <div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th>#</th><th>Lot</th><th>Category</th><th>Status</th><th>Cure by</th></tr></thead>
-    <tbody>{% for v in rows %}<tr><td><a href="{% url 'violation_detail' v.pk %}">V-{{ v.pk }}</a></td><td>Lot {{ v.lot.number }}</td><td>{{ v.get_category_display }}</td><td>{% status v.state v.get_state_display %}</td><td class="nowrap">{{ v.cure_by|date:"M j, Y"|default:"" }}</td></tr>
-    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="check-circle" title="No violations" %}</td></tr>{% endfor %}</tbody>
+    <thead><tr>{% if mine %}<th>Notice</th><th>Home</th><th>Status</th><th>Please fix by</th>{% else %}<th>#</th><th>Lot</th><th>Category</th><th>Status</th><th>Cure by</th>{% endif %}</tr></thead>
+    <tbody>{% for v in rows %}<tr>{% if mine %}<td><a href="{% url 'violation_detail' v.pk %}">{{ v.get_category_display }}</a></td><td>{{ v.lot.street_address|default:v.lot }}</td>{% else %}<td><a href="{% url 'violation_detail' v.pk %}">V-{{ v.pk }}</a></td><td>Lot {{ v.lot.number }}</td><td>{{ v.get_category_display }}</td>{% endif %}<td>{% status v.state v.get_state_display %}</td><td class="nowrap">{{ v.cure_by|date:"M j, Y"|default:"" }}</td></tr>
+    {% empty %}<tr><td colspan="5">{% if mine %}{% include "partials/empty.html" with icon="check-circle" title="Nothing to fix" text="You're all set. There are no notices about your home." %}{% else %}{% include "partials/empty.html" with icon="check-circle" title="No violations" %}{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% include "partials/pager.html" %}
-  {% if can_manage %}<details class="panel"><summary>Report a violation</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Report</button></div></form></div></details>{% endif %}
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Report a violation</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Report</button></div></form></div></details>{% endif %}
 {% endblock %}
