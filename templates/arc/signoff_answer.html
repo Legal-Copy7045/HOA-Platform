@@ -1,28 +1,35 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load portal static %}
 {% block title %}Neighbor acknowledgement · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <div class="crumbs"><a href="{% url 'signoffs_mine' %}">Neighbor acknowledgements</a> / {{ req.title|truncatechars:48 }}</div>
   <div class="page-head"><div><h1>Your neighbor's project</h1>
-    <p class="subtitle">{{ req.lot.street_address }} is applying to the architectural committee for an exterior project. Please review it and acknowledge it. You can add comments, or object.</p></div></div>
-  <div class="split">
-    <div>
-      <section class="card"><h2>{{ req.title }}</h2>
-        <dl class="kv small">{% if req.project_type %}<dt>Kind</dt><dd>{{ req.project_type }}</dd>{% endif %}{% if req.planned_start %}<dt>Planned start</dt><dd>{{ req.planned_start|date:"M j, Y" }}</dd>{% endif %}<dt>You are asked as</dt><dd>{{ signoff.label }}</dd></dl>
-        <div class="prose">{{ req.description|linebreaks }}</div></section>
-      {% if signoff.state == "pending" and can_answer %}
-        <section class="card"><h2>Your acknowledgement</h2>
-          <form method="post">{% csrf_token %}
-            <p><label><input type="radio" name="position" value="approved" required> I have reviewed this project and have no objection</label><br><label><input type="radio" name="position" value="objected"> I have reviewed this project and I object</label></p>
-            <p><label>Comments (needed if you object) <textarea name="comment" rows="4" maxlength="2000"></textarea></label></p>
-            <p><label>Type your full name <input type="text" name="signer_name" maxlength="200" required autocomplete="name"></label></p>
-            <div class="form-actions"><button type="submit">Send my acknowledgement</button></div>
-            <p class="small muted">Your acknowledgement and comments go to the architectural committee, which makes the decision. {% if token %}This link works once and then expires.{% endif %}</p>
-          </form></section>
-      {% elif last %}<section class="card"><h2>Acknowledged</h2><p>{{ last.get_position_display }}, by {{ last.signer_name }} on {{ last.signed_on|date:"M j, Y" }}.</p></section>
-      {% else %}<section class="card"><p class="muted">This acknowledgement is no longer open.</p></section>{% endif %}
-    </div>
-    <aside><section class="card"><h3>Plans and photos</h3>
-      {% if files %}<ul class="list">{% for f in files %}<li>{% icon "file" %}<a class="grow" href="{% if token %}{% url 'signoff_link_file' token f.pk %}{% else %}{% url 'signoff_file' signoff.pk f.pk %}{% endif %}">{{ f.original_filename }}</a></li>{% endfor %}</ul>{% else %}<p class="muted small">No files attached.</p>{% endif %}
-    </section></aside>
-  </div>
+    <p class="subtitle">{{ req.lot.street_address }} is asking the architectural committee to approve an exterior project. {{ asked_because }}</p></div></div>
+  {% if signoff.state == "pending" and can_answer and respond_by %}<div class="alert info">{% icon "clock" %}<span>Please respond by <strong>{{ respond_by|date:"M j, Y" }}</strong>.</span></div>{% endif %}
+  <section class="card"><h2>{{ req.title }}</h2>
+    <dl class="kv small">{% if req.project_type %}<dt>Kind</dt><dd>{{ req.project_type }}</dd>{% endif %}{% if req.planned_start %}<dt>Planned start</dt><dd>{{ req.planned_start|date:"M j, Y" }}</dd>{% endif %}{% if req.location %}<dt>Where on the lot</dt><dd>{{ req.get_location_display }}{% if req.location_detail %}: {{ req.location_detail }}{% endif %}</dd>{% endif %}</dl>
+    <div class="prose">{{ req.description|linebreaks }}</div></section>
+  <section class="card"><h2>Plans and photos</h2>
+    {% if files %}<ul class="list files">{% for f in files %}{% url 'signoff_file' signoff.pk f.pk as file_url %}<li>{% if f.thumbnail %}<a href="{{ file_url }}" class="thumb"><img src="{{ file_url }}" alt="" loading="lazy" width="56" height="56"></a>{% else %}{% icon "file" %}{% endif %}<a class="grow" href="{{ file_url }}">{{ f.original_filename }}</a></li>{% endfor %}</ul>{% else %}<p class="muted small">No files attached.</p>{% endif %}
+  </section>
+  {% if signoff.state == "pending" and can_answer %}
+    <section class="card" id="answer"><h2>Your acknowledgement</h2>
+      {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ error }} Nothing has been sent yet.</span></div>{% endif %}
+      <form method="post">{% csrf_token %}
+        <fieldset class="choices"><legend class="field-label">Your answer<span class="required-mark" aria-hidden="true">*</span></legend>
+          <label class="choice"><input type="radio" name="position" value="approved" required{% if posted.position == "approved" %} checked{% endif %}> I have looked at this project and I have no objection</label>
+          <label class="choice"><input type="radio" name="position" value="objected"{% if posted.position == "objected" %} checked{% endif %}> I have looked at this project and I object</label>
+        </fieldset>
+        <div class="field"><label for="so-comment">Comments<span class="required-mark" data-required-mark-for="so-comment" hidden aria-hidden="true">*</span></label>
+          <textarea id="so-comment" name="comment" rows="4" maxlength="2000" data-required-if="position=objected" aria-describedby="so-comment-help">{{ posted.comment }}</textarea>
+          <p class="help" id="so-comment-help">Optional, but needed if you object: please say what concerns you.</p></div>
+        <div class="field"><label for="so-name">Type your full name<span class="required-mark" aria-hidden="true">*</span></label>
+          <input type="text" id="so-name" name="signer_name" maxlength="200" required autocomplete="name" value="{{ posted.signer_name }}"></div>
+        <div class="form-actions"><button type="submit">Send my acknowledgement</button></div>
+        <p class="small muted">Your answer and comments go to the architectural committee, which makes the decision. Neighbors don't approve or deny projects.</p>
+      </form></section>
+  {% elif last %}<section class="card"><h2>Thank you</h2><p>You answered “{{ last.get_position_display|lower }}” as {{ last.signer_name }} on {{ last.signed_on|date:"M j, Y" }}. The committee will take it into account when it reviews the project.</p><p><a href="{% url 'signoffs_mine' %}">Back to neighbor acknowledgements</a></p></section>
+  {% else %}<section class="card"><p class="muted">This acknowledgement is no longer open.</p></section>{% endif %}
+  <p class="small muted">Questions about this project? {% if contact %}Contact {{ contact }}.{% else %}<a href="{% url 'requests' %}?mine=1">Send a question to the board</a>.{% endif %}</p>
 {% endblock %}
+{% block extra_body %}<script src="{% static 'js/forms.js' %}"></script>{% endblock %}

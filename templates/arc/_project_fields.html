@@ -1,0 +1,11 @@
+{# The owner's project fields (new request and edit draft). Expects: form. "If other" shows only when Other is picked, and the chosen kind's guidance shows under it (static/js/forms.js; without JavaScript everything shows). #}
+{% include "partials/form_errors.html" %}
+{{ form.non_field_errors }}
+{% for f in form.hidden_fields %}{{ f }}{% endfor %}
+{% for f in form.visible_fields %}
+  {% if f.name == "location_detail" %}<div data-show-if="location=other">{{ f.as_field_group }}</div>
+  {% else %}{{ f.as_field_group }}{% endif %}
+  {% if f.name == "project_type" and form.type_guidance %}<div class="help type-guidance" data-guidance-for="{{ f.auto_id }}">
+    {% for name, guidance, citation in form.type_guidance %}<p data-type="{{ name }}"><strong>{{ name }}: what to include.</strong> {{ guidance }}{% if citation %} <span class="muted">({{ citation }})</span>{% endif %}</p>{% endfor %}
+  </div>{% endif %}
+{% endfor %}

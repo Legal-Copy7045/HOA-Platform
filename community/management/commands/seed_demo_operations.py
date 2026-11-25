@@ -270,7 +270,7 @@ class Command(BaseCommand):
         req = arc.create_request(
             lot=lots[3],
             title="Rear fence (demo)",
-            description="4 ft black aluminium, rear yard",
+            description="4 ft black aluminum, rear yard",
             actor=owner3,
         )
         arc.ARC.apply(req, "submit", actor=owner3)
@@ -385,11 +385,11 @@ class Command(BaseCommand):
             []
             if arc_services.active_project_types()
             else [
-                ("Fence", "Plot plan with location, height, material and colour."),
-                ("Shed or outbuilding", "Plot plan, size, materials and colours."),
+                ("Fence", "Plot plan with location, height, material and color."),
+                ("Shed or outbuilding", "Plot plan, size, materials and colors."),
                 ("Deck or patio", "Drawing with dimensions, materials and setbacks."),
-                ("Exterior paint or colour change", "Colour samples for body, trim and doors."),
-                ("Roofing", "Material and colour."),
+                ("Exterior paint or color change", "Color samples for body, trim and doors."),
+                ("Roofing", "Material and color."),
                 ("Landscaping or hardscaping", "Sketch of the area and plant list."),
                 ("Solar panels", "Panel layout and mounting details."),
                 ("Other", "Describe the project and attach drawings or photos."),

@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}ARC request types · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>ARC request types</h1><p class="subtitle">The kinds of project owners choose from when they apply. Add what each one needs (drawings, materials, colours) and where that rule comes from.</p></div></div>
+  <div class="page-head"><div><h1>ARC request types</h1><p class="subtitle">The kinds of project owners choose from when they apply. Add what each one needs (drawings, materials, colors) and where that rule comes from.</p></div></div>
   {% for t in types %}
     <section class="card"><form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="pk" value="{{ t.pk }}">
       <p><label>Name <input type="text" name="name" value="{{ t.name }}" maxlength="60" required></label></p>
@@ -15,7 +15,7 @@
   <details class="panel"{% if not types %} open{% endif %}><summary>Add a type</summary><div class="panel-body">
     <form method="post" class="form-grid">{% csrf_token %}
       <p><label>Name <input type="text" name="name" maxlength="60" required placeholder="Fence"></label></p>
-      <p><label>What to include <textarea name="guidance" rows="2" placeholder="Plot plan showing location, height, material and colour"></textarea></label></p>
+      <p><label>What to include <textarea name="guidance" rows="2" placeholder="Plot plan showing location, height, material and color"></textarea></label></p>
       <p><label>Citation <input type="text" name="citation" maxlength="200"></label></p>
       <p><label>Order <input type="number" name="sort_order" value="100" min="0" max="999"></label></p>
       <input type="hidden" name="active" value="on">

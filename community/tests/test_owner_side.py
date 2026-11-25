@@ -66,10 +66,10 @@ def test_board_owner_raises_their_own_arc_from_the_homeowner_side(client, w):
     arc.create_request(lot=w["other"], title="Neighbor shed", description="x", actor=w["owner"])
     client.force_login(w["board_owner"])
     mine = client.get(reverse("arc_list"), {"mine": "1"}).content
-    assert b"Start a new request" in mine
+    assert b"Ask for approval of a project" in mine
     assert b"Neighbor shed" not in mine
     board = client.get(reverse("arc_list")).content
-    assert b"Start a new request" not in board
+    assert b"Ask for approval of a project" not in board
     response = client.post(
         reverse("arc_list"),
         {

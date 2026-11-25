@@ -136,6 +136,14 @@ REGISTRY: dict[str, RuleSpec] = {
             "Architectural review",
             "Off: a board member or the manager confirms each signature read from a scanned form.",
         ),
+        RuleSpec(
+            "arc.signoff_respond_days",
+            "Days neighbors are asked to respond within",
+            DAYS,
+            None,
+            "Architectural review",
+            "Shown to neighbors as 'Please respond by ...'. Empty: no date is shown.",
+        ),
         RuleSpec("violation.cure_days", "Days given to cure a violation", DAYS, None, "Violations"),
         RuleSpec(
             "violation.hearing_notice_days",
