@@ -23,4 +23,9 @@ cat > /tmp/s3.json <<JSON
   ]
 }
 JSON
-exec weed server -dir=/data -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json -volume.max=0
+# Volumes of 1 GB (SeaweedFS defaults to 30 GB). With -volume.max=0 the
+# number of volumes is worked out from free disk space, so on a small disk
+# the 30 GB default gave zero volumes and every upload failed with
+# InternalError (POC, 2026-11).
+exec weed server -dir=/data -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json \
+  -master.volumeSizeLimitMB="${SEAWEEDFS_VOLUME_SIZE_MB:-1024}" -volume.max=0

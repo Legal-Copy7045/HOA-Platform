@@ -64,6 +64,9 @@ echo "==> Waiting for the services"
 sleep 20
 "${COMPOSE[@]}" ps --format 'table {{.Service}}\t{{.Status}}'
 echo
+echo "File store check:"
+"${COMPOSE[@]}" exec -T web python manage.py check_storage 2>&1 | grep -v '"level"' || true
+echo
 echo "Tunnel log (last lines; look for 'Registered tunnel connection'):"
 "${COMPOSE[@]}" logs --tail 5 --no-log-prefix cloudflared | grep -v -i token || true
 echo
