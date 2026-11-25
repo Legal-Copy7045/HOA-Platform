@@ -38,8 +38,16 @@ PUBLIC = {"home", "healthz", "invite_landing", "invite_accept"}
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")
 OWN_ACCOUNT = {"enroll_with_code", "my_profile", "export_my_data"}
+# Text from board-only or other-lot fixtures that must never reach owner A.
+BOARD_ONLY_MARKERS = (
+    b"Board only: legal matter",
+    b"Board executive session",
+    b"pond contractor",
+    b"counsel letter",
+    b"Lot B drainage survey",
+)
 # Pages any member may open; tests check board-only content never shows to owners.
-MEMBER_PAGES = {"announcements", "calendar", "directory"}
+MEMBER_PAGES = {"announcements", "calendar", "directory", "documents"}
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
 # pointed at owner B's data, and send anonymous visitors to sign in.
@@ -77,6 +85,11 @@ PROTECTED = {
     "event_cancel": ("POST", "event"),
     "tasks": ("GET", None),
     "task_close": ("POST", "task"),
+    "document_detail": ("GET", "lot_b_document"),
+    "document_download": ("GET", "lot_b_document"),
+    "document_version_download": ("GET", "board_document"),
+    "document_add_version": ("POST", "board_document"),
+    "document_archive": ("POST", "board_document"),
 }
 
 
@@ -132,6 +145,24 @@ def world():
             actor=board,
         )
         task = create_task(title="Chase the pond contractor", actor=board)
+        from documents import services as documents
+        from documents.tests.helpers import pdf
+
+        board_document = documents.create_document(
+            title="Board only: counsel letter",
+            category="other",
+            visibility="board",
+            file=pdf(),
+            actor=board,
+        )
+        lot_b_document = documents.create_document(
+            title="Lot B drainage survey",
+            category="lot",
+            visibility="lot",
+            lot=lot_b,
+            file=pdf(),
+            actor=board,
+        )
     targets = {
         "lot": lot_b.pk,
         "person": person_b.pk,
@@ -145,6 +176,8 @@ def world():
         "board_announcement": board_note.pk,
         "event": board_event.pk,
         "task": task.pk,
+        "board_document": board_document.pk,
+        "lot_b_document": lot_b_document.pk,
     }
     return {
         "owner_a": owner_a,
@@ -167,6 +200,10 @@ def _url(name, key, targets):
         kwargs["action"] = "revoke"
     elif name == "task_close":
         kwargs["status"] = "done"
+    elif name == "document_version_download":
+        kwargs["version"] = 1
+    elif name == "document_archive":
+        kwargs["action"] = "archive"
     return reverse(name, kwargs=kwargs)
 
 
@@ -297,7 +334,7 @@ def test_member_pages_hide_board_only_content_from_owners(client, world, name):
     client.force_login(world["owner_a"])
     response = client.get(reverse(name))
     assert response.status_code == 200
-    for secret in (b"Board only: legal matter", b"Board executive session", b"pond contractor"):
+    for secret in BOARD_ONLY_MARKERS:
         assert secret not in response.content
 
 

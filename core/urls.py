@@ -28,6 +28,7 @@ urlpatterns = [
     path("", include("community.urls")),
     path("", include("comms.urls")),
     path("", include("operations.urls")),
+    path("", include("documents.urls")),
 ]
 
 if settings.ADMIN_ENABLED:

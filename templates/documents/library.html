@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Documents · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Documents</h1>
+  {% for group, docs in groups.items %}
+    <h2>{{ group }}</h2>
+    <table><tbody>
+      {% for d in docs %}<tr><td><a href="{% url 'document_detail' d.pk %}">{{ d.title }}</a>{% if d.visibility == "board" %} <span class="muted">(board only)</span>{% elif d.visibility == "lot" %} <span class="muted">(lot {{ d.lot.number }})</span>{% endif %}{% if d.archived %} <span class="muted">(archived)</span>{% endif %}</td>
+        <td class="muted">{% if d.current_version %}v{{ d.current_version.number }} · {{ d.current_version.uploaded_at|date:"M j, Y" }}{% endif %}</td>
+        <td>{% if d.current_version %}<a href="{% url 'document_download' d.pk %}">Download</a>{% endif %}</td></tr>{% endfor %}
+    </tbody></table>
+  {% empty %}<p class="muted">No documents yet.</p>{% endfor %}
+  {% if can_manage %}
+    <details><summary>Upload a document</summary>
+      <p class="muted">PDF, Word (.docx, no macros), Excel (.xlsx), images (PNG/JPG), text or CSV. Each upload is kept forever; publish a new version rather than replacing.</p>
+      <form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button type="submit">Upload</button></form></details>
+  {% endif %}
+{% endblock %}

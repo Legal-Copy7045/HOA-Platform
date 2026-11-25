@@ -106,6 +106,13 @@ _SPECS = [
     _spec("event.cancelled", "Calendar event cancelled"),
     _spec("task.created", "Board task created"),
     _spec("task.closed", "Board task closed", "status"),
+    _spec("document.created", "Document created", "visibility", "category"),
+    _spec("document.version_uploaded", "Document version uploaded", "version", "scan"),
+    _spec("document.upload_blocked", "Upload blocked", "reason"),
+    _spec("document.archived", "Document archived"),
+    _spec("document.restored", "Document restored"),
+    _spec("document.downloaded", "Document downloaded", "version"),
+    _spec("document.viewed", "Document page viewed"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

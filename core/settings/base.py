@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "community",
     "comms",
     "operations",
+    "documents",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -217,6 +218,15 @@ STORAGES = {
     },
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+
+# Document uploads (CLAUDE.md "File uploads")
+DOCUMENT_MAX_BYTES = env.int("DOCUMENT_MAX_BYTES", default=25 * 1024 * 1024)
+# Malware scanning: "none" (record as unscanned) or "clamd" (host:port in
+# DOCUMENT_CLAMD_ADDRESS). With DOCUMENT_REQUIRE_CLEAN_SCAN, only files a
+# scanner marked clean can be downloaded.
+DOCUMENT_SCANNER = env("DOCUMENT_SCANNER", default="none")
+DOCUMENT_CLAMD_ADDRESS = env("DOCUMENT_CLAMD_ADDRESS", default="")
+DOCUMENT_REQUIRE_CLEAN_SCAN = env.bool("DOCUMENT_REQUIRE_CLEAN_SCAN", default=False)
 
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).

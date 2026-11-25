@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>{{ document.title }}</h1>
+  <p class="muted">{{ document.get_category_display }} · {{ document.get_visibility_display }}{% if document.lot %} (lot {{ document.lot.number }}){% endif %}{% if document.archived %} · archived{% endif %}</p>
+  {% if document.description %}<p>{{ document.description|linebreaksbr }}</p>{% endif %}
+  {% if document.current_version %}<p><a class="button" href="{% url 'document_download' document.pk %}">Download current version (v{{ document.current_version.number }})</a></p>{% endif %}
+  {% if versions %}
+    <h2>Version history</h2>
+    <table><tbody>{% for v in versions %}<tr><td>v{{ v.number }}</td><td>{{ v.original_filename }}</td><td class="muted">{{ v.uploaded_at|date:"M j, Y" }} · {{ v.size|filesizeformat }}{% if v.note %} · {{ v.note }}{% endif %}</td><td><a href="{% url 'document_version_download' document.pk v.number %}">Download</a></td></tr>{% endfor %}</tbody></table>
+  {% endif %}
+  {% if can_manage %}
+    <details><summary>Publish a new version</summary><form method="post" action="{% url 'document_add_version' document.pk %}" enctype="multipart/form-data">{% csrf_token %}{{ version_form.as_p }}<button type="submit">Publish</button></form></details>
+    <form method="post" action="{% url 'document_archive' document.pk document.archived|yesno:'restore,archive' %}">{% csrf_token %}<button type="submit" class="link">{% if document.archived %}Restore{% else %}Archive (hide from owners){% endif %}</button></form>
+  {% endif %}
+  <p><a href="{% url 'documents' %}">All documents</a></p>
+{% endblock %}

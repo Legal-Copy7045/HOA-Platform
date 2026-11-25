@@ -20,6 +20,7 @@ EMAIL_TRANSPORT_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 PASSWORD_BREACH_CHECK = False  # tests that need it mock the HTTP call
 MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = True
 EMAIL_REDIRECT_ALL_TO = ""
+STORAGES["default"] = {"BACKEND": "django.core.files.storage.InMemoryStorage"}  # noqa: F405
 STORAGES["staticfiles"] = {  # noqa: F405
     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
 }
