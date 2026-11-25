@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = [".venv", "staticfiles"]
+extend-exclude = [".venv", "staticfiles", ".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "DJ", "C4", "SIM", "RUF"]
@@ -26,14 +26,14 @@ python_files = ["test_*.py"]
 addopts = "--strict-markers -ra"
 testpaths = ["."]
 filterwarnings = ["ignore:No directory at:UserWarning"]
-norecursedirs = [".venv", "node_modules", "staticfiles", ".git"]
+norecursedirs = [".venv", "node_modules", "staticfiles", ".git", ".claude"]
 
 [tool.coverage.run]
 source = ["."]
-omit = [".venv/*", "*/migrations/*", "*/tests/*", "manage.py", "core/asgi.py", "core/wsgi.py"]
+omit = [".venv/*", ".claude/*", "*/migrations/*", "*/tests/*", "manage.py", "core/asgi.py", "core/wsgi.py"]
 
 [tool.bandit]
-exclude_dirs = [".venv", "staticfiles"]
+exclude_dirs = [".venv", "staticfiles", ".claude"]
 skips = []
 
 [tool.bandit.assert_used]
