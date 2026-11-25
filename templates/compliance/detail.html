@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Violation #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Violation #{{ obj.pk }}: {{ obj.get_category_display }}</h1>
+  <p>Lot {{ obj.lot.number }} · <span class="status">{{ obj.get_state_display }}</span> · observed {{ obj.observed_on }}{% if obj.cure_by %} · <strong>cure by {{ obj.cure_by }}</strong>{% endif %}</p>
+  <div class="card">{{ obj.description|linebreaks }}</div>
+  {% if obj.noticed_at %}<p><a href="{% url 'violation_letter' obj.pk %}">Notice letter (PDF)</a></p>{% endif %}
+  <h2>Photos</h2>
+  <ul>{% for p in photos %}<li><a href="{% url 'violation_file' obj.pk p.pk %}">{{ p.original_filename }}</a> <span class="muted">{{ p.uploaded_at|date:"M j" }}</span></li>{% empty %}<li class="muted">None.</li>{% endfor %}</ul>
+  {% if can_manage %}<form method="post" action="{% url 'violation_photo' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" accept="image/*,application/pdf" required aria-label="Photo"> <button type="submit">Add photo</button></form>{% endif %}
+  <h2>Owner responses</h2>
+  <ul>{% for r in responses %}<li>{{ r.created_at|date:"M j, Y" }}: {{ r.text|linebreaksbr }}</li>{% empty %}<li class="muted">None yet.</li>{% endfor %}</ul>
+  {% if can_respond %}<form method="post" action="{% url 'violation_respond' obj.pk %}">{% csrf_token %}<label for="t">Your response to the board</label><textarea id="t" name="text" rows="4" required></textarea><p><button type="submit">Send response</button></p></form>{% endif %}
+  {% include "partials/workflow.html" with obj=obj %}
+  <p><a href="{% url 'violations' %}">All violations</a></p>
+{% endblock %}

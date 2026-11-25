@@ -10,5 +10,9 @@
       <ul>{% for o in ownerships %}<li>{{ o.person.display_name }} <span class="muted">({{ o.get_ownership_type_display }}, since {{ o.start_date }})</span></li>{% endfor %}</ul>
     </section>
   {% endfor %}
-  <p class="muted">Documents, account statements and architectural requests will appear here in later milestones.</p>
+  <ul class="tiles">
+    <li><a href="{% url 'arc_list' %}">Architectural requests</a> <span class="muted">apply for exterior changes and track decisions</span></li>
+    <li><a href="{% url 'violations' %}">Notices about my lot</a> <span class="muted">covenant notices and your responses</span></li>
+    <li><a href="{% url 'documents' %}">Documents</a></li>
+  </ul>
 {% endblock %}

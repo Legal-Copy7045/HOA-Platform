@@ -1,0 +1,75 @@
+"""Covenant violations: report, notice, owner response, hearing, outcome.
+
+No fines are assessed here (decision: tracking only until PA law is reviewed).
+"""
+
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+
+from core.append_only import AppendOnlyModel
+from core.scoping import ScopedModel, ScopedQuerySet
+
+
+class ViolationCategory(models.TextChoices):
+    LANDSCAPING = "landscaping", "Lawn and landscaping"
+    TRASH = "trash", "Trash and recycling"
+    PARKING = "parking", "Parking and vehicles"
+    STRUCTURE = "structure", "Structures and exterior"
+    UNAPPROVED = "unapproved", "Unapproved architectural change"
+    PETS = "pets", "Pets"
+    NUISANCE = "nuisance", "Noise or nuisance"
+    OTHER = "other", "Other"
+
+
+class ViolationState(models.TextChoices):
+    OPEN = "open", "Reported"
+    NOTICED = "noticed", "Notice sent"
+    RESPONDED = "responded", "Owner responded"
+    HEARING = "hearing", "Hearing scheduled"
+    CURED = "cured", "Cured"
+    UPHELD = "upheld", "Upheld"
+    DISMISSED = "dismissed", "Dismissed"
+    CLOSED = "closed", "Closed"
+
+
+class Violation(ScopedModel):
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    category = models.CharField(max_length=16, choices=ViolationCategory.choices)
+    description = models.TextField()
+    observed_on = models.DateField(default=timezone.localdate)
+    reported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    state = models.CharField(
+        max_length=16, choices=ViolationState.choices, default=ViolationState.OPEN
+    )
+    state_changed_at = models.DateTimeField(default=timezone.now)
+    noticed_at = models.DateTimeField(null=True, blank=True)
+    cure_by = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    objects = ScopedQuerySet.as_manager()
+    scope_lot_path = "lot"
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Violation #{self.pk}"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Violations are dismissed or closed, never deleted.")
+
+
+class OwnerResponse(AppendOnlyModel):
+    violation = models.ForeignKey(Violation, on_delete=models.PROTECT, related_name="responses")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    text = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"response #{self.pk}"

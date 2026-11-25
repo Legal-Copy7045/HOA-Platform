@@ -31,6 +31,7 @@ urlpatterns = [
     path("", include("documents.urls")),
     path("", include("governance.urls")),
     path("", include("arc.urls")),
+    path("", include("compliance.urls")),
 ]
 
 if settings.ADMIN_ENABLED:

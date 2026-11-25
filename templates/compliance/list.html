@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Violations · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Violations</h1>
+  <table><thead><tr><th>#</th><th>Lot</th><th>Category</th><th>Status</th><th>Cure by</th></tr></thead><tbody>
+    {% for v in rows %}<tr><td><a href="{% url 'violation_detail' v.pk %}">{{ v.pk }}</a></td><td>{{ v.lot.number }}</td><td>{{ v.get_category_display }}</td><td><span class="status">{{ v.get_state_display }}</span></td><td>{{ v.cure_by|default:"" }}</td></tr>{% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_manage %}<details><summary>Report a violation</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Report</button></form></details>{% endif %}
+{% endblock %}

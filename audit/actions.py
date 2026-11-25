@@ -130,6 +130,8 @@ _SPECS = [
     _spec("arc.affected_lots_set", "ARC affected lots recorded", "count"),
     _spec("arc.position_recorded", "ARC reviewer position recorded"),
     _spec("arc.letter_downloaded", "ARC decision letter downloaded"),
+    _spec("violation.reported", "Violation reported", "lot_id", "category"),
+    _spec("violation.letter_downloaded", "Violation notice downloaded"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

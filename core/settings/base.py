@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "documents",
     "governance",
     "arc",
+    "compliance",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

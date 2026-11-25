@@ -49,6 +49,7 @@ BOARD_ONLY_MARKERS = (
     b"Lot B wants the 2019 audit",
     b"Draft: special assessment",
     b"Lot B hot tub",
+    b"Lot B boat in driveway",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -61,6 +62,7 @@ MEMBER_PAGES = {
     "votes",
     "records_requests",
     "arc_list",
+    "violations",
 }
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
@@ -118,6 +120,12 @@ PROTECTED = {
     "arc_file": ("GET", "arc_b"),
     "arc_letter": ("GET", "arc_b"),
     "arc_affected": ("POST", "arc_b"),
+    "violation_detail": ("GET", "violation_b"),
+    "violation_action": ("POST", "violation_b"),
+    "violation_respond": ("POST", "violation_b"),
+    "violation_photo": ("POST", "violation_b"),
+    "violation_file": ("GET", "violation_b"),
+    "violation_letter": ("GET", "violation_b"),
 }
 
 
@@ -212,6 +220,12 @@ def world():
             lot=lot_b, title="Lot B hot tub", description="Rear patio", actor=owner_b
         )
         arc_b_file = attach(arc_b, pdf("hot-tub.pdf"), actor=owner_b)
+        from compliance import services as compliance
+
+        violation_b = compliance.report(
+            lot=lot_b, category="parking", description="Lot B boat in driveway", actor=board
+        )
+        violation_b_file = attach(violation_b, pdf("boat.pdf"), actor=board)
     targets = {
         "lot": lot_b.pk,
         "person": person_b.pk,
@@ -232,6 +246,8 @@ def world():
         "draft_vote": draft_vote.pk,
         "arc_b": arc_b.pk,
         "arc_b_file": arc_b_file.pk,
+        "violation_b": violation_b.pk,
+        "violation_b_file": violation_b_file.pk,
     }
     return {
         "owner_a": owner_a,
@@ -272,6 +288,10 @@ def _url(name, key, targets):
         kwargs["file_id"] = targets["arc_b_file"]
     elif name == "arc_letter":
         kwargs["decision_id"] = 1
+    elif name == "violation_action":
+        kwargs["action"] = "send_notice"
+    elif name == "violation_file":
+        kwargs["file_id"] = targets["violation_b_file"]
     return reverse(name, kwargs=kwargs)
 
 
