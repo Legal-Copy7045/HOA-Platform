@@ -1,16 +1,21 @@
 {% extends "base.html" %}
-{% load portal %}
-{% block title %}Enter your enrollment code · {{ SITE_NAME }}{% endblock %}
+{% load portal signin %}
+{% block title %}Enter your reset code · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Enter your enrollment code</h1>
+  {% signin_contact as contact %}
+  {% if signin_setup %}{% include "accounts/_setup_steps.html" with steps=signin_setup.steps %}{% endif %}
+  <h1>Enter your reset code</h1>
   {% if reset.status == "awaiting_code" %}
-    <p class="muted">The board reset your sign-in because you lost access to your authenticator. A board member gave you a one-time code (for example <code>ABCD-EFGH-JKLM</code>).</p>
-    {% if error %}<div class="alert danger">{% icon "alert" %}<span>{{ error }}</span></div>{% endif %}
+    <p class="muted">The board reset your sign-in because you lost access to your passkey or authenticator app. A board member gave you a one-time code (for example <code>ABCD-EFGH-JKLM</code>).</p>
+    {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ error }}</span></div>{% endif %}
     <form method="post">{% csrf_token %}
-      <div class="field"><label for="code">Enrollment code</label><input id="code" name="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" class="code-input" required></div>
+      <div class="field"><label for="code">Reset code<span class="required-mark" aria-hidden="true">*</span></label><input id="code" name="code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" class="code-input" required></div>
       <div class="form-actions"><button type="submit" class="block">Continue</button></div>
     </form>
+    <p class="small muted">No code yet? {% if contact %}Contact {{ contact }}.{% else %}Ask a board member.{% endif %}</p>
   {% else %}
-    <div class="alert warning">{% icon "alert" %}<span>This enrollment code can no longer be used ({% if reset.status == "code_locked" %}too many wrong attempts{% else %}it has expired{% endif %}). Ask a board member to start a new reset.</span></div>
+    <div class="alert warning">{% icon "alert" %}<span>This code can no longer be used ({% if reset.status == "code_locked" %}too many wrong attempts{% else %}it has expired{% endif %}). The board needs to start a new reset.</span></div>
+    <div class="alert info">{% icon "info" %}<span>{% if contact %}Contact {{ contact }}.{% else %}Contact a board member.{% endif %}</span></div>
   {% endif %}
+  <form method="post" action="{% url 'account_logout' %}" class="setup-signout">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>
 {% endblock %}

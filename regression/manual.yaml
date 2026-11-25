@@ -49,3 +49,11 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: guided sign-in setup on a phone
+  check: "A new owner accepts an invitation on a phone and follows the three steps: password (show-password toggle works), 'Use this phone's fingerprint or face' creates a passkey, recovery codes shown; no menu until 'I've saved them'."
+  steps: "Invite a test person; open the link on an iPhone and an Android phone; finish all three steps; confirm the home page then shows the menu."
+  last: ""
+- key: recovery codes print
+  check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer)."
+  steps: "During setup or from Sign-in and security > Show codes, press Print and look at the print preview."
+  last: ""

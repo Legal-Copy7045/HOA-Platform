@@ -9,6 +9,12 @@ def site(request: HttpRequest) -> dict[str, str]:
 def navigation(request):
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return {}
+    from accounts import setup
+
+    # During the guided sign-in setup the sidebar stays hidden (UX review #2).
+    signin_setup = setup.state(request)
+    if signin_setup is not None:
+        return {"signin_setup": signin_setup}
     from community.models import Person
     from core import navigation as nav
     from core.scoping import system_access

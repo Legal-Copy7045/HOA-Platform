@@ -41,6 +41,8 @@ PUBLIC = {
     "invite_accept",
     "account_setup_expired",
     "login_background_image",
+    # Sign-in help (forgot password, lost phone): one of the sign-in steps.
+    "signin_help",
 }
 # Links emailed before sign-in became mandatory (D24): sign-in first, then
 # only the neighboring lot's owner is sent on to their review page.
