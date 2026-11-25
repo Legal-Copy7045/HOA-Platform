@@ -212,7 +212,7 @@ _SPECS = [
     _spec("vote.closed", "Vote closed"),
     _spec("vote.ballot_cast", "Ballot cast", "lot_id"),
     _spec("attachment.added", "File attached", "owner_type", "scan"),
-    _spec("attachment.downloaded", "Attached file downloaded", "owner_type", "scan"),
+    _spec("attachment.downloaded", "Attached file downloaded", "owner_type", "scan", "view"),
     _spec("arc.created", "ARC request started", "lot_id"),
     _spec("arc.affected_lots_set", "ARC affected lots recorded", "count", "added", "removed"),
     _spec("arc.position_recorded", "ARC reviewer position recorded"),

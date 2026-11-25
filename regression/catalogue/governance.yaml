@@ -50,3 +50,6 @@
 - feature: "Elections review fixes: ballot fixed once voting opens (service + DB trigger), withdraw/accept audited, proxy ends when the grantor sells, nominate by address not owner names, leap-day term end, stuck consents withdrawable"
   since: M4
   match: ["^unit:governance/tests/test_elections.py::test_(ballot_is_fixed|withdrawal_during|selling_the_lot|bad_form_values|leap_day|any_board_member|nomination_list)"]
+- feature: "Photo thumbnails are logged as file views marked view=thumbnail, apart from downloads"
+  since: M4
+  match: ["^unit:arc/tests/test_signoffs.py::test_thumbnail_views"]

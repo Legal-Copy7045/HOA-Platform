@@ -310,3 +310,7 @@ ClamAV holds its signature database in memory (~1.2 GB) and, by default, loads a
 8. Building images in CI and pulling them on the VM: only if faster overall (see the note below); R2 for the POC's files: under consideration.
 
 Note on 8: with the layer cache the VM rebuilds a code-only change in well under a minute and a docs-only change in about a second, and a dependency change in two to three minutes. Pulling a CI-built image would save at most a minute or two on dependency changes, add the CI build time before an update is available, and need a registry token stored on the VM. Not faster overall, so not done.
+
+## D28. Retention clears current contact details; the change history persists (2026-11-25)
+
+The retention rule (two years after someone's last ownership or contact role ends) clears the current phone, mailing address, extra contact methods and directory choices. The owner decided the change history persists: earlier values remain in the model history tables, which are part of the audit trail (D8), and no purge command exists. The retention page says so. Also accepted as proposed: managers may confirm and decline common-area bookings (a booking is not a governance decision); photo thumbnails are logged as downloads but marked `view: thumbnail`; the sign-in help contact field stays empty unless filled with an association contact; adding a passkey also enables passkey-only sign-in (a passkey is itself strong authentication); the neighbor response period (`arc.signoff_respond_days`) is set by the board, suggested 14 days.

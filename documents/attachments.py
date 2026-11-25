@@ -123,7 +123,13 @@ def serve(request, obj, attachment_id: int, *, exclude_labels=()):
         request=request,
         actor=request.user if request.user.is_authenticated else None,
         target=obj,
-        metadata={"owner_type": attachment.owner_type, "scan": current_scan(attachment)},
+        metadata={
+            "owner_type": attachment.owner_type,
+            "scan": current_scan(attachment),
+            # Small previews on a page are logged too, but marked, so the
+            # audit log tells a glance from a download (owner's choice).
+            "view": "thumbnail" if request.GET.get("view") == "thumb" else "file",
+        },
     )
     response = FileResponse(
         attachment.file.open("rb"),

@@ -14,7 +14,7 @@
     </div>
     <aside>
       {% if photos or can_add_photos %}<section class="card"><h3>Photos</h3>
-        {% if photos %}<ul class="list files">{% for f in photos %}{% url 'request_file' obj.pk f.pk as file_url %}<li>{% if f.thumbnail %}<a href="{{ file_url }}" class="thumb"><img src="{{ file_url }}" alt="" loading="lazy" width="56" height="56"></a>{% else %}{% icon "file" %}{% endif %}<div class="grow"><a href="{{ file_url }}">{{ f.original_filename }}</a><div class="small muted">{{ f.uploaded_at|date:"M j, Y" }}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
+        {% if photos %}<ul class="list files">{% for f in photos %}{% url 'request_file' obj.pk f.pk as file_url %}<li>{% if f.thumbnail %}<a href="{{ file_url }}" class="thumb"><img src="{{ file_url }}?view=thumb" alt="" loading="lazy" width="56" height="56"></a>{% else %}{% icon "file" %}{% endif %}<div class="grow"><a href="{{ file_url }}">{{ f.original_filename }}</a><div class="small muted">{{ f.uploaded_at|date:"M j, Y" }}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
         {% if can_add_photos %}<form method="post" action="{% url 'request_attach' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<label for="rq-add">Add photos</label><input id="rq-add" type="file" name="photos" accept="image/*,application/pdf" multiple required><div class="form-actions"><button type="submit" class="secondary small">Add</button></div></form>{% endif %}
       </section>{% endif %}
       {% if staff %}

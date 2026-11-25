@@ -556,3 +556,17 @@ def test_simultaneous_last_answers_do_not_error(w, django_capture_on_commit_call
     # A second call that finds the state already moved simply returns False.
     arc.ArcRequest.objects.unscoped("t").filter(pk=w["req"].pk).update(state="submitted")
     assert signoffs.submit_if_acknowledged(w["req"]) is False
+
+
+def test_thumbnail_views_are_logged_and_marked(client, w):
+    from audit.models import AuditEvent
+    from documents.attachments import attachments_for
+
+    plans = attachments_for(w["req"]).get(original_filename="plans.pdf")
+    client.force_login(w["applicant"])
+    client.get(reverse("arc_file", args=[w["req"].pk, plans.pk]) + "?view=thumb")
+    client.get(reverse("arc_file", args=[w["req"].pk, plans.pk]))
+    views = sorted(
+        e.metadata.get("view") for e in AuditEvent.objects.filter(action="attachment.downloaded")
+    )
+    assert views == ["file", "thumbnail"]
