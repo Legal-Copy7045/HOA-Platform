@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Reconcile a statement · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'accounting' %}">Accounting</a> / Reconcile</div>
+  <div class="page-head"><div><h1>Reconcile a bank statement</h1><p class="subtitle">Tick what appears on the statement. Unticked items stay outstanding for next month.</p></div></div>
+  <section class="card"><form method="get" class="inline-form"><div><label for="sd">Statement date</label><input id="sd" type="date" name="date" value="{{ statement_date|date:'Y-m-d' }}" required></div><button type="submit" class="secondary">Show open items</button></form></section>
+  {% if statement_date %}<form method="post">{% csrf_token %}<input type="hidden" name="statement_date" value="{{ statement_date|date:'Y-m-d' }}">
+    <div class="split">
+      <section class="card"><h2>Deposits</h2>{% if open.deposits %}<ul class="list">{% for d in open.deposits %}<li><label class="grow"><input type="checkbox" name="deposits" value="{{ d.pk }}"> {{ d.deposited_on|date:"M j" }}{% if d.bank_reference %} · {{ d.bank_reference }}{% endif %}</label><span>{{ d.total_cents|cents }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None open.</p>{% endif %}</section>
+      <section class="card"><h2>Vendor payments</h2>{% if open.payments %}<ul class="list">{% for p in open.payments %}<li><label class="grow"><input type="checkbox" name="payments" value="{{ p.pk }}"> {{ p.paid_on|date:"M j" }} · {{ p.invoice.vendor.name }}{% if p.reference %} · {{ p.reference }}{% endif %}</label><span>{{ p.amount_cents|cents }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None open.</p>{% endif %}</section>
+    </div>
+    <section class="card"><p>Book cash balance on {{ statement_date|date:"M j, Y" }}: <strong>{{ book|cents }}</strong></p>
+      <div class="inline-form"><div><label for="sb">Statement ending balance</label><input id="sb" name="statement_balance" inputmode="decimal" required placeholder="12500.00"></div><div class="grow"><label for="nt">Note</label><input id="nt" name="note" maxlength="2000"></div><button type="submit">Record reconciliation</button></div>
+      <p class="small muted">Recorded as entered; a redo is a new reconciliation.</p></section>
+  </form>{% endif %}
+{% endblock %}

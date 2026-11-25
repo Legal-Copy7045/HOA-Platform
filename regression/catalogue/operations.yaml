@@ -32,3 +32,6 @@
 - feature: "Compliance calendar (recurring items, one reminder per due date, My items) and budget notices to owners (proposed, then adopted with dues; paper list)"
   since: M4
   match: ["^unit:operations/tests/test_compliance"]
+- feature: "Statements and delinquency notices: board-edited wording with plain placeholders (never str.format), first/second/final notice with the statement attached, second and final certified, running-balance statement with remittance stub, downloads audited and board/manager only; resale certificate fills application data in bold, separate from the delinquency packet"
+  since: M4
+  match: ["^unit:ledger/tests/test_letters"]

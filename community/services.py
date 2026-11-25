@@ -1381,3 +1381,40 @@ def owner_notice_recipients() -> tuple[list[str], list[Person]]:
         else:
             paper.append(person)
     return sorted(set(emails)), paper
+
+
+# --- Letters and resale certificate settings (Milestone 4) ----------------------------
+
+LETTER_FIELDS = ("letterhead", "remit_to", "letter_contact", "letter_signature")
+RESALE_TEXT_FIELDS = (
+    "resale_restraints",
+    "resale_other_fees",
+    "resale_capital_expenditures",
+    "resale_reserve_designations",
+    "resale_judgments",
+    "resale_insurance_company",
+)
+RESALE_MONEY_FIELDS = ("resale_reserves_cents", "resale_insurance_cents")
+
+
+def update_letter_settings(*, actor, request=None, **values):
+    """Letterhead, remittance, contact and signature; resale certificate facts."""
+    from community.models import CommunityProfile
+
+    _authorize(actor, "letters.manage")
+    with transaction.atomic():
+        profile = CommunityProfile.get()
+        for field in LETTER_FIELDS + RESALE_TEXT_FIELDS:
+            if field in values:
+                setattr(profile, field, (values[field] or "").strip()[:3000])
+        for field in RESALE_MONEY_FIELDS:
+            if field in values:
+                value = values[field]
+                if value is not None and int(value) < 0:
+                    raise CommunityError("Amounts cannot be negative.")
+                setattr(profile, field, value)
+        profile.save()
+        _audit(
+            "community.letters_changed", actor=actor, request=request, target=profile, metadata={}
+        )
+    return profile

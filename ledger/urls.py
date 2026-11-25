@@ -18,6 +18,17 @@ urlpatterns = [
         views.lot_statement_pdf,
         name="lot_statement_pdf",
     ),
+    re_path(
+        r"^finance/ledger/lot/(?P<pk>[0-9]+)/notice-(?P<kind>statement|first|second|final)\.pdf$",
+        views.lot_notice_pdf,
+        name="lot_notice_pdf",
+    ),
+    path("finance/letters/", views.letters_settings, name="letters_settings"),
+    path("finance/accounting/", views.accounting, name="accounting"),
+    path("finance/accounting/export.csv", views.accounting_export, name="accounting_export"),
+    path("finance/accounting/1099-<int:year>.csv", views.accounting_1099, name="accounting_1099"),
+    path("finance/accounting/reconcile/", views.reconcile, name="reconcile"),
+    path("finance/collections/<int:pk>/letter/", views.collection_letter, name="collection_letter"),
     path("finance/collections/", views.collections, name="collections"),
     path("finance/collections/<int:pk>/", views.collection_detail, name="collection_detail"),
     re_path(

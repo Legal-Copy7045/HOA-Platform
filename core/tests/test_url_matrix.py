@@ -152,6 +152,7 @@ PROTECTED = {
     "board_home": ("GET", None),
     "owner_preview_start": ("POST", None),
     "branding_settings": ("GET", None),
+    "feature_settings": ("GET", None),
     "approvals": ("GET", None),
     "people": ("GET", None),
     "person_detail": ("GET", "person"),
@@ -219,9 +220,16 @@ PROTECTED = {
     "lot_ledger": ("GET", "lot"),
     "lot_ledger_action": ("POST", "lot"),
     "lot_statement_pdf": ("GET", "lot"),
+    "lot_notice_pdf": ("GET", "lot"),
+    "letters_settings": ("GET", None),
     "collections": ("GET", None),
     "collection_detail": ("GET", "collection"),
     "collection_action": ("POST", "collection"),
+    "collection_letter": ("POST", "collection"),
+    "accounting": ("GET", None),
+    "accounting_export": ("GET", None),
+    "accounting_1099": ("GET", None),
+    "reconcile": ("GET", None),
     "budgets": ("GET", None),
     "budget_detail": ("GET", "budget"),
     "resale_detail": ("GET", "resale_b"),
@@ -547,6 +555,10 @@ def _url(name, key, targets):
         kwargs["action"] = "credit"
     elif name == "lot_statement_pdf":
         kwargs["kind"] = "statement"
+    elif name == "lot_notice_pdf":
+        kwargs["kind"] = "first"
+    elif name == "accounting_1099":
+        kwargs = {"year": 2026}
     elif name == "collection_action":
         kwargs["action"] = "send_reminder"
     elif name == "resale_action":

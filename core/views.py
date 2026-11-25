@@ -78,3 +78,30 @@ def export_my_data(request):
     response["Content-Disposition"] = 'attachment; filename="my-portal-data.json"'
     response["Cache-Control"] = "no-store"
     return response
+
+
+@login_required
+def feature_settings(request):
+    """Board: switch optional features on and off."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from core import features
+
+    policy.require(request.user, "features.manage")
+    if request.method == "POST":
+        key = request.POST.get("feature", "")
+        if key not in features.BY_KEY:
+            messages.error(request, "Unknown feature.")
+        else:
+            on = request.POST.get("enabled") == "on"
+            features.set_feature(key, on, actor=request.user, request=request)
+            label = features.BY_KEY[key].label
+            messages.success(request, f"{label} switched {'on' if on else 'off'}.")
+        return redirect("feature_settings")
+    states = features.states(request)
+    return render(
+        request,
+        "core/features.html",
+        {"rows": [(f, states[f.key]) for f in features.FEATURES]},
+    )

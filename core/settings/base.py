@@ -102,6 +102,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "accounts.middleware.RequireMFAMiddleware",
+    "core.features.FeatureGateMiddleware",
     "core.preview.OwnerPreviewMiddleware",
     "core.sysadmin_audit.SysadminRequestAuditMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",

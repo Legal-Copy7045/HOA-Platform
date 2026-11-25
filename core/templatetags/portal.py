@@ -19,6 +19,16 @@ def cents(value) -> str:
     return format_cents(value) if value is not None else ""
 
 
+@register.filter
+def cents_plain(value) -> str:
+    """{{ amount_cents|cents_plain }} -> 1234.56 (for form inputs)."""
+    if value is None:
+        return ""
+    sign = "-" if value < 0 else ""
+    value = abs(int(value))
+    return f"{sign}{value // 100}.{value % 100:02d}"
+
+
 @register.simple_tag
 def icon(name: str, extra_class: str = ""):
     """{% icon "home" %} -> inline <svg> using the self-hosted sprite."""

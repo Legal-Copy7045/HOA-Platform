@@ -93,6 +93,42 @@ def _add_neighbors_as_affected(req) -> None:
             ArcRequest.objects.unscoped("affected lots").get(pk=req.pk).affected_lots.add(*lots)
 
 
+def _waiting_acknowledgements(req) -> int:
+    from arc.models import SignoffRequest, SignoffState
+
+    with system_access("acknowledgements waiting"):
+        return SignoffRequest.objects.filter(arc_request=req, state=SignoffState.PENDING).count()
+
+
+def _may_submit(obj, actor):
+    """Straight to the board only when no neighbor acknowledgement is waiting."""
+    problem = _lot_owner(obj, actor)
+    if problem:
+        return problem
+    if _waiting_acknowledgements(obj):
+        return "Request your neighbors' acknowledgements first."
+    return None
+
+
+def _may_request_acknowledgements(obj, actor):
+    problem = _lot_owner(obj, actor)
+    if problem:
+        return problem
+    if not _waiting_acknowledgements(obj):
+        return "There are no neighbors to ask."
+    return None
+
+
+def _send_acknowledgement_requests(obj, actor):
+    from arc.signoffs import send_signoffs
+
+    send_signoffs(obj, actor=actor)
+
+
+def _automatic(obj, actor):
+    return None if actor is SYSTEM else "This happens when the last acknowledgement is in."
+
+
 ARC = Workflow(
     "arc",
     [
@@ -102,7 +138,25 @@ ARC = Workflow(
             ArcState.SUBMITTED,
             "arc.submit",
             "Submit for review",
-            guard=_lot_owner,
+            guard=_may_submit,
+            after=_mark_submitted,
+        ),
+        Transition(
+            "request_acknowledgements",
+            {ArcState.DRAFT},
+            ArcState.NEIGHBORS,
+            "arc.submit",
+            "Request Neighbor Acknowledgements",
+            guard=_may_request_acknowledgements,
+            after=_send_acknowledgement_requests,
+        ),
+        Transition(
+            "acknowledged",
+            {ArcState.NEIGHBORS},
+            ArcState.SUBMITTED,
+            "arc.submit",
+            "All acknowledgements in: submitted",
+            guard=_automatic,
             after=_mark_submitted,
         ),
         Transition(
@@ -125,7 +179,7 @@ ARC = Workflow(
         ),
         Transition(
             "withdraw",
-            {ArcState.DRAFT, ArcState.SUBMITTED, ArcState.IN_REVIEW},
+            {ArcState.DRAFT, ArcState.NEIGHBORS, ArcState.SUBMITTED, ArcState.IN_REVIEW},
             ArcState.WITHDRAWN,
             "arc.submit",
             "Withdraw",
@@ -204,7 +258,8 @@ def create_request(
         raise ArcError("Describe the project.")
     project_type = (project_type or "").strip()
     types = active_project_types()
-    if types and project_type not in {t.name for t in types}:
+    # The owner form requires a choice; here an unknown name is refused.
+    if project_type and project_type not in {t.name for t in types} | {"Other"}:
         raise ArcError("Choose the kind of project.")
     with system_access("create arc request"):
         applicant = Person.objects.get(user=actor)
@@ -229,6 +284,10 @@ def create_request(
     record_event(
         "arc.created", actor=actor, request=request, target=req, metadata={"lot_id": lot.pk}
     )
+    # The lot's recorded neighbors are on the list from the start (locked).
+    from arc.signoffs import prepare_signoffs
+
+    prepare_signoffs(req, actor=actor)
     return req
 
 

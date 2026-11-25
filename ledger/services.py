@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import record_event
-from community.models import CommunityProfile, Lot, Ownership
+from community.models import CommunityProfile, Lot
 from community.rules import rule, rule_with_citation
 from core import pdf
 from core.money import format_cents
@@ -372,38 +372,13 @@ def delinquent_lots(min_age_days: int = 30, as_of=None) -> list[tuple[Lot, int, 
 
 @internal("ledger service")
 def statement_pdf(lot: Lot, *, since: datetime.date | None = None, reminder: bool = False):
-    profile = CommunityProfile.get()
-    since = since or datetime.date(2000, 1, 1)
-    st = owner_statement(lot.pk, since)
-    body = [
-        ("heading", profile.legal_name),
-        ("normal", "Payment reminder" if reminder else "Account statement"),
-        ("normal", timezone.localdate().strftime("%B %-d, %Y")),
-        ("normal", f"Lot {lot.number}, {lot.street_address}"),
-        ("normal", ""),
-    ]
-    if st.brought_forward:
-        body.append(("normal", f"Balance brought forward: {format_cents(st.brought_forward)}"))
-    for e in st.entries:
-        body.append(
-            (
-                "normal",
-                f"{e.posted_on:%Y-%m-%d}  {e.description[:60]:<60}  {format_cents(e.amount_cents)}",
-            )
-        )
-    label = "Amount due" if st.balance > 0 else "Credit on account"
-    body += [("normal", ""), ("heading", f"{label}: {format_cents(abs(st.balance))}")]
+    """The account statement (and, with ``reminder``, the first delinquency
+    notice with the statement attached), in the association's layout."""
+    from ledger import letters
+
     if reminder:
-        body += [
-            ("normal", ""),
-            (
-                "normal",
-                "Our records show this balance is overdue. Please "
-                "pay, or contact the board to discuss a payment plan. If you have already "
-                "paid, thank you, and please let us know.",
-            ),
-        ]
-    return pdf.render(body, title=f"Statement lot {lot.number}")
+        return letters.notice_pdf(lot, "first")
+    return letters.statement_pdf(lot, since=since)
 
 
 # --- Collections (tracking only; no automatic fees or legal steps) -----------------------
@@ -422,8 +397,15 @@ COLLECTION = Workflow(
             "Second reminder sent",
         ),
         Transition(
+            "send_final_notice",
+            {"second_reminder"},
+            "final_notice",
+            "collections.manage",
+            "Final notice sent",
+        ),
+        Transition(
             "payment_plan",
-            {"open", "reminder_sent", "second_reminder"},
+            {"open", "reminder_sent", "second_reminder", "final_notice"},
             "payment_plan",
             "collections.manage",
             "Payment plan agreed",
@@ -431,7 +413,7 @@ COLLECTION = Workflow(
         ),
         Transition(
             "refer",
-            {"second_reminder", "payment_plan"},
+            {"second_reminder", "final_notice", "payment_plan"},
             "referred",
             "collections.refer",
             "Referred for legal collection (board)",
@@ -439,7 +421,14 @@ COLLECTION = Workflow(
         ),
         Transition(
             "close",
-            {"open", "reminder_sent", "second_reminder", "payment_plan", "referred"},
+            {
+                "open",
+                "reminder_sent",
+                "second_reminder",
+                "final_notice",
+                "payment_plan",
+                "referred",
+            },
             "closed",
             "collections.manage",
             "Close (paid or resolved)",
@@ -702,64 +691,174 @@ def request_resale(
 
 @internal("ledger service")
 def resale_certificate(obj: ResaleRequest) -> bytes:
-    """Draft content; the board must confirm it meets 68 Pa.C.S. § 5407 with counsel."""
-    from arc.models import ArcRequest
+    """The resale certificate under 68 Pa.C.S. § 5407, in the layout of the
+    association's sample: every value filled in from the portal is in bold.
+    Association-wide facts come from Community settings; this lot's figures
+    from its account and records. The board confirms it with counsel."""
     from compliance.models import Violation
-    from governance.models import Resolution
 
     profile = CommunityProfile.get()
+    lot = obj.lot
     with system_access("resale certificate"):
-        lot = obj.lot
-        owners = [
-            o.person.display_name
-            for o in Ownership.objects.active().filter(lot=lot).select_related("person")
-        ]
-        open_violations = (
+        open_violations = list(
             Violation.objects.filter(lot=lot)
             .exclude(state__in=["closed", "dismissed", "cured"])
-            .count()
-        )
-        open_arc = (
-            ArcRequest.objects.filter(lot=lot)
-            .exclude(state__in=["completed", "withdrawn", "denied", "appeal_decided"])
-            .count()
+            .exclude(noticed_at__isnull=True)
         )
     dues, dues_cite = rule_with_citation("dues.monthly_cents")
+    due_day = min(rule("dues.due_day") or 1, 28)
     bal = balance(lot.pk)
-    policies = Resolution.objects.filter(kind="policy", superseded_by__isnull=True).count()
+    today = timezone.localdate()
+
+    def b(text) -> str:
+        return f"**{text}**"
+
+    def stated(text: str) -> str:
+        text = " ".join((text or "").split())
+        return b(text) if text else b("None")
+
+    violations_text = (
+        "; ".join(
+            f"{v.get_category_display()} (notice of {v.noticed_at:%B %-d, %Y})"
+            for v in open_violations
+        )
+        if open_violations
+        else ""
+    )
+    if obj.other_disclosures.strip():
+        violations_text = (violations_text + "; " if violations_text else "") + (
+            obj.other_disclosures.strip()
+        )
+    designations = []
+    for line in (profile.resale_reserve_designations or "").splitlines():
+        amount, _, project = line.partition("|")
+        if amount.strip() or project.strip():
+            designations.append((amount.strip(), project.strip()))
     body = [
-        ("heading", profile.legal_name),
-        ("normal", "Resale certificate"),
-        ("normal", timezone.localdate().strftime("%B %-d, %Y")),
-        ("normal", f"Lot {lot.number}, {lot.street_address}"),
-        ("normal", f"Record owner(s): {', '.join(owners) or 'not recorded'}"),
-        ("normal", f"Requested by: {obj.requester_name}"),
+        ("heading", "HOMEOWNER ASSOCIATION RESALE CERTIFICATE"),
         ("normal", ""),
-        ("heading", "Assessments and account"),
         (
             "normal",
-            f"Current assessment: {format_cents(dues)} per month"
-            + (f" ({dues_cite})" if dues_cite else ""),
+            "This certificate is provided pursuant to the provisions of Section 5407 of the "
+            f"Pennsylvania Uniform Planned Community Act. {b(profile.legal_name)} (hereinafter "
+            f'"Association") represents the following with respect to {b(lot.street_address)} '
+            f'(lot {b(lot.number)}) (hereinafter "Unit"), as of {b(today.strftime("%B %-d, %Y"))}.',
+        ),
+        ("normal", ""),
+        (
+            "normal",
+            "1. The sale of the Unit is not subject to any right of first refusal or any other "
+            "restraint on the free alienability of the Unit known to the Association unless "
+            f"otherwise stated here: {stated(profile.resale_restraints)}",
         ),
         (
             "normal",
-            f"Account balance today: {format_cents(bal)}"
-            + (" owed" if bal > 0 else " (credit)" if bal < 0 else ""),
+            "2. The regular monthly common expense assessment of the Unit is "
+            + (b(format_cents(dues)) if dues else b("not set"))
+            + f", payable in {b('monthly')} installments, due on or before day {b(due_day)} of "
+            "each month" + (f" ({b(dues_cite)})" if dues_cite else "") + ".",
         ),
         ("normal", ""),
-        ("heading", "Open matters for this lot"),
-        ("normal", f"Open covenant violations: {open_violations}"),
-        ("normal", f"Open architectural requests: {open_arc}"),
-        ("normal", f"Rules and policies in force: {policies} (copies available on request)"),
+        (
+            "normal",
+            "As of the date of this certificate, there are no unpaid common expenses or special "
+            "assessments currently due and payable by the Unit owner except as otherwise stated "
+            "here: "
+            + (
+                b(f"{format_cents(bal)} unpaid, per the attached account") if bal > 0 else b("None")
+            ),
+        ),
+        (
+            "normal",
+            "As of the date of this certificate, there are no surplus fund credits applicable to "
+            "the Unit except as otherwise stated here: "
+            + (b(f"{format_cents(-bal)} credit on the account") if bal < 0 else b("None")),
+        ),
         ("normal", ""),
-        ("heading", "Other disclosures"),
-        ("normal", obj.other_disclosures or "None provided by the board."),
+        (
+            "normal",
+            "3. No other fees are presently due to the Association by the Unit owner(s) except as "
+            f"otherwise stated here: {stated(profile.resale_other_fees)}",
+        ),
+        ("normal", ""),
+        (
+            "normal",
+            "The Unit owner is personally responsible for all County, Township and School real "
+            "estate taxes on the Unit as well as all utilities furnished to the individual unit.",
+        ),
+        ("normal", ""),
+        (
+            "normal",
+            "4. As of the date of this certificate no capital expenditures are proposed by the "
+            "Association for the current or the two next succeeding fiscal years unless otherwise "
+            f"stated here: {stated(profile.resale_capital_expenditures)}",
+        ),
+        (
+            "normal",
+            "5. The Association has "
+            + (
+                b(format_cents(profile.resale_reserves_cents))
+                if profile.resale_reserves_cents is not None
+                else b("not stated")
+            )
+            + " reserved for capital expenditures. Those reserves have not been specifically "
+            "designated by the Association for specified projects unless otherwise stated here:"
+            + ("" if designations else f" {b('None')}"),
+        ),
+    ]
+    for amount, project in designations:
+        body.append(("normal", f"     Amount {b(amount)}     Project: {b(project)}"))
+    budget = Budget.objects.filter(status=BudgetStatus.ADOPTED).first()
+    body += [
+        (
+            "normal",
+            "6. The most recent regularly prepared balance sheet and income and expense "
+            "statement, if any, of the Association is attached hereto and incorporated herein "
+            "by reference.",
+        ),
+        (
+            "normal",
+            "7. The current operating budget of the Association"
+            + (f" ({b(budget)})" if budget else "")
+            + " is attached hereto and incorporated herein by reference.",
+        ),
+        (
+            "normal",
+            "8. At present, there exist no judgments against the Association known to it, nor "
+            "are there any pending lawsuits known to the Association to which it is a party "
+            f"unless otherwise stated here: {stated(profile.resale_judgments)}",
+        ),
+        (
+            "normal",
+            "9. Pursuant to the requirements of the Uniform Planned Community Act, the "
+            "Association maintains public liability insurance of the common facilities in the "
+            "amount of "
+            + (
+                b(format_cents(profile.resale_insurance_cents))
+                if profile.resale_insurance_cents is not None
+                else b("not stated")
+            )
+            + ". Such insurance is maintained with "
+            + b(profile.resale_insurance_company or "not stated")
+            + ".",
+        ),
+        (
+            "normal",
+            "10. The Executive Board of the Association has no knowledge of any alterations or "
+            "improvements to the above referenced Unit or the limited common facilities assigned "
+            "thereto that are in violation of any provision of the Declaration unless otherwise "
+            f"stated here: {stated(violations_text)}",
+        ),
+        ("normal", ""),
+        ("normal", f"Requested by: {b(obj.requester_name)}"),
+        ("normal", ""),
+        ("normal", "_______________________________________          ____________________"),
+        ("normal", f"For {profile.legal_name}" + " " * 30 + "Date"),
         ("normal", ""),
         (
             "small",
-            "Prepared from the association's records. The board must confirm this "
-            "certificate contains everything required by the Uniform Planned "
-            "Community Act (68 Pa.C.S. § 5407) before it is relied upon.",
+            "Prepared from the association's records. The board confirms the certificate "
+            "contains everything 68 Pa.C.S. § 5407 requires before it is relied upon.",
         ),
     ]
     return pdf.render(body, title=f"Resale certificate {obj.pk}")
@@ -952,3 +1051,44 @@ def owner_visible_budget():
     if proposed and (adopted is None or proposed.fiscal_year > adopted.fiscal_year):
         return proposed
     return adopted
+
+
+def save_letter_template(
+    kind: str, *, subject: str, body: str, certified: bool, actor, request=None
+):
+    from ledger.models import LetterKind, LetterTemplate
+
+    _authorize(actor, "letters.manage")
+    if kind not in LetterKind.values:
+        raise LedgerError("Unknown letter.")
+    if not (body or "").strip():
+        raise LedgerError("The letter needs some text.")
+    LetterTemplate.objects.update_or_create(
+        kind=kind,
+        defaults={
+            "subject": " ".join((subject or "").split())[:200],
+            "body": body.strip()[:6000],
+            "certified": bool(certified),
+            "updated_by": actor,
+            "updated_at": timezone.now(),
+        },
+    )
+    record_event(
+        "ledger.letter_template_saved", actor=actor, request=request, metadata={"kind": kind}
+    )
+
+
+def generate_notice(lot: Lot, kind: str, *, actor, request=None) -> bytes:
+    """A delinquency notice (with statement) or a statement, for printing."""
+    from ledger import letters
+
+    _authorize(actor, "collections.manage")
+    data = letters.statement_pdf(lot) if kind == "statement" else letters.notice_pdf(lot, kind)
+    record_event(
+        "ledger.notice_generated",
+        actor=actor,
+        request=request,
+        target=lot,
+        metadata={"kind": kind, "lot_id": lot.pk},
+    )
+    return data

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from django.urls import NoReverseMatch, reverse
 
-from core import policy
+from core import features, policy
 from core.my_items import MY_ITEMS_PERMISSIONS
 
 # (label, url name, icon, permission or tuple of alternatives; None = everyone)
@@ -23,7 +23,7 @@ SECTIONS = [
             ("My home", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
             ("My architectural requests", "arc_list?mine=1", "pencil", "arc.submit"),
-            ("Neighbor sign-offs", "signoffs_mine", "check-circle", "arc.submit"),
+            ("Neighbor acknowledgements", "signoffs_mine", "check-circle", "arc.submit"),
             ("Notices about my home", "violations?mine=1", "flag", "lot.view_own"),
             ("My requests", "requests?mine=1", "mail", "request.view_own"),
             ("My history", "my_history", "clock", "history.view_own"),
@@ -76,6 +76,8 @@ SECTIONS = [
             ("Vendors", "vendors", "users", "finance.view"),
             ("Budgets", "budgets", "chart", "finance.view"),
             ("Collections", "collections", "dollar", "finance.view"),
+            ("Letters and certificates", "letters_settings", "mail", "letters.manage"),
+            ("Accounting", "accounting", "receipt", "finance.view"),
             ("Resale certificates", "resales", "file", "resale.manage"),
             ("Reports", "reports", "chart", "reports.view"),
         ],
@@ -84,6 +86,7 @@ SECTIONS = [
         "Admin",
         [
             ("System status", "system_status", "activity", "system.view_status"),
+            ("Features", "feature_settings", "sliders", "features.manage"),
             ("Branding", "branding_settings", "sliders", "branding.manage"),
             ("Invitations", "invitations", "mail", "invite.resend"),
             ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
@@ -127,6 +130,8 @@ def build(request) -> dict:
             if name in seen or not _allowed(roles.groups, permission):
                 continue
             url_name, _, query = name.partition("?")
+            if not features.url_name_enabled(url_name, request):
+                continue
             try:
                 url = reverse(url_name) + (f"?{query}" if query else "")
             except NoReverseMatch:

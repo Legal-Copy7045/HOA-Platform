@@ -16,8 +16,15 @@ from documents import attachments
 from documents.services import DocumentError
 
 
+class _AddressChoice(forms.ModelChoiceField):
+    """Owners know their street address, not their lot number."""
+
+    def label_from_instance(self, obj):
+        return f"{obj.street_address} (lot {obj.number})" if obj.street_address else str(obj)
+
+
 class NewRequestForm(forms.Form):
-    lot = forms.ModelChoiceField(queryset=Lot.objects.none())
+    lot = _AddressChoice(queryset=Lot.objects.none(), label="Property", empty_label="Choose...")
     title = forms.CharField(max_length=200, help_text="e.g. 'Rear fence, 4 ft black aluminium'")
     project_type = forms.ChoiceField(label="Kind of project", required=False)
     description = forms.CharField(
@@ -25,8 +32,7 @@ class NewRequestForm(forms.Form):
         help_text="Materials, colours, dimensions, location, contractor.",
     )
     planned_start = forms.DateField(
-        required=False,
-        label="Approximate start",
+        label="Planned start",
         widget=forms.DateInput(attrs={"type": "date"}),
     )
     planned_completion = forms.DateField(
@@ -57,9 +63,13 @@ class NewRequestForm(forms.Form):
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["lot"].queryset = Lot.objects.for_user(user).filter(
-            pk__in=policy.roles_for(user).owned_lot_ids
-        )
+        lots = Lot.objects.for_user(user).filter(pk__in=policy.roles_for(user).owned_lot_ids)
+        self.fields["lot"].queryset = lots
+        self.only_lot = lots.first() if lots.count() == 1 else None
+        if self.only_lot:
+            # One home (nearly everyone): no dropdown, the address is shown as text.
+            self.fields["lot"].widget = forms.HiddenInput()
+            self.fields["lot"].initial = self.only_lot.pk
         types = services.active_project_types()
         if types:
             self.fields["project_type"].required = True
@@ -69,9 +79,8 @@ class NewRequestForm(forms.Form):
             guidance = "; ".join(f"{t.name}: {t.guidance}" for t in types if t.guidance)
             self.fields["project_type"].help_text = guidance[:600]
         else:
-            self.fields["project_type"] = forms.CharField(
-                max_length=60, required=False, label="Kind of project"
-            )
+            # The board retired every type: still a choice, never free text.
+            self.fields["project_type"].choices = [("", "Choose..."), ("Other", "Other")]
 
 
 class DecisionForm(forms.Form):
@@ -133,7 +142,14 @@ def arc_list(request):
         request,
         rows,
         date_field="created_at",
-        open_states=("draft", "submitted", "completeness_check", "in_review", "appeal"),
+        open_states=(
+            "draft",
+            "neighbors",
+            "submitted",
+            "completeness_check",
+            "in_review",
+            "appeal",
+        ),
     )
     if wants_csv(request) and can_view_all and not mine:
         return csv_response(

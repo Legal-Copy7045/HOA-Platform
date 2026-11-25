@@ -388,8 +388,9 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "My home",
-                    f"Sign-off: {so.arc_request.title}",
-                    f"Your neighbor at {so.arc_request.lot.street_address} asks for your view",
+                    f"Acknowledge: {so.arc_request.title}",
+                    f"Your neighbor at {so.arc_request.lot.street_address} asks you to review "
+                    "a project",
                     reverse("signoff_detail", args=[so.pk]),
                     "info",
                     nav="signoffs_mine",
@@ -414,7 +415,9 @@ def items_for(user) -> list[Item]:
 
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
-    return out
+    from core import features
+
+    return [i for i in out if features.path_enabled(i.url)]
 
 
 def counts(items: list[Item]) -> list[dict]:

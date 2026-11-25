@@ -188,24 +188,39 @@ def test_board_configures_types_and_owners_must_choose_one(client, w):
     client.force_login(w["board2"])
     client.post(
         reverse("arc_project_types"),
-        {"name": "Fence", "guidance": "Plot plan", "sort_order": "10", "active": "on"},
+        {"name": "Gazebo", "guidance": "Plot plan", "sort_order": "10", "active": "on"},
     )
     with pytest.raises(arc.ArcError):
-        arc.create_request(lot=w["other"], title="x", description="y", actor=w["owner"])
+        arc.create_request(
+            lot=w["other"], title="x", description="y", project_type="Moat", actor=w["owner"]
+        )
     req = arc.create_request(
-        lot=w["other"], title="x", description="y", project_type="Fence", actor=w["owner"]
+        lot=w["other"], title="x", description="y", project_type="Gazebo", actor=w["owner"]
     )
-    assert req.project_type == "Fence"
+    assert req.project_type == "Gazebo"
     client.force_login(w["owner"])
     page = client.get(reverse("arc_list"), {"mine": "1"}).content
-    assert b"Kind of project" in page and b"Fence" in page
+    assert b"Kind of project" in page and b"Gazebo" in page and b"Fence" in page
     assert client.get(reverse("arc_project_types")).status_code == 403
+
+
+def test_new_request_form_needs_a_kind_and_a_start_and_shows_the_address(client, w):
+    from arc.views import NewRequestForm
+
+    form = NewRequestForm({"lot": w["other"].pk, "title": "t", "description": "d"}, user=w["owner"])
+    assert not form.is_valid()
+    assert {"project_type", "planned_start"} <= set(form.errors)
+    assert form.only_lot == w["other"]  # one home: no dropdown
+    client.force_login(w["owner"])
+    page = client.get(reverse("arc_list"), {"mine": "1"}).content.decode()
+    assert w["other"].street_address in page
+    assert 'type="hidden" name="lot"' in page
 
 
 def test_retired_types_are_not_offered(w):
     t = arc.save_project_type(name="Pool", actor=w["board2"])
     arc.save_project_type(name="Pool", active=False, project_type=t, actor=w["board2"])
-    assert arc.active_project_types() == []
+    assert "Pool" not in {t.name for t in arc.active_project_types()}
 
 
 # --- Testing the owner side on the POC -------------------------------------------------------

@@ -10,6 +10,7 @@ from core.scoping import ScopedModel, ScopedQuerySet
 
 class ArcState(models.TextChoices):
     DRAFT = "draft", "Draft"
+    NEIGHBORS = "neighbors", "Awaiting neighbor acknowledgements"
     SUBMITTED = "submitted", "Submitted (completeness check)"
     IN_REVIEW = "in_review", "In review"
     APPROVED = "approved", "Approved"
@@ -204,8 +205,8 @@ class LotNeighbor(models.Model):
 
 class SignoffState(models.TextChoices):
     PENDING = "pending", "Waiting"
-    APPROVED = "approved", "Approves"
-    OBJECTED = "objected", "Objects"
+    APPROVED = "approved", "Acknowledged, no objection"
+    OBJECTED = "objected", "Acknowledged, objects"
     WITHDRAWN = "withdrawn", "No longer asked"
 
 
@@ -229,6 +230,9 @@ class SignoffRequest(ScopedModel):
     token_hash = models.CharField(max_length=64, blank=True)
     token_expires_at = models.DateTimeField(null=True, blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
+    # From the lot's neighbor list, or added by the board: the homeowner
+    # cannot remove it; the board can.
+    locked = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -276,8 +280,8 @@ class SignoffRequest(ScopedModel):
 
 
 class SignoffChannel(models.TextChoices):
-    PORTAL = "portal", "Signed in the portal"
-    LINK = "link", "Signed by emailed link"
+    PORTAL = "portal", "In the portal"
+    LINK = "link", "By emailed review link"
     PAPER = "paper", "Signed paper form (entered by staff)"
     AI = "ai", "Signed paper form (read automatically)"
 
@@ -288,7 +292,10 @@ class SignoffResponse(AppendOnlyModel):
     signoff = models.ForeignKey(SignoffRequest, on_delete=models.PROTECT, related_name="responses")
     position = models.CharField(
         max_length=12,
-        choices=[(SignoffState.APPROVED, "Approves"), (SignoffState.OBJECTED, "Objects")],
+        choices=[
+            (SignoffState.APPROVED, "Acknowledged, no objection"),
+            (SignoffState.OBJECTED, "Acknowledged, objects"),
+        ],
     )
     signer_name = models.CharField(max_length=200)
     comment = models.TextField(blank=True)

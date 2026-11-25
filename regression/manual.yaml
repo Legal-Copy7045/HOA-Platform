@@ -29,9 +29,9 @@
   check: "git pull and start-portal.sh on the VM bring every service up healthy, tunnel registered."
   steps: "VM console as hoa: cd /opt/hoa-portal && git pull --ff-only && sudo bash infra/poc/start-portal.sh"
   last: "2026-11-25: Milestone 1 deploy healthy"
-- key: gemini reads a scanned sign-off form
-  check: "With GEMINI_API_KEY set on the POC, a hand-filled sign-off form is read into the right proposals."
-  steps: "Print an ARC request's sign-off form; fill two blocks by hand (one approve, one object); scan or photograph it; upload it under 'Upload the signed paper form'; press 'Read automatically'; refresh after a minute; confirm both."
+- key: gemini reads a scanned acknowledgement form
+  check: "With GEMINI_API_KEY set on the POC, a hand-filled acknowledgement form is read into the right proposals."
+  steps: "Print an ARC request's acknowledgement form; fill two blocks by hand (one no objection, one object); scan or photograph it; upload it under 'Neighbor not online? Use the paper form'; press 'Read automatically'; refresh after a minute; confirm both."
   last: ""
 - key: restore drill on the POC VM
   check: "The newest nightly backup restores into a throwaway copy and passes its checks."

@@ -60,3 +60,18 @@ class AlertState(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class FeatureSetting(models.Model):
+    """The board's choice for one optional feature (core.features). A missing
+    row means the feature's default."""
+
+    key = models.CharField(max_length=40, primary_key=True)
+    enabled = models.BooleanField()
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return f"{self.key}: {'on' if self.enabled else 'off'}"

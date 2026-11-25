@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Letters and certificates · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="page-head"><div><h1>Letters and certificates</h1><p class="subtitle">Letterhead, where payments go, and the wording of statements and delinquency notices; the facts the resale certificate states. Nothing here is sent automatically: the board downloads, prints and mails.</p></div></div>
+  <div class="split">
+    <section class="card"><h2>Letterhead and signature</h2>
+      <form method="post">{% csrf_token %}<input type="hidden" name="section" value="settings">
+        <p><label>Letterhead (first line is the heading) <textarea name="letterhead" rows="4">{{ profile.letterhead }}</textarea></label></p>
+        <p><label>Remit payments to (mailing address) <textarea name="remit_to" rows="4">{{ profile.remit_to }}</textarea></label></p>
+        <p><label>Contact line used in letters <input type="text" name="letter_contact" value="{{ profile.letter_contact }}" maxlength="300" placeholder="the management office at 555-0100"></label></p>
+        <p><label>Signature block <textarea name="letter_signature" rows="3">{{ profile.letter_signature }}</textarea></label></p>
+        <h3>Resale certificate facts</h3>
+        <p class="small muted">Stated on every certificate (PA § 5407). Leave blank for "None".</p>
+        <p><label>Restraints on transfer (right of first refusal etc.) <textarea name="resale_restraints" rows="2">{{ profile.resale_restraints }}</textarea></label></p>
+        <p><label>Other fees payable by owners <textarea name="resale_other_fees" rows="2">{{ profile.resale_other_fees }}</textarea></label></p>
+        <p><label>Capital expenditures approved for this and next fiscal year <textarea name="resale_capital_expenditures" rows="2">{{ profile.resale_capital_expenditures }}</textarea></label></p>
+        <p><label>Reserves for capital expenditures (dollars) <input type="text" name="resale_reserves_cents" value="{% if profile.resale_reserves_cents is not None %}{{ profile.resale_reserves_cents|cents_plain }}{% endif %}" inputmode="decimal"></label></p>
+        <p><label>Reserve designations, one per line as "amount | project" <textarea name="resale_reserve_designations" rows="3">{{ profile.resale_reserve_designations }}</textarea></label></p>
+        <p><label>Unsatisfied judgments and pending suits <textarea name="resale_judgments" rows="2">{{ profile.resale_judgments }}</textarea></label></p>
+        <p><label>Insurance coverage (dollars) <input type="text" name="resale_insurance_cents" value="{% if profile.resale_insurance_cents is not None %}{{ profile.resale_insurance_cents|cents_plain }}{% endif %}" inputmode="decimal"></label></p>
+        <p><label>Insurance company <input type="text" name="resale_insurance_company" value="{{ profile.resale_insurance_company }}" maxlength="300"></label></p>
+        <div class="form-actions"><button type="submit">Save</button></div>
+      </form></section>
+    <div>
+      {% for t in templates %}<section class="card"><h2>{{ t.get_kind_display }}</h2>
+        <form method="post">{% csrf_token %}<input type="hidden" name="section" value="template"><input type="hidden" name="kind" value="{{ t.kind }}">
+          {% if t.kind != "statement" %}<p><label>Subject (the "RE:" line) <input type="text" name="subject" value="{{ t.subject }}" maxlength="200"></label></p>{% endif %}
+          <p><label>{% if t.kind == "statement" %}Message on the statement{% else %}Letter{% endif %} <textarea name="body" rows="8">{{ t.body }}</textarea></label></p>
+          {% if t.kind != "statement" %}<p><label><input type="checkbox" name="certified"{% if t.certified %} checked{% endif %}> Sent certified and regular mail</label></p>{% endif %}
+          <div class="form-actions"><button type="submit" class="secondary">Save wording</button>{% if t.is_default %}<span class="small muted">Default wording</span>{% else %}<span class="small muted">Saved {{ t.updated_at|date:"M j, Y" }}</span>{% endif %}</div>
+        </form></section>{% endfor %}
+      <section class="card"><h3>Placeholders</h3><p class="small muted">Write these in the wording; they are filled in for each letter.</p>
+        <dl class="kv small">{% for k, v in placeholders.items %}<dt>{{ "{" }}{{ k }}{{ "}" }}</dt><dd>{{ v }}</dd>{% endfor %}</dl></section>
+    </div>
+  </div>
+{% endblock %}

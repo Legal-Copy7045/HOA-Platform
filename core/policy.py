@@ -139,6 +139,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "ledger.manage": frozenset({BOARD, MANAGER}),
     # Charging a late fee is a board decision (the manager prepares the list).
     "late_fee.post": frozenset({BOARD}),
+    # Letter wording, letterhead and resale certificate facts: the board.
+    "letters.manage": frozenset({BOARD}),
+    # Switching optional features on and off: the board.
+    "features.manage": frozenset({BOARD}),
+    # Deposits, reconciliation, chart of accounts: data entry (manager) or board.
+    "accounting.manage": frozenset({BOARD, MANAGER}),
     "budget.manage": frozenset({BOARD}),
     "budget.view_owner": ACCOUNT_VIEWERS | {BOARD, MANAGER, AUDITOR},
     "collections.manage": frozenset({BOARD, MANAGER}),

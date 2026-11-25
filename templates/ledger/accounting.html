@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Accounting · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="page-head"><div><h1>Accounting</h1><p class="subtitle">Journal export for the accounting package, bank deposits, monthly bank reconciliation, and the 1099 worksheet. Book cash balance today: <strong>{{ book_balance|cents }}</strong>.</p></div>
+    {% if can_manage %}<div class="actions"><a class="btn" href="{% url 'reconcile' %}?date={{ last_month_start|date:'Y-m' }}-{{ month_start|date:'d'|default:'01' }}">{% icon "check-circle" %} Reconcile a statement</a></div>{% endif %}</div>
+  <div class="split">
+    <div>
+      <section class="card"><h2>Journal export</h2>
+        <form method="get" action="{% url 'accounting_export' %}" class="inline-form">
+          <div><label for="xs">From</label><input id="xs" type="date" name="start" value="{{ last_month_start|date:'Y-m-d' }}" required></div>
+          <div><label for="xe">To</label><input id="xe" type="date" name="end" value="{{ today|date:'Y-m-d' }}" required></div>
+          <button type="submit" class="secondary">{% icon "download" %} Download CSV</button></form>
+        <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by lot number only. Accounts come from the setup below.</p></section>
+      {% if can_manage %}<section class="card"><h2>Payments to deposit</h2>
+        {% if undeposited %}<form method="post">{% csrf_token %}<input type="hidden" name="section" value="deposit">
+          <ul class="list">{% for e in undeposited %}<li><label class="grow"><input type="checkbox" name="entries" value="{{ e.pk }}" checked> {{ e.posted_on|date:"M j" }} · Lot {{ e.lot.number }}{% if e.reference %} · {{ e.reference }}{% endif %}</label><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
+          <div class="inline-form"><div><label for="dd">Deposited on</label><input id="dd" type="date" name="deposited_on" value="{{ today|date:'Y-m-d' }}" required></div><div><label for="br">Bank reference</label><input id="br" name="bank_reference" maxlength="40" placeholder="Deposit slip number"></div><button type="submit">Record deposit</button></div>
+        </form>{% else %}<p class="muted small">Every recorded payment is in a deposit.</p>{% endif %}</section>{% endif %}
+      <section class="card"><h2>Deposits</h2>
+        {% if batches %}<ul class="list">{% for b in batches %}<li><span class="grow">{{ b.deposited_on|date:"M j, Y" }}{% if b.bank_reference %} · {{ b.bank_reference }}{% endif %}{% if b.voids_id %} <span class="small muted">(voids #{{ b.voids_id }})</span>{% endif %}</span><span>{{ b.total_cents|cents }}</span>
+          {% if can_manage and not b.voids_id %}<form method="post" data-confirm="Void this deposit? Its payments become undeposited again.">{% csrf_token %}<input type="hidden" name="section" value="void"><input type="hidden" name="batch" value="{{ b.pk }}"><button type="submit" class="secondary small">Void</button></form>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="muted small">No deposits recorded yet.</p>{% endif %}</section>
+    </div>
+    <div>
+      <section class="card"><h2>Bank reconciliations</h2>
+        {% if reconciliations %}<ul class="list">{% for r in reconciliations %}<li><span class="grow">{{ r.statement_date|date:"M j, Y" }} · statement {{ r.statement_balance_cents|cents }}</span>{% if r.difference_cents %}<span class="status tone-danger">Off by {{ r.difference_cents|cents }}</span>{% else %}<span class="status tone-success">Balanced</span>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="muted small">None yet.</p>{% endif %}</section>
+      <section class="card"><h2>1099 worksheet</h2>
+        <form method="get" class="inline-form"><div><label for="yr">Calendar year</label><input id="yr" name="year" value="{{ year }}" inputmode="numeric" size="6"></div><button type="submit" class="secondary">Show</button><a class="btn secondary" href="{% url 'accounting_1099' year %}">{% icon "download" %} CSV</a></form>
+        {% if vendors_1099 %}<table class="table small"><thead><tr><th>Vendor</th><th>Paid</th><th>Over threshold</th><th>W-9</th></tr></thead><tbody>{% for r in vendors_1099 %}<tr><td>{{ r.vendor.name }}</td><td>{{ r.total_cents|cents }}</td><td>{% if r.over %}<strong>Yes</strong>{% endif %}</td><td>{% if r.w9 %}On file{% else %}<span class="status tone-warning">Missing</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+        {% else %}<p class="muted small">No vendor payments that year.</p>{% endif %}
+        <p class="small muted">A worksheet for the treasurer: corporations are generally exempt, and the IRS threshold is a setting under Community settings.</p></section>
+      {% if can_manage %}<section class="card"><h2>Setup</h2>
+        <form method="post">{% csrf_token %}<input type="hidden" name="section" value="setup">
+          <p><label>Accounts, one per line as "key = account" <textarea name="gl_accounts" rows="8">{{ setup.gl_accounts }}</textarea></label></p>
+          <p class="small muted">Keys: cash, receivable, assessment, late_fee, resale_fee, other_charge, credit. Expenses use each invoice's category code.</p>
+          <div class="inline-form"><div><label for="oc">Opening bank balance</label><input id="oc" name="opening_cash" value="{{ setup.opening_cash_cents|cents_plain }}" inputmode="decimal"></div><div><label for="od">as of</label><input id="od" type="date" name="opening_cash_on" value="{{ setup.opening_cash_on|date:'Y-m-d' }}"></div></div>
+          <div class="form-actions"><button type="submit" class="secondary">Save setup</button></div></form></section>{% endif %}
+    </div>
+  </div>
+{% endblock %}

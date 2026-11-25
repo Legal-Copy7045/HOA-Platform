@@ -1,16 +1,23 @@
-"""ARC neighbor sign-off (Milestone 3 phase 7).
+"""ARC neighbor acknowledgements (Milestone 3 phase 7; reworked in Milestone 4).
+
+(The code says "signoff"; everything people see says "acknowledgement".)
 
 * Neighbors come from an adjacency list the board records once from the
-  development plan; they are pre-selected on each request, and extra
-  addresses can be added.
+  development plan. They are on every request from the start and locked:
+  the homeowner cannot remove them, the board can. The homeowner (or the
+  board) can add other lots or addresses.
+* "Request Neighbor Acknowledgements" moves the draft to awaiting
+  acknowledgements and emails each neighbor a review link. When the last
+  one is in (or the board removes the last one waiting), the request goes
+  to the board automatically. Neighbors may comment and may object.
 * A neighbor who owns a lot here and has a login signs in the portal. Anyone
   else gets a single-use, expiring link by email (only its hash is stored)
   that shows that one request's summary and plans, and nothing else.
 * A printable form prefilled from the request can be signed on paper,
   scanned and uploaded; Gemini proposes what each signature says, and a
   person confirms it unless the board switched on automatic confirming.
-* Sign-offs inform the reviewers. They never decide the request: that stays
-  with the committee, with recusal.
+* Acknowledgements inform the reviewers. They never decide the request:
+  that stays with the committee, with recusal.
 """
 
 from __future__ import annotations
@@ -48,6 +55,7 @@ from core.text import single_line
 
 OPEN_FOR_SIGNOFF = {
     ArcState.DRAFT,
+    ArcState.NEIGHBORS,
     ArcState.SUBMITTED,
     ArcState.IN_REVIEW,
     ArcState.APPEAL,
@@ -158,11 +166,20 @@ def can_arrange(actor, req: ArcRequest) -> bool:
     return can(actor, "arc.intake") and not is_recused(actor, req)
 
 
+def is_board_side(actor, req: ArcRequest) -> bool:
+    """The board (not recused) may lock and remove neighbors."""
+    if actor is SYSTEM:
+        return True
+    from arc.services import is_recused
+
+    return can(actor, "arc.configure") and not is_recused(actor, req)
+
+
 def _require_arrange(actor, req: ArcRequest) -> None:
     if not can_arrange(actor, req):
         raise PermissionDenied("signoff")
     if req.state not in OPEN_FOR_SIGNOFF:
-        raise SignoffError("Sign-offs can be arranged only while the request is open.")
+        raise SignoffError("Acknowledgements can be arranged only while the request is open.")
 
 
 def prepare_signoffs(req: ArcRequest, *, actor, request=None) -> int:
@@ -173,7 +190,9 @@ def prepare_signoffs(req: ArcRequest, *, actor, request=None) -> int:
         for lot in neighbors_of(req.lot):
             try:
                 with transaction.atomic():
-                    SignoffRequest.objects.create(arc_request=req, lot=lot, created_by=_user(actor))
+                    SignoffRequest.objects.create(
+                        arc_request=req, lot=lot, locked=True, created_by=_user(actor)
+                    )
                 created += 1
             except IntegrityError:
                 continue
@@ -194,9 +213,21 @@ def add_signoff_lot(req: ArcRequest, lot: Lot, *, actor, request=None) -> Signof
         raise SignoffError("That is the applicant's own lot.")
     try:
         with transaction.atomic(), system_access("add signoff lot"):
-            signoff = SignoffRequest.objects.create(
-                arc_request=req, lot=lot, created_by=_user(actor)
-            )
+            existing = SignoffRequest.objects.filter(arc_request=req, lot=lot).first()
+            if existing and existing.state == SignoffState.WITHDRAWN:
+                # Asked again after being removed: back on the list.
+                SignoffRequest.objects.filter(pk=existing.pk).update(
+                    state=SignoffState.PENDING, sent_at=None, locked=is_board_side(actor, req)
+                )
+                existing.refresh_from_db()
+                signoff = existing
+            else:
+                signoff = SignoffRequest.objects.create(
+                    arc_request=req,
+                    lot=lot,
+                    locked=is_board_side(actor, req),
+                    created_by=_user(actor),
+                )
     except IntegrityError as exc:
         raise SignoffError("That lot is already on the list.") from exc
     record_event(
@@ -230,7 +261,12 @@ def add_signoff_address(
         if SignoffRequest.objects.filter(arc_request=req, lot__isnull=True).count() >= MAX_EXTRA:
             raise SignoffError("That is the most extra addresses one request can have.")
         signoff = SignoffRequest.objects.create(
-            arc_request=req, name=name, address=address, email=email, created_by=_user(actor)
+            arc_request=req,
+            name=name,
+            address=address,
+            email=email,
+            locked=is_board_side(actor, req),
+            created_by=_user(actor),
         )
     record_event(
         "arc.signoff_added",
@@ -243,15 +279,42 @@ def add_signoff_address(
 
 
 def withdraw_signoff(signoff: SignoffRequest, *, actor, request=None) -> None:
-    _require_arrange(actor, signoff.arc_request)
+    req = signoff.arc_request
+    _require_arrange(actor, req)
+    if signoff.locked and not is_board_side(actor, req):
+        raise SignoffError("Only the board can remove this neighbor.")
     with system_access("withdraw signoff"):
         SignoffRequest.objects.filter(pk=signoff.pk, state=SignoffState.PENDING).update(
             state=SignoffState.WITHDRAWN,
             token_hash="",  # nosec B106 - clearing a used link's hash, not a password
         )
-    record_event(
-        "arc.signoff_withdrawn", actor=_user(actor), request=request, target=signoff.arc_request
-    )
+    record_event("arc.signoff_withdrawn", actor=_user(actor), request=request, target=req)
+    submit_if_acknowledged(req)
+
+
+def submit_if_acknowledged(req: ArcRequest) -> bool:
+    """Once nothing is waiting, a request awaiting acknowledgements goes to
+    the board, and the applicant is told."""
+    from arc.services import ARC, _waiting_acknowledgements
+
+    req.refresh_from_db()
+    if req.state != ArcState.NEIGHBORS or _waiting_acknowledgements(req):
+        return False
+    ARC.apply(req, "acknowledged", actor=SYSTEM)
+    with system_access("applicant email"):
+        user = getattr(req.applicant, "user", None)
+    if user is not None and user.is_active and user.email:
+        link = settings.PORTAL_BASE_URL + reverse("arc_detail", args=[req.pk])
+        send_update(
+            {user.email},
+            subject=f"[{settings.SITE_NAME}] Your neighbors' acknowledgements are in",
+            body=(
+                "Every neighbor has now acknowledged your architectural request, and it "
+                f"has gone to the committee for review.\n\n{link}\n\n-- \n{settings.SITE_NAME}"
+            ),
+            link=link,
+        )
+    return True
 
 
 # --- Sending --------------------------------------------------------------------------
@@ -268,7 +331,6 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
     project, never the plans or anyone's details."""
     _require_arrange(actor, req)
     base = settings.PORTAL_BASE_URL
-    portal_link = base + reverse("signoffs_mine")
     sent = {"portal": 0, "link": 0, "no_contact": 0}
     messages: list[tuple[str, str]] = []
     expires = timezone.now() + datetime.timedelta(days=settings.SIGNOFF_LINK_DAYS)
@@ -297,21 +359,22 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
                 sent["no_contact"] += 1
                 continue
             for email in portal_emails:
-                messages.append((email, portal_link))
+                messages.append((email, base + reverse("signoff_detail", args=[signoff.pk])))
                 sent["portal"] += 1
             for email in link_emails:
                 messages.append((email, base + reverse("signoff_link", args=[token])))
                 sent["link"] += 1
             SignoffRequest.objects.filter(pk=signoff.pk).update(sent_at=timezone.now())
     where = single_line(req.lot.street_address)
-    subject = f"[{settings.SITE_NAME}] A neighbor asks for your sign-off"
+    subject = f"[{settings.SITE_NAME}] Please review your neighbor's project"
     for email, link in messages:
         body = (
-            f"Your neighbor at {where} has applied to the architectural committee for "
-            f"an exterior project and asks whether you approve or object.\n\n"
-            f"See the details and plans, and answer, here:\n{link}\n\n"
-            "Your answer is shared with the committee. If you did not expect this, you can "
-            f"ignore it.\n\n-- \n{settings.SITE_NAME}"
+            f"Your neighbor at {where} is applying to the architectural committee for "
+            "an exterior project. Before the committee reviews it, each neighbor is asked "
+            "to acknowledge it, and may comment or object.\n\n"
+            f"Review the details and plans, and acknowledge, here:\n{link}\n\n"
+            "Your acknowledgement and any comments go to the committee, which makes the "
+            f"decision. If you did not expect this, you can ignore it.\n\n-- \n{settings.SITE_NAME}"
         )
         send_update({email}, subject=subject, body=body, link=link)
     record_event(
@@ -365,10 +428,16 @@ def respond(
     """Record an answer. Portal: an owner of that lot. Link: whoever holds the
     single-use link (the caller checked it). Paper/AI: staff entering it."""
     if position not in (SignoffState.APPROVED, SignoffState.OBJECTED):
-        raise SignoffError("Choose approve or object.")
+        raise SignoffError("Choose no objection, or object.")
     signer_name = single_line(signer_name)[:200]
     if not signer_name:
-        raise SignoffError("Type your name to sign.")
+        raise SignoffError("Type your name to acknowledge.")
+    if (
+        position == SignoffState.OBJECTED
+        and channel in (SignoffChannel.PORTAL, SignoffChannel.LINK)
+        and not (comment or "").strip()
+    ):
+        raise SignoffError("Please say what you object to.")
     if channel == SignoffChannel.PORTAL:
         if actor is None or not may_answer_in_portal(actor, signoff):
             raise PermissionDenied("signoff")
@@ -380,11 +449,11 @@ def respond(
     with transaction.atomic(), system_access("record signoff"):
         locked = SignoffRequest.objects.select_for_update().get(pk=signoff.pk)
         if locked.state == SignoffState.WITHDRAWN:
-            raise SignoffError("This sign-off is no longer being asked for.")
+            raise SignoffError("This acknowledgement is no longer being asked for.")
         if channel in (SignoffChannel.PORTAL, SignoffChannel.LINK) and locked.state != "pending":
-            raise SignoffError("This sign-off has already been answered.")
+            raise SignoffError("This has already been acknowledged.")
         if locked.arc_request.state not in OPEN_FOR_SIGNOFF:
-            raise SignoffError("The request is no longer open for sign-offs.")
+            raise SignoffError("The request is no longer open for acknowledgements.")
         response = SignoffResponse.objects.create(
             signoff=locked,
             position=position,
@@ -408,6 +477,7 @@ def respond(
         metadata={"position": position, "channel": channel},
     )
     signoff.refresh_from_db()
+    submit_if_acknowledged(signoff.arc_request)
     return response
 
 
@@ -549,7 +619,7 @@ def signoff_form_pdf(req: ArcRequest) -> bytes:
         (
             "small",
             "Note to neighbors: your signature shows you have been notified of this "
-            "proposed alteration. Tick whether you approve or object. If you object, please "
+            "proposed alteration. Tick no objection, or that you object. If you object, please "
             "also contact the management office, or a board or architectural committee "
             "member, at once.",
         ),
@@ -568,7 +638,7 @@ def signoff_form_pdf(req: ArcRequest) -> bytes:
         paras += [
             ("normal", ""),
             ("normal", heading),
-            ("normal", "     [  ] I approve      [  ] I object"),
+            ("normal", "     [  ] No objection   [  ] I object"),
             (
                 "normal",
                 "     Name (print): _________________________________   Date: ______________",
@@ -583,7 +653,7 @@ def signoff_form_pdf(req: ArcRequest) -> bytes:
                 ("normal", f"{side} neighbor: name and address _________________________________"),
                 (
                     "normal",
-                    "     [  ] I approve      [  ] I object      Signature: ______________________",
+                    "     [  ] No objection   [  ] I object      Signature: ______________________",
                 ),
             ]
     paras += [
