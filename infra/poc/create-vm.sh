@@ -17,6 +17,7 @@
 #
 # Re-running with an existing VM ID stops without changing anything.
 set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]} stopped at line $LINENO (exit $?). Nothing after that line ran." >&2' ERR
 
 VLAN_ID="${VLAN_ID:?Set VLAN_ID, e.g. VLAN_ID=50}"
 BRIDGE="${BRIDGE:-vmbr0}"
@@ -66,7 +67,9 @@ say "Verifying checksum"
   || fail "Checksum mismatch - image not used."
 
 # --- Create the VM ------------------------------------------------------------
-CONSOLE_PASSWORD="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+# openssl's output is finite, so no pipe is cut short (that would trip pipefail).
+CONSOLE_PASSWORD="$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | cut -c1-24)"
+[ "${#CONSOLE_PASSWORD}" -ge 20 ] || fail "Could not generate a console password."
 
 say "Creating VM $VMID ($VM_NAME) on $BRIDGE, VLAN $VLAN_ID"
 qm create "$VMID" \

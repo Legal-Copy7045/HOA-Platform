@@ -15,6 +15,7 @@
 #   - checks out the portal code into /opt/hoa-portal.
 # It does NOT create .env or any secret; that is a separate, manual step.
 set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]} stopped at line $LINENO (exit $?). Nothing after that line ran." >&2' ERR
 
 REPO_URL="${REPO_URL:-https://github.com/Legal-Copy7045/HOA-Platform.git}"
 BRANCH="${BRANCH:-claude/ecstatic-bell-cnrpzi}"
