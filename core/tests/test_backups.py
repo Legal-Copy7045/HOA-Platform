@@ -100,3 +100,14 @@ def test_scanner_reloads_in_place():
         "docker/clamav/clamd.conf:/etc/clamav/clamd.conf:ro"
         in Path("docker-compose.tunnel.yml").read_text()
     )
+
+
+def test_r2_switch_keeps_the_local_store_optional():
+    from pathlib import Path
+
+    compose = Path("docker-compose.yml").read_text()
+    assert 'profiles: ["local-store"]' in compose
+    assert "required: false" in compose
+    script = Path("infra/poc/move-files-to-r2.sh").read_text()
+    assert "read -r -s" in script  # the secret is never echoed
+    assert "check_storage" in script and "import_files" in script

@@ -116,7 +116,10 @@ services:
       timeout: 5s
       retries: 20
 
+  # The local file store runs only with the "local-store" profile
+  # (COMPOSE_PROFILES=local-store in .env). With Cloudflare R2 it isn't needed.
   seaweedfs:
+    profiles: ["local-store"]
     image: chrislusf/seaweedfs:4.55
     restart: unless-stopped
     logging: *logging
@@ -133,6 +136,7 @@ services:
 
   create-bucket:
     <<: *app
+    profiles: ["local-store"]
     restart: "no"
     command: ["python", "/app/docker/seaweedfs/create-bucket.py"]
     environment: *app-env
@@ -165,7 +169,7 @@ services:
       - "127.0.0.1:8000:8000"
     depends_on:
       migrate: {condition: service_completed_successfully}
-      create-bucket: {condition: service_completed_successfully}
+      create-bucket: {condition: service_completed_successfully, required: false}
     healthcheck:
       test: ["CMD", "python", "/app/docker/healthcheck.py"]
       interval: 30s
