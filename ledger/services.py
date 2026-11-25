@@ -19,6 +19,7 @@ from core.policy import SYSTEM, require
 from core.scoping import internal, system_access
 from core.workflow import Transition, Workflow
 from ledger.models import (
+    CHARGE_KINDS,
     Budget,
     BudgetLine,
     BudgetStatus,
@@ -53,6 +54,21 @@ def balance(lot_id: int, as_of: datetime.date | None = None) -> int:
     if as_of:
         qs = qs.filter(posted_on__lte=as_of)
     return qs.aggregate(s=Sum("amount_cents"))["s"] or 0
+
+
+def past_due(lot_id: int, today: datetime.date | None = None) -> int:
+    """What is actually overdue: charges dated before today, less every
+    payment and credit so far. Assessments auto-posted for a due date later
+    this month do not count yet (BUG-006)."""
+    from django.db.models import Q
+
+    today = today or timezone.localdate()
+    qs = (
+        LedgerEntry.objects.unscoped("past due")
+        .filter(lot_id=lot_id, posted_on__lte=today)
+        .filter(~Q(kind__in=CHARGE_KINDS) | Q(posted_on__lt=today))
+    )
+    return max(qs.aggregate(s=Sum("amount_cents"))["s"] or 0, 0)
 
 
 @internal("ledger service")
@@ -707,7 +723,7 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
         )
     dues, dues_cite = rule_with_citation("dues.monthly_cents")
     due_day = min(rule("dues.due_day") or 1, 28)
-    bal = balance(lot.pk)
+    bal = balance(lot.pk, as_of=timezone.localdate())
     today = timezone.localdate()
 
     def b(text) -> str:

@@ -778,6 +778,7 @@ def reconcile(request):
                 statement_balance_cents=_money(request.POST.get("statement_balance") or ""),
                 cleared_deposit_ids=request.POST.getlist("deposits"),
                 cleared_payment_ids=request.POST.getlist("payments"),
+                cleared_returned_ids=request.POST.getlist("returned"),
                 note=request.POST.get("note", ""),
                 actor=request.user,
                 request=request,

@@ -4,6 +4,7 @@ courtesy reminders and the collections letter sequence."""
 import csv
 import datetime
 import io
+from unittest import mock
 
 import pytest
 from django.core import mail
@@ -206,6 +207,7 @@ def test_courtesy_reminders_only_when_set_and_once_a_month(w):
         kind=EntryKind.OTHER_CHARGE,
         amount_cents=4500,
         description="Dues",
+        posted_on=TODAY - datetime.timedelta(days=20),
         actor=w["board"],
     )
     day20 = TODAY.replace(day=20)
@@ -232,15 +234,24 @@ def test_letter_sequence_first_second_final_then_board_decides(w):
         kind=EntryKind.OTHER_CHARGE,
         amount_cents=9000,
         description="Dues",
+        posted_on=TODAY - datetime.timedelta(days=20),
         actor=w["board"],
     )
     case = services.open_case(lot=w["lot"], actor=w["manager"])
     kinds = []
+    clock = [TODAY]
     for _ in range(3):
-        data, kind = acc.generate_case_letter(case, actor=w["manager"])
+        with mock.patch("ledger.accounting.timezone.localdate", lambda: clock[0]):
+            data, kind = acc.generate_case_letter(case, actor=w["manager"])
         assert data.startswith(b"%PDF")
         kinds.append(kind)
         case.refresh_from_db()
+        with (
+            mock.patch("ledger.accounting.timezone.localdate", lambda: clock[0]),
+            pytest.raises(acc.AccountingError),  # the notice period runs first
+        ):
+            acc.generate_case_letter(case, actor=w["manager"])
+        clock[0] += datetime.timedelta(days=11)
     assert kinds == ["first", "second", "final"] and case.state == "final_notice"
     with pytest.raises(acc.AccountingError):
         acc.generate_case_letter(case, actor=w["manager"])
@@ -257,6 +268,7 @@ def test_letters_due_waits_the_notice_period(w):
         kind=EntryKind.OTHER_CHARGE,
         amount_cents=9000,
         description="Dues",
+        posted_on=TODAY - datetime.timedelta(days=20),
         actor=w["board"],
     )
     case = services.open_case(lot=w["lot"], actor=w["manager"])
@@ -273,6 +285,7 @@ def test_case_letter_view_downloads_and_logs(client, w):
         kind=EntryKind.OTHER_CHARGE,
         amount_cents=9000,
         description="Dues",
+        posted_on=TODAY - datetime.timedelta(days=20),
         actor=w["board"],
     )
     case = services.open_case(lot=w["lot"], actor=w["manager"])
@@ -293,3 +306,50 @@ def test_accounting_page(client, w):
     client.force_login(w["owner"])
     assert client.get(reverse("accounting")).status_code == 403
     assert DepositBatch.objects.count() == 0
+
+
+# --- Regression review fixes (BUG-006, BUG-016, SEC-007, BUG-014) --------------------------
+
+
+def test_charges_dated_later_this_month_are_not_past_due(w):
+    services.post_charge(
+        lot=w["lot"],
+        kind=EntryKind.OTHER_CHARGE,
+        amount_cents=4500,
+        description="Due on the 15th",
+        posted_on=TODAY + datetime.timedelta(days=5),
+        actor=w["board"],
+    )
+    assert services.past_due(w["lot"].pk) == 0
+    assert services.past_due(w["lot"].pk, TODAY + datetime.timedelta(days=6)) == 4500
+
+
+def test_a_bounced_deposited_payment_leaves_book_cash(w):
+    payment = _owner_payment(w, 5000)
+    acc.create_deposit(entry_ids=[payment.pk], deposited_on=TODAY, actor=w["manager"])
+    before = acc.book_balance(TODAY)
+    services.reverse_entry(payment, reason="Returned check", actor=w["board"])
+    assert acc.book_balance(TODAY) == before - 5000
+    assert len(acc.uncleared(TODAY)["returned"]) == 1
+
+
+def test_export_uses_the_shared_formula_guard(w):
+    from core.lists import safe_cell
+
+    w["vendor"].name = "\t=cmd"
+    w["vendor"].save()
+    _pay_vendor(w, 100)
+    text = acc.vendor_1099_csv(TODAY.year, actor=w["board"]).decode()
+    assert safe_cell("\t=cmd") in text
+
+
+def test_long_letter_settings_are_trimmed_not_a_500(w):
+    from community.models import CommunityProfile
+
+    community.update_letter_settings(
+        letter_contact="x" * 5000, resale_insurance_company="y" * 5000, actor=w["board"]
+    )
+    profile = CommunityProfile.get()
+    assert (
+        len(profile.letter_contact) <= CommunityProfile._meta.get_field("letter_contact").max_length
+    )

@@ -1406,7 +1406,8 @@ def update_letter_settings(*, actor, request=None, **values):
         profile = CommunityProfile.get()
         for field in LETTER_FIELDS + RESALE_TEXT_FIELDS:
             if field in values:
-                setattr(profile, field, (values[field] or "").strip()[:3000])
+                limit = CommunityProfile._meta.get_field(field).max_length or 3000
+                setattr(profile, field, (values[field] or "").strip()[:limit])
         for field in RESALE_MONEY_FIELDS:
             if field in values:
                 value = values[field]

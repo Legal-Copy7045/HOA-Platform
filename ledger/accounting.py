@@ -24,6 +24,7 @@ from audit.services import record_event
 from comms.notify import send_now
 from community.models import Lot
 from community.rules import rule
+from core.lists import safe_cell
 from core.money import format_cents
 from core.policy import SYSTEM, require
 from core.scoping import system_access
@@ -150,9 +151,7 @@ def export_csv(start, end, *, actor, request=None) -> bytes:
     for row in rows:
         # Spreadsheet formula injection: text cells never start with = + - @
         # (the debit and credit columns are plain positive numbers).
-        writer.writerow(
-            [c if i in (4, 5) or str(c)[:1] not in "=+-@" else "'" + c for i, c in enumerate(row)]
-        )
+        writer.writerow([c if i in (4, 5) else safe_cell(c) for i, c in enumerate(row)])
     record_event(
         "accounting.exported",
         actor=_user(actor),
@@ -247,8 +246,31 @@ def _cleared_ids(kind: str) -> set[int]:
     return set(ReconciledItem.objects.filter(kind=kind).values_list("object_id", flat=True))
 
 
+def _returned_items(since, as_of):
+    """Owner payments that were deposited and then bounced: the reversal of a
+    deposited payment is money the bank takes back (BUG-016)."""
+    with system_access("returned items"):
+        deposited = set(
+            DepositItem.objects.values("entry_id")
+            .annotate(total=Sum("amount_cents"))
+            .exclude(total=0)
+            .values_list("entry_id", flat=True)
+        )
+        return list(
+            LedgerEntry.objects.filter(
+                kind=EntryKind.REVERSAL,
+                reverses_id__in=deposited,
+                posted_on__gt=since,
+                posted_on__lte=as_of,
+            )
+            .select_related("lot")
+            .order_by("posted_on", "id")
+        )
+
+
 def book_balance(as_of: datetime.date) -> int:
-    """Opening cash + deposits - vendor payments, through ``as_of``."""
+    """Opening cash + deposits - vendor payments - bounced deposited
+    payments, through ``as_of``."""
     from operations.models import InvoicePayment
 
     setup = AccountingSetup.get()
@@ -265,7 +287,8 @@ def book_balance(as_of: datetime.date) -> int:
         )["t"]
         or 0
     )
-    return setup.opening_cash_cents + deposits - paid
+    returned = sum(e.amount_cents for e in _returned_items(since, as_of))
+    return setup.opening_cash_cents + deposits - paid - returned
 
 
 def uncleared(as_of: datetime.date) -> dict:
@@ -286,7 +309,8 @@ def uncleared(as_of: datetime.date) -> dict:
         ).select_related("invoice__vendor")
         if p.pk not in _cleared_ids("payment")
     ]
-    return {"deposits": deposits, "payments": payments}
+    returned = [e for e in _returned_items(since, as_of) if e.pk not in _cleared_ids("returned")]
+    return {"deposits": deposits, "payments": payments, "returned": returned}
 
 
 def reconcile(
@@ -295,6 +319,7 @@ def reconcile(
     statement_balance_cents: int,
     cleared_deposit_ids,
     cleared_payment_ids,
+    cleared_returned_ids=(),
     note: str = "",
     actor,
     request=None,
@@ -307,12 +332,15 @@ def reconcile(
         open_items = uncleared(statement_date)
         deposits = {d.pk: d for d in open_items["deposits"]}
         payments = {p.pk: p for p in open_items["payments"]}
+        returned = {e.pk: e for e in open_items["returned"]}
         dep_ids = {int(i) for i in cleared_deposit_ids}
         pay_ids = {int(i) for i in cleared_payment_ids}
-        if not dep_ids <= set(deposits) or not pay_ids <= set(payments):
+        ret_ids = {int(i) for i in cleared_returned_ids}
+        if not (dep_ids <= set(deposits) and pay_ids <= set(payments) and ret_ids <= set(returned)):
             raise AccountingError("Some ticked items are not open on this date.")
         outstanding_dep = sum(d.total_cents for k, d in deposits.items() if k not in dep_ids)
         outstanding_pay = sum(p.amount_cents for k, p in payments.items() if k not in pay_ids)
+        outstanding_pay += sum(e.amount_cents for k, e in returned.items() if k not in ret_ids)
         book = book_balance(statement_date)
         adjusted_bank = statement_balance_cents + outstanding_dep - outstanding_pay
         rec = BankReconciliation.objects.create(
@@ -331,6 +359,13 @@ def reconcile(
                 kind="deposit",
                 object_id=k,
                 amount_cents=deposits[k].total_cents,
+            )
+        for k in ret_ids:
+            ReconciledItem.objects.create(
+                reconciliation=rec,
+                kind="returned",
+                object_id=k,
+                amount_cents=returned[k].amount_cents,
             )
         for k in pay_ids:
             ReconciledItem.objects.create(
@@ -385,9 +420,7 @@ def vendor_1099_csv(year: int, *, actor, request=None) -> bytes:
     writer = csv.writer(buf)
     writer.writerow(["Vendor", "Paid in year", "At or over threshold", "W-9 on file"])
     for row in vendor_1099_totals(year):
-        name = row["vendor"].name
-        if name[:1] in "=+-@":
-            name = "'" + name
+        name = safe_cell(row["vendor"].name)
         writer.writerow(
             [
                 name,
@@ -410,7 +443,7 @@ def send_courtesy_reminders(*, today=None) -> int:
     a past-due balance. Off unless the board sets the day. Once per lot per
     month; never to the board's legal-notice standard (that is the letters)."""
     from community.models import Ownership
-    from ledger.services import balance
+    from ledger.services import past_due
 
     day = rule("collections.courtesy_reminder_day") or 0
     today = today or timezone.localdate()
@@ -421,7 +454,7 @@ def send_courtesy_reminders(*, today=None) -> int:
     link = settings.PORTAL_BASE_URL + reverse("my_account")
     with system_access("courtesy reminders"):
         for lot in Lot.objects.order_by("number"):
-            owed = balance(lot.pk)
+            owed = past_due(lot.pk, today)
             if owed <= 0 or CourtesyReminder.objects.filter(lot=lot, period=period).exists():
                 continue
             emails = {
@@ -485,20 +518,34 @@ def generate_case_letter(case: CollectionCase, *, actor, request=None) -> tuple[
     """The next notice in the sequence, as a PDF to print and mail; logged,
     and the case moves to the matching step."""
     from ledger import letters
-    from ledger.services import COLLECTION, balance
+    from ledger.services import COLLECTION, past_due
 
     require(actor, "collections.manage")
     if case.state in ("closed", "referred"):
         raise AccountingError("This case is closed or referred.")
-    kind = next_letter(case)
-    if kind is None:
-        raise AccountingError("All three notices have been generated; the board decides next.")
-    owed = balance(case.lot_id)
-    if owed <= 0:
-        raise AccountingError("This account is not past due.")
-    data = letters.notice_pdf(case.lot, kind)
     with transaction.atomic():
-        CollectionLetter.objects.create(case=case, kind=kind, amount_cents=owed, generated_by=actor)
+        # Locked so a double-click cannot record the same letter twice (BUG-013).
+        case = CollectionCase.objects.unscoped("letter").select_for_update().get(pk=case.pk)
+        kind = next_letter(case)
+        if kind is None:
+            raise AccountingError("All three notices have been generated; the board decides next.")
+        due = letter_due_on(case)
+        if kind != LetterKind.FIRST and due and due > timezone.localdate():
+            raise AccountingError(
+                f"The notice period from the last letter runs until {due:%B %-d}; "
+                "the next letter can go out then."
+            )
+        owed = past_due(case.lot_id)
+        if owed <= 0:
+            raise AccountingError("This account is not past due.")
+        data = letters.notice_pdf(case.lot, kind)
+        CollectionLetter.objects.create(
+            case=case,
+            kind=kind,
+            amount_cents=owed,
+            generated_by=actor,
+            generated_on=timezone.localdate(),
+        )
         action = _TRANSITION_FOR[kind]
         if action in [t.action for t in COLLECTION.available(case, actor)]:
             COLLECTION.apply(case, action, actor=actor, request=request)

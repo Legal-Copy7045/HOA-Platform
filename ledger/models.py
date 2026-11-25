@@ -365,7 +365,10 @@ class ReconciledItem(AppendOnlyModel):
     reconciliation = models.ForeignKey(
         BankReconciliation, on_delete=models.PROTECT, related_name="items"
     )
-    kind = models.CharField(max_length=8, choices=[("deposit", "Deposit"), ("payment", "Payment")])
+    kind = models.CharField(
+        max_length=8,
+        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
+    )
     object_id = models.PositiveBigIntegerField()
     amount_cents = models.BigIntegerField()
 
@@ -409,6 +412,9 @@ class CollectionLetter(ScopedAppendOnlyModel):
 
     class Meta:
         ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["case", "kind"], name="collection_letter_once_per_kind")
+        ]
 
     def __str__(self) -> str:
         return f"{self.kind} letter"
