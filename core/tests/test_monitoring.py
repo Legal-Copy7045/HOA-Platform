@@ -85,3 +85,42 @@ def test_send_me_a_test_email_goes_only_to_me(client, settings):
     owner = make_member(lots=[])
     client.force_login(owner)
     assert client.post(reverse("system_status"), {"action": "test_email"}).status_code == 403
+
+
+def test_update_controls_only_record_a_request(client):
+    from audit.models import AuditEvent
+    from core.models import UpdateStatus
+
+    admin = make_member(roles=[Role.SYSADMIN])
+    client.force_login(admin)
+    page = client.get(reverse("system_status")).content
+    assert b"update agent" in page  # not installed yet: says how
+    UpdateStatus.objects.create(
+        pk=1,
+        running_commit="aaa1111",
+        latest_commit="bbb2222",
+        behind=2,
+        changes="Fix one\nFix two",
+        agent_seen_at=timezone.now(),
+        checked_at=timezone.now(),
+    )
+    page = client.get(reverse("system_status")).content.decode()
+    assert "Update available: 2 changes" in page and "Install update" in page
+    client.post(reverse("system_status"), {"action": "install_update"})
+    status = UpdateStatus.objects.get(pk=1)
+    assert status.state == "requested" and status.requested_by == admin
+    client.post(reverse("system_status"), {"action": "install_update"})  # no double request
+    assert AuditEvent.objects.filter(action="system.install_update").count() == 2
+    client.post(reverse("system_status"), {"action": "check_updates"})
+    assert UpdateStatus.objects.get(pk=1).check_requested_at is not None
+    board = make_member(board=True)
+    client.force_login(board)
+    assert client.post(reverse("system_status"), {"action": "install_update"}).status_code == 403
+
+
+def test_agent_script_passes_values_as_psql_variables_only():
+    from pathlib import Path
+
+    text = Path("infra/poc/portal-agent.sh").read_text()
+    assert ":'changes'" in text and "flock -n" in text
+    assert '-c "$' not in text  # no SQL built from shell strings

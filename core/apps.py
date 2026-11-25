@@ -13,6 +13,28 @@ class CoreConfig(AppConfig):
 
         post_migrate.connect(apply_runtime_grants_on_migrate, dispatch_uid="core.db_grants")
 
+        # Anything that grants or removes a role clears the remembered roles.
+        from django.apps import apps
+        from django.db.models.signals import m2m_changed, post_delete, post_save
+
+        from core.policy import invalidate_roles
+
+        for label in (
+            "community.Person",
+            "community.Ownership",
+            "community.BoardSeat",
+            "community.OfficeHolding",
+            "community.RoleAssignment",
+            "community.Account",
+            "community.AccountContact",
+            "governance.CommitteeMembership",
+            "accounts.User",
+        ):
+            model = apps.get_model(label)
+            post_save.connect(invalidate_roles, sender=model, dispatch_uid=f"roles.save.{label}")
+            post_delete.connect(invalidate_roles, sender=model, dispatch_uid=f"roles.del.{label}")
+        m2m_changed.connect(invalidate_roles, dispatch_uid="roles.m2m")
+
         import logging
 
         from django.conf import settings

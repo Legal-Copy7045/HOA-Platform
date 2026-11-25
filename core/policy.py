@@ -18,6 +18,7 @@ To give an office its own power later, change PERMISSIONS below (and tests).
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 from dataclasses import dataclass, field
 
@@ -234,10 +235,18 @@ def _preview_roles(preview, on) -> Roles:
     )
 
 
-def roles_for(user, on: datetime.date | None = None) -> Roles:
-    from community.models import BoardSeat, OfficeHolding, Ownership, Person, RoleAssignment
-    from core.scoping import system_access
+# Roles are remembered on the user object (one per request) and recomputed
+# whenever anything that grants a role changes in this process: the
+# generation below is bumped by signals on those models and by the few bulk
+# updates that bypass signals (optimization review A1: 500+ queries a page).
+_ROLES_GENERATION = [0]
 
+
+def invalidate_roles(*args, **kwargs) -> None:
+    _ROLES_GENERATION[0] += 1
+
+
+def roles_for(user, on: datetime.date | None = None) -> Roles:
     if user is None or not getattr(user, "is_authenticated", False) or not user.is_active:
         return NO_ROLES
     from core.preview import current_for
@@ -245,6 +254,22 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
     preview = current_for(user)
     if preview is not None:
         return _preview_roles(preview, on)
+    if on is not None:
+        return _compute_roles(user, on)
+    cached = getattr(user, "_roles_cache", None)
+    generation = (_ROLES_GENERATION[0], datetime.date.today())
+    if cached is not None and cached[0] == generation:
+        return cached[1]
+    roles = _compute_roles(user, None)
+    with contextlib.suppress(AttributeError):
+        user._roles_cache = (generation, roles)
+    return roles
+
+
+def _compute_roles(user, on) -> Roles:
+    from community.models import BoardSeat, OfficeHolding, Ownership, Person, RoleAssignment
+    from core.scoping import system_access
+
     with system_access("policy: compute roles"):
         person = Person.objects.filter(user=user).only("pk").first()
         if person is None:
@@ -393,25 +418,31 @@ def is_sysadmin(user) -> bool:
     return user is not SYSTEM and roles_for(user).has(SYSADMIN)
 
 
-def people_able_to(action: str) -> set[int]:
-    """Person IDs who can currently perform ``action``."""
+def _people_by_group() -> dict[str, set[int]]:
+    """Everyone holding each group, in three queries (optimization A2)."""
     from community.models import BoardSeat, Ownership, RoleAssignment
     from core.scoping import system_access
 
-    groups = PERMISSIONS[action]
-    people: set[int] = set()
+    out: dict[str, set[int]] = {}
     with system_access("policy: coverage"):
-        if BOARD in groups:
-            people.update(BoardSeat.objects.active().values_list("person_id", flat=True))
-        if OWNER in groups:
-            people.update(Ownership.objects.active().values_list("person_id", flat=True))
-        role_groups = groups & {ARC_REVIEWER, AUDITOR, SYSADMIN, MANAGER}
-        if role_groups:
-            people.update(
-                RoleAssignment.objects.active()
-                .filter(role__in=role_groups)
-                .values_list("person_id", flat=True)
-            )
+        out[BOARD] = set(BoardSeat.objects.active().values_list("person_id", flat=True))
+        out[OWNER] = set(Ownership.objects.active().values_list("person_id", flat=True))
+        for role, person_id in (
+            RoleAssignment.objects.active()
+            .filter(role__in=[ARC_REVIEWER, AUDITOR, SYSADMIN, MANAGER])
+            .values_list("role", "person_id")
+        ):
+            out.setdefault(role, set()).add(person_id)
+    return out
+
+
+def people_able_to(action: str, by_group: dict[str, set[int]] | None = None) -> set[int]:
+    """Person IDs who can currently perform ``action``."""
+    by_group = by_group if by_group is not None else _people_by_group()
+    groups = PERMISSIONS[action] & {BOARD, OWNER, ARC_REVIEWER, AUDITOR, SYSADMIN, MANAGER}
+    people: set[int] = set()
+    for group in groups:
+        people |= by_group.get(group, set())
     return people
 
 
@@ -424,11 +455,12 @@ def thinly_covered_actions(minimum: int = 2) -> dict[str, int]:
     from core.policy_mfa import people_with_mfa
 
     with_mfa = people_with_mfa()
+    by_group = _people_by_group()
     result = {}
     for action, groups in PERMISSIONS.items():
         if groups & SELF_SERVICE:
             continue  # owner/resident actions concern one's own lot or records
-        able = people_able_to(action)
+        able = people_able_to(action, by_group)
         if with_mfa is not None:
             able &= with_mfa
         if len(able) < minimum:

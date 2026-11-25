@@ -66,9 +66,15 @@ x-app-env: &app-env
   OFFICERS_REQUIRE_BOARD_SEAT: ${OFFICERS_REQUIRE_BOARD_SEAT:-true}
   OFFICERS_REQUIRE_BOARD_SEAT_CITATION: ${OFFICERS_REQUIRE_BOARD_SEAT_CITATION:-}
 
+# Container logs rotate (10 MB x 3 per service) so they never fill the disk.
+x-logging: &logging
+  driver: local
+  options: {max-size: "10m", max-file: "3"}
+
 x-app: &app
-  build: .
   image: oak-creek-portal:local
+  pull_policy: never   # built locally by the web service, never pulled
+  logging: *logging
   restart: unless-stopped
   read_only: true
   tmpfs: [/tmp]
@@ -79,6 +85,20 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *logging
+    # Sized for a small VM and a 44-household community.
+    command:
+      - postgres
+      - -c
+      - max_connections=40
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - jit=off
+      - -c
+      - log_min_duration_statement=1000
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env}
@@ -92,18 +112,21 @@ services:
       - ./docker/postgres/init-roles.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ${HOA_DB_NAME:-hoa}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 20
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.55
     restart: unless-stopped
+    logging: *logging
+    mem_limit: 512m
     entrypoint: ["/bin/sh", "/start.sh"]
     environment:
       S3_BUCKET: ${S3_BUCKET:-hoa-private}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?}
+      GOMEMLIMIT: 400MiB
     volumes:
       - objectdata:/data
       - ./docker/seaweedfs/start.sh:/start.sh:ro
@@ -118,6 +141,7 @@ services:
   mailpit:
     image: axllent/mailpit:v1.34.0
     restart: unless-stopped
+    logging: *logging
     ports:
       - "127.0.0.1:8025:8025"   # web inbox: http://localhost:8025
 
@@ -133,7 +157,9 @@ services:
 
   web:
     <<: *app
+    build: .   # the one service that builds; the others reuse the image
     command: ["web"]
+    mem_limit: 768m
     environment: *app-env
     ports:
       - "127.0.0.1:8000:8000"
@@ -142,13 +168,15 @@ services:
       create-bucket: {condition: service_completed_successfully}
     healthcheck:
       test: ["CMD", "python", "/app/docker/healthcheck.py"]
-      interval: 15s
+      interval: 30s
+      start_period: 20s
       timeout: 5s
       retries: 5
 
   worker:
     <<: *app
     command: ["worker"]
+    mem_limit: 512m
     environment: *app-env
     depends_on:
       migrate: {condition: service_completed_successfully}

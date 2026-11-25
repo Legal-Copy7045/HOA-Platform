@@ -1,6 +1,8 @@
 """Shared models. Also ensures Django sends core's post_migrate signal, which
 applies runtime DB grants (see core.db_roles)."""
 
+from __future__ import annotations
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -75,3 +77,35 @@ class FeatureSetting(models.Model):
 
     def __str__(self) -> str:
         return f"{self.key}: {'on' if self.enabled else 'off'}"
+
+
+class UpdateStatus(models.Model):
+    """One row, kept by the VM's update agent (infra/poc/portal-agent.sh):
+    which commit runs, whether GitHub has a newer one, and an install
+    requested from System status. The web app only ever sets the two
+    "requested" fields; the agent on the host does the work (decision D25)."""
+
+    branch = models.CharField(max_length=100, blank=True)
+    running_commit = models.CharField(max_length=40, blank=True)
+    latest_commit = models.CharField(max_length=40, blank=True)
+    behind = models.PositiveIntegerField(default=0)
+    changes = models.TextField(blank=True)  # commit subjects, newest first
+    checked_at = models.DateTimeField(null=True, blank=True)
+    check_requested_at = models.DateTimeField(null=True, blank=True)
+    state = models.CharField(
+        max_length=12, default="idle"
+    )  # idle requested running succeeded failed
+    state_changed_at = models.DateTimeField(null=True, blank=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    message = models.CharField(max_length=300, blank=True)
+    agent_seen_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return f"update status ({self.state})"
+
+    @classmethod
+    def get(cls) -> UpdateStatus:
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

@@ -34,6 +34,56 @@ def home(request):
     )
 
 
+def _update_status():
+    from core.models import UpdateStatus
+
+    status = UpdateStatus.objects.filter(pk=1).first()
+    if status is None:
+        return None
+    agent_ok = bool(
+        status.agent_seen_at
+        and status.agent_seen_at > timezone.now() - __import__("datetime").timedelta(minutes=5)
+    )
+    return {"s": status, "agent_ok": agent_ok, "changes": status.changes.splitlines()[:10]}
+
+
+def _update_action(request, action):
+    """Ask the VM's update agent to check GitHub, or to install the update.
+    The web app never touches the server itself: it records the request and
+    the agent on the host acts within a minute (decision D25)."""
+    from django.contrib import messages
+    from django.db import transaction
+    from django.shortcuts import redirect
+
+    from audit.services import record_event
+    from core.models import UpdateStatus
+
+    with transaction.atomic():
+        UpdateStatus.get()
+        status = UpdateStatus.objects.select_for_update().get(pk=1)
+        if action == "check_updates":
+            status.check_requested_at = timezone.now()
+            status.save(update_fields=["check_requested_at"])
+            messages.success(request, "Checking for updates: refresh in a minute.")
+        elif status.state in ("requested", "running"):
+            messages.info(request, "An update is already on its way.")
+        elif not status.behind:
+            messages.info(request, "The portal is already up to date.")
+        else:
+            status.state = "requested"
+            status.state_changed_at = timezone.now()
+            status.requested_by = request.user
+            status.message = ""
+            status.save(update_fields=["state", "state_changed_at", "requested_by", "message"])
+            messages.success(
+                request,
+                "Update requested. It starts within a minute and takes a few minutes; "
+                "the site may be unavailable for a few seconds at the end.",
+            )
+    record_event(f"system.{action}", actor=request.user, request=request, metadata={})
+    return redirect("system_status")
+
+
 def _send_test_email(request):
     """Only to the signed-in person's own address, so the button cannot be
     used to email anyone else. Audited."""
@@ -73,6 +123,11 @@ def system_status(request):
     policy.require(request.user, "system.view_status")
     if request.method == "POST" and request.POST.get("action") == "test_email":
         return _send_test_email(request)
+    if request.method == "POST" and request.POST.get("action") in (
+        "check_updates",
+        "install_update",
+    ):
+        return _update_action(request, request.POST["action"])
     executor = MigrationExecutor(connection)
     pending = executor.migration_plan(executor.loader.graph.leaf_nodes())
     with connection.cursor() as cursor:
@@ -90,6 +145,7 @@ def system_status(request):
             "thin": policy.thinly_covered_actions(),
             "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),
             "health": run_checks(),
+            "update": _update_status(),
             "scanner": settings.DOCUMENT_SCANNER,
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
         },

@@ -8,7 +8,20 @@
     <ul class="list">{% for r in health %}<li><div class="todo-icon tone-{% if r.ok %}success{% else %}danger{% endif %}">{% if r.ok %}{% icon "check" %}{% else %}{% icon "alert" %}{% endif %}</div><div class="grow"><div class="title">{{ r.label }}</div><div class="small muted">{{ r.detail }}</div></div></li>{% endfor %}</ul>
     <p class="small muted">Sysadmins are emailed when a check starts failing, every {{ 6 }} hours while it fails, and when it recovers.</p></section>
   <div class="grid grid-4">
-    <div class="stat"><div class="label">Version</div><div class="value small-value">{{ version }}</div></div>
+    <div class="stat {% if update and update.s.state == 'failed' %}tone-danger{% elif update and update.s.behind %}tone-warning{% else %}tone-success{% endif %}"><div class="label">Version</div><div class="value small-value">{{ version }}</div>
+      <div class="hint">{% if not update %}Update checks start once the VM's update agent is installed (run update-portal.sh once).
+        {% elif update.s.state == "requested" %}Update requested; starting within a minute.
+        {% elif update.s.state == "running" %}Updating now… refresh in a few minutes.
+        {% elif update.s.state == "failed" %}Last update failed{% if update.s.message %}: {{ update.s.message }}{% endif %}.
+        {% elif update.s.behind %}Update available: {{ update.s.behind }} change{{ update.s.behind|pluralize }} ({{ update.s.latest_commit }}).
+        {% else %}Up to date{% if update.s.state == "succeeded" %} (updated {{ update.s.state_changed_at|date:"M j, g:i A" }}){% endif %}.{% endif %}
+        {% if update and update.s.checked_at %}<br>Checked {{ update.s.checked_at|timesince }} ago.{% endif %}
+        {% if update and not update.agent_ok %}<br><strong>The update agent on the VM is not running.</strong>{% endif %}</div>
+      {% if update and update.changes and update.s.behind %}<details class="hint"><summary>What's new</summary><ul>{% for c in update.changes %}<li>{{ c }}</li>{% endfor %}</ul></details>{% endif %}
+      <div class="inline-form">
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="check_updates"><button type="submit" class="secondary small">Check now</button></form>
+        {% if update and update.s.behind and update.s.state != "requested" and update.s.state != "running" %}<form method="post" data-confirm="Install the update now? The portal restarts; it may be unavailable for a few seconds.">{% csrf_token %}<input type="hidden" name="action" value="install_update"><button type="submit" class="small">Install update</button></form>{% endif %}
+      </div></div>
     <div class="stat {% if pending_migrations %}tone-danger{% else %}tone-success{% endif %}"><div class="label">Unapplied migrations</div><div class="value">{{ pending_migrations }}</div></div>
     <div class="stat"><div class="label">Background jobs</div><div class="value small-value">{% for status, n in jobs %}{{ status }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}None{% endfor %}</div></div>
     <div class="stat {% if email_redirect %}tone-warning{% endif %}"><div class="label">Email redirect (POC)</div><div class="value small-value">{% if email_redirect %}On{% else %}Off{% endif %}</div>{% if email_redirect %}<div class="hint">All mail goes to one inbox</div>{% endif %}

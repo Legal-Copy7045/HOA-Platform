@@ -177,12 +177,15 @@ def url_name_enabled(url_name: str | None, request=None) -> bool:
     return key is None or enabled(key, request)
 
 
-def path_enabled(path: str, request=None) -> bool:
+def path_enabled(path: str, request=None, states_: dict | None = None) -> bool:
     try:
         match = resolve(path.split("?", 1)[0])
     except Resolver404:
         return True
-    return url_name_enabled(match.url_name, request)
+    key = BY_URL.get(match.url_name or "")
+    if key is None:
+        return True
+    return (states_ if states_ is not None else states(request)).get(key, True)
 
 
 class FeatureGateMiddleware:

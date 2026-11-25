@@ -21,3 +21,19 @@ def health_alerts(timestamp: int) -> int:
     from core.health import alert, run_checks
 
     return alert(run_checks())
+
+
+@app.periodic(cron="37 3 * * *")  # daily
+@app.task(queue="maintenance", queueing_lock="remove_old_jobs", pass_context=True)
+async def remove_old_jobs(context, timestamp: int) -> None:
+    """Finished background jobs are kept two weeks, then removed, so the job
+    tables do not grow forever (optimization review A7)."""
+    from procrastinate import builtin_tasks
+
+    await builtin_tasks.remove_old_jobs(
+        context,
+        max_hours=24 * 14,
+        remove_failed=True,
+        remove_cancelled=True,
+        remove_aborted=True,
+    )

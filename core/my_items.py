@@ -422,7 +422,8 @@ def items_for(user) -> list[Item]:
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
     from core import features
 
-    return [i for i in out if features.path_enabled(i.url)]
+    states = features.states()  # one query, not one per item (optimization A9)
+    return [i for i in out if features.path_enabled(i.url, states_=states)]
 
 
 def counts(items: list[Item]) -> list[dict]:

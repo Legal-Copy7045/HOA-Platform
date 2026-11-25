@@ -45,6 +45,7 @@ from community.models import (
     today,
 )
 from core.policy import SYSTEM, can, require, roles_for
+from core.policy import invalidate_roles as _invalidate_roles
 from core.scoping import internal, system_access
 
 
@@ -292,6 +293,7 @@ def _close_account_if_empty(account_id: int | None, on: datetime.date) -> None:
     Account.objects.filter(pk=account_id, closed_on__isnull=True).update(closed_on=on)
     # Contacts and tenants of a dormant account lose access with it.
     AccountContact.objects.filter(account_id=account_id, end_date__isnull=True).update(end_date=on)
+    _invalidate_roles()
 
 
 @internal("community accounts")
@@ -360,6 +362,7 @@ def end_account_contact(contact: AccountContact, *, actor, request=None) -> Acco
     _authorize(actor, "account.manage")
     with system_access("end account contact"):
         AccountContact.objects.filter(pk=contact.pk, end_date__isnull=True).update(end_date=today())
+        _invalidate_roles()
     _audit(
         "account.contact_ended",
         actor=actor,

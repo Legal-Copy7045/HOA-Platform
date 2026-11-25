@@ -49,3 +49,6 @@
 - feature: "Feature switches: board turns optional features on and off (reservations off by default); a switched-off feature leaves the menu and my items and its pages answer 404; records kept; switching audited; sysadmin and owners cannot switch"
   since: M4
   match: ["^unit:core/tests/test_features"]
+- feature: "D25 updates from System status: Check now and Install update only record an audited request (sysadmin); the VM agent passes values as psql variables; agent-not-running shown"
+  since: M4
+  match: ["^unit:core/tests/test_monitoring.py::test_(update_controls|agent_script|send_me_a_test)"]

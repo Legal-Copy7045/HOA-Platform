@@ -140,7 +140,15 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 # DATABASE_URL is the *runtime* (app role) connection. Migrations run in a
 # separate one-shot process whose DATABASE_URL is the owner role (decision Q8).
 DATABASES = {"default": env.db("DATABASE_URL")}
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=600)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+
+# The worker is woken instantly by Postgres notifications; polling is only a
+# fallback, so once a minute is plenty (optimization review A7).
+PROCRASTINATE_WORKER_DEFAULTS = {
+    "fetch_job_polling_interval": 60,
+    "abort_job_polling_interval": 60,
+}
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 DB_APP_ROLE = env("DB_APP_ROLE", default="")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
