@@ -156,6 +156,8 @@ PROTECTED = {
     "folder_create": ("POST", None),
     "document_move": ("POST", "board_document"),
     "request_detail": ("GET", "request_b"),
+    "request_attach": ("POST", "request_b"),
+    "request_file": ("GET", "request_b"),
     "request_action": ("POST", "request_b"),
     "request_assign": ("POST", "request_b"),
     "request_work_order": ("POST", "request_b"),
@@ -210,6 +212,7 @@ PROTECTED = {
     "vote_detail": ("GET", "draft_vote"),
     "vote_action": ("POST", "draft_vote"),
     "arc_detail": ("GET", "arc_b"),
+    "arc_edit": ("POST", "arc_b"),
     "arc_action": ("POST", "arc_b"),
     "arc_decide": ("POST", "arc_b"),
     "arc_position": ("POST", "arc_b"),
@@ -421,6 +424,7 @@ def world():
             actor=owner_b,
         )
         threads.post("request", request_b, body="Board note on lot B", actor=board)
+        request_b_file = attach(request_b, pdf("gutter.pdf"), actor=owner_b)
         from governance import services as gov
         from governance.models import CommitteeMembership
 
@@ -502,6 +506,7 @@ def world():
         "contract": contract.pk,
         "change_b": change_b.pk,
         "request_b": request_b.pk,
+        "request_b_file": request_b_file.pk,
         "committee_b": committee_b.pk,
         "topic_b": topic_b.pk,
         "task_b": task_b.pk,
@@ -582,6 +587,8 @@ def _url(name, key, targets):
         kwargs["action"] = "send_notice"
     elif name == "violation_file":
         kwargs["file_id"] = targets["violation_b_file"]
+    elif name == "request_file":
+        kwargs["file_id"] = targets["request_b_file"]
     elif name == "request_action":
         kwargs["action"] = "withdraw"
     elif name == "account_change_decide" or name == "seat_nomination_decide":

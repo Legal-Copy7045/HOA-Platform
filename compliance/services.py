@@ -137,6 +137,23 @@ def respond(violation: Violation, *, text: str, actor, request=None) -> OwnerRes
         return OwnerResponse.objects.create(violation=violation, person=person, text=text.strip())
 
 
+OWNER_OPEN_STATES = (S.NOTICED, S.RESPONDED, S.HEARING)
+
+
+def owner_may_add_photo(actor, v: Violation) -> bool:
+    """An owner of the lot (on the deed, not view-only or a former owner) may
+    add a photo showing the fix while the notice is open."""
+    from core.policy import can
+
+    if actor is SYSTEM or not getattr(actor, "is_authenticated", False):
+        return False
+    return (
+        v.state in OWNER_OPEN_STATES
+        and can(actor, "lot.view_own")
+        and v.lot_id in roles_for(actor).owned_lot_ids
+    )
+
+
 def notice_letter(v: Violation) -> bytes:
     profile = CommunityProfile.get()
     with system_access("violation notice letter"):

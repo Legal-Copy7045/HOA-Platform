@@ -46,7 +46,7 @@ def w(settings):
     )
     signoffs.set_neighbors(applicant_lot, left=portal_lot, right=paper_lot, actor=board)
     req = arc.create_request(
-        lot=applicant_lot, title="Rear fence", description="4 ft aluminium", actor=applicant
+        lot=applicant_lot, title="Rear fence", description="4 ft aluminum", actor=applicant
     )
     attach(req, pdf("plans.pdf"), actor=applicant)
     return {
@@ -70,7 +70,7 @@ def applicant_lot_start():
 
 def _send(w, django_capture_on_commit_callbacks):
     signoffs.prepare_signoffs(w["req"], actor=w["applicant"])
-    # As after "Request Neighbor Acknowledgements": neighbors see only a
+    # As after "Request neighbor acknowledgements": neighbors see only a
     # request that has left draft.
     arc.ArcRequest.objects.unscoped("t").filter(pk=w["req"].pk).update(state="neighbors")
     w["req"].refresh_from_db()
@@ -155,7 +155,7 @@ def test_only_neighbors_with_a_login_are_emailed_and_the_link_needs_sign_in(
     with system_access("t"):
         row = SignoffRequest.objects.get(lot=w["portal_lot"])
     assert reverse("signoff_detail", args=[row.pk]) in message.body
-    assert "4 ft aluminium" not in message.body  # details only behind sign-in
+    assert "4 ft aluminum" not in message.body  # details only behind sign-in
     response = client.get(reverse("signoff_detail", args=[row.pk]))
     assert response.status_code == 302 and "/accounts/login/" in response["Location"]
 
@@ -375,7 +375,7 @@ def test_board_review_waits_for_every_acknowledgement(
     with pytest.raises(arc.WorkflowError):
         arc.ARC.apply(w["req"], "submit", actor=w["applicant"])
     labels = [t.label for t in arc.ARC.available(w["req"], w["applicant"])]
-    assert "Request Neighbor Acknowledgements" in labels and "Submit for review" not in labels
+    assert "Request neighbor acknowledgements" in labels and "Submit for review" not in labels
     with django_capture_on_commit_callbacks(execute=True):
         arc.ARC.apply(w["req"], "request_acknowledgements", actor=w["applicant"])
     assert _req_state(w) == "neighbors"
@@ -425,7 +425,7 @@ def test_no_neighbors_means_submit_directly(w):
     owner = make_member(lots=[lonely])
     req = arc.create_request(lot=lonely, title="Shed", description="8x10", actor=owner)
     labels = [t.label for t in arc.ARC.available(req, owner)]
-    assert "Submit for review" in labels and "Request Neighbor Acknowledgements" not in labels
+    assert "Submit for review" in labels and "Request neighbor acknowledgements" not in labels
     arc.ARC.apply(req, "submit", actor=owner)
 
 

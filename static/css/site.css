@@ -466,3 +466,19 @@ details.menu-details > .panel-body br { display: none; }
 .todo-link:hover .title { color: var(--green-700); text-decoration: underline; }
 .todo-link .todo-detail { display: block; }
 .todo-link .todo-arrow { color: var(--muted); }
+/* ---------- Homeowner ARC, requests and notices (UX review) ---------- */
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+.checklist > li { display: flex; gap: .75rem; align-items: flex-start; padding: .75rem 0; border-top: 1px solid var(--line-2); }
+.checklist > li:first-child { border-top: 0; }
+.checklist .check { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line); font-weight: 700; color: var(--muted); }
+.checklist li.done .check { border-color: var(--green-700); background: var(--green-700); color: #fff; }
+.checklist .title { font-weight: 600; }
+.checklist form { margin: .5rem 0 0; }
+.wf-action.is-blocked { flex-direction: column; align-items: flex-start; gap: .2rem; }
+.wf-action.is-blocked .help { margin: 0; }
+.files .thumb img { display: block; width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.type-guidance { margin: -.5rem 0 1rem; }
+.type-guidance p { margin: .25rem 0; }
+.group-pinned { border-color: var(--green-700); }
+fieldset.choices { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; }
+fieldset.choices legend { padding: 0; margin-bottom: .4rem; }

@@ -1,26 +1,28 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Notice #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if owner_view %}Notice: {{ obj.get_category_display }}{% else %}Notice #{{ obj.pk }}{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs">{% if user|can:"violation.view_all" %}<a href="{% url 'violations' %}">Violations</a>{% else %}<a href="{% url 'violations' %}?mine=1">Notices about my home</a>{% endif %} / Notice #{{ obj.pk }}</div>
+  <div class="crumbs">{% if owner_view %}<a href="{% url 'violations' %}?mine=1">Notices</a> / {{ obj.get_category_display }}{% else %}<a href="{% url 'violations' %}">Violations</a> / Notice #{{ obj.pk }}{% endif %}</div>
   <div class="page-head">
     <div><h1>{{ obj.get_category_display }}</h1>
-      <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}Lot {{ obj.lot.number }}</span><span>Observed {{ obj.observed_on|date:"M j, Y" }}</span>{% if obj.cure_by %}<strong>{% icon "clock" %}Fix by {{ obj.cure_by|date:"M j, Y" }}</strong>{% endif %}</div></div>
+      <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.street_address|default:obj.lot }}{% if not owner_view %} (lot {{ obj.lot.number }}){% endif %}</span><span>Observed {{ obj.observed_on|date:"M j, Y" }}</span>{% if obj.cure_by %}<strong>{% icon "clock" %}{% if owner_view %}Please fix by{% else %}Fix by{% endif %} {{ obj.cure_by|date:"M j, Y" }}</strong>{% endif %}</div></div>
     {% if obj.noticed_at %}<div class="actions"><a class="btn secondary" href="{% url 'violation_letter' obj.pk %}">{% icon "download" %} Notice letter</a></div>{% endif %}
   </div>
   <div class="split">
     <div>
       <section class="card prose">{{ obj.description|linebreaks }}</section>
-      <section class="card"><h2>Owner responses</h2>
-        {% if responses %}{% for r in responses %}<div class="notice"><div class="small muted">{{ r.created_at|date:"M j, Y" }}</div>{{ r.text|linebreaksbr }}</div>{% endfor %}{% else %}<p class="muted">None yet.</p>{% endif %}
-        {% if can_respond %}<form method="post" action="{% url 'violation_respond' obj.pk %}">{% csrf_token %}<label for="t">Your response to the board</label><textarea id="t" name="text" rows="4" required></textarea><p class="help">Explain what you've done or plan to do, or why you disagree. The board sees this before any hearing.</p><div class="form-actions"><button type="submit">Send response</button></div></form>{% endif %}
+      <section class="card" id="response"><h2>{% if owner_view %}Your response{% else %}Owner responses{% endif %}</h2>
+        {% if responses %}{% for r in responses %}<div class="notice"><div class="small muted">{{ r.created_at|date:"M j, Y" }}</div>{{ r.text|linebreaksbr }}</div>{% endfor %}{% elif not can_respond %}<p class="muted">None yet.</p>{% endif %}
+        {% if can_respond %}<form method="post" action="{% url 'violation_respond' obj.pk %}">{% csrf_token %}<label for="t">Your response to the board<span class="required-mark" aria-hidden="true">*</span></label><textarea id="t" name="text" rows="4" required aria-describedby="t-help"></textarea><p class="help" id="t-help">Explain what you've done or plan to do, or why you disagree. This is your formal response: it becomes part of the record the board reads before any hearing.</p><div class="form-actions"><button type="submit">Send response</button></div></form>
+        {% elif owner_view and responses %}<p class="small muted">Your response is on the record. For questions, use Messages below.</p>{% endif %}
       </section>
-      {% thread_panel "violation" obj %}
+      {% if can_respond %}{% thread_panel "violation" obj "To answer this notice, use Your response above. Once you've responded, you can send the board questions here." %}{% else %}{% thread_panel "violation" obj %}{% endif %}
       {% include "partials/workflow.html" with obj=obj %}
     </div>
     <aside>{% follow_up_form "violation" obj %}<section class="card"><h3>Photos</h3>
-      {% if photos %}<ul class="list">{% for p in photos %}<li>{% icon "file" %}<div class="grow"><a href="{% url 'violation_file' obj.pk p.pk %}">{{ p.original_filename }}</a><div class="small muted">{{ p.uploaded_at|date:"M j" }}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}
-      {% if can_manage %}<form method="post" action="{% url 'violation_photo' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" accept="image/*,application/pdf" required aria-label="Photo"><div class="form-actions"><button type="submit" class="secondary small">Add photo</button></div></form>{% endif %}
+      {% if photos %}<ul class="list files">{% for p in photos %}{% url 'violation_file' obj.pk p.pk as file_url %}<li>{% if p.thumbnail %}<a href="{{ file_url }}" class="thumb"><img src="{{ file_url }}" alt="" loading="lazy" width="56" height="56"></a>{% else %}{% icon "file" %}{% endif %}<div class="grow"><a href="{{ file_url }}">{{ p.original_filename }}</a><div class="small muted">{{ p.uploaded_at|date:"M j, Y" }}{% if p.label %} · {{ p.label }}{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}
+      {% if can_manage %}<form method="post" action="{% url 'violation_photo' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" accept="image/*,application/pdf" multiple required aria-label="Photo"><div class="form-actions"><button type="submit" class="secondary small">Add photo</button></div></form>
+      {% elif can_add_fix_photo %}<form method="post" action="{% url 'violation_photo' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<label for="fix-photo">Show the fix</label><input id="fix-photo" type="file" name="file" accept="image/*,application/pdf" multiple required aria-describedby="fix-photo-help"><p class="help" id="fix-photo-help">A photo of the finished work helps the board close the notice.</p><div class="form-actions"><button type="submit" class="secondary small">Add photo</button></div></form>{% endif %}
     </section></aside>
   </div>
 {% endblock %}

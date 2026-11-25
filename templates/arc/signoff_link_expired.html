@@ -1,3 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Link not valid · {{ SITE_NAME }}{% endblock %}
-{% block content %}<section class="card"><h1>This link is no longer valid</h1><p>It may have expired, or it is for another household. If you have a request to review, it is under Neighbor acknowledgements in your menu.</p></section>{% endblock %}
+{% block content %}<section class="card"><h1>This link is no longer valid</h1>
+  <p>It may have expired, the project may already have been decided, or the link is for another household.</p>
+  <p><strong>What next:</strong> any project you are asked to look at is listed under <a href="{% url 'signoffs_mine' %}">Neighbor acknowledgements</a>.</p>
+  <p class="small muted">Questions? {% if contact %}Contact {{ contact }}.{% else %}<a href="{% url 'requests' %}?mine=1">Send a question to the board</a>.{% endif %}</p></section>{% endblock %}

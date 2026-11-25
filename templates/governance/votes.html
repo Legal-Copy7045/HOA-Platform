@@ -8,7 +8,7 @@
     {% if rows %}<ul class="list">{% for v in rows %}<li><div class="todo-icon">{% icon "vote" %}</div><div class="grow"><a class="title" href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a><div class="small muted">{{ v.get_kind_display }}{% if v.closes_at %} · closes {{ v.closes_at|short_date }}{% endif %}</div></div>{% status v.status v.get_status_display %}</li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="vote" title="No votes yet" %}{% endif %}
   </section>
-  {% if can_manage %}<details class="panel"><summary>Create a vote or poll</summary><div class="panel-body">
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Create a vote or poll</summary><div class="panel-body">
     <div class="alert info">{% icon "vote" %}<span>Formal votes are binding and use the quorum and pass rules from Community settings (each with its citation). Informal polls are for opinion only.</span></div>
-    <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
+    <form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
 {% endblock %}

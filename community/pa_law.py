@@ -182,6 +182,12 @@ GUIDES: dict[str, Guide] = {
         "decision stays with the committee under the Declaration.",
         "Off: a person confirms each signature read from a scanned form (Board resolution).",
     ),
+    "arc.signoff_respond_days": Guide(
+        BOARD,
+        "Not covered by the Act. Neighbor acknowledgements inform the reviewers; the review "
+        "deadlines that bind the committee come from the Declaration.",
+        "14 days to respond (Board resolution or ARC guidelines).",
+    ),
     "violation.cure_days": Guide(
         RULES,
         "Not set by the Act.",

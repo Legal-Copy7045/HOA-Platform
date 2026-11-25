@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load portal static %}
+{% block title %}Edit: {{ obj.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'arc_list' %}?mine=1">Home improvement approvals (ARC)</a> / <a href="{% url 'arc_detail' obj.pk %}">{{ obj.title|truncatechars:48 }}</a> / Edit</div>
+  <div class="page-head"><div><h1>Edit your draft</h1><p class="subtitle">{{ obj.lot.street_address|default:obj.lot }}. You can change the details until you send the request on. The earlier wording is kept.</p></div></div>
+  <section class="card">
+    <form method="post">{% csrf_token %}
+      {% include "arc/_project_fields.html" %}
+      <div class="form-actions"><button type="submit">Save changes</button><a class="btn secondary" href="{% url 'arc_detail' obj.pk %}">Cancel</a></div>
+    </form>
+  </section>
+{% endblock %}
+{% block extra_body %}<script src="{% static 'js/forms.js' %}"></script>{% endblock %}

@@ -20,8 +20,8 @@
   {% include "partials/pager.html" %}
   {% if can_enter %}
     {% if has_categories %}
-      <details class="panel"{% if not rows %} open{% endif %}><summary>Enter an invoice</summary><div class="panel-body">
-        <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save as draft</button></div></form>
+      <details class="panel"{% if not rows or form.errors %} open{% endif %}><summary>Enter an invoice</summary><div class="panel-body">
+        <form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Save as draft</button></div></form>
       </div></details>
     {% else %}<div class="alert warning">{% icon "alert" %}<span>Add expense categories first, on the <a href="{% url 'budgets' %}">Budgets</a> page.</span></div>{% endif %}
   {% endif %}

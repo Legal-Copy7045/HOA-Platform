@@ -6,7 +6,7 @@
   development plan. They are on every request from the start and locked:
   the homeowner cannot remove them, the board can. The homeowner (or the
   board) can add other lots or addresses.
-* "Request Neighbor Acknowledgements" moves the draft to awaiting
+* "Request neighbor acknowledgements" moves the draft to awaiting
   acknowledgements and emails each neighbor a review link. When the last
   one is in (or the board removes the last one waiting), the request goes
   to the board automatically. Neighbors may comment and may object.
@@ -486,6 +486,45 @@ def respond(
     signoff.refresh_from_db()
     submit_if_acknowledged(signoff.arc_request)
     return response
+
+
+ASKED_BECAUSE = {
+    "left": "You were asked because you live next door (left side).",
+    "right": "You were asked because you live next door (right side).",
+    "other": "You were asked because the project may affect your home.",
+}
+
+
+def asked_because(signoff: SignoffRequest) -> str:
+    """Why this neighbor was asked, in a sentence they understand."""
+    if signoff.lot_id:
+        with system_access("neighbor side"):
+            side = (
+                LotNeighbor.objects.filter(
+                    lot_id=signoff.arc_request.lot_id, neighbor_id=signoff.lot_id
+                )
+                .values_list("side", flat=True)
+                .first()
+            )
+        if side in ASKED_BECAUSE:
+            return ASKED_BECAUSE[side]
+    return "You were asked because your neighbor would like your view on the project."
+
+
+def respond_by(signoff: SignoffRequest):
+    """The date neighbors are asked to answer by, when the board set one."""
+    days = rule("arc.signoff_respond_days")
+    if not days or not signoff.sent_at:
+        return None
+    return timezone.localtime(signoff.sent_at).date() + datetime.timedelta(days=days)
+
+
+def contact_line() -> str:
+    """Who to contact with questions, as the board recorded it (never hard-coded)."""
+    from community.models import CommunityProfile
+
+    profile = CommunityProfile.get()
+    return single_line(profile.letter_contact or profile.arc_form_return_to or "")
 
 
 def summary(req: ArcRequest) -> dict:

@@ -11,5 +11,5 @@
     {% empty %}<tr><td colspan="7">{% include "partials/empty.html" with icon="wrench" title="No work orders" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% include "partials/pager.html" %}
-  {% if can_manage %}<details class="panel"><summary>New work order</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Create</button></div></form></div></details>{% endif %}
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>New work order</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Create</button></div></form></div></details>{% endif %}
 {% endblock %}

@@ -12,7 +12,7 @@
       <td>{% status c.state c.get_state_display %}{% if c.ends_on %} <span class="small muted">to {{ c.ends_on|date:"M j, Y" }}</span>{% endif %}</td></tr>
     {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="file" title="No contracts yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
-  {% if can_manage %}<details class="panel"><summary>Enter a contract</summary><div class="panel-body">
-    <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Enter contract</button></div></form>
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Enter a contract</summary><div class="panel-body">
+    <form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Enter contract</button></div></form>
     <p class="small muted">A board member other than the one who enters it approves it. After approval its terms can't change; a new term is a new contract.</p></div></details>{% endif %}
 {% endblock %}

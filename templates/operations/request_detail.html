@@ -2,10 +2,10 @@
 {% load portal %}
 {% block title %}Request #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'requests' %}">Requests</a> / #{{ obj.pk }}</div>
+  <div class="crumbs">{% if owner_view %}<a href="{% url 'requests' %}?mine=1">My requests</a>{% else %}<a href="{% url 'requests' %}">Owner requests</a>{% endif %} / {{ obj.subject|truncatechars:48 }}</div>
   <div class="page-head"><div><h1>{{ obj.subject }}</h1>
-    <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_request_type_display }}</span><span>{% icon "pin" %}Lot {{ obj.lot.number }}</span>
-      {% if obj.first_response_at %}<span>{% icon "check" %}Answered {{ obj.first_response_at|date:"M j" }}</span>{% elif obj.respond_by %}<span>{% icon "clock" %}{% if obj.is_overdue %}Response overdue since{% else %}Response expected by{% endif %} {{ obj.respond_by|date:"M j" }}</span>{% endif %}</div></div></div>
+    <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_request_type_display }}</span><span>{% icon "pin" %}{{ obj.lot.street_address|default:obj.lot }}{% if staff %} (lot {{ obj.lot.number }}){% endif %}</span>
+      {% if obj.first_response_at %}<span>{% icon "check" %}Answered {{ obj.first_response_at|date:"M j, Y" }}</span>{% elif obj.respond_by %}<span>{% icon "clock" %}{% if obj.is_overdue %}Response overdue since{% else %}Response expected by{% endif %} {{ obj.respond_by|date:"M j, Y" }}</span>{% endif %}</div></div></div>
   <div class="split">
     <div>
       <section class="card prose">{{ obj.description|linebreaks }}{% if obj.common_area %}<p class="small muted">Common area: {{ obj.common_area }}</p>{% endif %}</section>
@@ -13,6 +13,10 @@
       {% include "partials/workflow.html" with obj=obj %}
     </div>
     <aside>
+      {% if photos or can_add_photos %}<section class="card"><h3>Photos</h3>
+        {% if photos %}<ul class="list files">{% for f in photos %}{% url 'request_file' obj.pk f.pk as file_url %}<li>{% if f.thumbnail %}<a href="{{ file_url }}" class="thumb"><img src="{{ file_url }}" alt="" loading="lazy" width="56" height="56"></a>{% else %}{% icon "file" %}{% endif %}<div class="grow"><a href="{{ file_url }}">{{ f.original_filename }}</a><div class="small muted">{{ f.uploaded_at|date:"M j, Y" }}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
+        {% if can_add_photos %}<form method="post" action="{% url 'request_attach' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<label for="rq-add">Add photos</label><input id="rq-add" type="file" name="photos" accept="image/*,application/pdf" multiple required><div class="form-actions"><button type="submit" class="secondary small">Add</button></div></form>{% endif %}
+      </section>{% endif %}
       {% if staff %}
         <section class="card"><h3>Assigned to</h3>
           <form method="post" action="{% url 'request_assign' obj.pk %}">{% csrf_token %}

@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -13,7 +14,6 @@ from community.models import Lot
 from core import policy
 from core.workflow import WorkflowError
 from documents import attachments
-from documents.services import DocumentError
 
 
 class _AddressChoice(forms.ModelChoiceField):
@@ -23,14 +23,32 @@ class _AddressChoice(forms.ModelChoiceField):
         return f"{obj.street_address} (lot {obj.number})" if obj.street_address else str(obj)
 
 
-class NewRequestForm(forms.Form):
-    lot = _AddressChoice(queryset=Lot.objects.none(), label="Property", empty_label="Choose...")
-    title = forms.CharField(max_length=200, help_text="e.g. 'Rear fence, 4 ft black aluminium'")
+LOCATIONS = [
+    ("", "Choose..."),
+    ("front", "Front"),
+    ("side", "Side"),
+    ("rear", "Back (rear)"),
+    ("other", "Other"),
+]
+
+
+class ProjectForm(forms.Form):
+    """What the owner tells the committee about the project. Kind first, so
+    its guidance (drawings, samples...) shows before they start writing."""
+
     project_type = forms.ChoiceField(label="Kind of project", required=False)
-    description = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 5}),
-        help_text="Materials, colours, dimensions, location, contractor.",
+    title = forms.CharField(
+        max_length=200,
+        label="Short name for the project",
+        help_text="For example: Rear fence, 4 ft black aluminum.",
     )
+    description = forms.CharField(
+        label="What you plan to do",
+        widget=forms.Textarea(attrs={"rows": 5}),
+        help_text="Sizes, colors and anything the committee should know.",
+    )
+    location = forms.ChoiceField(required=False, label="Where on your lot", choices=LOCATIONS)
+    location_detail = forms.CharField(max_length=200, required=False, label="If other, where?")
     planned_start = forms.DateField(
         label="Planned start",
         widget=forms.DateInput(attrs={"type": "date"}),
@@ -40,26 +58,42 @@ class NewRequestForm(forms.Form):
         label="Approximate completion",
         widget=forms.DateInput(attrs={"type": "date"}),
     )
-    location = forms.ChoiceField(
-        required=False,
-        label="Location with respect to the nearest unit",
-        choices=[
-            ("", "Choose..."),
-            ("front", "Front"),
-            ("side", "Side"),
-            ("rear", "Rear"),
-            ("other", "Other"),
-        ],
-    )
-    location_detail = forms.CharField(
-        max_length=200, required=False, label="If other, please explain"
-    )
     materials = forms.CharField(
         required=False,
         label="Materials and contractors",
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Materials (or shrubs) to be installed or removed, quantities, contractors.",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        types = services.active_project_types()
+        # Shown one at a time under the choice (static/js/forms.js); all of
+        # them without JavaScript. Escaped like any other text.
+        self.type_guidance = [(t.name, t.guidance, t.citation) for t in types if t.guidance]
+        if types:
+            self.fields["project_type"].required = True
+            self.fields["project_type"].choices = [("", "Choose...")] + [
+                (t.name, t.name) for t in types
+            ]
+        else:
+            # The board retired every type: still a choice, never free text.
+            self.fields["project_type"].choices = [("", "Choose..."), ("Other", "Other")]
+
+    def clean(self):
+        data = super().clean()
+        if data.get("location") != "other":
+            data["location_detail"] = ""
+        start, end = data.get("planned_start"), data.get("planned_completion")
+        if start and end and end < start:
+            self.add_error("planned_completion", "Completion cannot be before the start.")
+        return data
+
+
+class NewRequestForm(ProjectForm):
+    lot = _AddressChoice(queryset=Lot.objects.none(), label="Property", empty_label="Choose...")
+
+    field_order = ["lot", *ProjectForm.base_fields]
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
@@ -70,17 +104,6 @@ class NewRequestForm(forms.Form):
             # One home (nearly everyone): no dropdown, the address is shown as text.
             self.fields["lot"].widget = forms.HiddenInput()
             self.fields["lot"].initial = self.only_lot.pk
-        types = services.active_project_types()
-        if types:
-            self.fields["project_type"].required = True
-            self.fields["project_type"].choices = [("", "Choose...")] + [
-                (t.name, t.name) for t in types
-            ]
-            guidance = "; ".join(f"{t.name}: {t.guidance}" for t in types if t.guidance)
-            self.fields["project_type"].help_text = guidance[:600]
-        else:
-            # The board retired every type: still a choice, never free text.
-            self.fields["project_type"].choices = [("", "Choose..."), ("Other", "Other")]
 
 
 class DecisionForm(forms.Form):
@@ -124,14 +147,16 @@ def arc_list(request):
                     actor=request.user, request=request, **form.cleaned_data
                 )
             except services.ArcError as exc:
-                messages.error(request, str(exc))
+                form.add_error(None, str(exc))
             else:
-                messages.success(request, "Draft created. Attach plans or photos, then submit.")
+                messages.success(
+                    request,
+                    "Your draft is saved. Next, add plans or photos, then send it on "
+                    "(the steps are below).",
+                )
                 return redirect("arc_detail", pk=req.pk)
-        else:
-            # Show the form again with what was typed and the errors beside
-            # each field, instead of throwing the input away.
-            messages.error(request, "Please check the highlighted fields.")
+        # Invalid: the page is shown again with what was typed, a summary at
+        # the top of the form and the errors beside each field.
     from core.lists import csv_response, filter_list, paginate, wants_csv
     from core.scoping import own_records, wants_mine
 
@@ -189,6 +214,55 @@ def arc_list(request):
     )
 
 
+# Steps the owner sends from the draft checklist rather than "Next steps".
+CHECKLIST_ACTIONS = {"submit", "request_acknowledgements"}
+
+# What the owner (or the board) is told after each step, in plain sentences.
+DONE_MESSAGES = {
+    "submit": "Sent to the committee. We'll email you when there's a decision.",
+    "request_acknowledgements": (
+        "Sent to your neighbors. When they have all responded, your request goes to "
+        "the committee automatically."
+    ),
+    "withdraw": "Your request has been withdrawn.",
+    "appeal": "Your appeal has been sent to the board.",
+    "accept": "Marked complete. The review clock has started.",
+    "return_incomplete": "Returned to the owner as incomplete, with your note.",
+    "complete": "The project is marked as complete.",
+}
+
+
+def _files(req):
+    """Plans and photos, with a thumbnail for images the scanner has cleared."""
+    from documents.services import scan_allows_download
+
+    files = list(attachments.attachments_for(req))
+    for f in files:
+        f.thumbnail = f.content_type.startswith("image/") and scan_allows_download(
+            attachments.current_scan(f)
+        )
+    return files
+
+
+def _checklist(req, user, actions, files, signoff) -> dict | None:
+    """Draft only, for an owner of the lot: describe, add files, neighbors,
+    send. The step that sends it is the one the workflow allows now."""
+    if not services.can_edit(user, req):
+        return None
+    send = next((t for t in actions if t.action in CHECKLIST_ACTIONS), None)
+    blocked = {
+        t.action: reason
+        for t, reason in services.ARC.blocked(req, user)
+        if t.action in CHECKLIST_ACTIONS
+    }
+    return {
+        "has_files": bool(files),
+        "neighbors_waiting": signoff["counts"].get("pending", 0),
+        "send": send,
+        "blocked_reason": None if send else next(iter(blocked.values()), None),
+    }
+
+
 @login_required
 def arc_detail(request, pk):
     req = _get(request, pk)
@@ -209,17 +283,34 @@ def arc_detail(request, pk):
     can_attach = (services.owns_lot(user, req) and req.state == ArcState.DRAFT) or (
         policy.can(user, "arc.intake") and req.state not in (ArcState.COMPLETED, ArcState.WITHDRAWN)
     )
+    panel = panel_context(user, req)
+    files = _files(req)
+    checklist = _checklist(req, user, actions, files, panel["signoff"])
+    if checklist:
+        actions = [t for t in actions if t.action not in CHECKLIST_ACTIONS]
+    blocked = [
+        (t, reason)
+        for t, reason in services.ARC.blocked(req, user)
+        if t.action not in services.DECISION_ACTIONS
+        and not (checklist and t.action in CHECKLIST_ACTIONS)
+    ]
+    roles = policy.roles_for(user)
     return render(
         request,
         "arc/detail.html",
         {
-            **panel_context(user, req),
+            **panel,
             "obj": req,
             "actions": actions,
+            "blocked_steps": blocked,
+            "checklist": checklist,
+            "can_edit": services.can_edit(user, req),
+            "owner_view": req.lot_id in roles.owned_lot_ids or not policy.can(user, "arc.view_all"),
             "history": services.ARC.history(req),
             "action_url_name": "arc_action",
             "decisions": req.decisions.all(),
-            "files": attachments.attachments_for(req),
+            "files": files,
+            "revisions": req.revisions.all(),
             "can_attach": can_attach,
             "deliberation": services.deliberation(req, user),
             "recused": services.is_recused(user, req) and policy.can(user, "arc.view_all"),
@@ -232,6 +323,25 @@ def arc_detail(request, pk):
             "affected": _affected_numbers(req),
         },
     )
+
+
+@login_required
+def arc_edit(request, pk):
+    """The owner corrects their draft (title, description, dates...)."""
+    req = _get(request, pk)
+    if not services.can_edit(request.user, req):
+        raise PermissionDenied
+    initial = {f: getattr(req, f) for f in services.EDITABLE_FIELDS}
+    form = ProjectForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        try:
+            services.edit_request(req, actor=request.user, request=request, **form.cleaned_data)
+        except services.ArcError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(request, "Your changes are saved.")
+            return redirect("arc_detail", pk=req.pk)
+    return render(request, "arc/edit.html", {"obj": req, "form": form})
 
 
 @login_required
@@ -248,7 +358,10 @@ def arc_action(request, pk, action):
     except WorkflowError as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, f"{services.ARC.transitions[action].label}: done.")
+        messages.success(
+            request,
+            DONE_MESSAGES.get(action, f"{services.ARC.transitions[action].label}: done."),
+        )
     return redirect("arc_detail", pk=req.pk)
 
 
@@ -308,19 +421,17 @@ def arc_attach(request, pk):
         and req.state in services.AFFECTED_LOTS_STATES
         and not services.is_recused(request.user, req)
     )
-    if not allowed or "file" not in request.FILES:
+    uploads = request.FILES.getlist("file")
+    if not allowed or not uploads:
         messages.error(request, "Files can be added to a draft by the owner, or by intake.")
         return redirect("arc_detail", pk=req.pk)
-    try:
-        attachments.attach(
-            req,
-            request.FILES["file"],
-            actor=request.user,
-            label=request.POST.get("label", ""),
-            request=request,
-        )
-    except DocumentError as exc:
-        messages.error(request, str(exc))
+    attachments.attach_many(
+        request,
+        req,
+        uploads,
+        actor=request.user,
+        label=request.POST.get("label", ""),
+    )
     return redirect("arc_detail", pk=req.pk)
 
 

@@ -1,4 +1,4 @@
-// Portal behaviour: mobile navigation, menu groups, confirmations and ballot
+// Portal behavior: mobile navigation, menu groups, confirmations and ballot
 // limits. No inline scripts (CSP).
 (function () {
   "use strict";

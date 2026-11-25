@@ -304,6 +304,8 @@ _SPECS = [
         "methods_removed",
         "mode",
     ),
+    # --- Homeowner ARC, requests and notices (UX review) ---
+    _spec("arc.edited", "ARC draft edited by the owner", "fields"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

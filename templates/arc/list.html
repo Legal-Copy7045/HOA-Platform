@@ -1,15 +1,22 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load portal static %}
 {% block title %}{% if mine %}Home improvement approvals (ARC){% else %}Architectural review{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{% if mine %}Home improvement approvals (ARC){% else %}Architectural review{% endif %}</h1><p class="subtitle">{% if mine %}Exterior changes need approval before work starts. Start a request, attach plans and photos, then submit it to the committee.{% else %}Every request from the community, for review.{% endif %}</p></div>
-    {% if can_view_all and user|can:"arc.submit" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'arc_list' %}">Board review list</a>{% else %}<a class="btn secondary" href="{% url 'arc_list' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
-  {% include "partials/list_tools.html" %}
+  <div class="page-head"><div><h1>{% if mine %}Home improvement approvals (ARC){% else %}Architectural review{% endif %}</h1><p class="subtitle">{% if mine %}Exterior changes need approval before work starts. Describe your project, add plans and photos, then send it to your neighbors and the committee.{% else %}Every request from the community, for review.{% endif %}</p></div>
+    <div class="actions">{% if can_submit %}<a class="btn" href="?mine=1&amp;new=1#new-request">{% icon "plus" %} Ask for approval of a project</a>{% endif %}
+    {% if can_view_all and user|can:"arc.submit" %}{% if mine %}<a class="btn secondary" href="{% url 'arc_list' %}">Board review list</a>{% else %}<a class="btn secondary" href="{% url 'arc_list' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}{% endif %}</div></div>
+  {% if can_submit %}<details class="panel" id="new-request"{% if not rows or form.errors or request.GET.new %} open{% endif %}><summary>Ask for approval of a project</summary><div class="panel-body">
+    <form method="post" action="{% url 'arc_list' %}?mine=1">{% csrf_token %}
+      {% if form.only_lot %}<div class="field"><span class="field-label">Property</span><p><strong>{{ form.only_lot.street_address|default:form.only_lot }}</strong></p></div>{% endif %}
+      {% include "arc/_project_fields.html" %}
+      <div class="form-actions"><button type="submit">Save as a draft</button></div></form>
+    <p class="muted small">Only you can see a draft. Next you add plans or photos, then send it on.</p></div></details>{% endif %}
+  {% if not mine %}{% include "partials/list_tools.html" %}{% endif %}
   <div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th>#</th><th>Project</th><th>Property</th><th>Status</th><th>Decision due</th></tr></thead>
-    <tbody>{% for r in rows %}<tr><td><a href="{% url 'arc_detail' r.pk %}">#{{ r.pk }}</a></td><td><a href="{% url 'arc_detail' r.pk %}">{{ r.title }}</a></td><td>{{ r.lot.street_address|default:r.lot }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.review_due_on|date:"M j, Y"|default:"" }}</td></tr>
-    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="pencil" title="No requests yet" text="Planning a fence, shed, deck, paint colour or other exterior change? Start a request below." %}</td></tr>{% endfor %}</tbody>
+    <thead><tr>{% if not mine %}<th>#</th>{% endif %}<th>Project</th><th>Property</th><th>Status</th><th>Decision due</th></tr></thead>
+    <tbody>{% for r in rows %}<tr>{% if not mine %}<td><a href="{% url 'arc_detail' r.pk %}">#{{ r.pk }}</a></td>{% endif %}<td><a href="{% url 'arc_detail' r.pk %}">{{ r.title }}</a></td><td>{{ r.lot.street_address|default:r.lot }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.review_due_on|date:"M j, Y"|default:"" }}</td></tr>
+    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="pencil" title="No requests yet" text="Planning a fence, shed, deck, paint color or other exterior change? Ask for approval above." %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% include "partials/pager.html" %}
-  {% if can_submit %}<details class="panel"{% if not rows or form.errors %} open{% endif %}><summary>Start a new request</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% if form.only_lot %}<div class="field"><label>Property</label><p><strong>{{ form.only_lot.street_address|default:form.only_lot }}</strong></p></div>{% endif %}{{ form }}<div class="form-actions"><button type="submit">Create draft</button></div></form><p class="muted small">Drafts are only visible to you until you submit them.</p></div></details>{% endif %}
 {% endblock %}
+{% block extra_body %}<script src="{% static 'js/forms.js' %}"></script>{% endblock %}

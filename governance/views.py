@@ -35,6 +35,18 @@ def _flash(request, fn, ok: str):
     return result
 
 
+def _saved(request, form, fn, ok: str):
+    """Like _flash, but a refusal is shown on the form, which the page shows
+    again with everything that was typed (nothing is thrown away)."""
+    try:
+        result = fn()
+    except services.GovernanceError as exc:
+        form.add_error(None, str(exc))
+        return None
+    messages.success(request, ok)
+    return result or True
+
+
 # --- Meetings -----------------------------------------------------------------------
 
 
@@ -53,8 +65,9 @@ def meetings(request):
     if request.method == "POST":
         policy.require(request.user, "meeting.manage")
         if form.is_valid():
-            m = _flash(
+            m = _saved(
                 request,
+                form,
                 lambda: services.create_meeting(
                     actor=request.user, request=request, **form.cleaned_data
                 ),
@@ -62,7 +75,7 @@ def meetings(request):
             )
             if m:
                 return redirect("meeting_detail", pk=m.pk)
-        return redirect("meetings")
+        # Invalid: show the form again with what was typed and the errors.
     return render(
         request,
         "governance/meetings.html",
@@ -164,17 +177,15 @@ def resolutions(request):
     form = ResolutionForm(request.POST or None)
     if request.method == "POST":
         policy.require(request.user, "resolution.record")
-        if form.is_valid():
-            _flash(
-                request,
-                lambda: services.record_resolution(
-                    actor=request.user, request=request, **form.cleaned_data
-                ),
-                "Recorded.",
-            )
-        else:
-            messages.error(request, "Check the form.")
-        return redirect("resolutions")
+        if form.is_valid() and _saved(
+            request,
+            form,
+            lambda: services.record_resolution(
+                actor=request.user, request=request, **form.cleaned_data
+            ),
+            "Recorded.",
+        ):
+            return redirect("resolutions")
     show_all = request.GET.get("all") == "1"
     rows = Resolution.objects.all() if show_all else services.in_force()
     return render(
@@ -325,14 +336,14 @@ def votes(request):
         if form.is_valid():
             data = dict(form.cleaned_data)
             data["options"] = data["options"].splitlines()
-            vote = _flash(
+            vote = _saved(
                 request,
+                form,
                 lambda: services.create_vote(actor=request.user, request=request, **data),
                 "Vote created as a draft.",
             )
             if vote:
                 return redirect("vote_detail", pk=vote.pk)
-        return redirect("votes")
     rows = Vote.objects.all()
     if not policy.can(request.user, "vote.manage"):
         rows = rows.exclude(status="draft")
