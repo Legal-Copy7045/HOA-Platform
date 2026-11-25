@@ -153,6 +153,8 @@ _SPECS = [
     _spec("budget.adopted", "Budget adopted", "fiscal_year"),
     _spec("resale.requested", "Resale certificate requested", "lot_id"),
     _spec("resale.certificate_downloaded", "Resale certificate downloaded", "lot_id"),
+    _spec("report.viewed", "Report viewed", "report", "rows"),
+    _spec("report.exported", "Report exported (CSV)", "report", "rows"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

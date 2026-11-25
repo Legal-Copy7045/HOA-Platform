@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "compliance",
     "ledger",
     "payments",
+    "reports",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

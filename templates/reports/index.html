@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Reports · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <h1>Reports</h1>
+  {% for group, reports in groups.items %}
+    <h2>{{ group }}</h2>
+    <table><tbody>{% for r in reports %}<tr><td><strong>{{ r.title }}</strong><div class="muted">{{ r.description }}</div></td><td><a class="button" href="{% url 'report_run' r.key %}">View</a> <a href="{% url 'report_run' r.key %}?format=csv">Download CSV</a></td></tr>{% endfor %}</tbody></table>
+  {% endfor %}
+{% endblock %}

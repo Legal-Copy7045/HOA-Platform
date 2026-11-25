@@ -151,6 +151,8 @@ PROTECTED = {
     "resale_detail": ("GET", "resale_b"),
     "resale_action": ("POST", "resale_b"),
     "resale_pdf": ("GET", "resale_b"),
+    "reports": ("GET", None),
+    "report_run": ("GET", "report"),
 }
 
 
@@ -305,6 +307,7 @@ def world():
         "collection": collection.pk,
         "budget": budget.pk,
         "resale_b": resale_b.pk,
+        "report": "ar_aging",
     }
     return {
         "owner_a": owner_a,
@@ -365,6 +368,8 @@ def _url(name, key, targets):
         kwargs["action"] = "send_reminder"
     elif name == "resale_action":
         kwargs["action"] = "issue"
+    elif name == "report_run":
+        kwargs = {"key": "ar_aging"}
     return reverse(name, kwargs=kwargs)
 
 

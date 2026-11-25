@@ -33,6 +33,7 @@ urlpatterns = [
     path("", include("arc.urls")),
     path("", include("compliance.urls")),
     path("", include("ledger.urls")),
+    path("", include("reports.urls")),
 ]
 
 if settings.ADMIN_ENABLED:
