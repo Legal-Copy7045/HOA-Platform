@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from django import forms
+from django.core import validators
 
 _PATTERN = re.compile(r"^-?\d{1,9}(\.\d{1,2})?$")
 
@@ -35,11 +36,19 @@ class MoneyField(forms.CharField):
         kwargs.setdefault("max_length", 16)
         self.allow_negative = allow_negative
         super().__init__(*args, **kwargs)
+        # The length limit applies to the typed text (the widget's maxlength
+        # and to_python below), not to the cleaned integer: Django's
+        # MaxLengthValidator would call len() on an int.
+        self.validators = [
+            v for v in self.validators if not isinstance(v, validators.MaxLengthValidator)
+        ]
 
     def to_python(self, value):
         value = super().to_python(value)
         if value in self.empty_values:
             return None
+        if self.max_length is not None and len(value) > self.max_length:
+            raise forms.ValidationError("Enter a shorter amount.")
         try:
             cents = parse_cents(value)
         except ValueError as exc:
