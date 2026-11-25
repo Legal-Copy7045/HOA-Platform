@@ -103,6 +103,7 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
     "accounts.middleware.RequireMFAMiddleware",
     "core.features.FeatureGateMiddleware",
+    "core.middleware.EmailUnavailableMiddleware",
     "core.preview.OwnerPreviewMiddleware",
     "core.sysadmin_audit.SysadminRequestAuditMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
@@ -165,6 +166,7 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]  # signup is closed anyway
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USER_DISPLAY = "core.people.display_name"  # names, never "User #1"
 # Invitations prove the address; there is no self-service email change.
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_PREVENT_ENUMERATION = True

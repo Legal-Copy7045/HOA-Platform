@@ -1,0 +1,65 @@
+{# Local override: plain wording, styled buttons (owner feedback). #}
+{% extends "mfa/base_entrance.html" %}
+{% load i18n %}
+{% load allauth %}
+{% load allauth static %}
+{% block head_title %}
+    {% trans "Sign In" %}
+{% endblock head_title %}
+{% block content %}
+    {% element h1 %}
+        One more step
+    {% endelement %}
+    {% element p %}
+        Enter the 6-digit code from your authenticator app.
+    {% endelement %}
+    {% url 'mfa_authenticate' as action_url %}
+    {% element form form=form method="post" action=action_url %}
+        {% slot body %}
+            {% csrf_token %}
+            {% element fields form=form unlabeled=True %}
+            {% endelement %}
+        {% endslot %}
+        {% slot actions %}
+            {% element button type="submit" tags="primary,mfa,login" %}
+                {% trans "Sign In" %}
+            {% endelement %}
+            {% if "webauthn" not in MFA_SUPPORTED_TYPES %}
+                {% element button type="submit" form="logout-from-stage" tags="link,mfa,cancel" %}
+                    {% trans "Cancel" %}
+                {% endelement %}
+            {% endif %}
+        {% endslot %}
+    {% endelement %}
+    {% if "webauthn" in MFA_SUPPORTED_TYPES %}
+        <div class="stack-actions">
+            <button type="button" id="mfa_webauthn_authenticate" form="webauthn_form" class="secondary">Use my passkey instead</button>
+            <button type="submit" form="logout-from-stage" class="secondary">Cancel</button>
+        </div>
+        {% if "webauthn" in MFA_SUPPORTED_TYPES %}
+            {% element form id="webauthn_form" form=webauthn_form method="post" action=action_url no_visible_fields=True %}
+                {% slot body %}
+                    {% csrf_token %}
+                    {% element fields form=webauthn_form %}
+                    {% endelement %}
+                {% endslot %}
+            {% endelement %}
+            {{ js_data|json_script:"js_data" }}
+            {% include "mfa/webauthn/snippets/scripts.html" %}
+            <script data-allauth-onload="allauth.webauthn.forms.authenticateForm" type="application/json">{
+    "ids": {
+        "authenticate": "mfa_webauthn_authenticate",
+        "credential": "{{ webauthn_form.credential.auto_id }}",
+        "data": "js_data"
+    }
+}
+            </script>
+        {% endif %}
+    {% endif %}
+    <form id="logout-from-stage"
+          method="post"
+          action="{% url 'account_logout' %}">
+        <input type="hidden" name="next" value="{% url 'account_login' %}">
+        {% csrf_token %}
+    </form>
+{% endblock content %}

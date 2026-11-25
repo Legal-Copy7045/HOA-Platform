@@ -183,7 +183,9 @@ def actor_label(context, actor) -> str:
     if viewer is not None and getattr(viewer, "pk", None) == actor.pk:
         return "you"
     if viewer is not None and policy.can(viewer, "lot.view_all"):
-        return actor.email
+        from core.people import display_name
+
+        return display_name(actor)
     groups = policy.roles_for(actor).groups
     for group, label in (
         (policy.BOARD, "the board"),

@@ -372,6 +372,16 @@ def nomination_decide(request, pk, decision):
     return _done(request, message, back)
 
 
+def _named(resets):
+    from core.people import display_name
+
+    out = []
+    for r in resets:
+        r.subject_name = display_name(r.subject)
+        out.append(r)
+    return out
+
+
 @login_required
 def approvals(request):
     policy.require(request.user, "role.sysadmin.approve")
@@ -394,7 +404,7 @@ def approvals(request):
         {
             "seat_proposals": seat_proposals,
             "nominations": [n for n in nominations if n.is_open],
-            "resets": [r for r in resets[:50] if r.status == "awaiting_approval"],
+            "resets": _named(r for r in resets[:50] if r.status == "awaiting_approval"),
             "me": request.user,
         },
     )
