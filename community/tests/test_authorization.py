@@ -267,6 +267,7 @@ MEMBER_READS = {
     "meeting.view",
     "resolution.view",
     "vote.view",
+    "reservation.view",
 }
 
 
@@ -288,6 +289,7 @@ MEMBER_READS = {
                 "request.view_own",
                 "account.request_change",
                 "budget.view_owner",
+                "reservation.request",
             },
         ),
         (
