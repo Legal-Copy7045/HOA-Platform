@@ -124,7 +124,7 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 - Optional features (board, Admin → Features): register in `core/features.py` (`FEATURES`, with every URL name); switched-off features 404 and leave the menu
 - Money tools: `ledger/accounting.py` (journal CSV export, deposit batches, bank reconciliation, 1099 worksheet, courtesy reminders, collections letter sequence); letters and resale certificate wording: `ledger/letters.py`, Finance → Letters
 - Security review findings and fixes: `docs/security-review-2026-11.md`
-- POC VM: see `infra/poc/README.md` and `docs/runbook.md`; update in one step with `sudo bash infra/poc/update-portal.sh`
+- POC VM: see `infra/poc/README.md` and `docs/runbook.md`; update in one step with `sudo bash infra/poc/update-portal.sh`; test outgoing mail with `sudo bash infra/poc/test-email.sh [address]`
 
 ## Never
 
