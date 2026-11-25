@@ -79,6 +79,18 @@ def _start_clock(obj, actor):
 def _mark_submitted(obj, actor):
     obj.submitted_at = timezone.now()
     obj.save(update_fields=["submitted_at"])
+    _add_neighbors_as_affected(obj)
+
+
+def _add_neighbors_as_affected(req) -> None:
+    """The lot's recorded neighbors are affected lots: their owners are
+    recused from reviewing it. Only ever adds (security review A2)."""
+    from arc.signoffs import neighbors_of
+
+    lots = neighbors_of(req.lot)
+    if lots:
+        with system_access("neighbors are affected lots"):
+            ArcRequest.objects.unscoped("affected lots").get(pk=req.pk).affected_lots.add(*lots)
 
 
 ARC = Workflow(
@@ -178,6 +190,10 @@ def create_request(
     description: str,
     project_type: str = "",
     planned_start=None,
+    planned_completion=None,
+    location: str = "",
+    location_detail: str = "",
+    materials: str = "",
     actor,
     request=None,
 ) -> ArcRequest:
@@ -193,6 +209,8 @@ def create_request(
     with system_access("create arc request"):
         applicant = Person.objects.get(user=actor)
         drafts = ArcRequest.objects.filter(applicant=applicant, state=ArcState.DRAFT).count()
+    if planned_start and planned_completion and planned_completion < planned_start:
+        raise ArcError("Completion cannot be before the start.")
     if drafts >= MAX_OPEN_DRAFTS:
         # Files are permanent: cap unsubmitted requests (re-audit of review C4).
         raise ArcError("Submit or withdraw one of your draft requests before starting another.")
@@ -203,6 +221,10 @@ def create_request(
         description=description.strip(),
         project_type=project_type[:60],
         planned_start=planned_start,
+        planned_completion=planned_completion,
+        location=location if location in ("front", "side", "rear", "other") else "",
+        location_detail=" ".join((location_detail or "").split())[:200],
+        materials=(materials or "").strip()[:5000],
     )
     record_event(
         "arc.created", actor=actor, request=request, target=req, metadata={"lot_id": lot.pk}
@@ -214,7 +236,7 @@ AFFECTED_LOTS_STATES = {ArcState.SUBMITTED, ArcState.IN_REVIEW, ArcState.APPEAL}
 
 
 def set_affected_lots(req: ArcRequest, lots, *, actor, request=None) -> None:
-    """Neighbouring lots whose owners must not review this request.
+    """Neighboring lots whose owners must not review this request.
 
     Security review 2026-11 (A2): a reviewer who owned an affected lot could
     clear the list and then decide. Now a recused person can never change it,

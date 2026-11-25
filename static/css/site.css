@@ -383,3 +383,4 @@ details.coverage ul { columns: 2; column-gap: 2rem; }
 details.faq { border-top: 1px solid var(--line-2); padding: .6rem 0; }
 details.faq > summary { cursor: pointer; font-weight: 600; }
 .list-tools { margin: 0 0 .75rem; flex-wrap: wrap; }
+input.narrow { width: 5.5rem; }

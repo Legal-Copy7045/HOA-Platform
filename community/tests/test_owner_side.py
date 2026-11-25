@@ -63,11 +63,11 @@ def test_menu_has_dashboard_and_a_homeowner_section(client, w):
 
 
 def test_board_owner_raises_their_own_arc_from_the_homeowner_side(client, w):
-    arc.create_request(lot=w["other"], title="Neighbour shed", description="x", actor=w["owner"])
+    arc.create_request(lot=w["other"], title="Neighbor shed", description="x", actor=w["owner"])
     client.force_login(w["board_owner"])
     mine = client.get(reverse("arc_list"), {"mine": "1"}).content
     assert b"Start a new request" in mine
-    assert b"Neighbour shed" not in mine
+    assert b"Neighbor shed" not in mine
     board = client.get(reverse("arc_list")).content
     assert b"Start a new request" not in board
     response = client.post(

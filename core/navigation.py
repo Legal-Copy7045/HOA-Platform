@@ -23,7 +23,7 @@ SECTIONS = [
             ("My home", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
             ("My architectural requests", "arc_list?mine=1", "pencil", "arc.submit"),
-            ("Neighbour sign-offs", "signoffs_mine", "check-circle", "arc.submit"),
+            ("Neighbor sign-offs", "signoffs_mine", "check-circle", "arc.submit"),
             ("Notices about my home", "violations?mine=1", "flag", "lot.view_own"),
             ("My requests", "requests?mine=1", "mail", "request.view_own"),
             ("My history", "my_history", "clock", "history.view_own"),
@@ -63,7 +63,7 @@ SECTIONS = [
             ("Compliance calendar", "compliance", "calendar", "compliance.manage"),
             ("Community settings", "community_settings", "sliders", "lot.view_all"),
             ("ARC request types", "arc_project_types", "pencil", "arc.configure"),
-            ("Lot neighbours", "arc_neighbours", "map", "arc.configure"),
+            ("Lot neighbors", "arc_neighbors", "map", "arc.configure"),
         ],
     ),
     (

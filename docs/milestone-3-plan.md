@@ -53,15 +53,15 @@ commit.
 - **AutoPay (15).** Stripe supports saved payment methods and recurring
   charges through its hosted pages, so the card never touches the portal;
   built when the Stripe decision is made (placeholder until then).
-- **ARC neighbour sign-off.**
-  - Neighbouring lots come from an adjacency list the board records once
-    from the development plan (per lot: its neighbours); they are
+- **ARC neighbor sign-off.**
+  - Neighboring lots come from an adjacency list the board records once
+    from the development plan (per lot: its neighbors); they are
     pre-selected on each request and the board can add other addresses.
-  - Neighbours with a portal login sign in the portal; anyone else gets a
+  - Neighbors with a portal login sign in the portal; anyone else gets a
     **single-use emailed link** (expires) showing only that request's summary
     and plans, and signs by typed name with approve/object and a comment.
   - A **printable form** prefilled from the request (applicant, lot, project,
-    neighbours with signature lines) can be printed, signed on paper,
+    neighbors with signature lines) can be printed, signed on paper,
     scanned and uploaded back.
   - **Gemini** reads an uploaded signed form and proposes the sign-offs
     (who, approve/object, date). **Human in the loop by default**: the board
@@ -80,5 +80,5 @@ commit.
 4. Document folders and search.
 5. Recurring invoices against approved contracts.
 6. Board roster and list tools; FAQs; welcome message.
-7. ARC: neighbour adjacency, sign-off requests (portal and one-time link),
+7. ARC: neighbor adjacency, sign-off requests (portal and one-time link),
    printable form, scanned upload with Gemini proposals.

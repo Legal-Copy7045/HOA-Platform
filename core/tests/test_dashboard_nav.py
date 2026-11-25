@@ -18,13 +18,13 @@ def test_owner_sidebar_and_dashboard_stay_in_scope(client):
     board = make_member(board=True)
     mine, theirs = LotFactory(), LotFactory()
     owner = make_member(lots=[mine])
-    compliance.report(lot=theirs, category="trash", description="NEIGHBOUR-SECRET", actor=board)
+    compliance.report(lot=theirs, category="trash", description="NEIGHBOR-SECRET", actor=board)
     v = compliance.report(lot=mine, category="trash", description="Mine", actor=board)
     compliance.VIOLATION.apply(v, "send_notice", actor=board)
     client.force_login(owner)
     response = client.get(reverse("home"))
     page = response.content.decode()
-    assert "NEIGHBOUR-SECRET" not in page
+    assert "NEIGHBOR-SECRET" not in page
     assert "Notice: Trash and recycling" in page
     labels = nav_labels(response)
     assert "My account" in labels and "Invoices" not in labels and "People" not in labels

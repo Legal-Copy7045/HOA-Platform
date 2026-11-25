@@ -389,7 +389,7 @@ def items_for(user) -> list[Item]:
                 Item(
                     "My home",
                     f"Sign-off: {so.arc_request.title}",
-                    f"Your neighbour at {so.arc_request.lot.street_address} asks for your view",
+                    f"Your neighbor at {so.arc_request.lot.street_address} asks for your view",
                     reverse("signoff_detail", args=[so.pk]),
                     "info",
                     nav="signoffs_mine",

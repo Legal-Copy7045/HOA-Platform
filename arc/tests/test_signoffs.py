@@ -1,4 +1,4 @@
-"""Milestone 3 phase 7: ARC neighbour sign-off, printable form, and reading
+"""Milestone 3 phase 7: ARC neighbor sign-off, printable form, and reading
 scanned forms (Gemini replaced by a stand-in)."""
 
 import re
@@ -36,15 +36,15 @@ def w(settings):
     applicant_lot, portal_lot, paper_lot, far_lot = (LotFactory() for _ in range(4))
     board = make_member(board=True)
     applicant = make_member(lots=[applicant_lot])
-    portal_neighbour = make_member(lots=[portal_lot])
-    # A neighbour with no login, only an email on record.
+    portal_neighbor = make_member(lots=[portal_lot])
+    # A neighbor with no login, only an email on record.
     paper_person = community.record_person(
         display_name="Pat Paper", email="pat.paper@example.com", actor=SYSTEM
     )
     community.record_ownership(
         person=paper_person, lot=paper_lot, start_date=applicant_lot_start(), actor=SYSTEM
     )
-    signoffs.set_neighbours(applicant_lot, [portal_lot, paper_lot], actor=board)
+    signoffs.set_neighbors(applicant_lot, left=portal_lot, right=paper_lot, actor=board)
     req = arc.create_request(
         lot=applicant_lot, title="Rear fence", description="4 ft aluminium", actor=applicant
     )
@@ -52,7 +52,7 @@ def w(settings):
     return {
         "board": board,
         "applicant": applicant,
-        "neighbour": portal_neighbour,
+        "neighbor": portal_neighbor,
         "outsider": make_member(lots=[far_lot]),
         "req": req,
         "applicant_lot": applicant_lot,
@@ -74,16 +74,47 @@ def _send(w, django_capture_on_commit_callbacks):
         return signoffs.send_signoffs(w["req"], actor=w["applicant"])
 
 
-# --- Neighbours ---------------------------------------------------------------------------
+# --- Neighbors ---------------------------------------------------------------------------
 
 
-def test_neighbours_are_symmetric_and_board_managed(w):
-    assert w["applicant_lot"] in signoffs.neighbours_of(w["portal_lot"])
+def test_neighbors_are_defined_per_lot_and_board_managed(w):
+    sides = signoffs.neighbor_sides(w["applicant_lot"])
+    assert sides["left"] == w["portal_lot"] and sides["right"] == w["paper_lot"]
+    # Per lot: the neighbor's own list is separate (corner lots need not mirror).
+    assert signoffs.neighbor_sides(w["portal_lot"])["right"] is None
+    signoffs.set_neighbors(
+        w["applicant_lot"],
+        left=w["portal_lot"],
+        right=w["paper_lot"],
+        others=[w["far_lot"]],
+        actor=w["board"],
+    )
+    assert signoffs.neighbors_of(w["applicant_lot"]) == [
+        w["portal_lot"],
+        w["paper_lot"],
+        w["far_lot"],
+    ]
     with pytest.raises(PermissionDenied):
-        signoffs.set_neighbours(w["far_lot"], [w["portal_lot"]], actor=w["applicant"])
+        signoffs.set_neighbors(w["far_lot"], left=w["portal_lot"], actor=w["applicant"])
 
 
-def test_neighbours_are_preselected_and_extra_addresses_added(w):
+def test_neighbors_become_affected_lots_on_submit(w):
+    arc.ARC.apply(w["req"], "submit", actor=w["applicant"])
+    with system_access("t"):
+        assert set(w["req"].affected_lots.all()) == {w["portal_lot"], w["paper_lot"]}
+
+
+def test_sign_offs_and_the_form_show_neighbor_names(client, w):
+    signoffs.prepare_signoffs(w["req"], actor=w["applicant"])
+    rows = signoffs.summary(w["req"])["rows"]
+    assert any("Pat Paper" in r.label for r in rows)
+    client.force_login(w["applicant"])
+    pdf_bytes = client.get(reverse("arc_signoff_form", args=[w["req"].pk])).content
+    assert b"ALTERATION REQUEST FORM" in pdf_bytes
+    assert b"Left neighbor" in pdf_bytes and b"Right neighbor: Pat Paper" in pdf_bytes
+
+
+def test_neighbors_are_preselected_and_extra_addresses_added(w):
     assert signoffs.prepare_signoffs(w["req"], actor=w["applicant"]) == 2
     assert signoffs.prepare_signoffs(w["req"], actor=w["applicant"]) == 0
     signoffs.add_signoff_address(
@@ -112,7 +143,7 @@ def test_portal_users_get_a_sign_in_link_others_a_single_use_link(
     sent = _send(w, django_capture_on_commit_callbacks)
     assert sent == {"portal": 1, "link": 1, "no_contact": 0}
     by_to = {m.to[0]: m for m in mail.outbox}
-    assert "/signoffs/" in by_to[w["neighbour"].email].body
+    assert "/signoffs/" in by_to[w["neighbor"].email].body
     assert _link_token(by_to["pat.paper@example.com"])
     for m in mail.outbox:
         assert "4 ft aluminium" not in m.body  # details only behind the link
@@ -163,7 +194,7 @@ def test_link_expires(client, w, django_capture_on_commit_callbacks):
     assert client.get(reverse("signoff_link", args=[token])).status_code == 404
 
 
-def test_portal_neighbour_answers_others_cannot(client, w, django_capture_on_commit_callbacks):
+def test_portal_neighbor_answers_others_cannot(client, w, django_capture_on_commit_callbacks):
     _send(w, django_capture_on_commit_callbacks)
     with system_access("t"):
         signoff = SignoffRequest.objects.get(lot=w["portal_lot"])
@@ -174,16 +205,16 @@ def test_portal_neighbour_answers_others_cannot(client, w, django_capture_on_com
         signoffs.respond(
             signoff, position="approved", signer_name="X", channel="portal", actor=w["applicant"]
         )
-    client.force_login(w["neighbour"])
+    client.force_login(w["neighbor"])
     assert b"Rear fence" in client.get(reverse("signoffs_mine")).content
     client.post(
         reverse("signoff_detail", args=[signoff.pk]),
-        {"position": "approved", "signer_name": "Nina Neighbour"},
+        {"position": "approved", "signer_name": "Nina Neighbor"},
     )
     signoff.refresh_from_db()
     assert signoff.state == "approved"
     response = SignoffResponse.objects.get(signoff=signoff)
-    assert response.channel == "portal" and response.recorded_by == w["neighbour"]
+    assert response.channel == "portal" and response.recorded_by == w["neighbor"]
     with pytest.raises(AppendOnlyError):
         response.delete()
 
@@ -193,7 +224,7 @@ def test_applicant_sees_answers_on_their_request(client, w, django_capture_on_co
     with system_access("t"):
         signoff = SignoffRequest.objects.get(lot=w["portal_lot"])
     signoffs.respond(
-        signoff, position="approved", signer_name="Nina", channel="portal", actor=w["neighbour"]
+        signoff, position="approved", signer_name="Nina", channel="portal", actor=w["neighbor"]
     )
     client.force_login(w["applicant"])
     page = client.get(reverse("arc_detail", args=[w["req"].pk])).content
@@ -203,7 +234,7 @@ def test_applicant_sees_answers_on_their_request(client, w, django_capture_on_co
 # --- Paper form and reading it ---------------------------------------------------------------
 
 
-def test_printable_form_lists_each_neighbour(client, w):
+def test_printable_form_lists_each_neighbor(client, w):
     signoffs.prepare_signoffs(w["req"], actor=w["applicant"])
     client.force_login(w["applicant"])
     response = client.get(reverse("arc_signoff_form", args=[w["req"].pk]))

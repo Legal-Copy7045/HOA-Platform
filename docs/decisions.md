@@ -169,7 +169,7 @@ The portal image itself is still built from reviewed code.
   invitation and enrolling (same session, enrollment forced immediately).
 - Recovery codes are shown by allauth after enrollment; we do not force a
   "I saved them" confirmation in M1.
-- Authenticator-app codes from the neighbouring 30-second window are accepted
+- Authenticator-app codes from the neighboring 30-second window are accepted
   (`MFA_TOTP_TOLERANCE = 1`, RFC 6238 s.5.2). allauth's default of 0 rejected
   codes typed as the window rolled over (found on the POC).
 

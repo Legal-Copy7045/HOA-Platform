@@ -923,6 +923,8 @@ def update_profile(
     legal_name: str,
     fiscal_year_start_month: int,
     welcome_message: str | None = None,
+    arc_form_return_to: str | None = None,
+    arc_form_conditions: str | None = None,
     actor,
     request: HttpRequest | None = None,
 ):
@@ -937,6 +939,10 @@ def update_profile(
         profile.fiscal_year_start_month = int(fiscal_year_start_month)
         if welcome_message is not None:
             profile.welcome_message = welcome_message.strip()[:2000]
+        if arc_form_return_to is not None:
+            profile.arc_form_return_to = " ".join(arc_form_return_to.split())[:300]
+        if arc_form_conditions is not None:
+            profile.arc_form_conditions = arc_form_conditions.strip()[:3000]
         profile.save()
         _audit(
             "community.profile_changed", actor=actor, request=request, target=profile, metadata={}

@@ -1,9 +1,9 @@
-"""ARC neighbour sign-off (Milestone 3 phase 7).
+"""ARC neighbor sign-off (Milestone 3 phase 7).
 
-* Neighbours come from an adjacency list the board records once from the
+* Neighbors come from an adjacency list the board records once from the
   development plan; they are pre-selected on each request, and extra
   addresses can be added.
-* A neighbour who owns a lot here and has a login signs in the portal. Anyone
+* A neighbor who owns a lot here and has a login signs in the portal. Anyone
   else gets a single-use, expiring link by email (only its hash is stored)
   that shows that one request's summary and plans, and nothing else.
 * A printable form prefilled from the request can be signed on paper,
@@ -29,7 +29,7 @@ from django.utils import timezone
 from arc.models import (
     ArcRequest,
     ArcState,
-    LotNeighbour,
+    LotNeighbor,
     ScanReading,
     SignoffChannel,
     SignoffProposal,
@@ -66,30 +66,75 @@ def _hash(token: str) -> str:
 # --- The adjacency list ---------------------------------------------------------------
 
 
-def neighbours_of(lot: Lot) -> list[Lot]:
-    with system_access("neighbours of lot"):
-        ids = LotNeighbour.objects.filter(lot=lot).values_list("neighbour_id", flat=True)
-        return list(Lot.objects.filter(pk__in=list(ids)).order_by("number"))
+def neighbors_of(lot: Lot) -> list[Lot]:
+    """Left, right, then other affected lots, as the board recorded them."""
+    with system_access("neighbors of lot"):
+        rows = list(LotNeighbor.objects.filter(lot=lot).select_related("neighbor").order_by("side"))
+    order = {"left": 0, "right": 1, "other": 2}
+    rows.sort(key=lambda r: (order.get(r.side, 3), r.neighbor.number))
+    return [r.neighbor for r in rows]
 
 
-def set_neighbours(lot: Lot, neighbours, *, actor, request=None) -> list[Lot]:
-    """Replace a lot's neighbours (kept symmetric: A next to B means B next to A)."""
+def neighbor_sides(lot: Lot) -> dict:
+    """{"left": Lot|None, "right": Lot|None, "other": [Lot, ...]} for one lot."""
+    with system_access("neighbor sides"):
+        rows = list(LotNeighbor.objects.filter(lot=lot).select_related("neighbor"))
+    out = {"left": None, "right": None, "other": []}
+    for r in rows:
+        if r.side in ("left", "right"):
+            out[r.side] = r.neighbor
+        else:
+            out["other"].append(r.neighbor)
+    out["other"].sort(key=lambda n: n.number)
+    return out
+
+
+def set_neighbors(
+    lot: Lot,
+    *,
+    left: Lot | None = None,
+    right: Lot | None = None,
+    others=(),
+    actor,
+    request=None,
+) -> dict:
+    """Replace one lot's left and right neighbors and other affected lots."""
     require(actor, "arc.configure")
-    wanted = {n.pk for n in neighbours if n.pk != lot.pk}
-    with transaction.atomic(), system_access("set neighbours"):
-        LotNeighbour.objects.filter(lot=lot).exclude(neighbour_id__in=wanted).delete()
-        LotNeighbour.objects.filter(neighbour=lot).exclude(lot_id__in=wanted).delete()
-        for other in wanted:
-            LotNeighbour.objects.get_or_create(lot=lot, neighbour_id=other)
-            LotNeighbour.objects.get_or_create(lot_id=other, neighbour=lot)
+    wanted = []
+    seen = set()
+    for side, neighbor in [("left", left), ("right", right)] + [("other", o) for o in others]:
+        if neighbor is None or neighbor.pk == lot.pk or neighbor.pk in seen:
+            continue
+        seen.add(neighbor.pk)
+        wanted.append((side, neighbor))
+    with transaction.atomic(), system_access("set neighbors"):
+        LotNeighbor.objects.filter(lot=lot).delete()
+        for side, neighbor in wanted:
+            LotNeighbor.objects.create(lot=lot, neighbor=neighbor, side=side)
     record_event(
-        "arc.neighbours_set",
+        "arc.neighbors_set",
         actor=actor,
         request=request,
         target=lot,
         metadata={"lot_id": lot.pk, "count": len(wanted)},
     )
-    return neighbours_of(lot)
+    return neighbor_sides(lot)
+
+
+def owner_names(lot_ids) -> dict[int, str]:
+    """Current owners' names per lot, for sign-off lists and the printed form
+    (a neighbor's name and address, as on the association's paper form)."""
+    with system_access("neighbor names"):
+        rows = (
+            Ownership.objects.active()
+            .filter(lot_id__in=list(lot_ids))
+            .select_related("person")
+            .order_by("start_date", "pk")
+        )
+        out: dict[int, list[str]] = {}
+        for o in rows:
+            out.setdefault(o.lot_id, []).append(o.person.display_name)
+    return {k: " & ".join(v) for k, v in out.items()}
 
 
 # --- Who may arrange sign-offs -------------------------------------------------------
@@ -121,11 +166,11 @@ def _require_arrange(actor, req: ArcRequest) -> None:
 
 
 def prepare_signoffs(req: ArcRequest, *, actor, request=None) -> int:
-    """Add the neighbouring lots (from the adjacency list) not already asked."""
+    """Add the neighboring lots (from the adjacency list) not already asked."""
     _require_arrange(actor, req)
     created = 0
     with system_access("prepare signoffs"):
-        for lot in neighbours_of(req.lot):
+        for lot in neighbors_of(req.lot):
             try:
                 with transaction.atomic():
                     SignoffRequest.objects.create(arc_request=req, lot=lot, created_by=_user(actor))
@@ -218,7 +263,7 @@ def _owners_of(lot_id: int):
 
 
 def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
-    """Email every waiting neighbour: portal users get a sign-in link, everyone
+    """Email every waiting neighbor: portal users get a sign-in link, everyone
     else a single-use link. Emails carry only the link and the address of the
     project, never the plans or anyone's details."""
     _require_arrange(actor, req)
@@ -259,10 +304,10 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
                 sent["link"] += 1
             SignoffRequest.objects.filter(pk=signoff.pk).update(sent_at=timezone.now())
     where = single_line(req.lot.street_address)
-    subject = f"[{settings.SITE_NAME}] A neighbour asks for your sign-off"
+    subject = f"[{settings.SITE_NAME}] A neighbor asks for your sign-off"
     for email, link in messages:
         body = (
-            f"Your neighbour at {where} has applied to the architectural committee for "
+            f"Your neighbor at {where} has applied to the architectural committee for "
             f"an exterior project and asks whether you approve or object.\n\n"
             f"See the details and plans, and answer, here:\n{link}\n\n"
             "Your answer is shared with the committee. If you did not expect this, you can "
@@ -375,7 +420,9 @@ def summary(req: ArcRequest) -> dict:
             .prefetch_related("responses")
         )
     counts = dict.fromkeys((SignoffState.PENDING, SignoffState.APPROVED, SignoffState.OBJECTED), 0)
+    names = owner_names([r.lot_id for r in rows if r.lot_id])
     for r in rows:
+        r.owner_names = names.get(r.lot_id, "")
         answers = list(r.responses.all())
         r.last_response = answers[-1] if answers else None
         counts[r.state] = counts.get(r.state, 0) + 1
@@ -385,47 +432,177 @@ def summary(req: ArcRequest) -> dict:
 # --- The printable form ---------------------------------------------------------------
 
 
+DEFAULT_CONDITIONS = (
+    "In order for this review and approval to be considered, you agree that any costs "
+    "involved in implementing the requested alteration are yours to bear and in no way give "
+    "you any exclusive use of the Common Area; and that should the alteration require any "
+    "additional maintenance or upkeep, those future costs will be at your expense."
+)
+DEFAULT_TYPES = ["Landscape", "Building exterior", "Satellite dish", "Other"]
+LOCATIONS = [("front", "Front"), ("side", "Side"), ("rear", "Rear"), ("other", "Other")]
+
+
+def _box(checked: bool) -> str:
+    return "[X]" if checked else "[  ]"
+
+
+def _blank(value, width=40) -> str:
+    text = str(value) if value else ""
+    return text if text else "_" * width
+
+
 def signoff_form_pdf(req: ArcRequest) -> bytes:
-    """A form prefilled from the request, with a signature block for each
-    neighbour, to print, sign and upload back."""
+    """The association's alteration request form, prefilled from the request:
+    owner and address, dates, contact, type, location, scope, materials, the
+    left and right neighbors (and any others) with signature lines, the
+    attachments reminder, the conditions, and the owner's signature."""
+    from arc.models import ArcProjectType
+    from community.models import CommunityProfile, ContactProfile
     from core import pdf
 
-    with system_access("signoff form"):
-        applicant = req.applicant.display_name
+    profile = CommunityProfile.get()
+    with system_access("alteration form"):
+        applicant = req.applicant
+        contact = ContactProfile.objects.filter(person=applicant).first()
+        email = applicant.user.email if applicant.user_id else applicant.email
         rows = list(
             SignoffRequest.objects.filter(arc_request=req)
             .exclude(state=SignoffState.WITHDRAWN)
             .select_related("lot")
         )
+        sides = {}
+        for n in LotNeighbor.objects.filter(lot=req.lot):
+            sides[n.neighbor_id] = n.side
+    names = owner_names([r.lot_id for r in rows if r.lot_id])
+    start = req.planned_start.strftime("%B %-d, %Y") if req.planned_start else ""
+    finish = req.planned_completion.strftime("%B %-d, %Y") if req.planned_completion else ""
+    order = {"left": 0, "right": 1}
+    rows.sort(key=lambda r: (order.get(sides.get(r.lot_id), 2), r.pk))
+    types = [t.name for t in ArcProjectType.objects.filter(active=True)] or DEFAULT_TYPES
+    chosen = (req.project_type or "").strip().lower()
+
     paras = [
-        ("heading", f"Neighbour sign-off: architectural request ARC-{req.pk}"),
-        ("normal", f"Applicant: {applicant}"),
-        ("normal", f"Property: Lot {req.lot.number}, {req.lot.street_address}"),
+        ("heading", profile.legal_name.upper()),
         (
-            "normal",
-            f"Project: {req.title}" + (f" ({req.project_type})" if req.project_type else ""),
+            "small",
+            profile.arc_form_return_to
+            or "Please return the completed form to the association's management office.",
         ),
-        ("normal", f"Planned start: {req.planned_start:%B %-d, %Y}" if req.planned_start else ""),
-        ("normal", "Description:"),
-        ("small", req.description[:1500]),
+        ("heading", "ALTERATION REQUEST FORM"),
+        ("small", f"Reference ARC-{req.pk}. Prefilled from the request in the owners' portal."),
+        ("normal", ""),
+        ("normal", f"1.  Name of owner requesting approval: {_blank(applicant.display_name)}"),
         (
             "normal",
-            "Each neighbour below: tick APPROVE or OBJECT, print and sign your name, and date it. "
-            "Your answer goes to the architectural committee, which makes the decision.",
+            f"     Approximate date to begin alteration: {_blank(start, 20)}",
+        ),
+        (
+            "normal",
+            f"2.  Address of unit where alteration will occur: "
+            f"{req.lot.street_address} (lot {req.lot.number})",
+        ),
+        (
+            "normal",
+            f"     Approximate date of completion: {_blank(finish, 20)}",
+        ),
+        (
+            "normal",
+            f"3.  Phone of applicant: {_blank(contact.phone if contact else '', 24)}"
+            f"     Email address: {_blank(email, 30)}",
+        ),
+        (
+            "normal",
+            "4.  Type of alteration:  "
+            + "   ".join(f"{_box(t.lower() == chosen)} {t}" for t in types),
         ),
     ]
-    for i, row in enumerate(rows, start=1):
+    if chosen and chosen not in [t.lower() for t in types]:
+        paras.append(("normal", f"     If other, please explain: {req.project_type}"))
+    paras += [
+        (
+            "normal",
+            "5.  Location (from the nearest unit):  "
+            + "   ".join(f"{_box(req.location == v)} {label}" for v, label in LOCATIONS),
+        ),
+    ]
+    if req.location_detail:
+        paras.append(("normal", f"     {req.location_detail}"))
+    paras += [
+        (
+            "normal",
+            "6.  Scope of alteration (what you are asking to do, with approximate dimensions):",
+        ),
+        ("small", f"     {req.title}. {req.description}"[:1800]),
+        (
+            "normal",
+            "7.  Materials to be used and contractors (materials or shrubs installed or "
+            "removed, and quantities):",
+        ),
+        ("small", f"     {req.materials}"[:1200] if req.materials else "_" * 88),
+        ("normal", ""),
+        (
+            "normal",
+            "8.  Signature of the nearest owners (residing there) to the right and left of "
+            "your home, to show they have been made aware of this alteration "
+            "(not necessary for like-kind replacement requests).",
+        ),
+        (
+            "small",
+            "Note to neighbors: your signature shows you have been notified of this "
+            "proposed alteration. Tick whether you approve or object. If you object, please "
+            "also contact the management office, or a board or architectural committee "
+            "member, at once.",
+        ),
+    ]
+    for row in rows:
+        if row.lot_id:
+            who = names.get(row.lot_id, "")
+            side = sides.get(row.lot_id)
+            heading = (
+                (f"{side.title()} neighbor: " if side in ("left", "right") else "Also affected: ")
+                + (f"{who}, " if who else "")
+                + f"{row.lot.street_address} (lot {row.lot.number})"
+            )
+        else:
+            heading = "Also asked: " + row.label
         paras += [
-            ("heading", f"{i}. {row.label}"),
-            ("normal", "[  ] APPROVE      [  ] OBJECT"),
-            ("normal", "Name (print): ______________________________________"),
-            ("normal", "Signature: _________________________   Date: ____________"),
-            ("normal", "Comment: ___________________________________________"),
-            ("small", f"Reference: SO-{row.pk}"),
+            ("normal", ""),
+            ("normal", heading),
+            ("normal", "     [  ] I approve      [  ] I object"),
+            (
+                "normal",
+                "     Name (print): _________________________________   Date: ______________",
+            ),
+            ("normal", "     Signature: _____________________________________"),
+            ("small", f"     Reference: SO-{row.pk}"),
         ]
     if not rows:
-        paras.append(("normal", "No neighbours have been added to this request yet."))
-    return pdf.render(paras, title=f"ARC-{req.pk} sign-off form")
+        for side in ("Left", "Right"):
+            paras += [
+                ("normal", ""),
+                ("normal", f"{side} neighbor: name and address _________________________________"),
+                (
+                    "normal",
+                    "     [  ] I approve      [  ] I object      Signature: ______________________",
+                ),
+            ]
+    paras += [
+        ("normal", ""),
+        (
+            "normal",
+            "9.  Additional information: please attach a drawing of the proposed "
+            "alteration, including a site or plot plan, material samples, photographs, "
+            "manufacturer's literature and color chips (if applicable), and two 'before' "
+            "pictures of the area. Files uploaded in the portal are already attached.",
+        ),
+        ("normal", "10. Conditions:"),
+        ("small", profile.arc_form_conditions or DEFAULT_CONDITIONS),
+        ("normal", "Notes: " + "_" * 80),
+        ("normal", ""),
+        ("normal", "_______________________________________          ____________________"),
+        ("normal", "Owner signature                                                   Date"),
+    ]
+    return pdf.render(paras, title=f"ARC-{req.pk} alteration request form")
 
 
 # --- Reading a scanned, signed form ---------------------------------------------------
@@ -528,7 +705,7 @@ def confirm_proposal(
     if proposal.state != "pending":
         raise SignoffError("This has already been dealt with.")
     if proposal.signoff is None:
-        raise SignoffError("Choose which neighbour this signature belongs to.")
+        raise SignoffError("Choose which neighbor this signature belongs to.")
     reading = proposal.reading
     response = respond(
         proposal.signoff,

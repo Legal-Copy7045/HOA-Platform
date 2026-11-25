@@ -153,7 +153,7 @@ GUIDES: dict[str, Guide] = {
     ),
     "arc.signoff_auto_confirm": Guide(
         BOARD,
-        "Not covered by the Act. Neighbour sign-offs are information for the reviewers; the "
+        "Not covered by the Act. Neighbor sign-offs are information for the reviewers; the "
         "decision stays with the committee under the Declaration.",
         "Off: a person confirms each signature read from a scanned form (Board resolution).",
     ),

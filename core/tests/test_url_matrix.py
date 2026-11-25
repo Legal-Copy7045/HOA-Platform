@@ -117,7 +117,7 @@ PROTECTED = {
     "onboarding": ("GET", None),
     "arc_signoff_action": ("POST", "arc_b"),
     "arc_signoff_form": ("GET", "arc_b"),
-    "arc_neighbours": ("GET", None),
+    "arc_neighbors": ("GET", None),
     "signoff_detail": ("GET", "signoff_b"),
     "signoff_file": ("GET", "signoff_b"),
     "seat_nomination_decide": ("POST", "seat_proposal"),

@@ -20,7 +20,7 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def w():
-    lot, neighbour_lot = LotFactory(), LotFactory()
+    lot, neighbor_lot = LotFactory(), LotFactory()
     board = make_member(board=True)
     for key, value, cite in (
         ("arc.review_days", "45", "Declaration §9.3"),
@@ -33,8 +33,8 @@ def w():
         "lot": lot,
         "owner": make_member(lots=[lot]),
         "reviewer": make_member(roles=[Role.ARC_REVIEWER]),
-        "neighbour_reviewer": make_member(lots=[neighbour_lot], roles=[Role.ARC_REVIEWER]),
-        "neighbour_lot": neighbour_lot,
+        "neighbor_reviewer": make_member(lots=[neighbor_lot], roles=[Role.ARC_REVIEWER]),
+        "neighbor_lot": neighbor_lot,
         "manager": make_member(roles=[Role.MANAGER]),
         "stranger": make_member(lots=[LotFactory()]),
     }
@@ -45,7 +45,7 @@ def submitted(w):
         lot=w["lot"], title="Rear fence", description="4 ft black", actor=w["owner"]
     )
     services.ARC.apply(req, "submit", actor=w["owner"])
-    services.set_affected_lots(req, [w["neighbour_lot"]], actor=w["manager"])
+    services.set_affected_lots(req, [w["neighbor_lot"]], actor=w["manager"])
     return services.ARC.apply(req, "accept", actor=w["manager"])
 
 
@@ -61,7 +61,7 @@ def test_full_flow_with_clock_letter_and_appeal(w):
     assert req.appeal_due_on == timezone.localdate() + timedelta(days=30)
     letter = services.decision_letter(req, decision)
     assert letter.startswith(b"%PDF") and b"Declaration \\247" not in letter
-    services.ARC.apply(req, "appeal", actor=w["owner"], note="Neighbour fences are 5 ft")
+    services.ARC.apply(req, "appeal", actor=w["owner"], note="Neighbor fences are 5 ft")
     services.decide_appeal(
         req, outcome=ArcState.APPROVED, reasons="Consistent with lots nearby", actor=w["board"]
     )
@@ -74,13 +74,13 @@ def test_full_flow_with_clock_letter_and_appeal(w):
 
 def test_recusal_applicant_and_affected_lot_owner(w):
     req = submitted(w)
-    neighbour = w["neighbour_reviewer"]
-    assert services.is_recused(neighbour, req)
-    assert services.deliberation(req, neighbour) is None
+    neighbor = w["neighbor_reviewer"]
+    assert services.is_recused(neighbor, req)
+    assert services.deliberation(req, neighbor) is None
     with pytest.raises(services.ArcError, match="recused"):
-        services.record_position(req, position="approve", actor=neighbour)
+        services.record_position(req, position="approve", actor=neighbor)
     with pytest.raises(WorkflowError, match="recused"):
-        services.decide(req, outcome=ArcState.APPROVED, citation="x", actor=neighbour)
+        services.decide(req, outcome=ArcState.APPROVED, citation="x", actor=neighbor)
     assert services.deliberation(req, w["owner"]) is None  # the applicant never sees it
     assert services.deliberation(req, w["reviewer"]) == []
 
@@ -176,26 +176,26 @@ def test_files_are_kept_and_served_only_in_scope(client, w):
 def test_recused_reviewer_cannot_clear_affected_lots_to_escape_recusal(w, client):
     """Finding A2: clearing the list un-recused the reviewer, who then decided."""
     req = submitted(w)
-    neighbour = w["neighbour_reviewer"]
+    neighbor = w["neighbor_reviewer"]
     with pytest.raises(services.ArcError, match="recused"):
-        services.set_affected_lots(req, [], actor=neighbour)
-    client.force_login(neighbour)
+        services.set_affected_lots(req, [], actor=neighbor)
+    client.force_login(neighbor)
     client.post(reverse("arc_affected", args=[req.pk]), {"lots": ""})
     req.refresh_from_db()
-    assert services.is_recused(neighbour, req)
+    assert services.is_recused(neighbor, req)
     with pytest.raises(WorkflowError, match="recused"):
-        services.decide(req, outcome=ArcState.DENIED, reasons="No", citation="x", actor=neighbour)
+        services.decide(req, outcome=ArcState.DENIED, reasons="No", citation="x", actor=neighbor)
 
 
 def test_affected_lots_can_only_be_added_once_review_starts(w):
-    req = submitted(w)  # in review, neighbour lot listed
+    req = submitted(w)  # in review, neighbor lot listed
     with pytest.raises(services.ArcError, match="only be added"):
         services.set_affected_lots(req, [], actor=w["manager"])
     extra = LotFactory()
-    services.set_affected_lots(req, [w["neighbour_lot"], extra], actor=w["manager"])
+    services.set_affected_lots(req, [w["neighbor_lot"], extra], actor=w["manager"])
     with system_access("t"):
         listed = set(req.affected_lots.values_list("pk", flat=True))
-    assert listed == {w["neighbour_lot"].pk, extra.pk}
+    assert listed == {w["neighbor_lot"].pk, extra.pk}
 
 
 def test_affected_lots_frozen_after_decision(w):

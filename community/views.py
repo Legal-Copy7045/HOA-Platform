@@ -444,6 +444,8 @@ def community_settings(request):
                     "legal_name": profile.legal_name,
                     "fiscal_year_start_month": profile.fiscal_year_start_month,
                     "welcome_message": profile.welcome_message,
+                    "arc_form_return_to": profile.arc_form_return_to,
+                    "arc_form_conditions": profile.arc_form_conditions,
                 }
             ),
             "areas": CommonArea.objects.all(),

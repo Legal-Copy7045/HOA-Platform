@@ -300,9 +300,9 @@ def test_recused_arc_reviewer_sees_no_internal_notes(w):
     from community.models import AppointedBy, Role
 
     req = arc.create_request(lot=w["lot"], title="Deck", description="Rear", actor=w["owner"])
-    neighbour = make_member(lots=[w["other"]])
+    neighbor = make_member(lots=[w["other"]])
     with system_access("t"):
-        person = Person.objects.get(user=neighbour)
+        person = Person.objects.get(user=neighbor)
     community.grant_role(
         person=person, role=Role.ARC_REVIEWER, appointed_by=AppointedBy.BOARD, actor=SYSTEM
     )
@@ -310,8 +310,8 @@ def test_recused_arc_reviewer_sees_no_internal_notes(w):
     arc.ARC.apply(req, "submit", actor=w["owner"])
     arc.set_affected_lots(req, [w["other"]], actor=w["board"])
     threads.post("arc", req, body="Deliberation", internal=True, actor=reviewer)
-    assert threads.messages_for("arc", req, neighbour) == []
-    assert not threads.access("arc", req, neighbour).post_internal
+    assert threads.messages_for("arc", req, neighbor) == []
+    assert not threads.access("arc", req, neighbor).post_internal
 
 
 # --- Follow-ups and My items -----------------------------------------------------------------

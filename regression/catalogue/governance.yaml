@@ -29,9 +29,12 @@
 - feature: "Secret ballots stored unlinkable: the ballot records who voted, the choice is a separate row with no voter, lot, time or sequential id; database refuses a linked secret ballot; formal votes binding (D21)"
   since: M3
   match: ["^unit:governance/tests/test_governance.py::test_(secret_ballot_choice|open_ballots_still)"]
-- feature: "ARC neighbour sign-off: adjacency from the development plan, extra addresses, portal answers or single-use expiring links, plans shown (not signed forms), printable prefilled form, scanned forms read into proposals a person confirms (automatic only when switched on), recusal"
+- feature: "ARC neighbor sign-off: adjacency from the development plan, extra addresses, portal answers or single-use expiring links, plans shown (not signed forms), printable prefilled form, scanned forms read into proposals a person confirms (automatic only when switched on), recusal"
   since: M3
   match: ["^unit:arc/tests/test_signoffs"]
 - feature: "Elections: nominations with acceptance, one unlinkable ballot per lot (owner or proxy holder), tie for last seat flagged, certification by a non-candidate proposes seats; proxies and live quorum; resolutions by unanimous written consent"
   since: M4
   match: ["^unit:governance/tests/test_elections"]
+- feature: "ARC: per-lot left/right neighbors and other affected lots (board), neighbors become affected lots on submit (recusal), sign-offs show neighbor names, printable form follows the association's alteration request form"
+  since: M4
+  match: ["^unit:arc/tests/test_signoffs.py::test_(neighbors_are_defined|neighbors_become|sign_offs_and_the_form)"]

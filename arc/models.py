@@ -42,11 +42,23 @@ class ArcRequest(ScopedModel):
     description = models.TextField()
     project_type = models.CharField(max_length=60, blank=True)
     planned_start = models.DateField(null=True, blank=True)
+    # From the association's alteration request form (Milestone 4).
+    planned_completion = models.DateField(null=True, blank=True)
+    location = models.CharField(
+        max_length=8,
+        blank=True,
+        choices=[("front", "Front"), ("side", "Side"), ("rear", "Rear"), ("other", "Other")],
+        help_text="Where the alteration is, with respect to the nearest unit.",
+    )
+    location_detail = models.CharField(max_length=200, blank=True)
+    materials = models.TextField(
+        blank=True, help_text="Materials (or shrubs) installed or removed, quantities, contractors."
+    )
     affected_lots = models.ManyToManyField(
         "community.Lot",
         blank=True,
         related_name="+",
-        help_text="Neighbouring lots affected (recusal).",
+        help_text="Neighboring lots affected (recusal).",
     )
     state = models.CharField(max_length=32, choices=ArcState.choices, default=ArcState.DRAFT)
     state_changed_at = models.DateTimeField(default=timezone.now)
@@ -152,26 +164,42 @@ class ArcProjectType(models.Model):
         raise PermissionError("Project types are retired, not deleted (requests refer to them).")
 
 
-# --- Neighbour sign-off (Milestone 3 phase 7) ------------------------------------------
+# --- Neighbor sign-off (Milestone 3 phase 7) ------------------------------------------
 
 
-class LotNeighbour(models.Model):
-    """Adjacency from the development plan, recorded once by the board. Stored
-    both ways (a pair of rows) so lookups are simple."""
+class NeighborSide(models.TextChoices):
+    LEFT = "left", "Left"
+    RIGHT = "right", "Right"
+    OTHER = "other", "Also affected"
+
+
+class LotNeighbor(models.Model):
+    """For each lot, the board records its left and right neighbors (from the
+    development plan) and any other lots a project there affects. They are
+    asked to sign off on that lot's ARC requests, and are treated as affected
+    lots (their owners are recused from reviewing). Defined per lot: a corner
+    lot's neighbors need not mirror."""
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
-    neighbour = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    neighbor = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    side = models.CharField(max_length=8, choices=NeighborSide.choices, default=NeighborSide.OTHER)
 
     class Meta:
+        ordering = ["lot", "side", "neighbor"]
         constraints = [
-            models.UniqueConstraint(fields=["lot", "neighbour"], name="lot_neighbour_once"),
+            models.UniqueConstraint(fields=["lot", "neighbor"], name="lot_neighbor_once"),
             models.CheckConstraint(
-                condition=~models.Q(lot=models.F("neighbour")), name="lot_not_own_neighbour"
+                condition=~models.Q(lot=models.F("neighbor")), name="lot_not_own_neighbor"
+            ),
+            models.UniqueConstraint(
+                fields=["lot", "side"],
+                condition=models.Q(side__in=["left", "right"]),
+                name="lot_one_left_one_right",
             ),
         ]
 
     def __str__(self) -> str:
-        return f"neighbour #{self.pk}"
+        return f"neighbor #{self.pk}"
 
 
 class SignoffState(models.TextChoices):
@@ -182,9 +210,9 @@ class SignoffState(models.TextChoices):
 
 
 class SignoffRequest(ScopedModel):
-    """One neighbour (a lot, or an extra address) asked to sign off on an ARC
+    """One neighbor (a lot, or an extra address) asked to sign off on an ARC
     request. Their answer is an append-only SignoffResponse; ``state`` mirrors
-    the latest one for listing. A neighbour without a portal login gets a
+    the latest one for listing. A neighbor without a portal login gets a
     single-use, expiring emailed link (only its hash is stored)."""
 
     arc_request = models.ForeignKey(ArcRequest, on_delete=models.PROTECT, related_name="signoffs")
@@ -211,7 +239,7 @@ class SignoffRequest(ScopedModel):
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):
-        """Owners see the sign-offs asked of their own lot (their neighbours'
+        """Owners see the sign-offs asked of their own lot (their neighbors'
         projects), and those on their own ARC requests."""
         return queryset.filter(
             models.Q(lot_id__in=roles.owned_lot_ids)
@@ -240,8 +268,10 @@ class SignoffRequest(ScopedModel):
 
     @property
     def label(self) -> str:
+        names = getattr(self, "owner_names", "")
         if self.lot_id:
-            return f"Lot {self.lot.number}, {self.lot.street_address}"
+            who = f"{names}, " if names else ""
+            return f"{who}{self.lot.street_address} (lot {self.lot.number})"
         return f"{self.name}, {self.address}" if self.name else self.address
 
 
@@ -253,7 +283,7 @@ class SignoffChannel(models.TextChoices):
 
 
 class SignoffResponse(AppendOnlyModel):
-    """A neighbour's answer. Never changed; a change of mind is a new row."""
+    """A neighbor's answer. Never changed; a change of mind is a new row."""
 
     signoff = models.ForeignKey(SignoffRequest, on_delete=models.PROTECT, related_name="responses")
     position = models.CharField(

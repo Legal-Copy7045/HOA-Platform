@@ -30,7 +30,7 @@ SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
 # member's approval. On in production; the POC turns it off (see production.py).
 BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=True)
 
-# ARC neighbour sign-off (Milestone 3): single-use links expire after this
+# ARC neighbor sign-off (Milestone 3): single-use links expire after this
 # many days. Gemini reads scanned signed forms when a key is set; a person
 # confirms what it reads unless the board switches on automatic confirming.
 SIGNOFF_LINK_DAYS = env.int("SIGNOFF_LINK_DAYS", default=14)
@@ -191,7 +191,7 @@ MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_PASSKEY_SIGNUP_ENABLED = False
 MFA_TRUST_ENABLED = False  # never skip the second factor on a "trusted" browser
 MFA_TOTP_ISSUER = env("SITE_NAME", default="Oak Creek Farms HOA")
-# Accept the code from the neighbouring 30-second window too (RFC 6238 s.5.2),
+# Accept the code from the neighboring 30-second window too (RFC 6238 s.5.2),
 # so a code typed as it rolls over, or a few seconds of clock drift, still works.
 MFA_TOTP_TOLERANCE = 1
 MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = False

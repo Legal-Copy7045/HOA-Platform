@@ -24,7 +24,7 @@ urlpatterns = [
         name="arc_signoff_action",
     ),
     path("arc/<int:pk>/signoff-form.pdf", sv.arc_signoff_form, name="arc_signoff_form"),
-    path("board/arc-neighbours/", sv.neighbours_page, name="arc_neighbours"),
+    path("board/arc-neighbors/", sv.neighbors_page, name="arc_neighbors"),
     path("signoffs/", sv.signoffs_mine, name="signoffs_mine"),
     path("signoffs/<int:pk>/", sv.signoff_detail, name="signoff_detail"),
     path("signoffs/<int:pk>/files/<int:file_id>/", sv.signoff_file, name="signoff_file"),

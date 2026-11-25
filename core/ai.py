@@ -1,6 +1,6 @@
 """Gemini, used only to read scanned, signed ARC sign-off forms.
 
-Sends the scanned file and the list of expected neighbours (reference and
+Sends the scanned file and the list of expected neighbors (reference and
 address) and asks for JSON: which reference each signature is for, approve
 or object, the printed name, the date and a confidence. Nothing here decides
 anything: results are proposals that a person confirms (arc.signoffs).
@@ -31,7 +31,7 @@ class AIError(RuntimeError):
 
 
 PROMPT = (
-    "This is a scanned paper form on which neighbours approve or object to a homeowner's "
+    "This is a scanned paper form on which neighbors approve or object to a homeowner's "
     "architectural project. Each signature block has a reference like SO-12. For every "
     "block that has been filled in, return: reference, position ('approve' or 'object', "
     "from the ticked box), signer_name (as printed), signed_on (YYYY-MM-DD if a date is "

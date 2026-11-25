@@ -1,4 +1,4 @@
-"""Neighbour sign-off pages: the panel on an ARC request, the neighbour's
+"""Neighbor sign-off pages: the panel on an ARC request, the neighbor's
 portal list, and the public single-use link."""
 
 import datetime
@@ -51,7 +51,7 @@ def panel_context(user, req: ArcRequest) -> dict:
         "signoff": signoffs.summary(req),
         "signoff_can_arrange": can_arrange and req.state in signoffs.OPEN_FOR_SIGNOFF,
         "signoff_staff": staff,
-        "signoff_neighbours": signoffs.neighbours_of(req.lot),
+        "signoff_neighbors": signoffs.neighbors_of(req.lot),
         "signoff_has_reader": bool(_gemini_configured()),
     }
     if staff:
@@ -78,13 +78,13 @@ def arc_signoff_action(request, pk, action):
         _flash(
             request,
             lambda: signoffs.prepare_signoffs(req, actor=user, request=request),
-            "Neighbours added from the development plan.",
+            "Neighbors added from the development plan.",
         )
     elif action == "add_lot":
         # Lot numbers and addresses are not private within the community;
         # the service checks the caller may arrange sign-offs for this request.
         lot = get_object_or_404(
-            Lot.objects.unscoped("pick a neighbour lot"),
+            Lot.objects.unscoped("pick a neighbor lot"),
             number=int(request.POST.get("lot_number") or 0),
         )
         _flash(
@@ -121,7 +121,7 @@ def arc_signoff_action(request, pk, action):
         if sent and sent["no_contact"]:
             messages.warning(
                 request,
-                f"{sent['no_contact']} neighbour(s) have no email on record: "
+                f"{sent['no_contact']} neighbor(s) have no email on record: "
                 "print the sign-off form for them.",
             )
     elif action == "paper":
@@ -218,12 +218,12 @@ def arc_signoff_form(request, pk):
     return attachments.pdf_response(signoffs.signoff_form_pdf(req), f"ARC-{req.pk}-signoffs.pdf")
 
 
-# --- The neighbour's side (portal) ---------------------------------------------------
+# --- The neighbor's side (portal) ---------------------------------------------------
 
 
 @login_required
 def signoffs_mine(request):
-    """Sign-offs neighbours have asked of the lots I own."""
+    """Sign-offs neighbors have asked of the lots I own."""
     policy.require(request.user, "arc.submit")
     roles = policy.roles_for(request.user)
     rows = (
@@ -236,7 +236,7 @@ def signoffs_mine(request):
     return render(request, "arc/signoffs_mine.html", {"rows": rows})
 
 
-def _neighbour_signoff(request, pk) -> SignoffRequest:
+def _neighbor_signoff(request, pk) -> SignoffRequest:
     signoff = get_object_or_404(
         SignoffRequest.objects.for_user(request.user).select_related("arc_request__lot"), pk=pk
     )
@@ -247,7 +247,7 @@ def _neighbour_signoff(request, pk) -> SignoffRequest:
 
 @login_required
 def signoff_detail(request, pk):
-    signoff = _neighbour_signoff(request, pk)
+    signoff = _neighbor_signoff(request, pk)
     if request.method == "POST":
         _flash(
             request,
@@ -272,7 +272,7 @@ def signoff_detail(request, pk):
 
 @login_required
 def signoff_file(request, pk, file_id):
-    signoff = _neighbour_signoff(request, pk)
+    signoff = _neighbor_signoff(request, pk)
     return attachments.serve(request, signoff.arc_request, file_id, exclude_labels=(SIGNED_FORM,))
 
 
@@ -330,20 +330,54 @@ def signoff_link_file(request, token, file_id):
 
 
 @login_required
-def neighbours_page(request):
+def neighbors_page(request):
+    """Board: each lot's left and right neighbors and other affected lots."""
     policy.require(request.user, "arc.configure")
     lots = list(Lot.objects.for_user(request.user).order_by("number"))
     by_number = {lot.number: lot for lot in lots}
+
+    def pick(value):
+        value = (value or "").strip()
+        return by_number.get(int(value)) if value.isdigit() else None
+
     if request.method == "POST":
-        lot = by_number.get(int(request.POST.get("lot") or 0))
+        lot = pick(request.POST.get("lot"))
         if lot is None:
             raise Http404
-        wanted = []
-        for part in (request.POST.get("neighbours") or "").replace(",", " ").split():
-            if part.isdigit() and int(part) in by_number:
-                wanted.append(by_number[int(part)])
-        signoffs.set_neighbours(lot, wanted, actor=request.user, request=request)
-        messages.success(request, f"Neighbours of lot {lot.number} saved (both ways).")
-        return redirect("arc_neighbours")
-    rows = [(lot, [n.number for n in signoffs.neighbours_of(lot)]) for lot in lots]
-    return render(request, "arc/neighbours.html", {"rows": rows})
+        others = [
+            by_number[int(p)]
+            for p in (request.POST.get("others") or "").replace(",", " ").split()
+            if p.isdigit() and int(p) in by_number
+        ]
+        signoffs.set_neighbors(
+            lot,
+            left=pick(request.POST.get("left")),
+            right=pick(request.POST.get("right")),
+            others=others,
+            actor=request.user,
+            request=request,
+        )
+        messages.success(request, f"Neighbors of lot {lot.number} saved.")
+        return redirect(f"{_neighbors_url()}#lot-{lot.number}")
+    names = signoffs.owner_names([lot.pk for lot in lots])
+    rows = []
+    for lot in lots:
+        sides = signoffs.neighbor_sides(lot)
+        rows.append(
+            {
+                "lot": lot,
+                "owners": names.get(lot.pk, ""),
+                "left": sides["left"],
+                "right": sides["right"],
+                "others": sides["other"],
+                "left_name": names.get(sides["left"].pk, "") if sides["left"] else "",
+                "right_name": names.get(sides["right"].pk, "") if sides["right"] else "",
+            }
+        )
+    return render(request, "arc/neighbors.html", {"rows": rows})
+
+
+def _neighbors_url():
+    from django.urls import reverse
+
+    return reverse("arc_neighbors")

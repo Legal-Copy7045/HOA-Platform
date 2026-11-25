@@ -24,7 +24,36 @@ class NewRequestForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 5}),
         help_text="Materials, colours, dimensions, location, contractor.",
     )
-    planned_start = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    planned_start = forms.DateField(
+        required=False,
+        label="Approximate start",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    planned_completion = forms.DateField(
+        required=False,
+        label="Approximate completion",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    location = forms.ChoiceField(
+        required=False,
+        label="Location with respect to the nearest unit",
+        choices=[
+            ("", "Choose..."),
+            ("front", "Front"),
+            ("side", "Side"),
+            ("rear", "Rear"),
+            ("other", "Other"),
+        ],
+    )
+    location_detail = forms.CharField(
+        max_length=200, required=False, label="If other, please explain"
+    )
+    materials = forms.CharField(
+        required=False,
+        label="Materials and contractors",
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Materials (or shrubs) to be installed or removed, quantities, contractors.",
+    )
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
@@ -303,7 +332,7 @@ def arc_affected(request, pk):
     numbers = [
         int(n) for n in request.POST.get("lots", "").replace(",", " ").split() if n.isdigit()
     ]
-    # Intake roles name neighbouring lots by number; only the numbers are used.
+    # Intake roles name neighboring lots by number; only the numbers are used.
     lots = list(Lot.objects.unscoped("affected lots by number").filter(number__in=numbers))
     try:
         services.set_affected_lots(req, lots, actor=request.user, request=request)

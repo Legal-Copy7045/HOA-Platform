@@ -437,6 +437,10 @@ class CommunityProfile(models.Model):
     fiscal_year_start_month = models.PositiveSmallIntegerField(default=1)
     # Shown at the top of everyone's dashboard (Milestone 3); plain text.
     welcome_message = models.TextField(blank=True)
+    # The printable alteration request form (Milestone 4): where to return it
+    # and the conditions owners agree to. Set by the board; not hard-coded.
+    arc_form_return_to = models.CharField(max_length=300, blank=True)
+    arc_form_conditions = models.TextField(blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 

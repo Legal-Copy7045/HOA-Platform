@@ -107,6 +107,20 @@ class ProfileForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Shown at the top of everyone's dashboard. Plain text; leave empty for none.",
     )
+    arc_form_return_to = forms.CharField(
+        required=False,
+        max_length=300,
+        label="Alteration form: where to return it",
+        help_text="Printed at the top of the alteration request form, e.g. the management "
+        "office's address and email.",
+    )
+    arc_form_conditions = forms.CharField(
+        required=False,
+        max_length=3000,
+        label="Alteration form: conditions owners agree to",
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Leave empty for the standard wording.",
+    )
 
 
 class RuleForm(forms.Form):

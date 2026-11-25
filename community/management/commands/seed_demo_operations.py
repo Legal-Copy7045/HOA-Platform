@@ -341,17 +341,23 @@ class Command(BaseCommand):
             legal_name="Oak Creek Farms Homeowners Association",
             fiscal_year_start_month=1,
             welcome_message="Welcome to the demo portal. Everything here is fictional.",
+            arc_form_return_to="Please return the completed form to Example Management Co. "
+            "(demo), 1 Example Road, or arc@example.com",
             actor=b1,
         )
 
-        # Lot neighbours from the (fictional) development plan: next-door lots
+        # Lot neighbors from the (fictional) development plan: next-door lots
         # on each of the two roads (Milestone 3 phase 7).
         from arc import signoffs as arc_signoffs
 
         for number, lot in lots.items():
             same_road = range(1, 23) if number <= 22 else range(23, 45)
-            beside = [lots[n] for n in (number - 1, number + 1) if n in same_road]
-            arc_signoffs.set_neighbours(lot, beside, actor=b1)
+            arc_signoffs.set_neighbors(
+                lot,
+                left=lots.get(number - 1) if number - 1 in same_road else None,
+                right=lots.get(number + 1) if number + 1 in same_road else None,
+                actor=b1,
+            )
 
         # Compliance calendar suggestions and an annual election (Milestone 4).
         ops.add_starter_items(actor=b1)

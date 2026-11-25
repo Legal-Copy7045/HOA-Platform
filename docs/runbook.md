@@ -259,12 +259,12 @@ password manager and the POC VM's `.env`.
 - [ ] Board decisions in `docs/security-review-2026-11.md` section 3 made.
 
 
-## ARC neighbour sign-off and Gemini
+## ARC neighbor sign-off and Gemini
 
-1. Record each lot's neighbours once (Board > Lot neighbours), from the
+1. Record each lot's neighbors once (Board > Lot neighbors), from the
    development plan. They are pre-selected on every architectural request.
 2. On a request, the applicant (or the board or manager) adds the
-   neighbours, adds any other addresses, and sends the requests. Owners with
+   neighbors, adds any other addresses, and sends the requests. Owners with
    a login answer in the portal; everyone else gets a single-use link that
    expires after `SIGNOFF_LINK_DAYS`. Anyone can also print the prefilled
    form, sign it on paper, scan it and upload it.
