@@ -13,6 +13,7 @@ SAFE_ENV = {
     "DB_APP_ROLE": "hoa_app",
     "DJANGO_DEBUG": "false",
     "ADMIN_ENABLED": "false",
+    "AUDIT_HASH_KEY": "k" * 40,
 }
 
 
@@ -49,6 +50,8 @@ def test_safe_configuration_loads(monkeypatch):
         {"DB_APP_ROLE": ""},
         {"DJANGO_DEBUG": "true"},
         {"ADMIN_ENABLED": "true"},
+        {"AUDIT_HASH_KEY": ""},
+        {"AUDIT_HASH_KEY": "too-short"},
     ],
 )
 def test_unsafe_configuration_is_refused(monkeypatch, overrides):

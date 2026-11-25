@@ -59,6 +59,7 @@ jobs:
       HOA_APP_DB_PASSWORD: ci-app
       DATABASE_URL: postgres://hoa_owner:ci-owner@localhost:5432/hoa
       DB_APP_ROLE: hoa_app
+      DB_APP_PASSWORD_FOR_TESTS: ci-app
       DJANGO_SECRET_KEY: ci-only-not-a-secret
     steps:
       - uses: actions/checkout@v4

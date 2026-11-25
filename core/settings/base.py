@@ -30,7 +30,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "procrastinate.contrib.django",
     "core",
+    "accounts",
+    "audit",
 ]
+
+AUTH_USER_MODEL = "accounts.User"
 
 ADMIN_ENABLED = env.bool("ADMIN_ENABLED", default=False)
 ADMIN_URL = env("ADMIN_URL", default="admin/")
@@ -38,6 +42,7 @@ if ADMIN_ENABLED:
     INSTALLED_APPS.insert(0, "django.contrib.admin")
 
 MIDDLEWARE = [
+    "core.middleware.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "csp.middleware.CSPMiddleware",
@@ -171,6 +176,11 @@ CONTENT_SECURITY_POLICY = {
         "object-src": ["'none'"],
     },
 }
+
+# --- Audit (decision D7) ------------------------------------------------------
+# Key for hashing identifiers we must not store in clear (unknown login emails).
+AUDIT_HASH_KEY = env("AUDIT_HASH_KEY", default="")
+AUDIT_IP_RETENTION_DAYS = env.int("AUDIT_IP_RETENTION_DAYS", default=365)
 
 # --- Logging ----------------------------------------------------------------
 LOG_LEVEL = env("LOG_LEVEL", default="INFO")

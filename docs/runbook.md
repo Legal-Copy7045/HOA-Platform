@@ -44,6 +44,26 @@ docker compose run --rm migrate manage apply_db_grants
 Only for restore drills and declared incidents. Record each use in a written
 incident note: who, when, why, what was run. (Decision D9.)
 
+## Cloudflare (POC) - current state
+
+Configured 2026-11-25. No secrets here; the tunnel token lives only in the
+password manager and the POC VM's `.env`.
+
+- Tunnel `hoa-portal-poc` (dedicated; its connector runs inside the VM's
+  compose stack, so the isolated VLAN needs no inbound exceptions).
+  Route: `portal-dev.oakcreekhoa.com` -> `http://web:8000`; everything else 404.
+- DNS: `portal-dev` CNAME to the tunnel, proxied.
+- Access application "HOA portal (POC)" on `portal-dev.oakcreekhoa.com`:
+  allow listed tester emails only, 24h session, hidden from the app launcher.
+  Remove it when the portal goes to production.
+- Zone `oakcreekhoa.com`: minimum TLS 1.2. "Always use HTTPS" is OFF because
+  HTTPS on the apex site was failing (edge certificate to be checked under
+  SSL/TLS -> Edge Certificates). Turn it on once https://oakcreekhoa.com
+  loads cleanly. SSL mode is "Full"; switch to "Full (strict)" after
+  confirming the website origin has a valid certificate.
+- The zone and Zero Trust organisation are in a personal Cloudflare account.
+  Move them to an HOA-owned account before production.
+
 ## To be written in Milestone 1
 
 - POC VM provisioning (Proxmox, VLAN, host firewall, automatic updates).

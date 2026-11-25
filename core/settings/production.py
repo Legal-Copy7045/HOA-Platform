@@ -21,6 +21,8 @@ if not SESSION_COOKIE_SECURE or not CSRF_COOKIE_SECURE:  # noqa: F405
     _problems.append("Session and CSRF cookies must be Secure in production")
 if not DB_APP_ROLE:  # noqa: F405
     _problems.append("DB_APP_ROLE must name the runtime database role (decision Q8)")
+if len(AUDIT_HASH_KEY) < 32:  # noqa: F405
+    _problems.append("AUDIT_HASH_KEY must be a random value of 32+ characters")
 if ADMIN_ENABLED:  # noqa: F405
     _problems.append("ADMIN_ENABLED must be false in production (decision Q9)")
 if env.bool("DJANGO_DEBUG", default=False):

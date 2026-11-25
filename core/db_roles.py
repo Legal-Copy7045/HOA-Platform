@@ -25,7 +25,8 @@ from psycopg import sql
 logger = logging.getLogger(__name__)
 
 # Tables whose rows may only be inserted and read by the app role.
-# Populated by core.append_only.register_append_only_table().
+# Concrete AppendOnlyModel subclasses are found automatically; this set is for
+# tables without a Django model.
 _APPEND_ONLY_TABLES: set[str] = set()
 
 
@@ -34,7 +35,17 @@ def register_append_only_table(table: str) -> None:
 
 
 def append_only_tables() -> frozenset[str]:
-    return frozenset(_APPEND_ONLY_TABLES)
+    """Every concrete AppendOnlyModel table, plus any registered explicitly."""
+    from django.apps import apps
+
+    from core.append_only import AppendOnlyModel
+
+    model_tables = {
+        model._meta.db_table
+        for model in apps.get_models()
+        if issubclass(model, AppendOnlyModel) and not model._meta.proxy
+    }
+    return frozenset(model_tables | _APPEND_ONLY_TABLES)
 
 
 def apply_runtime_grants(using: str = "default") -> bool:
@@ -51,7 +62,8 @@ def apply_runtime_grants(using: str = "default") -> bool:
         sql.SQL("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {}").format(role_id),
         sql.SQL("REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public FROM {}").format(role_id),
     ]
-    for table in sorted(_APPEND_ONLY_TABLES):
+    protected = append_only_tables()
+    for table in sorted(protected):
         statements.append(
             sql.SQL("REVOKE UPDATE, DELETE, TRUNCATE ON TABLE {} FROM {}").format(
                 sql.Identifier(table), role_id
@@ -62,7 +74,7 @@ def apply_runtime_grants(using: str = "default") -> bool:
             cursor.execute(statement.as_string(cursor.connection))
     logger.info(
         "db.runtime_grants_applied",
-        extra={"append_only_tables": len(_APPEND_ONLY_TABLES)},
+        extra={"append_only_tables": len(protected)},
     )
     return True
 

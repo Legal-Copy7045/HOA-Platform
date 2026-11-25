@@ -10,6 +10,7 @@ import os
 os.environ.setdefault("DJANGO_SECRET_KEY", "test-only-not-a-secret")
 os.environ.setdefault("DATABASE_URL", "postgres://hoa_owner:hoa_owner@localhost:5432/hoa")
 os.environ.setdefault("DB_APP_ROLE", "hoa_app")
+os.environ.setdefault("AUDIT_HASH_KEY", "test-only-audit-hash-key-not-a-secret")
 
 from .base import *  # noqa: F403
 

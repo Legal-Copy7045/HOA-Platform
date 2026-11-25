@@ -112,6 +112,20 @@ Open for Milestone 2: signed URLs point at `S3_ENDPOINT_URL`, which browsers
 cannot reach locally. Either add a separate public endpoint setting or stream
 downloads through Django after the authorization check.
 
+## D11. Custom user model before any user reference
+
+The email-based `accounts.User` landed with the audit app (step 2) rather than
+step 4, because `AuditEvent.actor` references users and Django cannot switch
+user models after such a migration exists. Users are never deleted
+(`on_delete=PROTECT` from audit events; `delete()` raises).
+
+## D12. Dedicated Cloudflare tunnel for the POC
+
+Reusing the existing home tunnel would need a firewall hole from the home
+network into the isolated VLAN, would widen the set of hosts trusted to set
+client-IP headers, and could not be handed to the HOA later. The dedicated
+`hoa-portal-poc` tunnel's connector runs inside the VM.
+
 ## Dependencies
 
 | Package | Why |
