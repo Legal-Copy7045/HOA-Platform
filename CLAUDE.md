@@ -83,13 +83,17 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 
 - First time: `cp .env.example .env`
 - Run locally: `docker compose up` (site http://localhost:8000, mail http://localhost:8025)
+- All CI checks, stopping at the first failure: `scripts/check.sh`
 - Tests (needs Postgres with the two roles from `docker/postgres/init-roles.sh`): `pytest`
 - Lint: `ruff check . && ruff format --check .`
 - Security: `bandit -q -c pyproject.toml -r .` and `pip-audit --strict -r requirements/base.txt -r requirements/dev.txt`
-- Update dependencies: edit `requirements/*.in`, then `pip-compile --generate-hashes --allow-unsafe -o requirements/base.txt requirements/base.in` (and the same for dev)
+- Update dependencies: edit `requirements/*.in`, then `pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements/base.txt requirements/base.in` (and the same for dev)
 - Re-apply runtime DB grants: `python manage.py apply_db_grants`
 - Actions fewer than two people can perform: `python manage.py check_coverage`
-- Seed synthetic data: `python manage.py seed_demo` (planned, Milestone 1 step 9)
+- First officer (once, on the server): `python manage.py bootstrap_first_officer --name ... --email ... [--also-sysadmin]`
+- Seed synthetic data (needs `SEED_DEMO_ALLOWED=true`): `python manage.py seed_demo`
+- Break-glass (sysadmin, audited): `breakglass_end_ownership`, `breakglass_end_role`, `breakglass_lock_user`, each with `--actor` and `--reason`
+- POC VM: see `infra/poc/README.md` and `docs/runbook.md`
 
 ## Never
 
