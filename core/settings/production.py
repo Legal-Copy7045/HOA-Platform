@@ -1,0 +1,29 @@
+"""Production and POC settings. Refuses to start with an unsafe configuration."""
+
+from django.core.exceptions import ImproperlyConfigured
+
+from .base import *  # noqa: F403
+from .base import env
+
+DEBUG = False
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+# Start short on the POC; raise to 31536000 for production (runbook).
+SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=3600)
+
+_problems = []
+if not ALLOWED_HOSTS:  # noqa: F405
+    _problems.append("DJANGO_ALLOWED_HOSTS must list the public hostname(s)")
+if "*" in ALLOWED_HOSTS:  # noqa: F405
+    _problems.append("DJANGO_ALLOWED_HOSTS must not contain '*'")
+if len(SECRET_KEY) < 50 or SECRET_KEY.startswith("dev-insecure"):  # noqa: F405
+    _problems.append("DJANGO_SECRET_KEY must be a unique random value of 50+ characters")
+if not SESSION_COOKIE_SECURE or not CSRF_COOKIE_SECURE:  # noqa: F405
+    _problems.append("Session and CSRF cookies must be Secure in production")
+if not DB_APP_ROLE:  # noqa: F405
+    _problems.append("DB_APP_ROLE must name the runtime database role (decision Q8)")
+if ADMIN_ENABLED:  # noqa: F405
+    _problems.append("ADMIN_ENABLED must be false in production (decision Q9)")
+if env.bool("DJANGO_DEBUG", default=False):
+    _problems.append("DJANGO_DEBUG must be false in production")
+if _problems:
+    raise ImproperlyConfigured("Unsafe production configuration: " + "; ".join(_problems))

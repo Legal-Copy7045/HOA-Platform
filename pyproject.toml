@@ -1,0 +1,38 @@
+[project]
+name = "oak-creek-farms-portal"
+version = "0.1.0"
+description = "Secure owner and board portal for the Oak Creek Farms HOA"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "staticfiles"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "DJ", "C4", "SIM", "RUF"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106"]
+"**/migrations/**" = ["E501", "RUF"]
+"conftest.py" = ["S101"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "core.settings.test"
+python_files = ["test_*.py"]
+addopts = "--strict-markers -ra"
+testpaths = ["."]
+filterwarnings = ["ignore:No directory at:UserWarning"]
+norecursedirs = [".venv", "node_modules", "staticfiles", ".git"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [".venv/*", "*/migrations/*", "*/tests/*", "manage.py", "core/asgi.py", "core/wsgi.py"]
+
+[tool.bandit]
+exclude_dirs = [".venv", "staticfiles"]
+skips = []
+
+[tool.bandit.assert_used]
+skips = ["*/tests/*", "*/test_*.py"]

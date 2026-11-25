@@ -1,0 +1,11 @@
+# Development and CI tooling.
+# Compile with: pip-compile --generate-hashes --allow-unsafe -o requirements/dev.txt requirements/dev.in
+-c base.txt
+pytest
+pytest-django
+pytest-cov
+factory-boy
+ruff
+bandit
+pip-audit
+pip-tools
