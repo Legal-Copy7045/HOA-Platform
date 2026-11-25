@@ -48,6 +48,7 @@ def icon(name: str, extra_class: str = ""):
 _TONES = {
     "success": {
         "approved",
+        "confirmed",
         "approved_with_conditions",
         "paid",
         "completed",
