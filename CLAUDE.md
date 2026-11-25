@@ -8,6 +8,8 @@ This file is the source of truth for architecture and rules. If a task conflicts
 
 - Milestone 1 (done): accounts and MFA, lots and ownership, role-scoped access, audit log.
 - Milestone 2 (directed 2026-11-25, see `docs/milestone-2-plan.md`): community definition (rules with citations, dues, common areas), owner profile and opt-in directory, calendar, announcements, board tasks, data exports, document library, meetings, resolutions and policies, records requests, voting (informal polls and formal votes), architectural review, violations, vendors and work orders, invoice approval, owner ledger with monthly dues and prepayment drawdown, budgets, collections tracking, resale certificates, reports, Stripe placeholder.
+- Milestone 3 (done, `docs/milestone-3-plan.md`): accounts and contacts, owner requests and threads, committees, folders, contracts, roster, FAQ, ARC neighbour sign-off.
+- Milestone 4 (directed 2026-11-25, `docs/milestone-4-plan.md`): backups and restore, monitoring, email preferences and digest, bulk onboarding; annual meeting and elections, budget notices, compliance calendar, written consent; accounting export, reconciliation, reminders and collections letters; reservations, PWA, SMS, access reviews, retention, accessibility.
 - Decided 2026-11-25 (D21): late fees can be automatic but start manual; formal votes are binding; secret ballots are stored unlinkable; payments by card and bank transfer through Stripe hosted pages with an owner-paid convenience fee; board seats need a second approval in production; malware scanning on.
 - Still requires a decision before use: live Stripe keys and the HOA's Stripe account.
 - Out of scope: native mobile apps, multi-association tenancy, anything that stores card or bank numbers.
@@ -109,6 +111,8 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Web/worker refuse to run as the DB owner: `python manage.py check_db_role` (run by the entrypoint)
 - File store write/read/delete probe: `python manage.py check_storage`
 - What the database holds (counts only, no personal data): `python manage.py data_status`
+- Backups (POC VM): `sudo bash infra/poc/backup.sh [--install]`; restore drill: `sudo bash infra/poc/restore-drill.sh`; file store export/import: `export_files` / `import_files`
+- Health: `python manage.py health_check [--alert]` (VM timer: `infra/poc/health-timer.sh`); routine update emails go through `comms.notify.send_update` (honours the weekly digest), legal notices never do
 - Load the lot and owner register (go-live; check, then `--commit`): `python manage.py import_register register.csv` (template `docs/examples/register-template.csv`; real file never in the repo)
 - On a fictional-data POC, attach yourself to a demo lot: `python manage.py demo_make_me_owner --email you@... --lot N`
 - Lists with an owner side and a board side use `?mine=1` (`core.scoping.own_records`); the Homeowner menu links there

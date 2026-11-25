@@ -985,6 +985,7 @@ def update_my_profile(
     in_directory: bool = False,
     directory_show_email: bool = False,
     directory_show_phone: bool = False,
+    weekly_digest: bool | None = None,
     request: HttpRequest | None = None,
 ):
     """Anyone with a linked Person edits only their own profile."""
@@ -1005,6 +1006,8 @@ def update_my_profile(
         profile.in_directory = in_directory
         profile.directory_show_email = in_directory and directory_show_email
         profile.directory_show_phone = in_directory and directory_show_phone
+        if weekly_digest is not None:
+            profile.weekly_digest = weekly_digest
         profile.save()
         _audit(
             "profile.updated",

@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from core import policy
+from core.health import run_checks
 
 
 @require_GET
@@ -53,6 +54,7 @@ def system_status(request):
             "jobs": jobs,
             "thin": policy.thinly_covered_actions(),
             "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),
+            "health": run_checks(),
             "scanner": settings.DOCUMENT_SCANNER,
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
         },

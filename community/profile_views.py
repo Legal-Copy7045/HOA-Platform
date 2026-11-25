@@ -25,6 +25,12 @@ class ProfileForm(djforms.Form):
         required=False, label="...and show my email address"
     )
     directory_show_phone = djforms.BooleanField(required=False, label="...and show my phone number")
+    weekly_digest = djforms.BooleanField(
+        required=False,
+        label="Send routine updates as one weekly summary",
+        help_text="Replies, discussions and sign-off requests. "
+        "Official notices always come at once.",
+    )
 
 
 @login_required

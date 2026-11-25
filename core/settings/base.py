@@ -34,6 +34,14 @@ BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=True
 # many days. Gemini reads scanned signed forms when a key is set; a person
 # confirms what it reads unless the board switches on automatic confirming.
 SIGNOFF_LINK_DAYS = env.int("SIGNOFF_LINK_DAYS", default=14)
+
+# Off-site backups (Milestone 4): an S3-compatible bucket the HOA owns,
+# separate from the portal's file store. Empty bucket = local backups only.
+BACKUP_S3_BUCKET = env("BACKUP_S3_BUCKET", default="")
+BACKUP_S3_ENDPOINT_URL = env("BACKUP_S3_ENDPOINT_URL", default="")
+BACKUP_S3_ACCESS_KEY_ID = env("BACKUP_S3_ACCESS_KEY_ID", default="")
+BACKUP_S3_SECRET_ACCESS_KEY = env("BACKUP_S3_SECRET_ACCESS_KEY", default="")
+BACKUP_S3_REGION = env("BACKUP_S3_REGION", default="auto")
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-2.5-flash")
 # Absolute address used in emailed links (the worker has no request to ask).

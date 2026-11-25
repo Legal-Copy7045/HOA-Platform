@@ -50,6 +50,7 @@ SECTIONS = [
             ("Owner requests", "requests", "mail", "request.manage"),
             ("Approvals", "approvals", "check-circle", "role.sysadmin.approve"),
             ("People", "people", "users", "person.manage"),
+            ("Onboarding", "onboarding", "mail", "invite.send"),
             ("All lots", "lot_list", "map", "lot.view_all"),
             ("Roster", "roster", "list", "roster.view"),
             ("Architectural review", "arc_list", "pencil", "arc.view_all"),

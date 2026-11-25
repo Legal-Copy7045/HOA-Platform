@@ -236,3 +236,119 @@ def issue_invitation_link(invitation: Invitation) -> str:
             metadata={"person_id": invitation.person_id},
         )
     return settings.PORTAL_BASE_URL + reverse("invite_landing", args=[token])
+
+
+# --- Bulk onboarding (Milestone 4) ---------------------------------------------------
+
+
+def onboarding_rows() -> list[dict]:
+    """Every current owner with their sign-up status. Board only (the view
+    checks invite.send). Invitations still go only to the email on record."""
+    from community.models import Ownership
+
+    now = timezone.now()
+    with system_access("onboarding status"):
+        owners = (
+            Ownership.objects.active()
+            .select_related("person", "lot")
+            .order_by("lot__number", "person__display_name")
+        )
+        latest = {}
+        for inv in Invitation.objects.order_by("created_at"):
+            latest[inv.person_id] = inv
+        rows, seen = [], set()
+        for o in owners:
+            person = o.person
+            if person.pk in seen:
+                continue
+            seen.add(person.pk)
+            inv = latest.get(person.pk)
+            if person.user_id:
+                status = "signed_up"
+            elif not person.email:
+                status = "no_email"
+            elif inv is None or inv.revoked_at:
+                status = "not_invited"
+            elif inv.accepted_at:
+                status = "signed_up"
+            elif inv.expires_at <= now:
+                status = "expired"
+            else:
+                status = "invited"
+            rows.append({"person": person, "lot": o.lot, "status": status, "invitation": inv})
+    return rows
+
+
+ONBOARDING_LABELS = {
+    "signed_up": "Signed up",
+    "invited": "Invitation sent",
+    "expired": "Invitation expired",
+    "not_invited": "Not invited yet",
+    "no_email": "No email on record",
+}
+
+
+def invite_everyone(*, actor, request=None) -> int:
+    """Invite every owner with an email who has no login and no live invitation
+    (expired ones get a fresh invitation)."""
+    require(actor, "invite.send")
+    sent = 0
+    for row in onboarding_rows():
+        if row["status"] in ("not_invited", "expired"):
+            try:
+                create_invitation(person=row["person"], actor=actor, request=request)
+            except InvitationError:
+                continue
+            sent += 1
+    return sent
+
+
+def remind_pending(*, actor, older_than_days: int = 3, request=None) -> int:
+    """Re-send open invitations nobody has used for a few days (new link)."""
+    require(actor, "invite.resend")
+    cutoff = timezone.now() - timedelta(days=older_than_days)
+    reminded = 0
+    for row in onboarding_rows():
+        inv = row["invitation"]
+        if row["status"] == "invited" and (inv.sent_at or inv.created_at) <= cutoff:
+            try:
+                resend_invitation(inv, actor=actor, request=request)
+            except InvitationError:
+                continue
+            reminded += 1
+    return reminded
+
+
+def email_request_letters_pdf(rows) -> bytes:
+    """One printable page per owner with no email on record, asking them to
+    give the board an address. No codes or links: invitations only ever go to
+    an email on the person's record."""
+    from core import pdf
+
+    paras = []
+    for i, row in enumerate(rows):
+        if i:
+            paras.append(("pagebreak", ""))
+        paras += [
+            ("heading", f"{settings.SITE_NAME}: the owners' portal"),
+            ("normal", f"To the owner of Lot {row['lot'].number}, {row['lot'].street_address}"),
+            ("normal", f"Dear {row['person'].display_name},"),
+            (
+                "normal",
+                "The association now has a secure online portal where owners see their "
+                "account, documents, notices and meetings, and apply for architectural "
+                "approval.",
+            ),
+            (
+                "normal",
+                "We don't have an email address for you. To join, please send the board an "
+                "email address you would like to use (write it below and return this page, or "
+                "tell a board member). We will then email you a personal invitation.",
+            ),
+            ("normal", "Email address: ______________________________________________"),
+            ("normal", "Name: _____________________________  Date: ______________"),
+            ("small", "Your address is used only for association business."),
+        ]
+    return pdf.render(
+        paras or [("normal", "Everyone has an email on record.")], title="Portal letters"
+    )

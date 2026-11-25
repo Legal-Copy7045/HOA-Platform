@@ -2,6 +2,7 @@ import hmac
 
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
@@ -10,6 +11,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from accounts import enrollment, services
 from accounts.forms import AcceptInvitationForm
 from accounts.models import Invitation
+from core import policy
 from core.scoping import system_access
 
 SESSION_KEY = "invitation_id"
@@ -112,3 +114,45 @@ def enroll_with_code(request):
 @require_GET
 def account_setup_expired(request):
     return render(request, "accounts/setup_expired.html", status=403)
+
+
+# --- Bulk onboarding (Milestone 4) ---------------------------------------------------
+
+
+@login_required
+def onboarding(request):
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from documents.attachments import pdf_response
+
+    policy.require(request.user, "invite.send")
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "invite_all":
+            n = services.invite_everyone(actor=request.user, request=request)
+            messages.success(request, f"{n} invitation(s) sent.")
+        elif action == "remind":
+            n = services.remind_pending(actor=request.user, request=request)
+            messages.success(request, f"{n} reminder(s) sent.")
+        return redirect("onboarding")
+    rows = services.onboarding_rows()
+    if request.GET.get("letters") == "1":
+        return pdf_response(
+            services.email_request_letters_pdf([r for r in rows if r["status"] == "no_email"]),
+            "portal-letters.pdf",
+        )
+    counts = dict.fromkeys(services.ONBOARDING_LABELS, 0)
+    for r in rows:
+        counts[r["status"]] += 1
+        r["label"] = services.ONBOARDING_LABELS[r["status"]]
+    return render(
+        request,
+        "accounts/onboarding.html",
+        {
+            "rows": rows,
+            "counts": counts,
+            "labels": services.ONBOARDING_LABELS,
+            "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
+        },
+    )

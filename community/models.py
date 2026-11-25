@@ -516,6 +516,9 @@ class ContactProfile(ScopedModel):
     in_directory = models.BooleanField(default=False)
     directory_show_email = models.BooleanField(default=False)
     directory_show_phone = models.BooleanField(default=False)
+    # Routine updates (replies, discussions, sign-off requests): at once or in
+    # a weekly digest (Milestone 4). Legal notices are always sent at once.
+    weekly_digest = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 

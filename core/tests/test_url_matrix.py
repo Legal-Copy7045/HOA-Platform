@@ -100,6 +100,7 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "onboarding": ("GET", None),
     "arc_signoff_action": ("POST", "arc_b"),
     "arc_signoff_form": ("GET", "arc_b"),
     "arc_neighbours": ("GET", None),

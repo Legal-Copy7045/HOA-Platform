@@ -29,3 +29,11 @@ def email_announcement(announcement_id: int) -> int:
         sent += 1
     Announcement.objects.filter(pk=announcement.pk).update(emailed_count=sent)
     return sent
+
+
+@app.periodic(cron="13 7 * * 1")  # Monday mornings
+@app.task(queue="email", queueing_lock="weekly_digest")
+def weekly_digest(timestamp: int) -> int:
+    from comms.notify import send_digests
+
+    return send_digests()

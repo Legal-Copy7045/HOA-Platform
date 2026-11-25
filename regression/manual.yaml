@@ -33,3 +33,11 @@
   check: "With GEMINI_API_KEY set on the POC, a hand-filled sign-off form is read into the right proposals."
   steps: "Print an ARC request's sign-off form; fill two blocks by hand (one approve, one object); scan or photograph it; upload it under 'Upload the signed paper form'; press 'Read automatically'; refresh after a minute; confirm both."
   last: ""
+- key: restore drill on the POC VM
+  check: "The newest nightly backup restores into a throwaway copy and passes its checks."
+  steps: "sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh"
+  last: ""
+- key: health alert email arrives
+  check: "Stopping the worker produces a health email to the sysadmins within 30 minutes, and a recovery email after restarting it."
+  steps: "docker compose ... stop worker; wait; check inbox; docker compose ... start worker"
+  last: ""

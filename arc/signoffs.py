@@ -22,7 +22,6 @@ import secrets
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils import timezone
@@ -39,6 +38,7 @@ from arc.models import (
     SignoffState,
 )
 from audit.services import record_event
+from comms.notify import send_update
 from community.models import Lot, Ownership
 from community.rules import rule
 from core import policy
@@ -268,9 +268,7 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
             "Your answer is shared with the committee. If you did not expect this, you can "
             f"ignore it.\n\n-- \n{settings.SITE_NAME}"
         )
-        transaction.on_commit(
-            lambda e=email, b=body: send_mail(subject, b, None, [e], fail_silently=True)
-        )
+        send_update({email}, subject=subject, body=body, link=link)
     record_event(
         "arc.signoffs_sent",
         actor=_user(actor),

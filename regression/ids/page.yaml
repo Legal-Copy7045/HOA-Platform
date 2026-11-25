@@ -1,6 +1,6 @@
 # Stable check IDs for the page stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: PAGE-768
+# highest issued: PAGE-772
 PAGE-001: "board: / loads"
 PAGE-002: "board: / has no console or CSP errors"
 PAGE-003: "board: / fits a phone screen"
@@ -737,3 +737,7 @@ PAGE-765: "owner: /signoffs/ loads"
 PAGE-766: "owner: /signoffs/ has no console or CSP errors"
 PAGE-767: "owner: /signoffs/ fits a phone screen"
 PAGE-768: "owner is refused board page /board/arc-neighbours/"
+PAGE-769: "board: /board/onboarding/ loads"
+PAGE-770: "board: /board/onboarding/ has no console or CSP errors"
+PAGE-771: "board: /board/onboarding/ fits a phone screen"
+PAGE-772: "owner is refused board page /board/onboarding/"

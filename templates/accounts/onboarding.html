@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Onboarding · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Onboarding</h1><p class="subtitle">Who has signed up to the portal. Invitations only ever go to the email on each owner's record.</p></div>
+    <div class="actions"><a class="btn secondary" href="?letters=1">{% icon "download" %} Letters for owners without email ({{ counts.no_email }})</a></div></div>
+  <div class="grid grid-4">
+    <div class="stat tone-success"><div class="label">Signed up</div><div class="value">{{ counts.signed_up }}</div><div class="hint">{{ signed_up_percent }}% of owners</div></div>
+    <div class="stat"><div class="label">Invited, waiting</div><div class="value">{{ counts.invited }}</div></div>
+    <div class="stat {% if counts.not_invited or counts.expired %}tone-warning{% endif %}"><div class="label">Not invited / expired</div><div class="value">{{ counts.not_invited|add:counts.expired }}</div></div>
+    <div class="stat {% if counts.no_email %}tone-warning{% endif %}"><div class="label">No email on record</div><div class="value">{{ counts.no_email }}</div></div>
+  </div>
+  <div class="form-actions">
+    <form method="post" data-confirm="Send an invitation to every owner with an email who hasn't been invited (or whose invitation expired)?">{% csrf_token %}<input type="hidden" name="action" value="invite_all"><button type="submit">{% icon "mail" %} Invite everyone not yet invited ({{ counts.not_invited|add:counts.expired }})</button></form>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary">Remind those who haven't signed up ({{ counts.invited }})</button></form>
+  </div>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Lot</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>
+    <tbody>{% for r in rows %}<tr><td>{{ r.lot.number }}</td><td><a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
+      <td><span class="badge {% if r.status == 'signed_up' %}tone-success{% elif r.status == 'invited' %}tone-info{% else %}tone-warning{% endif %}">{{ r.label }}</span></td>
+      <td class="small muted">{% if r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|date:"M j" }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|date:"M j" }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="users" title="No owners recorded yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

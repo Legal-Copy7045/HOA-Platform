@@ -281,3 +281,67 @@ password manager and the POC VM's `.env`.
    sign-offs" in Community settings. The free tier may use submitted forms to
    improve Google's products: use a paid key once forms carry real names
    (decision D21).
+
+
+## Backups and the restore drill
+
+Run once to install the nightly backup (02:30) and take a first backup:
+
+```bash
+sudo bash /opt/hoa-portal/infra/poc/backup.sh --install
+```
+
+The first run creates `/root/hoa-backup.key`. Copy it somewhere safe and
+offline (a password manager, or printed and locked away): without it the
+backups cannot be restored. Backups land in `/var/backups/hoa-portal/<date>/`
+(14 days kept). For an off-site copy, create a bucket the HOA owns (for
+example Cloudflare R2), put its details in `BACKUP_S3_*` in `.env`, and the
+nightly run uploads the already-encrypted files.
+
+Prove a backup restores, without touching the live portal:
+
+```bash
+sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh
+```
+
+It loads the newest backup into a throwaway copy, brings it up to the current
+code, checks the file store and prints the record counts. Do this before any
+real data goes in, and every few months after.
+
+## Health alerts
+
+Install the 10-minute health check, which emails the sysadmins when the site,
+the background worker, the disk, the file store, the malware scanner or the
+error rate has a problem (and again when it recovers):
+
+```bash
+sudo bash /opt/hoa-portal/infra/poc/health-timer.sh
+```
+
+The same checks are on Admin > System status.
+
+## Email deliverability (SPF, DKIM, DMARC)
+
+Notices are only useful if they arrive. For the domain the portal sends from
+(`DEFAULT_FROM_EMAIL`), add these DNS records at your DNS provider (Cloudflare):
+
+1. **SPF**: one TXT record on the domain, listing your mail provider, e.g.
+   `v=spf1 include:<your provider's SPF host> ~all` (your provider documents
+   the exact value; only one SPF record per domain).
+2. **DKIM**: the TXT/CNAME records your mail provider gives you (they sign
+   outgoing mail).
+3. **DMARC**: a TXT record at `_dmarc.<domain>`, starting with monitoring:
+   `v=DMARC1; p=none; rua=mailto:<an inbox you read>`. After a few weeks of
+   clean reports, tighten to `p=quarantine`.
+
+Then send a test (invite yourself, or `sendtestemail` in the web container)
+and check the message headers show `spf=pass`, `dkim=pass`, `dmarc=pass`.
+Bounces go to the provider's bounce address: check its dashboard for
+addresses to correct on owners' records.
+
+## Onboarding owners
+
+After loading the register, Board > Onboarding shows who has signed up. Use
+"Invite everyone not yet invited", then "Remind" a few days later. Owners with
+no email get a printable letter asking for one; invitations only ever go to
+the email on the owner's record.

@@ -18,7 +18,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.db import transaction
 from django.http import Http404
 from django.urls import reverse
@@ -232,11 +231,9 @@ def _send(kind: str, obj, emails: set[str]) -> None:
         f"Sign in to read it:\n{_link(kind, obj)}\n\n-- \n{settings.SITE_NAME}"
     )
 
-    def go():
-        for email in sorted(emails):
-            send_mail(subject, body, None, [email], fail_silently=True)
+    from comms.notify import send_update
 
-    transaction.on_commit(go)
+    send_update(emails, subject=subject, body=body, link=_link(kind, obj))
 
 
 def _owner_side_emails(kind: str, obj) -> set[str]:

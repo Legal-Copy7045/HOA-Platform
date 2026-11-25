@@ -37,3 +37,12 @@
 - feature: "Sidebar count bubbles: each menu entry shows the number of items waiting on you (from the My items queue, scoped)"
   since: M3
   match: ["^unit:core/tests/test_nav_counts"]
+- feature: "Backups: file store export/import round trip (unsafe archive paths ignored), off-site upload guarded; health checks with throttled sysadmin alerts and error counting"
+  since: M4
+  match: ["^unit:core/tests/test_backups", "^unit:core/tests/test_monitoring"]
+- feature: "Routine updates immediately or as a weekly digest (links only); official notices always immediate"
+  since: M4
+  match: ["^unit:comms/tests/test_digest"]
+- feature: "Bulk onboarding: sign-up status, invite everyone, reminders, letters for owners without email (invitations only to the email on record)"
+  since: M4
+  match: ["^unit:accounts/tests/test_onboarding"]

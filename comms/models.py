@@ -153,3 +153,19 @@ class FaqEntry(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("FAQ entries are unpublished, not deleted.")
+
+
+class DigestItem(models.Model):
+    """A routine update held for someone's weekly digest. Only a subject line
+    and a link - never the content (emails carry links only)."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    subject = models.CharField(max_length=200)
+    link = models.CharField(max_length=500)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"digest item #{self.pk}"

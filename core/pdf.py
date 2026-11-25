@@ -21,6 +21,9 @@ def _escape(text: str) -> str:
 def _lines(paragraphs: list[tuple[str, str]]) -> list[tuple[str, str]]:
     out = []
     for style, text in paragraphs:
+        if style == "pagebreak":
+            out.append(("pagebreak", ""))
+            continue
         if not text:
             out.append(("normal", ""))
             continue
@@ -31,10 +34,17 @@ def _lines(paragraphs: list[tuple[str, str]]) -> list[tuple[str, str]]:
 
 
 def render(paragraphs: list[tuple[str, str]], *, title: str = "Letter") -> bytes:
-    """paragraphs: [("heading"|"normal"|"small", text), ...] -> PDF bytes."""
+    """paragraphs: [("heading"|"normal"|"small"|"pagebreak", text), ...] -> PDF bytes."""
     per_page = (PAGE_H - 2 * MARGIN) // LEADING
-    lines = _lines(paragraphs)
-    pages = [lines[i : i + per_page] for i in range(0, len(lines), per_page)] or [[]]
+    pages: list[list[tuple[str, str]]] = [[]]
+    for line in _lines(paragraphs):
+        if line[0] == "pagebreak":
+            if pages[-1]:
+                pages.append([])
+            continue
+        if len(pages[-1]) >= per_page:
+            pages.append([])
+        pages[-1].append(line)
     objects: list[bytes] = []
 
     def add(obj: bytes) -> int:
