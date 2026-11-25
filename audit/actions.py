@@ -212,7 +212,7 @@ _SPECS = [
     _spec("vote.closed", "Vote closed"),
     _spec("vote.ballot_cast", "Ballot cast", "lot_id"),
     _spec("attachment.added", "File attached", "owner_type", "scan"),
-    _spec("attachment.downloaded", "Attached file downloaded", "owner_type", "scan"),
+    _spec("attachment.downloaded", "Attached file downloaded", "owner_type", "scan", "view"),
     _spec("arc.created", "ARC request started", "lot_id"),
     _spec("arc.affected_lots_set", "ARC affected lots recorded", "count", "added", "removed"),
     _spec("arc.position_recorded", "ARC reviewer position recorded"),
@@ -255,6 +255,57 @@ _SPECS = [
         "reason",
         "target_id",
     ),
+    # Installable app, push and text alerts (Milestone 4). Counts only: never
+    # phone numbers, codes or device addresses.
+    _spec("push.subscribed", "Push notifications turned on for a device", "new"),
+    _spec("push.unsubscribed", "Push notifications turned off", "devices"),
+    _spec("sms.code_sent", "Text message confirmation code sent"),
+    _spec("sms.opted_in", "Urgent text messages turned on"),
+    _spec("sms.opted_out", "Urgent text messages turned off", "by"),
+    _spec("sms.urgent_queued", "Urgent text notice sent", "notice_id", "recipients"),
+    _spec(
+        "sms.urgent_delivered",
+        "Urgent text notice delivered",
+        "notice_id",
+        "sent",
+        "failed",
+        "opted_out",
+    ),
+    # --- UX review: finance and board admin pages ---
+    _spec(
+        "ledger.payments_batch_recorded",
+        "Owner payments recorded together (Record payments page)",
+        "count",
+        "total_cents",
+    ),
+    # --- Reservations, access review, retention (Milestone 4) ---
+    _spec(
+        "reservation.settings_saved", "Booking rules saved for a common area", "area_id", "bookable"
+    ),
+    _spec("reservation.requested", "Common area booking requested", "area_id", "lot_id", "state"),
+    _spec("reservation.approved", "Common area booking confirmed", "area_id", "lot_id"),
+    _spec("reservation.declined", "Common area booking declined", "area_id", "lot_id"),
+    _spec("reservation.cancelled", "Common area booking cancelled", "area_id", "lot_id", "by"),
+    _spec("access_review.viewed", "Access review page viewed", "logins", "flagged"),
+    _spec(
+        "access_review.recorded",
+        "Access review recorded",
+        "logins",
+        "flagged",
+        "inactive",
+        "without_mfa",
+    ),
+    _spec(
+        "retention.run",
+        "Former owners' contact details cleared under the retention rule",
+        "days",
+        "people",
+        "profiles_cleared",
+        "methods_removed",
+        "mode",
+    ),
+    # --- Homeowner ARC, requests and notices (UX review) ---
+    _spec("arc.edited", "ARC draft edited by the owner", "fields"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

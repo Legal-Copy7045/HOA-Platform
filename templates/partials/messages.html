@@ -1,5 +1,10 @@
-{% load portal %}{% if messages %}
-<ul class="messages" role="status">
-  {% for message in messages %}<li class="message {{ message.tags }}">{% if message.tags == "error" %}{% icon "alert" %}{% elif message.tags == "warning" %}{% icon "alert" %}{% elif message.tags == "success" %}{% icon "check" %}{% else %}{% icon "info" %}{% endif %}<span>{{ message }}</span></li>{% endfor %}
-</ul>
+{% load portal %}{% if messages %}{# Errors are announced at once (role="alert"); the rest politely (role="status"). #}
+{% with all=messages|list_messages %}
+{% if all.errors %}<div class="messages" role="alert">
+  {% for message in all.errors %}<div class="message {{ message.tags }}">{% icon "alert" %}<span>{{ message }}</span></div>{% endfor %}
+</div>{% endif %}
+{% if all.others %}<div class="messages" role="status">
+  {% for message in all.others %}<div class="message {{ message.tags }}">{% if message.tags == "warning" %}{% icon "alert" %}{% elif message.tags == "success" %}{% icon "check" %}{% else %}{% icon "info" %}{% endif %}<span>{{ message }}</span></div>{% endfor %}
+</div>{% endif %}
+{% endwith %}
 {% endif %}

@@ -8,27 +8,42 @@ from community.models import ContactMethod, ContactMethodKind, ContactProfile, P
 from core import policy
 
 
+def _described(field_name: str) -> dict:
+    return {"aria-describedby": f"id_{field_name}_help"}
+
+
 class ProfileForm(djforms.Form):
-    phone = djforms.CharField(max_length=40, required=False)
+    """The owner's own details, grouped on the page as How to reach you, Official
+    notices, Owner directory and Email updates (UX review)."""
+
+    phone = djforms.CharField(
+        max_length=40, required=False, widget=djforms.TextInput(attrs={"autocomplete": "tel"})
+    )
     mailing_address = djforms.CharField(
         required=False,
-        widget=djforms.Textarea(attrs={"rows": 3}),
+        widget=djforms.Textarea(attrs={"rows": 3, **_described("mailing_address")}),
         help_text="Only if different from your lot address.",
     )
     electronic_notice_consent = djforms.BooleanField(
-        required=False, label="Send me official association notices by email"
+        required=False,
+        label="Send me official association notices by email",
+        widget=djforms.CheckboxInput(attrs=_described("electronic_notice_consent")),
+        help_text="Notices the association must send you, such as meeting and assessment "
+        "notices, then come by email instead of by mail. You can change this at any time.",
     )
     in_directory = djforms.BooleanField(
-        required=False, label="List me in the owner directory (name and lot)"
+        required=False,
+        label="List me in the owner directory (name and lot)",
+        widget=djforms.CheckboxInput(attrs=_described("in_directory")),
+        help_text="Leave this unticked to stay out of the directory.",
     )
-    directory_show_email = djforms.BooleanField(
-        required=False, label="...and show my email address"
-    )
-    directory_show_phone = djforms.BooleanField(required=False, label="...and show my phone number")
+    directory_show_email = djforms.BooleanField(required=False, label="My email address")
+    directory_show_phone = djforms.BooleanField(required=False, label="My phone number")
     weekly_digest = djforms.BooleanField(
         required=False,
         label="Send routine updates as one weekly summary",
-        help_text="Replies, discussions and sign-off requests. "
+        widget=djforms.CheckboxInput(attrs=_described("weekly_digest")),
+        help_text="Replies, discussions and acknowledgement requests. "
         "Official notices always come at once.",
     )
 

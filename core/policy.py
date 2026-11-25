@@ -153,6 +153,21 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "resale.request": frozenset({OWNER, BOARD, MANAGER}),
     "resale.manage": frozenset({BOARD, MANAGER}),
     "reports.view": frozenset({BOARD, AUDITOR, MANAGER}),
+    # Text alerts (Milestone 4): owners opt in; the board sends urgent notices.
+    "sms.opt_in": frozenset({OWNER}),
+    "sms.send_urgent": frozenset({BOARD}),
+    # --- Reservations, access review, retention (Milestone 4) ---
+    # Common-area bookings: residents request (per-area rules decide whether
+    # authorized contacts and tenants may); board or manager confirm.
+    "reservation.view": COMMUNITY,
+    "reservation.request": frozenset({OWNER, AUTHORIZED, TENANT}),
+    "reservation.manage": frozenset({BOARD, MANAGER}),
+    "reservation.configure": frozenset({BOARD}),
+    # Quarterly review of every login's access: the board only (sysadmins get
+    # operations pages, never owner data).
+    "access_review.record": frozenset({BOARD}),
+    # Clearing former owners' contact details under the retention rule.
+    "retention.manage": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

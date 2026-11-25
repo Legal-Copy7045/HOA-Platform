@@ -413,6 +413,35 @@ def ballot_choices_for(vote: Vote, user) -> dict:
     return {"can_vote": bool(lots), "lots": lots}
 
 
+def my_ballots(vote: Vote, user) -> list[Ballot]:
+    """Ballots already cast that this person may be told about: their own
+    (informal), or their lots' (formal). Never the choice on a secret vote,
+    which the ballot row does not hold."""
+    from core import policy
+
+    roles = policy.roles_for(user)
+    if vote.kind == VoteKind.INFORMAL:
+        if not roles.person_id:
+            return []
+        return list(Ballot.objects.filter(vote=vote, person_id=roles.person_id, lot__isnull=True))
+    if not roles.owned_lot_ids:
+        return []
+    # Only ballots cast while this person has owned the lot: a buyer must not
+    # see how the seller voted (review R2-001).
+    since = dict(roles.owned_since)
+    with system_access("my lots' ballots"):
+        rows = (
+            Ballot.objects.filter(vote=vote, lot_id__in=roles.owned_lot_ids)
+            .select_related("lot", "option")
+            .order_by("lot__number")
+        )
+        return [
+            b
+            for b in rows
+            if b.lot_id in since and timezone.localdate(b.cast_at) >= since[b.lot_id]
+        ]
+
+
 def cast_ballot(
     vote: Vote, *, option_id: int, lot_id: int | None = None, actor, request=None
 ) -> Ballot:

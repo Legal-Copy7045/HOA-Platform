@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Access review · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Access review</h1>
+    <p class="subtitle">Every login, what it can reach, and anything worth a second look. Review it every {{ every_days }} days: end seats, offices and roles that should have ended from the person's page. Viewing this page is logged.</p></div></div>
+
+  <section class="card"><h2>Last review</h2>
+    {% if last %}<p>Recorded by {{ last_name }} on {{ last.reviewed_at|date:"M j, Y" }}: {{ last.logins }} login{{ last.logins|pluralize }}, {{ last.flagged }} flagged.{% if also %} Also reviewed by {% for name, when in also %}{{ name }} ({{ when|date:"M j" }}){% if not forloop.last %}, {% endif %}{% endfor %}.{% endif %}</p>
+    {% else %}<p>No access review has been recorded yet.</p>{% endif %}
+    {% if due %}<p class="small"><span class="status tone-warning">Due</span> The last review is more than {{ every_days }} days old.</p>{% endif %}
+    <form method="post" action="{% url 'access_review_record' %}" class="inline" data-confirm="Record that you reviewed every login below?">{% csrf_token %}<button type="submit">{% icon "check-circle" %} I have reviewed this list</button></form>
+  </section>
+
+  <div class="grid grid-4">
+    <div class="stat"><div class="label">Logins</div><div class="value">{{ counts.logins }}</div></div>
+    <div class="stat{% if counts.flagged %} tone-warning{% endif %}"><div class="label">Flagged</div><div class="value">{{ counts.flagged }}</div></div>
+    <div class="stat{% if counts.without_mfa %} tone-danger{% endif %}"><div class="label">No authenticator</div><div class="value">{{ counts.without_mfa }}</div></div>
+    <div class="stat"><div class="label">Sysadmins</div><div class="value">{{ counts.sysadmins }}</div></div>
+  </div>
+
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Login</th><th>Homes</th><th>Board, offices, roles</th><th>Account contact</th><th>Last sign-in</th><th>Authenticator</th><th>Flags</th></tr></thead>
+    <tbody>{% for r in rows %}<tr>
+      <td>{% if r.person %}<a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a>{% else %}<span class="muted">No person record</span>{% endif %}<div class="small muted">{{ r.user.email }}</div></td>
+      <td class="small">{% for n in r.lots %}Lot {{ n }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="small">{% if r.board %}Board{% endif %}{% for o in r.offices %}{% if r.board or not forloop.first %}, {% endif %}{{ o }}{% endfor %}{% for x in r.roles %}{% if r.board or r.offices or not forloop.first %}, {% endif %}{{ x }}{% endfor %}{% if not r.board and not r.offices and not r.roles %}<span class="muted">-</span>{% endif %}</td>
+      <td class="small">{% for c in r.contacts %}{{ c }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="nowrap small">{% if r.user.last_login %}{{ r.user.last_login|date:"M j, Y" }}{% else %}<span class="muted">Never</span>{% endif %}</td>
+      <td>{% if r.mfa %}{% status "active" "Yes" %}{% else %}{% status "overdue" "None" %}{% endif %}</td>
+      <td class="small">{% for f in r.flag_labels %}<span class="badge tone-warning">{{ f }}</span> {% empty %}<span class="muted">-</span>{% endfor %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div></div>
+  <p class="small muted">To end a seat, office, role or ownership, or to reset a lost authenticator, open the person's page. To switch off a login at once (for example a compromised account), a sysadmin runs the audited <code>breakglass_lock_user</code> command.</p>
+
+  {% if history %}<section class="card"><h2>Earlier reviews</h2><ul class="list">{% for h in history %}<li><div class="grow"><div class="title">{{ h.reviewed_at|date:"M j, Y" }}</div><div class="small muted">{{ h.logins }} logins · {{ h.flagged }} flagged · {{ h.inactive }} inactive · {{ h.without_mfa }} without an authenticator</div></div></li>{% endfor %}</ul></section>{% endif %}
+{% endblock %}

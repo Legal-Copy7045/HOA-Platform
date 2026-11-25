@@ -44,6 +44,7 @@ VIOLATION = Workflow(
             "violation.manage",
             "Send notice",
             after=_set_cure_by,
+            confirm="Send the notice? The owner gets a letter with the date to fix it by.",
         ),
         Transition(
             "respond",
@@ -60,6 +61,7 @@ VIOLATION = Workflow(
             "violation.manage",
             "Schedule hearing",
             note_required=True,
+            confirm="Schedule a hearing? The owner sees your note with the date and place.",
         ),
         Transition(
             "mark_cured",
@@ -67,6 +69,7 @@ VIOLATION = Workflow(
             S.CURED,
             "violation.manage",
             "Mark cured",
+            confirm="Mark this as fixed? The owner is no longer asked to act.",
         ),
         Transition(
             "uphold",
@@ -75,6 +78,10 @@ VIOLATION = Workflow(
             "violation.decide",
             "Uphold (board)",
             note_required=True,
+            confirm=(
+                "Uphold this violation? The owner is told the board's "
+                "decision and any fine that follows."
+            ),
         ),
         Transition(
             "dismiss",
@@ -83,8 +90,16 @@ VIOLATION = Workflow(
             "violation.decide",
             "Dismiss (board)",
             note_required=True,
+            confirm="Dismiss this notice? It closes with no action against the owner.",
         ),
-        Transition("close", {S.CURED, S.UPHELD}, S.CLOSED, "violation.manage", "Close"),
+        Transition(
+            "close",
+            {S.CURED, S.UPHELD},
+            S.CLOSED,
+            "violation.manage",
+            "Close",
+            confirm="Close this record? It stays in the lot's history.",
+        ),
     ],
 )
 
@@ -120,6 +135,23 @@ def respond(violation: Violation, *, text: str, actor, request=None) -> OwnerRes
         with system_access("owner response"):
             person = Person.objects.get(user=actor)
         return OwnerResponse.objects.create(violation=violation, person=person, text=text.strip())
+
+
+OWNER_OPEN_STATES = (S.NOTICED, S.RESPONDED, S.HEARING)
+
+
+def owner_may_add_photo(actor, v: Violation) -> bool:
+    """An owner of the lot (on the deed, not view-only or a former owner) may
+    add a photo showing the fix while the notice is open."""
+    from core.policy import can
+
+    if actor is SYSTEM or not getattr(actor, "is_authenticated", False):
+        return False
+    return (
+        v.state in OWNER_OPEN_STATES
+        and can(actor, "lot.view_own")
+        and v.lot_id in roles_for(actor).owned_lot_ids
+    )
 
 
 def notice_letter(v: Violation) -> bytes:

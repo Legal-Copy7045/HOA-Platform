@@ -1,56 +1,45 @@
-{# Local override of allauth's login page: no sign-up wording (accounts are by invitation). #}
+{# Local override of allauth's login page (UX review #3): no sign-up wording (accounts are #}
+{# by invitation), the passkey first, visible labels, and a way to get help. #}
 {% extends "account/base_entrance.html" %}
-{% load i18n %}
-{% load allauth account %}
-{% block head_title %}
-    {% trans "Sign In" %}
-{% endblock head_title %}
+{% load portal %}
+{% block head_title %}Sign in{% endblock head_title %}
 {% block content %}
-    {% element h1 %}
-        Sign in
-    {% endelement %}
-    {% if not SOCIALACCOUNT_ONLY %}
-        {% element p %}
-            Welcome back. Use your passkey if you have one, or your email and password.
-        {% endelement %}
-        {% url 'account_login' as login_url %}
-        {% element form form=form method="post" action=login_url tags="entrance,login" %}
-            {% slot body %}
-                {% csrf_token %}
-                {% element fields form=form unlabeled=True %}
-                {% endelement %}
-                {{ redirect_field }}
-            {% endslot %}
-            {% slot actions %}
-                {% element button type="submit" tags="prominent,login" %}
-                    Sign in
-                {% endelement %}
-            {% endslot %}
-        {% endelement %}
-    {% endif %}
-    {% if LOGIN_BY_CODE_ENABLED or PASSKEY_LOGIN_ENABLED %}
-        {% element hr %}
-        {% endelement %}
-        {% element button_group vertical=True %}
-            {% if PASSKEY_LOGIN_ENABLED %}
-                {% element button type="submit" form="mfa_login" id="passkey_login" tags="prominent,login,outline,primary" %}
-                    {% trans "Sign in with a passkey" %}
-                {% endelement %}
-            {% endif %}
-            {% if LOGIN_BY_CODE_ENABLED %}
-                {% element button href=request_login_code_url tags="prominent,login,outline,primary" %}
-                    {% trans "Send me a sign-in code" %}
-                {% endelement %}
-            {% endif %}
-        {% endelement %}
-    {% endif %}
-    {% if SOCIALACCOUNT_ENABLED %}
-        {% include "socialaccount/snippets/login.html" with page_layout="entrance" %}
-    {% endif %}
+  <h1>Sign in</h1>
+  {% if PASSKEY_LOGIN_ENABLED %}
+    <button type="submit" form="mfa_login" id="passkey_login" class="block">{% icon "key" %} Sign in with a passkey</button>
+    <p class="small muted center">Uses your phone's or computer's fingerprint, face or screen lock.</p>
+    <p class="or-divider"><span>or use your email and password</span></p>
+  {% endif %}
+  {% if not SOCIALACCOUNT_ONLY %}
+    <form method="post" action="{% url 'account_login' %}" novalidate>{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</span></div>{% endif %}
+      <div class="field{% if form.login.errors %} has-error{% endif %}">
+        <label for="id_login">Email</label>
+        <input type="email" name="login" id="id_login" value="{{ form.login.value|default:'' }}" autocomplete="email" maxlength="320" required{% if form.login.errors %} aria-invalid="true" aria-describedby="id_login_errors"{% endif %}>
+        {% if form.login.errors %}<ul class="errorlist" id="id_login_errors" role="alert">{% for e in form.login.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      <div class="field{% if form.password.errors %} has-error{% endif %}">
+        <label for="id_password">Password</label>
+        <input type="password" name="password" id="id_password" autocomplete="current-password" required{% if form.password.errors %} aria-invalid="true" aria-describedby="id_password_errors"{% endif %}>
+        {% if form.password.errors %}<ul class="errorlist" id="id_password_errors" role="alert">{% for e in form.password.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      <label class="choice show-password"><input type="checkbox" data-show-password="id_password"> Show password</label>
+      {{ redirect_field }}
+      <div class="form-actions"><button type="submit" class="secondary block">Sign in</button></div>
+    </form>
+  {% endif %}
+  {% if LOGIN_BY_CODE_ENABLED %}
+    <div class="form-actions"><a class="btn secondary block" href="{{ request_login_code_url }}" aria-describedby="login-code-hint">{% icon "mail" %} Send me a sign-in code</a></div>
+    <p class="small muted" id="login-code-hint">Instead of your password. You'll still need your authenticator app or passkey.</p>
+  {% endif %}
+  <p class="center"><a href="{% url 'signin_help' %}">Forgot password or lost my phone?</a></p>
+  {% if SOCIALACCOUNT_ENABLED %}
+    {% include "socialaccount/snippets/login.html" with page_layout="entrance" %}
+  {% endif %}
 {% endblock content %}
 {% block extra_body %}
-    {{ block.super }}
-    {% if PASSKEY_LOGIN_ENABLED %}
-        {% include "mfa/webauthn/snippets/login_script.html" with button_id="passkey_login" %}
-    {% endif %}
+  {{ block.super }}
+  {% if PASSKEY_LOGIN_ENABLED %}
+    {% include "mfa/webauthn/snippets/login_script.html" with button_id="passkey_login" %}
+  {% endif %}
 {% endblock %}

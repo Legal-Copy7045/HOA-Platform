@@ -36,3 +36,11 @@ def payment_options(amount_cents: int) -> list[dict]:
             }
         )
     return out
+
+
+def online_payments_enabled() -> bool:
+    """True only when an online payment provider is set up and working, so
+    pages never offer a "Pay online" button or fee lines that cannot be used."""
+    from payments.providers import provider
+
+    return bool(provider().available)

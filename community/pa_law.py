@@ -83,6 +83,11 @@ GROUP_NOTES: dict[str, str] = {
         "them to be disclosed before payment; counsel should confirm the fee wording before "
         "live payments. Bank transfer fees are not card surcharges."
     ),
+    "Privacy": (
+        "The Act does not say how long an association keeps owners' contact details. Records "
+        f"the Act requires (financial records, minutes, ballots, {ACT} § 5316) are kept in "
+        "full; contact details of people who have left are a board privacy policy."
+    ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
@@ -177,6 +182,12 @@ GUIDES: dict[str, Guide] = {
         "decision stays with the committee under the Declaration.",
         "Off: a person confirms each signature read from a scanned form (Board resolution).",
     ),
+    "arc.signoff_respond_days": Guide(
+        BOARD,
+        "Not covered by the Act. Neighbor acknowledgements inform the reviewers; the review "
+        "deadlines that bind the committee come from the Declaration.",
+        "14 days to respond (Board resolution or ARC guidelines).",
+    ),
     "violation.cure_days": Guide(
         RULES,
         "Not set by the Act.",
@@ -243,6 +254,13 @@ GUIDES["payments.bank_fee_cents"] = Guide(
     BOARD,
     "Not covered by the Act.",
     "$1.00 per bank transfer: Board resolution 2027-09.",
+)
+
+GUIDES["retention.former_owner_contact_days"] = Guide(
+    BOARD,
+    "Not covered by the Act. Only contact details are cleared: ledger, ARC, violation, vote "
+    f"and audit records stay, as the association must keep its records ({ACT} § 5316).",
+    "730 days (two years after leaving): Board privacy policy, resolution 2027-11.",
 )
 
 for _key in ("general", "billing", "maintenance", "common_area"):

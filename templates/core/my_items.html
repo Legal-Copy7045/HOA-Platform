@@ -7,7 +7,7 @@
   {% regroup items by area as areas %}
   {% for group in areas %}
     <section class="card" id="area-{{ forloop.counter }}"><h2>{{ group.grouper }}</h2>
-      <ul class="list">{% for it in group.list %}<li><div class="todo-icon tone-{{ it.tone }}">{% icon "clock" %}</div><div class="grow"><a class="title" href="{{ it.url }}">{{ it.title }}</a><div class="small muted">{{ it.detail }}</div></div>{% if it.overdue %}<span class="badge tone-danger">overdue</span>{% endif %}</li>{% endfor %}</ul>
+      <ul class="list">{% for t in group.list %}{% include "partials/todo.html" %}{% endfor %}</ul>
     </section>
   {% empty %}{% include "partials/empty.html" with icon="check-circle" title="Nothing waiting on you" text="New requests, approvals and follow-ups will appear here." %}{% endfor %}
 {% endblock %}

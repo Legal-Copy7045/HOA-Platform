@@ -41,3 +41,14 @@ def notify_board(kind: str) -> int:
     for address in recipients:
         send_mail(f"[{settings.SITE_NAME}] Board notice", body, None, [address])
     return len(recipients)
+
+
+@app.periodic(cron="47 3 * * *")  # daily, 03:47 server time
+@app.task(queue="maintenance", queueing_lock="contact_retention")
+def contact_retention(timestamp: int) -> int:
+    """Clear former owners' contact details under the retention rule."""
+    from community import retention
+    from core.policy import SYSTEM
+
+    result = retention.run(actor=SYSTEM)
+    return result.people if result is not None else 0

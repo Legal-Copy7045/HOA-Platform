@@ -114,6 +114,14 @@ class ProfileForm(forms.Form):
         help_text="Printed at the top of the alteration request form, e.g. the management "
         "office's address and email.",
     )
+    signin_help_contact = forms.CharField(
+        required=False,
+        max_length=200,
+        label="Sign-in help: who owners contact",
+        help_text="For a lost password, phone or passkey, e.g. the board's email and phone. "
+        "Shown on the sign-in help page, which anyone can open: use association contacts, "
+        "not a personal number.",
+    )
     arc_form_conditions = forms.CharField(
         required=False,
         max_length=3000,

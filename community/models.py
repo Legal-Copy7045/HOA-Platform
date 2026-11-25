@@ -19,12 +19,13 @@ import datetime
 
 from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
-from django.contrib.postgres.fields import DateRangeField, RangeOperators
+from django.contrib.postgres.fields import DateRangeField, DateTimeRangeField, RangeOperators
 from django.db import models
 from django.db.models import F, Func, Q
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from core.append_only import AppendOnlyModel
 from core.scoping import ScopedModel, ScopedQuerySet
 
 
@@ -441,6 +442,9 @@ class CommunityProfile(models.Model):
     # and the conditions owners agree to. Set by the board; not hard-coded.
     arc_form_return_to = models.CharField(max_length=300, blank=True)
     arc_form_conditions = models.TextField(blank=True)
+    # Who owners contact about sign-in trouble (UX review): shown on the
+    # sign-in help page, which anyone can open, so association contacts only.
+    signin_help_contact = models.CharField(max_length=200, blank=True)
     # Letters and statements (Milestone 4): set by the board, never hard-coded.
     letterhead = models.TextField(
         blank=True, help_text="Lines at the top of letters, e.g. name, c/o manager, address, email."
@@ -546,6 +550,11 @@ class ContactProfile(ScopedModel):
     # Routine updates (replies, discussions, sign-off requests): at once or in
     # a weekly digest (Milestone 4). Legal notices are always sent at once.
     weekly_digest = models.BooleanField(default=False)
+    # Urgent text messages (Milestone 4): opt-in, and only to a number the
+    # owner proved by entering a texted code. Never shown in the directory.
+    sms_number = models.CharField(max_length=20, blank=True)
+    sms_verified_at = models.DateTimeField(null=True, blank=True)
+    sms_opt_in = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 
@@ -772,3 +781,156 @@ class BoardSeatNomination(NeverDeleteMixin, ScopedModel):
     @property
     def is_open(self) -> bool:
         return not self.outcome
+
+
+# --- Common-area reservations (Milestone 4, optional feature "reservations") ---------
+
+
+class TimeRange(Func):
+    """Postgres tstzrange(start, end, '[)') - for the no-double-booking constraint."""
+
+    function = "TSTZRANGE"
+    output_field = DateTimeRangeField()
+
+
+class ReservationSettings(models.Model):
+    """Booking rules for one common area, set by the board. Where a rule comes
+    from the Declaration or the Rules and Regulations, ``citation`` says where.
+    Fees and deposits are shown to owners as text only: nothing is charged
+    here."""
+
+    area = models.OneToOneField(
+        CommonArea, on_delete=models.PROTECT, related_name="reservation_settings"
+    )
+    bookable = models.BooleanField(default=False)
+    needs_approval = models.BooleanField(
+        default=True, help_text="A board member or the manager confirms each booking."
+    )
+    max_hours = models.PositiveSmallIntegerField(null=True, blank=True)
+    advance_days = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="How far ahead a booking may be made."
+    )
+    monthly_limit_per_lot = models.PositiveSmallIntegerField(null=True, blank=True)
+    fee_cents = models.BigIntegerField(null=True, blank=True)
+    deposit_cents = models.BigIntegerField(null=True, blank=True)
+    allow_authorized = models.BooleanField(
+        default=False, help_text="Authorized contacts on an account may book."
+    )
+    allow_tenants = models.BooleanField(default=False, help_text="Tenants may book.")
+    terms = models.TextField(blank=True, help_text="Rules owners agree to, shown when booking.")
+    citation = models.CharField(max_length=200, blank=True, help_text='e.g. "Rules §4.2"')
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(Q(fee_cents__isnull=True) | Q(fee_cents__gte=0))
+                & (Q(deposit_cents__isnull=True) | Q(deposit_cents__gte=0)),
+                name="reservation_settings_money_not_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Booking rules for area #{self.area_id}"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Booking rules are changed, never deleted (history is kept).")
+
+
+class ReservationState(models.TextChoices):
+    PENDING = "pending", "Waiting for approval"
+    CONFIRMED = "confirmed", "Confirmed"
+    DECLINED = "declined", "Declined"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+OPEN_RESERVATION_STATES = (ReservationState.PENDING, ReservationState.CONFIRMED)
+
+
+class Reservation(NeverDeleteMixin, ScopedModel):
+    """One booking of a common area for one lot. Change only through
+    community.reservations. Two confirmed bookings of one area can never
+    overlap: the database refuses it."""
+
+    area = models.ForeignKey(CommonArea, on_delete=models.PROTECT, related_name="reservations")
+    lot = models.ForeignKey(Lot, on_delete=models.PROTECT, related_name="reservations")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    purpose = models.CharField(max_length=200, blank=True)
+    state = models.CharField(
+        max_length=10, choices=ReservationState.choices, default=ReservationState.PENDING
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    note = models.TextField(blank=True, help_text="Reason for declining or cancelling.")
+    history = HistoricalRecords()
+
+    objects = ScopedQuerySet.as_manager()
+    scope_lot_path = "lot"
+
+    class Meta:
+        ordering = ["starts_at", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(ends_at__gt=F("starts_at")), name="reservation_ends_after_start"
+            ),
+            ExclusionConstraint(
+                name="reservation_no_double_booking",
+                expressions=[
+                    (F("area"), RangeOperators.EQUAL),
+                    (TimeRange("starts_at", "ends_at"), RangeOperators.OVERLAPS),
+                ],
+                condition=Q(state="confirmed"),
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Booking #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Owners and authorized contacts see their lot's bookings from their own
+        time there; anyone sees the bookings they made themselves."""
+        from core.scoping import owner_era_q
+
+        condition = owner_era_q(roles)
+        if roles.user_id is not None:
+            condition |= Q(requested_by_id=roles.user_id)
+        return queryset.filter(condition)
+
+    @property
+    def is_open(self) -> bool:
+        return self.state in OPEN_RESERVATION_STATES
+
+
+# --- Retention of former owners' contact details (Milestone 4) -----------------------
+
+
+class RetentionRun(AppendOnlyModel):
+    """One run of the contact-details retention rule: counts only, never
+    names. Append-only (see migration)."""
+
+    ran_at = models.DateTimeField(default=timezone.now)
+    ran_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    days = models.PositiveIntegerField()
+    people = models.PositiveIntegerField(default=0)
+    profiles_cleared = models.PositiveIntegerField(default=0)
+    methods_removed = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-ran_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Retention run #{self.pk}"

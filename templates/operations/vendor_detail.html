@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}{{ vendor.name }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "operations/finance_nav.html" %}
+  {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'vendors' %}">Vendors</a> / {{ vendor.name }}</div>
   <div class="page-head"><div><h1>{{ vendor.name }}</h1><div class="meta">{% if vendor.services %}<span>{{ vendor.services }}</span>{% endif %}{% if vendor.email %}<span>{% icon "mail" %}{{ vendor.email }}</span>{% endif %}{% if vendor.phone %}<span>{{ vendor.phone }}</span>{% endif %}</div></div></div>
   <div class="split">
@@ -12,6 +12,6 @@
         {% for i in invoices %}<tr><td><a href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td>{{ i.invoice_date|date:"M j, Y" }}</td><td class="num">{{ i.amount_cents|cents }}</td><td>{% status i.state i.get_state_display %}</td></tr>{% empty %}<tr><td colspan="4" class="muted">No invoices.</td></tr>{% endfor %}
       </tbody></table></div></div>
     </div>
-    <aside>{% if can_manage %}<section class="card"><h3>Details</h3><form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form></section>{% endif %}</aside>
+    <aside>{% if can_manage %}<section class="card"><h3>Details</h3><form method="post">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form></section>{% endif %}</aside>
   </div>
 {% endblock %}

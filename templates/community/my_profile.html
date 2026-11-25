@@ -1,15 +1,38 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load portal app_alerts %}
 {% block title %}My profile · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>My profile</h1>{% if person %}<div class="meta"><span>{% icon "user" %}{{ person.display_name }}</span><span>{% icon "mail" %}{{ user.email }}</span></div>{% endif %}</div>
-    <div class="actions"><a class="btn secondary" href="{% url 'mfa_index' %}">{% icon "lock" %} Passkeys and security</a></div></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'mfa_index' %}">{% icon "lock" %} Sign-in and security</a></div></div>
   <div class="split">
     <section class="card">
       {% if person %}
-        <h2>Contact details and directory</h2>
-        <p class="muted small">The directory is hidden unless you opt in, and shows only what you tick.</p>
-        <form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save changes</button></div></form>
+        <h2>Your details and choices</h2>
+        <form method="post" class="profile-form">{% csrf_token %}
+          {% if form.errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>Please check the details below.</span></div>{% endif %}
+          <fieldset><legend>How to reach you</legend>
+            <div class="field"><span class="field-label">Sign-in email</span><div>{{ user.email }}</div><div class="help">To change your sign-in email, ask the board.</div></div>
+            <div class="field{% if form.phone.errors %} has-error{% endif %}"><label for="{{ form.phone.auto_id }}">Phone</label>{{ form.phone }}{{ form.phone.errors }}</div>
+            <div class="field{% if form.mailing_address.errors %} has-error{% endif %}"><label for="{{ form.mailing_address.auto_id }}">Mailing address</label>{{ form.mailing_address }}<div class="help" id="id_mailing_address_help">{{ form.mailing_address.help_text }}</div>{{ form.mailing_address.errors }}</div>
+          </fieldset>
+          <fieldset><legend>Official notices</legend>
+            <label class="choice" for="{{ form.electronic_notice_consent.auto_id }}">{{ form.electronic_notice_consent }} {{ form.electronic_notice_consent.label }}</label>
+            <div class="help" id="id_electronic_notice_consent_help">{{ form.electronic_notice_consent.help_text }}</div>
+          </fieldset>
+          <fieldset><legend>Owner directory</legend>
+            <label class="choice" for="{{ form.in_directory.auto_id }}">{{ form.in_directory }} {{ form.in_directory.label }}</label>
+            <div class="help" id="id_in_directory_help">{{ form.in_directory.help_text }}</div>
+            <fieldset class="nested"><legend>If you're listed, also show</legend>
+              <label class="choice" for="{{ form.directory_show_email.auto_id }}">{{ form.directory_show_email }} {{ form.directory_show_email.label }}</label>
+              <label class="choice" for="{{ form.directory_show_phone.auto_id }}">{{ form.directory_show_phone }} {{ form.directory_show_phone.label }}</label>
+            </fieldset>
+          </fieldset>
+          <fieldset><legend>Email updates</legend>
+            <label class="choice" for="{{ form.weekly_digest.auto_id }}">{{ form.weekly_digest }} {{ form.weekly_digest.label }}</label>
+            <div class="help" id="id_weekly_digest_help">{{ form.weekly_digest.help_text }}</div>
+          </fieldset>
+          <div class="form-actions"><button type="submit">Save changes</button></div>
+        </form>
       {% else %}{% include "partials/empty.html" with icon="user" title="Not linked yet" text="Your login isn't linked to a person record yet. Ask a board member." %}{% endif %}
     </section>
     <aside>{% if person %}<section class="card"><h3>More ways to reach you</h3>
@@ -23,6 +46,7 @@
         <p><label><input type="checkbox" name="notices"> Send notices here (emails only)</label></p>
         <div class="form-actions"><button type="submit" class="secondary">Add</button></div>
       </form></section>{% endif %}
-      <section class="card"><h3>Your data</h3><p class="small muted">A JSON file of everything the portal holds about you.</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
+      {% app_alerts_panel %}
+      <section class="card"><h3>Your data</h3><p class="small muted">A file with everything the portal holds about you (for your records).</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
   </div>
 {% endblock %}

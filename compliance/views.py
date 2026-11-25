@@ -11,7 +11,6 @@ from compliance.models import Violation, ViolationCategory
 from core import policy
 from core.workflow import WorkflowError
 from documents import attachments
-from documents.services import DocumentError
 
 
 class ReportForm(forms.Form):
@@ -45,12 +44,11 @@ def violations(request):
             try:
                 v = services.report(actor=request.user, request=request, **form.cleaned_data)
             except services.ComplianceError as exc:
-                messages.error(request, str(exc))
+                form.add_error(None, str(exc))
             else:
+                messages.success(request, "Violation recorded. Send the notice when ready.")
                 return redirect("violation_detail", pk=v.pk)
-        else:
-            messages.error(request, "Check the form.")
-        return redirect("violations")
+        # Invalid: the page is shown again with what was typed and the errors.
     from core.scoping import own_records, wants_mine
 
     staff = policy.can(request.user, "violation.view_all")
@@ -120,13 +118,27 @@ def violation_detail(request, pk):
             "responses": v.responses.all()
             if policy.can(request.user, "lot.view_all")
             else v.responses.filter(person_id=policy.roles_for(request.user).person_id),
-            "photos": attachments.attachments_for(v),
+            "photos": _photos(v),
             "can_respond": any(
                 t.action == "respond" for t in services.VIOLATION.available(v, request.user)
             ),
             "can_manage": policy.can(request.user, "violation.manage"),
+            "can_add_fix_photo": services.owner_may_add_photo(request.user, v),
+            "owner_view": v.lot_id in policy.roles_for(request.user).account_lot_ids
+            or not policy.can(request.user, "violation.view_all"),
         },
     )
+
+
+def _photos(v):
+    from documents.services import scan_allows_download
+
+    files = list(attachments.attachments_for(v))
+    for f in files:
+        f.thumbnail = f.content_type.startswith("image/") and scan_allows_download(
+            attachments.current_scan(f)
+        )
+    return files
 
 
 @login_required
@@ -158,21 +170,41 @@ def violation_respond(request, pk):
     return redirect("violation_detail", pk=v.pk)
 
 
+OWNER_FIX_LABEL = "Owner photo of the fix"
+OWNER_FIX_PHOTOS_MAX = 10
+
+
 @login_required
 @require_POST
 def violation_photo(request, pk):
+    """Board or manager: evidence photos. An owner of the lot: photos of the
+    fix, while the notice is open."""
     v = _get(request, pk)
-    policy.require(request.user, "violation.manage")
-    try:
-        attachments.attach(
-            v,
-            request.FILES["file"],
-            actor=request.user,
-            request=request,
-            label=request.POST.get("label", ""),
-        )
-    except (DocumentError, KeyError) as exc:
-        messages.error(request, str(exc) or "Choose a photo.")
+    owner = services.owner_may_add_photo(request.user, v)
+    if not owner:
+        policy.require(request.user, "violation.manage")
+    uploads = request.FILES.getlist("file")
+    if not uploads:
+        messages.error(request, "Choose a photo first.")
+    else:
+        by_owner = owner and not policy.can(request.user, "violation.manage")
+        label = OWNER_FIX_LABEL if by_owner else request.POST.get("label", "")
+        room = None
+        if by_owner:
+            # Owners have their own allowance, so their photos can never use
+            # up the board's room for evidence (review R2-003).
+            used = attachments.attachments_for(v).filter(label=OWNER_FIX_LABEL).count()
+            room = max(OWNER_FIX_PHOTOS_MAX - used, 0)
+        if room == 0:
+            messages.error(
+                request,
+                f"You've added {OWNER_FIX_PHOTOS_MAX} photos already. Send the board a message"
+                " if there's more to show.",
+            )
+        else:
+            attachments.attach_many(
+                request, v, uploads[:room] if room else uploads, actor=request.user, label=label
+            )
     return redirect("violation_detail", pk=v.pk)
 
 

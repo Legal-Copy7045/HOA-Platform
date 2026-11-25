@@ -50,6 +50,10 @@ if grep -q '^DOCUMENT_SCANNER=none' .env; then
   sed -i 's/^DOCUMENT_SCANNER=none/DOCUMENT_SCANNER=clamd/' .env
   NEEDS_RESCAN=1
 fi
+# The local file store is used unless .env points at Cloudflare R2.
+if ! grep -qE '^S3_ENDPOINT_URL=https://[^ ]*r2\.cloudflarestorage\.com' .env; then
+  add_setting COMPOSE_PROFILES local-store
+fi
 add_setting DOCUMENT_SCANNER clamd
 add_setting DOCUMENT_CLAMD_ADDRESS clamav:3310
 sed -i 's/^DOCUMENT_CLAMD_ADDRESS=$/DOCUMENT_CLAMD_ADDRESS=clamav:3310/' .env

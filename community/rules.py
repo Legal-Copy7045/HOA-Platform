@@ -136,6 +136,14 @@ REGISTRY: dict[str, RuleSpec] = {
             "Architectural review",
             "Off: a board member or the manager confirms each signature read from a scanned form.",
         ),
+        RuleSpec(
+            "arc.signoff_respond_days",
+            "Days neighbors are asked to respond within",
+            DAYS,
+            None,
+            "Architectural review",
+            "Shown to neighbors as 'Please respond by ...'. Empty: no date is shown.",
+        ),
         RuleSpec("violation.cure_days", "Days given to cure a violation", DAYS, None, "Violations"),
         RuleSpec(
             "violation.hearing_notice_days",
@@ -175,6 +183,15 @@ REGISTRY: dict[str, RuleSpec] = {
             None,
             "Online payments",
             "Added to bank transfer payments and shown before the owner pays.",
+        ),
+        RuleSpec(
+            "retention.former_owner_contact_days",
+            "Days after someone leaves before their contact details are cleared",
+            DAYS,
+            "730",
+            "Privacy",
+            "Former owners and contacts: phone, mailing address, extra contact methods and "
+            "directory choices are cleared; names and records are kept. 0 means never.",
         ),
         *[
             RuleSpec(

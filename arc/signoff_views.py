@@ -256,6 +256,10 @@ def signoffs_mine(request):
         .select_related("arc_request__lot", "lot")
         .order_by("state", "-created_at")
     )
+    rows = list(rows)
+    for row in rows:
+        row.asked_because = signoffs.asked_because(row)
+        row.respond_by = signoffs.respond_by(row) if row.state == "pending" else None
     return render(request, "arc/signoffs_mine.html", {"rows": rows})
 
 
@@ -271,26 +275,34 @@ def _neighbor_signoff(request, pk) -> SignoffRequest:
 @login_required
 def signoff_detail(request, pk):
     signoff = _neighbor_signoff(request, pk)
+    can_answer = signoffs.may_answer_in_portal(request.user, signoff)
+    posted = {}
+    error = ""
     if request.method == "POST":
-        _flash(
-            request,
-            lambda: signoffs.respond(
+        posted = {
+            "position": request.POST.get("position", ""),
+            "comment": request.POST.get("comment", ""),
+            "signer_name": request.POST.get("signer_name", ""),
+        }
+        try:
+            signoffs.respond(
                 signoff,
-                position=request.POST.get("position", ""),
-                signer_name=request.POST.get("signer_name", ""),
-                comment=request.POST.get("comment", ""),
+                **posted,
                 channel=SignoffChannel.PORTAL,
                 actor=request.user,
                 request=request,
-            ),
-            "Thank you: your acknowledgement has been sent to the committee.",
-        )
-        return redirect("signoff_detail", pk=signoff.pk)
-    return render(
-        request,
-        "arc/signoff_answer.html",
-        _answer_context(signoff, can_answer=signoffs.may_answer_in_portal(request.user, signoff)),
-    )
+            )
+        except (signoffs.SignoffError, DocumentError) as exc:
+            # Shown again with what the neighbor chose and typed.
+            error = str(exc)
+        else:
+            messages.success(
+                request, "Thank you. Your acknowledgement has been sent to the committee."
+            )
+            return redirect("signoff_detail", pk=signoff.pk)
+    context = _answer_context(signoff, can_answer=can_answer)
+    context.update({"posted": posted, "error": error})
+    return render(request, "arc/signoff_answer.html", context)
 
 
 @login_required
@@ -304,6 +316,13 @@ def signoff_file(request, pk, file_id):
 def _answer_context(signoff, *, can_answer, token=None):
     req = signoff.arc_request
     files = attachments.attachments_for(req).exclude(label__in=SIGNED_FORM_LABELS)
+    from documents.services import scan_allows_download
+
+    files = list(files)
+    for f in files:
+        f.thumbnail = f.content_type.startswith("image/") and scan_allows_download(
+            attachments.current_scan(f)
+        )
     return {
         "signoff": signoff,
         "req": req,
@@ -311,6 +330,9 @@ def _answer_context(signoff, *, can_answer, token=None):
         "can_answer": can_answer,
         "token": token,
         "last": signoff.responses.order_by("created_at", "id").last(),
+        "asked_because": signoffs.asked_because(signoff),
+        "respond_by": signoffs.respond_by(signoff),
+        "contact": signoffs.contact_line(),
     }
 
 
@@ -324,7 +346,12 @@ def signoff_link(request, token):
     anything without signing in."""
     signoff = signoffs.signoff_for_token(token)
     if signoff is None or signoff.lot_id not in policy.roles_for(request.user).owned_lot_ids:
-        return render(request, "arc/signoff_link_expired.html", status=404)
+        return render(
+            request,
+            "arc/signoff_link_expired.html",
+            {"contact": signoffs.contact_line()},
+            status=404,
+        )
     return redirect("signoff_detail", pk=signoff.pk)
 
 
@@ -350,23 +377,53 @@ def neighbors_page(request):
         value = (value or "").strip()
         return by_number.get(int(value)) if value.isdigit() else None
 
+    def wanted(suffix):
+        others = [
+            by_number[int(p)]
+            for p in (request.POST.get(f"others{suffix}") or "").replace(",", " ").split()
+            if p.isdigit() and int(p) in by_number
+        ]
+        return (
+            pick(request.POST.get(f"left{suffix}")),
+            pick(request.POST.get(f"right{suffix}")),
+            others,
+        )
+
+    def save(lot, left, right, others):
+        signoffs.set_neighbors(
+            lot, left=left, right=right, others=others, actor=request.user, request=request
+        )
+
+    all_rows = any(k.startswith("left_") for k in request.POST)
+    if request.method == "POST" and (request.POST.get("save_all") or all_rows):
+        # Every row is in one form: "Save all", or a row's own Save, saves
+        # each row that changed (and audits it), so no edit is lost.
+        changed = []
+        for lot in lots:
+            if f"left_{lot.number}" not in request.POST:
+                continue
+            left, right, others = wanted(f"_{lot.number}")
+            sides = signoffs.neighbor_sides(lot)
+            if (left, right, sorted(o.pk for o in others)) != (
+                sides["left"],
+                sides["right"],
+                sorted(o.pk for o in sides["other"]),
+            ):
+                save(lot, left, right, others)
+                changed.append(lot.number)
+        messages.success(
+            request,
+            f"Neighbors saved for {len(changed)} lot{'s' if len(changed) != 1 else ''}."
+            if changed
+            else "No changes to save.",
+        )
+        row = pick(request.POST.get("lot"))
+        return redirect(_neighbors_url() + (f"#lot-{row.number}" if row else ""))
     if request.method == "POST":
         lot = pick(request.POST.get("lot"))
         if lot is None:
             raise Http404
-        others = [
-            by_number[int(p)]
-            for p in (request.POST.get("others") or "").replace(",", " ").split()
-            if p.isdigit() and int(p) in by_number
-        ]
-        signoffs.set_neighbors(
-            lot,
-            left=pick(request.POST.get("left")),
-            right=pick(request.POST.get("right")),
-            others=others,
-            actor=request.user,
-            request=request,
-        )
+        save(lot, *wanted(""))
         messages.success(request, f"Neighbors of lot {lot.number} saved.")
         return redirect(f"{_neighbors_url()}#lot-{lot.number}")
     names = signoffs.owner_names([lot.pk for lot in lots])

@@ -306,17 +306,26 @@ def invite_everyone(*, actor, request=None) -> int:
 def remind_pending(*, actor, older_than_days: int = 3, request=None) -> int:
     """Re-send open invitations nobody has used for a few days (new link)."""
     require(actor, "invite.resend")
-    cutoff = timezone.now() - timedelta(days=older_than_days)
     reminded = 0
-    for row in onboarding_rows():
-        inv = row["invitation"]
-        if row["status"] == "invited" and (inv.sent_at or inv.created_at) <= cutoff:
-            try:
-                resend_invitation(inv, actor=actor, request=request)
-            except InvitationError:
-                continue
-            reminded += 1
+    for inv in reminder_due(older_than_days):
+        try:
+            resend_invitation(inv, actor=actor, request=request)
+        except InvitationError:
+            continue
+        reminded += 1
     return reminded
+
+
+def reminder_due(older_than_days: int = 3, rows=None) -> list:
+    """Open invitations a reminder would go to (the count is shown in the
+    confirmation before sending)."""
+    cutoff = timezone.now() - timedelta(days=older_than_days)
+    return [
+        row["invitation"]
+        for row in (onboarding_rows() if rows is None else rows)
+        if row["status"] == "invited"
+        and (row["invitation"].sent_at or row["invitation"].created_at) <= cutoff
+    ]
 
 
 def email_request_letters_pdf(rows) -> bytes:

@@ -179,13 +179,13 @@ def board_home(request):
     resets_waiting = [
         r for r in MfaReset.objects.for_user(request.user) if r.status == "awaiting_approval"
     ]
-    from core.my_items import counts, items_for
+    from core.my_items import counts, items_for_request
 
     return render(
         request,
         "community/board_home.html",
         {
-            "item_counts": counts(items_for(request.user)),
+            "item_counts": counts(items_for_request(request)),
             "thin": policy.thinly_covered_actions(),
             "past_term": BoardSeat.objects.for_user(request.user)
             .past_term_end()
@@ -372,13 +372,28 @@ def nomination_decide(request, pk, decision):
     return _done(request, message, back)
 
 
-def _named(resets):
+def _named(resets, viewer):
+    """Who each reset is for (name, email, current lots) and who started it, so
+    the approving board member knows exactly whose authenticators go (UX review)."""
+    from community.models import Ownership
     from core.people import display_name
 
-    out = []
-    for r in resets:
+    out = list(resets)
+    lots: dict[int, list[str]] = {}
+    ownerships = (
+        Ownership.objects.for_user(viewer)
+        .active()
+        .filter(person__user_id__in={r.subject_id for r in out})
+        .select_related("lot", "person")
+        .order_by("lot__number")
+    )
+    for o in ownerships:
+        lots.setdefault(o.person.user_id, []).append(str(o.lot.number))
+    for r in out:
         r.subject_name = display_name(r.subject)
-        out.append(r)
+        r.subject_email = r.subject.email
+        r.subject_lots = lots.get(r.subject_id, [])
+        r.started_by_name = display_name(r.started_by)
     return out
 
 
@@ -404,7 +419,9 @@ def approvals(request):
         {
             "seat_proposals": seat_proposals,
             "nominations": [n for n in nominations if n.is_open],
-            "resets": _named(r for r in resets[:50] if r.status == "awaiting_approval"),
+            "resets": _named(
+                (r for r in resets[:50] if r.status == "awaiting_approval"), request.user
+            ),
             "me": request.user,
         },
     )
@@ -440,14 +457,24 @@ def community_settings(request):
                 "guide": guide,
                 "origin": origin,
                 "needs_attention": spec.key in needing,
+                "unit": MONEY_UNITS.get(spec.key, ""),
             }
         )
+    # Rules that need attention come first: their groups first, and first
+    # within each group (UX review).
+    for rules in groups.values():
+        rules.sort(key=lambda r: not r["needs_attention"])
+    groups = dict(
+        sorted(groups.items(), key=lambda item: not any(r["needs_attention"] for r in item[1]))
+    )
+    attention = [r for rules in groups.values() for r in rules if r["needs_attention"]]
     profile = CommunityProfile.get()
     return render(
         request,
         "community/settings.html",
         {
             "groups": groups,
+            "attention": attention,
             "group_notes": pa_law.GROUP_NOTES,
             "pa_disclaimer": pa_law.DISCLAIMER,
             "profile_form": forms.ProfileForm(
@@ -457,6 +484,7 @@ def community_settings(request):
                     "welcome_message": profile.welcome_message,
                     "arc_form_return_to": profile.arc_form_return_to,
                     "arc_form_conditions": profile.arc_form_conditions,
+                    "signin_help_contact": profile.signin_help_contact,
                 }
             ),
             "areas": CommonArea.objects.all(),
@@ -494,11 +522,56 @@ def community_rule_save(request):
     back = reverse("community_settings")
     if not form.is_valid():
         return _invalid(request, form, back)
+    big = _big_dues_change(form.cleaned_data)
+    if big and request.POST.get("confirm") != "yes":
+        # Dues changing by more than a quarter is asked about first (UX review).
+        return render(
+            request,
+            "community/settings_confirm.html",
+            {"change": big, "post": form.cleaned_data, "typed": request.POST.get("value", "")},
+        )
     try:
         services.set_rule(actor=request.user, request=request, **form.cleaned_data)
     except CommunityError as exc:
         return _failed(request, exc, back)
-    return _done(request, "Rule saved.", back)
+    saved = "Rule saved."
+    if spec is not None and spec.kind == "cents" and form.cleaned_data["value"]:
+        unit = f" {MONEY_UNITS[spec.key]}" if spec.key in MONEY_UNITS else ""
+        saved = f"Saved: {spec.label} = {_money(form.cleaned_data['value'])}{unit}."
+    return _done(request, saved, back + f"#rule-{spec.key}" if spec else back)
+
+
+# Shown after a dollar amount ("= $75.00 per month").
+MONEY_UNITS = {"dues.monthly_cents": "per month"}
+# Ask before dues change by more than this share of the current amount.
+DUES_CONFIRM_RATIO = 0.25
+
+
+def _money(cents_text: str) -> str:
+    from core.money import format_cents
+
+    return format_cents(int(cents_text))
+
+
+def _big_dues_change(cleaned: dict) -> dict | None:
+    """Old and new dues when the change is more than DUES_CONFIRM_RATIO."""
+    from community.rules import rule
+
+    if cleaned.get("key") != "dues.monthly_cents" or not (cleaned.get("value") or "").strip():
+        return None
+    try:
+        new = int(cleaned["value"])
+    except ValueError:
+        return None
+    old = int(rule("dues.monthly_cents") or 0)
+    if old <= 0 or abs(new - old) <= old * DUES_CONFIRM_RATIO:
+        return None
+    return {
+        "old": old,
+        "new": new,
+        "percent": round(abs(new - old) * 100 / old),
+        "up": new > old,
+    }
 
 
 @login_required

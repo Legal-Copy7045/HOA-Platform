@@ -1,0 +1,15 @@
+# Navigation, dashboards, accessibility and wording (UX review 2026-11-25). `match` runs over "<stage>:<check>".
+- feature: "Collapsible sidebar groups (open on the current page, remembered per browser); Settings and Community info hubs; owner Voting page"
+  since: M4
+  docs: docs/glossary.md
+  match: ["^unit:core/tests/test_ux_nav.py::test_(owner_menu|rarely_used|settings_hub|hub_entry|voting_entry|feature_switches|permissions_unchanged)", "^unit:core/tests/test_dashboard_nav", "^unit:core/tests/test_features.py::test_switched_off", "^manual:sidebar groups on a phone"]
+- feature: "One list of what's waiting: dashboard to-dos, My items, Board overview counts and sidebar bubbles (built once per request)"
+  since: M4
+  match: ["^unit:core/tests/test_ux_nav.py::test_(nav_items_built_once|dashboard|balance_todo|oldest_unpaid|my_items_uses|badge_text)", "^unit:core/tests/test_nav_counts"]
+- feature: "Votes, elections and proxies for owners: ballot cards with a choice limit and confirmation, 'you voted' notes, proxies by address, per-lot ballots"
+  since: M4
+  match: ["^unit:core/tests/test_ux_nav.py::test_(after_voting|secret_ballot|election_|owner_of_two_lots|elections_tab|proxy_)", "^manual:election ballot limit"]
+- feature: "Accessible and consistent pages: 17px text, 16px inputs, 44px targets, focus ring, off-canvas menu hidden when closed, role=alert errors, visible labels, specific confirmations, glossary wording, dates with the year"
+  since: M4
+  docs: docs/glossary.md
+  match: ["^unit:core/tests/test_ux_nav.py::test_(error_messages|workflow_buttons|every_state|short_date|owner_visible_jargon|records_requests|css_|menu_script|nav_labels_match)", "^manual:(keyboard and screen reader menu|print a page with values)"]

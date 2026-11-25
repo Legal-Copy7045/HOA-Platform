@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Vendors · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "operations/finance_nav.html" %}
+  {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Vendors</h1><p class="subtitle">Contractors and service providers. Insurance expiring within 30 days is highlighted.</p></div></div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Vendor</th><th>Services</th><th>Insurance</th><th>W-9</th></tr></thead>
@@ -10,5 +10,5 @@
       <td>{% if v.insurance_expires_on %}{% if v.insurance_expires_on < today %}<span class="status tone-danger">Expired {{ v.insurance_expires_on|date:"M j" }}</span>{% elif v.insurance_expires_on <= soon %}<span class="status tone-warning">Expires {{ v.insurance_expires_on|date:"M j" }}</span>{% else %}{{ v.insurance_expires_on|date:"M j, Y" }}{% endif %}{% else %}<span class="muted">Not recorded</span>{% endif %}</td><td>{% if v.w9_on_file %}{% icon "check" %}<span class="sr-only">Yes</span>{% else %}<span class="muted">No</span>{% endif %}</td></tr>
     {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="users" title="No vendors yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
-  {% if can_manage %}<details class="panel"><summary>Add a vendor</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Add vendor</button></div></form></div></details>{% endif %}
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Add a vendor</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Add vendor</button></div></form></div></details>{% endif %}
 {% endblock %}

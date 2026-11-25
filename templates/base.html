@@ -3,12 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="max-upload-bytes" content="{% max_upload_bytes %}">
   <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
   <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'css/site.css' %}">
+  {% if user.is_authenticated %}<link rel="manifest" href="{% url 'pwa_manifest' %}" crossorigin="use-credentials">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+  <meta name="theme-color" content="#1f5a43">{% endif %}
   {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body{% if user.is_authenticated %} data-sw="{% url 'pwa_service_worker' %}"{% endif %}>
   <a class="skip-link" href="#main">Skip to content</a>
 {% if user.is_authenticated and nav %}
   <div class="shell">
@@ -19,12 +23,16 @@
       </a>
       <nav class="nav">
         {% for section in nav.sections %}
+          {% if section.title %}
+          <details class="nav-section nav-group" data-nav-group="{{ section.key }}"{% if section.open %} open{% endif %}{% if section.current %} data-nav-current{% endif %}>
+            <summary class="nav-heading"><span>{{ section.title }}</span>{% if section.count %}<span class="badge-count group-count">{{ section.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</summary>
+          {% else %}
           <div class="nav-section">
-            {% if section.title %}<div class="nav-heading">{{ section.title }}</div>{% endif %}
+          {% endif %}
             {% for item in section.items %}
-              <a href="{{ item.url }}"{% if item.current %} aria-current="page"{% endif %}>{% icon item.icon %}<span>{{ item.label }}</span>{% if item.count %}<span class="badge-count" aria-label="{{ item.count }} waiting on you">{{ item.count }}</span>{% endif %}</a>
+              <a href="{{ item.url }}"{% if item.current %} aria-current="page"{% endif %}>{% icon item.icon %}<span>{{ item.label }}</span>{% if item.count %}<span class="badge-count">{{ item.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</a>
             {% endfor %}
-          </div>
+          {% if section.title %}</details>{% else %}</div>{% endif %}
         {% endfor %}
       </nav>
       <div class="sidebar-foot">
@@ -32,7 +40,7 @@
         <div class="who-sub">{{ nav.roles|join:" · "|default:user.email }}</div>
         <div class="foot-links">
           <a href="{% url 'my_profile' %}">Profile</a>
-          <a href="{% url 'mfa_index' %}">Security</a>
+          <a href="{% url 'mfa_index' %}">Sign-in and security</a>
           <form method="post" action="{% url 'account_logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>
         </div>
       </div>

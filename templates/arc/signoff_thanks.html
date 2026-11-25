@@ -1,3 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Thank you · {{ SITE_NAME }}{% endblock %}
-{% block content %}<section class="card"><h1>Thank you</h1><p>Your acknowledgement has been sent to the architectural committee. This link no longer works; you can close this page.</p></section>{% endblock %}
+{% block content %}<section class="card"><h1>Thank you</h1>
+  <p>Your acknowledgement has been sent to the architectural committee, which makes the decision.</p>
+  <p><strong>What next:</strong> nothing more is needed from you. <a href="{% url 'signoffs_mine' %}">See the projects you've been asked about</a>.</p>
+  <p class="small muted">Questions? {% if contact %}Contact {{ contact }}.{% else %}<a href="{% url 'requests' %}?mine=1">Send a question to the board</a>.{% endif %}</p></section>{% endblock %}

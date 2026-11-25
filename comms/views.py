@@ -84,10 +84,24 @@ def calendar(request):
         "comms/calendar.html",
         {
             "events": services.upcoming(request.user)[:200],
+            "bookings": _bookings(request),
             "form": form,
             "can_manage": policy.can(request.user, "calendar.manage"),
         },
     )
+
+
+def _bookings(request) -> list[dict]:
+    """Confirmed common-area bookings (no names) when reservations are on."""
+    from core import features
+
+    if not features.enabled("reservations", request):
+        return []
+    if not policy.can(request.user, "reservation.view"):
+        return []
+    from community.reservations import calendar_entries
+
+    return calendar_entries(request.user)
 
 
 @login_required

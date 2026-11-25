@@ -1,5 +1,7 @@
 """Decision D21: owners pay a convenience fee, shown before they pay."""
 
+from unittest import mock
+
 import pytest
 from django.urls import reverse
 
@@ -45,5 +47,6 @@ def test_fee_shown_on_my_account(client):
         actor=make_member(board=True),
     )
     client.force_login(owner)
-    page = client.get(reverse("my_account")).content
+    with mock.patch("ledger.views.online_payments_enabled", return_value=True):
+        page = client.get(reverse("my_account")).content
     assert b"convenience fee" in page and b"$103.00" in page

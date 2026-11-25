@@ -293,3 +293,24 @@ For votes: "if we're logging people's votes, I want to be able to ensure it's th
 The owner asked for "update available" on System status and a button to install it without terminal access. The web app gets no access to the VM: a request row in the database (`core.UpdateStatus`, set only by a sysadmin with MFA, audited) is the whole interface. A host-side agent (`infra/poc/portal-agent.sh`, systemd timer every minute, installed by `start-portal.sh`) checks GitHub every 15 minutes or on "Check now", records how many commits the tracked branch is behind, and on "Install update" runs `update-portal.sh` and records the result. Values it writes back (commit subjects) go through psql variables, never shell-built SQL. Only the tracked branch is ever installed (on the POC that should be `main`, which only receives CI-green merges), so the button takes no input.
 
 From the optimization review, accepted without a decision because they change no rule: roles remembered per request (cleared whenever anything that grants a role changes); the two-person coverage check in four queries; gunicorn 2 processes x 4 threads with preload; bytecode compiled into the image; finished background jobs removed after two weeks and worker polling once a minute; container logs rotated; memory caps on web, worker and the file store; Postgres sized for a small VM; updates no longer stop every container (Postgres, the file store, the scanner and the tunnel keep running), base images refreshed weekly instead of every update, documentation-only changes skip the restart, migrations skipped when none are pending; CI runs once per PR commit with cached dependencies and a non-durable throwaway database. Left for the owner: ClamAV memory (on-demand or off-box scanning conflicts with D21's "scanning on"), building images in CI and pulling them on the VM, and R2 instead of SeaweedFS on the POC.
+
+## D26. Malware scanner reloads signatures in place (2026-11-25)
+
+ClamAV holds its signature database in memory (~1.2 GB) and, by default, loads a fresh copy alongside the old one at each signature update (~2.4 GB for about a minute), close to the 4 GB the POC VM has. The owner chose "reload in place": `ConcurrentDatabaseReload no` (`docker/clamav/clamd.conf`, the image's own defaults plus this one line, checked with `clamconf`). Peak memory stays near one copy; scanning pauses for about a minute during each reload, and files uploaded in that window wait as "not yet scanned" until it is back (DOCUMENT_REQUIRE_CLEAN_SCAN keeps them from being downloaded meanwhile). Scanning stays on (D21).
+
+## D27. Owner's answers on the open items (2026-11-25)
+
+1. Secret ballots: the residual risk in D23 (linkable only with direct database or backup access) is accepted; no mixing step.
+2. Online payments stay a placeholder until the HOA's Stripe account and live keys exist.
+3. Counsel review (online voting, proxies, quorum, collection letters, resale certificate, convenience-fee wording): the owner is arranging it.
+4. SMS stays dormant until a provider account exists.
+5. Former owners' contact details: cleared two years after their last ownership or contact role ends (a board setting).
+6. Common-area reservations: dormant (feature switch off) until areas and rules are set.
+7. Production hosting and HOA-owned accounts: to be decided.
+8. Building images in CI and pulling them on the VM: only if faster overall (see the note below); R2 for the POC's files: under consideration.
+
+Note on 8: with the layer cache the VM rebuilds a code-only change in well under a minute and a docs-only change in about a second, and a dependency change in two to three minutes. Pulling a CI-built image would save at most a minute or two on dependency changes, add the CI build time before an update is available, and need a registry token stored on the VM. Not faster overall, so not done.
+
+## D28. Retention clears current contact details; the change history persists (2026-11-25)
+
+The retention rule (two years after someone's last ownership or contact role ends) clears the current phone, mailing address, extra contact methods and directory choices. The owner decided the change history persists: earlier values remain in the model history tables, which are part of the audit trail (D8), and no purge command exists. The retention page says so. Also accepted as proposed: managers may confirm and decline common-area bookings (a booking is not a governance decision); photo thumbnails are logged as downloads but marked `view: thumbnail`; the sign-in help contact field stays empty unless filled with an association contact; adding a passkey also enables passkey-only sign-in (a passkey is itself strong authentication); the neighbor response period (`arc.signoff_respond_days`) is set by the board, suggested 14 days.

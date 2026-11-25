@@ -31,7 +31,16 @@ class RequestSizeLimitMiddleware:
         except ValueError:
             return HttpResponse("Bad request.", status=400, content_type="text/plain")
         if length > max_request_bytes():
-            return HttpResponse("The upload is too large.", status=413, content_type="text/plain")
+            # A page people can act on, not a bare error (review R2-004).
+            # Rendered without the site's database-backed context: this check
+            # runs before anything else and must stay cheap.
+            from django.template.loader import render_to_string
+
+            body = render_to_string(
+                "upload_too_large.html",
+                {"limit_mb": settings.DOCUMENT_MAX_BYTES // (1024 * 1024)},
+            )
+            return HttpResponse(body, status=413)
         return self.get_response(request)
 
 

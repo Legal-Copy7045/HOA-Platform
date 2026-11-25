@@ -46,12 +46,20 @@ class Transition:
     guard: Guard | None = None
     note_required: bool = False
     after: Callable[[object, object], None] | None = field(default=None, compare=False)
+    # What the confirmation dialog says, naming what happens next (UX review).
+    # Steps that close or refuse something get a generic one if this is empty.
+    confirm: str = ""
+
+
+# Every workflow by name, so a history entry can show its step's label.
+REGISTRY: dict[str, Workflow] = {}
 
 
 class Workflow:
     def __init__(self, name: str, transitions: Iterable[Transition]):
         self.name = name
         self.transitions = {t.action: t for t in transitions}
+        REGISTRY[name] = self
         for t in self.transitions.values():
             audit_actions.register(
                 audit_actions.ActionSpec(
@@ -73,6 +81,20 @@ class Workflow:
     def available(self, obj, actor) -> list[Transition]:
         """Transitions this actor could take now (for showing buttons)."""
         return [t for t in self.transitions.values() if self._check(obj, t, actor) is None]
+
+    def blocked(self, obj, actor) -> list[tuple[Transition, str]]:
+        """Steps that fit the current state and the actor's role, but that a
+        rule stops right now, with the reason (shown as a disabled step)."""
+        out = []
+        for t in self.transitions.values():
+            if obj.state not in t.sources or t.guard is None:
+                continue
+            if actor is not SYSTEM and not can(actor, t.permission):
+                continue
+            reason = t.guard(obj, actor)
+            if reason:
+                out.append((t, reason))
+        return out
 
     def apply(self, obj, action: str, *, actor, note: str = "", request=None):
         t = self.transitions.get(action)

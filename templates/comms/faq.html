@@ -3,7 +3,7 @@
 {% block title %}FAQ · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Frequently asked questions</h1><p class="subtitle">Quick answers about living here.{% if user|can:"request.submit" %} Can't find yours? <a href="{% url 'requests' %}?mine=1">Ask the board</a>.{% endif %}</p></div></div>
-  <form method="get" class="inline-form search-form" role="search"><input type="search" name="q" value="{{ q }}" placeholder="Search questions and answers" aria-label="Search the FAQ"><button type="submit" class="secondary">Search</button>{% if q %}<a class="small" href="?">Clear</a>{% endif %}</form>
+  <form method="get" class="inline-form search-form" role="search"><div class="grow"><label for="faq-search">Search questions and answers</label><input id="faq-search" type="search" name="q" value="{{ q }}"></div><button type="submit" class="secondary">Search</button>{% if q %}<a class="small" href="?">Clear</a>{% endif %}</form>
   {% for group, entries in groups.items %}
     <section class="card"><h2>{{ group }}</h2>
       {% for e in entries %}<details class="faq"{% if q %} open{% endif %}><summary>{{ e.question }}{% if not e.published %} <span class="badge">Hidden</span>{% endif %}</summary>

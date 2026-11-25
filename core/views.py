@@ -30,7 +30,7 @@ def home(request):
     hour = timezone.localtime().hour
     greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
     return render(
-        request, "home.html", {"dash": dashboard.build(request.user), "greeting": greeting}
+        request, "home.html", {"dash": dashboard.build(request.user, request), "greeting": greeting}
     )
 
 
@@ -191,8 +191,64 @@ def feature_settings(request):
             messages.success(request, f"{label} switched {'on' if on else 'off'}.")
         return redirect("feature_settings")
     states = features.states(request)
+    open_items = _feature_open_items()
     return render(
         request,
         "core/features.html",
-        {"rows": [(f, states[f.key]) for f in features.FEATURES]},
+        {
+            "rows": [
+                (f, states[f.key], _switch_off_warning(f, open_items.get(f.key)))
+                for f in features.FEATURES
+            ],
+        },
     )
+
+
+def _feature_open_items() -> dict[str, tuple[int, str, str]]:
+    """Open records each feature would hide, for the switch-off warning
+    (counts only; cheap queries)."""
+    from compliance.models import Violation
+    from core.scoping import system_access
+    from governance.models import Election, RecordsRequest, Vote
+    from operations.models import WorkOrder
+
+    with system_access("feature switch-off warning (counts only)"):
+        return {
+            "votes": (
+                Vote.objects.filter(status="open").count(),
+                "vote is open",
+                "votes are open",
+            ),
+            "elections": (
+                Election.objects.exclude(state="certified").count(),
+                "election is under way",
+                "elections are under way",
+            ),
+            "violations": (
+                Violation.objects.exclude(state__in=["cured", "dismissed", "closed"]).count(),
+                "violation is open",
+                "violations are open",
+            ),
+            "work_orders": (
+                WorkOrder.objects.exclude(state__in=["completed", "closed", "cancelled"]).count(),
+                "work order is open",
+                "work orders are open",
+            ),
+            "records_requests": (
+                RecordsRequest.objects.exclude(state__in=["fulfilled", "denied", "closed"]).count(),
+                "records request is open",
+                "records requests are open",
+            ),
+        }
+
+
+def _switch_off_warning(feature, open_item) -> str:
+    """What disappears when a feature is switched off, named for the board."""
+    text = (
+        f"Switch off {feature.label}? It leaves the menu for everyone, owners included, "
+        "and its pages stop opening."
+    )
+    if open_item and open_item[0]:
+        count, one, many = open_item
+        text += f" {count} {one if count == 1 else many}."
+    return text + " Its records are kept and come back if you switch it on again."

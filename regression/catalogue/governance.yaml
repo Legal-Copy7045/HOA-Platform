@@ -38,7 +38,7 @@
 - feature: "ARC: per-lot left/right neighbors and other affected lots (board), neighbors become affected lots on submit (recusal), sign-offs show neighbor names, printable form follows the association's alteration request form"
   since: M4
   match: ["^unit:arc/tests/test_signoffs.py::test_(neighbors_are_defined|neighbors_become|sign_offs_and_the_form)"]
-- feature: "ARC neighbor acknowledgements before board review: plan neighbors locked for the homeowner (board can remove), other homeowners added by address and owner names (no email shown), 'Request Neighbor Acknowledgements' emails review links, objections need a comment, request goes to the board automatically when the last one is in, old signed-form label still hidden"
+- feature: "ARC neighbor acknowledgements before board review: plan neighbors locked for the homeowner (board can remove), other homeowners added by address and owner names (no email shown), 'Request neighbor acknowledgements' emails review links, objections need a comment, request goes to the board automatically when the last one is in, old signed-form label still hidden"
   since: M4
   match: ["^unit:arc/tests/test_signoffs.py::test_(plan_neighbors|board_review_waits|board_removing|no_neighbors|the_automatic|an_objection|add_a_homeowner|forms_uploaded)"]
 - feature: "ARC new request: kind of project always a list (starter types), planned start required, the property shown as its address (dropdown only for owners of several lots)"
@@ -50,3 +50,9 @@
 - feature: "Elections review fixes: ballot fixed once voting opens (service + DB trigger), withdraw/accept audited, proxy ends when the grantor sells, nominate by address not owner names, leap-day term end, stuck consents withdrawable"
   since: M4
   match: ["^unit:governance/tests/test_elections.py::test_(ballot_is_fixed|withdrawal_during|selling_the_lot|bad_form_values|leap_day|any_board_member|nomination_list)"]
+- feature: "Photo thumbnails are logged as file views marked view=thumbnail, apart from downloads"
+  since: M4
+  match: ["^unit:arc/tests/test_signoffs.py::test_thumbnail_views"]
+- feature: "Review 2 fixes: a buyer never sees the seller's ballots; editing a returned ARC draft asks neighbors again; owners' fix photos have their own allowance; too-large uploads warned before sending and answered with a page; a broken push server key never deletes subscriptions; retention clears the text-message number"
+  since: M4
+  match: ["^unit:governance/tests/test_governance.py::test_a_buyer_does_not_see", "^unit:arc/tests/test_owner_ux.py::test_editing_a_returned_draft", "^unit:compliance/tests/test_owner_notices.py::test_owner_photos_have", "^unit:comms/tests/test_pwa_push.py::test_a_broken_server_key", "^unit:community/tests/test_retention.py::test_text_message_number", "^unit:core/tests/test_backups.py::test_too_large_upload"]

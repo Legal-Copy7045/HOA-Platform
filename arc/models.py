@@ -95,6 +95,35 @@ class ArcRequest(ScopedModel):
         raise PermissionError("ARC requests are kept; withdraw instead.")
 
 
+class ArcRequestRevision(AppendOnlyModel):
+    """What a draft said before its owner edited it. Every edit keeps the
+    earlier wording, so a request returned as incomplete still shows what was
+    first submitted. Never changed."""
+
+    request = models.ForeignKey(ArcRequest, on_delete=models.PROTECT, related_name="revisions")
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    project_type = models.CharField(max_length=60, blank=True)
+    planned_start = models.DateField(null=True, blank=True)
+    planned_completion = models.DateField(null=True, blank=True)
+    location = models.CharField(max_length=8, blank=True)
+    location_detail = models.CharField(max_length=200, blank=True)
+    materials = models.TextField(blank=True)
+    was_submitted = models.BooleanField(
+        default=False, help_text="This wording had been submitted to the committee."
+    )
+    edited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"ARC revision #{self.pk}"
+
+
 class Position(models.TextChoices):
     APPROVE = "approve", "Approve"
     APPROVE_WITH_CONDITIONS = "approve_with_conditions", "Approve with conditions"
@@ -149,7 +178,7 @@ class ArcProjectType(models.Model):
 
     name = models.CharField(max_length=60, unique=True)
     guidance = models.TextField(
-        blank=True, help_text="What to include: drawings, materials, colours, a plot plan..."
+        blank=True, help_text="What to include: drawings, materials, colors, a plot plan..."
     )
     citation = models.CharField(max_length=200, blank=True)
     active = models.BooleanField(default=True)

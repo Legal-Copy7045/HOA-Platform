@@ -2,25 +2,31 @@
 {% load portal %}
 {% block title %}Invoice {{ obj.number }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "operations/finance_nav.html" %}
+  {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'invoices' %}">Invoices</a> / {{ obj.number }}</div>
   <div class="page-head">
     <div>
       <h1>{{ obj.vendor }} · {{ obj.number }}</h1>
-      <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.category.name }}</span><span>Dated {{ obj.invoice_date|date:"M j, Y" }}</span>{% if obj.due_date %}<span>Due {{ obj.due_date|date:"M j, Y" }}</span>{% endif %}{% if obj.work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% endif %}</div>
+      <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.category.name }}</span><span>Dated {{ obj.invoice_date|date:"M j, Y" }}</span>{% if obj.due_date %}<span>Due {{ obj.due_date|date:"M j, Y" }}</span>{% endif %}{% if obj.work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">Work order #{{ obj.work_order_id }}</a>{% endif %}</div>
     </div>
     <div class="amount-big">{{ obj.amount_cents|cents }}</div>
   </div>
   <div class="split">
     <div>
       {% if obj.description %}<section class="card prose">{{ obj.description|linebreaks }}</section>{% endif %}
+      <section class="card" id="invoice-file" aria-labelledby="invoice-file-h">
+        <h2 id="invoice-file-h">Invoice file</h2>
+        {% if files %}<p class="small muted">Open the invoice and check it before approving.</p><ul class="list">{% for f in files %}<li>{% icon "file" %}<a class="grow" href="{% url 'invoice_file' obj.pk f.pk %}">{{ f.original_filename }}</a><a class="btn secondary small" href="{% url 'invoice_file' obj.pk f.pk %}">Open</a></li>{% endfor %}</ul>
+        {% else %}<p class="muted small">No file attached yet.{% if can_approve %} Ask for the invoice before approving.{% endif %}</p>{% endif %}
+        {% if can_attach %}<form method="post" action="{% url 'invoice_action' obj.pk 'attach' %}" enctype="multipart/form-data">{% csrf_token %}<label for="invoice-upload">Attach a file</label> <input id="invoice-upload" type="file" name="file" required><div class="form-actions"><button type="submit" class="secondary small">Attach</button></div></form>{% endif %}
+      </section>
       {% if can_approve %}
         <section class="card">
           <h2>Your approval</h2>
           <p class="muted">{{ approvals|length }} of {{ needed }} approval{{ needed|pluralize }} recorded.</p>
           <div class="wf-actions">
-            <form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="wf-action">{% csrf_token %}<input name="note" placeholder="Note (optional)" aria-label="Note"><button type="submit">{% icon "check" %} Approve</button></form>
-            <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="wf-action" data-confirm="Reject this invoice?">{% csrf_token %}<input name="note" placeholder="Reason (required)" required aria-label="Reason"><button type="submit" class="danger">Reject</button></form>
+            <form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="wf-action" data-confirm="Approve this invoice for payment?">{% csrf_token %}<label for="approve-note" class="wf-label">Note for &ldquo;Approve&rdquo; <span class="muted">(optional)</span></label><div class="wf-row"><input id="approve-note" name="note"><button type="submit">{% icon "check" %} Approve</button></div></form>
+            <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="wf-action" data-confirm="Reject this invoice? It will not be paid.">{% csrf_token %}<label for="reject-note" class="wf-label">Reason for rejecting<span class="required-mark" aria-hidden="true">*</span></label><div class="wf-row"><input id="reject-note" name="note" required><button type="submit" class="danger">Reject</button></div></form>
           </div>
         </section>
       {% endif %}
@@ -33,12 +39,6 @@
       {% include "partials/workflow.html" with obj=obj %}
     </div>
     <aside>
-      <section class="card">
-        <h3>Invoice file</h3>
-        {% if files %}<ul class="list">{% for f in files %}<li>{% icon "file" %}<a class="grow" href="{% url 'invoice_file' obj.pk f.pk %}">{{ f.original_filename }}</a></li>{% endfor %}</ul>
-        {% else %}<p class="muted small">No file attached yet.</p>{% endif %}
-        {% if can_attach %}<form method="post" action="{% url 'invoice_action' obj.pk 'attach' %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" required aria-label="Invoice file"><div class="form-actions"><button type="submit" class="secondary small">Attach</button></div></form>{% endif %}
-      </section>
       <section class="card">
         <h3>Approvals <span class="muted small">({{ needed }} needed)</span></h3>
         {% if approvals %}<ul class="list">{% for a in approvals %}<li>{% if a.decision == "approve" %}{% icon "check-circle" %}{% else %}{% icon "alert" %}{% endif %}<div class="grow"><div>{{ a.approver.email }}</div><div class="small muted">{{ a.get_decision_display }} · {{ a.created_at|date:"M j" }}{% if a.note %} · {{ a.note }}{% endif %}</div></div></li>{% endfor %}</ul>

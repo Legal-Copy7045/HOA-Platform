@@ -1,7 +1,7 @@
 from django.urls import path, re_path
 from django.views.generic import RedirectView
 
-from community import account_views, branding_views, views
+from community import account_views, branding_views, reservation_views, retention_views, views
 
 urlpatterns = [
     path("board/branding/", branding_views.branding_settings, name="branding_settings"),
@@ -84,4 +84,23 @@ urlpatterns = [
         views.nomination_decide,
         name="nomination_decide",
     ),
+    # Common-area reservations (optional feature "reservations")
+    path("reservations/", reservation_views.reservations_page, name="reservations"),
+    path("reservations/<int:pk>/", reservation_views.reservation_detail, name="reservation_detail"),
+    re_path(
+        r"^reservations/(?P<pk>[0-9]+)/(?P<action>approve|decline|cancel)/$",
+        reservation_views.reservation_action,
+        name="reservation_action",
+    ),
+    path(
+        "board/reservations/", reservation_views.reservation_settings, name="reservation_settings"
+    ),
+    path(
+        "board/reservations/areas/<int:pk>/",
+        reservation_views.reservation_area_save,
+        name="reservation_area_save",
+    ),
+    # Retention of former owners' contact details
+    path("board/retention/", retention_views.retention, name="retention"),
+    path("board/retention/run/", retention_views.retention_run, name="retention_run"),
 ]

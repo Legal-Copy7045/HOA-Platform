@@ -1,0 +1,37 @@
+{# Local override of allauth's "Add Security Key" page (UX review #2): plain words, #}
+{# labels above fields, and the setup step bar while the account is being set up. #}
+{# allauth's script finds the button, checkbox and hidden credential by their ids. #}
+{% extends "allauth/layouts/base.html" %}
+{% load portal %}
+{% block head_title %}Add a passkey{% endblock head_title %}
+{% block content %}
+  {% if signin_setup %}{% include "accounts/_setup_steps.html" with steps=signin_setup.steps %}{% endif %}
+  <h1>Add a passkey</h1>
+  <p>When you press the button, your phone or computer asks for your fingerprint, face or screen lock. That creates the passkey. Nothing is sent to us but a public key.</p>
+  <form method="post" action="{% url 'mfa_add_webauthn' %}">{% csrf_token %}
+    {% if form.non_field_errors or form.credential.errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>That didn't work. Please try again{% if signin_setup %}, or use an authenticator app instead{% endif %}.</span></div>{% endif %}
+    <div class="field{% if form.name.errors %} has-error{% endif %}">
+      <label for="{{ form.name.auto_id }}">Name for this passkey (optional)</label>
+      <input type="text" name="{{ form.name.html_name }}" id="{{ form.name.auto_id }}" value="{{ form.name.value|default:'' }}" maxlength="100" aria-describedby="{{ form.name.auto_id }}_help">
+      <div class="help" id="{{ form.name.auto_id }}_help">So you can tell your devices apart, for example "My phone".</div>
+    </div>
+    {% if form.passwordless %}
+      <label class="choice"><input type="checkbox" name="{{ form.passwordless.html_name }}" id="{{ form.passwordless.auto_id }}"{% if not form.is_bound or form.passwordless.value %} checked{% endif %} aria-describedby="{{ form.passwordless.auto_id }}_help"> Also use it to sign in without typing my password</label>
+      <div class="help" id="{{ form.passwordless.auto_id }}_help">Your device then checks your fingerprint, face or PIN each time.</div>
+    {% endif %}
+    {{ form.credential }}
+    <div class="form-actions"><button type="button" id="mfa_webauthn_add" class="primary block">{% icon "key" %} Create my passkey</button></div>
+  </form>
+  <p class="small">{% if signin_setup %}<a href="{% url 'mfa_activate_totp' %}">Use an authenticator app instead</a>{% else %}<a href="{% url 'mfa_index' %}">Back to sign-in and security</a>{% endif %}</p>
+  {% include "mfa/webauthn/snippets/scripts.html" %}
+  {{ js_data|json_script:"js_data" }}
+  <script data-allauth-onload="allauth.webauthn.forms.addForm" type="application/json">{
+    "ids": {
+        "add": "mfa_webauthn_add",
+        "passwordless": "{{ form.passwordless.auto_id }}",
+        "credential": "{{ form.credential.auto_id }}",
+        "data": "js_data"
+    }
+}
+  </script>
+{% endblock content %}

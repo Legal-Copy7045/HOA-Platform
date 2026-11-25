@@ -1,21 +1,44 @@
 {% extends "base.html" %}
-{% load portal %}
-{% block title %}ARC-{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% load portal static %}
+{% block title %}{% if owner_view %}{{ obj.title }}{% else %}Request #{{ obj.pk }}{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'arc_list' %}">Architectural review</a> / ARC-{{ obj.pk }}</div>
+  <div class="crumbs">{% if owner_view %}<a href="{% url 'arc_list' %}?mine=1">Home improvement approvals (ARC)</a> / {{ obj.title|truncatechars:48 }}{% else %}<a href="{% url 'arc_list' %}">Architectural review</a> / Request #{{ obj.pk }}{% endif %}</div>
   <div class="page-head"><div><h1>{{ obj.title }}</h1>
-    <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.street_address|default:obj.lot }}</span>{% if obj.review_due_on %}<span>{% icon "clock" %}Decision due {{ obj.review_due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.appeal_due_on %}<span>Appeal by {{ obj.appeal_due_on|date:"M j, Y" }}</span>{% endif %}</div></div></div>
-  {% if recused %}<div class="alert warning">{% icon "alert" %}<span>You are recused from this request (you are the applicant or own an affected lot). Deliberations are hidden and you cannot decide.</span></div>{% endif %}
+    <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.street_address|default:obj.lot }}</span>{% if obj.review_due_on %}<span>{% icon "clock" %}Decision due {{ obj.review_due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.appeal_due_on %}<span>Appeal by {{ obj.appeal_due_on|date:"M j, Y" }}</span>{% endif %}</div></div>
+    {% if can_edit %}<div class="actions"><a class="btn secondary" href="{% url 'arc_edit' obj.pk %}">{% icon "pencil" %} Edit the details</a></div>{% endif %}</div>
+  {% if recused %}<div class="alert warning">{% icon "alert" %}<span>You can't review this one because it's your lot or a neighboring lot. The reviewers' discussion is hidden from you, and you can't decide it.</span></div>{% endif %}
+  {% if checklist %}
+  <section class="card" id="steps"><h2>Get your request ready</h2>
+    <ol class="checklist">
+      <li class="done"><span class="check" aria-hidden="true">{% icon "check" %}</span><div class="grow"><div class="title">Describe the project <span class="sr-only">(done)</span></div><div class="small muted">Done. <a href="{% url 'arc_edit' obj.pk %}">Edit the details</a> if something needs changing.</div></div></li>
+      <li class="{% if checklist.has_files %}done{% endif %}"><span class="check" aria-hidden="true">{% if checklist.has_files %}{% icon "check" %}{% else %}2{% endif %}</span><div class="grow"><div class="title">Add plans or photos{% if checklist.has_files %} <span class="sr-only">(done)</span>{% endif %}</div>
+        <div class="small muted">{% if checklist.has_files %}{{ files|length }} added. You can add more.{% else %}A drawing or plot plan, and photos of where the work will be.{% endif %}</div>
+        <form method="post" action="{% url 'arc_attach' obj.pk %}" enctype="multipart/form-data" class="upload-form">{% csrf_token %}
+          <label for="af">Choose files</label><input id="af" type="file" name="file" accept="image/*,application/pdf" multiple required aria-describedby="af-help">
+          <p class="help" id="af-help">PDFs or photos. You can pick several at once, or take a photo with your phone. Every file is kept.</p>
+          <button type="submit" class="secondary small">Add files</button></form></div></li>
+      <li class="{% if not checklist.neighbors_waiting %}done{% endif %}"><span class="check" aria-hidden="true">{% if not checklist.neighbors_waiting %}{% icon "check" %}{% else %}3{% endif %}</span><div class="grow"><div class="title">Neighbors</div>
+        {% if checklist.neighbors_waiting %}<div class="small muted">{{ checklist.neighbors_waiting }} neighbor{{ checklist.neighbors_waiting|pluralize }} will be asked to look at your project and acknowledge it (<a href="#signoffs">see the list</a>). They can comment, but they don't decide.</div>
+          {% if checklist.send and checklist.send.action == "request_acknowledgements" %}<form method="post" action="{% url 'arc_action' obj.pk 'request_acknowledgements' %}">{% csrf_token %}<button type="submit">{% icon "mail" %} Send to my neighbors</button></form>{% endif %}
+        {% else %}<div class="small muted">No neighbors need to be asked.</div>{% endif %}</div></li>
+      <li><span class="check" aria-hidden="true">4</span><div class="grow"><div class="title">Submit to the committee</div>
+        {% if checklist.send and checklist.send.action == "submit" %}<div class="small muted">The committee checks it is complete, then reviews it. We'll email you when there's a decision.</div><form method="post" action="{% url 'arc_action' obj.pk 'submit' %}">{% csrf_token %}<button type="submit">Submit for review</button></form>
+        {% elif checklist.neighbors_waiting %}<div class="small muted">This happens automatically once your neighbors have responded.</div>
+        {% else %}<button type="button" disabled aria-describedby="send-why">Submit for review</button><p class="help" id="send-why">{{ checklist.blocked_reason|default:"Not possible right now." }}</p>{% endif %}</div></li>
+    </ol>
+  </section>
+  {% endif %}
   <div class="split">
     <div>
       <section class="card prose">{{ obj.description|linebreaks }}
-        <dl class="kv small">{% if obj.project_type %}<dt>Type</dt><dd>{{ obj.project_type }}</dd>{% endif %}
+        <dl class="kv small">{% if obj.project_type %}<dt>Kind</dt><dd>{{ obj.project_type }}</dd>{% endif %}
           {% if obj.planned_start %}<dt>Approximate start</dt><dd>{{ obj.planned_start|date:"M j, Y" }}</dd>{% endif %}
           {% if obj.planned_completion %}<dt>Approximate completion</dt><dd>{{ obj.planned_completion|date:"M j, Y" }}</dd>{% endif %}
-          {% if obj.location %}<dt>Location</dt><dd>{{ obj.get_location_display }}{% if obj.location_detail %}: {{ obj.location_detail }}{% endif %}</dd>{% endif %}
-          {% if obj.materials %}<dt>Materials and contractors</dt><dd>{{ obj.materials|linebreaksbr }}</dd>{% endif %}</dl></section>
+          {% if obj.location %}<dt>Where on the lot</dt><dd>{{ obj.get_location_display }}{% if obj.location_detail %}: {{ obj.location_detail }}{% endif %}</dd>{% endif %}
+          {% if obj.materials %}<dt>Materials and contractors</dt><dd>{{ obj.materials|linebreaksbr }}</dd>{% endif %}</dl>
+        {% if revisions %}<details><summary>Earlier wording ({{ revisions|length }})</summary>{% for r in revisions %}<div class="notice"><div class="small muted">Before the change on {{ r.created_at|date:"M j, Y g:i A" }}{% if r.was_submitted %} · this wording had been submitted{% endif %}</div><strong>{{ r.title }}</strong>{{ r.description|linebreaks }}</div>{% endfor %}</details>{% endif %}</section>
 
-      {% if decisions %}<section class="card"><h2>Decisions</h2><ul class="list">{% for d in decisions %}<li><div class="todo-icon {% if d.outcome == 'denied' %}tone-danger{% endif %}">{% icon "check-circle" %}</div><div class="grow"><div class="title">{{ d.get_outcome_display }}{% if d.is_appeal %} (appeal){% endif %}{% if d.deemed %} (deemed){% endif %}</div><div class="small muted">{{ d.decided_at|date:"M j, Y" }} · {{ d.citation }}</div>{% if d.conditions %}<div class="small">Conditions: {{ d.conditions }}</div>{% endif %}{% if d.reasons %}<div class="small">Reasons: {{ d.reasons }}</div>{% endif %}</div><a class="btn secondary small" href="{% url 'arc_letter' obj.pk d.pk %}">{% icon "download" %} Letter</a></li>{% endfor %}</ul></section>{% endif %}
+      {% if decisions %}<section class="card"><h2>Decisions</h2><ul class="list">{% for d in decisions %}<li><div class="todo-icon {% if d.outcome == 'denied' %}tone-danger{% endif %}">{% icon "check-circle" %}</div><div class="grow"><div class="title">{{ d.get_outcome_display }}{% if d.is_appeal %} (appeal){% endif %}{% if d.deemed %} (approved automatically: no decision was made in time){% endif %}</div><div class="small muted">{{ d.decided_at|date:"M j, Y" }} · {{ d.citation }}</div>{% if d.conditions %}<div class="small">Conditions: {{ d.conditions }}</div>{% endif %}{% if d.reasons %}<div class="small">Reasons: {{ d.reasons }}</div>{% endif %}</div><a class="btn secondary small" href="{% url 'arc_letter' obj.pk d.pk %}">{% icon "download" %} Letter</a></li>{% endfor %}</ul></section>{% endif %}
 
       {% if deliberation is not None %}
         <section class="card"><h2>Reviewer positions</h2><p class="muted small">Not shown to the applicant.</p>
@@ -31,10 +54,10 @@
     </div>
     <aside>
       <section class="card"><h3>Plans and photos</h3>
-        {% if files %}<ul class="list">{% for f in files %}<li>{% icon "file" %}<div class="grow"><a href="{% url 'arc_file' obj.pk f.pk %}">{{ f.original_filename }}</a><div class="small muted">{{ f.uploaded_at|date:"M j" }}{% if f.label %} · {{ f.label }}{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
-        {% if can_attach %}<form method="post" action="{% url 'arc_attach' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<label for="af">Add a file</label><input id="af" type="file" name="file" required><input name="label" placeholder="Description (optional)" aria-label="Description"><p class="help">PDF or images. Every file is kept, including earlier versions.</p><button type="submit" class="secondary small">Attach</button></form>{% endif %}
+        {% if files %}<ul class="list files">{% for f in files %}<li>{% if f.thumbnail %}<a href="{% url 'arc_file' obj.pk f.pk %}" class="thumb"><img src="{% url 'arc_file' obj.pk f.pk %}?view=thumb" alt="" loading="lazy" width="56" height="56"></a>{% else %}{% icon "file" %}{% endif %}<div class="grow"><a href="{% url 'arc_file' obj.pk f.pk %}">{{ f.original_filename }}</a><div class="small muted">{{ f.uploaded_at|date:"M j, Y" }}{% if f.label %} · {{ f.label }}{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
+        {% if can_attach and not checklist %}<form method="post" action="{% url 'arc_attach' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<label for="af2">Add files</label><input id="af2" type="file" name="file" accept="image/*,application/pdf" multiple required><label for="af2-label">Description (optional)</label><input id="af2-label" name="label" maxlength="200"><p class="help">PDFs or photos; you can pick several at once. Every file is kept, including earlier versions.</p><button type="submit" class="secondary small">Add files</button></form>{% endif %}
       </section>
-      {% if can_set_affected %}<section class="card"><h3>Affected lots</h3><form method="post" action="{% url 'arc_affected' obj.pk %}">{% csrf_token %}<label for="aff">Neighboring lot numbers</label><input id="aff" name="lots" value="{{ affected|join:' ' }}"><p class="help">Owners of these lots are recused.</p><button type="submit" class="secondary small">Save</button></form></section>{% endif %}
+      {% if can_set_affected %}<section class="card"><h3>Affected lots</h3><form method="post" action="{% url 'arc_affected' obj.pk %}">{% csrf_token %}<label for="aff">Neighboring lot numbers</label><input id="aff" name="lots" value="{{ affected|join:' ' }}"><p class="help">Owners of these lots can't review this request.</p><button type="submit" class="secondary small">Save</button></form></section>{% endif %}
     </aside>
   </div>
 {% endblock %}

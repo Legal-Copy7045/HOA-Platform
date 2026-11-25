@@ -41,6 +41,8 @@ PUBLIC = {
     "invite_accept",
     "account_setup_expired",
     "login_background_image",
+    # Sign-in help (forgot password, lost phone): one of the sign-in steps.
+    "signin_help",
 }
 # Links emailed before sign-in became mandatory (D24): sign-in first, then
 # only the neighboring lot's owner is sent on to their review page.
@@ -54,6 +56,15 @@ OWN_ACCOUNT = {
     "export_my_data",
     "owner_preview_stop",
     "contact_method_add",
+    # Installable app and alerts (Milestone 4): the manifest and service
+    # worker hold nothing personal; the rest act on the signed-in login only.
+    "pwa_manifest",
+    "pwa_service_worker",
+    "push_subscribe",
+    "push_unsubscribe",
+    "sms_start",
+    "sms_verify",
+    "sms_stop",
 }
 # Text from board-only or other-lot fixtures that must never reach owner A.
 BOARD_ONLY_MARKERS = (
@@ -72,6 +83,7 @@ BOARD_ONLY_MARKERS = (
     b"Board note on lot B",
     b"Lot B pond",
     b"Lot B nephew",
+    b"Lot B pavilion party",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -92,6 +104,10 @@ MEMBER_PAGES = {
     "signoffs_mine",
     "elections",
     "owner_budget",
+    "reservations",
+    # Navigation and UX review (ux_nav): hub pages.
+    "voting",
+    "community_info",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -109,6 +125,7 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "settings_hub": ("GET", None),
     "proxy_grant": ("POST", "executive_meeting"),
     "proxy_revoke": ("POST", "proxy_b"),
     "consents": ("GET", None),
@@ -139,6 +156,8 @@ PROTECTED = {
     "folder_create": ("POST", None),
     "document_move": ("POST", "board_document"),
     "request_detail": ("GET", "request_b"),
+    "request_attach": ("POST", "request_b"),
+    "request_file": ("GET", "request_b"),
     "request_action": ("POST", "request_b"),
     "request_assign": ("POST", "request_b"),
     "request_work_order": ("POST", "request_b"),
@@ -193,6 +212,7 @@ PROTECTED = {
     "vote_detail": ("GET", "draft_vote"),
     "vote_action": ("POST", "draft_vote"),
     "arc_detail": ("GET", "arc_b"),
+    "arc_edit": ("POST", "arc_b"),
     "arc_action": ("POST", "arc_b"),
     "arc_decide": ("POST", "arc_b"),
     "arc_position": ("POST", "arc_b"),
@@ -217,6 +237,7 @@ PROTECTED = {
     "invoice_file": ("GET", "invoice"),
     "my_statement_pdf": ("GET", "lot_id_b"),
     "ledger_home": ("GET", None),
+    "record_payments": ("GET", None),
     "lot_ledger": ("GET", "lot"),
     "lot_ledger_action": ("POST", "lot"),
     "lot_statement_pdf": ("GET", "lot"),
@@ -237,6 +258,17 @@ PROTECTED = {
     "resale_pdf": ("GET", "resale_b"),
     "reports": ("GET", None),
     "report_run": ("GET", "report"),
+    # Text alerts (Milestone 4; the feature is switched on in world()).
+    "urgent_notice": ("GET", None),
+    # Reservations, access review, retention (Milestone 4)
+    "reservation_detail": ("GET", "reservation_b"),
+    "reservation_action": ("POST", "reservation_b"),
+    "reservation_settings": ("GET", None),
+    "reservation_area_save": ("POST", "area"),
+    "access_review": ("GET", None),
+    "access_review_record": ("POST", None),
+    "retention": ("GET", None),
+    "retention_run": ("POST", None),
 }
 
 
@@ -266,6 +298,10 @@ def world():
         mock.patch("accounts.tasks.send_invitation.defer"),
         mock.patch("community.tasks.notify_board.defer"),
     ):
+        from core.models import FeatureSetting
+
+        for key in ("push", "sms"):  # off by default; their pages are checked here
+            FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
             LotFactory(street_address="2 Bravo Way"),
@@ -388,6 +424,7 @@ def world():
             actor=owner_b,
         )
         threads.post("request", request_b, body="Board note on lot B", actor=board)
+        request_b_file = attach(request_b, pdf("gutter.pdf"), actor=owner_b)
         from governance import services as gov
         from governance.models import CommitteeMembership
 
@@ -439,7 +476,27 @@ def world():
         method_b = services.add_contact_method(
             person_b, kind="phone", value="555-0100", actor=SYSTEM
         )
+        # Reservations are an optional feature: switched on to check its pages.
+        from community import reservations
+        from community.models import CommonArea
+        from core.models import FeatureSetting
+
+        FeatureSetting.objects.create(key="reservations", enabled=True)
+        area = CommonArea.objects.create(name="Pavilion", kind="amenity")
+        reservations.save_area_settings(area, bookable=True, actor=SYSTEM)
+        start = timezone.now() + timedelta(days=3)
+        reservation_b = reservations.request_reservation(
+            area=area,
+            lot_id=lot_b.pk,
+            starts_at=start,
+            ends_at=start + timedelta(hours=2),
+            purpose="Lot B pavilion party",
+            actor=owner_b,
+        )
+        reservations.approve(reservation_b, actor=board)
     targets = {
+        "reservation_b": reservation_b.pk,
+        "area": area.pk,
         "account_b": account_b.pk,
         "proxy_b": proxy_b.pk,
         "election": election.pk,
@@ -449,6 +506,7 @@ def world():
         "contract": contract.pk,
         "change_b": change_b.pk,
         "request_b": request_b.pk,
+        "request_b_file": request_b_file.pk,
         "committee_b": committee_b.pk,
         "topic_b": topic_b.pk,
         "task_b": task_b.pk,
@@ -529,6 +587,8 @@ def _url(name, key, targets):
         kwargs["action"] = "send_notice"
     elif name == "violation_file":
         kwargs["file_id"] = targets["violation_b_file"]
+    elif name == "request_file":
+        kwargs["file_id"] = targets["request_b_file"]
     elif name == "request_action":
         kwargs["action"] = "withdraw"
     elif name == "account_change_decide" or name == "seat_nomination_decide":
@@ -571,6 +631,8 @@ def _url(name, key, targets):
         kwargs["action"] = "issue"
     elif name == "report_run":
         kwargs = {"key": "ar_aging"}
+    elif name == "reservation_action":
+        kwargs["action"] = "cancel"
     return reverse(name, kwargs=kwargs)
 
 

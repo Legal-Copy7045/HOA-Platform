@@ -49,6 +49,7 @@ urlpatterns = [
         views.records_request_action,
         name="records_request_action",
     ),
+    path("voting/", views.voting, name="voting"),
     path("votes/", views.votes, name="votes"),
     path("ballot/<str:token>/", views.ballot_link, name="ballot_link"),
     path("votes/<int:pk>/", views.vote_detail, name="vote_detail"),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from arc.models import DECIDED, ArcRequest, ArcState, Decision, Position, ReviewerVote
@@ -144,6 +144,10 @@ ARC = Workflow(
             "arc.submit",
             "Submit for review",
             guard=_may_submit,
+            confirm=(
+                "Submit this request? The board checks it is "
+                "complete, then starts the review clock."
+            ),
             after=_mark_submitted,
         ),
         Transition(
@@ -151,8 +155,12 @@ ARC = Workflow(
             {ArcState.DRAFT},
             ArcState.NEIGHBORS,
             "arc.submit",
-            "Request Neighbor Acknowledgements",
+            "Request neighbor acknowledgements",
             guard=_may_request_acknowledgements,
+            confirm=(
+                "Email your neighbors and ask them to acknowledge this project? "
+                "You can't edit the request while they respond."
+            ),
             after=_send_acknowledgement_requests,
         ),
         Transition(
@@ -171,6 +179,10 @@ ARC = Workflow(
             "arc.intake",
             "Complete: start review",
             guard=_not_recused,
+            confirm=(
+                "Accept this request as complete? The review clock "
+                "starts now and the owner is told."
+            ),
             after=_start_clock,
         ),
         Transition(
@@ -180,6 +192,10 @@ ARC = Workflow(
             "arc.intake",
             "Return as incomplete",
             guard=_not_recused,
+            confirm=(
+                "Return this request to the owner as incomplete? They "
+                "see your note and can submit again."
+            ),
             note_required=True,
         ),
         Transition(
@@ -189,6 +205,7 @@ ARC = Workflow(
             "arc.submit",
             "Withdraw",
             guard=_lot_owner,
+            confirm="Withdraw this request? The review stops. You can start a new request later.",
         ),
         # Decisions: applied only through decide() / decide_appeal(), which also
         # write the Decision record.
@@ -199,6 +216,7 @@ ARC = Workflow(
             "arc.decide",
             "Approve",
             guard=_not_recused,
+            confirm="Approve this request? The owner gets a decision letter.",
         ),
         Transition(
             "approve_with_conditions",
@@ -207,9 +225,18 @@ ARC = Workflow(
             "arc.decide",
             "Approve with conditions",
             guard=_not_recused,
+            confirm="Approve with conditions? The owner gets a decision letter listing them.",
         ),
         Transition(
-            "deny", {ArcState.IN_REVIEW}, ArcState.DENIED, "arc.decide", "Deny", guard=_not_recused
+            "deny",
+            {ArcState.IN_REVIEW},
+            ArcState.DENIED,
+            "arc.decide",
+            "Deny",
+            guard=_not_recused,
+            confirm=(
+                "Deny this request? The owner gets a decision letter and can appeal to the board."
+            ),
         ),
         Transition(
             "appeal",
@@ -218,6 +245,9 @@ ARC = Workflow(
             "arc.submit",
             "Appeal to the board",
             guard=_within_appeal_window,
+            confirm=(
+                "Appeal this decision to the board? The board reviews it and sends a new decision."
+            ),
             note_required=True,
         ),
         Transition(
@@ -227,6 +257,7 @@ ARC = Workflow(
             "arc.appeal_decide",
             "Decide appeal",
             guard=_not_recused,
+            confirm="Record the board's decision on this appeal? The owner gets a letter.",
         ),
         Transition(
             "complete",
@@ -235,11 +266,62 @@ ARC = Workflow(
             "arc.intake",
             "Mark project complete",
             guard=_may_complete,
+            confirm="Mark the project complete? This closes the request.",
         ),
     ],
 )
 MAX_OPEN_DRAFTS = 5
 DECISION_ACTIONS = {"approve", "approve_with_conditions", "deny", "decide_appeal"}
+
+
+EDITABLE_FIELDS = (
+    "title",
+    "description",
+    "project_type",
+    "planned_start",
+    "planned_completion",
+    "location",
+    "location_detail",
+    "materials",
+)
+
+
+def _clean_request_fields(
+    *,
+    title: str,
+    description: str,
+    project_type: str = "",
+    planned_start=None,
+    planned_completion=None,
+    location: str = "",
+    location_detail: str = "",
+    materials: str = "",
+) -> dict:
+    """The owner's description of the project, checked the same way when it
+    is created and when a draft is edited."""
+    if not (title or "").strip() or not (description or "").strip():
+        raise ArcError("Describe the project.")
+    project_type = (project_type or "").strip()
+    types = active_project_types()
+    # The owner form requires a choice; here an unknown name is refused.
+    if project_type and project_type not in {t.name for t in types} | {"Other"}:
+        raise ArcError("Choose the kind of project.")
+    if planned_start and planned_completion and planned_completion < planned_start:
+        raise ArcError("Completion cannot be before the start.")
+    location = location if location in ("front", "side", "rear", "other") else ""
+    return {
+        "title": title.strip()[:200],
+        "description": description.strip(),
+        "project_type": project_type[:60],
+        "planned_start": planned_start,
+        "planned_completion": planned_completion,
+        "location": location,
+        # Only kept when the owner chose "Other".
+        "location_detail": " ".join((location_detail or "").split())[:200]
+        if location == "other"
+        else "",
+        "materials": (materials or "").strip()[:5000],
+    }
 
 
 def create_request(
@@ -259,33 +341,23 @@ def create_request(
     require(actor, "arc.submit")
     if lot.pk not in roles_for(actor).owned_lot_ids:
         raise ArcError("You can only apply for a lot you own.")
-    if not title.strip() or not description.strip():
-        raise ArcError("Describe the project.")
-    project_type = (project_type or "").strip()
-    types = active_project_types()
-    # The owner form requires a choice; here an unknown name is refused.
-    if project_type and project_type not in {t.name for t in types} | {"Other"}:
-        raise ArcError("Choose the kind of project.")
+    fields = _clean_request_fields(
+        title=title,
+        description=description,
+        project_type=project_type,
+        planned_start=planned_start,
+        planned_completion=planned_completion,
+        location=location,
+        location_detail=location_detail,
+        materials=materials,
+    )
     with system_access("create arc request"):
         applicant = Person.objects.get(user=actor)
         drafts = ArcRequest.objects.filter(applicant=applicant, state=ArcState.DRAFT).count()
-    if planned_start and planned_completion and planned_completion < planned_start:
-        raise ArcError("Completion cannot be before the start.")
     if drafts >= MAX_OPEN_DRAFTS:
         # Files are permanent: cap unsubmitted requests (re-audit of review C4).
         raise ArcError("Submit or withdraw one of your draft requests before starting another.")
-    req = ArcRequest.objects.create(
-        lot=lot,
-        applicant=applicant,
-        title=title.strip()[:200],
-        description=description.strip(),
-        project_type=project_type[:60],
-        planned_start=planned_start,
-        planned_completion=planned_completion,
-        location=location if location in ("front", "side", "rear", "other") else "",
-        location_detail=" ".join((location_detail or "").split())[:200],
-        materials=(materials or "").strip()[:5000],
-    )
+    req = ArcRequest.objects.create(lot=lot, applicant=applicant, **fields)
     record_event(
         "arc.created", actor=actor, request=request, target=req, metadata={"lot_id": lot.pk}
     )
@@ -293,6 +365,63 @@ def create_request(
     from arc.signoffs import prepare_signoffs
 
     prepare_signoffs(req, actor=actor)
+    return req
+
+
+def can_edit(user, req: ArcRequest) -> bool:
+    """Only an owner of the lot, and only while the request is a draft."""
+    return (
+        user is not SYSTEM
+        and req.state == ArcState.DRAFT
+        and can(user, "arc.submit")
+        and owns_lot(user, req)
+    )
+
+
+def edit_request(req: ArcRequest, *, actor, request=None, **changes) -> ArcRequest:
+    """The owner corrects their draft. The earlier wording is kept as an
+    append-only revision (CLAUDE.md: keep every submitted version)."""
+    from arc.models import ArcRequestRevision
+
+    require(actor, "arc.submit")
+    unknown = set(changes) - set(EDITABLE_FIELDS)
+    if unknown:
+        raise ArcError("Those details cannot be changed here.")
+    with transaction.atomic(), system_access("edit arc draft"):
+        req = ArcRequest.objects.select_for_update().get(pk=req.pk)
+        if req.state != ArcState.DRAFT:
+            raise ArcError("Only a draft can be edited. Withdraw it and start again if needed.")
+        if not owns_lot(actor, req):
+            raise ArcError("Only an owner of this lot can edit the request.")
+        current = {f: getattr(req, f) for f in EDITABLE_FIELDS}
+        fields = _clean_request_fields(**{**current, **changes})
+        changed = [f for f in EDITABLE_FIELDS if fields[f] != current[f]]
+        if not changed:
+            return req
+        ArcRequestRevision.objects.create(
+            request=req, edited_by=actor, was_submitted=req.submitted_at is not None, **current
+        )
+        for f in changed:
+            setattr(req, f, fields[f])
+        req.save(update_fields=changed)
+        # Neighbors acknowledged the earlier wording: after a change they are
+        # asked again (review R2-002). Their earlier answers stay on record.
+        from arc.models import SignoffRequest, SignoffState
+
+        SignoffRequest.objects.filter(arc_request=req).exclude(state=SignoffState.WITHDRAWN).filter(
+            models.Q(sent_at__isnull=False) | ~models.Q(state=SignoffState.PENDING)
+        ).update(
+            state=SignoffState.PENDING,
+            sent_at=None,
+            token_hash="",  # nosec B106 - clearing an old link's hash, not a password
+        )
+    record_event(
+        "arc.edited",
+        actor=actor,
+        request=request,
+        target=req,
+        metadata={"fields": " ".join(changed)},
+    )
     return req
 
 

@@ -1,14 +1,20 @@
-{% load portal %}{# Expects: actions (Transitions), history (WorkflowEvents), action_url_name, obj #}
-{% if actions %}
+{% load portal %}{# Expects: actions (Transitions), history (WorkflowEvents), action_url_name, obj. Optional: blocked_steps [(Transition, reason)] shown disabled with the reason. #}
+{% if actions or blocked_steps %}
 <section class="card">
   <h2>Next steps</h2>
   <div class="wf-actions">
     {% for t in actions %}
-      <form method="post" action="{% url action_url_name obj.pk t.action %}" class="wf-action"{% if t.action|is_danger %} data-confirm="{{ t.label }}: are you sure?"{% endif %}>
+      <form method="post" action="{% url action_url_name obj.pk t.action %}" class="wf-action"{% if t.confirm %} data-confirm="{{ t.confirm }}"{% elif t.action|is_danger %} data-confirm="{{ t.label }}? This can't be undone."{% endif %}>
         {% csrf_token %}
-        <input name="note" aria-label="Note for {{ t.label }}" placeholder="{% if t.note_required %}Note (required){% else %}Note (optional){% endif %}"{% if t.note_required %} required{% endif %}>
-        <button type="submit" class="{% if t.action|is_danger %}danger{% elif not forloop.first %}secondary{% endif %}">{{ t.label }}</button>
+        <label for="wf-note-{{ t.action }}" class="wf-label">Note for &ldquo;{{ t.label }}&rdquo;{% if t.note_required %}<span class="required-mark" aria-hidden="true">*</span><span class="sr-only"> (required)</span>{% else %} <span class="muted">(optional)</span>{% endif %}</label>
+        <div class="wf-row">
+          <input id="wf-note-{{ t.action }}" name="note"{% if t.note_required %} required{% endif %}>
+          <button type="submit" class="{% if t.action|is_danger %}danger{% elif not forloop.first %}secondary{% endif %}">{{ t.label }}</button>
+        </div>
       </form>
+    {% endfor %}
+    {% for t, reason in blocked_steps %}
+      <div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="blocked-{{ t.action }}">{{ t.label }}</button><p class="help" id="blocked-{{ t.action }}">{{ reason }}</p></div>
     {% endfor %}
   </div>
 </section>
@@ -18,7 +24,7 @@
   {% if history %}
     <ol class="timeline">
       {% for e in history %}
-        <li><div class="what">{{ e.action|humanize_action }} <span class="muted small">→ {{ e.to_state|state_label }}</span></div>
+        <li><div class="what">{{ e|step_label }} <span class="muted small">→ {{ e.to_state|state_label }}</span></div>
           <div class="when">{{ e.created_at|date:"M j, Y g:i A" }} · {% actor_label e.actor %}</div>
           {% if e.note %}<div class="note">{{ e.note }}</div>{% endif %}</li>
       {% endfor %}

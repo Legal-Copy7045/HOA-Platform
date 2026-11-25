@@ -2,14 +2,14 @@
 {% load portal %}
 {% block title %}Work orders · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "operations/finance_nav.html" %}
+  {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Work orders</h1><p class="subtitle">Maintenance of common areas, from request to completion.</p></div></div>
   {% include "partials/list_tools.html" %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Work</th><th>Area</th><th>Vendor</th><th>Priority</th><th>Status</th><th>Due</th></tr></thead>
-    <tbody>{% for w in rows %}<tr><td class="nowrap"><a href="{% url 'work_order_detail' w.pk %}">WO-{{ w.pk }}</a></td><td>{{ w.title }}</td><td>{{ w.common_area|default:"" }}</td><td>{{ w.vendor|default:"" }}</td><td>{% if w.priority == "urgent" %}<span class="status tone-danger">Urgent</span>{% else %}{{ w.get_priority_display }}{% endif %}</td><td>{% status w.state w.get_state_display %}</td><td class="nowrap">{{ w.due_on|date:"M j"|default:"" }}</td></tr>
+    <tbody>{% for w in rows %}<tr><td class="nowrap"><a href="{% url 'work_order_detail' w.pk %}">#{{ w.pk }}</a></td><td>{{ w.title }}</td><td>{{ w.common_area|default:"" }}</td><td>{{ w.vendor|default:"" }}</td><td>{% if w.priority == "urgent" %}<span class="status tone-danger">Urgent</span>{% else %}{{ w.get_priority_display }}{% endif %}</td><td>{% status w.state w.get_state_display %}</td><td class="nowrap">{{ w.due_on|date:"M j"|default:"" }}</td></tr>
     {% empty %}<tr><td colspan="7">{% include "partials/empty.html" with icon="wrench" title="No work orders" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% include "partials/pager.html" %}
-  {% if can_manage %}<details class="panel"><summary>New work order</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Create</button></div></form></div></details>{% endif %}
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>New work order</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Create</button></div></form></div></details>{% endif %}
 {% endblock %}

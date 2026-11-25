@@ -1,0 +1,51 @@
+{% load static portal %}
+<section class="card" id="app">
+  <h3>Install the app</h3>
+  <p class="small muted">Put the portal on your phone's home screen or your computer's dock. It opens like an app and still asks you to sign in.</p>
+  <ul class="small">
+    <li><strong>iPhone or iPad:</strong> in Safari, tap Share, then "Add to Home Screen".</li>
+    <li><strong>Android:</strong> in Chrome, tap the menu, then "Install app" or "Add to Home screen".</li>
+    <li><strong>Computer:</strong> in Chrome or Edge, use the install icon in the address bar.</li>
+  </ul>
+  <div class="form-actions"><button type="button" class="secondary" data-install-app hidden>{% icon "download" %} Install the app</button></div>
+</section>
+{% if push_on %}
+<section class="card" id="notifications" data-push data-vapid-key="{{ vapid_public_key }}" data-subscribe-url="{% url 'push_subscribe' %}" data-unsubscribe-url="{% url 'push_unsubscribe' %}">
+  <h3>Notifications on this device</h3>
+  <p class="small muted">A short alert when there is an update for you, with a link to sign in and read it. Alerts never show names, amounts or message text. Official notices still come by email.</p>
+  <p class="small" data-push-status role="status">{% if push_devices %}On for {{ push_devices }} device{{ push_devices|pluralize }}.{% else %}Off.{% endif %}</p>
+  <div class="form-actions">
+    <button type="button" data-push-on hidden>Turn on for this device</button>
+    <button type="button" class="secondary" data-push-off hidden>Turn off for this device</button>
+  </div>
+  {% if push_devices %}<form method="post" action="{% url 'push_unsubscribe' %}">{% csrf_token %}<button type="submit" class="secondary small">Turn off on all my devices</button></form>{% endif %}
+</section>
+{% endif %}
+{% if sms_on %}
+<section class="card" id="texts">
+  <h3>Urgent text messages</h3>
+  <p class="small muted">Optional. The board texts only urgent community notices (a water main break, a road closure), with a link to sign in for details. Never your balance or anything personal. {{ stop_note }}</p>
+  {% if sms_number %}
+    <p class="small"><span class="badge tone-success">On</span> Texts go to your number {{ sms_number }}.</p>
+    <form method="post" action="{% url 'sms_stop' %}">{% csrf_token %}<button type="submit" class="secondary small">Stop texts and remove my number</button></form>
+  {% elif not sms_ready %}
+    <p class="small">Text messages aren't set up yet.</p>
+  {% else %}
+    {% if sms_pending %}
+      <form method="post" action="{% url 'sms_verify' %}">{% csrf_token %}
+        <p><label for="sms-code">Code we texted to your number ending in {{ sms_pending.number|slice:"-4:" }} <span class="required-mark" aria-hidden="true">*</span></label>
+          <input id="sms-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required aria-describedby="sms-code-help">
+          <span class="help" id="sms-code-help">6 digits. The code works for 10 minutes.</span></p>
+        <div class="form-actions"><button type="submit">Confirm</button></div>
+      </form>
+    {% endif %}
+    <form method="post" action="{% url 'sms_start' %}">{% csrf_token %}
+      <p><label for="sms-number">Mobile number <span class="required-mark" aria-hidden="true">*</span></label>
+        <input id="sms-number" type="tel" name="number" autocomplete="tel" maxlength="20" required aria-describedby="sms-number-help">
+        <span class="help" id="sms-number-help">We text a 6-digit code to confirm it. Message and data rates may apply.</span></p>
+      <div class="form-actions"><button type="submit" class="secondary">{% if sms_pending %}Send a new code{% else %}Text me a code{% endif %}</button></div>
+    </form>
+  {% endif %}
+</section>
+{% endif %}
+<script src="{% static 'js/alerts.js' %}" defer></script>

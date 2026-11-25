@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Contact details retention · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Contact details retention</h1>
+    <p class="subtitle">{% if days %}Contact details of people who left more than {{ days }} days ago are cleared every night{% if citation %} ({{ citation }}){% endif %}.{% else %}Switched off: contact details of people who left are kept.{% endif %} Only their phone, text-message number, mailing address, extra contact methods and directory choices are cleared. Their name, login and every record (account history, ARC, violations, votes, audit) are kept. Earlier values stay in the change history, which is part of the audit trail and is never erased.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'community_settings' %}">{% icon "sliders" %} Change the rule</a></div></div>
+
+  <section class="card"><h2>Due at the next run ({{ due|length }})</h2>
+    <p class="small muted">A preview: nothing has been cleared yet. People who still own a home, are still on an account, or hold a board seat, office or role are never included.</p>
+    {% if due %}<div class="table-wrap"><table>
+      <thead><tr><th>Person</th><th>Left on</th><th>Will clear</th></tr></thead>
+      <tbody>{% for c in due %}<tr><td><a href="{% url 'person_detail' c.person.pk %}">{{ c.person.display_name }}</a></td><td class="nowrap">{{ c.left_on|date:"M j, Y" }}</td>
+        <td class="small">{% if c.profile %}{% if c.profile.phone %}phone; {% endif %}{% if c.profile.mailing_address %}mailing address; {% endif %}{% if c.profile.in_directory or c.profile.directory_show_email or c.profile.directory_show_phone %}directory listing; {% endif %}{% endif %}{% if c.methods %}{{ c.methods|length }} contact method{{ c.methods|length|pluralize }}{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if days %}<form method="post" action="{% url 'retention_run' %}" class="inline" data-confirm="Clear these contact details now? This cannot be undone.">{% csrf_token %}<button type="submit" class="danger">Clear now</button></form>{% endif %}
+    {% else %}{% include "partials/empty.html" with icon="check-circle" title="Nobody is due" %}{% endif %}
+  </section>
+
+  <section class="card"><h2>Recent runs</h2>
+    {% if runs %}<div class="table-wrap"><table>
+      <thead><tr><th>When</th><th>By</th><th class="num">Days</th><th class="num">People</th><th class="num">Profiles cleared</th><th class="num">Contact methods removed</th></tr></thead>
+      <tbody>{% for r in runs %}<tr><td class="nowrap">{{ r.ran_at|date:"M j, Y g:i A" }}</td><td>{% if r.ran_by %}{{ r.ran_by.email }}{% else %}Nightly task{% endif %}</td><td class="num">{{ r.days }}</td><td class="num">{{ r.people }}</td><td class="num">{{ r.profiles_cleared }}</td><td class="num">{{ r.methods_removed }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% include "partials/empty.html" with icon="clock" title="No runs yet" %}{% endif %}
+  </section>
+{% endblock %}

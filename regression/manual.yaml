@@ -49,3 +49,61 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: scanner reloads in place
+  check: "On the VM, ClamAV runs with ConcurrentDatabaseReload disabled and memory stays near one signature copy during a reload."
+  steps: "docker compose exec clamav clamconf -n | grep Concurrent (expect disabled); watch docker stats during a freshclam update; upload a test file just after and see it scanned once the reload finishes."
+- key: guided sign-in setup on a phone
+  check: "A new owner accepts an invitation on a phone and follows the three steps: password (show-password toggle works), 'Use this phone's fingerprint or face' creates a passkey, recovery codes shown; no menu until 'I've saved them'."
+  steps: "Invite a test person; open the link on an iPhone and an Android phone; finish all three steps; confirm the home page then shows the menu."
+  last: ""
+- key: recovery codes print
+  check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer)."
+  steps: "During setup or from Sign-in and security > Show codes, press Print and look at the print preview."
+- key: install the app
+  check: "The portal installs to a phone home screen and a desktop, opens standalone with the leaf icon, still asks for sign-in, and shows no cached page after signing out."
+  steps: "Android Chrome: menu, Install app. iPhone Safari: Share, Add to Home Screen. Desktop Chrome: install icon. Open it, sign in, browse; sign out; reopen offline: expect the browser's offline page, never a portal page."
+  last: ""
+- key: push notification arrives
+  check: "With VAPID keys set and the push feature on, a device that turned notifications on gets an alert with a short title and opens the right signed-in page."
+  steps: "python manage.py generate_vapid_keys into .env; Admin, Features: Push on; My profile: Turn on for this device; have a board member reply on one of your requests; tap the alert; expect sign-in (if signed out) then the request page."
+  last: ""
+- key: urgent text arrives
+  check: "With a Twilio test account and the sms feature on, an owner confirms a number by code and receives the board's urgent text with the link and STOP note; replying STOP stops later texts."
+  steps: "Set SMS_PROVIDER=twilio and test credentials; Admin, Features: Urgent text messages on; My profile: enter a mobile number, enter the texted code; Board, Urgent texts: send; reply STOP; send again and check the owner is no longer counted."
+- key: my account how to pay
+  check: "On a phone, My account reads clearly for an owner: amount and Due by, who to make checks payable to and where to mail them, a statement with Charges / Payments / Balance that fits or scrolls sideways."
+  steps: "Set Remit to under Finance, Letters; sign in as a demo owner with a balance on a phone; open My account."
+  last: ""
+- key: letters unsaved changes warning
+  check: "On Finance, Letters, typing in one section and then saving another asks first; leaving the page with unsaved edits asks first."
+  steps: "Edit the letterhead, press Save wording on a notice: a prompt names the letterhead section. Edit again and click another menu link: the browser asks to leave."
+  last: ""
+- key: settings dues confirmation
+  check: "Community settings shows '= $75.00 per month' while typing dues, and asks for confirmation when dues change by more than 25%."
+  steps: "Community settings, Monthly dues: type 75; then type 150 and save: a confirmation page names the old and new amounts."
+- key: reservation booking on a phone
+  check: "With Common area reservations switched on, an owner books an area on a phone (date and time pickers work), gets the email, and a board member confirms it from My items."
+  steps: "Admin > Features: switch on reservations; Booking rules: make one area bookable; as an owner request a slot on a phone; as a board member confirm it; check the owner's email and the Calendar page."
+- key: sidebar groups on a phone
+  check: "On a phone, the Menu button opens the sidebar with focus inside it; Board, Finance and Admin start closed unless the current page is inside; a group opened or closed stays that way on the next page."
+  steps: "Sign in as a board member on a phone; open Menu; open Finance; go to another page; open Menu again (Finance still open); press Escape or tap outside (focus returns to Menu)."
+  last: ""
+- key: keyboard and screen reader menu
+  check: "With the phone-width menu closed, Tab never reaches hidden menu links, and VoiceOver or TalkBack reads count bubbles as 'N waiting on you' and error messages at once."
+  steps: "Narrow a desktop browser below 820px; Tab through the page; then try a failed form (for example a proxy with no holder) with a screen reader on."
+  last: ""
+- key: election ballot limit
+  check: "On an election ballot with 2 seats, a third box can't be ticked, the count reads '2 of 2 chosen', and Cast ballot asks 'Cast your ballot for X and Y?' before the password or passkey step."
+  steps: "Open a test election to voting; sign in as a test owner; tick candidates; press Cast ballot."
+  last: ""
+- key: print a page with values
+  check: "Printing Community settings or an owner statement shows the values in the fields and leaves out buttons and menus."
+  steps: "Open the page; browser Print preview."
+- key: owner ARC on a phone
+  check: "On a phone, an owner asks for approval of a project: Kind's guidance appears when a kind is picked, 'If other, where?' shows only for Other, the camera and photo library are offered for plans and photos, several photos upload at once with thumbnails, and the checklist sends the request."
+  steps: "Sign in as a demo owner on an iPhone and an Android phone; My architectural requests; Ask for approval of a project; pick a kind and Other; save; add three photos at once; send."
+  last: ""
+- key: neighbor review page on a phone
+  check: "A signed-in neighbor sees the plans above the answer, large choice cards, and the comment becomes required when 'I object' is picked (before sending)."
+  steps: "As the neighbor, open the emailed link on a phone; pick 'I object' and try to send with no comment; then pick 'no objection' and send."
+  last: ""

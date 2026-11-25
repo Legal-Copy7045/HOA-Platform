@@ -243,6 +243,72 @@ def record_payment(
     return entry
 
 
+@dataclass
+class BatchPayment:
+    lot: Lot
+    amount_cents: int
+    received_on: datetime.date
+    reference: str = ""
+
+
+def check_payment(p: BatchPayment, *, today: datetime.date | None = None) -> list[str]:
+    """Why one payment row cannot be recorded (empty when it can)."""
+    today = today or timezone.localdate()
+    errors = []
+    if p.amount_cents <= 0:
+        errors.append("Enter an amount above $0.00.")
+    if p.received_on > today:
+        errors.append("The date received cannot be in the future.")
+    if _ACCOUNT_NUMBER.search(p.reference.replace(" ", "").replace("-", "")):
+        errors.append("Enter a check number, never an account number.")
+    elif p.reference and (
+        LedgerEntry.objects.unscoped("duplicate check")
+        .filter(lot=p.lot, kind=EntryKind.PAYMENT, reference=p.reference[:40])
+        .exists()
+    ):
+        errors.append(f"Check {p.reference} for this home is already recorded.")
+    return errors
+
+
+@internal("ledger service")
+def record_payments(payments: list[BatchPayment], *, actor, request=None) -> list[LedgerEntry]:
+    """A stack of checks entered on one page: all are recorded, or none.
+    Each is a normal payment (with its own audit event) plus one batch event."""
+    _authorize(actor, "ledger.manage")
+    if not payments:
+        raise LedgerError("Enter at least one payment.")
+    seen = set()
+    for p in payments:
+        if check_payment(p):
+            raise LedgerError("Fix the payments marked below; nothing was recorded.")
+        if p.reference and (p.lot.pk, p.reference) in seen:
+            raise LedgerError(f"Check {p.reference} is entered twice for the same home.")
+        seen.add((p.lot.pk, p.reference))
+    with transaction.atomic():
+        entries = [
+            record_payment(
+                lot=p.lot,
+                amount_cents=p.amount_cents,
+                received_on=p.received_on,
+                method="check",
+                reference=p.reference,
+                actor=actor,
+                request=request,
+            )
+            for p in payments
+        ]
+    record_event(
+        "ledger.payments_batch_recorded",
+        actor=_user(actor),
+        request=request,
+        metadata={
+            "count": len(entries),
+            "total_cents": sum(p.amount_cents for p in payments),
+        },
+    )
+    return entries
+
+
 @internal("ledger service")
 def post_charge(
     *, lot: Lot, kind: str, amount_cents: int, description: str, posted_on=None, actor, request=None
@@ -334,41 +400,111 @@ def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> Le
 
 # --- Aging (credits applied to the oldest charges first) ------------------------------------
 
-BUCKETS = ("current", "31_60", "61_90", "over_90")
+# One set of buckets everywhere (UX review): Current (due today or not yet
+# due), then 1-30, 31-60, 61-90 and over 90 days past the charge's due date.
+BUCKETS = ("current", "1_30", "31_60", "61_90", "over_90")
+BUCKET_LABELS = {
+    "current": "Current",
+    "1_30": "1\u201330 days",
+    "31_60": "31\u201360 days",
+    "61_90": "61\u201390 days",
+    "over_90": "Over 90 days",
+}
+
+
+def _bucket(age_days: int) -> str:
+    if age_days <= 0:
+        return "current"
+    if age_days <= 30:
+        return "1_30"
+    if age_days <= 60:
+        return "31_60"
+    if age_days <= 90:
+        return "61_90"
+    return "over_90"
 
 
 @internal("ledger service")
-def aging(lot_id: int, as_of: datetime.date | None = None) -> dict[str, int]:
-    as_of = as_of or timezone.localdate()
+def _open_charges(lot_id: int, as_of: datetime.date) -> tuple[list[list], int]:
+    """Charges still unpaid on ``as_of`` as [posted_on, open_cents], oldest
+    first (credits pay the oldest charges first), and any credit left over."""
     entries = list(LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of))
     # A reversal cancels the entry it reverses (review D2): drop both, so a
     # bounced payment brings back the original charges' ages and a reversed
     # mistaken charge does not age as if paid down the oldest debt.
     cancelled = {e.reverses_id for e in entries if e.reverses_id}
     entries = [e for e in entries if e.pk not in cancelled and not e.reverses_id]
-    charges = [[e.posted_on, e.amount_cents] for e in entries if e.amount_cents > 0]
+    charges = sorted([e.posted_on, e.amount_cents] for e in entries if e.amount_cents > 0)
     credit = -sum(e.amount_cents for e in entries if e.amount_cents < 0)
-    for charge in sorted(charges):
+    for charge in charges:
         applied = min(credit, charge[1])
         charge[1] -= applied
         credit -= applied
+    return [c for c in charges if c[1] > 0], credit
+
+
+def aging(lot_id: int, as_of: datetime.date | None = None) -> dict[str, int]:
+    as_of = as_of or timezone.localdate()
+    charges, credit = _open_charges(lot_id, as_of)
     result = dict.fromkeys(BUCKETS, 0)
     for posted_on, open_cents in charges:
-        if open_cents <= 0:
-            continue
-        age = (as_of - posted_on).days
-        bucket = (
-            "current"
-            if age <= 30
-            else "31_60"
-            if age <= 60
-            else "61_90"
-            if age <= 90
-            else "over_90"
-        )
-        result[bucket] += open_cents
+        result[_bucket((as_of - posted_on).days)] += open_cents
     result["credit"] = credit
     return result
+
+
+def aging_columns(a: dict[str, int]) -> list[tuple[str, int]]:
+    """(label, cents) for each bucket, in order, for tables and stat cards."""
+    return [(BUCKET_LABELS[b], a[b]) for b in BUCKETS]
+
+
+@dataclass
+class AmountDue:
+    amount_cents: int  # what is owed now (0 when paid up or in credit)
+    due_on: datetime.date | None  # when the oldest unpaid charge is or was due
+    past_due: bool
+
+
+def amount_due(lot_id: int, today: datetime.date | None = None) -> AmountDue:
+    """What is owed on a lot and by when ("Due by <date>": the oldest unpaid
+    charge's date). Shared by My account and the dashboard's balance to-do."""
+    today = today or timezone.localdate()
+    owed = balance(lot_id)
+    if owed <= 0:
+        return AmountDue(0, None, False)
+    charges, _credit = _open_charges(lot_id, datetime.date.max)
+    due_on = charges[0][0] if charges else today
+    return AmountDue(owed, due_on, due_on < today)
+
+
+@dataclass
+class StatementRow:
+    posted_on: datetime.date | None
+    description: str
+    charge_cents: int
+    payment_cents: int
+    balance_cents: int
+
+
+def statement_rows(statement: OwnerStatement) -> list[StatementRow]:
+    """The statement as Charges / Payments / running Balance columns, so a
+    payment reads as a payment, not as a negative amount."""
+    running = statement.brought_forward
+    rows = []
+    if statement.brought_forward:
+        rows.append(StatementRow(None, "Balance brought forward", 0, 0, running))
+    for e in statement.entries:
+        running += e.amount_cents
+        rows.append(
+            StatementRow(
+                e.posted_on,
+                e.description,
+                max(e.amount_cents, 0),
+                max(-e.amount_cents, 0),
+                running,
+            )
+        )
+    return rows
 
 
 @internal("ledger service")

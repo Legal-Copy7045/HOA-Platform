@@ -3,6 +3,7 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -13,15 +14,34 @@ from community.services import staff_people
 from core import policy
 from core.lists import paginate
 from core.workflow import WorkflowError
+from documents import attachments
 from operations import services
 from operations.models import OPEN_REQUEST_STATES, OwnerRequest, RequestType
+
+# One line each, so owners know which to pick.
+TYPE_HELP = {
+    RequestType.GENERAL: "A question about the rules, the community or this website.",
+    RequestType.BILLING: "Your dues, a charge or a payment on your account.",
+    RequestType.MAINTENANCE: "Something that needs fixing, such as a streetlight, sign or drain.",
+    RequestType.COMMON_AREA: "A problem in a shared space, such as damage, misuse or a hazard.",
+}
+
+
+def _address(lot) -> str:
+    """Owners know their street address, not their lot number."""
+    first = (lot.street_address or "").splitlines()[0].strip() if lot.street_address else ""
+    return first or str(lot)
 
 
 class RequestForm(forms.Form):
     lot = forms.ChoiceField(label="Home")
-    request_type = forms.ChoiceField(choices=RequestType.choices, label="Kind of request")
+    request_type = forms.ChoiceField(
+        choices=RequestType.choices, label="What is it about?", widget=forms.RadioSelect
+    )
     subject = forms.CharField(max_length=200)
-    description = forms.CharField(widget=forms.Textarea(attrs={"rows": 6}), max_length=10_000)
+    description = forms.CharField(
+        label="Details", widget=forms.Textarea(attrs={"rows": 6}), max_length=10_000
+    )
     common_area = forms.ModelChoiceField(
         queryset=CommonArea.objects.none(), required=False, label="Common area (if any)"
     )
@@ -29,8 +49,16 @@ class RequestForm(forms.Form):
     def __init__(self, *args, lots, **kwargs):
         super().__init__(*args, **kwargs)
         self.lots = {str(lot.pk): lot for lot in lots}
-        self.fields["lot"].choices = [(k, str(v)) for k, v in self.lots.items()]
+        self.fields["lot"].choices = [(k, _address(v)) for k, v in self.lots.items()]
+        self.only_lot = next(iter(self.lots.values())) if len(self.lots) == 1 else None
+        if self.only_lot:
+            # One home (nearly everyone): no dropdown, the address is shown as text.
+            self.fields["lot"].widget = forms.HiddenInput()
+            self.fields["lot"].initial = str(self.only_lot.pk)
         self.fields["common_area"].queryset = CommonArea.objects.filter(active=True)
+        self.type_help = [
+            (value, label, TYPE_HELP.get(value, "")) for value, label in RequestType.choices
+        ]
 
 
 @login_required
@@ -97,12 +125,14 @@ def requests_list(request):
                         request=request,
                     )
                 except services.OperationsError as exc:
-                    messages.error(request, str(exc))
+                    form.add_error(None, str(exc))
                 else:
                     messages.success(request, "Request sent. You'll get an email when we reply.")
+                    photos = request.FILES.getlist("photos")
+                    if photos and services.can_add_request_photos(user, req):
+                        attachments.attach_many(request, req, photos, actor=user)
                     return redirect("request_detail", pk=req.pk)
-            if request.method == "POST":
-                return redirect(reverse("requests") + "?mine=1")
+            # Invalid: shown again below with what was typed and the errors.
     elif request.method == "POST":
         policy.require(user, "request.submit")
         return redirect(reverse("requests") + "?mine=1")
@@ -120,6 +150,7 @@ def requests_list(request):
             "form": form,
             "types": RequestType.choices,
             "type": kind,
+            "open_form": bool(form and (form.errors or request.GET.get("new"))),
         },
     )
 
@@ -152,8 +183,46 @@ def request_detail(request, pk):
                 and req.is_open
             ),
             "can_see_work_order": policy.can(request.user, "workorder.manage"),
+            "photos": _files(req),
+            "can_add_photos": services.can_add_request_photos(request.user, req),
+            "owner_view": not staff or req.requested_by_id == request.user.pk,
         },
     )
+
+
+def _files(req):
+    from documents.services import scan_allows_download
+
+    files = list(attachments.attachments_for(req))
+    for f in files:
+        f.thumbnail = f.content_type.startswith("image/") and scan_allows_download(
+            attachments.current_scan(f)
+        )
+    return files
+
+
+def _scoped(request, pk) -> OwnerRequest:
+    return get_object_or_404(OwnerRequest.objects.for_user(request.user), pk=pk)
+
+
+@login_required
+@require_POST
+def request_attach(request, pk):
+    """Photos on a request: the person who raised it, while it is open, or staff."""
+    req = _scoped(request, pk)
+    uploads = request.FILES.getlist("photos")
+    if not services.can_add_request_photos(request.user, req):
+        raise PermissionDenied
+    if not uploads:
+        messages.error(request, "Choose a photo first.")
+    else:
+        attachments.attach_many(request, req, uploads, actor=request.user)
+    return redirect("request_detail", pk=req.pk)
+
+
+@login_required
+def request_file(request, pk, file_id):
+    return attachments.serve(request, _scoped(request, pk), file_id)
 
 
 @login_required

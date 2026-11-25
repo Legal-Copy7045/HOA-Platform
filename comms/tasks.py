@@ -37,3 +37,20 @@ def weekly_digest(timestamp: int) -> int:
     from comms.notify import send_digests
 
     return send_digests()
+
+
+@app.task(queue="email", retry=2)
+def send_push(user_ids: list[int], title: str, path: str) -> dict:
+    """Push a title and a portal path to these logins' devices."""
+    from comms.push import deliver
+
+    return deliver(user_ids, title=title, path=path)
+
+
+@app.task(queue="email", retry=0)
+def send_urgent_sms(notice_id: int) -> dict:
+    """Text an urgent notice to the owners who opted in (once: no retries,
+    so nobody gets the same text twice)."""
+    from comms.sms import deliver_urgent_notice
+
+    return deliver_urgent_notice(notice_id)

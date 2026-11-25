@@ -35,27 +35,47 @@ A `<PREFIX>-RUN` failure means a stage broke (Postgres down, port 8011 in use,
 Node missing): fix the environment and re-run that stage with `--stage`.
 Commit new IDs in `regression/ids/*.yaml`.
 
-## 3. Review (two fresh agents, in parallel, while the stages run)
+## 3. Review and security audit (three fresh agents, in parallel, while the stages run)
 
-Brief two general-purpose agents with the code, not your conclusions. Both are
-read-only, run no test suites (the stages use the databases), verify each
-finding end to end, and include nothing that identifies a real person.
+Every run includes a full security audit (owner's standing instruction,
+2026-11-25). Brief three general-purpose agents with the code, not your
+conclusions. All are read-only, run no test suites or anything touching a
+database (the stages use them), ignore `.claude/`, verify each finding end to
+end, and include nothing that identifies a real person.
 
 - **Bugs** -> `regression/out/findings-bugs.json`: a list of `{id: BUG-001..,
   severity critical|high|medium|low|info, area, title, file, line, description,
   scenario, recommendation, verified}`. Focus on what changed since the last
   run, then the risky paths: money (ledger, invoices, aging), votes, ARC clock
   and recusal, ownership transfer, append-only records, workflows.
-- **Security** -> `regression/out/findings-security.json`: `{findings:
-  [SEC-001..], claims: [{claim, where, held, note}]}`: every security claim in
-  CLAUDE.md, `docs/decisions.md` and `docs/security-review-2026-11.md` checked
-  against the code (cross-owner access, MFA everywhere, invitations, recusal,
-  two-person rules, append-only, no personal data in logs, file handling,
-  trusted proxy, sysadmin scope).
+- **Security audit: claims and whole codebase** ->
+  `regression/out/findings-security.json`: `{findings: [SEC-001..], claims:
+  [{claim, where, held, note}]}`. Every security claim in CLAUDE.md,
+  `docs/decisions.md` and `docs/security-review-2026-11.md` checked against the
+  code (cross-owner access on every URL and download, no anonymous access
+  except the sign-in steps, MFA everywhere and the enrollment window, re-auth
+  never by emailed code, invitations, recusal, two-person rules, manager never
+  decides, append-only (model, trigger, grants), audit without personal data,
+  file handling and malware scanning, trusted proxy, CSP/HSTS/cookies, sysadmin
+  scope and break-glass, personal ballot links, feature switches), plus earlier
+  fixes not regressed. Run `bandit -q -c pyproject.toml -r .` and
+  `pip-audit --strict -r requirements/base.txt -r requirements/dev.txt`.
+- **Security audit: new code and deployment** ->
+  `regression/out/findings-review2.json` (list, ids `R2-001..`, same fields as
+  bugs): attack the code changed since the previous run (`git diff <last run
+  commit>..HEAD`) as an outsider, an owner trying to reach another owner's data,
+  a recused or former member, and a manager acting beyond their role; plus the
+  deployment surface: Dockerfile, compose files, `docker/`, `infra/poc/*.sh`
+  (secrets handling, the update agent, backups), `.github/workflows/`,
+  settings, CSP, outbound calls (push, SMS, AI, storage) and anything new that
+  is reachable without signing in.
 
 Severity follows `docs/security-review-2026-11.md`: high = account takeover or
 a decision someone must not take; medium = data to the wrong person, quietly
 wrong records, or an attacker can block the site.
+
+Before the report, merge `findings-review2.json` into `findings-bugs.json`
+(prefix the titles "Security:") so the report lists every finding.
 
 ## 4. Report
 
@@ -77,4 +97,4 @@ IDs, the report link).
 Commit the suite changes (catalogue, ids, manual.yaml, new tests, RUNS.md) and
 push to the working branch. **Fix nothing in product code during the run**: the
 report lists failures and findings, and the owner decides what is fixed next.
-Tell him the totals, the failures, the high findings and the report link.
+Tell him the totals, the failures, the security audit's findings (by severity) and the report link.

@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Board · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Board</h1><p class="subtitle">Everything the board and manager run, in one place.</p></div></div>
+  <div class="page-head"><div><h1>Board overview</h1><p class="subtitle">Everything the board and manager run, in one place.</p></div></div>
   {% if thin %}
     <div class="alert warning">{% icon "alert" %}<div><strong>{{ thin|length }} action{{ thin|length|pluralize }} can be done by fewer than two people with MFA.</strong>
       Every action should be possible for at least two people, so nothing stalls if someone is away. Invite another board member from their page under People.

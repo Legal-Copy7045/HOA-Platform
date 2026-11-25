@@ -5,14 +5,14 @@
   <div class="crumbs"><a href="{% url 'documents' %}">Documents</a> / {{ document.get_category_display }}</div>
   <div class="page-head">
     <div><h1>{{ document.title }}</h1><div class="meta"><span>{{ document.get_category_display }}</span><span>{% icon "lock" %}{{ document.get_visibility_display }}{% if document.lot %} (lot {{ document.lot.number }}){% endif %}</span>{% if document.archived %}<span class="status tone-neutral">Archived</span>{% endif %}</div></div>
-    {% if document.current_version %}<div class="actions"><a class="btn" href="{% url 'document_download' document.pk %}">{% icon "download" %} Download v{{ document.current_version.number }}</a></div>{% endif %}
+    {% if document.current_version %}<div class="actions"><a class="btn" href="{% url 'document_download' document.pk %}">{% icon "download" %} Download</a></div>{% endif %}
   </div>
   {% if document.description %}<section class="card prose">{{ document.description|linebreaks }}</section>{% endif %}
   {% if versions %}
     <h2>Version history</h2>
     <div class="table-card"><div class="table-wrap"><table>
       <thead><tr><th>Version</th><th>File</th><th>Uploaded</th><th class="num">Size</th><th><span class="sr-only">Download</span></th></tr></thead>
-      <tbody>{% for v in versions %}<tr><td>v{{ v.number }}</td><td>{{ v.original_filename }}{% if v.note %}<div class="small muted">{{ v.note }}</div>{% endif %}</td><td class="nowrap">{{ v.uploaded_at|date:"M j, Y" }}</td><td class="num">{{ v.size|filesizeformat }}</td><td class="actions"><a href="{% url 'document_version_download' document.pk v.number %}">Download</a></td></tr>{% endfor %}</tbody>
+      <tbody>{% for v in versions %}<tr><td>Version {{ v.number }}</td><td>{{ v.original_filename }}{% if v.note %}<div class="small muted">{{ v.note }}</div>{% endif %}</td><td class="nowrap">{{ v.uploaded_at|date:"M j, Y" }}</td><td class="num">{{ v.size|filesizeformat }}</td><td class="actions"><a href="{% url 'document_version_download' document.pk v.number %}">Download</a></td></tr>{% endfor %}</tbody>
     </table></div></div>
   {% endif %}
   {% if can_manage and document.visibility != "lot" %}

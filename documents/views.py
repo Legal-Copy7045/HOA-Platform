@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 
 from audit.services import record_event
 from community.models import Lot
-from core import policy
+from core import features, policy
 from documents import services
 from documents.models import Category, Document, DocumentVersion, Folder, Visibility
 from documents.validation import download_filename
@@ -56,13 +56,11 @@ def library(request):
                     actor=request.user, request=request, **form.cleaned_data
                 )
             except services.DocumentError as exc:
-                messages.error(request, str(exc))
+                form.add_error(None, str(exc))
             else:
                 messages.success(request, "Document uploaded.")
                 return redirect("document_detail", pk=document.pk)
-        else:
-            messages.error(request, "Check the form: a title, category and file are needed.")
-        return redirect("documents")
+        # Invalid: shown again with what was typed (the file must be chosen again).
     documents = Document.objects.for_user(request.user).select_related(
         "current_version", "lot", "folder"
     )
@@ -77,8 +75,18 @@ def library(request):
         documents = documents.filter(folder=current)
     q = (request.GET.get("q") or "").strip()
     documents = services.search_documents(documents, q)
+    # Governing documents (Declaration, bylaws) first, then rules and
+    # policies, then the rest in the usual category order.
+    order = {value: i for i, value in enumerate(Category.values)}
+    pinned = (Category.GOVERNING, Category.POLICIES)
     groups: dict[str, list] = {}
-    for d in documents:
+    for d in sorted(
+        documents,
+        key=lambda d: (
+            pinned.index(d.category) if d.category in pinned else len(pinned),
+            order.get(d.category, 99),
+        ),
+    ):
         groups.setdefault(d.get_category_display(), []).append(d)
     return render(
         request,
@@ -92,6 +100,9 @@ def library(request):
             "subfolders": current.children.all() if current else [],
             "q": q,
             "folder_visibilities": [c for c in Visibility.choices if c[0] in ("owners", "board")],
+            "pinned_group": Category.GOVERNING.label,
+            "can_ask_records": policy.can(request.user, "records_request.submit")
+            and features.url_name_enabled("records_requests", request),
         },
     )
 

@@ -1,3 +1,5 @@
+import datetime
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -27,8 +29,7 @@ from ledger.models import (
     ResaleRequest,
 )
 from operations.models import ExpenseCategory
-from payments.providers import provider
-from payments.services import payment_options
+from payments.services import online_payments_enabled, payment_options
 
 
 def _date(**kw):
@@ -89,7 +90,10 @@ def _ownership_start(user, lot_id):
 
 @login_required
 def my_account(request):
+    from community.models import CommunityProfile
+
     policy.require(request.user, "ledger.view_own")
+    online = online_payments_enabled()
     accounts = []
     for lot in Lot.objects.for_user(request.user).filter(
         pk__in=policy.roles_for(request.user).account_lot_ids
@@ -100,13 +104,23 @@ def my_account(request):
             {
                 "lot": lot,
                 "statement": statement,
+                "rows": services.statement_rows(statement),
+                "due": services.amount_due(lot.pk),
                 "upcoming": services.upcoming_charges(statement.balance),
-                "pay_options": payment_options(statement.balance),
+                "pay_options": payment_options(statement.balance) if online else [],
                 **my_account_people(request.user, lot.pk),
             }
         )
+    profile = CommunityProfile.get()
     return render(
-        request, "ledger/my_account.html", {"accounts": accounts, "online": provider().available}
+        request,
+        "ledger/my_account.html",
+        {
+            "accounts": accounts,
+            "online": online,
+            "payable_to": profile.legal_name,
+            "remit_lines": [line for line in profile.remit_to.splitlines() if line.strip()],
+        },
     )
 
 
@@ -137,6 +151,17 @@ def _finance(request):
         policy.require(request.user, "finance.view")
 
 
+def _month(value: str) -> tuple[int, int]:
+    """'2026-12' from a month picker -> (2026, 12); (0, 0) when not valid."""
+    try:
+        year, month = (int(part) for part in (value or "").strip().split("-"))
+    except ValueError:
+        return 0, 0
+    if not (2000 <= year <= 2100 and 1 <= month <= 12):
+        return 0, 0
+    return year, month
+
+
 @login_required
 def ledger_home(request):
     _finance(request)
@@ -151,7 +176,10 @@ def ledger_home(request):
         )
         return redirect("ledger_home")
     if request.method == "POST":
-        year, month = int(request.POST.get("year", 0)), int(request.POST.get("month", 0))
+        year, month = _month(request.POST.get("period", ""))
+        if not year:
+            messages.error(request, "Choose the month to charge.")
+            return redirect("ledger_home")
         _flash(
             request,
             lambda: services.post_monthly_assessments(
@@ -161,8 +189,10 @@ def ledger_home(request):
         )
         return redirect("ledger_home")
     bal = services.balances()
-    lots = Lot.objects.for_user(request.user)
+    lots = list(Lot.objects.for_user(request.user))
     today = timezone.localdate()
+    next_month = (today.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
+    dues = rule("dues.monthly_cents") or 0
     return render(
         request,
         "ledger/home.html",
@@ -170,8 +200,10 @@ def ledger_home(request):
             "rows": [(lot, bal.get(lot.pk, 0)) for lot in lots],
             "total_owed": sum(v for v in bal.values() if v > 0),
             "total_credit": -sum(v for v in bal.values() if v < 0),
-            "year": today.year,
-            "month": today.month,
+            "default_period": f"{next_month:%Y-%m}",
+            "dues_cents": dues,
+            "dues_lots": len(lots),
+            "dues_total": dues * len(lots),
             "can_manage": policy.can(request.user, "ledger.manage"),
             "late": services.late_fee_candidates(year=today.year, month=today.month),
             "late_fee": rule_with_citation("late_fee.cents"),
@@ -195,7 +227,8 @@ def lot_ledger(request, pk):
             "lot": lot,
             "entries": entries,
             "balance": services.balance(lot.pk),
-            "aging": services.aging(lot.pk),
+            "aging": (aging := services.aging(lot.pk)),
+            "aging_columns": services.aging_columns(aging),
             "can_manage": policy.can(request.user, "ledger.manage"),
             "payment_form": PaymentForm(),
             "charge_form": ChargeForm(),
@@ -268,6 +301,119 @@ def lot_ledger_action(request, pk, action):
     return redirect("lot_ledger", pk=lot.pk)
 
 
+BATCH_ROWS = 10
+BATCH_MAX_ROWS = 60
+
+
+def _batch_row(request, i, lots_by_pk, today):
+    """One row of the Record payments form: (values, payment or None, errors)."""
+    from core.money import parse_cents
+
+    values = {
+        "lot": (request.POST.get(f"lot_{i}") or "").strip(),
+        "amount": (request.POST.get(f"amount_{i}") or "").strip(),
+        "check": " ".join((request.POST.get(f"check_{i}") or "").split())[:40],
+        "date": (request.POST.get(f"date_{i}") or "").strip(),
+    }
+    if not (values["lot"] or values["amount"] or values["check"]):
+        return values, None, []
+    errors = []
+    lot = lots_by_pk.get(int(values["lot"])) if values["lot"].isdigit() else None
+    if lot is None:
+        errors.append("Choose the home.")
+    try:
+        amount = parse_cents(values["amount"])
+    except ValueError:
+        amount = None
+        errors.append("Enter the amount in dollars, e.g. 75.00.")
+    try:
+        received_on = datetime.date.fromisoformat(values["date"]) if values["date"] else today
+    except ValueError:
+        received_on = None
+        errors.append("Enter the date received.")
+    if errors:
+        return values, None, errors
+    payment = services.BatchPayment(lot, amount, received_on, values["check"])
+    return values, payment, services.check_payment(payment, today=today)
+
+
+@login_required
+def record_payments(request):
+    """Enter a stack of checks on one page (managers and the board), then
+    offer to put them in a deposit."""
+    from ledger import accounting as acc
+
+    policy.require(request.user, "ledger.manage")
+    today = timezone.localdate()
+    if request.method == "POST" and request.POST.get("section") == "deposit":
+        policy.require(request.user, "accounting.manage")
+        try:
+            acc.create_deposit(
+                entry_ids=[i for i in request.POST.getlist("entries") if i.isdigit()],
+                deposited_on=_date(request.POST.get("deposited_on"), today),
+                bank_reference=request.POST.get("bank_reference", ""),
+                actor=request.user,
+                request=request,
+            )
+        except acc.AccountingError as exc:
+            messages.error(request, str(exc))
+            return redirect("record_payments")
+        messages.success(request, "Deposit recorded.")
+        return redirect("accounting")
+    lots = list(Lot.objects.for_user(request.user).order_by("street_address", "number"))
+    lots_by_pk = {lot.pk: lot for lot in lots}
+    try:
+        count = int(request.POST.get("rows") or request.GET.get("rows") or BATCH_ROWS)
+    except ValueError:
+        count = BATCH_ROWS
+    count = max(1, min(count, BATCH_MAX_ROWS))
+    rows = [{"values": {"date": today.isoformat()}, "errors": []} for _ in range(count)]
+    if request.method == "POST":
+        payments, has_errors = [], False
+        for i in range(count):
+            values, payment, errors = _batch_row(request, i, lots_by_pk, today)
+            rows[i] = {"values": values, "errors": errors}
+            has_errors = has_errors or bool(errors)
+            if payment and not errors:
+                payments.append(payment)
+        if not has_errors:
+            try:
+                entries = services.record_payments(payments, actor=request.user, request=request)
+            except services.LedgerError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, f"{len(entries)} payment(s) recorded.")
+                ids = ",".join(str(e.pk) for e in entries)
+                return redirect(f"{request.path}?recorded={ids}")
+        else:
+            messages.error(request, "Fix the rows marked below; nothing was recorded.")
+    recorded = []
+    ids = [int(i) for i in request.GET.get("recorded", "").split(",") if i.isdigit()][:100]
+    if ids and request.method == "GET":
+        undeposited = {e.pk for e in acc.undeposited_payments()}
+        recorded = [
+            (e, e.pk in undeposited)
+            for e in LedgerEntry.objects.for_user(request.user)
+            .filter(pk__in=ids, kind=EntryKind.PAYMENT)
+            .select_related("lot")
+        ]
+    return render(
+        request,
+        "ledger/record_payments.html",
+        {
+            "lots": lots,
+            "rows": rows,
+            "row_count": count,
+            "more_rows": min(count + 10, BATCH_MAX_ROWS),
+            "today": today,
+            "recorded": recorded,
+            "recorded_total": sum(-e.amount_cents for e, _ in recorded),
+            "can_deposit": policy.can(request.user, "accounting.manage")
+            and any(open_ for _, open_ in recorded),
+        },
+    )
+
+
 @login_required
 def lot_statement_pdf(request, pk, kind):
     _finance(request)
@@ -295,7 +441,10 @@ def collections(request):
         "ledger/collections.html",
         {
             "cases": CollectionCase.objects.for_user(request.user).select_related("lot"),
-            "delinquent": services.delinquent_lots(),
+            "delinquent": [
+                (lot, bal, services.aging_columns(a)) for lot, bal, a in services.delinquent_lots()
+            ],
+            "bucket_labels": list(services.BUCKET_LABELS.values()),
         },
     )
 
@@ -314,17 +463,19 @@ def _next_letter(case):
 def collection_detail(request, pk):
     _finance(request)
     case = get_object_or_404(CollectionCase.objects.for_user(request.user), pk=pk)
+    actions = [
+        t
+        for t in services.COLLECTION.available(case, request.user)
+        if t.action not in ("send_reminder", "send_second_reminder", "send_final_notice")
+    ]
     return render(
         request,
         "ledger/collection_detail.html",
         {
             "obj": case,
             "balance": services.balance(case.lot_id),
-            "actions": [
-                t
-                for t in services.COLLECTION.available(case, request.user)
-                if t.action not in ("send_reminder", "send_second_reminder", "send_final_notice")
-            ],
+            "actions": actions,
+            "note_required_for": [t.label for t in actions if t.note_required],
             "history": services.COLLECTION.history(case),
             "next_letter": _next_letter(case),
             "letters": CollectionLetter.objects.for_user(request.user).filter(case=case),
@@ -691,7 +842,10 @@ def accounting(request):
                 messages.success(request, "Deposit voided; its payments are undeposited again.")
             elif section == "setup":
                 acc.save_setup(
-                    gl_accounts=request.POST.get("gl_accounts", ""),
+                    gl_accounts=acc.gl_text(
+                        AccountingSetup.get(),
+                        {key: request.POST.get(f"gl_{key}", "") for key in acc.GL_LABELS},
+                    ),
                     opening_cash_cents=_money(request.POST.get("opening_cash") or "0"),
                     opening_cash_on=_date(request.POST.get("opening_cash_on")),
                     actor=request.user,
@@ -715,7 +869,8 @@ def accounting(request):
             "undeposited": acc.undeposited_payments() if can_manage else [],
             "batches": DepositBatch.objects.all()[:20],
             "reconciliations": BankReconciliation.objects.all()[:12],
-            "setup": AccountingSetup.get(),
+            "setup": (setup := AccountingSetup.get()),
+            "gl_rows": acc.gl_rows(setup),
             "book_balance": acc.book_balance(today),
             "year": year,
             "vendors_1099": acc.vendor_1099_totals(year),

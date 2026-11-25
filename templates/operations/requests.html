@@ -4,32 +4,42 @@
 {% block content %}
   <div class="page-head"><div><h1>{% if staff %}Owner requests{% else %}My requests{% endif %}</h1>
     <p class="subtitle">{% if staff %}Questions and reports from owners, contacts and tenants. Each type has a response target set in Community settings.{% else %}Ask a question or report a problem. We'll reply here and email you a link.{% endif %}</p></div>
-    {% if is_staff and user|can:"request.submit" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'requests' %}">All owner requests</a>{% else %}<a class="btn secondary" href="{% url 'requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
-  <div class="split">
-    <div>
-      <nav class="subnav" aria-label="Filter">
-        <a href="?show=open{% if mine %}&amp;mine=1{% endif %}"{% if show == "open" %} aria-current="page"{% endif %}>Open</a>
-        <a href="?show=closed{% if mine %}&amp;mine=1{% endif %}"{% if show == "closed" %} aria-current="page"{% endif %}>Closed</a>
-        <a href="?show=all{% if mine %}&amp;mine=1{% endif %}"{% if show == "all" %} aria-current="page"{% endif %}>All</a>
-        {% if staff %}<a href="?show={{ show }}&amp;assigned=1"{% if request.GET.assigned == "1" %} aria-current="page"{% endif %}>Assigned to me</a>{% endif %}
-      </nav>
-      {% include "partials/list_tools.html" %}
-      <section class="card">
-        {% if page.object_list %}
-          <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Subject</th><th>Type</th>{% if staff %}<th>Lot</th><th>Assigned</th>{% endif %}<th>Respond by</th><th>Status</th></tr></thead>
-            <tbody>{% for r in page.object_list %}<tr>
-              <td>{{ r.pk }}</td><td><a href="{% url 'request_detail' r.pk %}">{{ r.subject }}</a></td><td>{{ r.get_request_type_display }}</td>
-              {% if staff %}<td>{{ r.lot.number }}</td><td>{{ r.assignee.display_name|default:"—" }}</td>{% endif %}
-              <td class="nowrap">{% if r.first_response_at %}<span class="muted small">answered</span>{% elif r.respond_by %}{{ r.respond_by|date:"M j" }}{% if r.is_overdue %} <span class="badge tone-danger">overdue</span>{% endif %}{% else %}—{% endif %}</td>
-              <td>{% status r.state r.get_state_display %}</td></tr>{% endfor %}</tbody>
-          </table></div>
-          {% include "partials/pager.html" %}
-        {% else %}{% include "partials/empty.html" with icon="inbox" title="No requests here" %}{% endif %}
-      </section>
-    </div>
-    {% if form %}<aside><section class="card"><h2>New request</h2>
-      <form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Send request</button></div></form>
-    </section></aside>{% endif %}
-  </div>
+    <div class="actions">{% if form %}<a class="btn" href="?mine=1&amp;new=1#new-request">{% icon "plus" %} Ask the board a question</a>{% endif %}
+    {% if is_staff and user|can:"request.submit" %}{% if mine %}<a class="btn secondary" href="{% url 'requests' %}">All owner requests</a>{% else %}<a class="btn secondary" href="{% url 'requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}{% endif %}</div></div>
+  {% if form %}<details class="panel" id="new-request"{% if open_form or not page.object_list %} open{% endif %}><summary>Ask a question or report a problem</summary><div class="panel-body">
+    <form method="post" action="{% url 'requests' %}?mine=1" enctype="multipart/form-data">{% csrf_token %}
+      {% include "partials/form_errors.html" %}
+      {{ form.non_field_errors }}
+      {% if form.only_lot %}<div class="field"><span class="field-label">Home</span><p><strong>{{ form.only_lot.street_address|default:form.only_lot }}</strong></p></div>{% endif %}
+      {% for f in form.hidden_fields %}{{ f }}{% endfor %}
+      {% if not form.only_lot %}{{ form.lot.as_field_group }}{% endif %}
+      <fieldset class="choices{% if form.request_type.errors %} has-error{% endif %}" id="{{ form.request_type.auto_id }}"><legend class="field-label">What is it about?<span class="required-mark" aria-hidden="true">*</span></legend>
+        {% for value, label, help in form.type_help %}<label class="choice"><input type="radio" name="request_type" value="{{ value }}" required{% if form.request_type.value == value %} checked{% endif %}><span><strong>{{ label }}</strong><span class="small muted"> · {{ help }}</span></span></label>{% endfor %}
+        {{ form.request_type.errors }}</fieldset>
+      {{ form.subject.as_field_group }}
+      {{ form.description.as_field_group }}
+      {{ form.common_area.as_field_group }}
+      <div class="field"><label for="rq-photos">Photos (optional)</label><input type="file" id="rq-photos" name="photos" accept="image/*,application/pdf" multiple aria-describedby="rq-photos-help"><p class="help" id="rq-photos-help">A photo helps if you're reporting a problem. You can pick several, or take one with your phone.</p></div>
+      <div class="form-actions"><button type="submit">Send request</button></div></form>
+  </div></details>{% endif %}
+  <nav class="subnav" aria-label="Filter">
+    <a href="?show=open{% if mine %}&amp;mine=1{% endif %}"{% if show == "open" %} aria-current="page"{% endif %}>Open</a>
+    <a href="?show=closed{% if mine %}&amp;mine=1{% endif %}"{% if show == "closed" %} aria-current="page"{% endif %}>Closed</a>
+    <a href="?show=all{% if mine %}&amp;mine=1{% endif %}"{% if show == "all" %} aria-current="page"{% endif %}>All</a>
+    {% if staff %}<a href="?show={{ show }}&amp;assigned=1"{% if request.GET.assigned == "1" %} aria-current="page"{% endif %}>Assigned to me</a>{% endif %}
+  </nav>
+  {% if not mine %}{% include "partials/list_tools.html" %}{% endif %}
+  <section class="card">
+    {% if page.object_list %}
+      <div class="table-wrap"><table>
+        <thead><tr>{% if staff %}<th>#</th>{% endif %}<th>Subject</th><th>Type</th>{% if staff %}<th>Lot</th><th>Assigned</th>{% endif %}<th>Respond by</th><th>Status</th></tr></thead>
+        <tbody>{% for r in page.object_list %}<tr>
+          {% if staff %}<td>{{ r.pk }}</td>{% endif %}<td><a href="{% url 'request_detail' r.pk %}">{{ r.subject }}</a></td><td>{{ r.get_request_type_display }}</td>
+          {% if staff %}<td>{{ r.lot.number }}</td><td>{{ r.assignee.display_name|default:"—" }}</td>{% endif %}
+          <td class="nowrap">{% if r.first_response_at %}<span class="muted small">answered</span>{% elif r.respond_by %}{{ r.respond_by|date:"M j, Y" }}{% if r.is_overdue %} <span class="badge tone-danger">overdue</span>{% endif %}{% else %}—{% endif %}</td>
+          <td>{% status r.state r.get_state_display %}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% include "partials/pager.html" %}
+    {% else %}{% include "partials/empty.html" with icon="inbox" title="No requests here" %}{% endif %}
+  </section>
 {% endblock %}

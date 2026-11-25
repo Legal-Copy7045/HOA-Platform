@@ -3,7 +3,8 @@
 {% block title %}Owner accounts · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <div class="page-head"><div><h1>Owner accounts</h1><p class="subtitle">Every lot's balance. Positive is owed to the association; negative is a prepayment credit.</p></div></div>
+  <div class="page-head"><div><h1>Owner accounts</h1><p class="subtitle">Every lot's balance. Positive is owed to the association; negative is a prepayment credit.</p></div>
+    {% if can_manage %}<div class="actions"><a class="btn" href="{% url 'record_payments' %}">{% icon "receipt" %} Record payments</a></div>{% endif %}</div>
   <div class="grid grid-3">
     <div class="stat {% if total_owed > 0 %}tone-warning{% endif %}"><div class="label">Owed by owners</div><div class="value">{{ total_owed|cents }}</div></div>
     <div class="stat tone-success"><div class="label">Prepayment credits</div><div class="value">{{ total_credit|cents|cut:"-" }}</div></div>
@@ -12,12 +13,16 @@
   {% if can_manage %}
     <section class="card">
       <h2>Post monthly dues</h2>
-      <form method="post" class="inline-form">{% csrf_token %}
-        <div><label for="dy">Year</label><input id="dy" name="year" value="{{ year }}" inputmode="numeric" size="5"></div>
-        <div><label for="dm">Month</label><input id="dm" name="month" value="{{ month }}" inputmode="numeric" size="3"></div>
+      {% if dues_cents %}
+      <form method="post" class="inline-form" data-confirm="Charge {{ dues_lots }} lots {{ dues_cents|cents }} each for the month you chose? Lots already charged for that month are skipped.">{% csrf_token %}
+        <div><label for="dperiod">Month to charge <span class="required-mark" aria-hidden="true">*</span></label><input id="dperiod" name="period" type="month" value="{{ default_period }}" required></div>
         <button type="submit">Post to every lot</button>
       </form>
+      <p class="small" data-testid="dues-preview">Will charge <strong>{{ dues_lots }} lot{{ dues_lots|pluralize }} {{ dues_cents|cents }} each</strong> ({{ dues_total|cents }} in all).</p>
       <p class="muted small">Uses the monthly dues rule. A lot already charged for that month is skipped, so posting twice is safe.</p>
+      {% else %}
+      <p class="muted small">No monthly dues amount is set. Set it in <a href="{% url 'community_settings' %}">Community settings</a> first.</p>
+      {% endif %}
     </section>
   {% endif %}
   {% if can_manage or can_post_late_fees %}

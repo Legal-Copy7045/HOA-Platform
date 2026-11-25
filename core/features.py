@@ -133,7 +133,29 @@ FEATURES: list[Feature] = [
         "reservations",
         "Common area reservations",
         "Owners book common areas (clubhouse, pavilion). Not needed yet.",
-        set(),
+        {
+            "reservations",
+            "reservation_detail",
+            "reservation_action",
+            "reservation_settings",
+            "reservation_area_save",
+        },
+        default=False,
+    ),
+    # Installable app alerts (Milestone 4). The app itself (manifest, offline
+    # styles) is always on; these need keys or a provider in the environment.
+    _f(
+        "push",
+        "Push notifications",
+        "Owners can get update alerts on their phone or computer (needs VAPID keys).",
+        {"push_subscribe", "push_unsubscribe"},
+        default=False,
+    ),
+    _f(
+        "sms",
+        "Urgent text messages",
+        "Owners can opt in to texts; the board sends urgent notices (needs an SMS provider).",
+        {"sms_start", "sms_verify", "sms_stop", "urgent_notice"},
         default=False,
     ),
 ]
@@ -149,6 +171,9 @@ SHARED_BY_KIND = {
     "follow_up_set": {"violation": "violations", "work_order": "work_orders"},
 }
 BY_URL = {name: f.key for f in FEATURES for name in f.url_names}
+# Pages that show several features' records: on while any of them is on
+# (the page itself leaves out the parts that are off).
+ANY_OF = {"voting": frozenset({"votes", "elections"})}
 
 
 def _load() -> dict[str, bool]:
@@ -173,6 +198,8 @@ def enabled(key: str, request=None) -> bool:
 
 
 def url_name_enabled(url_name: str | None, request=None) -> bool:
+    if url_name in ANY_OF:
+        return any(enabled(k, request) for k in ANY_OF[url_name])
     key = BY_URL.get(url_name or "")
     return key is None or enabled(key, request)
 
@@ -200,7 +227,7 @@ class FeatureGateMiddleware:
     def process_view(self, request, view_func, view_args, view_kwargs):
         match = getattr(request, "resolver_match", None)
         name = match.url_name if match else None
-        if name in BY_URL and not url_name_enabled(name, request):
+        if (name in BY_URL or name in ANY_OF) and not url_name_enabled(name, request):
             raise Http404
         feature = SHARED_BY_KIND.get(name, {}).get(view_kwargs.get("kind"))
         if feature and not enabled(feature, request):

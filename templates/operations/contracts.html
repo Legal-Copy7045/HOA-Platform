@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Contracts · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "operations/finance_nav.html" %}
+  {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Contracts</h1><p class="subtitle">Recurring services the board has approved. Each invoice under a contract, within its cap and one per period, is pre-approved; anything more needs the usual approvals.</p></div></div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Contract</th><th>Vendor</th><th>Invoiced</th><th class="num">Cap</th><th>This period</th><th>Status</th></tr></thead>
@@ -12,7 +12,7 @@
       <td>{% status c.state c.get_state_display %}{% if c.ends_on %} <span class="small muted">to {{ c.ends_on|date:"M j, Y" }}</span>{% endif %}</td></tr>
     {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="file" title="No contracts yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
-  {% if can_manage %}<details class="panel"><summary>Enter a contract</summary><div class="panel-body">
-    <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Enter contract</button></div></form>
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Enter a contract</summary><div class="panel-body">
+    <form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Enter contract</button></div></form>
     <p class="small muted">A board member other than the one who enters it approves it. After approval its terms can't change; a new term is a new contract.</p></div></details>{% endif %}
 {% endblock %}

@@ -16,6 +16,7 @@ from governance.models import (
     Candidate,
     ConsentRequest,
     Election,
+    ElectionParticipation,
     ElectionState,
     Meeting,
     Proxy,
@@ -92,6 +93,22 @@ def election_detail(request, pk):
     show_results = election.state == ElectionState.CERTIFIED or (
         can_manage and election.state == ElectionState.CLOSED
     )
+    roles = policy.roles_for(user)
+    with system_access("my lots' election participation"):
+        # That a ballot was cast for my lot (never what it chose: D21).
+        recorded = list(
+            ElectionParticipation.objects.filter(election=election, lot_id__in=roles.owned_lot_ids)
+            .select_related("lot")
+            .order_by("lot__number")
+        )
+    meeting_ahead = (
+        election.meeting
+        if election.meeting_id
+        and election.state in (ElectionState.NOMINATIONS, ElectionState.VOTING)
+        and election.meeting.status == "scheduled"
+        and policy.can(user, "vote.cast")
+        else None
+    )
     return render(
         request,
         "governance/election_detail.html",
@@ -104,6 +121,8 @@ def election_detail(request, pk):
             and (policy.can(user, "vote.cast") or can_manage),
             "owners": _owner_choices() if election.state == ElectionState.NOMINATIONS else [],
             "my_lots": elections.lots_actor_may_vote_for(election, user),
+            "recorded": recorded,
+            "proxy_meeting": meeting_ahead,
             "ballot": elections.ballot_candidates(election),
             "tally": elections.tally(election) if show_results else None,
             "results": election.results.select_related("candidate__person")
@@ -222,6 +241,9 @@ def meeting_extras(user, meeting) -> dict:
         "proxies_held": [p for p in mine if p.holder_id == roles.person_id],
         "proxy_board": board,
         "proxy_lots": my_lots,
+        "proxy_homes": [lot for lot in _owner_choices() if lot.pk not in roles.owned_lot_ids]
+        if my_lots
+        else [],
         "quorum": elections.quorum_status(meeting) if policy.can(user, "meeting.manage") else None,
     }
 
@@ -241,18 +263,20 @@ def proxy_grant(request, pk):
         with system_access("holder must be on the board"):
             if not BoardSeat.objects.active().filter(person=holder).exists():
                 raise PermissionDenied
-    elif request.POST.get("holder_lot"):
-        # "The owner of lot N": no owner names are shown to pick from.
-        with system_access("proxy holder by lot"):
+    elif request.POST.get("holder_home"):
+        # "The owner at <address>": homes are listed by street address, no
+        # owner names (SEC-010).
+        home = request.POST["holder_home"]
+        with system_access("proxy holder by home"):
             ownership = (
                 Ownership.objects.active()
-                .filter(lot__number=int(request.POST["holder_lot"] or 0))
+                .filter(lot_id=int(home) if home.isdigit() else 0)
                 .order_by("start_date", "pk")
                 .first()
             )
         holder = ownership.person if ownership else None
     if holder is None:
-        messages.error(request, "Choose a board member or a lot number for your proxy.")
+        messages.error(request, "Choose a board member or a home for your proxy.")
     else:
         _flash(
             request,
