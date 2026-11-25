@@ -37,6 +37,10 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
    dc exec web python manage.py seed_demo
    ```
 
+   It ends with "Demo data created: 44 lots ...". If it prints an error
+   instead, nothing is saved (it runs as one transaction). Check what the
+   database holds with `dc exec web python manage.py data_status`.
+
 4. Invite a second board member as soon as possible: the board page warns
    until at least two people with MFA can perform every action.
 

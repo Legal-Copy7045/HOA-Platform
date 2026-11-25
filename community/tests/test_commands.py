@@ -272,3 +272,18 @@ def test_rescan_blocks_a_file_found_infected_later(client, sysadmin, settings):
         out = run("rescan_files", actor=sysadmin.email, reason="signatures updated today")
     assert "infected: 1" in out
     assert client.get(url).status_code == 404
+
+
+def test_data_status_prints_counts_without_personal_data(settings):
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from community.tests.factories import LotFactory, make_member
+
+    make_member(lots=[LotFactory()], email="private-owner@example.com")
+    out = StringIO()
+    call_command("data_status", stdout=out)
+    text = out.getvalue()
+    assert "Lots" in text and "1" in text
+    assert "private-owner" not in text
