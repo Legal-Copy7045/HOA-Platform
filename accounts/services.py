@@ -46,7 +46,12 @@ def _enqueue_send(invitation: Invitation) -> None:
 
 
 def create_invitation(
-    *, person: Person, email: str = "", actor, request: HttpRequest | None = None
+    *,
+    person: Person,
+    email: str = "",
+    actor,
+    request: HttpRequest | None = None,
+    send_email: bool = True,
 ) -> Invitation:
     if actor is not SYSTEM:
         require(actor, "invite.send")
@@ -77,7 +82,8 @@ def create_invitation(
             metadata={"person_id": person.pk},
             channel=Channel.WEB if request else Channel.CLI,
         )
-        _enqueue_send(invitation)
+        if send_email:
+            _enqueue_send(invitation)
     return invitation
 
 
@@ -188,3 +194,27 @@ def accept_invitation(invitation: Invitation, *, password: str, request=None) ->
             metadata={"person_id": invitation.person_id},
         )
     return user
+
+
+def issue_invitation_link(invitation: Invitation) -> str:
+    """CLI only (bootstrap): mint a token and return the link instead of emailing it.
+
+    For the very first account, before email is configured. The operator
+    running the command is the person being invited.
+    """
+    token = secrets.token_urlsafe(32)
+    with transaction.atomic(), system_access("issue_invitation_link"):
+        invitation = Invitation.objects.select_for_update().get(pk=invitation.pk)
+        if invitation.status not in ("queued", "pending"):
+            raise InvitationError("This invitation is closed.")
+        invitation.token_hash = _hash(token)
+        invitation.sent_at = timezone.now()
+        invitation.send_count += 1
+        invitation.save(update_fields=["token_hash", "sent_at", "send_count"])
+        record_event(
+            "invite.link_issued",
+            target=invitation,
+            channel=Channel.CLI,
+            metadata={"person_id": invitation.person_id},
+        )
+    return settings.PORTAL_BASE_URL + reverse("invite_landing", args=[token])

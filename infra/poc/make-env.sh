@@ -65,6 +65,9 @@ EMAIL_HOST_PASSWORD=
 DEFAULT_FROM_EMAIL=Oak Creek Farms HOA <portal@oakcreekhoa.com>
 EMAIL_REDIRECT_ALL_TO=${REDIRECT_TO}
 
+# POC only: fictional demo data allowed. Never true in production.
+SEED_DEMO_ALLOWED=true
+
 OFFICERS_REQUIRE_BOARD_SEAT=true
 OFFICERS_REQUIRE_BOARD_SEAT_CITATION=
 

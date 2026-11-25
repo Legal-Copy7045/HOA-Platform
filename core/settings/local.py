@@ -20,3 +20,4 @@ if ADMIN_ENABLED and "django.contrib.admin" not in INSTALLED_APPS:  # noqa: F405
 
 # Passkeys on http://localhost (browsers allow WebAuthn there).
 MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = True
+SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=True)

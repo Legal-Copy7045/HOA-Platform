@@ -128,6 +128,10 @@ def test_accepting_creates_login_and_goes_straight_to_mfa(client, board):
     # Before enrolling MFA, every other page sends them back to enrollment.
     assert client.get(reverse("home"))["Location"] == reverse("mfa_index")
     assert AuditEvent.objects.filter(action="invite.accepted", actor=user).exists()
+    # Enrollment pages open straight away, without asking for the password again.
+    assert client.get(reverse("mfa_activate_totp")).status_code == 200
+    login_event = AuditEvent.objects.filter(action="auth.login", actor=user).latest("id")
+    assert login_event.metadata == {"method": "password"}
 
 
 def test_link_works_only_once(client, board):

@@ -50,6 +50,13 @@ def invite_accept(request):
             form.add_error(None, str(exc))
         else:
             request.session.pop(SESSION_KEY, None)
+            # Tell allauth a password was just used, so MFA enrollment does not
+            # immediately ask for it again ("reauthenticate").
+            from allauth.account.internal.flows.login import record_authentication
+
+            record_authentication(
+                request, user, method="password", email=user.email, reauthenticated=True
+            )
             login(request, user, backend="allauth.account.auth_backends.AuthenticationBackend")
             messages.success(
                 request,

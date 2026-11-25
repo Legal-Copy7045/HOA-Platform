@@ -23,6 +23,8 @@ USE_X_FORWARDED_HOST = False  # never trust a client-supplied Host override
 SITE_NAME = env("SITE_NAME", default="Oak Creek Farms HOA")
 # Shown on the sysadmin status page; start-portal.sh sets it to the git commit.
 APP_VERSION = env("APP_VERSION", default="dev")
+# seed_demo refuses to run unless this is true (never set it in production).
+SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
 # Absolute address used in emailed links (the worker has no request to ask).
 PORTAL_BASE_URL = env("PORTAL_BASE_URL", default="http://localhost:8000").rstrip("/")
 INVITE_TTL_HOURS = env.int("INVITE_TTL_HOURS", default=168)

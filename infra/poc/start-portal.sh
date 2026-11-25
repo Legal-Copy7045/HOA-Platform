@@ -19,6 +19,9 @@ fi
 
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
 
+# Show the deployed commit on the sysadmin status page.
+export APP_VERSION="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+
 echo "==> Building the portal image"
 "${COMPOSE[@]}" build --pull
 echo "==> Starting (migrations run first, as the owner role)"
