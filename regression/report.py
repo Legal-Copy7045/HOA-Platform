@@ -173,16 +173,21 @@ def main() -> None:
         f"<li><code>{e(r['id'])}</code> {e(s)}: {e(r['check'])}</li>" for s, r in unowned[:200]
     )
     obs = "".join(f"<li>{e(o)}</li>" for o in notes.get("observations", []))
-    page = f"""<!doctype html><html lang=en><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1"><title>Portal regression report</title>
+    # Page content only (no html/head/body): the artifact host wraps it, and a
+    # browser opening the file locally renders it the same way.
+    page = f"""<title>Portal regression report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
 :root{{--bg:#f6f5f1;--card:#fff;--ink:#1d2320;--muted:#66706b;--line:#e3e1d9;--pass:#1f6b46;--pass-bg:#e3f1e8;
 --fail:#a3302a;--fail-bg:#fbe7e5;--warn:#8a5a00;--warn-bg:#fdf1d8;--neutral-bg:#eceae4}}
 @media (prefers-color-scheme:dark){{:root:not([data-theme=light]){{--bg:#151917;--card:#1e2421;--ink:#e8ece9;
 --muted:#9aa49f;--line:#2f3632;--pass:#7fd1a4;--pass-bg:#1d3327;--fail:#f19a93;--fail-bg:#3a1f1d;--warn:#f0c36a;
---warn-bg:#3a2f17;--neutral-bg:#2a302c}}}}
+--warn-bg:#3a2f17;--neutral-bg:#2a302c;color-scheme:dark}}}}
+:root[data-theme=dark]{{--bg:#151917;--card:#1e2421;--ink:#e8ece9;--muted:#9aa49f;--line:#2f3632;--pass:#7fd1a4;
+--pass-bg:#1d3327;--fail:#f19a93;--fail-bg:#3a1f1d;--warn:#f0c36a;--warn-bg:#3a2f17;--neutral-bg:#2a302c;color-scheme:dark}}
 body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}}
-main{{max-width:1100px;margin:0 auto;padding:24px 16px 64px}}h1{{font-size:1.6rem;margin:0 0 4px}}
+main{{max-width:1100px;margin:0 auto;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));
+padding-right:max(16px,env(safe-area-inset-right,0px))}}.grid>*{{min-width:0}}h1{{font-size:1.6rem;margin:0 0 4px}}
 h2{{font-size:1.15rem;margin:28px 0 10px}}h3{{font-size:1rem;margin:6px 0 2px}}.m{{color:var(--muted);font-size:.85rem}}
 .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}}
 .card{{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}}
@@ -193,7 +198,7 @@ vertical-align:top;text-align:left}}th{{font-size:.78rem;text-transform:uppercas
 font-size:.75rem;font-weight:600;background:var(--neutral-bg);white-space:nowrap}}.b.pass{{background:var(--pass-bg);color:var(--pass)}}
 .b.fail,.b.critical,.b.high{{background:var(--fail-bg);color:var(--fail)}}.b.manual,.b.medium,.b.not-run,.b.uncovered{{background:var(--warn-bg);color:var(--warn)}}
 code{{font-size:.85em}}.wrap{{overflow-x:auto}}
-</style></head><body><main>
+</style><main>
 <h1>Portal regression report</h1><div class=m>{e(when)} · commit {e(commit)}</div>
 {f"<p>{e(notes['summary'])}</p>" if notes.get("summary") else ""}
 <div class=grid style="margin-top:14px">
@@ -209,7 +214,7 @@ code{{font-size:.85em}}.wrap{{overflow-x:auto}}
 <h2>Needs a person</h2><div class=wrap><table>{manual_rows or "<tr><td class=m>None.</td></tr>"}</table></div>
 {f"<h2>Observations</h2><ul>{obs}</ul>" if obs else ""}
 {f"<h2>Checks not in any feature</h2><ul class=m>{unowned_rows}</ul>" if unowned_rows else ""}
-</main></body></html>"""
+</main>"""
     (OUT / "report.html").write_text(page, encoding="utf-8")
     print(f"wrote {OUT / 'report.html'} and report.md: {dict(totals)}; {len(findings)} findings")
 

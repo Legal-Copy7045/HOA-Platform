@@ -63,7 +63,9 @@ class Violation(ScopedModel):
             lot_id__in=roles.owned_lot_ids,
             state__in=[ViolationState.NOTICED, ViolationState.RESPONDED, ViolationState.HEARING],
         )
-        return queryset.exclude(state=ViolationState.OPEN).filter(owner_era_q(roles) | unresolved)
+        # Only violations a notice was actually sent for (one dismissed
+        # before notice stays internal).
+        return queryset.filter(noticed_at__isnull=False).filter(owner_era_q(roles) | unresolved)
 
     class Meta:
         ordering = ["-created_at"]

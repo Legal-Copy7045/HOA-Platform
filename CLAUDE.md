@@ -98,10 +98,10 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Re-apply runtime DB grants: `python manage.py apply_db_grants`
 - Actions fewer than two people can perform: `python manage.py check_coverage`
 - First officer (once, on the server): `python manage.py bootstrap_first_officer --name ... --email ... [--also-sysadmin]`
-- Seed synthetic data (needs `SEED_DEMO_ALLOWED=true`): `python manage.py seed_demo` (also runs `seed_demo_operations`; run that alone on a community seeded before Milestone 2)
+- Seed synthetic data (needs `SEED_DEMO_ALLOWED=true`, and with production settings `DEPLOYMENT_STAGE=poc`): `python manage.py seed_demo` (also runs `seed_demo_operations`; run that alone on a community seeded before Milestone 2)
 - New list/detail pages: register every URL in `core/tests/test_url_matrix.py` (PROTECTED with a lot-B target, or MEMBER_PAGES with a BOARD_ONLY_MARKERS entry)
 - Workflows: declare transitions with `core.workflow.Workflow`; decisions that create records go through a service, not the generic action URL
-- Break-glass (sysadmin, audited): `breakglass_end_ownership`, `breakglass_end_role`, `breakglass_lock_user`, `rescan_files`, each with `--actor` and `--reason`
+- Break-glass (sysadmin, audited): `breakglass_end_ownership`, `breakglass_end_role`, `breakglass_lock_user`, `breakglass_enrollment_code` (only while fewer than two other board members can sign in), `rescan_files`, each with `--actor` and `--reason`
 - Web/worker refuse to run as the DB owner: `python manage.py check_db_role` (run by the entrypoint)
 - Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
 - Security review findings and fixes: `docs/security-review-2026-11.md`

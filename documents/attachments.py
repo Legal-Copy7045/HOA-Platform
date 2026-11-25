@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 
 from django.conf import settings
+from django.db import transaction
 from django.http import FileResponse, Http404
 
 from audit.services import record_event
@@ -24,10 +25,6 @@ def _owner_key(obj) -> tuple[str, str]:
 def attach(
     obj, uploaded, *, actor, label: str = "", allowed: set[str] | None = None, request=None
 ) -> Attachment:
-    if attachments_for(obj).count() >= settings.ATTACHMENTS_PER_OBJECT_MAX:
-        raise DocumentError(
-            "This item already has the maximum number of files. Ask the board if you need more."
-        )
     try:
         kind = check_upload(uploaded, allowed=allowed or IMAGES_AND_PDF)
     except UploadRejected as exc:
@@ -51,8 +48,15 @@ def attach(
         label=label[:200],
         uploaded_by=actor,
     )
-    attachment.file.save("upload", uploaded, save=False)
-    attachment.save()
+    with transaction.atomic():
+        # Lock the owning row so two uploads at once cannot both pass the cap.
+        type(obj)._base_manager.select_for_update().filter(pk=obj.pk).exists()
+        if attachments_for(obj).count() >= settings.ATTACHMENTS_PER_OBJECT_MAX:
+            raise DocumentError(
+                "This item already has the maximum number of files. Ask the board if you need more."
+            )
+        attachment.file.save("upload", uploaded, save=False)
+        attachment.save()
     record_event(
         "attachment.added",
         actor=actor,

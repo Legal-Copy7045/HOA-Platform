@@ -165,6 +165,7 @@ ACCOUNT_RATE_LIMITS = {
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
+MFA_ADAPTER = "accounts.mfa_adapter.MFAAdapter"
 MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_PASSKEY_SIGNUP_ENABLED = False
 MFA_TRUST_ENABLED = False  # never skip the second factor on a "trusted" browser

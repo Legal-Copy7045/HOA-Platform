@@ -120,8 +120,28 @@ account takeover.
 - **HSTS:** the POC uses a short HSTS time without subdomains. Turn both up before production (runbook checklist).
 - **Malware scanning** is still off on the POC. To turn it on: run a ClamAV container, set `DOCUMENT_SCANNER=clamd` and `DOCUMENT_REQUIRE_CLEAN_SCAN=true`, then run `rescan_files`.
 
-## 5. Verification
+## 5. Second iteration: re-audit of the fixes
+
+A separate reviewer then tried to break every fix, end to end. It found:
+- **Two lockouts the new sign-in rules caused.** Both fixed:
+  - Removing your only passkey or app now isn't allowed: add the new one first.
+  - New break-glass `breakglass_enrollment_code` (sysadmin, audited) helps a first officer who missed the setup window. It works only while fewer than two other board members can sign in.
+- **Gaps in the first round of fixes**, all fixed:
+  - An owner's history disappeared when their ownership was re-recorded (adding a spouse, a deed into a trust). Visibility now counts from the start of the *unbroken* ownership.
+  - A violation dismissed before any notice became visible to the owner. Owners now see only violations a notice was sent for.
+  - A seller kept their ARC request after selling while owning another lot. The applicant keeps it only while they still own the lot.
+  - Office checks missed single-quoted attributes, external images on file shares, DDE fields and Excel external links. Every outside link except a plain hyperlink is now refused.
+- **Low items**, all fixed:
+  - The attachment cap could race; it is now locked.
+  - An owner could create unlimited draft ARC requests; the cap is 5 open drafts.
+  - Invoices already pending at deploy now get their fixed approval count (data migration).
+  - Open invitations to an address other than the person's own are revoked (data migration). Re-send and accept also check the address.
+- **Accepted:** Django's internal "base manager" is still unrestricted on the scoped append-only tables (such as the ledger). The database trigger and grants refuse any change there, as the reviewer confirmed.
+
+It confirmed end to end that these still work: first-officer bootstrap, assisted reset, production start-up with the POC's settings, and the new network layout.
+
+## 6. Verification
 
 - Every fixed finding has a regression test, mostly in `core/tests/test_security_review.py` and in each app's tests, marked "Security review 2026-11". There are now over 680 automated tests.
 - ruff, bandit, the migration check and pip-audit (no known vulnerabilities) are clean.
-- A separate reviewer re-tested the fixes and tried to bypass them; its results are folded into this report.
+- The new regression suite (`regression/`, `/regression`) runs all of this plus a browser crawl of every page per role. Its first run found two navigation bugs (fixed).

@@ -167,6 +167,7 @@ ARC = Workflow(
         ),
     ],
 )
+MAX_OPEN_DRAFTS = 5
 DECISION_ACTIONS = {"approve", "approve_with_conditions", "deny", "decide_appeal"}
 
 
@@ -187,6 +188,10 @@ def create_request(
         raise ArcError("Describe the project.")
     with system_access("create arc request"):
         applicant = Person.objects.get(user=actor)
+        drafts = ArcRequest.objects.filter(applicant=applicant, state=ArcState.DRAFT).count()
+    if drafts >= MAX_OPEN_DRAFTS:
+        # Files are permanent: cap unsubmitted requests (re-audit of review C4).
+        raise ArcError("Submit or withdraw one of your draft requests before starting another.")
     req = ArcRequest.objects.create(
         lot=lot,
         applicant=applicant,

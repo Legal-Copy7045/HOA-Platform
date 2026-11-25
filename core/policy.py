@@ -153,12 +153,10 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         person = Person.objects.filter(user=user).only("pk").first()
         if person is None:
             return NO_ROLES
-        since: dict[int, datetime.date] = {}
-        for lot_id, start in (
-            Ownership.objects.filter(person=person).active(on).values_list("lot_id", "start_date")
-        ):
-            since[lot_id] = min(start, since.get(lot_id, start))
-        lots = frozenset(since)
+        lots = frozenset(
+            Ownership.objects.filter(person=person).active(on).values_list("lot_id", flat=True)
+        )
+        since = _continuous_ownership_starts(person, lots)
         groups = set()
         if lots:
             groups.add(OWNER)
@@ -171,6 +169,35 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
             OfficeHolding.objects.filter(person=person).active(on).values_list("office", flat=True)
         )
     return Roles(frozenset(groups), lots, person.pk, offices, tuple(sorted(since.items())))
+
+
+def _continuous_ownership_starts(person, lots) -> dict[int, datetime.date]:
+    """For each currently owned lot, when this person's *unbroken* ownership began.
+
+    Re-recording an ownership (adding a spouse, a deed into a trust) ends one
+    record and starts another the same day; the owner's history must not
+    disappear because of it (re-audit of the 2026-11 review).
+    """
+    from community.models import Ownership
+
+    since: dict[int, datetime.date] = {}
+    if not lots:
+        return since
+    periods: dict[int, list[tuple[datetime.date, datetime.date | None]]] = {}
+    for lot_id, start, end in Ownership.objects.filter(person=person, lot_id__in=lots).values_list(
+        "lot_id", "start_date", "end_date"
+    ):
+        periods.setdefault(lot_id, []).append((start, end))
+    for lot_id, spans in periods.items():
+        spans.sort(key=lambda p: p[0], reverse=True)  # newest first
+        start = spans[0][0]
+        for earlier_start, earlier_end in spans[1:]:
+            if earlier_end is None or earlier_end >= start - datetime.timedelta(days=1):
+                start = min(start, earlier_start)
+            else:
+                break
+        since[lot_id] = start
+    return since
 
 
 def can(user, action: str, on: datetime.date | None = None) -> bool:

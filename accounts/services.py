@@ -94,6 +94,11 @@ def resend_invitation(invitation: Invitation, *, actor, request=None) -> Invitat
         invitation = Invitation.objects.select_for_update().get(pk=invitation.pk)
         if invitation.accepted_at or invitation.revoked_at:
             raise InvitationError("Only an open invitation can be re-sent.")
+        if not _matches_record(invitation):
+            raise InvitationError(
+                "This invitation is not for the address on the person's record. "
+                "Revoke it and invite again."
+            )
         invitation.expires_at = timezone.now() + timedelta(hours=settings.INVITE_TTL_HOURS)
         # The old link stops working now, not when the worker sends the new one.
         invitation.token_hash = ""  # nosec B105
@@ -164,6 +169,12 @@ def send_invitation_email(invitation_id: int) -> bool:
     return True
 
 
+def _matches_record(invitation: Invitation) -> bool:
+    with system_access("invitation address check"):
+        on_file = normalize_email_address(invitation.person.email or "")
+    return bool(on_file) and invitation.email == on_file
+
+
 def token_hash(token: str) -> str:
     return _hash(token)
 
@@ -179,7 +190,7 @@ def find_open_invitation(token: str) -> Invitation | None:
 def accept_invitation(invitation: Invitation, *, password: str, request=None) -> User:
     with transaction.atomic(), system_access("accept_invitation"):
         invitation = Invitation.objects.select_for_update().get(pk=invitation.pk)
-        if invitation.status != "pending":
+        if invitation.status != "pending" or not _matches_record(invitation):
             raise InvitationError("This invitation is no longer valid.")
         if User.objects.filter(email=invitation.email).exists():
             raise InvitationError("That email address already belongs to a login.")

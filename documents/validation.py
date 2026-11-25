@@ -52,16 +52,25 @@ TYPES: dict[str, FileType] = {
 
 # Office parts that can run or fetch code when the file is opened.
 _OFFICE_FORBIDDEN_MEMBER = re.compile(
-    r"(^|/)(macros|activex|embeddings)(/|$)|vbaproject|\.bin$|vbadata", re.IGNORECASE
+    r"(^|/)(macros|activex|embeddings|externallinks)(/|$)|vbaproject|\.bin$|vbadata",
+    re.IGNORECASE,
 )
 _OFFICE_FORBIDDEN_CONTENT = (
     b"macroEnabled",
     b"vnd.ms-office.vbaProject",
     b"vnd.ms-office.activeX",
     b"oleObject",
+    b"externalLink",
 )
-_EXTERNAL_REL = re.compile(rb'TargetMode\s*=\s*"External"', re.IGNORECASE)
-_RISKY_REL_TYPES = (b"attachedTemplate", b"oleObject", b"/frame", b"subDocument", b"aFChunk")
+_RELATIONSHIP = re.compile(rb"<\s*(?:\w+:)?Relationship\b([^>]*)>", re.IGNORECASE)
+_ATTRIBUTE = re.compile(rb"""([\w:]+)\s*=\s*(["'])(.*?)\2""", re.DOTALL)
+# Field codes that pull in or run outside content (DDE, linked files).
+_FIELD_CODE = re.compile(
+    rb"""(instr\s*=\s*["'][^"']*|<\s*w:instrText[^>]*>[^<]*)"""
+    rb"""\b(DDEAUTO|DDE|INCLUDETEXT|INCLUDEPICTURE|LINK|IMPORT)\b""",
+    re.IGNORECASE,
+)
+_MAX_PART = 20 * 1024 * 1024
 
 
 def _office_problem(archive: zipfile.ZipFile, kind: FileType) -> str | None:
@@ -81,12 +90,24 @@ def _office_problem(archive: zipfile.ZipFile, kind: FileType) -> str | None:
         types = archive.read("[Content_Types].xml")
         if any(marker.lower() in types.lower() for marker in _OFFICE_FORBIDDEN_CONTENT):
             return "macros or embedded objects"
-    for name in names:
-        if name.endswith(".rels"):
-            rels = archive.read(name)
-            for rel in re.findall(rb"<Relationship\b[^>]*>", rels):
-                if _EXTERNAL_REL.search(rel) and any(t in rel for t in _RISKY_REL_TYPES):
-                    return "links to outside templates or objects"
+    for info in archive.infolist():
+        name = info.filename
+        if not name.lower().endswith((".rels", ".xml")) or info.file_size > _MAX_PART:
+            continue
+        data = archive.read(name)
+        if name.lower().endswith(".rels"):
+            # Any relationship to something outside the file, except a plain
+            # hyperlink: remote templates, linked images on file shares, frames.
+            for match in _RELATIONSHIP.finditer(data):
+                attrs = {
+                    k.lower().split(b":")[-1]: v for k, _, v in _ATTRIBUTE.findall(match.group(1))
+                }
+                external = attrs.get(b"targetmode", b"").strip().lower() == b"external"
+                hyperlink = attrs.get(b"type", b"").rstrip(b"/").lower().endswith(b"/hyperlink")
+                if external and not hyperlink:
+                    return "links to outside content"
+        elif _FIELD_CODE.search(data):
+            return "fields that load outside content"
     return None
 
 
