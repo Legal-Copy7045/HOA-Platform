@@ -1035,6 +1035,68 @@ def update_my_profile(
     return profile
 
 
+def sms_settings(user) -> tuple[str, bool]:
+    """(verified mobile number, opted in) of this login's own profile."""
+    from community.models import ContactProfile
+
+    with system_access("own sms settings"):
+        profile = ContactProfile.objects.filter(person__user=user).first()
+    if profile is None or not profile.sms_verified_at:
+        return "", False
+    return profile.sms_number, profile.sms_opt_in
+
+
+def set_sms_number(*, user, number: str) -> None:
+    """Save a number the owner just proved (comms.sms checks the code)."""
+    _refuse_read_only(user)
+    from community.models import ContactProfile
+
+    with transaction.atomic(), system_access("set sms number"):
+        person = Person.objects.filter(user=user).first()
+        if person is None:
+            raise CommunityError("Your login is not linked to a person yet.")
+        profile, _ = ContactProfile.objects.select_for_update().get_or_create(person=person)
+        profile.sms_number = number
+        profile.sms_verified_at = timezone.now()
+        profile.sms_opt_in = True
+        profile.save()
+
+
+def stop_sms(*, user=None, number: str = "") -> int:
+    """Turn urgent texts off: for one login (their choice), or for every
+    profile with ``number`` (the carrier reported a STOP reply)."""
+    from community.models import ContactProfile
+
+    with transaction.atomic(), system_access("stop sms"):
+        if user is not None:
+            profiles = ContactProfile.objects.filter(person__user=user)
+        elif number:
+            profiles = ContactProfile.objects.filter(sms_number=number)
+        else:
+            return 0
+        changed = 0
+        for profile in profiles.select_for_update():
+            profile.sms_number = ""
+            profile.sms_verified_at = None
+            profile.sms_opt_in = False
+            profile.save()
+            changed += 1
+    return changed
+
+
+def sms_recipients() -> list[str]:
+    """Verified numbers of current owners who opted in to urgent texts."""
+    from community.models import ContactProfile
+
+    with system_access("urgent text recipients"):
+        numbers = ContactProfile.objects.filter(
+            sms_opt_in=True,
+            sms_verified_at__isnull=False,
+            person__in=Ownership.objects.active().values("person_id"),
+        ).exclude(sms_number="")
+        return sorted(set(numbers.values_list("sms_number", flat=True)))
+
+
 def board_roster_public():
     """Who is on the board now: names, seat type, office and term end only."""
     with system_access("directory: board roster"):

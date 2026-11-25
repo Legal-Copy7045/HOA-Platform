@@ -37,4 +37,9 @@
     var el = e.target.closest && e.target.closest("[data-print]");
     if (el) { e.preventDefault(); window.print(); }
   });
+  // Installable app: the service worker caches static files only (signed-in pages).
+  var sw = document.body.getAttribute("data-sw");
+  if (sw && "serviceWorker" in navigator) {
+    navigator.serviceWorker.register(sw, { scope: "/" }).catch(function () {});
+  }
 })();

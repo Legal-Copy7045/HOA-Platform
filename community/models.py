@@ -549,6 +549,11 @@ class ContactProfile(ScopedModel):
     # Routine updates (replies, discussions, sign-off requests): at once or in
     # a weekly digest (Milestone 4). Legal notices are always sent at once.
     weekly_digest = models.BooleanField(default=False)
+    # Urgent text messages (Milestone 4): opt-in, and only to a number the
+    # owner proved by entering a texted code. Never shown in the directory.
+    sms_number = models.CharField(max_length=20, blank=True)
+    sms_verified_at = models.DateTimeField(null=True, blank=True)
+    sms_opt_in = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 

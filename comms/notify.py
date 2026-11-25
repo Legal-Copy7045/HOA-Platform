@@ -46,6 +46,24 @@ def send_update(emails, *, subject: str, body: str, link: str) -> None:
             send_mail(subject, body, None, [email], fail_silently=True)
 
     transaction.on_commit(go)
+    _push(now, subject=subject, link=link)
+
+
+def _push(emails, *, subject: str, link: str) -> None:
+    """Also notify the installed app of people who get updates at once.
+    The subject lines used here carry no personal data (they travel in clear
+    in email too); the push holds that title and the page's path only."""
+    from comms import push
+
+    if not emails or not push.available():
+        return
+    from accounts.models import User
+
+    user_ids = User.objects.filter(email__in=list(emails), is_active=True).values_list(
+        "pk", flat=True
+    )
+    title = subject.removeprefix(f"[{settings.SITE_NAME}]").strip()
+    push.queue_for_users(user_ids, title=title, link=link)
 
 
 def send_now(emails, *, subject: str, body: str) -> None:

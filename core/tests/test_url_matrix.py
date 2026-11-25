@@ -56,6 +56,15 @@ OWN_ACCOUNT = {
     "export_my_data",
     "owner_preview_stop",
     "contact_method_add",
+    # Installable app and alerts (Milestone 4): the manifest and service
+    # worker hold nothing personal; the rest act on the signed-in login only.
+    "pwa_manifest",
+    "pwa_service_worker",
+    "push_subscribe",
+    "push_unsubscribe",
+    "sms_start",
+    "sms_verify",
+    "sms_stop",
 }
 # Text from board-only or other-lot fixtures that must never reach owner A.
 BOARD_ONLY_MARKERS = (
@@ -239,6 +248,8 @@ PROTECTED = {
     "resale_pdf": ("GET", "resale_b"),
     "reports": ("GET", None),
     "report_run": ("GET", "report"),
+    # Text alerts (Milestone 4; the feature is switched on in world()).
+    "urgent_notice": ("GET", None),
 }
 
 
@@ -268,6 +279,10 @@ def world():
         mock.patch("accounts.tasks.send_invitation.defer"),
         mock.patch("community.tasks.notify_board.defer"),
     ):
+        from core.models import FeatureSetting
+
+        for key in ("push", "sms"):  # off by default; their pages are checked here
+            FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
             LotFactory(street_address="2 Bravo Way"),

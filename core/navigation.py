@@ -60,6 +60,7 @@ SECTIONS = [
             ("Violations", "violations", "flag", "violation.view_all"),
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
             ("Tasks", "tasks", "list", "task.manage"),
+            ("Urgent texts", "urgent_notice", "megaphone", "sms.send_urgent"),
             ("Compliance calendar", "compliance", "calendar", "compliance.manage"),
             ("Community settings", "community_settings", "sliders", "lot.view_all"),
             ("ARC request types", "arc_project_types", "pencil", "arc.configure"),

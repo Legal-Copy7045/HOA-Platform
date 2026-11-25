@@ -169,3 +169,89 @@ class DigestItem(models.Model):
 
     def __str__(self) -> str:
         return f"digest item #{self.pk}"
+
+
+# --- Installable app and text alerts (Milestone 4) -------------------------------------
+
+from core.scoping import ScopedQuerySet  # noqa: E402
+
+
+class OwnLoginQuerySet(ScopedQuerySet):
+    """Rows that belong to one login. ``for_user`` returns only that login's
+    rows, for everyone (the board included): nobody manages another person's
+    devices or codes. Services that fan out use ``unscoped(reason)``."""
+
+    def for_user(self, user):
+        clone = self._clone()
+        clone._scope_ok = True
+        if not getattr(user, "is_authenticated", False):
+            return clone.none()
+        return clone.filter(user_id=user.pk)
+
+
+class PushSubscription(models.Model):
+    """One browser or installed app that asked for push notifications.
+    Removed when the person turns it off or the push service says it is gone
+    (404/410). Holds only what the push service needs to reach the device."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    endpoint = models.URLField(max_length=1000, unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=100)
+    created_at = models.DateTimeField(default=timezone.now)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+
+    objects = OwnLoginQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"push subscription #{self.pk}"
+
+
+class SmsVerification(models.Model):
+    """A 6-digit code texted to confirm a mobile number. Only a keyed hash of
+    the code is stored; it expires after ten minutes and allows a few tries."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    number = models.CharField(max_length=20)
+    code_hash = models.CharField(max_length=64)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    objects = OwnLoginQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"sms verification #{self.pk}"
+
+
+class UrgentNotice(models.Model):
+    """An urgent text the board sent to owners who opted in. Kept as a record
+    (never deleted); holds the short text and link, and counts only - never
+    who received it or their numbers."""
+
+    message = models.CharField(max_length=300)
+    link_path = models.CharField(max_length=200)
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    recipients = models.PositiveIntegerField(default=0)
+    sent_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"urgent notice #{self.pk}"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Urgent notices are kept as a record.")

@@ -136,6 +136,22 @@ FEATURES: list[Feature] = [
         set(),
         default=False,
     ),
+    # Installable app alerts (Milestone 4). The app itself (manifest, offline
+    # styles) is always on; these need keys or a provider in the environment.
+    _f(
+        "push",
+        "Push notifications",
+        "Owners can get update alerts on their phone or computer (needs VAPID keys).",
+        {"push_subscribe", "push_unsubscribe"},
+        default=False,
+    ),
+    _f(
+        "sms",
+        "Urgent text messages",
+        "Owners can opt in to texts; the board sends urgent notices (needs an SMS provider).",
+        {"sms_start", "sms_verify", "sms_stop", "urgent_notice"},
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"
