@@ -18,6 +18,7 @@ urlpatterns = [
     path("accounts/signup/", not_available),
     path("accounts/email/", not_available),
     path("accounts/", include("allauth.urls")),
+    path("", include("accounts.urls")),
 ]
 
 if settings.ADMIN_ENABLED:

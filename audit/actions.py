@@ -72,6 +72,13 @@ _SPECS = [
     _spec("mfa.recovery_codes_regenerated", "Recovery codes regenerated", "type"),
     _spec("password.changed", "Password changed or set"),
     _spec("password.reset", "Password reset by email link"),
+    # invitations (step 6)
+    _spec("person.login_linked", "Login linked to a person", "person_id", "user_id"),
+    _spec("invite.created", "Invitation created", "person_id"),
+    _spec("invite.resent", "Invitation re-sent", "person_id"),
+    _spec("invite.revoked", "Invitation revoked", "person_id"),
+    _spec("invite.sent", "Invitation email sent", "person_id", "send_count"),
+    _spec("invite.accepted", "Invitation accepted", "person_id"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Invitation · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>This invitation link can't be used</h1>
+  {% if signed_in %}
+    <p>You're already signed in. Sign out first if you want to accept an invitation for someone else.</p>
+  {% else %}
+    <p>It may have expired, been replaced by a newer invitation, or already been used.
+       Ask a board member to send you a new one.</p>
+  {% endif %}
+{% endblock %}

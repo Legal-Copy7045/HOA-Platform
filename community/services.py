@@ -489,3 +489,28 @@ def end_role(
             },
         )
     return assignment
+
+
+# --- Logins --------------------------------------------------------------------
+
+
+def link_login(person: Person, user, *, actor, request: HttpRequest | None = None) -> Person:
+    """Attach a login to a Person (called when an invitation is accepted)."""
+    if actor is not SYSTEM:
+        _authorize(actor, "person.manage")
+    with transaction.atomic(), system_access("link_login"):
+        person = Person.objects.select_for_update().get(pk=person.pk)
+        if person.user_id is not None:
+            raise CommunityError("This person already has a login.")
+        if Person.objects.filter(user=user).exists():
+            raise CommunityError("That login already belongs to someone else.")
+        person.user = user
+        person.save(update_fields=["user"])
+        _audit(
+            "person.login_linked",
+            actor=actor,
+            request=request,
+            target=person,
+            metadata={"person_id": person.pk, "user_id": user.pk},
+        )
+    return person

@@ -11,3 +11,11 @@ class CoreConfig(AppConfig):
         from core.db_roles import apply_runtime_grants_on_migrate
 
         post_migrate.connect(apply_runtime_grants_on_migrate, dispatch_uid="core.db_grants")
+
+        import logging
+
+        from django.conf import settings
+
+        if settings.EMAIL_REDIRECT_ALL_TO:
+            # Decision D2: make a forgotten POC setting impossible to miss.
+            logging.getLogger("core").warning("email.redirect_all_active")

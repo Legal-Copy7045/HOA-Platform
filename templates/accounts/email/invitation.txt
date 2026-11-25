@@ -1,0 +1,13 @@
+{% autoescape off %}You've been invited to the {{ site_name }} owner portal.
+
+To create your account, open this link:
+
+{{ link }}
+
+The link works once and expires on {{ expires_at|date:"F j, Y" }}. You'll choose a
+password and then set up a passkey or an authenticator app.
+
+If you weren't expecting this, you can ignore this email.
+
+-- 
+{{ site_name }}{% endautoescape %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Create your account · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Create your account</h1>
+  <p>You're setting up the login for <strong>{{ email }}</strong>.</p>
+  <p class="muted">Use a long passphrase you don't use anywhere else: four or five
+     unrelated words work well. Next you'll set up a passkey or an authenticator app.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<div class="muted">{{ field.help_text }}</div>{% endif %}
+      {{ field.errors }}
+    {% endfor %}
+    <p><button type="submit">Create account</button></p>
+  </form>
+{% endblock %}
