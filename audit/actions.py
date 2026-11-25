@@ -28,6 +28,31 @@ _SPECS = [
         "purged",
         "retention_days",
     ),
+    # community (step 3). IDs and dates only; no names, emails or addresses.
+    _spec("person.recorded", "Person added to the community register", "person_id"),
+    _spec(
+        "ownership.recorded",
+        "Ownership recorded",
+        "lot_id",
+        "person_id",
+        "ownership_type",
+        "start_date",
+    ),
+    _spec("ownership.ended", "Ownership ended", "lot_id", "person_id", "end_date"),
+    _spec(
+        "ownership.transferred",
+        "Lot transferred to new owners",
+        "lot_id",
+        "transfer_date",
+        "ended_count",
+        "new_owner_count",
+    ),
+    _spec(
+        "seat.recorded", "Board seat recorded", "person_id", "seat_type", "term_start", "term_end"
+    ),
+    _spec("seat.ended", "Board seat ended", "person_id", "ended_on", "reason"),
+    _spec("office.recorded", "Office holding recorded", "person_id", "office", "start_date"),
+    _spec("office.ended", "Office holding ended", "person_id", "office", "end_date"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

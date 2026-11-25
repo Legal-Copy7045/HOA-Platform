@@ -37,13 +37,16 @@ def register_append_only_table(table: str) -> None:
 def append_only_tables() -> frozenset[str]:
     """Every concrete AppendOnlyModel table, plus any registered explicitly."""
     from django.apps import apps
+    from simple_history.models import HistoricalChanges
 
     from core.append_only import AppendOnlyModel
 
+    # django-simple-history tables are append-only by nature: history rows are
+    # only ever inserted. Protect them with grants (no trigger needed).
     model_tables = {
         model._meta.db_table
         for model in apps.get_models()
-        if issubclass(model, AppendOnlyModel) and not model._meta.proxy
+        if issubclass(model, (AppendOnlyModel, HistoricalChanges)) and not model._meta.proxy
     }
     return frozenset(model_tables | _APPEND_ONLY_TABLES)
 

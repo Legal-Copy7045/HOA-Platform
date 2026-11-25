@@ -138,9 +138,10 @@ client-IP headers, and could not be handed to the HOA later. The dedicated
 | django-storages[s3] | S3-compatible storage (R2 / SeaweedFS); brings boto3 |
 | procrastinate[django] | Postgres-backed task queue (no Redis) |
 | django-csp | Content-Security-Policy headers (built into Django only from 6.0) |
+| django-simple-history | change history for lots, people, ownerships, seats, offices (CLAUDE.md stack); history tables are insert-only for the runtime role |
 
 Added in later steps, each justified when added: django-allauth[mfa],
-django-axes, django-simple-history.
+django-axes.
 
 Development only: pytest, pytest-django, pytest-cov, factory-boy, ruff, bandit,
 pip-audit, pip-tools.

@@ -28,10 +28,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
+    "simple_history",
     "procrastinate.contrib.django",
     "core",
     "accounts",
     "audit",
+    "community",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -51,6 +54,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -181,6 +185,11 @@ CONTENT_SECURITY_POLICY = {
 # Key for hashing identifiers we must not store in clear (unknown login emails).
 AUDIT_HASH_KEY = env("AUDIT_HASH_KEY", default="")
 AUDIT_IP_RETENTION_DAYS = env.int("AUDIT_IP_RETENTION_DAYS", default=365)
+
+# --- Governance rules from the Declaration/bylaws (CLAUDE.md rule 6) ----------
+# Officers must hold an active board seat (decision D1, 1a).
+OFFICERS_REQUIRE_BOARD_SEAT = env.bool("OFFICERS_REQUIRE_BOARD_SEAT", default=True)
+OFFICERS_REQUIRE_BOARD_SEAT_CITATION = env("OFFICERS_REQUIRE_BOARD_SEAT_CITATION", default="")
 
 # --- Logging ----------------------------------------------------------------
 LOG_LEVEL = env("LOG_LEVEL", default="INFO")

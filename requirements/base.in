@@ -8,3 +8,4 @@ whitenoise
 django-storages[s3]
 procrastinate[django]
 django-csp>=4
+django-simple-history
