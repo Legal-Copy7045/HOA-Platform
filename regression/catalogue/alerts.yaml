@@ -1,0 +1,11 @@
+# Installable app, push notifications and urgent text messages (Milestone 4, comms app).
+# `match` runs over "<stage>:<check>".
+- feature: "Installable app: manifest and root service worker behind sign-in, static files cached only, strict CSP"
+  since: M4
+  match: ["^unit:comms/tests/test_pwa_push.py::test_(manifest|service_worker|signed_in_pages|content_security)", "^manual:install the app"]
+- feature: "Push notifications: RFC 8291/8292 without new dependencies, known push services only, own devices only, title and link only, digest and legal notices respected"
+  since: M4
+  match: ["^unit:comms/tests/test_pwa_push.py::test_(encryption|vapid|only_known|post_refuses|generate_vapid|subscribe|people_see|scoped_manager|updates_push|no_push|legal_notices|gone_devices|other_failures|links_outside|web_push_sender)", "^manual:push notification arrives"]
+- feature: "Urgent text messages: verified opt-in (hashed codes, 10 minutes, rate-limited), board-only urgent notices with counts-only audit, STOP handling, Twilio-compatible provider"
+  since: M4
+  match: ["^unit:comms/tests/test_sms.py::test_", "^manual:urgent text arrives"]

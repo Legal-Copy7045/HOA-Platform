@@ -49,3 +49,15 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: install the app
+  check: "The portal installs to a phone home screen and a desktop, opens standalone with the leaf icon, still asks for sign-in, and shows no cached page after signing out."
+  steps: "Android Chrome: menu, Install app. iPhone Safari: Share, Add to Home Screen. Desktop Chrome: install icon. Open it, sign in, browse; sign out; reopen offline: expect the browser's offline page, never a portal page."
+  last: ""
+- key: push notification arrives
+  check: "With VAPID keys set and the push feature on, a device that turned notifications on gets an alert with a short title and opens the right signed-in page."
+  steps: "python manage.py generate_vapid_keys into .env; Admin, Features: Push on; My profile: Turn on for this device; have a board member reply on one of your requests; tap the alert; expect sign-in (if signed out) then the request page."
+  last: ""
+- key: urgent text arrives
+  check: "With a Twilio test account and the sms feature on, an owner confirms a number by code and receives the board's urgent text with the link and STOP note; replying STOP stops later texts."
+  steps: "Set SMS_PROVIDER=twilio and test credentials; Admin, Features: Urgent text messages on; My profile: enter a mobile number, enter the texted code; Board, Urgent texts: send; reply STOP; send again and check the owner is no longer counted."
+  last: ""

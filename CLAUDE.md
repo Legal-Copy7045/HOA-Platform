@@ -123,6 +123,7 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 - My items queue (`core/my_items.py`): add new "waiting on someone" work there, from scoped queries
 - Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
 - Optional features (board, Admin → Features): register in `core/features.py` (`FEATURES`, with every URL name); switched-off features 404 and leave the menu
+- Installable app and alerts (`comms`): `/manifest.webmanifest` and `/sw.js` (signed-in; the worker caches static files only); push via `comms/push.py` + `comms/webpush.py` (RFC 8291/8292 on `cryptography`, no pywebpush; keys from `python manage.py generate_vapid_keys`; posts only to `PUSH_ALLOWED_HOSTS`); urgent texts via `comms/sms.py` (providers `none`/`twilio`, verified opt-in on My profile, Board → Urgent texts). Both are optional features ("push", "sms"), off by default
 - Money tools: `ledger/accounting.py` (journal CSV export, deposit batches, bank reconciliation, 1099 worksheet, courtesy reminders, collections letter sequence); letters and resale certificate wording: `ledger/letters.py`, Finance → Letters
 - Security review findings and fixes: `docs/security-review-2026-11.md`
 - Updates without a terminal: System status → Check now / Install update (sysadmin); the VM's `infra/poc/portal-agent.sh` timer does the work (D25)
