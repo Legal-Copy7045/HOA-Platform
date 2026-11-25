@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}My items · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>My items</h1><p class="subtitle">Everything waiting on you, overdue first. Each item opens the page where you take the step.</p></div></div>
+  {% if counts %}<div class="grid grid-4">{% for c in counts %}<a class="stat {% if c.overdue %}tone-danger{% endif %}" href="#area-{{ forloop.counter }}"><div class="label">{{ c.area }}</div><div class="value">{{ c.count }}</div><div class="hint">{% if c.overdue %}{{ c.overdue }} overdue{% else %}waiting{% endif %}</div></a>{% endfor %}</div>{% endif %}
+  {% regroup items by area as areas %}
+  {% for group in areas %}
+    <section class="card" id="area-{{ forloop.counter }}"><h2>{{ group.grouper }}</h2>
+      <ul class="list">{% for it in group.list %}<li><div class="todo-icon tone-{{ it.tone }}">{% icon "clock" %}</div><div class="grow"><a class="title" href="{{ it.url }}">{{ it.title }}</a><div class="small muted">{{ it.detail }}</div></div>{% if it.overdue %}<span class="badge tone-danger">overdue</span>{% endif %}</li>{% endfor %}</ul>
+    </section>
+  {% empty %}{% include "partials/empty.html" with icon="check-circle" title="Nothing waiting on you" text="New requests, approvals and follow-ups will appear here." %}{% endfor %}
+{% endblock %}

@@ -74,6 +74,18 @@ def owner_panel(user, roles) -> dict:
                 "warning",
             )
         )
+    from operations.models import OwnerRequest
+
+    for r in OwnerRequest.objects.for_user(user).filter(state="waiting", requested_by=user):
+        todos.append(
+            _todo(
+                "mail",
+                f"Request #{r.pk}: {r.subject}",
+                "The board asked you for more information",
+                reverse("request_detail", args=[r.pk]),
+                "warning",
+            )
+        )
     for a in accounts:
         if a["balance"] > 0:
             todos.append(

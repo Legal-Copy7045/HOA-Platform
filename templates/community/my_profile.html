@@ -14,7 +14,7 @@
     </section>
     <aside>{% if person %}<section class="card"><h3>More ways to reach you</h3>
       <p class="small muted">Extra emails, phones or mailing addresses. Tick "send notices" on an email to get association notices there too.</p>
-      {% if methods %}<ul class="list">{% for m in methods %}<li><span class="grow">{{ m.get_kind_display }}{% if m.label %} ({{ m.label }}){% endif %}: {{ m.value }}{% if m.notices %} <span class="badge ok">notices</span>{% endif %}</span>
+      {% if methods %}<ul class="list">{% for m in methods %}<li><span class="grow">{{ m.get_kind_display }}{% if m.label %} ({{ m.label }}){% endif %}: {{ m.value }}{% if m.notices %} <span class="badge tone-success">notices</span>{% endif %}</span>
         <form method="post" action="{% url 'contact_method_remove' m.pk %}">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form></li>{% endfor %}</ul>{% endif %}
       <form method="post" action="{% url 'contact_method_add' %}">{% csrf_token %}
         <p><label>Kind <select name="kind">{% for value, label in method_kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></p>

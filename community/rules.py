@@ -120,6 +120,22 @@ REGISTRY: dict[str, RuleSpec] = {
         RuleSpec(
             "vote.pass_percent", "Share of votes cast needed to pass", PERCENT, None, "Voting"
         ),
+        *[
+            RuleSpec(
+                f"request.sla_days.{key}",
+                f"First response target: {label.lower()}s (business days)",
+                DAYS,
+                default,
+                "Owner requests",
+                "Board decision. Requests not answered by then are flagged as overdue.",
+            )
+            for key, label, default in (
+                ("general", "General question", "5"),
+                ("billing", "Billing question", "5"),
+                ("maintenance", "Maintenance report", "3"),
+                ("common_area", "Common area issue", "3"),
+            )
+        ],
     ]
 }
 

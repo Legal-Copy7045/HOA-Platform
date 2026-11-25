@@ -158,6 +158,7 @@ class CollectionCase(ScopedModel):
     )
     opened_at = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
+    follow_up_on = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["-opened_at"]

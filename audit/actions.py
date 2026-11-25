@@ -107,6 +107,11 @@ _SPECS = [
     _spec("account.contact_ended", "Account contact ended", "person_id", "kind"),
     _spec("contact.method_added", "Contact detail added", "kind"),
     _spec("contact.method_removed", "Contact detail removed", "kind"),
+    _spec("request.submitted", "Owner request submitted", "type", "lot_id"),
+    _spec("request.assigned", "Owner request assigned", "person_id"),
+    _spec("request.work_order_created", "Work order created from a request", "work_order_id"),
+    _spec("thread.message_posted", "Thread message posted", "kind", "object_id", "internal"),
+    _spec("followup.set", "Follow-up date set", "kind", "object_id", "on"),
     _spec(
         "branding.login_background_set", "Sign-in background uploaded", "variant", "width", "height"
     ),

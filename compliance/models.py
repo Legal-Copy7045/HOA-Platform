@@ -47,6 +47,7 @@ class Violation(ScopedModel):
     state_changed_at = models.DateTimeField(default=timezone.now)
     noticed_at = models.DateTimeField(null=True, blank=True)
     cure_by = models.DateField(null=True, blank=True)
+    follow_up_on = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     objects = ScopedQuerySet.as_manager()

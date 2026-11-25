@@ -1,0 +1,10 @@
+{% if allowed %}
+<section class="card"><h3>Follow up</h3>
+  {% if obj.follow_up_on %}<p class="small">Next check: <strong>{{ obj.follow_up_on|date:"M j, Y" }}</strong></p>{% else %}<p class="small muted">No follow-up date set.</p>{% endif %}
+  <form method="post" action="{% url 'follow_up_set' kind obj.pk %}" class="inline-form">{% csrf_token %}
+    <input type="date" name="on" value="{{ obj.follow_up_on|date:'Y-m-d' }}" aria-label="Follow-up date">
+    <button type="submit" class="secondary small">Save</button>
+  </form>
+  <p class="small muted">Shows in My items from that date.</p>
+</section>
+{% endif %}

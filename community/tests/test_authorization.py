@@ -284,6 +284,8 @@ MEMBER_READS = {
                 "arc.submit",
                 "ledger.view_own",
                 "resale.request",
+                "request.submit",
+                "request.view_own",
             },
         ),
         (
@@ -301,7 +303,7 @@ MEMBER_READS = {
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
         ("sysadmin", {"system.view_status", "invite.resend", "invite.revoke", "branding.manage"}),
-        ("former", {"history.view_own"}),
+        ("former", {"history.view_own", "request.view_own"}),
     ],
 )
 def test_permission_matrix(world, who, allowed):

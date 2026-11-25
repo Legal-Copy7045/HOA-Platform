@@ -65,6 +65,8 @@ BOARD_ONLY_MARKERS = (
     b"Lot B hot tub",
     b"Lot B boat in driveway",
     b"Lot B Buyer Agent",
+    b"Lot B leaking gutter",
+    b"Board note on lot B",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -80,6 +82,7 @@ MEMBER_PAGES = {
     "violations",
     "my_account",
     "resales",
+    "requests",
 }
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
@@ -89,6 +92,13 @@ PROTECTED = {
     "lot_list": ("GET", None),
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
+    "my_items": ("GET", None),
+    "request_detail": ("GET", "request_b"),
+    "request_action": ("POST", "request_b"),
+    "request_assign": ("POST", "request_b"),
+    "request_work_order": ("POST", "request_b"),
+    "thread_post": ("POST", "request_b"),
+    "follow_up_set": ("POST", "violation_b"),
     "lot_account_number": ("POST", "account_b"),
     "lot_account_contact_add": ("POST", "account_b"),
     "lot_account_contact_end": ("POST", "account_contact_b"),
@@ -298,6 +308,17 @@ def world():
         resale_b = ledger.request_resale(
             lot=lot_b, requester_name="Lot B Buyer Agent", actor=owner_b
         )
+        from comms import threads
+        from operations import services as operations
+
+        request_b = operations.submit_request(
+            lot=lot_b,
+            request_type="maintenance",
+            subject="Lot B leaking gutter",
+            description="Water everywhere",
+            actor=owner_b,
+        )
+        threads.post("request", request_b, body="Board note on lot B", actor=board)
         account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
         contact_b = services.add_account_contact(
             account_b,
@@ -310,6 +331,7 @@ def world():
         )
     targets = {
         "account_b": account_b.pk,
+        "request_b": request_b.pk,
         "account_contact_b": contact_b.pk,
         "contact_method_b": method_b.pk,
         "lot": lot_b.pk,
@@ -386,6 +408,12 @@ def _url(name, key, targets):
         kwargs["action"] = "send_notice"
     elif name == "violation_file":
         kwargs["file_id"] = targets["violation_b_file"]
+    elif name == "request_action":
+        kwargs["action"] = "withdraw"
+    elif name == "thread_post":
+        kwargs["kind"] = "request"
+    elif name == "follow_up_set":
+        kwargs["kind"] = "violation"
     elif name == "work_order_action":
         kwargs["action"] = "cancel"
     elif name == "invoice_action":

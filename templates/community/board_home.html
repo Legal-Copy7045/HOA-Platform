@@ -13,6 +13,10 @@
   {% endfor %}
   {% if rules_attention %}<div class="alert warning">{% icon "sliders" %}<span>{{ rules_attention }} governing rule{{ rules_attention|pluralize }} need{{ rules_attention|pluralize:"s," }} a value or citation. <a href="{% url 'community_settings' %}">Community settings</a></span></div>{% endif %}
 
+  <section class="card"><div class="card-head"><h2>{% icon "inbox" %} My items</h2><a class="small" href="{% url 'my_items' %}">Open the queue</a></div>
+    {% if item_counts %}<div class="grid grid-4">{% for c in item_counts %}<a class="stat {% if c.overdue %}tone-danger{% endif %}" href="{% url 'my_items' %}#area-{{ forloop.counter }}"><div class="label">{{ c.area }}</div><div class="value">{{ c.count }}</div><div class="hint">{% if c.overdue %}{{ c.overdue }} overdue{% else %}waiting on you{% endif %}</div></a>{% endfor %}</div>
+    {% else %}<p class="muted small">Nothing is waiting on you.</p>{% endif %}</section>
+
   <div class="grid grid-2">
     {% if user|can:"role.sysadmin.approve" %}<a class="stat {% if approvals_waiting %}tone-warning{% endif %}" href="{% url 'approvals' %}"><div class="label">Approvals waiting</div><div class="value">{{ approvals_waiting }}</div><div class="hint">sysadmin nominations and sign-in resets</div></a>{% endif %}
     {% if user|can:"invite.resend" %}<a class="stat" href="{% url 'invitations' %}"><div class="label">Open invitations</div><div class="value">{{ invites_open }}</div><div class="hint">not yet accepted</div></a>{% endif %}
@@ -35,7 +39,7 @@
       <li><a href="{% url 'collections' %}">Collections</a></li>{% if user|can:"resale.request" %}<li><a href="{% url 'resales' %}">Resale certificates</a></li>{% endif %}<li><a href="{% url 'reports' %}">Reports</a></li></ul></section>
     <section class="card"><h2>{% icon "pencil" %} Reviews and compliance</h2><ul class="links">
       <li><a href="{% url 'arc_list' %}">Architectural review</a></li><li><a href="{% url 'violations' %}">Violations</a></li>
-      <li><a href="{% url 'work_orders' %}">Work orders</a></li><li><a href="{% url 'vendors' %}">Vendors</a></li></ul></section>
+      {% if user|can:"request.manage" %}<li><a href="{% url 'requests' %}">Owner requests</a></li>{% endif %}<li><a href="{% url 'work_orders' %}">Work orders</a></li><li><a href="{% url 'vendors' %}">Vendors</a></li></ul></section>
     <section class="card"><h2>{% icon "vote" %} Governance</h2><ul class="links">
       <li><a href="{% url 'meetings' %}">Meetings</a></li><li><a href="{% url 'votes' %}">Votes and polls</a></li>
       <li><a href="{% url 'resolutions' %}">Resolutions and policies</a></li>{% if user|can:"records_request.manage" %}<li><a href="{% url 'records_requests' %}">Records requests</a></li>{% endif %}</ul></section>

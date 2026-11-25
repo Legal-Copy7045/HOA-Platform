@@ -21,7 +21,7 @@
       {% if a.upcoming %}<h3>Upcoming charges</h3>
       <div class="table-wrap"><table>
         <thead><tr><th>Due</th><th>Description</th><th class="num">Amount</th></tr></thead>
-        <tbody>{% for c in a.upcoming %}<tr><td class="nowrap">{{ c.due_on|date:"M j, Y" }}</td><td>{{ c.description }}{% if c.covered_by_credit %} <span class="badge ok">covered by credit</span>{% endif %}</td><td class="num">{{ c.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
+        <tbody>{% for c in a.upcoming %}<tr><td class="nowrap">{{ c.due_on|date:"M j, Y" }}</td><td>{{ c.description }}{% if c.covered_by_credit %} <span class="badge tone-success">covered by credit</span>{% endif %}</td><td class="num">{{ c.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
       </table></div>{% endif %}
       {% if a.account %}<h3>On this account</h3>
       <p class="small muted">Account {{ a.account.number }}</p>

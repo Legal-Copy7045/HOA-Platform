@@ -415,6 +415,20 @@ def notice_emails(person: Person) -> list[str]:
         )
 
 
+def lots_by_ids(ids) -> list[Lot]:
+    """Lots by id, for another app's service that has already checked the
+    caller's scope (e.g. the lots someone may raise a request for)."""
+    with system_access("lots by ids"):
+        return list(Lot.objects.filter(pk__in=list(ids)).order_by("number"))
+
+
+def staff_people(action: str) -> list[Person]:
+    """People whose login may perform ``action`` (for assignment pickers)."""
+    with system_access("staff people"):
+        people = list(Person.objects.filter(user__isnull=False, user__is_active=True))
+    return [p for p in people if can(p.user, action)]
+
+
 def notice_emails_for_users(users) -> list[str]:
     """Consented extra notice emails of the people behind these logins."""
     with system_access("notice emails for users"):

@@ -6,6 +6,7 @@ from __future__ import annotations
 from django.urls import NoReverseMatch, reverse
 
 from core import policy
+from core.my_items import MY_ITEMS_PERMISSIONS
 
 # (label, url name, icon, permission or tuple of alternatives; None = everyone)
 SECTIONS = [
@@ -13,10 +14,17 @@ SECTIONS = [
         "My home",
         [
             ("Home", "home", "home", None),
+            (
+                "My items",
+                "my_items",
+                "inbox",
+                MY_ITEMS_PERMISSIONS,
+            ),
             ("My lot", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
             ("Architectural requests", "arc_list", "pencil", "arc.submit"),
             ("Notices about my lot", "violations", "flag", "lot.view_own"),
+            ("My requests", "requests", "mail", "request.view_own"),
             ("My history", "my_history", "clock", "history.view_own"),
         ],
     ),
@@ -36,6 +44,7 @@ SECTIONS = [
         "Board",
         [
             ("Board overview", "board_home", "sliders", ("person.manage", "task.manage")),
+            ("Owner requests", "requests", "mail", "request.manage"),
             ("Approvals", "approvals", "check-circle", "role.sysadmin.approve"),
             ("People", "people", "users", "person.manage"),
             ("All lots", "lot_list", "map", "lot.view_all"),

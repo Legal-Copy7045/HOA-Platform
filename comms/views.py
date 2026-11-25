@@ -100,3 +100,33 @@ def event_cancel(request, pk):
     except services.CommsError as exc:
         messages.error(request, str(exc))
     return redirect("calendar")
+
+
+@login_required
+@require_POST
+def thread_post(request, kind, pk):
+    """Post on a subject's thread; the subject is fetched through its own
+    scoping first, so out-of-scope subjects are 404."""
+    from django.urls import reverse
+
+    from comms import threads
+
+    if kind not in threads.KINDS:
+        from django.http import Http404
+
+        raise Http404
+    obj = threads.subject_for(kind, pk, request.user)
+    try:
+        threads.post(
+            kind,
+            obj,
+            body=request.POST.get("body", ""),
+            internal=request.POST.get("internal") == "on",
+            actor=request.user,
+            request=request,
+        )
+    except threads.ThreadError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Message posted.")
+    return redirect(reverse(threads.DETAIL_URLS[kind], args=[obj.pk]) + "#thread")

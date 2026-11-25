@@ -1,6 +1,7 @@
 from django.urls import path, re_path
 
 from operations import finance_views as fv
+from operations import request_views as rv
 from operations import views
 
 urlpatterns = [
@@ -10,6 +11,15 @@ urlpatterns = [
         views.task_close,
         name="task_close",
     ),
+    path("requests/", rv.requests_list, name="requests"),
+    path("requests/<int:pk>/", rv.request_detail, name="request_detail"),
+    re_path(
+        r"^requests/(?P<pk>[0-9]+)/do/(?P<action>[a-z_]+)/$",
+        rv.request_action,
+        name="request_action",
+    ),
+    path("board/requests/<int:pk>/assign/", rv.request_assign, name="request_assign"),
+    path("board/requests/<int:pk>/work-order/", rv.request_work_order, name="request_work_order"),
     path("finance/vendors/", fv.vendors, name="vendors"),
     path("finance/vendors/<int:pk>/", fv.vendor_detail, name="vendor_detail"),
     path("finance/work-orders/", fv.work_orders, name="work_orders"),

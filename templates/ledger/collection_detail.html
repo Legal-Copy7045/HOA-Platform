@@ -10,6 +10,6 @@
   </div>
   <div class="split">
     <div>{% include "partials/workflow.html" with obj=obj %}</div>
-    <aside><section class="card"><h3>Letters</h3><a class="btn secondary" href="{% url 'lot_statement_pdf' obj.lot_id 'reminder' %}">{% icon "download" %} Reminder letter (PDF)</a></section></aside>
+    <aside>{% follow_up_form "collection" obj %}<section class="card"><h3>Letters</h3><a class="btn secondary" href="{% url 'lot_statement_pdf' obj.lot_id 'reminder' %}">{% icon "download" %} Reminder letter (PDF)</a></section></aside>
   </div>
 {% endblock %}

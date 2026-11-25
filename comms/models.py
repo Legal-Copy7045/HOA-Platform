@@ -88,3 +88,30 @@ class Event(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Events are cancelled, not deleted.")
+
+
+# --- Message threads (Milestone 3) ----------------------------------------------------
+
+from core.append_only import AppendOnlyModel  # noqa: E402
+
+
+class ThreadMessage(AppendOnlyModel):
+    """One message on the thread of a request, ARC request, violation or work
+    order. Append-only: a correction is a new message. ``internal`` messages
+    are for the board, manager and reviewers only (never the owner side);
+    who may read a thread is decided by comms.threads, through the subject's
+    own scoping."""
+
+    subject_kind = models.CharField(max_length=24)
+    subject_id = models.PositiveBigIntegerField()
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    body = models.TextField()
+    internal = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["subject_kind", "subject_id"])]
+
+    def __str__(self) -> str:
+        return f"message #{self.pk}"

@@ -99,6 +99,7 @@ class WorkOrder(models.Model):
     state = models.CharField(max_length=16, default="open")
     state_changed_at = models.DateTimeField(default=timezone.now)
     due_on = models.DateField(null=True, blank=True)
+    follow_up_on = models.DateField(null=True, blank=True)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -204,3 +205,94 @@ class InvoicePayment(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"payment #{self.pk}"
+
+
+# --- Owner requests (Milestone 3) ------------------------------------------------------
+
+from core.scoping import ScopedModel, ScopedQuerySet  # noqa: E402
+
+
+class RequestType(models.TextChoices):
+    GENERAL = "general", "General question"
+    BILLING = "billing", "Billing question"
+    MAINTENANCE = "maintenance", "Maintenance report"
+    COMMON_AREA = "common_area", "Common area issue"
+
+
+class RequestState(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    IN_PROGRESS = "in_progress", "In progress"
+    WAITING = "waiting", "Waiting on you"
+    RESOLVED = "resolved", "Resolved"
+    CLOSED = "closed", "Closed"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+
+
+OPEN_REQUEST_STATES = (RequestState.SUBMITTED, RequestState.IN_PROGRESS, RequestState.WAITING)
+
+
+class OwnerRequest(ScopedModel):
+    """A question or report from someone on an account (owner, authorized
+    contact or tenant). Owners and authorized contacts see their lot's
+    requests from their own time; tenants see only their own."""
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    request_type = models.CharField(max_length=16, choices=RequestType.choices)
+    subject = models.CharField(max_length=200)
+    description = models.TextField()
+    common_area = models.ForeignKey(
+        "community.CommonArea", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    state = models.CharField(
+        max_length=16, choices=RequestState.choices, default=RequestState.SUBMITTED
+    )
+    state_changed_at = models.DateTimeField(default=timezone.now)
+    assignee = models.ForeignKey(
+        "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    # Response target from the SLA rule for its type, fixed on submission.
+    respond_by = models.DateField(null=True, blank=True)
+    sla_citation = models.CharField(max_length=200, blank=True)
+    first_response_at = models.DateTimeField(null=True, blank=True)
+    work_order = models.ForeignKey(
+        WorkOrder, null=True, blank=True, on_delete=models.PROTECT, related_name="requests"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    objects = ScopedQuerySet.as_manager()
+    scope_lot_path = "lot"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        from core.scoping import owner_era_q
+
+        # Their own, plus their account lots' requests from their own time
+        # (owner_era_q covers owners, authorized and view-only contacts and
+        # former owners' periods; tenants only ever see their own).
+        mine = models.Q(requested_by_id=roles.user_id) if roles.user_id else models.Q(pk__in=[])
+        return queryset.filter(mine | owner_era_q(roles))
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Request #{self.pk}"
+
+    @property
+    def is_open(self) -> bool:
+        return self.state in OPEN_REQUEST_STATES
+
+    @property
+    def is_overdue(self) -> bool:
+        return bool(
+            self.is_open
+            and self.first_response_at is None
+            and self.respond_by
+            and self.respond_by < timezone.localdate()
+        )
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Requests are closed or withdrawn, not deleted.")

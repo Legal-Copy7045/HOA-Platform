@@ -1,10 +1,12 @@
 from django.conf import settings
 from django.http import Http404
-from django.urls import include, path
+from django.urls import include, path, re_path
 
 from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
 from core import preview
+from core.followups import set_follow_up
+from core.my_items_views import my_items_page
 from core.views import export_my_data, healthz, home, system_status
 
 
@@ -22,6 +24,12 @@ urlpatterns = [
     path("board/homeowner-view/", preview.start, name="owner_preview_start"),
     path("homeowner-view/exit/", preview.stop, name="owner_preview_stop"),
     path("board/sysadmin-activity/", sysadmin_activity, name="sysadmin_activity"),
+    path("my-items/", my_items_page, name="my_items"),
+    re_path(
+        r"^follow-up/(?P<kind>violation|collection|work_order)/(?P<pk>[0-9]+)/$",
+        set_follow_up,
+        name="follow_up_set",
+    ),
     # Invite-only, and no self-service change of email address (D5). These
     # come before allauth's own URLs so they win.
     path("accounts/signup/", not_available),

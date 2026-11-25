@@ -108,6 +108,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "violation.decide": frozenset({BOARD}),
     # Operations and money
     "vendor.manage": frozenset({BOARD, MANAGER}),
+    # Owner requests: owners, authorized contacts and tenants raise them
+    # (view-only contacts and former owners cannot).
+    "request.submit": frozenset({OWNER, AUTHORIZED, TENANT}),
+    "request.view_own": RESIDENTS | {FORMER_OWNER},
+    "request.manage": frozenset({BOARD, MANAGER}),
+    "followup.view": frozenset({BOARD, MANAGER}),
     "workorder.manage": frozenset({BOARD, MANAGER}),
     "invoice.enter": frozenset({BOARD, MANAGER}),
     "invoice.approve": frozenset({BOARD}),
@@ -158,6 +164,8 @@ class Roles:
     # (lot_id, since) for account contacts: the account's opening date.
     contact_since: tuple[tuple[int, datetime.date], ...] = ()
     tenant_lot_ids: frozenset[int] = frozenset()
+    # The login these roles belong to (None in the homeowner view).
+    user_id: int | None = None
     # Former owners: (lot_id, start, end) of each past ownership period, and
     # the dormant accounts they were on (read-only history).
     former_periods: tuple[tuple[int, datetime.date, datetime.date], ...] = ()
@@ -253,6 +261,7 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         tenant_lot_ids=frozenset(contacts["tenant"]),
         former_periods=tuple(sorted(former["periods"])),
         former_account_ids=frozenset(former["accounts"]),
+        user_id=user.pk,
     )
 
 

@@ -183,3 +183,36 @@ def actor_label(context, actor) -> str:
         if group in groups:
             return label
     return "an owner"
+
+
+@register.inclusion_tag("partials/thread.html", takes_context=True)
+def thread_panel(context, kind, obj):
+    """The message thread on a request, ARC request, violation or work order.
+    ``obj`` was already fetched through its scoping by the page's view."""
+    from comms import threads
+
+    user = context["user"]
+    return {
+        "kind": kind,
+        "obj": obj,
+        "messages_list": threads.messages_for(kind, obj, user),
+        "acc": threads.access(kind, obj, user),
+        "csrf_token": context.get("csrf_token"),
+        "user": user,
+    }
+
+
+@register.inclusion_tag("partials/follow_up.html", takes_context=True)
+def follow_up_form(context, kind, obj):
+    perms = {
+        "violation": "violation.manage",
+        "collection": "collections.manage",
+        "work_order": "workorder.manage",
+    }
+    user = context["user"]
+    return {
+        "kind": kind,
+        "obj": obj,
+        "allowed": policy.can(user, perms[kind]),
+        "csrf_token": context.get("csrf_token"),
+    }

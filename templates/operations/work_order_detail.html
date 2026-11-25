@@ -9,9 +9,12 @@
   <div class="split">
     <div>
       <section class="card prose">{{ obj.description|default:"No description."|linebreaks }}</section>
+      {% thread_panel "work_order" obj %}
       {% include "partials/workflow.html" with obj=obj %}
     </div>
     <aside>
+      {% follow_up_form "work_order" obj %}
+      {% if from_requests %}<section class="card"><h3>From owner request</h3>{% for r in from_requests %}<p><a href="{% url 'request_detail' r.pk %}">Request #{{ r.pk }}</a></p>{% endfor %}</section>{% endif %}
       <section class="card"><h3>Vendor</h3>
         {% if obj.vendor %}<p><a href="{% url 'vendor_detail' obj.vendor_id %}">{{ obj.vendor }}</a></p>{% else %}<p class="muted small">Not assigned yet.</p>{% endif %}
         {% if can_manage and obj.state == "open" %}<form method="post">{% csrf_token %}<label for="v">Assign vendor</label><select id="v" name="vendor">{% for v in vendors %}<option value="{{ v.pk }}">{{ v.name }}</option>{% endfor %}</select><div class="form-actions"><button type="submit" class="secondary small">Set vendor</button></div></form>{% endif %}

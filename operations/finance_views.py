@@ -17,6 +17,7 @@ from operations import services
 from operations.models import (
     ExpenseCategory,
     Invoice,
+    OwnerRequest,
     PaymentMethod,
     Priority,
     Vendor,
@@ -175,6 +176,7 @@ def work_order_detail(request, pk):
             "action_url_name": "work_order_action",
             "vendors": Vendor.objects.filter(active=True),
             "invoices": wo.invoices.all(),
+            "from_requests": OwnerRequest.objects.for_user(request.user).filter(work_order=wo),
             "can_manage": policy.can(request.user, "workorder.manage"),
         },
     )

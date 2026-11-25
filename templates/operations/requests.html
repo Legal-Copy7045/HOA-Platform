@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Requests · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>{% if staff %}Owner requests{% else %}My requests{% endif %}</h1>
+    <p class="subtitle">{% if staff %}Questions and reports from owners, contacts and tenants. Each type has a response target set in Community settings.{% else %}Ask a question or report a problem. We'll reply here and email you a link.{% endif %}</p></div></div>
+  <div class="split">
+    <div>
+      <nav class="subnav" aria-label="Filter">
+        <a href="?show=open"{% if show == "open" %} aria-current="page"{% endif %}>Open</a>
+        <a href="?show=closed"{% if show == "closed" %} aria-current="page"{% endif %}>Closed</a>
+        <a href="?show=all"{% if show == "all" %} aria-current="page"{% endif %}>All</a>
+        {% if staff %}<a href="?show={{ show }}&amp;mine=1"{% if request.GET.mine == "1" %} aria-current="page"{% endif %}>Assigned to me</a>{% endif %}
+      </nav>
+      <section class="card">
+        {% if page.object_list %}
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Subject</th><th>Type</th>{% if staff %}<th>Lot</th><th>Assigned</th>{% endif %}<th>Respond by</th><th>Status</th></tr></thead>
+            <tbody>{% for r in page.object_list %}<tr>
+              <td>{{ r.pk }}</td><td><a href="{% url 'request_detail' r.pk %}">{{ r.subject }}</a></td><td>{{ r.get_request_type_display }}</td>
+              {% if staff %}<td>{{ r.lot.number }}</td><td>{{ r.assignee.display_name|default:"—" }}</td>{% endif %}
+              <td class="nowrap">{% if r.first_response_at %}<span class="muted small">answered</span>{% elif r.respond_by %}{{ r.respond_by|date:"M j" }}{% if r.is_overdue %} <span class="badge tone-danger">overdue</span>{% endif %}{% else %}—{% endif %}</td>
+              <td>{% status r.state %}</td></tr>{% endfor %}</tbody>
+          </table></div>
+          {% include "partials/pager.html" %}
+        {% else %}{% include "partials/empty.html" with icon="inbox" title="No requests here" %}{% endif %}
+      </section>
+    </div>
+    {% if form %}<aside><section class="card"><h2>New request</h2>
+      <form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Send request</button></div></form>
+    </section></aside>{% endif %}
+  </div>
+{% endblock %}

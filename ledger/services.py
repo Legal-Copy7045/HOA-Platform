@@ -778,3 +778,18 @@ def save_disclosures(obj: ResaleRequest, text: str, *, actor, request=None) -> N
             raise LedgerError("Disclosures can be changed only before the certificate is issued.")
         ResaleRequest.objects.filter(pk=obj.pk).update(other_disclosures=text[:5000])
         record_event("resale.disclosures_saved", actor=actor, request=request, target=obj)
+
+
+def set_case_follow_up(case: CollectionCase, on, *, actor, request=None) -> CollectionCase:
+    """Board or manager: the date to check on this collection case next."""
+    _authorize(actor, "collections.manage")
+    CollectionCase.objects.unscoped("follow-up").filter(pk=case.pk).update(follow_up_on=on)
+    case.follow_up_on = on
+    record_event(
+        "followup.set",
+        actor=actor,
+        request=request,
+        target=case,
+        metadata={"kind": "collection", "object_id": case.pk, "on": on.isoformat() if on else None},
+    )
+    return case

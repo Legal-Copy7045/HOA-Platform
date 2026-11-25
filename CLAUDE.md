@@ -106,6 +106,8 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Break-glass (sysadmin, audited): `breakglass_end_ownership`, `breakglass_end_role`, `breakglass_lock_user`, `breakglass_enrollment_code` (only while fewer than two other board members can sign in), `rescan_files`, each with `--actor` and `--reason`
 - Web/worker refuse to run as the DB owner: `python manage.py check_db_role` (run by the entrypoint)
 - File store write/read/delete probe: `python manage.py check_storage`
+- Threads on requests, ARC, violations and work orders: `comms.threads` (subject fetched through its own scoping; `internal` notes staff-only and hidden from recused reviewers; emails carry a link only). Render with `{% thread_panel kind obj %}`; follow-up dates with `{% follow_up_form kind obj %}`
+- My items queue (`core/my_items.py`): add new "waiting on someone" work there, from scoped queries
 - Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
 - Security review findings and fixes: `docs/security-review-2026-11.md`
 - POC VM: see `infra/poc/README.md` and `docs/runbook.md`

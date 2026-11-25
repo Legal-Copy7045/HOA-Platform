@@ -3,7 +3,7 @@
   <p class="muted small">An account is one ownership period of this lot. It goes dormant when the lot is sold; its history stays here.</p>
   {% for account in accounts %}
     <div class="account-block">
-      <h3>Account {{ account.number }} <span class="badge {% if account.is_active %}ok{% else %}muted{% endif %}">{{ account.status_label }}</span></h3>
+      <h3>Account {{ account.number }} <span class="badge {% if account.is_active %}tone-success{% endif %}">{{ account.status_label }}</span></h3>
       <div class="small muted">Opened {{ account.opened_on|date:"M j, Y" }}{% if account.closed_on %} · closed {{ account.closed_on|date:"M j, Y" }}{% endif %}</div>
       {% if account.is_active and can_manage_accounts %}
         <form method="post" action="{% url 'lot_account_number' account.pk %}" class="inline-form">{% csrf_token %}

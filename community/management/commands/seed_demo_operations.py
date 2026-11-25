@@ -281,6 +281,34 @@ class Command(BaseCommand):
         compliance.VIOLATION.apply(v, "send_notice", actor=b1)
         ledger.request_resale(lot=lots[12], requester_name="Demo Seller", actor=owner12)
         ops.create_task(title="Get second pond maintenance quote (demo)", actor=b1)
+        compliance.set_follow_up(v, today() + datetime.timedelta(days=7), actor=b1)
+        ops.set_work_order_follow_up(wo, today(), actor=b1)
+
+        # Owner requests with threads (Milestone 3).
+        from comms import threads
+
+        leak = ops.submit_request(
+            lot=lots[3],
+            request_type="common_area",
+            subject="Pond fountain not running (demo)",
+            description="The fountain has been off for a week.",
+            actor=owner3,
+        )
+        threads.post("request", leak, body="Thanks, we've called the vendor (demo).", actor=b1)
+        threads.post(
+            "request",
+            leak,
+            body="Vendor quote pending (internal demo note).",
+            internal=True,
+            actor=b1,
+        )
+        ops.submit_request(
+            lot=lots[12],
+            request_type="billing",
+            subject="Question about my statement (demo)",
+            description="Is the March dues payment on my account?",
+            actor=owner12,
+        )
 
         declaration = pdf.render(
             [

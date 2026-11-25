@@ -168,10 +168,13 @@ def board_home(request):
     resets_waiting = [
         r for r in MfaReset.objects.for_user(request.user) if r.status == "awaiting_approval"
     ]
+    from core.my_items import counts, items_for
+
     return render(
         request,
         "community/board_home.html",
         {
+            "item_counts": counts(items_for(request.user)),
             "thin": policy.thinly_covered_actions(),
             "past_term": BoardSeat.objects.for_user(request.user)
             .past_term_end()

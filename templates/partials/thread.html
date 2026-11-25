@@ -1,0 +1,22 @@
+{% load portal %}
+<section class="card" id="thread"><h2>Messages</h2>
+  {% if messages_list %}
+    <ul class="thread">
+      {% for m in messages_list %}
+        <li class="thread-msg{% if m.internal %} is-internal{% endif %}{% if m.author_id == user.pk %} is-mine{% endif %}">
+          <div class="small muted">{% actor_label m.author %} · {{ m.created_at|date:"M j, Y g:i A" }}{% if m.internal %} · <span class="badge tone-warning">Internal note</span>{% endif %}</div>
+          <div class="prose">{{ m.body|linebreaks }}</div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}<p class="muted small">No messages yet.</p>{% endif %}
+  {% if acc.post %}
+    <form method="post" action="{% url 'thread_post' kind obj.pk %}">{% csrf_token %}
+      <label for="thread-body-{{ obj.pk }}">Write a message</label>
+      <textarea id="thread-body-{{ obj.pk }}" name="body" rows="4" maxlength="5000" required></textarea>
+      {% if acc.post_internal %}<p><label><input type="checkbox" name="internal"> Internal note (board, manager and reviewers only)</label></p>{% endif %}
+      <div class="form-actions"><button type="submit">Send</button></div>
+    </form>
+    {% if not acc.post_internal %}<p class="small muted">We'll email you a link when there's a reply.</p>{% endif %}
+  {% endif %}
+</section>

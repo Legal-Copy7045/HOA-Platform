@@ -161,3 +161,22 @@ def notice_letter(v: Violation) -> bytes:
         ("small", "No fine has been assessed by this notice."),
     ]
     return pdf.render(body, title=f"Violation notice {v.pk}")
+
+
+def set_follow_up(violation: Violation, on, *, actor, request=None) -> Violation:
+    """Board or manager: the date to check on this violation next."""
+    require(actor, "violation.manage")
+    Violation.objects.unscoped("follow-up").filter(pk=violation.pk).update(follow_up_on=on)
+    violation.follow_up_on = on
+    record_event(
+        "followup.set",
+        actor=actor,
+        request=request,
+        target=violation,
+        metadata={
+            "kind": "violation",
+            "object_id": violation.pk,
+            "on": on.isoformat() if on else None,
+        },
+    )
+    return violation

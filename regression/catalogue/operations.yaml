@@ -14,3 +14,12 @@
 - feature: "Reports and CSV downloads"
   since: M2
   match: ["^unit:reports/tests"]
+- feature: "Owner requests: raise (owners, authorized contacts, tenants), response targets in business days with citations, workflow, assignment, work order from a report"
+  since: M3
+  match: ["^unit:operations/tests/test_requests.py::test_(business_days|request_gets|overdue|an_owner_reply|owner_cannot_raise|view_only_contacts|tenant_raises|authorized_contact|buyer_does_not|other_owner_gets|owner_raises|board_asks|only_the_requester|owner_cannot_resolve|maintenance_report|assignment_only)"]
+- feature: "Message threads on requests, ARC, violations and work orders: internal notes, recusal, link-only emails, append-only"
+  since: M3
+  match: ["^unit:operations/tests/test_requests.py::test_(internal_notes|owner_cannot_post|thread_email|internal_note_emails|messages_are_append|work_order_threads|violation_thread|recused_arc)"]
+- feature: "Follow-up dates and the My items queue with per-area counts"
+  since: M3
+  match: ["^unit:operations/tests/test_requests.py::test_(follow_up|owners_cannot_set|my_items|owner_sees_requests|invoice_approval_is)"]
