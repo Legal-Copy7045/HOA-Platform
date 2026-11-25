@@ -3,6 +3,11 @@ updates:
   - package-ecosystem: pip
     directory: /requirements
     schedule: {interval: weekly}
+    ignore:
+      # Stay on the Django LTS line (CLAUDE.md). Patch releases still arrive;
+      # moving to the next LTS (6.2, April 2027) is a deliberate decision.
+      - dependency-name: django
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: weekly}
