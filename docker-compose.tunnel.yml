@@ -35,6 +35,7 @@ services:
       FRESHCLAM_CHECKS: "2"   # signature checks per day
     volumes:
       - clamdata:/var/lib/clamav
+      - ./docker/clamav/clamd.conf:/etc/clamav/clamd.conf:ro   # reload in place (D26)
     healthcheck:
       test: ["CMD", "clamdcheck.sh"]
       interval: 5m

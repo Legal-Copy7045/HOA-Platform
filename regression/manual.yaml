@@ -49,3 +49,7 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: scanner reloads in place
+  check: "On the VM, ClamAV runs with ConcurrentDatabaseReload disabled and memory stays near one signature copy during a reload."
+  steps: "docker compose exec clamav clamconf -n | grep Concurrent (expect disabled); watch docker stats during a freshclam update; upload a test file just after and see it scanned once the reload finishes."
+  last: ""

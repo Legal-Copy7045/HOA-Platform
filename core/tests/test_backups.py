@@ -90,3 +90,13 @@ def test_backup_scripts_keep_the_password_off_the_command_line():
         assert '-e PGPASSWORD="' not in text
     assert "HMAC-SHA256" in Path("infra/poc/backup.sh").read_text()
     assert "keyed checksum" in Path("infra/poc/restore-drill.sh").read_text()
+
+
+def test_scanner_reloads_in_place():
+    from pathlib import Path
+
+    assert "ConcurrentDatabaseReload no" in Path("docker/clamav/clamd.conf").read_text()
+    assert (
+        "docker/clamav/clamd.conf:/etc/clamav/clamd.conf:ro"
+        in Path("docker-compose.tunnel.yml").read_text()
+    )
