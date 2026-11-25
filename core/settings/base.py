@@ -26,7 +26,7 @@ APP_VERSION = env("APP_VERSION", default="dev")
 # seed_demo refuses to run unless this is true (never set it in production).
 SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
 # Absolute address used in emailed links (the worker has no request to ask).
-PORTAL_BASE_URL = env("PORTAL_BASE_URL", default="http://localhost:8000").rstrip("/")
+PORTAL_BASE_URL = (env("PORTAL_BASE_URL", default="") or "http://localhost:8000").rstrip("/")
 INVITE_TTL_HOURS = env.int("INVITE_TTL_HOURS", default=168)
 # Two-person flows (decisions D4, D5)
 SYSADMIN_NOMINATION_TTL_DAYS = env.int("SYSADMIN_NOMINATION_TTL_DAYS", default=7)

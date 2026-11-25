@@ -29,6 +29,12 @@ def _load(monkeypatch, **overrides):
             sys.modules.pop(name, None)
 
 
+def test_portal_url_defaults_to_the_public_host(monkeypatch):
+    monkeypatch.delenv("PORTAL_BASE_URL", raising=False)
+    module = _load(monkeypatch)
+    assert module.PORTAL_BASE_URL == "https://portal.example.org"
+
+
 def test_safe_configuration_loads(monkeypatch):
     module = _load(monkeypatch, TRUSTED_PROXY_CIDRS="172.30.50.10/32")
     assert module.TRUSTED_PROXY_CIDRS == ["172.30.50.10/32"]
@@ -56,6 +62,7 @@ def test_safe_configuration_loads(monkeypatch):
         {"TRUSTED_PROXY_CIDRS": "0.0.0.0/0"},
         {"TRUSTED_PROXY_CIDRS": "::/0"},
         {"TRUSTED_PROXY_CIDRS": "not-a-network"},
+        {"PORTAL_BASE_URL": "http://localhost:8000"},
     ],
 )
 def test_unsafe_configuration_is_refused(monkeypatch, overrides):

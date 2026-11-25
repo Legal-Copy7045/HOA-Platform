@@ -12,6 +12,11 @@ SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
 # Start short on the POC; raise to 31536000 for production (runbook).
 SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=3600)
 
+# Emailed links must point at the public site. If PORTAL_BASE_URL was not
+# set (e.g. an older .env), use the public hostname rather than localhost.
+if not env("PORTAL_BASE_URL", default="") and ALLOWED_HOSTS:  # noqa: F405
+    PORTAL_BASE_URL = f"https://{ALLOWED_HOSTS[0]}"
+
 _problems = []
 if not ALLOWED_HOSTS:  # noqa: F405
     _problems.append("DJANGO_ALLOWED_HOSTS must list the public hostname(s)")
@@ -33,6 +38,8 @@ for _cidr in TRUSTED_PROXY_CIDRS:  # noqa: F405
         continue
     if _net.prefixlen == 0:
         _problems.append("TRUSTED_PROXY_CIDRS must not trust every address")
+if not PORTAL_BASE_URL.startswith("https://"):
+    _problems.append("PORTAL_BASE_URL must be the public https:// address")
 if ADMIN_ENABLED:  # noqa: F405
     _problems.append("ADMIN_ENABLED must be false in production (decision Q9)")
 if env.bool("DJANGO_DEBUG", default=False):
