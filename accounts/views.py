@@ -58,3 +58,28 @@ def invite_accept(request):
             )
             return redirect("mfa_index")
     return render(request, "accounts/invite_accept.html", {"form": form, "email": invitation.email})
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def enroll_with_code(request):
+    """After an assisted reset: the code from the approving board member."""
+    from accounts import mfa_reset
+
+    if not request.user.is_authenticated:
+        return redirect("account_login")
+    reset = mfa_reset.open_reset_for(request.user)
+    if reset is None:
+        return redirect("mfa_index")
+    error = None
+    if request.method == "POST" and reset.status == "awaiting_code":
+        if mfa_reset.redeem_code(
+            user=request.user, code=request.POST.get("code", ""), request=request
+        ):
+            messages.success(
+                request, "Code accepted. Now set up a passkey or an authenticator app."
+            )
+            return redirect("mfa_index")
+        reset.refresh_from_db()
+        error = "That code is not right."
+    return render(request, "accounts/enroll_with_code.html", {"reset": reset, "error": error})

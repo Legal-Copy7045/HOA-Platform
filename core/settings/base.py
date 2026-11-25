@@ -24,6 +24,10 @@ SITE_NAME = env("SITE_NAME", default="Oak Creek Farms HOA")
 # Absolute address used in emailed links (the worker has no request to ask).
 PORTAL_BASE_URL = env("PORTAL_BASE_URL", default="http://localhost:8000").rstrip("/")
 INVITE_TTL_HOURS = env.int("INVITE_TTL_HOURS", default=168)
+# Two-person flows (decisions D4, D5)
+SYSADMIN_NOMINATION_TTL_DAYS = env.int("SYSADMIN_NOMINATION_TTL_DAYS", default=7)
+MFA_RESET_REQUEST_TTL_DAYS = env.int("MFA_RESET_REQUEST_TTL_DAYS", default=7)
+MFA_RESET_CODE_TTL_HOURS = env.int("MFA_RESET_CODE_TTL_HOURS", default=24)
 
 INSTALLED_APPS = [
     "django.contrib.auth",

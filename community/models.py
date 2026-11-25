@@ -327,3 +327,40 @@ class RoleAssignment(NeverDeleteMixin, ScopedModel):
 
     def __str__(self) -> str:
         return f"{self.get_role_display()} assignment #{self.pk}"
+
+
+class NominationOutcome(models.TextChoices):
+    APPROVED = "approved", "Approved"
+    DECLINED = "declined", "Declined or withdrawn"
+
+
+class SysadminNomination(NeverDeleteMixin, ScopedModel):
+    """Granting sysadmin needs two different board members (decision D4)."""
+
+    person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="+")
+    nominated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    nominated_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    outcome = models.CharField(max_length=16, choices=NominationOutcome.choices, blank=True)
+    assignment = models.OneToOneField(
+        "RoleAssignment", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "person"
+
+    class Meta:
+        ordering = ["-nominated_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Sysadmin nomination #{self.pk}"
+
+    @property
+    def is_open(self) -> bool:
+        return not self.outcome and self.expires_at > timezone.now()

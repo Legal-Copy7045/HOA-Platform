@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Enter your enrollment code · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Enter your enrollment code</h1>
+  {% if reset.status == "awaiting_code" %}
+    <p>The board reset your sign-in because you lost access to your authenticator.
+       A board member gave you a one-time code (for example <code>ABCD-EFGH-JKLM</code>).</p>
+    {% if error %}<p class="message error">{{ error }}</p>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <label for="code">Enrollment code</label>
+      <input id="code" name="code" autocomplete="one-time-code" autocapitalize="characters" required>
+      <p><button type="submit">Continue</button></p>
+    </form>
+  {% else %}
+    <p class="warning">This enrollment code can no longer be used
+       ({% if reset.status == "code_locked" %}too many wrong attempts{% else %}it has expired{% endif %}).
+       Ask a board member to start a new reset.</p>
+  {% endif %}
+{% endblock %}

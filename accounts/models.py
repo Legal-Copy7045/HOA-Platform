@@ -43,6 +43,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
+    # Bumping this signs the user out of every session (assisted reset, D5).
+    session_generation = models.PositiveIntegerField(default=0)
 
     objects = UserManager()
 
@@ -64,6 +66,17 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Users are never deleted; set is_active=False instead.")
+
+    def _get_session_auth_hash(self, secret=None):
+        # Django checks this on every request; any change ends existing sessions.
+        from django.utils.crypto import salted_hmac
+
+        return salted_hmac(
+            "accounts.User.session",
+            f"{self.password}:{self.session_generation}",
+            secret=secret,
+            algorithm="sha256",
+        ).hexdigest()
 
 
 class InvitationQuerySet(ScopedQuerySet):
@@ -121,3 +134,61 @@ class Invitation(ScopedModel):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Invitations are revoked, never deleted.")
+
+
+class VerificationMethod(models.TextChoices):
+    IN_PERSON = "in_person", "In person"
+    PHONE_KNOWN_NUMBER = "phone_known_number", "Phone call to a number on file"
+    VIDEO_CALL = "video_call", "Video call"
+    OTHER = "other", "Other (explain to the approving board member)"
+
+
+class MfaReset(models.Model):
+    """Assisted reset after losing every authenticator (decision D5).
+
+    Board member A starts it, a different board member B approves it. Approval
+    removes the authenticators, signs the user out everywhere and produces a
+    single-use enrollment code that B hands over out of band.
+    """
+
+    MAX_CODE_ATTEMPTS = 5
+
+    subject = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    verification_method = models.CharField(max_length=24, choices=VerificationMethod.choices)
+    started_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    started_at = models.DateTimeField(default=timezone.now)
+    request_expires_at = models.DateTimeField()
+    approved_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    code_hash = models.CharField(max_length=64, blank=True)
+    code_expires_at = models.DateTimeField(null=True, blank=True)
+    code_used_at = models.DateTimeField(null=True, blank=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-started_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"MFA reset #{self.pk}"
+
+    @property
+    def status(self) -> str:
+        now = timezone.now()
+        if self.cancelled_at:
+            return "cancelled"
+        if self.code_used_at:
+            return "completed"
+        if self.approved_at:
+            if self.failed_attempts >= self.MAX_CODE_ATTEMPTS:
+                return "code_locked"
+            return "awaiting_code" if self.code_expires_at > now else "code_expired"
+        return "awaiting_approval" if self.request_expires_at > now else "expired"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Resets are cancelled, never deleted.")

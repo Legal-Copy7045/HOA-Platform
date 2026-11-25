@@ -79,6 +79,15 @@ _SPECS = [
     _spec("invite.revoked", "Invitation revoked", "person_id"),
     _spec("invite.sent", "Invitation email sent", "person_id", "send_count"),
     _spec("invite.accepted", "Invitation accepted", "person_id"),
+    # two-person flows (step 7)
+    _spec("role.sysadmin_nominated", "Sysadmin nominated", "person_id"),
+    _spec("role.sysadmin_approved", "Sysadmin nomination approved", "person_id"),
+    _spec("role.sysadmin_declined", "Sysadmin nomination declined or withdrawn", "person_id"),
+    _spec("mfa_reset.started", "Sign-in reset started", "user_id", "verification_method"),
+    _spec("mfa_reset.approved", "Sign-in reset approved", "user_id"),
+    _spec("mfa_reset.cancelled", "Sign-in reset cancelled", "user_id"),
+    _spec("mfa_reset.code_redeemed", "Enrollment code used", "user_id"),
+    _spec("mfa_reset.code_failed", "Wrong enrollment code entered", "user_id", "attempts"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

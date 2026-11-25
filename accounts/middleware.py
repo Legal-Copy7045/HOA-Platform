@@ -24,14 +24,27 @@ ALLOWED_URL_NAMES = {
 }
 
 
-def _is_allowed(request) -> bool:
-    if request.path_info.startswith("/" + settings.STATIC_URL.lstrip("/")):
-        return True
+# While an approved assisted reset waits for its code, only these work.
+RESET_ALLOWED_URL_NAMES = {"enroll_with_code", "account_logout", "healthz"}
+
+
+def _url_name(request) -> str | None:
     try:
-        match = resolve(request.path_info)
+        return resolve(request.path_info).url_name or ""
     except Resolver404:
+        return None
+
+
+def _is_static(request) -> bool:
+    return request.path_info.startswith("/" + settings.STATIC_URL.lstrip("/"))
+
+
+def _is_allowed(request) -> bool:
+    if _is_static(request):
+        return True
+    name = _url_name(request)
+    if name is None:
         return False
-    name = match.url_name or ""
     return name.startswith("mfa_") or name in ALLOWED_URL_NAMES
 
 
@@ -41,6 +54,11 @@ class RequireMFAMiddleware:
 
     def __call__(self, request):
         user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and not _is_static(request):
+            from accounts.mfa_reset import open_reset_for
+
+            if open_reset_for(user) and _url_name(request) not in RESET_ALLOWED_URL_NAMES:
+                return redirect("enroll_with_code")
         if (
             user is not None
             and user.is_authenticated

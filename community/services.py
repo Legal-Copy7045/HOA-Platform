@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
+from django.utils import timezone
 
 from audit.models import Channel
 from audit.services import record_event
@@ -488,6 +489,8 @@ def end_role(
                 "end_date": _iso(end_date),
             },
         )
+        if assignment.role == Role.SYSADMIN:
+            _board_notice("sysadmin_revoked")
     return assignment
 
 
@@ -514,3 +517,111 @@ def link_login(person: Person, user, *, actor, request: HttpRequest | None = Non
             metadata={"person_id": person.pk, "user_id": user.pk},
         )
     return person
+
+
+# --- Sysadmin: two board members to grant, one to revoke (D4) ------------------
+
+
+def _board_notice(kind: str) -> None:
+    from community.tasks import notify_board
+
+    transaction.on_commit(lambda: notify_board.defer(kind=kind))
+
+
+def nominate_sysadmin(*, person: Person, actor, request: HttpRequest | None = None):
+    from community.models import SysadminNomination
+
+    _authorize(actor, "role.sysadmin.nominate")
+    if person.user_id is not None and person.user_id == getattr(actor, "pk", None):
+        raise CommunityError("You cannot nominate yourself.")
+    now = timezone.now()
+    with transaction.atomic(), system_access("nominate_sysadmin"):
+        if RoleAssignment.objects.filter(person=person, role=Role.SYSADMIN).active().exists():
+            raise CommunityError("This person is already a sysadmin.")
+        open_ = SysadminNomination.objects.filter(person=person, outcome="", expires_at__gt=now)
+        if open_.exists():
+            raise CommunityError("There is already an open nomination for this person.")
+        nomination = SysadminNomination.objects.create(
+            person=person,
+            nominated_by=actor,
+            expires_at=now + datetime.timedelta(days=settings.SYSADMIN_NOMINATION_TTL_DAYS),
+        )
+        _audit(
+            "role.sysadmin_nominated",
+            actor=actor,
+            request=request,
+            target=nomination,
+            metadata={"person_id": person.pk},
+        )
+        _board_notice("sysadmin_nominated")
+    return nomination
+
+
+def approve_sysadmin(nomination, *, actor, request: HttpRequest | None = None):
+    from community.models import NominationOutcome, SysadminNomination
+
+    _authorize(actor, "role.sysadmin.approve")
+    with transaction.atomic(), system_access("approve_sysadmin"):
+        nomination = SysadminNomination.objects.select_for_update().get(pk=nomination.pk)
+        if not nomination.is_open:
+            raise CommunityError("This nomination is no longer open.")
+        if nomination.nominated_by_id == actor.pk:
+            raise CommunityError("A different board member must approve your nomination.")
+        if nomination.person.user_id == actor.pk:
+            raise CommunityError("You cannot approve your own nomination.")
+        assignment = _record_role(
+            person=nomination.person,
+            role=Role.SYSADMIN,
+            start_date=today(),
+            appointed_by="",
+            citation="",
+            actor=actor,
+            request=request,
+        )
+        nomination.outcome = NominationOutcome.APPROVED
+        nomination.decided_by = actor
+        nomination.decided_at = timezone.now()
+        nomination.assignment = assignment
+        nomination.save(update_fields=["outcome", "decided_by", "decided_at", "assignment"])
+        _audit(
+            "role.sysadmin_approved",
+            actor=actor,
+            request=request,
+            target=nomination,
+            metadata={"person_id": nomination.person_id},
+        )
+        _board_notice("sysadmin_granted")
+    return nomination
+
+
+def decline_sysadmin(nomination, *, actor, request: HttpRequest | None = None):
+    """Decline (any board member) or withdraw (the nominator)."""
+    from community.models import NominationOutcome, SysadminNomination
+
+    _authorize(actor, "role.sysadmin.nominate")
+    with transaction.atomic(), system_access("decline_sysadmin"):
+        nomination = SysadminNomination.objects.select_for_update().get(pk=nomination.pk)
+        if not nomination.is_open:
+            raise CommunityError("This nomination is no longer open.")
+        nomination.outcome = NominationOutcome.DECLINED
+        nomination.decided_by = actor
+        nomination.decided_at = timezone.now()
+        nomination.save(update_fields=["outcome", "decided_by", "decided_at"])
+        _audit(
+            "role.sysadmin_declined",
+            actor=actor,
+            request=request,
+            target=nomination,
+            metadata={"person_id": nomination.person_id},
+        )
+    return nomination
+
+
+def board_emails() -> list[str]:
+    with system_access("board notification recipients"):
+        return list(
+            BoardSeat.objects.active()
+            .filter(person__user__is_active=True)
+            .values_list("person__user__email", flat=True)
+            .distinct()
+        )
