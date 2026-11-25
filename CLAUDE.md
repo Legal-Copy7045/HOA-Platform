@@ -116,7 +116,7 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - My items queue (`core/my_items.py`): add new "waiting on someone" work there, from scoped queries
 - Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
 - Security review findings and fixes: `docs/security-review-2026-11.md`
-- POC VM: see `infra/poc/README.md` and `docs/runbook.md`
+- POC VM: see `infra/poc/README.md` and `docs/runbook.md`; update in one step with `sudo bash infra/poc/update-portal.sh`
 
 ## Never
 

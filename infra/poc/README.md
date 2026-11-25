@@ -74,8 +74,15 @@ Both scripts check before changing anything and are safe to re-run.
 
 ## Updating to a new version
 
+One command pulls the latest code, shows what changed, rebuilds, restarts
+(migrations run automatically) and prints the record counts. It refuses to
+pull over local edits and does nothing if there is nothing new (`--force`
+restarts anyway). Optional shortcut, once:
+`sudo ln -sf /opt/hoa-portal/infra/poc/update-portal.sh /usr/local/bin/hoa-update`,
+then `sudo hoa-update`.
+
 ```bash
-cd /opt/hoa-portal && git pull --ff-only && sudo bash infra/poc/start-portal.sh
+sudo bash /opt/hoa-portal/infra/poc/update-portal.sh
 ```
 
 Migrations run automatically. If the POC was seeded before Milestone 2, add
