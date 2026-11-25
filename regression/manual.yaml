@@ -49,3 +49,19 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: sidebar groups on a phone
+  check: "On a phone, the Menu button opens the sidebar with focus inside it; Board, Finance and Admin start closed unless the current page is inside; a group opened or closed stays that way on the next page."
+  steps: "Sign in as a board member on a phone; open Menu; open Finance; go to another page; open Menu again (Finance still open); press Escape or tap outside (focus returns to Menu)."
+  last: ""
+- key: keyboard and screen reader menu
+  check: "With the phone-width menu closed, Tab never reaches hidden menu links, and VoiceOver or TalkBack reads count bubbles as 'N waiting on you' and error messages at once."
+  steps: "Narrow a desktop browser below 820px; Tab through the page; then try a failed form (for example a proxy with no holder) with a screen reader on."
+  last: ""
+- key: election ballot limit
+  check: "On an election ballot with 2 seats, a third box can't be ticked, the count reads '2 of 2 chosen', and Cast ballot asks 'Cast your ballot for X and Y?' before the password or passkey step."
+  steps: "Open a test election to voting; sign in as a test owner; tick candidates; press Cast ballot."
+  last: ""
+- key: print a page with values
+  check: "Printing Community settings or an owner statement shows the values in the fields and leaves out buttons and menus."
+  steps: "Open the page; browser Print preview."
+  last: ""
