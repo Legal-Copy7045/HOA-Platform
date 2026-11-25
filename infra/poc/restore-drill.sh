@@ -27,6 +27,15 @@ SRC="${SRC%/}"
 
 echo "==> Checking $SRC"
 ( cd "$SRC" && sha256sum -c SHA256SUMS )
+if [ -f "$SRC/HMAC-SHA256" ]; then
+  echo "==> Checking the backup was made with this key and not altered"
+  while read -r want f; do
+    got="$(openssl dgst -sha256 -hmac "$(cat "$KEY_FILE")" -r "$SRC/$f" | cut -d' ' -f1)"
+    [ "$got" = "$want" ] || { echo "Backup file $f fails its keyed checksum: refusing to restore." >&2; exit 1; }
+  done < "$SRC/HMAC-SHA256"
+else
+  echo "    (older backup without a keyed checksum)"
+fi
 
 env_value() { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
 DB_NAME="$(env_value HOA_DB_NAME)"; DB_NAME="${DB_NAME:-hoa}"
@@ -56,7 +65,7 @@ for _ in $(seq 1 60); do
 done
 
 echo "==> Restoring the database"
-decrypt < "$SRC/db.dump.enc" | "${SCRATCH[@]}" exec -T -e PGPASSWORD="$OWNER_PW" postgres \
+decrypt < "$SRC/db.dump.enc" | PGPASSWORD="$OWNER_PW" "${SCRATCH[@]}" exec -T -e PGPASSWORD postgres \
   pg_restore -h 127.0.0.1 -U "$OWNER_USER" -d "$DB_NAME" --no-owner --role="$OWNER_USER" --exit-on-error
 
 echo "==> Bringing it up to the current code (migrations) and creating the bucket"

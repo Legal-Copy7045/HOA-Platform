@@ -138,6 +138,16 @@ FEATURES: list[Feature] = [
     ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
+# Shared endpoints that act on another feature's records, by their "kind"
+# URL argument (SEC-011): off with that feature.
+SHARED_BY_KIND = {
+    "thread_post": {
+        "violation": "violations",
+        "work_order": "work_orders",
+        "committee_topic": "committees",
+    },
+    "follow_up_set": {"violation": "violations", "work_order": "work_orders"},
+}
 BY_URL = {name: f.key for f in FEATURES for name in f.url_names}
 
 
@@ -188,6 +198,9 @@ class FeatureGateMiddleware:
         match = getattr(request, "resolver_match", None)
         name = match.url_name if match else None
         if name in BY_URL and not url_name_enabled(name, request):
+            raise Http404
+        feature = SHARED_BY_KIND.get(name, {}).get(view_kwargs.get("kind"))
+        if feature and not enabled(feature, request):
             raise Http404
 
 

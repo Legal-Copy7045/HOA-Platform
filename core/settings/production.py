@@ -57,6 +57,9 @@ if _problems:
 DEPLOYMENT_STAGE = env("DEPLOYMENT_STAGE", default="production")
 if DEPLOYMENT_STAGE != "poc":
     SEED_DEMO_ALLOWED = False
+    # Outside the POC a board seat always needs a second board member (D21);
+    # the environment cannot switch that off.
+    BOARD_SEAT_SECOND_APPROVAL = True
 else:
     # POC/test environment: one board member may record seats (D21).
     BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=False)

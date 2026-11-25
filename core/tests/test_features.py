@@ -65,3 +65,12 @@ def test_my_items_hide_switched_off_features(w):
     features.set_feature("votes", False, actor=w["board"])
     assert all("/votes/" not in i.url for i in items_for(w["owner"]))
     assert Item  # the queue still builds
+
+
+def test_shared_endpoints_close_with_their_feature(client, w):
+    features.set_feature("violations", False, actor=w["board"])
+    client.force_login(w["board"])
+    url = reverse("thread_post", kwargs={"kind": "violation", "pk": 1})
+    assert client.post(url, {"text": "x"}).status_code == 404
+    url = reverse("follow_up_set", kwargs={"kind": "violation", "pk": 1})
+    assert client.post(url, {"on": "2027-01-01"}).status_code == 404

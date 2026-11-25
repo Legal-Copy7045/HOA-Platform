@@ -64,3 +64,29 @@ def test_push_backup_refuses_odd_names(settings):
     settings.BACKUP_S3_BUCKET = "hoa-backups"
     with pytest.raises(CommandError, match="Bad backup name"):
         call_command("push_backup", name="../etc/passwd")
+
+
+@pytest.mark.django_db
+def test_overwrite_import_is_break_glass_and_imports_are_audited(tmp_path):
+    from django.core.management import CommandError, call_command
+
+    from audit.models import AuditEvent
+
+    archive = tmp_path / "files.tar"
+    call_command("export_files", out=str(archive))
+    assert AuditEvent.objects.filter(action="backup.files_exported").exists()
+    with pytest.raises(CommandError):
+        call_command("import_files", source=str(archive), overwrite=True)
+    call_command("import_files", source=str(archive))
+    assert AuditEvent.objects.filter(action="backup.files_imported").exists()
+
+
+def test_backup_scripts_keep_the_password_off_the_command_line():
+    from pathlib import Path
+
+    for name in ("backup.sh", "restore-drill.sh"):
+        text = Path("infra/poc", name).read_text()
+        assert 'PGPASSWORD="$OWNER_PW" "${' in text
+        assert '-e PGPASSWORD="' not in text
+    assert "HMAC-SHA256" in Path("infra/poc/backup.sh").read_text()
+    assert "keyed checksum" in Path("infra/poc/restore-drill.sh").read_text()

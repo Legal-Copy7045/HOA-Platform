@@ -165,6 +165,8 @@ _SPECS = [
     _spec("accounting.1099_exported", "1099 vendor totals exported", "year"),
     _spec("collections.courtesy_sent", "Courtesy payment reminders sent", "count"),
     _spec("system.test_email_sent", "Test email sent", "ok"),
+    _spec("backup.files_exported", "File store exported (backup)", "count"),
+    _spec("backup.files_imported", "File store imported (restore)", "count", "overwrite"),
     _spec("feature.switched", "Feature switched on or off", "feature", "enabled"),
     _spec("community.letters_changed", "Letter and certificate settings changed"),
     _spec("ledger.letter_template_saved", "Letter wording saved", "kind"),
