@@ -9,6 +9,6 @@
     {% else %}{% include "partials/empty.html" with icon="vote" title="No votes yet" %}{% endif %}
   </section>
   {% if can_manage %}<details class="panel"><summary>Create a vote or poll</summary><div class="panel-body">
-    <div class="alert warning">{% icon "alert" %}<span>Formal votes use the quorum and pass rules from Community settings. They are <strong>not for binding use until the association's counsel has reviewed those settings</strong>.</span></div>
+    <div class="alert info">{% icon "vote" %}<span>Formal votes are binding and use the quorum and pass rules from Community settings (each with its citation). Informal polls are for opinion only.</span></div>
     <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
 {% endblock %}

@@ -472,6 +472,7 @@ def record_board_seat(
     citation: str = "",
     actor,
     request: HttpRequest | None = None,
+    _second_approval: bool = False,
 ) -> BoardSeat:
     _authorize(actor, "seat.manage")
     if seat_type not in SeatType.values:
@@ -479,6 +480,10 @@ def record_board_seat(
     if term_end is not None and term_end < term_start:
         raise CommunityError("A term cannot end before it starts.")
     _refuse_self_grant(actor, person, "a board seat")
+    if seat_needs_second_approval(actor) and not _second_approval:
+        raise CommunityError(
+            "A new board seat needs a second board member's approval: propose it instead."
+        )
     try:
         with transaction.atomic(), system_access("record_board_seat"):
             seat = BoardSeat.objects.create(
@@ -1218,3 +1223,113 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
             }
         )
     return rows
+
+
+# --- Board seats with a second approval (decision D21) ------------------------------------
+
+
+def seat_needs_second_approval(actor) -> bool:
+    """On in production. Exempt: trusted internal code, and the start-up phase
+    while fewer than two board members hold seats (nobody to approve)."""
+    if actor is SYSTEM or not settings.BOARD_SEAT_SECOND_APPROVAL:
+        return False
+    with system_access("count board seats"):
+        return BoardSeat.objects.active().count() >= 2
+
+
+def propose_board_seat(
+    *,
+    person: Person,
+    seat_type: str,
+    term_start: datetime.date,
+    term_end: datetime.date | None = None,
+    citation: str = "",
+    actor,
+    request: HttpRequest | None = None,
+):
+    """Record the seat now if no second approval is needed, otherwise create a
+    nomination for another board member. Returns ("recorded", seat) or
+    ("proposed", nomination)."""
+    from community.models import BoardSeatNomination
+
+    _authorize(actor, "seat.manage")
+    if not seat_needs_second_approval(actor):
+        return "recorded", record_board_seat(
+            person=person,
+            seat_type=seat_type,
+            term_start=term_start,
+            term_end=term_end,
+            citation=citation,
+            actor=actor,
+            request=request,
+        )
+    if seat_type not in SeatType.values:
+        raise CommunityError("Unknown seat type.")
+    if term_end is not None and term_end < term_start:
+        raise CommunityError("A term cannot end before it starts.")
+    _refuse_self_grant(actor, person, "a board seat")
+    with transaction.atomic(), system_access("propose board seat"):
+        if BoardSeatNomination.objects.filter(person=person, outcome="").exists():
+            raise CommunityError("There is already a proposed seat for this person.")
+        nomination = BoardSeatNomination.objects.create(
+            person=person,
+            seat_type=seat_type,
+            term_start=term_start,
+            term_end=term_end,
+            citation=citation.strip()[:200],
+            nominated_by=_user(actor),
+        )
+        _audit(
+            "seat.proposed",
+            actor=actor,
+            request=request,
+            target=nomination,
+            metadata={"person_id": person.pk, "seat_type": seat_type},
+        )
+        _board_notice("board_seat_proposed")
+    return "proposed", nomination
+
+
+def decide_seat_nomination(nomination, *, approve: bool, actor, request=None):
+    """A board member other than the proposer (and not the nominee) approves,
+    which records the seat as them, or declines. The proposer may withdraw."""
+    from community.models import BoardSeatNomination
+
+    _authorize(actor, "seat.manage")
+    with transaction.atomic(), system_access("decide seat nomination"):
+        nomination = BoardSeatNomination.objects.select_for_update().get(pk=nomination.pk)
+        if nomination.outcome:
+            raise CommunityError("This proposal has already been decided.")
+        if approve:
+            if nomination.nominated_by_id == _user(actor).pk:
+                raise CommunityError("A different board member must approve your proposal.")
+            seat = record_board_seat(
+                person=nomination.person,
+                seat_type=nomination.seat_type,
+                term_start=nomination.term_start,
+                term_end=nomination.term_end,
+                citation=nomination.citation,
+                actor=actor,
+                request=request,
+                _second_approval=True,
+            )
+        else:
+            seat = None
+        BoardSeatNomination.objects.filter(pk=nomination.pk).update(
+            outcome="approved" if approve else "declined",
+            decided_by=_user(actor),
+            decided_at=timezone.now(),
+            seat=seat,
+        )
+        _audit(
+            "seat.proposal_decided",
+            actor=actor,
+            request=request,
+            target=nomination,
+            metadata={
+                "person_id": nomination.person_id,
+                "decision": "approved" if approve else "declined",
+            },
+        )
+    nomination.refresh_from_db()
+    return nomination

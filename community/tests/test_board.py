@@ -14,6 +14,13 @@ from community.tests.factories import PersonFactory, days_ago, make_member
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture(autouse=True)
+def _poc_seat_rules(settings):
+    # These tests exercise offices and terms; the second approval for new
+    # seats (production) is tested in test_seat_approval.py.
+    settings.BOARD_SEAT_SECOND_APPROVAL = False
+
+
 @pytest.fixture
 def board_user():
     return make_member(board=True)

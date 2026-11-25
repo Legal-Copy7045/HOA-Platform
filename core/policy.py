@@ -136,6 +136,8 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "committee.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
     "committee.manage": frozenset({BOARD}),
     "ledger.manage": frozenset({BOARD, MANAGER}),
+    # Charging a late fee is a board decision (the manager prepares the list).
+    "late_fee.post": frozenset({BOARD}),
     "budget.manage": frozenset({BOARD}),
     "collections.manage": frozenset({BOARD, MANAGER}),
     "collections.refer": frozenset({BOARD}),

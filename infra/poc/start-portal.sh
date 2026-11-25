@@ -19,6 +19,30 @@ fi
 
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
 
+# Settings added since this .env was made (decision D21). Only missing keys
+# are added; anything already set is left as it is.
+add_setting() {
+  local key="$1" value="$2"
+  if ! grep -q "^${key}=" .env; then
+    echo "Adding ${key}=${value} to .env"
+    printf '%s=%s\n' "$key" "$value" >> .env
+  fi
+}
+if grep -q '^DEPLOYMENT_STAGE=poc' .env; then
+  add_setting BOARD_SEAT_SECOND_APPROVAL false
+fi
+if grep -q '^DOCUMENT_SCANNER=none' .env; then
+  echo "Switching malware scanning on (ClamAV container)"
+  sed -i 's/^DOCUMENT_SCANNER=none/DOCUMENT_SCANNER=clamd/' .env
+  NEEDS_RESCAN=1
+fi
+add_setting DOCUMENT_SCANNER clamd
+add_setting DOCUMENT_CLAMD_ADDRESS clamav:3310
+sed -i 's/^DOCUMENT_CLAMD_ADDRESS=$/DOCUMENT_CLAMD_ADDRESS=clamav:3310/' .env
+sed -i 's/^DOCUMENT_REQUIRE_CLEAN_SCAN=false/DOCUMENT_REQUIRE_CLEAN_SCAN=true/' .env
+add_setting DOCUMENT_REQUIRE_CLEAN_SCAN true
+sed -i 's/^LEDGER_LATE_FEES_ENABLED=false/LEDGER_LATE_FEES_ENABLED=true/' .env
+
 # Show the deployed commit on the sysadmin status page.
 export APP_VERSION="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
@@ -63,6 +87,14 @@ systemctl enable --now hoa-cloudflared-update.timer >/dev/null
 echo "==> Waiting for the services"
 sleep 20
 "${COMPOSE[@]}" ps --format 'table {{.Service}}\t{{.Status}}'
+if [ "${NEEDS_RESCAN:-0}" = "1" ]; then
+  echo
+  echo "Malware scanning is now on. Files uploaded before today can't be downloaded"
+  echo "until they are scanned once. Run this, with your sysadmin login email:"
+  echo
+  echo "  docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web \\"
+  echo "    python manage.py rescan_files --actor you@example.org --reason \"malware scanning switched on\""
+fi
 echo
 echo "File store check:"
 "${COMPOSE[@]}" exec -T web python manage.py check_storage 2>&1 | grep -v '"level"' || true

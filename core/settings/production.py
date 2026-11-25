@@ -57,3 +57,6 @@ if _problems:
 DEPLOYMENT_STAGE = env("DEPLOYMENT_STAGE", default="production")
 if DEPLOYMENT_STAGE != "poc":
     SEED_DEMO_ALLOWED = False
+else:
+    # POC/test environment: one board member may record seats (D21).
+    BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=False)

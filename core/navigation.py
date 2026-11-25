@@ -107,6 +107,12 @@ def build(request) -> dict:
     path = request.path
     seen: set[str] = set()
     sections = []
+    from core.my_items import nav_counts
+
+    try:
+        counts = nav_counts(user) if user.is_authenticated else {}
+    except Exception:  # a count must never break the page
+        counts = {}
     best = ("", None)  # longest matching URL wins the "current page" mark
     for title, items in SECTIONS:
         visible = []
@@ -119,7 +125,13 @@ def build(request) -> dict:
             except NoReverseMatch:
                 continue
             seen.add(name)
-            item = {"label": label, "url": url, "icon": icon, "current": False}
+            item = {
+                "label": label,
+                "url": url,
+                "icon": icon,
+                "current": False,
+                "count": counts.get(name, 0),
+            }
             base, _, query = url.partition("?")
             here_mine = request.GET.get("mine") == "1"
             matches = (base == "/" and path == "/") or (

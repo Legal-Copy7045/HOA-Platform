@@ -26,6 +26,9 @@ SITE_NAME = env("SITE_NAME", default="Oak Creek Farms HOA")
 APP_VERSION = env("APP_VERSION", default="dev")
 # seed_demo refuses to run unless this is true (never set it in production).
 SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
+# Decision D21 (security review A3): a new board seat needs a second board
+# member's approval. On in production; the POC turns it off (see production.py).
+BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=True)
 # Absolute address used in emailed links (the worker has no request to ask).
 PORTAL_BASE_URL = (env("PORTAL_BASE_URL", default="") or "http://localhost:8000").rstrip("/")
 INVITE_TTL_HOURS = env.int("INVITE_TTL_HOURS", default=168)
@@ -268,7 +271,9 @@ FILE_UPLOAD_HANDLERS = [
 
 # Ledger: late fees cannot be posted until the board has reviewed PA law and
 # turned this on (decision recorded 2026-11-25).
-LEDGER_LATE_FEES_ENABLED = env.bool("LEDGER_LATE_FEES_ENABLED", default=False)
+# Decision D21: late fees may be posted (by the board, or automatically when
+# the late_fee.auto_apply rule is on). This stays as an emergency off switch.
+LEDGER_LATE_FEES_ENABLED = env.bool("LEDGER_LATE_FEES_ENABLED", default=True)
 # Online payments: "none" (placeholder) or "stripe" (hosted Checkout, later).
 PAYMENTS_PROVIDER = env("PAYMENTS_PROVIDER", default="none")
 

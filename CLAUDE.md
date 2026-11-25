@@ -8,7 +8,8 @@ This file is the source of truth for architecture and rules. If a task conflicts
 
 - Milestone 1 (done): accounts and MFA, lots and ownership, role-scoped access, audit log.
 - Milestone 2 (directed 2026-11-25, see `docs/milestone-2-plan.md`): community definition (rules with citations, dues, common areas), owner profile and opt-in directory, calendar, announcements, board tasks, data exports, document library, meetings, resolutions and policies, records requests, voting (informal polls and formal votes), architectural review, violations, vendors and work orders, invoice approval, owner ledger with monthly dues and prepayment drawdown, budgets, collections tracking, resale certificates, reports, Stripe placeholder.
-- Still requires a decision before use: automatic late fees (PA law review), binding formal votes (counsel review), live Stripe payments.
+- Decided 2026-11-25 (D21): late fees can be automatic but start manual; formal votes are binding; secret ballots are stored unlinkable; payments by card and bank transfer through Stripe hosted pages with an owner-paid convenience fee; board seats need a second approval in production; malware scanning on.
+- Still requires a decision before use: live Stripe keys and the HOA's Stripe account.
 - Out of scope: native mobile apps, multi-association tenancy, anything that stores card or bank numbers.
 
 ## Stack (decided)

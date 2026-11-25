@@ -233,10 +233,12 @@ def post_charge(
     _authorize(actor, "ledger.manage")
     if kind not in (EntryKind.OTHER_CHARGE, EntryKind.LATE_FEE, EntryKind.RESALE_FEE):
         raise LedgerError("Use the assessment posting for dues.")
-    if kind == EntryKind.LATE_FEE and not settings.LEDGER_LATE_FEES_ENABLED:
-        raise LedgerError(
-            "Late fees are switched off until the board has reviewed them against Pennsylvania law."
-        )
+    if kind == EntryKind.LATE_FEE:
+        _authorize(actor, "late_fee.post")  # a board decision, not the manager's
+        if not settings.LEDGER_LATE_FEES_ENABLED:
+            raise LedgerError(
+                "Late fees are switched off on this server (LEDGER_LATE_FEES_ENABLED)."
+            )
     if amount_cents <= 0 or not description.strip():
         raise LedgerError("A charge needs a positive amount and a description.")
     entry = LedgerEntry.objects.create(
@@ -793,3 +795,84 @@ def set_case_follow_up(case: CollectionCase, on, *, actor, request=None) -> Coll
         metadata={"kind": "collection", "object_id": case.pk, "on": on.isoformat() if on else None},
     )
     return case
+
+
+# --- Late fees (decision D21: definable, automatic only when switched on) --------------
+
+
+def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
+    """Lots past the grace period for this month's dues that still owe
+    money and have no late fee for the month yet."""
+    on = on or timezone.localdate()
+    fee = rule("late_fee.cents")
+    grace = rule("late_fee.grace_days")
+    if not fee or grace is None:
+        return []
+    period = _period(year, month)
+    out = []
+    with system_access("late fee candidates"):
+        assessments = LedgerEntry.objects.filter(kind=EntryKind.ASSESSMENT, period=period)
+        already = set(
+            LedgerEntry.objects.filter(kind=EntryKind.LATE_FEE, period=period).values_list(
+                "lot_id", flat=True
+            )
+        )
+        owed = balances()
+        for entry in assessments.select_related("lot"):
+            late_from = entry.posted_on + datetime.timedelta(days=int(grace) + 1)
+            if on < late_from or entry.lot_id in already:
+                continue
+            if owed.get(entry.lot_id, 0) <= 0:
+                continue  # paid up, or in credit (prepayment covers it)
+            out.append(
+                {"lot": entry.lot, "balance_cents": owed[entry.lot_id], "late_from": late_from}
+            )
+    return out
+
+
+@internal("ledger service")
+def post_late_fees(*, year: int, month: int, actor, request=None, on=None) -> int:
+    """Post the late fee to each late lot for the month (once per lot and month).
+    The board does this by button; SYSTEM only when automatic posting is on."""
+    if actor is SYSTEM:
+        if not rule("late_fee.auto_apply"):
+            return 0
+    else:
+        _authorize(actor, "late_fee.post")
+    if not settings.LEDGER_LATE_FEES_ENABLED:
+        raise LedgerError("Late fees are switched off on this server (LEDGER_LATE_FEES_ENABLED).")
+    fee, citation = rule_with_citation("late_fee.cents")
+    if not fee:
+        raise LedgerError(
+            "Set the late fee amount (with its citation) in Community settings first."
+        )
+    period = _period(year, month)
+    created = 0
+    for row in late_fee_candidates(year=year, month=month, on=on):
+        try:
+            with transaction.atomic():
+                LedgerEntry.objects.create(
+                    lot=row["lot"],
+                    posted_on=on or timezone.localdate(),
+                    kind=EntryKind.LATE_FEE,
+                    amount_cents=fee,
+                    period=period,
+                    description=f"Late fee {datetime.date(year, month, 1):%B %Y}"
+                    + (f" ({citation})" if citation else ""),
+                    posted_by=_user(actor),
+                )
+            created += 1
+        except IntegrityError:
+            continue
+    record_event(
+        "ledger.late_fees_posted",
+        actor=_user(actor),
+        request=request,
+        metadata={
+            "period": period,
+            "lots": created,
+            "amount_cents": fee,
+            "automatic": actor is SYSTEM,
+        },
+    )
+    return created

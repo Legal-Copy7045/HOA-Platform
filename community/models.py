@@ -706,3 +706,39 @@ class AccountChangeRequest(NeverDeleteMixin, ScopedModel):
 
     def __str__(self) -> str:
         return f"Account change #{self.pk}"
+
+
+class BoardSeatNomination(NeverDeleteMixin, ScopedModel):
+    """A proposed board seat waiting for a second board member (decision D21).
+    On approval the seat is recorded by the approver."""
+
+    person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="+")
+    seat_type = models.CharField(max_length=24, choices=SeatType.choices)
+    term_start = models.DateField()
+    term_end = models.DateField(null=True, blank=True)
+    citation = models.CharField(max_length=200, blank=True)
+    nominated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    nominated_at = models.DateTimeField(default=timezone.now)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    outcome = models.CharField(max_length=16, choices=NominationOutcome.choices, blank=True)
+    seat = models.OneToOneField(
+        BoardSeat, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "person"
+
+    class Meta:
+        ordering = ["-nominated_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Board seat nomination #{self.pk}"
+
+    @property
+    def is_open(self) -> bool:
+        return not self.outcome

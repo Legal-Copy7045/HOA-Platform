@@ -34,6 +34,7 @@
         <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
         <button type="button" class="btn" disabled>Pay online</button>
       </div>
+      {% if a.statement.balance > 0 %}<div class="small muted pay-options">{% for p in a.pay_options %}<div>{{ p.label }}: {{ a.statement.balance|cents }}{% if p.fee_cents %} + {{ p.fee_cents|cents }} convenience fee = <strong>{{ p.total_cents|cents }}</strong>{% else %} (no fee){% endif %}</div>{% endfor %}</div>{% endif %}
       {% if not online %}<p class="muted small">Online payment is coming soon. For now, pay by check as usual.</p>{% endif %}
     </section>
   {% endfor %}

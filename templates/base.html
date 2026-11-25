@@ -22,7 +22,7 @@
           <div class="nav-section">
             {% if section.title %}<div class="nav-heading">{{ section.title }}</div>{% endif %}
             {% for item in section.items %}
-              <a href="{{ item.url }}"{% if item.current %} aria-current="page"{% endif %}>{% icon item.icon %}<span>{{ item.label }}</span></a>
+              <a href="{{ item.url }}"{% if item.current %} aria-current="page"{% endif %}>{% icon item.icon %}<span>{{ item.label }}</span>{% if item.count %}<span class="badge-count" aria-label="{{ item.count }} waiting on you">{{ item.count }}</span>{% endif %}</a>
             {% endfor %}
           </div>
         {% endfor %}

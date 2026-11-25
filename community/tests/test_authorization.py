@@ -187,7 +187,7 @@ def _attempts(world):
         ),
         "end_ownership": lambda a: services.end_ownership(own_b, actor=a),
         "transfer_lot": lambda a: services.transfer_lot(lot, new_owners=[target], actor=a),
-        "record_board_seat": lambda a: services.record_board_seat(
+        "record_board_seat": lambda a: services.propose_board_seat(
             person=target, seat_type=SeatType.OWNER_ELECTED, term_start=days_ago(1), actor=a
         ),
         "end_board_seat": lambda a: services.end_board_seat(

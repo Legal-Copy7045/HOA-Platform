@@ -78,6 +78,11 @@ GROUP_NOTES: dict[str, str] = {
         f"votes are present in person or by proxy at the start ({ACT} § 5309). Amending the "
         f"Declaration needs at least 67% of the votes, or more if it says so (§ 5219)."
     ),
+    "Online payments": (
+        "The Act does not regulate how owners pay. Card networks cap card surcharges and require "
+        "them to be disclosed before payment; counsel should confirm the fee wording before "
+        "live payments. Bank transfer fees are not card surcharges."
+    ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
@@ -108,6 +113,13 @@ GUIDES: dict[str, Guide] = {
         "never applies them automatically until counsel has reviewed them.",
         "$25.00 per late month: collection policy adopted by Board resolution under "
         "Declaration §6.5.",
+    ),
+    "late_fee.auto_apply": Guide(
+        BOARD,
+        f"The Act allows charges for late payment ({ACT} § 5302(a)(11)) but says nothing about "
+        "automation. Have counsel confirm the amount, grace period and notice before switching "
+        "it on.",
+        "Off until counsel has reviewed: Board resolution 2027-02 (collection policy).",
     ),
     "late_fee.grace_days": Guide(
         BOARD,
@@ -194,6 +206,18 @@ GUIDES: dict[str, Guide] = {
         "Declaration amendment (§ 5219).",
     ),
 }
+
+GUIDES["payments.card_fee_bp"] = Guide(
+    BOARD,
+    "Not covered by the Act. Card-network rules cap surcharges (commonly at the actual cost, "
+    "and no more than 3%) and require disclosure before payment.",
+    "295 (2.95%, the processor's card cost): Board resolution 2027-09, after counsel review.",
+)
+GUIDES["payments.bank_fee_cents"] = Guide(
+    BOARD,
+    "Not covered by the Act.",
+    "$1.00 per bank transfer: Board resolution 2027-09.",
+)
 
 for _key in ("general", "billing", "maintenance", "common_area"):
     GUIDES[f"request.sla_days.{_key}"] = Guide(

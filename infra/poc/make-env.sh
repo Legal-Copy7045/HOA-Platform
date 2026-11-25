@@ -69,6 +69,13 @@ EMAIL_REDIRECT_ALL_TO=${REDIRECT_TO}
 SEED_DEMO_ALLOWED=true
 # Marks this deployment as the POC; production ignores SEED_DEMO_ALLOWED otherwise.
 DEPLOYMENT_STAGE=poc
+# Decision D21: one board member may record seats on the POC (production: true).
+BOARD_SEAT_SECOND_APPROVAL=false
+
+# Malware scanning with the ClamAV container (decision D21).
+DOCUMENT_SCANNER=clamd
+DOCUMENT_CLAMD_ADDRESS=clamav:3310
+DOCUMENT_REQUIRE_CLEAN_SCAN=true
 
 OFFICERS_REQUIRE_BOARD_SEAT=true
 OFFICERS_REQUIRE_BOARD_SEAT_CITATION=

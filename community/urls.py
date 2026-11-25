@@ -11,6 +11,11 @@ urlpatterns = [
         name="login_background_image",
     ),
     path("my-home/", views.my_lot, name="my_lot"),
+    re_path(
+        r"^board/seat-proposals/(?P<pk>[0-9]+)/(?P<decision>approve|decline)/$",
+        views.seat_nomination_decide,
+        name="seat_nomination_decide",
+    ),
     path("board/roster/", views.roster, name="roster"),
     path("my-lot/", RedirectView.as_view(pattern_name="my_lot", permanent=False)),
     path("my-history/", account_views.my_history, name="my_history"),

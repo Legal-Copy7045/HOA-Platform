@@ -283,8 +283,8 @@ person_add_ownership = _person_action(
 )
 person_add_seat = _person_action(
     forms.SeatForm,
-    lambda r, p, d: services.record_board_seat(person=p, actor=r.user, request=r, **d),
-    "Board seat recorded.",
+    lambda r, p, d: services.propose_board_seat(person=p, actor=r.user, request=r, **d),
+    "Done. If a second board member's approval is needed, it is waiting on Approvals.",
 )
 person_add_office = _person_action(
     forms.OfficeForm,
@@ -381,10 +381,18 @@ def approvals(request):
         "person", "nominated_by"
     )
     resets = MfaReset.objects.for_user(request.user).select_related("subject", "started_by")
+    from community.models import BoardSeatNomination
+
+    seat_proposals = (
+        BoardSeatNomination.objects.for_user(request.user)
+        .filter(outcome="")
+        .select_related("person")
+    )
     return render(
         request,
         "community/approvals.html",
         {
+            "seat_proposals": seat_proposals,
             "nominations": [n for n in nominations if n.is_open],
             "resets": [r for r in resets[:50] if r.status == "awaiting_approval"],
             "me": request.user,
@@ -537,3 +545,20 @@ def roster(request):
         "community/roster.html",
         {"rows": rows, "include_dormant": include_dormant},
     )
+
+
+@login_required
+@require_POST
+def seat_nomination_decide(request, pk, decision):
+    from community.models import BoardSeatNomination
+
+    policy.require(request.user, "seat.manage")
+    nomination = get_object_or_404(BoardSeatNomination.objects.for_user(request.user), pk=pk)
+    back = reverse("approvals")
+    try:
+        services.decide_seat_nomination(
+            nomination, approve=decision == "approve", actor=request.user, request=request
+        )
+    except CommunityError as exc:
+        return _failed(request, exc, back)
+    return _done(request, "Board seat recorded." if decision == "approve" else "Declined.", back)

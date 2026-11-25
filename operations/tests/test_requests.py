@@ -358,7 +358,8 @@ def test_owner_sees_requests_waiting_on_them(w):
     req = _submit(w)
     services.OWNER_REQUEST.apply(req, "ask_owner", actor=w["board"], note="Photo please")
     items = my_items.items_for(w["owner"])
-    assert [i.area for i in items] == ["Requests"]
+    assert [i.area for i in items] == ["My home"]
+    assert items[0].nav == "requests?mine=1"
     from core.dashboard import build
 
     assert any(

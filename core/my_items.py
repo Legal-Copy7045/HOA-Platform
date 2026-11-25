@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core import policy
+from core.scoping import own_records
 
 
 @dataclass
@@ -25,6 +26,13 @@ class Item:
     url: str
     tone: str = "info"  # info, warning, danger
     due: datetime.date | None = None
+    # The sidebar entry that shows this item in its count bubble (a URL name,
+    # with "?mine=1" for the homeowner side). Defaults from the area.
+    nav: str = ""
+
+    def __post_init__(self):
+        if not self.nav:
+            self.nav = AREA_NAV.get(self.area, "")
 
     @property
     def overdue(self) -> bool:
@@ -41,7 +49,18 @@ MY_ITEMS_PERMISSIONS = (
     "task.manage",
 )
 
+AREA_NAV = {
+    "Requests": "requests",
+    "Architectural review": "arc_list",
+    "Violations": "violations",
+    "Collections": "collections",
+    "Work orders": "work_orders",
+    "Records requests": "records_requests",
+    "Tasks": "tasks",
+}
+
 AREAS = [
+    "My home",
     "Requests",
     "Approvals",
     "Architectural review",
@@ -122,8 +141,26 @@ def items_for(user) -> list[Item]:
                     reverse("invoice_detail", args=[inv.pk]),
                     "warning",
                     inv.due_date,
+                    nav="invoices",
                 )
             )
+    if can(user, "seat.manage"):
+        from community.models import BoardSeatNomination
+
+        for n in (
+            BoardSeatNomination.objects.for_user(user).filter(outcome="").exclude(nominated_by=user)
+        ):
+            if n.person.user_id != user.pk:
+                out.append(
+                    Item(
+                        "Approvals",
+                        "Proposed board seat",
+                        "Needs a second board member",
+                        reverse("approvals"),
+                        "warning",
+                        nav="approvals",
+                    )
+                )
     if can(user, "role.sysadmin.approve"):
         from community.models import SysadminNomination
 
@@ -136,6 +173,7 @@ def items_for(user) -> list[Item]:
                         "Needs a second board member",
                         reverse("approvals"),
                         "warning",
+                        nav="approvals",
                     )
                 )
 
@@ -156,6 +194,7 @@ def items_for(user) -> list[Item]:
                     "An owner asked for this change",
                     reverse("lot_detail", args=[ch.account.lot_id]) + "#accounts",
                     "warning",
+                    nav="lot_list",
                 )
             )
 
@@ -289,20 +328,54 @@ def items_for(user) -> list[Item]:
                 )
             )
 
-    # Owner side: their requests waiting on them.
+    # Homeowner side: things waiting on them as an owner.
     if g & policy.RESIDENTS:
         from operations.models import OwnerRequest
 
-        for r in OwnerRequest.objects.for_user(user).filter(state="waiting", requested_by=user):
+        for r in own_records(OwnerRequest.objects.for_user(user), user).filter(
+            state="waiting", requested_by=user
+        ):
             out.append(
                 Item(
-                    "Requests",
+                    "My home",
                     f"#{r.pk} {r.subject}",
                     "The board asked you for more information",
                     reverse("request_detail", args=[r.pk]),
                     "warning",
+                    nav="requests?mine=1",
                 )
             )
+    if g & {policy.OWNER}:
+        from compliance.models import Violation
+
+        for v in own_records(Violation.objects.for_user(user), user).filter(state="noticed"):
+            out.append(
+                Item(
+                    "My home",
+                    f"Notice: {v.get_category_display()}",
+                    f"Cure by {v.cure_by:%b %-d}" if v.cure_by else "Please review and respond",
+                    reverse("violation_detail", args=[v.pk]),
+                    _due_tone(v.cure_by, today),
+                    v.cure_by,
+                    nav="violations?mine=1",
+                )
+            )
+    if can(user, "vote.cast"):
+        from governance.models import Vote
+        from governance.services import ballot_choices_for
+
+        for vote in Vote.objects.filter(status="open"):
+            if ballot_choices_for(vote, user)["can_vote"]:
+                out.append(
+                    Item(
+                        "My home",
+                        f"Vote: {vote.title}",
+                        "Your ballot is open",
+                        reverse("vote_detail", args=[vote.pk]),
+                        "info",
+                        nav="votes",
+                    )
+                )
 
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
@@ -318,3 +391,15 @@ def counts(items: list[Item]) -> list[dict]:
         row["overdue"] += it.overdue
     order = {a: i for i, a in enumerate(AREAS)}
     return sorted(by_area.values(), key=lambda r: order.get(r["area"], 99))
+
+
+def nav_counts(user) -> dict[str, int]:
+    """Items waiting on this person, by sidebar entry, plus the total
+    ("my_items"). Computed once per page by core.navigation."""
+    counts: dict[str, int] = {}
+    items = items_for(user)
+    for it in items:
+        if it.nav:
+            counts[it.nav] = counts.get(it.nav, 0) + 1
+    counts["my_items"] = len(items)
+    return counts

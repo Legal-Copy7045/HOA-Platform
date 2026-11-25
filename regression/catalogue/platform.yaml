@@ -34,3 +34,6 @@
   since: M1
   docs: docs/runbook.md
   match: ["^live:", "^manual:(deploy|restore)"]
+- feature: "Sidebar count bubbles: each menu entry shows the number of items waiting on you (from the My items queue, scoped)"
+  since: M3
+  match: ["^unit:core/tests/test_nav_counts"]

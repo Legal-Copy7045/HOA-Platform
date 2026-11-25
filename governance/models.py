@@ -1,5 +1,7 @@
 """Meetings, the resolution/policy register, records requests and votes."""
 
+import uuid
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -207,10 +209,16 @@ class VoteOption(models.Model):
 
 
 class Ballot(AppendOnlyModel):
-    """One cast ballot. Never changed. Formal: one per lot; informal: one per person."""
+    """One cast ballot. Never changed. Formal: one per lot; informal: one per person.
+
+    On a secret vote the ballot records only that this person/lot voted
+    (``option`` is empty); the choice is a separate, unlinkable
+    ``SecretChoice`` row (decision D21)."""
 
     vote = models.ForeignKey(Vote, on_delete=models.PROTECT, related_name="ballots")
-    option = models.ForeignKey(VoteOption, on_delete=models.PROTECT, related_name="+")
+    option = models.ForeignKey(
+        VoteOption, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
     lot = models.ForeignKey(
         "community.Lot", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
@@ -236,6 +244,19 @@ class Ballot(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"ballot #{self.pk}"
+
+
+class SecretChoice(AppendOnlyModel):
+    """A secret ballot's choice, stored apart from who cast it: no voter, no
+    lot, no timestamp, and a random id so the insertion order of rows cannot
+    be read from their ids. Counted for results; never shown per voter."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vote = models.ForeignKey(Vote, on_delete=models.PROTECT, related_name="+")
+    option = models.ForeignKey(VoteOption, on_delete=models.PROTECT, related_name="+")
+
+    def __str__(self) -> str:
+        return "secret choice"
 
 
 # --- Committees (Milestone 3) -----------------------------------------------------------

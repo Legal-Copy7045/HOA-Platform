@@ -96,6 +96,7 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "seat_nomination_decide": ("POST", "seat_proposal"),
     "roster": ("GET", None),
     "contracts": ("GET", None),
     "contract_detail": ("GET", "contract"),
@@ -359,6 +360,12 @@ def world():
         )
         task_b = gov.add_committee_task(committee_b, title="Lot B pond task", actor=owner_b)
         membership_b = CommitteeMembership.objects.unscoped("t").get(person=person_b)
+        _, seat_proposal = services.propose_board_seat(
+            person=services.record_person(display_name="Lot B seat candidate", actor=SYSTEM),
+            seat_type="owner_elected",
+            term_start=days_ago(1),
+            actor=board,
+        )
         account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
         change_b = services.request_account_change(
             account_b, action="add", name="Lot B nephew", kind="view_only", actor=owner_b
@@ -374,6 +381,7 @@ def world():
         )
     targets = {
         "account_b": account_b.pk,
+        "seat_proposal": seat_proposal.pk,
         "contract": contract.pk,
         "change_b": change_b.pk,
         "request_b": request_b.pk,
@@ -459,7 +467,7 @@ def _url(name, key, targets):
         kwargs["file_id"] = targets["violation_b_file"]
     elif name == "request_action":
         kwargs["action"] = "withdraw"
-    elif name == "account_change_decide":
+    elif name == "account_change_decide" or name == "seat_nomination_decide":
         kwargs["decision"] = "approve"
     elif name == "contract_action":
         kwargs["action"] = "approve"

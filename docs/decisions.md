@@ -258,3 +258,16 @@ The owner asked for each settings section to show an example from Pennsylvania l
 ## D20. Board members are homeowners first (2026-11-25)
 
 The owner pointed out that every board member also owns a home and must use the portal as a homeowner, with board rights added on top, and keep homeowner access after leaving the board. Roles were already additive (Ownership gives the homeowner side, BoardSeat the board side); what was missing was (a) a way to load the real register so board members' own ownerships exist, now `import_register` (check, then `--commit`; matches existing people by email, so the bootstrapped first officer gets their lot), and (b) a menu that keeps the two sides apart: a Homeowner section whose lists show only your own home (`?mine=1`) and a Board section with the review lists. A board member still cannot record their own ownership in the portal (no self-grants); the import runs on the server and is audited. The Homeowner view stays read-only, for seeing another owner's view.
+
+## D21. Owner decisions on the open items (2026-11-25)
+
+Interviewed one item at a time; answers recorded as given.
+
+1. **Board seats need a second board member's approval in production**, not on the POC/test environment. Implemented as a setting that defaults on outside `DEPLOYMENT_STAGE=poc` (security review A3).
+2. **Malware scanning on now**: a ClamAV container on the POC, `DOCUMENT_SCANNER=clamd`, clean scan required, existing files rescanned.
+3. **Gemini**: free key while data is fictional; a paid key before real signed forms. Human confirmation stays the default (earlier decision).
+4. **Late fees**: the board can define them and switch on automatic posting, but it starts manual (automatic posting off by default). This supersedes "never automatic until PA review"; the PA guidance on the settings page still recommends counsel review of amount, grace period and notice.
+5. **Formal votes are binding now.** The owner accepted this without waiting for counsel; the "not yet binding" labelling is removed. Recommended follow-up: counsel confirms online voting, proxies, quorum and notice under the Bylaws and 68 Pa.C.S. § 5310.
+6. **Secret ballots are separated now**: "who has voted" is stored apart from the choice, so the database itself cannot link a secret ballot to a lot (security review D12).
+7. **Online payments: cards and bank transfer**, through Stripe's hosted pages only (the portal never sees card or bank numbers).
+8. **The owner pays a convenience fee**, shown before paying. Card-network rules cap and require disclosure of card surcharges; counsel should confirm the fee wording before live payments.

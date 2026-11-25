@@ -47,11 +47,19 @@ REGISTRY: dict[str, RuleSpec] = {
         ),
         RuleSpec(
             "late_fee.cents",
-            "Late fee (recorded only)",
+            "Late fee per late month",
             CENTS,
             None,
             "Dues",
-            "Never applied automatically until reviewed against PA law.",
+            "Posted by the board from the late list, or automatically if switched on below.",
+        ),
+        RuleSpec(
+            "late_fee.auto_apply",
+            "Post late fees automatically after the grace period",
+            BOOL,
+            "false",
+            "Dues",
+            "Off: the board reviews the late list and posts fees with a button.",
         ),
         RuleSpec(
             "late_fee.grace_days",
@@ -119,6 +127,22 @@ REGISTRY: dict[str, RuleSpec] = {
         ),
         RuleSpec(
             "vote.pass_percent", "Share of votes cast needed to pass", PERCENT, None, "Voting"
+        ),
+        RuleSpec(
+            "payments.card_fee_bp",
+            "Card convenience fee (hundredths of a percent: 295 = 2.95%)",
+            INT,
+            None,
+            "Online payments",
+            "Added to card payments and shown before the owner pays (decision D21).",
+        ),
+        RuleSpec(
+            "payments.bank_fee_cents",
+            "Bank transfer convenience fee (flat)",
+            CENTS,
+            None,
+            "Online payments",
+            "Added to bank transfer payments and shown before the owner pays.",
         ),
         *[
             RuleSpec(

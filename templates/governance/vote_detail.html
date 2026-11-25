@@ -11,7 +11,7 @@
       {% if vote.status == "open" %}<form method="post" action="{% url 'vote_action' vote.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit" class="danger">Close voting</button></form>{% endif %}
     </div>{% endif %}
   </div>
-  {% if vote.kind == "formal" %}<div class="alert warning">{% icon "alert" %}<span>Formal vote: not for binding use until counsel has reviewed the voting rules.{% if vote.rules_citation %} Rules applied: quorum {{ vote.quorum_percent }}%, pass {{ vote.pass_percent }}% ({{ vote.rules_citation }}).{% endif %}</span></div>{% endif %}
+  {% if vote.kind == "formal" %}<div class="alert info">{% icon "vote" %}<span>Formal vote: the result is binding, one ballot per lot.{% if vote.rules_citation %} Rules applied: quorum {{ vote.quorum_percent }}%, pass {{ vote.pass_percent }}% ({{ vote.rules_citation }}).{% endif %}</span></div>{% endif %}
   <div class="split">
     <div>
       {% if vote.description %}<section class="card prose">{{ vote.description|linebreaks }}</section>{% endif %}

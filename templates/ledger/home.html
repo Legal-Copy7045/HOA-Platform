@@ -20,6 +20,17 @@
       <p class="muted small">Uses the monthly dues rule. A lot already charged for that month is skipped, so posting twice is safe.</p>
     </section>
   {% endif %}
+  {% if can_manage or can_post_late_fees %}
+    <section class="card"><h2>Late this month</h2>
+      {% if not late_fee.0 %}<p class="muted small">No late fee is set. Set its amount, grace period and citation in <a href="{% url 'community_settings' %}">Community settings</a>.</p>
+      {% else %}
+        <p class="small">Late fee {{ late_fee.0|cents }}{% if late_fee.1 %} ({{ late_fee.1 }}){% endif %}. Automatic posting is <strong>{% if late_auto %}on{% else %}off{% endif %}</strong>{% if not late_auto %}: the board reviews this list and posts{% endif %}.</p>
+        {% if late %}<ul class="list">{% for r in late %}<li><a class="grow" href="{% url 'lot_ledger' r.lot.pk %}">Lot {{ r.lot.number }}</a><span class="small muted">late from {{ r.late_from|date:"M j" }}</span><span class="num">{{ r.balance_cents|cents }}</span></li>{% endfor %}</ul>
+          {% if can_post_late_fees %}<form method="post" data-confirm="Post a late fee to each of these {{ late|length }} lots? Each lot is charged at most once a month.">{% csrf_token %}<input type="hidden" name="action" value="late_fees"><button type="submit">Post late fees ({{ late|length }})</button></form>{% else %}<p class="small muted">A board member posts the fees.</p>{% endif %}
+        {% else %}<p class="muted small">Nobody is late for this month's dues.</p>{% endif %}
+      {% endif %}
+    </section>
+  {% endif %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Lot</th><th>Address</th><th class="num">Balance</th></tr></thead>
     <tbody>{% for lot, bal in rows %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">Lot {{ lot.number }}</a></td><td>{{ lot.street_address }}</td><td class="num">{% if bal > 0 %}<span class="status tone-warning">{{ bal|cents }} due</span>{% elif bal < 0 %}<span class="status tone-success">{{ bal|cents|cut:"-" }} credit</span>{% else %}<span class="muted">Paid up</span>{% endif %}</td></tr>{% endfor %}</tbody>

@@ -258,3 +258,42 @@ def test_open_vote_rules_are_fixed_in_the_database(board):
     vote = _formal_with_ballots(board, 1, 0)
     with pytest.raises(IntegrityError), transaction.atomic():
         Vote.objects.filter(pk=vote.pk).update(pass_percent=1)
+
+
+# --- Decision D21: secret ballots are unlinkable in the database ----------------------
+
+
+def test_secret_ballot_choice_is_not_stored_with_the_voter(board):
+    from django.db import IntegrityError, connection, transaction
+
+    from governance.models import SecretChoice
+
+    owners = [make_member(lots=[LotFactory()]) for _ in range(3)]
+    vote, (yes, no) = _vote(board, secret=True)
+    services.open_vote(vote, actor=board)
+    services.cast_ballot(vote, option_id=yes.pk, actor=owners[0])
+    services.cast_ballot(vote, option_id=yes.pk, actor=owners[1])
+    services.cast_ballot(vote, option_id=no.pk, actor=owners[2])
+    # Who voted is known (one ballot each), what they chose is not.
+    assert Ballot.objects.filter(vote=vote).count() == 3
+    assert not Ballot.objects.filter(vote=vote, option__isnull=False).exists()
+    # The choices carry no voter, lot, time or sequential id.
+    fields = {f.name for f in SecretChoice._meta.get_fields()}
+    assert fields == {"id", "vote", "option"}
+    counts = {r["option"].label: r["count"] for r in services.results(vote)["rows"]}
+    assert counts == {"Yes": 2, "No": 1}
+    # The database itself refuses a secret ballot that records the choice.
+    with pytest.raises(IntegrityError), transaction.atomic(), connection.cursor() as cur:
+        cur.execute(
+            "INSERT INTO governance_ballot (vote_id, option_id, person_id, cast_by_id, cast_at)"
+            " SELECT %s, %s, person_id, cast_by_id, now() FROM governance_ballot LIMIT 1",
+            [vote.pk, yes.pk],
+        )
+
+
+def test_open_ballots_still_record_the_choice(board):
+    owner = make_member(lots=[LotFactory()])
+    vote, (yes, _) = _vote(board)
+    services.open_vote(vote, actor=board)
+    ballot = services.cast_ballot(vote, option_id=yes.pk, actor=owner)
+    assert ballot.option_id == yes.pk

@@ -17,3 +17,18 @@ def monthly_assessments(timestamp: int) -> int:
         return post_monthly_assessments(year=today.year, month=today.month, actor=SYSTEM)
     except LedgerError:
         return 0
+
+
+@app.periodic(cron="41 6 * * *")  # daily
+@app.task(queue="maintenance", queueing_lock="late_fees")
+def late_fees(timestamp: int) -> int:
+    """Only when the board switched on late_fee.auto_apply (off by default)."""
+    from ledger.services import post_late_fees
+
+    if not rule("late_fee.auto_apply"):
+        return 0
+    today = timezone.localdate()
+    try:
+        return post_late_fees(year=today.year, month=today.month, actor=SYSTEM)
+    except LedgerError:
+        return 0

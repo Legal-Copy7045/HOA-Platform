@@ -20,6 +20,8 @@ NOTICES = {
     "approve invoices, resets and sysadmin nominations.",
     "role_granted": "An ARC, auditor or manager role was granted in the portal. Check the "
     "People page if you did not expect it.",
+    "board_seat_proposed": "A new board seat was proposed in the portal. A different board "
+    "member must approve or decline it on the Approvals page.",
     "account_change_requested": "An owner asked to add or remove someone on their account. "
     "A board member (not the owner) can approve or decline it from My items.",
     "mfa_reset_code_locked": "A sign-in reset code was locked after too many wrong entries. "

@@ -70,8 +70,10 @@ def test_aging_applies_credits_to_the_oldest_charges_first(w):
     assert a == {"current": 4500, "31_60": 4500, "61_90": 4500, "over_90": 0, "credit": 0}
 
 
-def test_late_fees_are_blocked_until_enabled(w, settings):
-    with pytest.raises(services.LedgerError, match="Pennsylvania law"):
+def test_late_fees_stop_when_the_emergency_switch_is_off(w, settings):
+    """Decision D21: late fees are allowed; LEDGER_LATE_FEES_ENABLED=false stops them."""
+    settings.LEDGER_LATE_FEES_ENABLED = False
+    with pytest.raises(services.LedgerError):
         services.post_charge(
             lot=w["lot"],
             kind="late_fee",

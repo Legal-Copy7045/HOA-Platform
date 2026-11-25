@@ -25,6 +25,7 @@ from governance.models import (
     MeetingStatus,
     RecordsRequest,
     Resolution,
+    SecretChoice,
     Vote,
     VoteKind,
     VoteOption,
@@ -433,8 +434,15 @@ def cast_ballot(
                 if lot is None:
                     raise GovernanceError("Choose which of your lots this ballot is for.")
             ballot = Ballot.objects.create(
-                vote=vote, option=option, person_id=person_id, lot=lot, cast_by=actor
+                vote=vote,
+                option=None if vote.secret else option,
+                person_id=person_id,
+                lot=lot,
+                cast_by=actor,
             )
+            if vote.secret:
+                # Stored apart from the ballot, with nothing that links them.
+                SecretChoice.objects.create(vote=vote, option=option)
     except IntegrityError as exc:
         raise GovernanceError("A ballot was already cast for this lot.") from exc
     # Secret ballots: the audit trail records that a ballot was cast, not the choice.
@@ -449,10 +457,11 @@ def cast_ballot(
 
 
 def results(vote: Vote) -> dict:
+    source = SecretChoice if vote.secret else Ballot
     counts = dict(
-        Ballot.objects.filter(vote=vote)
+        source.objects.filter(vote=vote)
         .values_list("option")
-        .annotate(n=Count("id"))
+        .annotate(n=Count("pk"))
         .values_list("option", "n")
     )
     total = sum(counts.values())

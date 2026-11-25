@@ -128,6 +128,11 @@ _SPECS = [
         "period",
     ),
     _spec("faq.saved", "FAQ entry saved", "published"),
+    _spec(
+        "ledger.late_fees_posted", "Late fees posted", "period", "lots", "amount_cents", "automatic"
+    ),
+    _spec("seat.proposed", "Board seat proposed", "person_id", "seat_type"),
+    _spec("seat.proposal_decided", "Board seat proposal decided", "person_id", "decision"),
     _spec("committee.created", "Committee created"),
     _spec("committee.retired", "Committee retired"),
     _spec("committee.reactivated", "Committee reactivated"),

@@ -60,6 +60,11 @@ class LedgerEntry(ScopedAppendOnlyModel):
                 condition=models.Q(kind="assessment"),
                 name="one_assessment_per_lot_per_month",
             ),
+            models.UniqueConstraint(
+                fields=["lot", "period"],
+                condition=models.Q(kind="late_fee") & ~models.Q(period=""),
+                name="one_late_fee_per_lot_per_month",
+            ),
             models.CheckConstraint(
                 condition=~models.Q(amount_cents=0), name="ledger_entry_nonzero"
             ),

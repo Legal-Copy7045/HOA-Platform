@@ -51,3 +51,6 @@
 - feature: "Board roster (current and previous accounts) with audited, formula-safe CSV export; list tools (status, dates, paging, export) on board lists; FAQ; dashboard welcome message"
   since: M3
   match: ["^unit:community/tests/test_roster_lists_faq"]
+- feature: "Board seats need a second board member in production (proposal, approval, withdraw; first seats exempt; off on the POC)"
+  since: M3
+  match: ["^unit:community/tests/test_seat_approval"]

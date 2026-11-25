@@ -26,3 +26,6 @@
 - feature: "Recurring invoices: board-approved contracts (second board member, terms frozen by the database); one invoice per period within the cap is pre-approved and audited"
   since: M3
   match: ["^unit:operations/tests/test_contracts"]
+- feature: "Late fees: late list after the grace period, board posts once per lot and month, automatic posting off by default; owner-paid convenience fees for card and bank shown before paying (D21)"
+  since: M3
+  match: ["^unit:ledger/tests/test_late_fees", "^unit:payments/tests/test_fees"]

@@ -9,6 +9,7 @@ from django.views.decorators.http import require_POST
 from audit.services import record_event
 from community.account_views import my_account_people
 from community.models import Lot
+from community.rules import rule, rule_with_citation
 from core import policy
 from core.money import MoneyField
 from core.workflow import WorkflowError
@@ -26,6 +27,7 @@ from ledger.models import (
 )
 from operations.models import ExpenseCategory
 from payments.providers import provider
+from payments.services import payment_options
 
 
 def _date(**kw):
@@ -98,6 +100,7 @@ def my_account(request):
                 "lot": lot,
                 "statement": statement,
                 "upcoming": services.upcoming_charges(statement.balance),
+                "pay_options": payment_options(statement.balance),
                 **my_account_people(request.user, lot.pk),
             }
         )
@@ -136,6 +139,16 @@ def _finance(request):
 @login_required
 def ledger_home(request):
     _finance(request)
+    if request.method == "POST" and request.POST.get("action") == "late_fees":
+        today = timezone.localdate()
+        _flash(
+            request,
+            lambda: services.post_late_fees(
+                year=today.year, month=today.month, actor=request.user, request=request
+            ),
+            "Late fees posted to the lots on the late list.",
+        )
+        return redirect("ledger_home")
     if request.method == "POST":
         year, month = int(request.POST.get("year", 0)), int(request.POST.get("month", 0))
         _flash(
@@ -159,6 +172,10 @@ def ledger_home(request):
             "year": today.year,
             "month": today.month,
             "can_manage": policy.can(request.user, "ledger.manage"),
+            "late": services.late_fee_candidates(year=today.year, month=today.month),
+            "late_fee": rule_with_citation("late_fee.cents"),
+            "late_auto": rule("late_fee.auto_apply"),
+            "can_post_late_fees": policy.can(request.user, "late_fee.post"),
         },
     )
 

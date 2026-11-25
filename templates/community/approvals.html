@@ -3,6 +3,13 @@
 {% block title %}Approvals · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Approvals</h1><p class="subtitle">These need a second board member: whoever started a request cannot approve it.</p></div></div>
+  <section class="card"><h2>Proposed board seats</h2>
+    {% if seat_proposals %}<ul class="list">{% for n in seat_proposals %}<li><div class="todo-icon tone-warning">{% icon "users" %}</div>
+      <div class="grow"><div class="title">{{ n.person.display_name }}</div><div class="small muted">{{ n.get_seat_type_display }} · term from {{ n.term_start|date:"M j, Y" }}{% if n.citation %} · {{ n.citation }}{% endif %}</div></div>
+      {% if n.nominated_by_id != me.pk and n.person.user_id != me.pk %}<form method="post" action="{% url 'seat_nomination_decide' n.pk 'approve' %}" class="inline" data-confirm="Record this board seat?">{% csrf_token %}<button type="submit" class="small">Approve</button></form>{% else %}<span class="muted small">Needs another board member</span>{% endif %}
+      <form method="post" action="{% url 'seat_nomination_decide' n.pk 'decline' %}" class="inline">{% csrf_token %}<button type="submit" class="danger small">{% if n.nominated_by_id == me.pk %}Withdraw{% else %}Decline{% endif %}</button></form></li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="check-circle" title="None waiting" %}{% endif %}
+  </section>
   <section class="card"><h2>Sysadmin nominations</h2>
     {% if nominations %}<ul class="list">{% for n in nominations %}<li><div class="todo-icon tone-warning">{% icon "shield" %}</div>
       <div class="grow"><div class="title">{{ n.person.display_name }}</div><div class="small muted">Nominated {{ n.nominated_at|date:"M j" }} · expires {{ n.expires_at|date:"M j" }}</div></div>
