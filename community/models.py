@@ -272,6 +272,7 @@ class Role(models.TextChoices):
     ARC_REVIEWER = "arc_reviewer", "ARC reviewer"
     AUDITOR = "auditor", "Auditor (read-only)"
     SYSADMIN = "sysadmin", "System administrator"
+    MANAGER = "manager", "Community manager (management company)"
 
 
 class AppointedBy(models.TextChoices):
@@ -364,3 +365,74 @@ class SysadminNomination(NeverDeleteMixin, ScopedModel):
     @property
     def is_open(self) -> bool:
         return not self.outcome and self.expires_at > timezone.now()
+
+
+# --- Community definition (rules as data, CLAUDE.md rule 6) ---------------------
+
+
+class CommunityProfile(models.Model):
+    """The single row describing the association itself."""
+
+    legal_name = models.CharField(max_length=200, default="Oak Creek Farms Homeowners Association")
+    fiscal_year_start_month = models.PositiveSmallIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+
+    def __str__(self) -> str:
+        return self.legal_name
+
+    @classmethod
+    def get(cls) -> CommunityProfile:
+        profile, _ = cls.objects.get_or_create(pk=1)
+        return profile
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("The community profile cannot be deleted.")
+
+
+class GoverningRule(models.Model):
+    """A value that comes from the Declaration, bylaws or a board decision.
+
+    Keys are fixed in community.rules.REGISTRY; each value carries a citation.
+    """
+
+    key = models.CharField(max_length=64, unique=True)
+    value = models.CharField(max_length=200, blank=True)
+    citation = models.CharField(max_length=200, blank=True, help_text='e.g. "Declaration §9.3"')
+    notes = models.TextField(blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["key"]
+
+    def __str__(self) -> str:
+        return self.key
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Rules are changed, never deleted (history is kept).")
+
+
+class CommonAreaKind(models.TextChoices):
+    STORMWATER = "stormwater", "Stormwater / ponds"
+    LANDSCAPING = "landscaping", "Entrance and landscaping"
+    ROADS = "roads", "Roads and lighting"
+    AMENITY = "amenity", "Amenity"
+    OTHER = "other", "Other"
+
+
+class CommonArea(NeverDeleteMixin, models.Model):
+    name = models.CharField(max_length=120)
+    kind = models.CharField(max_length=16, choices=CommonAreaKind.choices)
+    notes = models.TextField(blank=True)
+    active = models.BooleanField(default=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name

@@ -65,6 +65,10 @@ PROTECTED = {
     "reset_decide": ("POST", "reset"),
     "sysadmin_activity": ("GET", None),
     "system_status": ("GET", None),
+    "community_settings": ("GET", None),
+    "community_rule_save": ("POST", None),
+    "community_profile_save": ("POST", None),
+    "common_area_save": ("POST", None),
 }
 
 

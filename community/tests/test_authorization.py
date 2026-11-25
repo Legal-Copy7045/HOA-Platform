@@ -253,12 +253,46 @@ def test_no_self_granted_roles(world):
 # --- Policy table and coverage ---------------------------------------------------
 
 
+MEMBER_READS = {
+    "announcement.view",
+    "calendar.view",
+    "document.view_owner",
+    "meeting.view",
+    "resolution.view",
+    "vote.view",
+}
+
+
 @pytest.mark.parametrize(
     ("who", "allowed"),
     [
-        ("owner_a", {"lot.view_own"}),
-        ("auditor", {"lot.view_all", "audit.view_sysadmin_activity"}),
-        ("arc", set()),
+        (
+            "owner_a",
+            MEMBER_READS
+            | {
+                "lot.view_own",
+                "directory.view",
+                "records_request.submit",
+                "vote.cast",
+                "arc.submit",
+                "ledger.view_own",
+                "resale.request",
+            },
+        ),
+        (
+            "auditor",
+            MEMBER_READS
+            | {
+                "lot.view_all",
+                "audit.view_sysadmin_activity",
+                "document.view_board",
+                "arc.view_all",
+                "violation.view_all",
+                "finance.view",
+                "reports.view",
+            },
+        ),
+        ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
         ("sysadmin", {"system.view_status", "invite.send", "invite.revoke"}),
         ("former", set()),
     ],
@@ -266,6 +300,30 @@ def test_no_self_granted_roles(world):
 def test_permission_matrix(world, who, allowed):
     granted = {action for action in policy.PERMISSIONS if policy.can(world[who], action)}
     assert granted == allowed
+
+
+def test_manager_does_data_entry_but_never_approves_or_votes():
+    manager = make_member(roles=[Role.MANAGER])
+    for action in (
+        "invoice.enter",
+        "workorder.manage",
+        "violation.manage",
+        "arc.intake",
+        "document.manage",
+        "lot.view_all",
+        "ledger.manage",
+    ):
+        assert policy.can(manager, action), action
+    for action in (
+        "invoice.approve",
+        "vote.cast",
+        "arc.decide",
+        "violation.decide",
+        "budget.manage",
+        "person.manage",
+        "role.sysadmin.approve",
+    ):
+        assert not policy.can(manager, action), action
 
 
 def test_board_member_can_do_every_board_action(world):

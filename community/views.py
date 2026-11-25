@@ -23,6 +23,7 @@ from community.models import (
     RoleAssignment,
     SysadminNomination,
 )
+from community.rules import rules_needing_attention
 from community.services import CommunityError
 from core import policy
 
@@ -367,3 +368,92 @@ def approvals(request):
             "me": request.user,
         },
     )
+
+
+# --- Community definition ------------------------------------------------------------
+
+
+@login_required
+def community_settings(request):
+    policy.require(request.user, "lot.view_all")
+    from community.models import CommonArea, CommunityProfile, GoverningRule
+    from community.rules import REGISTRY, cents_display
+
+    rows = {r.key: r for r in GoverningRule.objects.all()}
+    needing = {s.key for s in rules_needing_attention()}
+    groups: dict[str, list] = {}
+    for spec in REGISTRY.values():
+        row = rows.get(spec.key)
+        raw = row.value if row and row.value != "" else (spec.default or "")
+        shown = cents_display(int(raw)) if spec.kind == "cents" and raw else raw
+        groups.setdefault(spec.group, []).append(
+            {
+                "spec": spec,
+                "row": row,
+                "raw": raw,
+                "shown": shown,
+                "needs_attention": spec.key in needing,
+            }
+        )
+    profile = CommunityProfile.get()
+    return render(
+        request,
+        "community/settings.html",
+        {
+            "groups": groups,
+            "profile_form": forms.ProfileForm(
+                initial={
+                    "legal_name": profile.legal_name,
+                    "fiscal_year_start_month": profile.fiscal_year_start_month,
+                }
+            ),
+            "areas": CommonArea.objects.all(),
+            "area_form": forms.CommonAreaForm(),
+            "can_edit": policy.can(request.user, "community.manage_rules"),
+        },
+    )
+
+
+@login_required
+@require_POST
+def community_rule_save(request):
+    policy.require(request.user, "community.manage_rules")
+    form = forms.RuleForm(request.POST)
+    back = reverse("community_settings")
+    if not form.is_valid():
+        return _invalid(request, form, back)
+    try:
+        services.set_rule(actor=request.user, request=request, **form.cleaned_data)
+    except CommunityError as exc:
+        return _failed(request, exc, back)
+    return _done(request, "Rule saved.", back)
+
+
+@login_required
+@require_POST
+def community_profile_save(request):
+    policy.require(request.user, "community.manage_rules")
+    form = forms.ProfileForm(request.POST)
+    back = reverse("community_settings")
+    if not form.is_valid():
+        return _invalid(request, form, back)
+    try:
+        services.update_profile(actor=request.user, request=request, **form.cleaned_data)
+    except CommunityError as exc:
+        return _failed(request, exc, back)
+    return _done(request, "Community profile saved.", back)
+
+
+@login_required
+@require_POST
+def common_area_save(request):
+    policy.require(request.user, "community.manage_rules")
+    form = forms.CommonAreaForm(request.POST)
+    back = reverse("community_settings")
+    if not form.is_valid():
+        return _invalid(request, form, back)
+    try:
+        services.save_common_area(actor=request.user, request=request, **form.cleaned_data)
+    except CommunityError as exc:
+        return _failed(request, exc, back)
+    return _done(request, "Common area saved.", back)

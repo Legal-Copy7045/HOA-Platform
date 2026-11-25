@@ -6,8 +6,9 @@ This file is the source of truth for architecture and rules. If a task conflicts
 
 ## Scope
 
-- In scope for the POC (Milestones 1-3): accounts and MFA, lots and ownership, role-scoped access, audit log, document library, architectural review workflow, announcements.
-- Later (not now): owner ledger and Stripe payments, board financial reports, meetings and resolutions, violations, records requests, resale certificates.
+- Milestone 1 (done): accounts and MFA, lots and ownership, role-scoped access, audit log.
+- Milestone 2 (directed 2026-11-25, see `docs/milestone-2-plan.md`): community definition (rules with citations, dues, common areas), owner profile and opt-in directory, calendar, announcements, board tasks, data exports, document library, meetings, resolutions and policies, records requests, voting (informal polls and formal votes), architectural review, violations, vendors and work orders, invoice approval, owner ledger with monthly dues and prepayment drawdown, budgets, collections tracking, resale certificates, reports, Stripe placeholder.
+- Still requires a decision before use: automatic late fees (PA law review), binding formal votes (counsel review), live Stripe payments.
 - Out of scope: native mobile apps, multi-association tenancy, anything that stores card or bank numbers.
 
 ## Stack (decided)
@@ -23,7 +24,7 @@ This file is the source of truth for architecture and rules. If a task conflicts
 
 ## Architecture rules (non-negotiable)
 
-1. Modular monolith. Apps: `accounts`, `community`, `documents`, `arc`, `comms`, `audit`; later `ledger`, `payments`, `governance`, `reports`. Apps call each other through service functions in `services.py`, never by importing another app's models for writes.
+1. Modular monolith. Apps: `accounts`, `community`, `audit`, `comms`, `documents`, `governance`, `arc`, `compliance`, `operations`, `ledger`, `payments`, `reports`. Apps call each other through service functions in `services.py`, never by importing another app's models for writes.
 2. All configuration comes from environment variables (12-factor). No host-specific paths, hostnames, or secrets in code. Provide `.env.example`.
 3. Portable by design: the same image must run on a Proxmox VM, a VPS, or a PaaS with only environment changes.
 4. Single-tenant. No tenancy columns.
@@ -33,6 +34,7 @@ This file is the source of truth for architecture and rules. If a task conflicts
 
 ## Authorization (critical)
 
+- A `manager` role (management-company staff) does data entry and workflow steps; it never approves invoices, decides ARC or violations, changes rules, or votes.
 - Owner access derives from Ownership. Board membership derives from an active `BoardSeat` (declarant_appointed or owner_elected, with term dates; ends only when `ended_on` is recorded). Offices (president, vice_president, treasurer, secretary) are separate `OfficeHolding` records and require an active seat. Other roles (arc_reviewer, auditor, sysadmin) are dated `RoleAssignment` records; ARC appointments record who appointed them.
 - `Person` (community identity) is separate from `User` (login). Ownerships, seats, offices and roles attach to Person.
 - Permissions live in one map in `core/policy.py`. For now every board member can perform every board action. Every action must remain performable by at least two people with MFA; the app warns when it is not.

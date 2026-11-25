@@ -625,3 +625,88 @@ def board_emails() -> list[str]:
             .values_list("person__user__email", flat=True)
             .distinct()
         )
+
+
+# --- Community definition -------------------------------------------------------
+
+
+def set_rule(
+    *,
+    key: str,
+    value: str,
+    citation: str = "",
+    notes: str = "",
+    actor,
+    request: HttpRequest | None = None,
+):
+    from community.models import GoverningRule
+    from community.rules import REGISTRY, validate_value
+
+    _authorize(actor, "community.manage_rules")
+    if key not in REGISTRY:
+        raise CommunityError("Unknown rule.")
+    try:
+        value = validate_value(key, value)
+    except ValueError as exc:
+        raise CommunityError(str(exc)) from exc
+    with transaction.atomic():
+        row, _ = GoverningRule.objects.select_for_update().get_or_create(key=key)
+        row.value, row.citation, row.notes = value, citation.strip()[:200], notes.strip()
+        row.updated_by = _user(actor)
+        row.save()
+        _audit(
+            "community.rule_changed",
+            actor=actor,
+            request=request,
+            target=row,
+            metadata={"key": key, "has_citation": bool(row.citation)},
+        )
+    return row
+
+
+def update_profile(
+    *, legal_name: str, fiscal_year_start_month: int, actor, request: HttpRequest | None = None
+):
+    from community.models import CommunityProfile
+
+    _authorize(actor, "community.manage_rules")
+    if not 1 <= int(fiscal_year_start_month) <= 12:
+        raise CommunityError("The fiscal year must start in month 1-12.")
+    with transaction.atomic():
+        profile = CommunityProfile.get()
+        profile.legal_name = legal_name.strip()[:200] or profile.legal_name
+        profile.fiscal_year_start_month = int(fiscal_year_start_month)
+        profile.save()
+        _audit(
+            "community.profile_changed", actor=actor, request=request, target=profile, metadata={}
+        )
+    return profile
+
+
+def save_common_area(
+    *,
+    name: str,
+    kind: str,
+    notes: str = "",
+    active: bool = True,
+    area=None,
+    actor,
+    request: HttpRequest | None = None,
+):
+    from community.models import CommonArea, CommonAreaKind
+
+    _authorize(actor, "community.manage_rules")
+    if kind not in CommonAreaKind.values or not name.strip():
+        raise CommunityError("Give the area a name and a kind.")
+    with transaction.atomic():
+        area = area or CommonArea()
+        area.name, area.kind, area.notes, area.active = name.strip()[:120], kind, notes, active
+        area.save()
+        _audit(
+            "community.common_area_saved",
+            actor=actor,
+            request=request,
+            target=area,
+            metadata={"kind": kind, "active": active},
+        )
+    return area

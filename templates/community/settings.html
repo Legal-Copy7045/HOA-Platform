@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Community settings · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Community settings</h1>
+  <p class="muted">Numbers here come from the Declaration, the bylaws or a recorded board decision. Each needs a citation; rules marked <strong>needs attention</strong> are missing a value or a citation. Money is entered in cents (e.g. 600 for $6.00).</p>
+
+  <h2>Association</h2>
+  {% if can_edit %}
+    <form method="post" action="{% url 'community_profile_save' %}">{% csrf_token %}{{ profile_form.as_p }}<button type="submit">Save</button></form>
+  {% else %}<p>{{ profile_form.legal_name.value }}; fiscal year starts in month {{ profile_form.fiscal_year_start_month.value }}.</p>{% endif %}
+
+  {% for group, rules in groups.items %}
+    <h2>{{ group }}</h2>
+    <table>
+      <thead><tr><th>Rule</th><th>Value</th><th>Citation</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for r in rules %}
+        <tr>
+          <td>{{ r.spec.label }}{% if r.spec.help %}<div class="muted">{{ r.spec.help }}</div>{% endif %}{% if r.needs_attention %}<div><strong>needs attention</strong></div>{% endif %}</td>
+          {% if can_edit %}
+            <td colspan="3">
+              <form method="post" action="{% url 'community_rule_save' %}" class="rule-form">{% csrf_token %}
+                <input type="hidden" name="key" value="{{ r.spec.key }}">
+                <input name="value" value="{{ r.raw }}" aria-label="Value" size="10"> <span class="muted">{{ r.shown }}</span>
+                <input name="citation" value="{{ r.row.citation|default:'' }}" placeholder="Declaration §" aria-label="Citation">
+                <button type="submit">Save</button>
+              </form>
+            </td>
+          {% else %}<td>{{ r.shown|default:"-" }}</td><td>{{ r.row.citation|default:"-" }}</td>{% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endfor %}
+
+  <h2>Common areas</h2>
+  <ul>{% for a in areas %}<li>{{ a.name }} <span class="muted">({{ a.get_kind_display }}){% if not a.active %}, inactive{% endif %}</span></li>{% empty %}<li class="muted">None recorded.</li>{% endfor %}</ul>
+  {% if can_edit %}<details><summary>Add a common area</summary><form method="post" action="{% url 'common_area_save' %}">{% csrf_token %}{{ area_form.as_p }}<button type="submit">Add</button></form></details>{% endif %}
+{% endblock %}

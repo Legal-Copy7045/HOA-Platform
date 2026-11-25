@@ -10,7 +10,9 @@
   {% for seat in past_term %}
     <div class="warning">{{ seat.person.display_name }}'s board term was due to end on {{ seat.term_end }}. If a successor has been elected, end this seat.</div>
   {% endfor %}
+  {% if rules_attention %}<div class="warning">{{ rules_attention }} governing rule(s) need a value or citation. <a href="{% url 'community_settings' %}">Community settings</a></div>{% endif %}
   <ul class="tiles">
+    <li><a href="{% url 'community_settings' %}">Community settings</a> <span class="muted">dues, rules and citations, common areas</span></li>
     <li><a href="{% url 'people' %}">People</a> <span class="muted">owners, board seats, offices, roles, logins</span></li>
     <li><a href="{% url 'lot_list' %}">Lots</a> <span class="muted">ownership and transfers</span></li>
     <li><a href="{% url 'approvals' %}">Approvals</a> <span class="muted">{{ open_nominations|length }} sysadmin nomination(s), {{ resets_waiting|length }} sign-in reset(s) waiting</span></li>

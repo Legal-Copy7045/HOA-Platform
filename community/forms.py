@@ -83,7 +83,11 @@ class OfficeForm(forms.Form):
 
 class RoleForm(forms.Form):
     role = forms.ChoiceField(
-        choices=[(Role.ARC_REVIEWER, Role.ARC_REVIEWER.label), (Role.AUDITOR, Role.AUDITOR.label)]
+        choices=[
+            (Role.ARC_REVIEWER, Role.ARC_REVIEWER.label),
+            (Role.AUDITOR, Role.AUDITOR.label),
+            (Role.MANAGER, Role.MANAGER.label),
+        ]
     )
     start_date = forms.DateField(widget=DateInput, initial=today)
     appointed_by = forms.ChoiceField(
@@ -92,3 +96,23 @@ class RoleForm(forms.Form):
         help_text="Required for ARC members.",
     )
     citation = forms.CharField(max_length=200, required=False)
+
+
+class ProfileForm(forms.Form):
+    legal_name = forms.CharField(max_length=200)
+    fiscal_year_start_month = forms.IntegerField(min_value=1, max_value=12)
+
+
+class RuleForm(forms.Form):
+    key = forms.CharField(max_length=64, widget=forms.HiddenInput)
+    value = forms.CharField(max_length=200, required=False)
+    citation = forms.CharField(max_length=200, required=False)
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+
+class CommonAreaForm(forms.Form):
+    from community.models import CommonAreaKind
+
+    name = forms.CharField(max_length=120)
+    kind = forms.ChoiceField(choices=CommonAreaKind.choices)
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))

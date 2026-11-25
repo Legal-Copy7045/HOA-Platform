@@ -90,6 +90,9 @@ _SPECS = [
     _spec("mfa_reset.code_failed", "Wrong enrollment code entered", "user_id", "attempts"),
     # sysadmin visibility (D9)
     _spec("sysadmin.request", "Portal request by a sysadmin", "view", "method", "status"),
+    _spec("community.rule_changed", "Governing rule changed", "key", "has_citation"),
+    _spec("community.profile_changed", "Community profile changed"),
+    _spec("community.common_area_saved", "Common area saved", "kind", "active"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

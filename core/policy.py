@@ -28,21 +28,27 @@ BOARD = "board"
 ARC_REVIEWER = "arc_reviewer"
 AUDITOR = "auditor"
 SYSADMIN = "sysadmin"
+MANAGER = "manager"  # management-company staff: data entry, never approvals or votes
+
+MEMBERS = frozenset({OWNER, BOARD, ARC_REVIEWER, AUDITOR, MANAGER})
 
 # action -> role groups allowed to perform it. Keep this the only such table.
 PERMISSIONS: dict[str, frozenset[str]] = {
     # Reading
     "lot.view_own": frozenset({OWNER}),
-    "lot.view_all": frozenset({BOARD, AUDITOR}),
+    "lot.view_all": frozenset({BOARD, AUDITOR, MANAGER}),
     "audit.view_sysadmin_activity": frozenset({BOARD, AUDITOR}),
     "system.view_status": frozenset({SYSADMIN}),
-    # Community register
+    # Community register and definition
     "person.manage": frozenset({BOARD}),
     "ownership.manage": frozenset({BOARD}),
     "seat.manage": frozenset({BOARD}),
     "office.manage": frozenset({BOARD}),
     "role.arc_reviewer.manage": frozenset({BOARD}),
     "role.auditor.manage": frozenset({BOARD}),
+    "role.manager.manage": frozenset({BOARD}),
+    "community.manage_rules": frozenset({BOARD}),
+    "directory.view": frozenset({OWNER, BOARD, MANAGER}),
     # Sysadmin: two different board members to grant, one to revoke (D4)
     "role.sysadmin.nominate": frozenset({BOARD}),
     "role.sysadmin.approve": frozenset({BOARD}),
@@ -52,11 +58,55 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "invite.revoke": frozenset({BOARD, SYSADMIN}),
     "mfa_reset.start": frozenset({BOARD}),
     "mfa_reset.approve": frozenset({BOARD}),
+    # Communications
+    "announcement.view": MEMBERS,
+    "announcement.publish": frozenset({BOARD, MANAGER}),
+    "calendar.view": MEMBERS,
+    "calendar.manage": frozenset({BOARD, MANAGER}),
+    "task.manage": frozenset({BOARD, MANAGER}),
+    # Documents
+    "document.view_owner": MEMBERS,
+    "document.view_board": frozenset({BOARD, AUDITOR, MANAGER}),
+    "document.manage": frozenset({BOARD, MANAGER}),
+    # Governance
+    "meeting.view": MEMBERS,
+    "meeting.manage": frozenset({BOARD, MANAGER}),
+    "resolution.view": MEMBERS,
+    "resolution.record": frozenset({BOARD}),
+    "records_request.submit": frozenset({OWNER}),
+    "records_request.manage": frozenset({BOARD, MANAGER}),
+    "vote.view": MEMBERS,
+    "vote.cast": frozenset({OWNER}),
+    "vote.manage": frozenset({BOARD}),
+    # Architectural review
+    "arc.submit": frozenset({OWNER}),
+    "arc.view_all": frozenset({BOARD, ARC_REVIEWER, MANAGER, AUDITOR}),
+    "arc.intake": frozenset({BOARD, ARC_REVIEWER, MANAGER}),
+    "arc.decide": frozenset({ARC_REVIEWER}),
+    "arc.appeal_decide": frozenset({BOARD}),
+    # Compliance
+    "violation.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
+    "violation.manage": frozenset({BOARD, MANAGER}),
+    "violation.decide": frozenset({BOARD}),
+    # Operations and money
+    "vendor.manage": frozenset({BOARD, MANAGER}),
+    "workorder.manage": frozenset({BOARD, MANAGER}),
+    "invoice.enter": frozenset({BOARD, MANAGER}),
+    "invoice.approve": frozenset({BOARD}),
+    "invoice.record_payment": frozenset({BOARD, MANAGER}),
+    "finance.view": frozenset({BOARD, AUDITOR, MANAGER}),
+    "ledger.view_own": frozenset({OWNER}),
+    "ledger.manage": frozenset({BOARD, MANAGER}),
+    "budget.manage": frozenset({BOARD}),
+    "collections.manage": frozenset({BOARD, MANAGER}),
+    "resale.request": frozenset({OWNER, BOARD, MANAGER}),
+    "resale.manage": frozenset({BOARD, MANAGER}),
+    "reports.view": frozenset({BOARD, AUDITOR, MANAGER}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);
 # kept explicit for the coverage check below.
-PRIVILEGED_GROUPS = frozenset({BOARD, ARC_REVIEWER, AUDITOR, SYSADMIN})
+PRIVILEGED_GROUPS = frozenset({BOARD, ARC_REVIEWER, AUDITOR, SYSADMIN, MANAGER})
 
 
 class _System:
@@ -143,7 +193,7 @@ def people_able_to(action: str) -> set[int]:
             people.update(BoardSeat.objects.active().values_list("person_id", flat=True))
         if OWNER in groups:
             people.update(Ownership.objects.active().values_list("person_id", flat=True))
-        role_groups = groups & {ARC_REVIEWER, AUDITOR, SYSADMIN}
+        role_groups = groups & {ARC_REVIEWER, AUDITOR, SYSADMIN, MANAGER}
         if role_groups:
             people.update(
                 RoleAssignment.objects.active()
@@ -164,8 +214,8 @@ def thinly_covered_actions(minimum: int = 2) -> dict[str, int]:
     with_mfa = people_with_mfa()
     result = {}
     for action, groups in PERMISSIONS.items():
-        if groups == {OWNER}:
-            continue
+        if groups == {OWNER} or OWNER in groups:
+            continue  # owner actions concern one's own lot
         able = people_able_to(action)
         if with_mfa is not None:
             able &= with_mfa
