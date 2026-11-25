@@ -37,7 +37,7 @@ PUBLIC = {"home", "healthz", "invite_landing", "invite_accept", "account_setup_e
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")
-OWN_ACCOUNT = {"enroll_with_code", "my_profile", "export_my_data"}
+OWN_ACCOUNT = {"enroll_with_code", "my_profile", "export_my_data", "owner_preview_stop"}
 # Text from board-only or other-lot fixtures that must never reach owner A.
 BOARD_ONLY_MARKERS = (
     b"Board only: legal matter",
@@ -76,6 +76,7 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "board_home": ("GET", None),
+    "owner_preview_start": ("POST", None),
     "approvals": ("GET", None),
     "people": ("GET", None),
     "person_detail": ("GET", "person"),

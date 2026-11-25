@@ -173,6 +173,9 @@ def board_home(request):
             "open_nominations": open_nominations,
             "resets_waiting": resets_waiting,
             "approvals_waiting": len(open_nominations) + len(resets_waiting),
+            "preview_lots": Lot.objects.for_user(request.user).order_by("number")
+            if policy.can(request.user, "portal.preview_as_owner")
+            else [],
             "invites_open": Invitation.objects.for_user(request.user).pending().count(),
         },
     )

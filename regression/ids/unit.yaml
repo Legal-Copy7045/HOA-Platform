@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-692
+# highest issued: UNIT-700
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -693,3 +693,11 @@ UNIT-689: "core/tests/test_security_review.py::test_office_bypasses_found_on_re_
 UNIT-690: "core/tests/test_security_review.py::test_office_bypasses_found_on_re_audit_are_refused[dde-field]"
 UNIT-691: "core/tests/test_security_review.py::test_office_bypasses_found_on_re_audit_are_refused[excel-external-link]"
 UNIT-692: "core/tests/test_security_review.py::test_external_hyperlinks_are_still_allowed"
+UNIT-693: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[owner_preview_start]"
+UNIT-694: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[owner_preview_start]"
+UNIT-695: "core/tests/test_owner_preview.py::test_board_sees_the_owners_menu_and_scope"
+UNIT-696: "core/tests/test_owner_preview.py::test_homeowner_view_is_read_only"
+UNIT-697: "core/tests/test_owner_preview.py::test_exit_restores_the_board_view"
+UNIT-698: "core/tests/test_owner_preview.py::test_owners_cannot_use_homeowner_view"
+UNIT-699: "core/tests/test_owner_preview.py::test_preview_affects_only_the_viewer"
+UNIT-700: "core/tests/test_owner_preview.py::test_preview_ends_if_the_viewer_loses_the_role"

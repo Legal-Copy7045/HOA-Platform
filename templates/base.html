@@ -44,6 +44,10 @@
         <a class="brand" href="{% url 'home' %}"><span class="brand-mark"><svg aria-hidden="true"><use href="{% static 'img/icons.svg' %}#leaf"></use></svg></span><span>{{ SITE_NAME }}</span></a>
       </header>
       <main id="main" class="content {% block content_class %}{% endblock %}">
+        {% if request.owner_preview %}
+          <div class="preview-banner" role="status">{% icon "home" %}<span><strong>Homeowner view:</strong> you're seeing what the owner of lot {{ request.owner_preview.lot_number }} sees. Read-only; personal pages are still yours.</span>
+            <form method="post" action="{% url 'owner_preview_stop' %}" class="inline">{% csrf_token %}<button type="submit" class="small">Exit homeowner view</button></form></div>
+        {% endif %}
 {% else %}
   <main id="main" class="auth">
     <div class="auth-card">

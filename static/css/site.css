@@ -351,3 +351,8 @@ button.block, .btn.block { width: 100%; justify-content: center; }
 details.coverage summary { cursor: pointer; font-weight: 600; }
 details.coverage ul { columns: 2; column-gap: 2rem; }
 @media (max-width: 640px) { details.coverage ul { columns: 1; } }
+
+/* Homeowner view banner */
+.preview-banner { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: .7rem 1rem; margin: 0 0 1.25rem; border-radius: 10px; background: var(--warning-bg); color: var(--ink); border: 1px solid var(--warning); }
+.preview-banner > span { flex: 1 1 16rem; }
+.preview-banner form { margin: 0; }

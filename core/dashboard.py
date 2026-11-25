@@ -12,7 +12,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core import policy
-from core.scoping import system_access
 
 
 def _can(groups, action) -> bool:
@@ -31,22 +30,16 @@ def owner_panel(user, roles) -> dict:
     from arc.models import ArcRequest
     from comms.models import Announcement, AnnouncementRead
     from comms.services import upcoming
-    from community.models import Lot, Ownership
+    from community.models import Lot
     from compliance.models import Violation
     from governance.models import Vote
     from governance.services import ballot_choices_for
     from ledger.services import owner_statement
 
     accounts = []
+    since = dict(roles.owned_since)
     for lot in Lot.objects.for_user(user).filter(pk__in=roles.owned_lot_ids):
-        with system_access("dashboard ownership start"):
-            start = (
-                Ownership.objects.filter(person__user=user, lot=lot)
-                .active()
-                .order_by("start_date")
-                .values_list("start_date", flat=True)
-                .first()
-            )
+        start = since.get(lot.pk)
         accounts.append({"lot": lot, "balance": owner_statement(lot.pk, start).balance})
     open_arc = (
         ArcRequest.objects.for_user(user)

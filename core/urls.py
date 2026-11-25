@@ -4,6 +4,7 @@ from django.urls import include, path
 
 from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
+from core import preview
 from core.views import export_my_data, healthz, home, system_status
 
 
@@ -18,6 +19,8 @@ urlpatterns = [
     path("account/profile/", my_profile, name="my_profile"),
     path("account/export/", export_my_data, name="export_my_data"),
     path("directory/", directory, name="directory"),
+    path("board/homeowner-view/", preview.start, name="owner_preview_start"),
+    path("homeowner-view/exit/", preview.stop, name="owner_preview_stop"),
     path("board/sysadmin-activity/", sysadmin_activity, name="sysadmin_activity"),
     # Invite-only, and no self-service change of email address (D5). These
     # come before allauth's own URLs so they win.

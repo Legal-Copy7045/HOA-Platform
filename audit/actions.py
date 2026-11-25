@@ -101,6 +101,8 @@ _SPECS = [
         "in_directory",
     ),
     _spec("export.own_data", "Downloaded own data"),
+    _spec("preview.owner_started", "Homeowner view started", "lot_id"),
+    _spec("preview.owner_stopped", "Homeowner view ended", "lot_id"),
     _spec("announcement.published", "Announcement published", "audience", "urgent"),
     _spec("event.created", "Calendar event created", "audience"),
     _spec("event.cancelled", "Calendar event cancelled"),

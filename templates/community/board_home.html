@@ -18,6 +18,17 @@
     {% if user|can:"invite.resend" %}<a class="stat" href="{% url 'invitations' %}"><div class="label">Open invitations</div><div class="value">{{ invites_open }}</div><div class="hint">not yet accepted</div></a>{% endif %}
   </div>
 
+  {% if user|can:"portal.preview_as_owner" and preview_lots %}
+    <section class="card">
+      <h2>{% icon "home" %} Homeowner view</h2>
+      <p class="muted small">See the portal exactly as one lot's owner sees it: their menu, pages and data. Read-only, and logged.</p>
+      <form method="post" action="{% url 'owner_preview_start' %}" class="inline-form">{% csrf_token %}
+        <div><label for="pv-lot">Lot</label><select id="pv-lot" name="lot">{% for lot in preview_lots %}<option value="{{ lot.pk }}">Lot {{ lot.number }} · {{ lot.street_address }}</option>{% endfor %}</select></div>
+        <button type="submit" class="secondary">View as homeowner</button>
+      </form>
+    </section>
+  {% endif %}
+
   <div class="grid grid-3 hub">
     <section class="card"><h2>{% icon "dollar" %} Finance</h2><ul class="links">
       <li><a href="{% url 'ledger_home' %}">Owner accounts</a></li><li><a href="{% url 'invoices' %}">Invoices</a></li><li><a href="{% url 'budgets' %}">Budgets</a></li>

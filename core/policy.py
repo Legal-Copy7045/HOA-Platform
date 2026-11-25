@@ -37,6 +37,8 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Reading
     "lot.view_own": frozenset({OWNER}),
     "lot.view_all": frozenset({BOARD, AUDITOR, MANAGER}),
+    # Homeowner view: see the portal as one lot's owner sees it (read-only).
+    "portal.preview_as_owner": frozenset({BOARD, MANAGER}),
     "audit.view_sysadmin_activity": frozenset({BOARD, AUDITOR}),
     "system.view_status": frozenset({SYSADMIN}),
     # Community register and definition
@@ -143,12 +145,42 @@ class Roles:
 NO_ROLES = Roles()
 
 
+def _preview_roles(preview, on) -> Roles:
+    """Homeowner view (core.preview): the owner of one lot's permissions and
+    scope, with the viewer's own person (no impersonation of the owner)."""
+    from community.models import Ownership, Person
+    from core.scoping import system_access
+
+    with system_access("policy: owner preview"):
+        person_id = (
+            Person.objects.filter(user_id=preview.user_id).values_list("pk", flat=True).first()
+        )
+        starts = list(
+            Ownership.objects.filter(lot_id=preview.lot_id)
+            .active(on)
+            .values_list("start_date", flat=True)
+        )
+    since = min(starts) if starts else (on or datetime.date.today())
+    return Roles(
+        frozenset({OWNER}),
+        frozenset({preview.lot_id}),
+        person_id,
+        frozenset(),
+        ((preview.lot_id, since),),
+    )
+
+
 def roles_for(user, on: datetime.date | None = None) -> Roles:
     from community.models import BoardSeat, OfficeHolding, Ownership, Person, RoleAssignment
     from core.scoping import system_access
 
     if user is None or not getattr(user, "is_authenticated", False) or not user.is_active:
         return NO_ROLES
+    from core.preview import current_for
+
+    preview = current_for(user)
+    if preview is not None:
+        return _preview_roles(preview, on)
     with system_access("policy: compute roles"):
         person = Person.objects.filter(user=user).only("pk").first()
         if person is None:

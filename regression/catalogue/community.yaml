@@ -24,3 +24,6 @@
 - feature: "Change history protected"
   since: M1
   match: ["^unit:community/tests/test_history_protection"]
+- feature: "Homeowner view: board and manager see one lot's owner view, read-only and audited"
+  since: M3
+  match: ["^unit:core/tests/test_owner_preview"]

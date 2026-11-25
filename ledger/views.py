@@ -7,10 +7,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from audit.services import record_event
-from community.models import Lot, Ownership
+from community.models import Lot
 from core import policy
 from core.money import MoneyField
-from core.scoping import system_access
 from core.workflow import WorkflowError
 from documents import attachments
 from documents.attachments import pdf_response
@@ -79,14 +78,9 @@ def _flash(request, fn, ok):
 
 
 def _ownership_start(user, lot_id):
-    with system_access("ownership start for statement"):
-        o = (
-            Ownership.objects.filter(person__user=user, lot_id=lot_id)
-            .active()
-            .order_by("start_date")
-            .first()
-        )
-    return o.start_date if o else None
+    """When this owner's unbroken ownership began (also right for the
+    homeowner view, which has the previewed lot's owner scope)."""
+    return dict(policy.roles_for(user).owned_since).get(lot_id)
 
 
 @login_required
