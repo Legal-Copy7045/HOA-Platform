@@ -137,3 +137,34 @@ class VersionScan(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"scan {self.result}"
+
+
+def _attachment_key(instance, filename):
+    return f"attachments/{uuid.uuid4().hex}"
+
+
+class Attachment(AppendOnlyModel):
+    """A file attached to a workflow object (ARC plans, violation photos,
+    invoices). Never changed or removed: every submitted version is kept.
+    Access is always decided by the owning object's scoped lookup."""
+
+    owner_type = models.CharField(max_length=50)
+    owner_id = models.CharField(max_length=32)
+    file = models.FileField(upload_to=_attachment_key, max_length=200)
+    original_filename = models.CharField(max_length=200)
+    content_type = models.CharField(max_length=100)
+    size = models.PositiveBigIntegerField()
+    sha256 = models.CharField(max_length=64)
+    scan_result = models.CharField(max_length=16, choices=ScanResult.choices)
+    label = models.CharField(max_length=200, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    uploaded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["uploaded_at", "id"]
+        indexes = [models.Index(fields=["owner_type", "owner_id"])]
+
+    def __str__(self) -> str:
+        return self.original_filename

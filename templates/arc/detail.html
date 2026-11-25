@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}ARC #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>{{ obj.title }}</h1>
+  <p>Lot {{ obj.lot.number }} · <span class="status">{{ obj.get_state_display }}</span>{% if obj.review_due_on %} · decision due {{ obj.review_due_on }}{% endif %}{% if obj.appeal_due_on %} · appeal by {{ obj.appeal_due_on }}{% endif %}</p>
+  {% if recused %}<p class="warning">You are recused from this request (you are the applicant or own an affected lot). Deliberations are hidden and you cannot decide.</p>{% endif %}
+  <div class="card">{{ obj.description|linebreaks }}{% if obj.planned_start %}<p class="muted">Planned start: {{ obj.planned_start }}</p>{% endif %}</div>
+
+  <h2>Plans and photos</h2>
+  <ul>{% for f in files %}<li><a href="{% url 'arc_file' obj.pk f.pk %}">{{ f.original_filename }}</a> <span class="muted">{{ f.uploaded_at|date:"M j" }}{% if f.label %} · {{ f.label }}{% endif %}</span></li>{% empty %}<li class="muted">None yet.</li>{% endfor %}</ul>
+  {% if can_attach %}<form method="post" action="{% url 'arc_attach' obj.pk %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" required aria-label="File"> <input name="label" placeholder="Description" aria-label="Description"> <button type="submit">Attach</button><div class="muted">PDF or images. Every file is kept, including earlier versions.</div></form>{% endif %}
+
+  {% if decisions %}<h2>Decisions</h2><table><tbody>{% for d in decisions %}<tr><td>{{ d.decided_at|date:"M j, Y" }}</td><td>{{ d.get_outcome_display }}{% if d.is_appeal %} (appeal){% endif %}{% if d.deemed %} (deemed){% endif %}<div class="muted">{{ d.citation }}</div>{% if d.conditions %}<div>Conditions: {{ d.conditions }}</div>{% endif %}{% if d.reasons %}<div>Reasons: {{ d.reasons }}</div>{% endif %}</td><td><a href="{% url 'arc_letter' obj.pk d.pk %}">Decision letter (PDF)</a></td></tr>{% endfor %}</tbody></table>{% endif %}
+
+  {% if deliberation is not None %}
+    <h2>Reviewer positions <span class="muted">(not shown to the applicant)</span></h2>
+    <ul>{% for v in deliberation %}<li>{{ v.reviewer.email }}: {{ v.get_position_display }}{% if v.comment %} - {{ v.comment }}{% endif %}</li>{% empty %}<li class="muted">None yet.</li>{% endfor %}</ul>
+    {% if can_decide %}<form method="post" action="{% url 'arc_position' obj.pk %}">{% csrf_token %}<select name="position" aria-label="Position">{% for v, l in positions %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select> <input name="comment" placeholder="Comment" aria-label="Comment"> <button type="submit">Record my position</button></form>{% endif %}
+  {% endif %}
+  {% if can_decide %}<h2>Record the decision</h2><form method="post" action="{% url 'arc_decide' obj.pk 'decision' %}">{% csrf_token %}{{ decision_form.as_p }}<button type="submit">Record decision</button></form>{% endif %}
+  {% if can_decide_appeal %}<h2>Decide the appeal (board)</h2><form method="post" action="{% url 'arc_decide' obj.pk 'appeal' %}">{% csrf_token %}{{ decision_form.as_p }}<button type="submit">Record appeal decision</button></form>{% endif %}
+  {% if can_set_affected %}<form method="post" action="{% url 'arc_affected' obj.pk %}">{% csrf_token %}<label for="aff">Affected neighbouring lots (numbers; owners of these lots are recused)</label><input id="aff" name="lots" value="{{ affected|join:' ' }}"> <button type="submit">Save</button></form>{% endif %}
+  {% include "partials/workflow.html" with obj=obj %}
+  <p><a href="{% url 'arc_list' %}">All requests</a></p>
+{% endblock %}

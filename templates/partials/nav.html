@@ -2,6 +2,7 @@
 <a href="{% url 'home' %}">Home</a>
 {% if user|can:"lot.view_own" %}<a href="{% url 'my_lot' %}">My lot</a>{% endif %}
 {% if user|can:"announcement.view" %}<a href="{% url 'announcements' %}">News</a><a href="{% url 'calendar' %}">Calendar</a><a href="{% url 'documents' %}">Documents</a><a href="{% url 'meetings' %}">Governance</a>{% endif %}
+{% if user|can:"arc.submit" or user|can:"arc.view_all" %}<a href="{% url 'arc_list' %}">ARC</a>{% endif %}
 {% if user|can:"lot.view_all" %}<a href="{% url 'lot_list' %}">All lots</a>{% endif %}
 {% if user|can:"person.manage" or user|can:"task.manage" %}<a href="{% url 'board_home' %}">Board</a>{% endif %}
 {% if user|can:"system.view_status" %}<a href="{% url 'system_status' %}">System</a>{% endif %}

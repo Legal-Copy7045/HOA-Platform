@@ -48,6 +48,7 @@ BOARD_ONLY_MARKERS = (
     b"Executive session: litigation",
     b"Lot B wants the 2019 audit",
     b"Draft: special assessment",
+    b"Lot B hot tub",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -59,6 +60,7 @@ MEMBER_PAGES = {
     "resolutions",
     "votes",
     "records_requests",
+    "arc_list",
 }
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
@@ -108,6 +110,14 @@ PROTECTED = {
     "records_request_action": ("POST", "records_request_b"),
     "vote_detail": ("GET", "draft_vote"),
     "vote_action": ("POST", "draft_vote"),
+    "arc_detail": ("GET", "arc_b"),
+    "arc_action": ("POST", "arc_b"),
+    "arc_decide": ("POST", "arc_b"),
+    "arc_position": ("POST", "arc_b"),
+    "arc_attach": ("POST", "arc_b"),
+    "arc_file": ("GET", "arc_b"),
+    "arc_letter": ("GET", "arc_b"),
+    "arc_affected": ("POST", "arc_b"),
 }
 
 
@@ -195,6 +205,13 @@ def world():
         draft_vote = governance.create_vote(
             title="Draft: special assessment", kind="informal", options=["Yes", "No"], actor=board
         )
+        from arc import services as arc
+        from documents.attachments import attach
+
+        arc_b = arc.create_request(
+            lot=lot_b, title="Lot B hot tub", description="Rear patio", actor=owner_b
+        )
+        arc_b_file = attach(arc_b, pdf("hot-tub.pdf"), actor=owner_b)
     targets = {
         "lot": lot_b.pk,
         "person": person_b.pk,
@@ -213,6 +230,8 @@ def world():
         "executive_meeting": executive_meeting.pk,
         "records_request_b": records_request_b.pk,
         "draft_vote": draft_vote.pk,
+        "arc_b": arc_b.pk,
+        "arc_b_file": arc_b_file.pk,
     }
     return {
         "owner_a": owner_a,
@@ -245,6 +264,14 @@ def _url(name, key, targets):
         kwargs["action"] = "withdraw"
     elif name == "vote_action":
         kwargs["action"] = "open"
+    elif name == "arc_action":
+        kwargs["action"] = "withdraw"
+    elif name == "arc_decide":
+        kwargs["kind"] = "decision"
+    elif name == "arc_file":
+        kwargs["file_id"] = targets["arc_b_file"]
+    elif name == "arc_letter":
+        kwargs["decision_id"] = 1
     return reverse(name, kwargs=kwargs)
 
 

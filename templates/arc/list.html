@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Architectural review · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Architectural review</h1>
+  <p class="muted">Exterior changes need approval before work starts.</p>
+  <table><thead><tr><th>#</th><th>Lot</th><th>Project</th><th>Status</th><th>Decision due</th></tr></thead><tbody>
+    {% for r in rows %}<tr><td><a href="{% url 'arc_detail' r.pk %}">{{ r.pk }}</a></td><td>{{ r.lot.number }}</td><td>{{ r.title }}</td><td><span class="status">{{ r.get_state_display }}</span></td><td>{{ r.review_due_on|default:"" }}</td></tr>{% empty %}<tr><td class="muted">No requests.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_submit %}<details><summary>Start a new request</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Create draft</button></form></details>{% endif %}
+{% endblock %}
