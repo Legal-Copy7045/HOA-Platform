@@ -3,6 +3,15 @@
 One entry per full run (newest first): date, commit, totals, failing check IDs,
 finding IDs, report link. No real names, hosts or addresses.
 
+## 2026-11-25 (late) — UX/UI build and the last Milestone 4 features
+
+- Commit: f6339b1. Totals: 2336 pass, 0 fail, 28 manual, 26 skip (25 retired IDs removed after the run; the POC is not reachable from the cloud session).
+- Stages: ci 11 pass; unit 1443 pass; page 878 pass; live 4 pass, 1 skip; manual 28.
+- Built: the UX review (four builders: sign-in and profile; ARC, requests, notices, documents; navigation, dashboard, accessibility, voting; finance and board admin), reservations (off), access review, contact retention, installable app with push (off), opt-in texts (off).
+- Findings: second review R2-001..006 (2 medium), all fixed with tests. Earlier SEC-004/BUG-005 accepted (D27).
+- Decisions: D26 (scanner reloads in place), D27 (open items), D28 (change history persists).
+- Report: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 2)
+
 ## 2026-11-25 — Milestone 4 so far, with review fixes
 
 - Commit: 89fd079. Totals: 1931 pass, 0 fail, 12 manual, 15 skip (14 retired check IDs removed after the run; the POC is not reachable from the cloud session).

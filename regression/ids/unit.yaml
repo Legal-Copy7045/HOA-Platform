@@ -182,7 +182,6 @@ UNIT-1070: "ledger/tests/test_money_tools.py::test_letter_sequence_first_second_
 UNIT-1071: "ledger/tests/test_money_tools.py::test_letters_due_waits_the_notice_period"
 UNIT-1072: "ledger/tests/test_money_tools.py::test_case_letter_view_downloads_and_logs"
 UNIT-1073: "ledger/tests/test_money_tools.py::test_accounting_page"
-UNIT-1074: "core/tests/test_features.py::test_defaults_reservations_off_everything_else_on"
 UNIT-1075: "core/tests/test_features.py::test_switched_off_feature_leaves_menu_and_pages_404"
 UNIT-1076: "core/tests/test_features.py::test_every_gated_url_name_exists"
 UNIT-1077: "core/tests/test_features.py::test_only_the_board_switches_and_it_is_audited"
