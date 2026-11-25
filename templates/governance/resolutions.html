@@ -12,5 +12,5 @@
       {% if r.supersedes or r.citation %}<div class="meta small">{% if r.supersedes %}<span>Supersedes {{ r.supersedes.number }}</span>{% endif %}{% if r.citation %}<span>{{ r.citation }}</span>{% endif %}</div>{% endif %}
     </section>
   {% empty %}<section class="card">{% include "partials/empty.html" with icon="book" title="None recorded" %}</section>{% endfor %}
-  {% if can_record %}<details class="panel"><summary>Record a resolution or policy</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Record</button></div></form></div></details>{% endif %}
+  {% if can_record %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Record a resolution or policy</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Record</button></div></form></div></details>{% endif %}
 {% endblock %}

@@ -45,12 +45,11 @@ def violations(request):
             try:
                 v = services.report(actor=request.user, request=request, **form.cleaned_data)
             except services.ComplianceError as exc:
-                messages.error(request, str(exc))
+                form.add_error(None, str(exc))
             else:
+                messages.success(request, "Violation recorded. Send the notice when ready.")
                 return redirect("violation_detail", pk=v.pk)
-        else:
-            messages.error(request, "Check the form.")
-        return redirect("violations")
+        # Invalid: the page is shown again with what was typed and the errors.
     from core.scoping import own_records, wants_mine
 
     staff = policy.can(request.user, "violation.view_all")

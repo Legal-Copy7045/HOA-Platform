@@ -1,0 +1,3 @@
+{% load portal %}{# A summary at the top of a form that came back with errors: names each field to fix and links to it. Problems with the form as a whole are shown by the form itself, just below. Expects: form #}
+{% if form.errors %}{% if form.errors|length > 1 or "__all__" not in form.errors %}<div class="alert danger form-errors" role="alert">{% icon "alert" %}<div><strong>Nothing has been saved yet. Please check:</strong>
+  <ul>{% for f in form %}{% if f.errors %}<li>{% if f.is_hidden %}{{ f.label }}{% else %}<a href="#{{ f.auto_id }}">{{ f.label }}</a>{% endif %}: {{ f.errors|first }}</li>{% endif %}{% endfor %}</ul></div></div>{% endif %}{% endif %}

@@ -12,6 +12,6 @@
         {% for i in invoices %}<tr><td><a href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td>{{ i.invoice_date|date:"M j, Y" }}</td><td class="num">{{ i.amount_cents|cents }}</td><td>{% status i.state i.get_state_display %}</td></tr>{% empty %}<tr><td colspan="4" class="muted">No invoices.</td></tr>{% endfor %}
       </tbody></table></div></div>
     </div>
-    <aside>{% if can_manage %}<section class="card"><h3>Details</h3><form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form></section>{% endif %}</aside>
+    <aside>{% if can_manage %}<section class="card"><h3>Details</h3><form method="post">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form></section>{% endif %}</aside>
   </div>
 {% endblock %}
