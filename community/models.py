@@ -441,6 +441,29 @@ class CommunityProfile(models.Model):
     # and the conditions owners agree to. Set by the board; not hard-coded.
     arc_form_return_to = models.CharField(max_length=300, blank=True)
     arc_form_conditions = models.TextField(blank=True)
+    # Letters and statements (Milestone 4): set by the board, never hard-coded.
+    letterhead = models.TextField(
+        blank=True, help_text="Lines at the top of letters, e.g. name, c/o manager, address, email."
+    )
+    remit_to = models.TextField(blank=True, help_text="Where owners mail checks.")
+    letter_contact = models.CharField(
+        max_length=200, blank=True, help_text="How owners reach accounting, e.g. email and phone."
+    )
+    letter_signature = models.TextField(
+        blank=True, help_text="Signature block on letters, e.g. association, by its agent."
+    )
+    # Resale certificate facts that are the same for every lot (Milestone 4).
+    # Empty means "none" on the certificate; the board keeps them current.
+    resale_restraints = models.TextField(blank=True)
+    resale_other_fees = models.TextField(blank=True)
+    resale_capital_expenditures = models.TextField(blank=True)
+    resale_reserves_cents = models.BigIntegerField(null=True, blank=True)
+    resale_reserve_designations = models.TextField(
+        blank=True, help_text="One per line: amount | project"
+    )
+    resale_judgments = models.TextField(blank=True)
+    resale_insurance_cents = models.BigIntegerField(null=True, blank=True)
+    resale_insurance_company = models.CharField(max_length=200, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 

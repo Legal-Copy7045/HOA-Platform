@@ -8,7 +8,10 @@
     <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<a href="{% url 'collection_detail' open_case.pk %}">{% icon "alert" %}Open collection case</a>{% endif %}</div></div>
     <div class="actions">
       <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">{% icon "download" %} Statement</a>
-      <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'reminder' %}">{% icon "download" %} Reminder letter</a>
+      {% if user|can:"collections.manage" %}<details class="menu-details"><summary class="btn secondary">{% icon "mail" %} Delinquency notice</summary><div class="panel-body">
+        <a href="{% url 'lot_notice_pdf' lot.pk 'first' %}">First notice + statement</a><br>
+        <a href="{% url 'lot_notice_pdf' lot.pk 'second' %}">Second notice + statement</a><br>
+        <a href="{% url 'lot_notice_pdf' lot.pk 'final' %}">Final notice + statement</a></div></details>{% endif %}
     </div>
   </div>
   <div class="grid grid-4">

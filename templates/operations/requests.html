@@ -22,7 +22,7 @@
               <td>{{ r.pk }}</td><td><a href="{% url 'request_detail' r.pk %}">{{ r.subject }}</a></td><td>{{ r.get_request_type_display }}</td>
               {% if staff %}<td>{{ r.lot.number }}</td><td>{{ r.assignee.display_name|default:"—" }}</td>{% endif %}
               <td class="nowrap">{% if r.first_response_at %}<span class="muted small">answered</span>{% elif r.respond_by %}{{ r.respond_by|date:"M j" }}{% if r.is_overdue %} <span class="badge tone-danger">overdue</span>{% endif %}{% else %}—{% endif %}</td>
-              <td>{% status r.state %}</td></tr>{% endfor %}</tbody>
+              <td>{% status r.state r.get_state_display %}</td></tr>{% endfor %}</tbody>
           </table></div>
           {% include "partials/pager.html" %}
         {% else %}{% include "partials/empty.html" with icon="inbox" title="No requests here" %}{% endif %}

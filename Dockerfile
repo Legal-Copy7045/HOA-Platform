@@ -4,6 +4,7 @@ FROM python:3.13-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    MALLOC_ARENA_MAX=2 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
@@ -27,8 +28,12 @@ COPY . .
 RUN DJANGO_SETTINGS_MODULE=core.settings.local \
     DJANGO_SECRET_KEY=build-only-not-a-secret \
     DATABASE_URL=sqlite:////tmp/build.sqlite3 \
+    ADMIN_ENABLED=false \
     python manage.py collectstatic --noinput \
- && rm -f /tmp/build.sqlite3
+ && rm -f /tmp/build.sqlite3 \
+ && python -m compileall -q -j 0 /app
+# Bytecode is compiled above, once: the container's filesystem is read-only,
+# so otherwise every process start would recompile the whole app.
 
 # Safe default: anything run from this image uses production settings unless
 # told otherwise (compose sets local settings explicitly for development).

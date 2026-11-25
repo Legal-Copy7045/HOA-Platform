@@ -14,3 +14,12 @@ staticfiles
 *.env.local
 !.env.example
 docs
+# Not needed at runtime; keeping them out means a change there doesn't
+# trigger an image rebuild on the VM.
+regression
+infra
+scripts
+**/tests
+*.md
+!README.md
+node_modules

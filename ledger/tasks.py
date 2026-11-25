@@ -32,3 +32,11 @@ def late_fees(timestamp: int) -> int:
         return post_late_fees(year=today.year, month=today.month, actor=SYSTEM)
     except LedgerError:
         return 0
+
+
+@app.periodic(cron="17 9 * * *")  # daily; does nothing unless the board set the day
+@app.task(queue="maintenance", queueing_lock="courtesy_reminders")
+def courtesy_reminders(timestamp: int) -> int:
+    from ledger.accounting import send_courtesy_reminders
+
+    return send_courtesy_reminders()

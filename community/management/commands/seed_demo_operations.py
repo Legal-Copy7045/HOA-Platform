@@ -345,6 +345,16 @@ class Command(BaseCommand):
             "(demo), 1 Example Road, or arc@example.com",
             actor=b1,
         )
+        community.update_letter_settings(
+            letterhead="Oak Creek Farms Homeowners Association\nc/o Example Management Co. (demo)"
+            "\n1 Example Road, Exampletown, PA 00000",
+            remit_to="Oak Creek Farms HOA (demo)\nPO Box 0000\nExampletown, PA 00000",
+            letter_contact="Example Management Co. (demo) at 555-0100",
+            letter_signature="Example Management Co. (demo)\nFor the Board of Directors",
+            resale_insurance_company="Example Mutual Insurance (demo)",
+            resale_insurance_cents=100_000_000,
+            actor=b1,
+        )
 
         # Lot neighbors from the (fictional) development plan: next-door lots
         # on each of the two roads (Milestone 3 phase 7).
@@ -370,8 +380,11 @@ class Command(BaseCommand):
         # ARC project types owners choose from (Milestone 3).
         from arc import services as arc_services
 
+        # The migration already adds a starter list; only fill an empty one.
         for order, (name, guidance) in enumerate(
-            [
+            []
+            if arc_services.active_project_types()
+            else [
                 ("Fence", "Plot plan with location, height, material and colour."),
                 ("Shed or outbuilding", "Plot plan, size, materials and colours."),
                 ("Deck or patio", "Drawing with dimensions, materials and setbacks."),

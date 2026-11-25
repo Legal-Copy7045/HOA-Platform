@@ -109,6 +109,21 @@ def _errors():
     return total < ERRORS_PER_HOUR, f"{total} server error(s) in the last hour"
 
 
+def _email():
+    from django.core.cache import cache
+
+    from core.email import FAILURE_CACHE_KEY
+
+    failed = cache.get(FAILURE_CACHE_KEY)
+    if not failed:
+        return True, "No send failures in the last day"
+    when, kind = failed
+    return (
+        False,
+        f"Sending failed at {when[:16].replace('T', ' ')} UTC ({kind}): check EMAIL_* settings",
+    )
+
+
 CHECKS = [
     ("database", "Database", _database),
     ("worker", "Background worker", _worker),
@@ -116,6 +131,7 @@ CHECKS = [
     ("storage", "File store", _storage),
     ("signatures", "Malware scanner", _signatures),
     ("errors", "Server errors", _errors),
+    ("email", "Outgoing email", _email),
 ]
 
 

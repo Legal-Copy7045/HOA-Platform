@@ -811,17 +811,18 @@ import datetime as _dt  # noqa: E402
 from operations.models import ComplianceItem, Recurrence  # noqa: E402
 
 
-def _add_months(day: _dt.date, months: int) -> _dt.date:
+def _add_months(day: _dt.date, months: int, anchor: int | None = None) -> _dt.date:
     month = day.month - 1 + months
     year, month = day.year + month // 12, month % 12 + 1
-    return _dt.date(year, month, min(day.day, _calendar.monthrange(year, month)[1]))
+    want = anchor or day.day
+    return _dt.date(year, month, min(want, _calendar.monthrange(year, month)[1]))
 
 
 def next_due(item: ComplianceItem) -> _dt.date | None:
     step = {Recurrence.MONTHLY: 1, Recurrence.QUARTERLY: 3, Recurrence.ANNUAL: 12}.get(
         item.recurrence
     )
-    return _add_months(item.due_on, step) if step else None
+    return _add_months(item.due_on, step, item.anchor_day) if step else None
 
 
 def save_compliance_item(*, item=None, actor, request=None, **fields) -> ComplianceItem:
@@ -830,6 +831,16 @@ def save_compliance_item(*, item=None, actor, request=None, **fields) -> Complia
     if not title or not fields.get("due_on"):
         raise OperationsError("An item needs a title and a due date.")
     fields["title"] = title
+    from operations.models import ComplianceCategory
+
+    if fields.get("category") not in ComplianceCategory.values:
+        raise OperationsError("Choose a category.")
+    if fields.get("recurrence") not in Recurrence.values:
+        raise OperationsError("Choose how often it repeats.")
+    remind = fields.get("remind_days", 30)
+    if not isinstance(remind, int) or not 0 <= remind <= 365:
+        raise OperationsError("Remind between 0 and 365 days before.")
+    fields["anchor_day"] = fields["due_on"].day
     if item is None:
         item = ComplianceItem.objects.create(**fields)
     else:
@@ -839,8 +850,12 @@ def save_compliance_item(*, item=None, actor, request=None, **fields) -> Complia
     return item
 
 
-def complete_compliance_item(item: ComplianceItem, *, actor, done_on=None, request=None):
-    """Mark done; a recurring item moves to its next due date."""
+def complete_compliance_item(
+    item: ComplianceItem, *, actor, done_on=None, seen_due_on=None, request=None
+):
+    """Mark done; a recurring item moves to its next due date. Only if it is
+    still due on the date the person saw, so a double-click cannot skip a
+    period (BUG-015)."""
     require(actor, "compliance.manage")
     done_on = done_on or timezone.localdate()
     nxt = next_due(item)
@@ -849,7 +864,11 @@ def complete_compliance_item(item: ComplianceItem, *, actor, done_on=None, reque
         fields.update(due_on=nxt, reminded_for=None)
     else:
         fields.update(active=False)
-    ComplianceItem.objects.filter(pk=item.pk).update(**fields)
+    updated = ComplianceItem.objects.filter(
+        pk=item.pk, due_on=seen_due_on or item.due_on, active=True
+    ).update(**fields)
+    if not updated:
+        raise OperationsError("Already marked done.")
     record_event(
         "compliance.done",
         actor=actor,

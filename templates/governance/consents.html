@@ -3,7 +3,7 @@
 {% block title %}Written consents · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Resolutions by written consent</h1><p class="subtitle">A board decision without a meeting: every board member must approve in writing. One decline and it is not adopted. Counsel should confirm the Bylaws allow this.</p></div></div>
-  <div class="split"><div><section class="card">{% if rows %}<ul class="list">{% for c in rows %}<li><a class="grow title" href="{% url 'consent_detail' c.pk %}">{{ c.title }}</a><span class="small muted">{{ c.created_at|date:"M j, Y" }}</span>{% status c.state %}</li>{% endfor %}</ul>{% else %}{% include "partials/empty.html" with icon="file" title="None yet" %}{% endif %}</section></div>
+  <div class="split"><div><section class="card">{% if rows %}<ul class="list">{% for c in rows %}<li><a class="grow title" href="{% url 'consent_detail' c.pk %}">{{ c.title }}</a><span class="small muted">{{ c.created_at|date:"M j, Y" }}</span>{% status c.state c.get_state_display %}</li>{% endfor %}</ul>{% else %}{% include "partials/empty.html" with icon="file" title="None yet" %}{% endif %}</section></div>
     <aside><section class="card"><h2>Propose</h2><form method="post">{% csrf_token %}
       <p><label>Title <input type="text" name="title" maxlength="200" required></label></p>
       <p><label>Resolution text <textarea name="text" rows="6" required></textarea></label></p>

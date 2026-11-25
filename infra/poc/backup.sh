@@ -73,7 +73,9 @@ OWNER_USER="$(env_value HOA_OWNER_DB_USER)"
 OWNER_PW="$(env_value HOA_OWNER_DB_PASSWORD)"
 
 echo "==> Database"
-"${COMPOSE[@]}" exec -T -e PGPASSWORD="$OWNER_PW" postgres \
+# The password goes through the environment, not the command line, so it
+# never shows in the host's process list (SEC-008).
+PGPASSWORD="$OWNER_PW" "${COMPOSE[@]}" exec -T -e PGPASSWORD postgres \
   pg_dump -h 127.0.0.1 -U "$OWNER_USER" -d "$DB_NAME" -Fc --no-owner \
   | encrypt > "$DEST/db.dump.enc"
 
@@ -82,12 +84,17 @@ echo "==> Uploaded files"
   | encrypt > "$DEST/files.tar.enc"
 
 ( cd "$DEST" && sha256sum db.dump.enc files.tar.enc > SHA256SUMS )
+# A keyed checksum: someone who can write to the off-site bucket cannot swap a
+# backup without the backup key (SEC-008). Checked before every restore.
+( cd "$DEST" && for f in db.dump.enc files.tar.enc; do
+    printf '%s  %s\n' "$(openssl dgst -sha256 -hmac "$(cat "$KEY_FILE")" -r "$f" | cut -d' ' -f1)" "$f"
+  done > HMAC-SHA256 )
 echo "$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" > "$DEST/APP_VERSION"
 du -sh "$DEST" | awk '{print "    size: "$1}'
 
 if [ -n "$(env_value BACKUP_S3_BUCKET)" ]; then
   echo "==> Copying off-site"
-  for f in db.dump.enc files.tar.enc SHA256SUMS; do
+  for f in db.dump.enc files.tar.enc SHA256SUMS HMAC-SHA256; do
     "${COMPOSE[@]}" exec -T web python manage.py push_backup --name "$STAMP-$f" < "$DEST/$f"
   done
 else

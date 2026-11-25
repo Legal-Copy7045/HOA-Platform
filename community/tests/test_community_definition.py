@@ -98,9 +98,14 @@ def test_settings_page(client, board):
     assert b"needs attention" in response.content
     client.post(
         reverse("community_rule_save"),
-        {"key": "late_fee.cents", "value": "600", "citation": "Collections policy (demo)"},
+        {"key": "late_fee.cents", "value": "6.00", "citation": "Collections policy (demo)"},
     )
     assert rule("late_fee.cents") == 600
+    client.post(
+        reverse("community_rule_save"),
+        {"key": "late_fee.cents", "value": "75", "citation": "Collections policy (demo)"},
+    )
+    assert rule("late_fee.cents") == 7500  # typing 75 means $75, not 75 cents
 
 
 def test_manager_can_view_but_not_edit_settings(client):

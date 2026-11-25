@@ -11,6 +11,7 @@ import textwrap
 
 PAGE_W, PAGE_H, MARGIN, LEADING, SIZE = 612, 792, 72, 15, 11
 CHARS_PER_LINE = 88
+MONO_CHARS = 78  # Courier at 9pt across the text width
 
 
 def _escape(text: str) -> str:
@@ -28,13 +29,35 @@ def _lines(paragraphs: list[tuple[str, str]]) -> list[tuple[str, str]]:
             out.append(("normal", ""))
             continue
         for raw in text.splitlines() or [""]:
+            if style == "mono":  # tables: never re-wrapped, cut at the page edge
+                out.append((style, raw[:MONO_CHARS]))
+                continue
             wrapped = textwrap.wrap(raw, CHARS_PER_LINE) or [""]
-            out.extend((style, w) for w in wrapped)
+            bold_open = False
+            for w in wrapped:
+                # Keep **bold** spans balanced across wrapped lines.
+                line = ("**" if bold_open else "") + w
+                if line.count("**") % 2:
+                    line += "**"
+                    bold_open = True
+                else:
+                    bold_open = False
+                out.append((style, line))
     return out
 
 
+def _segments(text: str):
+    """Split on ** markers: [(bold?, text), ...]."""
+    parts = text.split("**")
+    return [(i % 2 == 1, part) for i, part in enumerate(parts) if part]
+
+
 def render(paragraphs: list[tuple[str, str]], *, title: str = "Letter") -> bytes:
-    """paragraphs: [("heading"|"normal"|"small"|"pagebreak", text), ...] -> PDF bytes."""
+    """paragraphs: [(style, text), ...] -> PDF bytes.
+
+    Styles: "heading", "normal", "small", "mono" (fixed-width, for tables and
+    stubs) and "pagebreak". In normal and small text, **double asterisks**
+    mark bold spans (used to show data filled in from the portal)."""
     per_page = (PAGE_H - 2 * MARGIN) // LEADING
     pages: list[list[tuple[str, str]]] = [[]]
     for line in _lines(paragraphs):
@@ -55,25 +78,31 @@ def render(paragraphs: list[tuple[str, str]], *, title: str = "Letter") -> bytes
     bold = add(
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
     )
+    mono = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>")
     pages_id = len(objects) + 1 + 2 * len(pages)  # placeholder index after content+page objs
     page_ids = []
     for page_lines in pages:
-        ops = ["BT", f"{MARGIN} {PAGE_H - MARGIN} Td"]
-        for style, text in page_lines:
-            f, size = (
-                ("/F2", SIZE + 3)
-                if style == "heading"
-                else (("/F1", SIZE - 2) if style == "small" else ("/F1", SIZE))
-            )
-            ops += [f"{f} {size} Tf", f"({_escape(text)}) Tj", f"0 -{LEADING} Td"]
-        ops.append("ET")
+        ops = []
+        for i, (style, text) in enumerate(page_lines):
+            # Each line starts at the left margin at its own height.
+            ops += ["BT", f"{MARGIN} {PAGE_H - MARGIN - i * LEADING} Td"]
+            if style == "heading":
+                ops += [f"/F2 {SIZE + 3} Tf", f"({_escape(text)}) Tj"]
+            elif style == "mono":
+                ops += [f"/F3 {SIZE - 2} Tf", f"({_escape(text)}) Tj"]
+            else:
+                size = SIZE - 2 if style == "small" else SIZE
+                # Each segment in its own font; Tj advances along the line.
+                for is_bold, part in _segments(text) or [(False, "")]:
+                    ops += [f"{'/F2' if is_bold else '/F1'} {size} Tf", f"({_escape(part)}) Tj"]
+            ops.append("ET")
         stream = "\n".join(ops).encode("latin-1")
         content = add(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
         page_ids.append(
             add(
                 (
                     f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {PAGE_W} {PAGE_H}] "
-                    f"/Resources << /Font << /F1 {font} 0 R /F2 {bold} 0 R >> >> "
+                    f"/Resources << /Font << /F1 {font} 0 R /F2 {bold} 0 R /F3 {mono} 0 R >> >> "
                     f"/Contents {content} 0 R >>"
                 ).encode()
             )

@@ -19,7 +19,7 @@
   </section>
   <section class="card"><h2>Sign-in resets</h2>
     {% if resets %}<ul class="list">{% for r in resets %}<li><div class="todo-icon tone-warning">{% icon "key" %}</div>
-      <div class="grow"><div class="title">Account #{{ r.subject_id }}</div><div class="small muted">Identity checked by {{ r.get_verification_method_display|lower }} · started {{ r.started_at|date:"M j" }}</div></div>
+      <div class="grow"><div class="title">Sign-in reset for {{ r.subject_name }}</div><div class="small muted">Identity checked by {{ r.get_verification_method_display|lower }} · started {{ r.started_at|date:"M j" }}</div></div>
       {% if r.started_by_id != me.pk and r.subject_id != me.pk %}<form method="post" action="{% url 'reset_decide' r.pk 'approve' %}" class="inline" data-confirm="Approve? This removes all of their authenticators and signs them out everywhere.">{% csrf_token %}<button type="submit" class="small">Approve and show code</button></form>{% else %}<span class="muted small">Needs another board member</span>{% endif %}
       <form method="post" action="{% url 'reset_decide' r.pk 'cancel' %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Cancel</button></form></li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="check-circle" title="None waiting" %}{% endif %}

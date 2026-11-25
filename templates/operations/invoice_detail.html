@@ -7,7 +7,7 @@
   <div class="page-head">
     <div>
       <h1>{{ obj.vendor }} · {{ obj.number }}</h1>
-      <div class="meta">{% status obj.state %}<span>{{ obj.category.name }}</span><span>Dated {{ obj.invoice_date|date:"M j, Y" }}</span>{% if obj.due_date %}<span>Due {{ obj.due_date|date:"M j, Y" }}</span>{% endif %}{% if obj.work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% endif %}</div>
+      <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.category.name }}</span><span>Dated {{ obj.invoice_date|date:"M j, Y" }}</span>{% if obj.due_date %}<span>Due {{ obj.due_date|date:"M j, Y" }}</span>{% endif %}{% if obj.work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% endif %}</div>
     </div>
     <div class="amount-big">{{ obj.amount_cents|cents }}</div>
   </div>

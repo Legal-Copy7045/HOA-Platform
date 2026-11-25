@@ -1,4 +1,4 @@
-"""Neighbor sign-off pages: the panel on an ARC request, the neighbor's
+"""Neighbor acknowledgement pages: the panel on an ARC request, the neighbor's
 portal list, and the public single-use link."""
 
 import datetime
@@ -23,7 +23,9 @@ from core import policy
 from documents import attachments
 from documents.services import DocumentError
 
-SIGNED_FORM = "Signed sign-off form"
+SIGNED_FORM = "Signed acknowledgement form"
+# Forms uploaded before the rename keep their old label: never show either to neighbors.
+SIGNED_FORM_LABELS = (SIGNED_FORM, "Signed sign-off form")
 
 
 def _arc(request, pk) -> ArcRequest:
@@ -53,14 +55,36 @@ def panel_context(user, req: ArcRequest) -> dict:
         "signoff_staff": staff,
         "signoff_neighbors": signoffs.neighbors_of(req.lot),
         "signoff_has_reader": bool(_gemini_configured()),
+        "signoff_board": signoffs.is_board_side(user, req),
+        "signoff_lot_choices": _lot_choices(req) if can_arrange else [],
     }
     if staff:
         data["signoff_readings"] = ScanReading.objects.filter(arc_request=req).order_by("-id")[:5]
         data["signoff_proposals"] = SignoffProposal.objects.filter(
             reading__arc_request=req, state="pending"
         ).select_related("signoff__lot")
-        data["signoff_forms"] = attachments.attachments_for(req).filter(label=SIGNED_FORM)
+        data["signoff_forms"] = attachments.attachments_for(req).filter(
+            label__in=SIGNED_FORM_LABELS
+        )
     return data
+
+
+def _lot_choices(req) -> list[tuple[int, str]]:
+    """Every other lot as "136 Oak Creek Drive (Pat & Sam Example)": the
+    address's first line and the owners on the deed (never tenants or emails)."""
+    from core.scoping import system_access
+
+    with system_access("neighbor lot choices"):
+        lots = list(Lot.objects.exclude(pk=req.lot_id).order_by("street_address", "number"))
+    names = signoffs.owner_names([lot.pk for lot in lots])
+    out = []
+    for lot in lots:
+        first = (lot.street_address or "").splitlines()[0] if lot.street_address else ""
+        label = first or f"Lot {lot.number}"
+        if names.get(lot.pk):
+            label += f" ({names[lot.pk]})"
+        out.append((lot.pk, label))
+    return out
 
 
 def _gemini_configured():
@@ -84,13 +108,12 @@ def arc_signoff_action(request, pk, action):
         # Lot numbers and addresses are not private within the community;
         # the service checks the caller may arrange sign-offs for this request.
         lot = get_object_or_404(
-            Lot.objects.unscoped("pick a neighbor lot"),
-            number=int(request.POST.get("lot_number") or 0),
+            Lot.objects.unscoped("pick a neighbor lot"), pk=int(request.POST.get("lot") or 0)
         )
         _flash(
             request,
             lambda: signoffs.add_signoff_lot(req, lot, actor=user, request=request),
-            "Lot added.",
+            "Neighbor added.",
         )
     elif action == "add_address":
         _flash(
@@ -116,13 +139,13 @@ def arc_signoff_action(request, pk, action):
         sent = _flash(
             request,
             lambda: signoffs.send_signoffs(req, actor=user, request=request),
-            "Requests sent.",
+            "Reminders sent.",
         )
         if sent and sent["no_contact"]:
             messages.warning(
                 request,
                 f"{sent['no_contact']} neighbor(s) have no email on record: "
-                "print the sign-off form for them.",
+                "print the acknowledgement form for them.",
             )
     elif action == "paper":
         if not policy.can(user, "arc.intake"):
@@ -140,7 +163,7 @@ def arc_signoff_action(request, pk, action):
                 actor=user,
                 request=request,
             ),
-            "Paper sign-off recorded.",
+            "Paper acknowledgement recorded.",
         )
     elif action == "upload_form":
         upload = request.FILES.get("file")
@@ -172,10 +195,9 @@ def arc_signoff_action(request, pk, action):
             signoffs.reject_proposal(proposal, actor=user)
             messages.success(request, "Proposal discarded.")
         else:
+            target = None
             if request.POST.get("signoff"):
                 target = get_object_or_404(_of(req), pk=request.POST["signoff"])
-                SignoffProposal.objects.filter(pk=proposal.pk).update(signoff=target)
-                proposal.refresh_from_db()
             _flash(
                 request,
                 lambda: signoffs.confirm_proposal(
@@ -183,9 +205,10 @@ def arc_signoff_action(request, pk, action):
                     actor=user,
                     position=request.POST.get("position") or None,
                     signer_name=request.POST.get("signer_name") or None,
+                    retarget=target,
                     request=request,
                 ),
-                "Sign-off recorded from the scanned form.",
+                "Acknowledgement recorded from the scanned form.",
             )
     else:
         raise Http404
@@ -260,7 +283,7 @@ def signoff_detail(request, pk):
                 actor=request.user,
                 request=request,
             ),
-            "Thank you: your answer has been sent to the committee.",
+            "Thank you: your acknowledgement has been sent to the committee.",
         )
         return redirect("signoff_detail", pk=signoff.pk)
     return render(
@@ -273,12 +296,14 @@ def signoff_detail(request, pk):
 @login_required
 def signoff_file(request, pk, file_id):
     signoff = _neighbor_signoff(request, pk)
-    return attachments.serve(request, signoff.arc_request, file_id, exclude_labels=(SIGNED_FORM,))
+    return attachments.serve(
+        request, signoff.arc_request, file_id, exclude_labels=SIGNED_FORM_LABELS
+    )
 
 
 def _answer_context(signoff, *, can_answer, token=None):
     req = signoff.arc_request
-    files = attachments.attachments_for(req).exclude(label=SIGNED_FORM)
+    files = attachments.attachments_for(req).exclude(label__in=SIGNED_FORM_LABELS)
     return {
         "signoff": signoff,
         "req": req,
@@ -292,38 +317,23 @@ def _answer_context(signoff, *, can_answer, token=None):
 # --- The single-use emailed link (no login) ------------------------------------------
 
 
+@login_required
 def signoff_link(request, token):
+    """Links emailed before sign-in became mandatory (D24): after signing in,
+    an owner of the neighboring lot goes to their review page. Nobody sees
+    anything without signing in."""
     signoff = signoffs.signoff_for_token(token)
-    if signoff is None:
+    if signoff is None or signoff.lot_id not in policy.roles_for(request.user).owned_lot_ids:
         return render(request, "arc/signoff_link_expired.html", status=404)
-    if request.method == "POST":
-        try:
-            signoffs.respond(
-                signoff,
-                position=request.POST.get("position", ""),
-                signer_name=request.POST.get("signer_name", ""),
-                comment=request.POST.get("comment", ""),
-                channel=SignoffChannel.LINK,
-                request=request,
-            )
-        except signoffs.SignoffError as exc:
-            messages.error(request, str(exc))
-            return render(
-                request,
-                "arc/signoff_answer.html",
-                _answer_context(signoff, can_answer=True, token=token),
-            )
-        return render(request, "arc/signoff_thanks.html")
-    return render(
-        request, "arc/signoff_answer.html", _answer_context(signoff, can_answer=True, token=token)
-    )
+    return redirect("signoff_detail", pk=signoff.pk)
 
 
+@login_required
 def signoff_link_file(request, token, file_id):
     signoff = signoffs.signoff_for_token(token)
-    if signoff is None:
+    if signoff is None or signoff.lot_id not in policy.roles_for(request.user).owned_lot_ids:
         raise Http404
-    return attachments.serve(request, signoff.arc_request, file_id, exclude_labels=(SIGNED_FORM,))
+    return redirect("signoff_file", pk=signoff.pk, file_id=file_id)
 
 
 # --- Board: the adjacency list ---------------------------------------------------------

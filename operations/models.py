@@ -410,6 +410,9 @@ class ComplianceItem(models.Model):
     active = models.BooleanField(default=True)
     last_done_on = models.DateField(null=True, blank=True)
     reminded_for = models.DateField(null=True, blank=True)  # due date last reminded
+    # The day of the month a recurring item falls on, so "the 31st" stays the
+    # last day of each month instead of drifting to the 28th (BUG-015).
+    anchor_day = models.PositiveSmallIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

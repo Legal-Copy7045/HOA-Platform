@@ -378,18 +378,24 @@ def items_for(user) -> list[Item]:
                 )
             )
     if can(user, "arc.submit") and roles.owned_lot_ids:
-        from arc.models import SignoffRequest
+        from arc.models import NEIGHBOR_VISIBLE_STATES, SignoffRequest
 
         for so in (
             SignoffRequest.objects.for_user(user)
-            .filter(lot_id__in=roles.owned_lot_ids, state="pending", sent_at__isnull=False)
+            .filter(
+                lot_id__in=roles.owned_lot_ids,
+                state="pending",
+                sent_at__isnull=False,
+                arc_request__state__in=NEIGHBOR_VISIBLE_STATES,
+            )
             .select_related("arc_request__lot")
         ):
             out.append(
                 Item(
                     "My home",
-                    f"Sign-off: {so.arc_request.title}",
-                    f"Your neighbor at {so.arc_request.lot.street_address} asks for your view",
+                    f"Acknowledge: {so.arc_request.title}",
+                    f"Your neighbor at {so.arc_request.lot.street_address} asks you to review "
+                    "a project",
                     reverse("signoff_detail", args=[so.pk]),
                     "info",
                     nav="signoffs_mine",
@@ -414,7 +420,10 @@ def items_for(user) -> list[Item]:
 
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
-    return out
+    from core import features
+
+    states = features.states()  # one query, not one per item (optimization A9)
+    return [i for i in out if features.path_enabled(i.url, states_=states)]
 
 
 def counts(items: list[Item]) -> list[dict]:

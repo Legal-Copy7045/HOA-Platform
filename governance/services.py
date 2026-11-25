@@ -14,6 +14,7 @@ from community import services as community_services
 from community.models import ContactProfile, Lot, Ownership, Person
 from community.rules import rule, rule_with_citation
 from core.policy import SYSTEM, can, require
+from core.policy import invalidate_roles as _invalidate_roles
 from core.scoping import system_access
 from core.text import single_line
 from core.workflow import Transition, Workflow
@@ -371,6 +372,10 @@ def open_vote(vote: Vote, *, actor, request=None) -> Vote:
         "vote.opened", actor=actor, request=request, target=vote, metadata={"kind": vote.kind}
     )
     vote.refresh_from_db()
+    if vote.kind == VoteKind.FORMAL:
+        from governance import ballot_links
+
+        ballot_links.issue(vote)  # personal, single-use, signed-in links (D24)
     return vote
 
 
@@ -636,6 +641,7 @@ def _end_membership(membership, on) -> None:
     CommitteeMembership.objects.unscoped("end membership").filter(
         pk=membership.pk, end_date__isnull=True
     ).update(end_date=max(on, membership.start_date))
+    _invalidate_roles()
 
 
 def end_committee_membership(membership, *, actor, request=None):

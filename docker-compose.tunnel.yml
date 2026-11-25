@@ -30,18 +30,23 @@ services:
   clamav:
     image: clamav/clamav:1.4
     restart: unless-stopped
+    logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
+    environment:
+      FRESHCLAM_CHECKS: "2"   # signature checks per day
     volumes:
       - clamdata:/var/lib/clamav
     healthcheck:
       test: ["CMD", "clamdcheck.sh"]
-      interval: 30s
+      interval: 5m
       timeout: 10s
       start_period: 300s
       retries: 10
 
   web:
+    # Start without waiting for the scanner: uploads are held as "not yet
+    # scanned" until it is ready, so an update does not wait minutes for it.
     depends_on:
-      clamav: {condition: service_healthy}
+      clamav: {condition: service_started}
     ports: !reset []
     environment: *production-env
     # The only service on both networks: cloudflared can reach web and
@@ -64,6 +69,7 @@ services:
     # container only when the image changed.
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
+    logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env (from the Cloudflare dashboard)}

@@ -19,6 +19,7 @@ from ledger import services
 from ledger.models import (
     Budget,
     CollectionCase,
+    CollectionLetter,
     EntryKind,
     IncomeSource,
     LedgerEntry,
@@ -299,6 +300,16 @@ def collections(request):
     )
 
 
+def _next_letter(case):
+    from ledger import accounting as acc
+    from ledger.models import LetterKind
+
+    kind = acc.next_letter(case)
+    if kind is None or case.state in ("closed", "referred"):
+        return None
+    return {"label": LetterKind(kind).label, "due_on": acc.letter_due_on(case)}
+
+
 @login_required
 def collection_detail(request, pk):
     _finance(request)
@@ -309,8 +320,14 @@ def collection_detail(request, pk):
         {
             "obj": case,
             "balance": services.balance(case.lot_id),
-            "actions": services.COLLECTION.available(case, request.user),
+            "actions": [
+                t
+                for t in services.COLLECTION.available(case, request.user)
+                if t.action not in ("send_reminder", "send_second_reminder", "send_final_notice")
+            ],
             "history": services.COLLECTION.history(case),
+            "next_letter": _next_letter(case),
+            "letters": CollectionLetter.objects.for_user(request.user).filter(case=case),
             "action_url_name": "collection_action",
         },
     )
@@ -560,3 +577,245 @@ def owner_budget(request):
             "dues": rule_with_citation("dues.monthly_cents"),
         },
     )
+
+
+# --- Letters and certificates (Milestone 4) ----------------------------------------------
+
+
+@login_required
+def letters_settings(request):
+    from community import services as community
+    from community.models import CommunityProfile
+    from ledger import letters
+    from ledger.models import LetterKind
+
+    policy.require(request.user, "letters.manage")
+    if request.method == "POST":
+        section = request.POST.get("section")
+        try:
+            if section == "template":
+                services.save_letter_template(
+                    request.POST.get("kind", ""),
+                    subject=request.POST.get("subject", ""),
+                    body=request.POST.get("body", ""),
+                    certified=request.POST.get("certified") == "on",
+                    actor=request.user,
+                    request=request,
+                )
+            else:
+                from core.money import parse_cents
+
+                values = {
+                    f: request.POST.get(f, "")
+                    for f in community.LETTER_FIELDS + community.RESALE_TEXT_FIELDS
+                }
+                for f in community.RESALE_MONEY_FIELDS:
+                    raw = (request.POST.get(f) or "").strip()
+                    values[f] = parse_cents(raw) if raw else None
+                community.update_letter_settings(actor=request.user, request=request, **values)
+        except (services.LedgerError, community.CommunityError, ValueError) as exc:
+            messages.error(
+                request,
+                str(exc)
+                if not isinstance(exc, ValueError)
+                else "Check the amounts (dollars, e.g. 125000.00).",
+            )
+        else:
+            messages.success(request, "Saved.")
+        return redirect("letters_settings")
+    return render(
+        request,
+        "ledger/letters_settings.html",
+        {
+            "profile": CommunityProfile.get(),
+            "templates": [letters.template(k) for k in LetterKind.values],
+            "placeholders": letters.PLACEHOLDERS,
+        },
+    )
+
+
+@login_required
+def lot_notice_pdf(request, pk, kind):
+    _finance(request)
+    lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
+    if kind not in ("statement", "first", "second", "final"):
+        raise Http404
+    data = services.generate_notice(lot, kind, actor=request.user, request=request)
+    return pdf_response(data, f"{kind}-lot-{lot.number}.pdf")
+
+
+# --- Money tools (Milestone 4 part 3) ------------------------------------------------------
+
+
+def _date(value, default=None):
+    import datetime
+
+    try:
+        return datetime.date.fromisoformat((value or "").strip())
+    except ValueError:
+        return default
+
+
+def _money(value) -> int:
+    from core.money import parse_cents
+
+    return parse_cents(value)
+
+
+@login_required
+def accounting(request):
+    """Export, deposits, reconciliation, 1099 worksheet and setup."""
+    import datetime
+
+    from ledger import accounting as acc
+    from ledger.models import AccountingSetup, BankReconciliation, DepositBatch
+
+    _finance(request)
+    can_manage = policy.can(request.user, "accounting.manage")
+    if request.method == "POST":
+        policy.require(request.user, "accounting.manage")
+        section = request.POST.get("section")
+        try:
+            if section == "deposit":
+                acc.create_deposit(
+                    entry_ids=request.POST.getlist("entries"),
+                    deposited_on=_date(request.POST.get("deposited_on"), timezone.localdate()),
+                    bank_reference=request.POST.get("bank_reference", ""),
+                    actor=request.user,
+                    request=request,
+                )
+                messages.success(request, "Deposit recorded.")
+            elif section == "void":
+                batch = get_object_or_404(DepositBatch, pk=request.POST.get("batch") or 0)
+                acc.void_deposit(batch, actor=request.user, request=request)
+                messages.success(request, "Deposit voided; its payments are undeposited again.")
+            elif section == "setup":
+                acc.save_setup(
+                    gl_accounts=request.POST.get("gl_accounts", ""),
+                    opening_cash_cents=_money(request.POST.get("opening_cash") or "0"),
+                    opening_cash_on=_date(request.POST.get("opening_cash_on")),
+                    actor=request.user,
+                    request=request,
+                )
+                messages.success(request, "Saved.")
+            else:
+                raise Http404
+        except acc.AccountingError as exc:
+            messages.error(request, str(exc))
+        except ValueError:
+            messages.error(request, "Check the amount (dollars, e.g. 1250.00).")
+        return redirect("accounting")
+    today = timezone.localdate()
+    year = int(request.GET.get("year") or today.year - (1 if today.month < 4 else 0))
+    return render(
+        request,
+        "ledger/accounting.html",
+        {
+            "can_manage": can_manage,
+            "undeposited": acc.undeposited_payments() if can_manage else [],
+            "batches": DepositBatch.objects.all()[:20],
+            "reconciliations": BankReconciliation.objects.all()[:12],
+            "setup": AccountingSetup.get(),
+            "book_balance": acc.book_balance(today),
+            "year": year,
+            "vendors_1099": acc.vendor_1099_totals(year),
+            "month_start": today.replace(day=1),
+            "last_month_start": (today.replace(day=1) - datetime.timedelta(days=1)).replace(day=1),
+            "today": today,
+        },
+    )
+
+
+@login_required
+def accounting_export(request):
+    from django.http import HttpResponse
+
+    from ledger import accounting as acc
+
+    _finance(request)
+    policy.require(request.user, "finance.view")
+    start = _date(request.GET.get("start"))
+    end = _date(request.GET.get("end"))
+    if not start or not end:
+        messages.error(request, "Choose the start and end dates.")
+        return redirect("accounting")
+    try:
+        data = acc.export_csv(start, end, actor=request.user, request=request)
+    except acc.AccountingError as exc:
+        messages.error(request, str(exc))
+        return redirect("accounting")
+    response = HttpResponse(data, content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="journal-{start}-{end}.csv"'
+    return response
+
+
+@login_required
+def accounting_1099(request, year):
+    from django.http import HttpResponse
+
+    from ledger import accounting as acc
+
+    _finance(request)
+    policy.require(request.user, "finance.view")
+    response = HttpResponse(
+        acc.vendor_1099_csv(int(year), actor=request.user, request=request),
+        content_type="text/csv",
+    )
+    response["Content-Disposition"] = f'attachment; filename="1099-worksheet-{year}.csv"'
+    return response
+
+
+@login_required
+def reconcile(request):
+    from ledger import accounting as acc
+
+    policy.require(request.user, "accounting.manage")
+    statement_date = _date(request.GET.get("date") or request.POST.get("statement_date"))
+    if request.method == "POST" and statement_date:
+        try:
+            rec = acc.reconcile(
+                statement_date=statement_date,
+                statement_balance_cents=_money(request.POST.get("statement_balance") or ""),
+                cleared_deposit_ids=request.POST.getlist("deposits"),
+                cleared_payment_ids=request.POST.getlist("payments"),
+                cleared_returned_ids=request.POST.getlist("returned"),
+                note=request.POST.get("note", ""),
+                actor=request.user,
+                request=request,
+            )
+        except acc.AccountingError as exc:
+            messages.error(request, str(exc))
+        except ValueError:
+            messages.error(request, "Enter the statement's ending balance, e.g. 12500.00.")
+        else:
+            if rec.difference_cents:
+                messages.warning(
+                    request, "Recorded, but it does not balance: see the difference below."
+                )
+            else:
+                messages.success(request, "Reconciled: the statement balances.")
+            return redirect("accounting")
+        return redirect(f"{request.path}?date={statement_date.isoformat()}")
+    return render(
+        request,
+        "ledger/reconcile.html",
+        {
+            "statement_date": statement_date,
+            "open": acc.uncleared(statement_date) if statement_date else None,
+            "book": acc.book_balance(statement_date) if statement_date else None,
+        },
+    )
+
+
+@login_required
+@require_POST
+def collection_letter(request, pk):
+    from ledger import accounting as acc
+
+    case = get_object_or_404(CollectionCase.objects.for_user(request.user), pk=pk)
+    try:
+        data, kind = acc.generate_case_letter(case, actor=request.user, request=request)
+    except acc.AccountingError as exc:
+        messages.error(request, str(exc))
+        return redirect("collection_detail", pk=case.pk)
+    return pdf_response(data, f"{kind}-notice-lot-{case.lot.number}.pdf")

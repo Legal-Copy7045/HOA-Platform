@@ -1,7 +1,10 @@
 name: CI
 
+# Pull requests run once per commit; pushes to main run after a merge. (Before,
+# every commit on a PR branch ran twice: once for the push, once for the PR.)
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
@@ -31,10 +34,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
-        with: {python-version: "3.13"}
+        with: {python-version: "3.13", cache: pip, cache-dependency-path: requirements/*.txt}
       - run: pip install --require-hashes -r requirements/base.txt -r requirements/dev.txt
       - name: pip-audit
-        run: pip-audit --strict -r requirements/base.txt -r requirements/dev.txt
+        # Every requirement is pinned with hashes, so nothing needs resolving.
+        run: pip-audit --strict --disable-pip --no-deps -r requirements/base.txt -r requirements/dev.txt
 
   test:
     runs-on: ubuntu-24.04
@@ -61,6 +65,7 @@ jobs:
       DB_APP_ROLE: hoa_app
       DB_APP_PASSWORD_FOR_TESTS: ci-app
       DJANGO_SECRET_KEY: ci-only-not-a-secret
+      COVERAGE_CORE: sysmon   # Python 3.12+ low-overhead coverage
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -69,6 +74,11 @@ jobs:
       - run: pip install --require-hashes -r requirements/base.txt -r requirements/dev.txt
       - name: Create database roles
         run: bash docker/postgres/init-roles.sh
+      - name: Throwaway database, so skip durability
+        run: |
+          psql -U postgres -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
       - name: Missing migrations
         run: python manage.py makemigrations --check --dry-run --settings=core.settings.test
       - name: pytest

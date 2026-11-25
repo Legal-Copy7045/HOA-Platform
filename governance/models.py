@@ -561,3 +561,35 @@ class ConsentSignature(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"signature #{self.pk}"
+
+
+class BallotLink(ScopedModel):
+    """A personal, single-use link to one vote or election, emailed to one
+    owner (decision D24). Only the hash of the token is stored. The link needs
+    sign-in, opens only for the person it was issued to, and stops working
+    once opened or when voting closes, so a forwarded email is useless."""
+
+    scope_person_path = "person"
+    objects = ScopedQuerySet.as_manager()
+
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    vote = models.ForeignKey(
+        "Vote", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    election = models.ForeignKey(
+        "Election", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(vote__isnull=False) ^ models.Q(election__isnull=False),
+                name="ballot_link_one_target",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"ballot link #{self.pk}"

@@ -48,6 +48,19 @@ def send_update(emails, *, subject: str, body: str, link: str) -> None:
     transaction.on_commit(go)
 
 
+def send_now(emails, *, subject: str, body: str) -> None:
+    """Account notices that must not wait for a weekly digest: sent after the
+    current transaction commits."""
+    emails = sorted({e for e in emails if e})
+
+    def go():
+        for email in emails:
+            send_mail(subject, body, None, [email], fail_silently=True)
+
+    if emails:
+        transaction.on_commit(go)
+
+
 def send_digests() -> int:
     """One email per person with everything held since their last digest."""
     from comms.models import DigestItem

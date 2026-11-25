@@ -1,5 +1,6 @@
 """Elections, proxies, quorum and written-consent pages."""
 
+from allauth.account.decorators import reauthentication_required
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -72,14 +73,12 @@ def election_list(request):
 
 
 def _owner_choices():
-    """Names of current owners, for nominating (candidates become public on the
-    ballot anyway). Only names and lot numbers."""
+    """Homes to nominate from, by street address only: owners' names stay
+    private unless they opted into the directory (SEC-010); a nominee's name
+    appears once nominated."""
     with system_access("nomination choices"):
-        return list(
-            Ownership.objects.active()
-            .select_related("person", "lot")
-            .order_by("person__display_name")
-        )
+        lot_ids = set(Ownership.objects.active().values_list("lot_id", flat=True))
+        return list(Lot.objects.filter(pk__in=lot_ids).order_by("street_address", "number"))
 
 
 @login_required
@@ -116,13 +115,28 @@ def election_detail(request, pk):
 
 @login_required
 @require_POST
+@reauthentication_required(enabled=lambda r: r.resolver_match.kwargs.get("action") == "ballot")
 def election_action(request, pk, action):
     election = get_object_or_404(Election, pk=pk)
     user = request.user
     if action == "nominate":
-        person = get_object_or_404(
-            Person.objects.unscoped("nominee by id"), pk=request.POST.get("person")
-        )
+        me = elections._person(user)
+        if request.POST.get("lot"):
+            with system_access("nominee by home"):
+                ownership = (
+                    Ownership.objects.active()
+                    .filter(lot_id=int(request.POST["lot"]) if request.POST["lot"].isdigit() else 0)
+                    .select_related("person")
+                    .order_by("start_date", "pk")
+                    .first()
+                )
+            if ownership is None:
+                raise Http404
+            person = ownership.person
+        elif me is not None:
+            person = me
+        else:
+            raise Http404
         _flash(
             request,
             lambda: elections.nominate(
@@ -135,13 +149,18 @@ def election_action(request, pk, action):
             Candidate, pk=request.POST.get("candidate"), election=election
         )
         if action == "accept":
-            elections.accept_nomination(
-                candidate, actor=user, statement=request.POST.get("statement")
+            _flash(
+                request,
+                lambda: elections.accept_nomination(
+                    candidate, actor=user, statement=request.POST.get("statement"), request=request
+                ),
+                "Nomination accepted.",
             )
-            messages.success(request, "Nomination accepted.")
         else:
             _flash(
-                request, lambda: elections.withdraw_candidate(candidate, actor=user), "Withdrawn."
+                request,
+                lambda: elections.withdraw_candidate(candidate, actor=user, request=request),
+                "Withdrawn.",
             )
     elif action == "open":
         _flash(
@@ -294,7 +313,7 @@ def consent_detail(request, pk):
                 "Signed.",
             )
         elif action == "withdraw":
-            elections.withdraw_consent(consent, actor=request.user)
+            elections.withdraw_consent(consent, actor=request.user, request=request)
         return redirect("consent_detail", pk=consent.pk)
     signed = {s.person_id: s for s in consent.signatures.all()}
     with system_access("consent signers"):

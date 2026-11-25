@@ -77,7 +77,13 @@ def compliance(request):
                 messages.success(request, f"{n} suggested item(s) added: set their real dates.")
             elif action == "done":
                 item = get_object_or_404(ComplianceItem, pk=request.POST.get("item"))
-                services.complete_compliance_item(item, actor=request.user, request=request)
+                seen = request.POST.get("due_on")
+                services.complete_compliance_item(
+                    item,
+                    actor=request.user,
+                    seen_due_on=datetime.date.fromisoformat(seen) if seen else None,
+                    request=request,
+                )
                 messages.success(request, "Marked done.")
             else:
                 item = None
@@ -94,7 +100,7 @@ def compliance(request):
                     category=request.POST.get("category") or "other",
                     due_on=datetime.date.fromisoformat(request.POST.get("due_on", "")),
                     recurrence=request.POST.get("recurrence") or "annual",
-                    remind_days=int(request.POST.get("remind_days") or 30),
+                    remind_days=int(request.POST.get("remind_days") or 30),  # ValueError -> message
                     notes=request.POST.get("notes", ""),
                     citation=request.POST.get("citation", ""),
                     responsible=responsible,
@@ -105,7 +111,9 @@ def compliance(request):
         except (services.OperationsError, ValueError) as exc:
             messages.error(
                 request,
-                str(exc) if isinstance(exc, services.OperationsError) else "Check the date.",
+                str(exc)
+                if isinstance(exc, services.OperationsError)
+                else "Check the date and the reminder days.",
             )
         return redirect("compliance")
     today = timezone.localdate()

@@ -165,7 +165,7 @@ def test_election_pages(client, w):
     client.force_login(a)
     client.post(
         reverse("election_action", args=[w["e"].pk, "nominate"]),
-        {"person": _person(a).pk, "statement": "I'll help"},
+        {"statement": "I'll help"},
     )
     page = client.get(reverse("election_detail", args=[w["e"].pk])).content
     assert b"I&#x27;ll help" in page or b"I'll help" in page
@@ -197,3 +197,84 @@ def test_one_decline_fails_it_and_outsiders_cannot_sign(w):
     assert consent.state == "failed"
     with pytest.raises(elections.ElectionError):
         elections.sign_consent(consent, approve=True, actor=w["board"])
+
+
+# --- Regression review fixes (SEC-001, SEC-003, BUG-004, BUG-010..012, SEC-010) ------------
+
+
+def test_ballot_is_fixed_once_voting_opens(w):
+    from django.db import IntegrityError, InternalError, ProgrammingError, transaction
+
+    a, b, c, _ = w["owners"]
+    late = elections.nominate(w["e"], person=_person(c), actor=b)  # not accepted yet
+    election = _ready(w, a, b)
+    cand_a = elections.ballot_candidates(election).get(person=_person(a))
+    with pytest.raises(elections.ElectionError):
+        elections.withdraw_candidate(cand_a, actor=w["board"])
+    with pytest.raises(elections.ElectionError):
+        elections.withdraw_candidate(cand_a, actor=a)
+    with pytest.raises(elections.ElectionError):
+        elections.accept_nomination(late, actor=c)
+    from governance.models import Candidate
+
+    with pytest.raises((InternalError, IntegrityError, ProgrammingError)), transaction.atomic():
+        Candidate.objects.filter(pk=cand_a.pk).update(withdrawn=True)
+
+
+def test_withdrawal_during_nominations_is_audited(w):
+    from audit.models import AuditEvent
+
+    a = w["owners"][0]
+    cand = elections.nominate(w["e"], person=_person(a), actor=w["board"])
+    elections.accept_nomination(cand, actor=a)
+    elections.withdraw_candidate(cand, actor=a)
+    assert AuditEvent.objects.filter(action="election.candidate_accepted").exists()
+    assert AuditEvent.objects.filter(action="election.candidate_withdrawn").exists()
+
+
+def test_selling_the_lot_ends_the_proxy(w):
+    from community.models import Ownership
+
+    a, _b, c, d = w["owners"]
+    election = _ready(w, a)
+    lot_d = elections.lots_actor_may_vote_for(election, d)[0]["lot"]
+    elections.grant_proxy(w["meeting"], lot=lot_d, holder=_person(c), actor=d)
+    with system_access("t"):
+        ownership = Ownership.objects.active().get(lot=lot_d)
+    community.end_ownership(ownership, end_date=timezone.localdate(), actor=w["board"])
+    assert lot_d.pk not in [r["lot"].pk for r in elections.lots_actor_may_vote_for(election, c)]
+    gov.record_attendance(w["meeting"], _person(c), actor=w["board"])
+    assert elections.quorum_status(w["meeting"])["by_proxy"] == 0
+
+
+def test_bad_form_values_are_refused_not_500(w):
+    a, _b, c, _ = w["owners"]
+    election = _ready(w, a)
+    with pytest.raises(elections.ElectionError):
+        elections.cast_election_ballot(election, lot_id="x", candidate_ids=["y"], actor=c)
+
+
+def test_leap_day_term_end():
+    assert elections._add_years(datetime.date(2028, 2, 29), 2) == datetime.date(2030, 2, 28)
+
+
+def test_any_board_member_can_withdraw_a_stuck_consent(w):
+    consent = elections.propose_consent(title="Fence", text="Mend it.", actor=w["board"])
+    elections.withdraw_consent(consent, actor=w["board2"])
+    consent.refresh_from_db()
+    assert consent.state == "withdrawn"
+
+
+def test_nomination_list_shows_addresses_not_names(client, w):
+    from community.models import Lot
+    from core import policy
+
+    a, b = w["owners"][:2]
+    client.force_login(a)
+    page = client.get(reverse("election_detail", args=[w["e"].pk])).content.decode()
+    assert _person(b).display_name not in page
+    lot_b = Lot.objects.unscoped("t").get(pk=next(iter(policy.roles_for(b).owned_lot_ids)))
+    assert lot_b.street_address in page
+    client.post(reverse("election_action", args=[w["e"].pk, "nominate"]), {"lot": lot_b.pk})
+    page = client.get(reverse("election_detail", args=[w["e"].pk])).content.decode()
+    assert _person(b).display_name in page

@@ -5,7 +5,7 @@
   {% include "operations/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'work_orders' %}">Work orders</a> / WO-{{ obj.pk }}</div>
   <div class="page-head"><div><h1>{{ obj.title }}</h1>
-    <div class="meta">{% status obj.state %}<span>{{ obj.get_priority_display }} priority</span>{% if obj.common_area %}<span>{% icon "pin" %}{{ obj.common_area }}</span>{% endif %}{% if obj.due_on %}<span>{% icon "clock" %}Due {{ obj.due_on|date:"M j" }}</span>{% endif %}</div></div></div>
+    <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_priority_display }} priority</span>{% if obj.common_area %}<span>{% icon "pin" %}{{ obj.common_area }}</span>{% endif %}{% if obj.due_on %}<span>{% icon "clock" %}Due {{ obj.due_on|date:"M j" }}</span>{% endif %}</div></div></div>
   <div class="split">
     <div>
       <section class="card prose">{{ obj.description|default:"No description."|linebreaks }}</section>
@@ -20,7 +20,7 @@
         {% if can_manage and obj.state == "open" %}<form method="post">{% csrf_token %}<label for="v">Assign vendor</label><select id="v" name="vendor">{% for v in vendors %}<option value="{{ v.pk }}">{{ v.name }}</option>{% endfor %}</select><div class="form-actions"><button type="submit" class="secondary small">Set vendor</button></div></form>{% endif %}
       </section>
       <section class="card"><h3>Invoices</h3>
-        {% if invoices %}<ul class="list">{% for i in invoices %}<li><a class="grow" href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a><span class="num">{{ i.amount_cents|cents }}</span>{% status i.state %}</li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
+        {% if invoices %}<ul class="list">{% for i in invoices %}<li><a class="grow" href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a><span class="num">{{ i.amount_cents|cents }}</span>{% status i.state i.get_state_display %}</li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
       </section>
     </aside>
   </div>

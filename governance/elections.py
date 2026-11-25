@@ -125,26 +125,53 @@ def nominate(election: Election, *, person: Person, statement: str = "", actor, 
     return candidate
 
 
-def accept_nomination(candidate: Candidate, *, actor, statement: str | None = None):
-    """The nominee accepts (or the board records a written acceptance)."""
+def accept_nomination(candidate: Candidate, *, actor, statement: str | None = None, request=None):
+    """The nominee accepts (or the board records a written acceptance), only
+    while nominations are open: the ballot is fixed when voting opens."""
     me = _person(actor)
     if not ((me and me.pk == candidate.person_id) or can(actor, "vote.manage")):
         raise PermissionDenied("accept")
     fields = {"accepted": True}
     if statement is not None:
         fields["statement"] = statement.strip()[:3000]
-    Candidate.objects.filter(pk=candidate.pk).update(**fields)
+    with transaction.atomic():
+        locked = Election.objects.select_for_update().get(pk=candidate.election_id)
+        if locked.state != ElectionState.NOMINATIONS:
+            raise ElectionError("Nominations are closed: the ballot is fixed.")
+        Candidate.objects.filter(pk=candidate.pk).update(**fields)
+    record_event(
+        "election.candidate_accepted",
+        actor=actor,
+        request=request,
+        target=candidate.election,
+        metadata={"candidate_id": candidate.pk},
+    )
     candidate.refresh_from_db()
     return candidate
 
 
-def withdraw_candidate(candidate: Candidate, *, actor):
+def withdraw_candidate(candidate: Candidate, *, actor, request=None):
+    """Only while nominations are open: once voting starts the ballot is fixed,
+    so no one (not even the board) can drop a candidate and the votes cast for
+    them (security review SEC-001)."""
     me = _person(actor)
     if not ((me and me.pk == candidate.person_id) or can(actor, "vote.manage")):
         raise PermissionDenied("withdraw")
-    if candidate.election.state not in (ElectionState.NOMINATIONS, ElectionState.VOTING):
-        raise ElectionError("Too late to withdraw.")
-    Candidate.objects.filter(pk=candidate.pk).update(withdrawn=True)
+    with transaction.atomic():
+        locked = Election.objects.select_for_update().get(pk=candidate.election_id)
+        if locked.state != ElectionState.NOMINATIONS:
+            raise ElectionError(
+                "Voting has opened, so the ballot can no longer change. A candidate who "
+                "will not serve can decline the seat after the count."
+            )
+        Candidate.objects.filter(pk=candidate.pk).update(withdrawn=True)
+    record_event(
+        "election.candidate_withdrawn",
+        actor=actor,
+        request=request,
+        target=candidate.election,
+        metadata={"candidate_id": candidate.pk},
+    )
 
 
 def ballot_candidates(election: Election):
@@ -166,6 +193,9 @@ def open_voting(election: Election, *, actor, request=None) -> Election:
     )
     record_event("election.voting_opened", actor=actor, request=request, target=election)
     election.refresh_from_db()
+    from governance import ballot_links
+
+    ballot_links.issue(election)  # personal, single-use, signed-in links (D24)
     return election
 
 
@@ -193,8 +223,8 @@ def lots_actor_may_vote_for(election: Election, actor) -> list[dict]:
             out[lot_id] = False
     if election.meeting_id and roles.person_id:
         with system_access("proxy lots"):
-            for lot_id in Proxy.objects.filter(
-                meeting_id=election.meeting_id, holder_id=roles.person_id, revoked_at__isnull=True
+            for lot_id in live_proxies(
+                Proxy.objects.filter(meeting_id=election.meeting_id, holder_id=roles.person_id)
             ).values_list("lot_id", flat=True):
                 out.setdefault(lot_id, True)
     with system_access("voted lots"):
@@ -212,7 +242,11 @@ def lots_actor_may_vote_for(election: Election, actor) -> list[dict]:
 def cast_election_ballot(
     election: Election, *, lot_id: int, candidate_ids: list[int], actor, request=None
 ) -> None:
-    candidate_ids = list(dict.fromkeys(int(c) for c in candidate_ids))
+    try:
+        candidate_ids = list(dict.fromkeys(int(c) for c in candidate_ids))
+        lot_id = int(lot_id)
+    except (TypeError, ValueError) as exc:
+        raise ElectionError("Choose from the candidates on the ballot.") from exc
     with transaction.atomic():
         locked = Election.objects.select_for_update().get(pk=election.pk)
         if locked.state != ElectionState.VOTING:
@@ -266,6 +300,13 @@ def tally(election: Election) -> dict:
     return {"rows": rows, "ballots": ballots, "tie_for_last": tie_for_last}
 
 
+def _add_years(day: datetime.date, years: int) -> datetime.date:
+    try:
+        return day.replace(year=day.year + years)
+    except ValueError:  # 29 February into a non-leap year
+        return day.replace(year=day.year + years, day=28)
+
+
 def certify(election: Election, *, actor, request=None) -> dict:
     """A board member who is not a candidate certifies the count; results are
     recorded permanently and the elected are proposed for board seats."""
@@ -302,8 +343,7 @@ def certify(election: Election, *, actor, request=None) -> dict:
                     person=r["candidate"].person,
                     seat_type="owner_elected",
                     term_start=today,
-                    term_end=today.replace(year=today.year + election.term_years)
-                    - datetime.timedelta(days=1),
+                    term_end=_add_years(today, election.term_years) - datetime.timedelta(days=1),
                     citation=f"Elected: {election.title}"
                     + (f" ({election.citation})" if election.citation else ""),
                     actor=actor,
@@ -342,6 +382,17 @@ def grant_proxy(meeting: Meeting, *, lot: Lot, holder: Person, actor, request=No
     return proxy
 
 
+def live_proxies(queryset, on=None):
+    """Proxies not revoked whose grantor still owns the lot: a sale ends the
+    seller's proxy (security review SEC-003)."""
+    from django.db.models import Exists, OuterRef
+
+    owns = Ownership.objects.active(on).filter(
+        person_id=OuterRef("grantor_id"), lot_id=OuterRef("lot_id")
+    )
+    return queryset.filter(revoked_at__isnull=True).filter(Exists(owns))
+
+
 def revoke_proxy(proxy: Proxy, *, actor, request=None) -> None:
     roles = policy.roles_for(actor)
     if proxy.lot_id not in roles.owned_lot_ids and not can(actor, "meeting.manage"):
@@ -375,8 +426,8 @@ def quorum_status(meeting: Meeting) -> dict:
         )
         by_proxy = (
             set(
-                Proxy.objects.filter(
-                    meeting=meeting, revoked_at__isnull=True, holder_id__in=present
+                live_proxies(
+                    Proxy.objects.filter(meeting=meeting, holder_id__in=present), on
                 ).values_list("lot_id", flat=True)
             )
             - lots
@@ -471,10 +522,12 @@ def sign_consent(consent: ConsentRequest, *, approve: bool, actor, request=None)
     return consent
 
 
-def withdraw_consent(consent: ConsentRequest, *, actor) -> None:
+def withdraw_consent(consent: ConsentRequest, *, actor, request=None) -> None:
+    """Any board member may withdraw an open consent (e.g. a signer left the
+    board, so it can never become unanimous)."""
     require(actor, "resolution.record")
-    if consent.created_by_id != actor.pk:
-        raise PermissionDenied("consent")
-    ConsentRequest.objects.filter(pk=consent.pk, state=ConsentState.OPEN).update(
+    updated = ConsentRequest.objects.filter(pk=consent.pk, state=ConsentState.OPEN).update(
         state=ConsentState.WITHDRAWN
     )
+    if updated:
+        record_event("consent.withdrawn", actor=actor, request=request, target=consent)

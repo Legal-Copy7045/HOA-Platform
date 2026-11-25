@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}Link not valid · {{ SITE_NAME }}{% endblock %}
+{% block content %}<section class="card"><h1>This voting link can't be used</h1><p>Voting links are personal and work once. This one has already been opened, voting has closed, or it was sent to someone else. If voting is still open you can vote from <a href="{% url 'votes' %}">Votes and polls</a> or <a href="{% url 'elections' %}">Elections</a> in the menu.</p></section>{% endblock %}

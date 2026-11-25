@@ -139,3 +139,42 @@ def test_only_the_board_sends_budget_notices(budget):
 def test_owners_see_no_draft_budget_before_it_is_sent(client, budget):
     client.force_login(make_member(lots=[LotFactory()]))
     assert b"Landscaping" not in client.get(reverse("owner_budget")).content
+
+
+# --- Regression review fix BUG-015 ----------------------------------------------------------
+
+
+def test_month_end_items_stay_at_month_end(board):
+    item = _item(board, datetime.date(2027, 1, 31), recurrence="monthly")
+    services.complete_compliance_item(item, actor=board)
+    item.refresh_from_db()
+    assert item.due_on == datetime.date(2027, 2, 28)
+    services.complete_compliance_item(item, actor=board)
+    item.refresh_from_db()
+    assert item.due_on == datetime.date(2027, 3, 31)
+
+
+def test_double_click_done_does_not_skip_a_period(board):
+    item = _item(board, datetime.date(2027, 1, 15), recurrence="annual")
+    seen = item.due_on
+    services.complete_compliance_item(item, actor=board, seen_due_on=seen)
+    with pytest.raises(services.OperationsError):
+        services.complete_compliance_item(item, actor=board, seen_due_on=seen)
+    item.refresh_from_db()
+    assert item.due_on == datetime.date(2028, 1, 15)
+
+
+@pytest.mark.parametrize(
+    "bad", [{"category": "nope"}, {"recurrence": "weekly"}, {"remind_days": -3}]
+)
+def test_bad_values_are_refused(board, bad):
+    values = {
+        "title": "Insurance",
+        "category": "insurance",
+        "due_on": datetime.date(2027, 5, 1),
+        "recurrence": "annual",
+        "remind_days": 30,
+        **bad,
+    }
+    with pytest.raises(services.OperationsError):
+        services.save_compliance_item(actor=board, **values)

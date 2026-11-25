@@ -19,6 +19,16 @@ def cents(value) -> str:
     return format_cents(value) if value is not None else ""
 
 
+@register.filter
+def cents_plain(value) -> str:
+    """{{ amount_cents|cents_plain }} -> 1234.56 (for form inputs)."""
+    if value is None:
+        return ""
+    sign = "-" if value < 0 else ""
+    value = abs(int(value))
+    return f"{sign}{value // 100}.{value % 100:02d}"
+
+
 @register.simple_tag
 def icon(name: str, extra_class: str = ""):
     """{% icon "home" %} -> inline <svg> using the self-hosted sprite."""
@@ -103,6 +113,7 @@ _LABELS = {
     "in_progress": "In progress",
     "submitted": "Submitted",
     "referred": "Referred to counsel",
+    "neighbors": "Awaiting neighbor acknowledgements",
 }
 
 
@@ -173,7 +184,9 @@ def actor_label(context, actor) -> str:
     if viewer is not None and getattr(viewer, "pk", None) == actor.pk:
         return "you"
     if viewer is not None and policy.can(viewer, "lot.view_all"):
-        return actor.email
+        from core.people import display_name
+
+        return display_name(actor)
     groups = policy.roles_for(actor).groups
     for group, label in (
         (policy.BOARD, "the board"),

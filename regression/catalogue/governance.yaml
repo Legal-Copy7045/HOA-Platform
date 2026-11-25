@@ -38,3 +38,15 @@
 - feature: "ARC: per-lot left/right neighbors and other affected lots (board), neighbors become affected lots on submit (recusal), sign-offs show neighbor names, printable form follows the association's alteration request form"
   since: M4
   match: ["^unit:arc/tests/test_signoffs.py::test_(neighbors_are_defined|neighbors_become|sign_offs_and_the_form)"]
+- feature: "ARC neighbor acknowledgements before board review: plan neighbors locked for the homeowner (board can remove), other homeowners added by address and owner names (no email shown), 'Request Neighbor Acknowledgements' emails review links, objections need a comment, request goes to the board automatically when the last one is in, old signed-form label still hidden"
+  since: M4
+  match: ["^unit:arc/tests/test_signoffs.py::test_(plan_neighbors|board_review_waits|board_removing|no_neighbors|the_automatic|an_objection|add_a_homeowner|forms_uploaded)"]
+- feature: "ARC new request: kind of project always a list (starter types), planned start required, the property shown as its address (dropdown only for owners of several lots)"
+  since: M4
+  match: ["^unit:community/tests/test_owner_side.py::test_(board_configures_types|new_request_form|retired_types)"]
+- feature: "D24 personal ballot links: one link per owner per formal vote or election, only its hash stored, sign-in required, opens only for its owner (a forwarded link shows nothing), single use, dead after close; casting needs a recent password or passkey (never an emailed code)"
+  since: M4
+  match: ["^unit:governance/tests/test_ballot_links"]
+- feature: "Elections review fixes: ballot fixed once voting opens (service + DB trigger), withdraw/accept audited, proxy ends when the grantor sells, nominate by address not owner names, leap-day term end, stuck consents withdrawable"
+  since: M4
+  match: ["^unit:governance/tests/test_elections.py::test_(ballot_is_fixed|withdrawal_during|selling_the_lot|bad_form_values|leap_day|any_board_member|nomination_list)"]

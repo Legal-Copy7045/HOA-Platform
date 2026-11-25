@@ -102,6 +102,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "accounts.middleware.RequireMFAMiddleware",
+    "core.features.FeatureGateMiddleware",
+    "core.middleware.EmailUnavailableMiddleware",
     "core.preview.OwnerPreviewMiddleware",
     "core.sysadmin_audit.SysadminRequestAuditMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
@@ -138,7 +140,15 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 # DATABASE_URL is the *runtime* (app role) connection. Migrations run in a
 # separate one-shot process whose DATABASE_URL is the owner role (decision Q8).
 DATABASES = {"default": env.db("DATABASE_URL")}
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DATABASE_CONN_MAX_AGE", default=600)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
+
+# The worker is woken instantly by Postgres notifications; polling is only a
+# fallback, so once a minute is plenty (optimization review A7).
+PROCRASTINATE_WORKER_DEFAULTS = {
+    "fetch_job_polling_interval": 60,
+    "abort_job_polling_interval": 60,
+}
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 DB_APP_ROLE = env("DB_APP_ROLE", default="")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -164,6 +174,7 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]  # signup is closed anyway
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USER_DISPLAY = "core.people.display_name"  # names, never "User #1"
 # Invitations prove the address; there is no self-service email change.
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_PREVENT_ENUMERATION = True

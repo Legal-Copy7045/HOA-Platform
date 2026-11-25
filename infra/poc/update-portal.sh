@@ -71,9 +71,17 @@ if [ "$OLD" = "$NEW" ]; then
 else
   echo "==> Updated $OLD -> $NEW:"
   g log --oneline --no-decorate "$OLD..$NEW" | sed 's/^/    /'
+  # Only documentation or the regression suite changed: nothing to restart.
+  if [ "$FORCE" -eq 0 ] && ! g diff --name-only "$OLD" "$NEW" \
+       | grep -qvE '^(docs/|regression/|[^/]*\.md$|[^/]+/[^/]*\.md$)'; then
+    echo "Only documentation changed; the running portal is unaffected."
+    echo "Done: the portal code is at $NEW."
+    exit 0
+  fi
 fi
 
 echo
+START=$(date +%s)
 bash "$APP_DIR/infra/poc/start-portal.sh"
 
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
@@ -81,4 +89,4 @@ echo
 echo "Record counts (no personal data):"
 "${COMPOSE[@]}" exec -T web python manage.py data_status 2>&1 | grep -v '"level"' || true
 echo
-echo "Done: the portal is running $NEW."
+echo "Done: the portal is running $NEW (update took $(( $(date +%s) - START ))s)."

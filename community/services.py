@@ -45,6 +45,7 @@ from community.models import (
     today,
 )
 from core.policy import SYSTEM, can, require, roles_for
+from core.policy import invalidate_roles as _invalidate_roles
 from core.scoping import internal, system_access
 
 
@@ -292,6 +293,7 @@ def _close_account_if_empty(account_id: int | None, on: datetime.date) -> None:
     Account.objects.filter(pk=account_id, closed_on__isnull=True).update(closed_on=on)
     # Contacts and tenants of a dormant account lose access with it.
     AccountContact.objects.filter(account_id=account_id, end_date__isnull=True).update(end_date=on)
+    _invalidate_roles()
 
 
 @internal("community accounts")
@@ -360,6 +362,7 @@ def end_account_contact(contact: AccountContact, *, actor, request=None) -> Acco
     _authorize(actor, "account.manage")
     with system_access("end account contact"):
         AccountContact.objects.filter(pk=contact.pk, end_date__isnull=True).update(end_date=today())
+        _invalidate_roles()
     _audit(
         "account.contact_ended",
         actor=actor,
@@ -1381,3 +1384,41 @@ def owner_notice_recipients() -> tuple[list[str], list[Person]]:
         else:
             paper.append(person)
     return sorted(set(emails)), paper
+
+
+# --- Letters and resale certificate settings (Milestone 4) ----------------------------
+
+LETTER_FIELDS = ("letterhead", "remit_to", "letter_contact", "letter_signature")
+RESALE_TEXT_FIELDS = (
+    "resale_restraints",
+    "resale_other_fees",
+    "resale_capital_expenditures",
+    "resale_reserve_designations",
+    "resale_judgments",
+    "resale_insurance_company",
+)
+RESALE_MONEY_FIELDS = ("resale_reserves_cents", "resale_insurance_cents")
+
+
+def update_letter_settings(*, actor, request=None, **values):
+    """Letterhead, remittance, contact and signature; resale certificate facts."""
+    from community.models import CommunityProfile
+
+    _authorize(actor, "letters.manage")
+    with transaction.atomic():
+        profile = CommunityProfile.get()
+        for field in LETTER_FIELDS + RESALE_TEXT_FIELDS:
+            if field in values:
+                limit = CommunityProfile._meta.get_field(field).max_length or 3000
+                setattr(profile, field, (values[field] or "").strip()[:limit])
+        for field in RESALE_MONEY_FIELDS:
+            if field in values:
+                value = values[field]
+                if value is not None and int(value) < 0:
+                    raise CommunityError("Amounts cannot be negative.")
+                setattr(profile, field, value)
+        profile.save()
+        _audit(
+            "community.letters_changed", actor=actor, request=request, target=profile, metadata={}
+        )
+    return profile

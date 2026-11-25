@@ -7,7 +7,7 @@ from community.profile_views import directory, my_profile
 from core import preview
 from core.followups import set_follow_up
 from core.my_items_views import my_items_page
-from core.views import export_my_data, healthz, home, system_status
+from core.views import export_my_data, feature_settings, healthz, home, system_status
 
 
 def not_available(request, *args, **kwargs):
@@ -25,6 +25,7 @@ urlpatterns = [
     path("homeowner-view/exit/", preview.stop, name="owner_preview_stop"),
     path("board/sysadmin-activity/", sysadmin_activity, name="sysadmin_activity"),
     path("my-items/", my_items_page, name="my_items"),
+    path("board/features/", feature_settings, name="feature_settings"),
     re_path(
         r"^follow-up/(?P<kind>violation|collection|work_order)/(?P<pk>[0-9]+)/$",
         set_follow_up,

@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Lot neighbors · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Lot neighbors</h1><p class="subtitle">For each lot, record its left and right neighbors from the development plan, and any other lots a project there affects. They are asked to sign off on that lot's architectural requests, and their owners are recused from reviewing them. Enter lot numbers.</p></div></div>
+  <div class="page-head"><div><h1>Lot neighbors</h1><p class="subtitle">For each lot, record its left and right neighbors from the development plan, and any other lots a project there affects. They are asked to acknowledge that lot's architectural requests (the homeowner cannot remove them), and their owners are recused from reviewing them. Enter lot numbers.</p></div></div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Lot</th><th>Left neighbor</th><th>Right neighbor</th><th>Also affected</th><th></th></tr></thead>
     <tbody>{% for r in rows %}<tr id="lot-{{ r.lot.number }}">

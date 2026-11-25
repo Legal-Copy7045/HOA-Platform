@@ -37,3 +37,22 @@ class RequestIDMiddleware:
         # (publickey-credentials-*) are deliberately left allowed.
         response.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
         return response
+
+
+class EmailUnavailableMiddleware:
+    """When the mail server is down, say so plainly instead of a 500."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_exception(self, request, exception):
+        from django.shortcuts import render
+
+        from core.email import EmailUnavailable
+
+        if isinstance(exception, EmailUnavailable):
+            return render(request, "email_unavailable.html", status=503)
+        return None

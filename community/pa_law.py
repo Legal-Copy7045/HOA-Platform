@@ -121,6 +121,26 @@ GUIDES: dict[str, Guide] = {
         "it on.",
         "Off until counsel has reviewed: Board resolution 2027-02 (collection policy).",
     ),
+    "collections.notice_days": Guide(
+        BOARD,
+        f"The Act does not set a notice period for collection letters; the association's "
+        f"lien for unpaid assessments arises under {ACT} § 5315. Counsel should review the "
+        "collection policy and letters.",
+        "10 days: collection policy, Board resolution 2027-02.",
+    ),
+    "collections.courtesy_reminder_day": Guide(
+        BOARD,
+        "Not set by the Act. A courtesy email is not a statutory notice; the printed "
+        "delinquency letters are the association's formal notices.",
+        "20: a courtesy email on the 20th to owners with a past-due balance.",
+    ),
+    "accounting.1099_threshold_cents": Guide(
+        BOARD,
+        "Federal, not Pennsylvania: the IRS sets when a 1099-NEC or 1099-MISC is required. "
+        "For payments made in 2026 and later it is $2,000 (it was $600), adjusted for "
+        "inflation from 2027. Check the IRS instructions each January.",
+        "$2,000 for 2026 payments.",
+    ),
     "late_fee.grace_days": Guide(
         BOARD,
         "Not set by the Act.",

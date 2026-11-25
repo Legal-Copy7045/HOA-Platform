@@ -34,10 +34,100 @@ def home(request):
     )
 
 
+def _update_status():
+    from core.models import UpdateStatus
+
+    status = UpdateStatus.objects.filter(pk=1).first()
+    if status is None:
+        return None
+    agent_ok = bool(
+        status.agent_seen_at
+        and status.agent_seen_at > timezone.now() - __import__("datetime").timedelta(minutes=5)
+    )
+    return {"s": status, "agent_ok": agent_ok, "changes": status.changes.splitlines()[:10]}
+
+
+def _update_action(request, action):
+    """Ask the VM's update agent to check GitHub, or to install the update.
+    The web app never touches the server itself: it records the request and
+    the agent on the host acts within a minute (decision D25)."""
+    from django.contrib import messages
+    from django.db import transaction
+    from django.shortcuts import redirect
+
+    from audit.services import record_event
+    from core.models import UpdateStatus
+
+    with transaction.atomic():
+        UpdateStatus.get()
+        status = UpdateStatus.objects.select_for_update().get(pk=1)
+        if action == "check_updates":
+            status.check_requested_at = timezone.now()
+            status.save(update_fields=["check_requested_at"])
+            messages.success(request, "Checking for updates: refresh in a minute.")
+        elif status.state in ("requested", "running"):
+            messages.info(request, "An update is already on its way.")
+        elif not status.behind:
+            messages.info(request, "The portal is already up to date.")
+        else:
+            status.state = "requested"
+            status.state_changed_at = timezone.now()
+            status.requested_by = request.user
+            status.message = ""
+            status.save(update_fields=["state", "state_changed_at", "requested_by", "message"])
+            messages.success(
+                request,
+                "Update requested. It starts within a minute and takes a few minutes; "
+                "the site may be unavailable for a few seconds at the end.",
+            )
+    record_event(f"system.{action}", actor=request.user, request=request, metadata={})
+    return redirect("system_status")
+
+
+def _send_test_email(request):
+    """Only to the signed-in person's own address, so the button cannot be
+    used to email anyone else. Audited."""
+    from django.contrib import messages
+    from django.core.mail import send_mail
+    from django.shortcuts import redirect
+
+    from audit.services import record_event
+    from core.email import EmailUnavailable
+
+    ok = True
+    try:
+        send_mail(
+            f"[{settings.SITE_NAME}] Test email",
+            "This is a test email from the portal. If you can read it, outgoing email works.",
+            None,
+            [request.user.email],
+        )
+    except EmailUnavailable:
+        ok = False
+    record_event("system.test_email_sent", actor=request.user, request=request, metadata={"ok": ok})
+    if ok:
+        where = "the redirect inbox" if settings.EMAIL_REDIRECT_ALL_TO else "your email address"
+        messages.success(request, f"Test email sent to {where}. Check the inbox (and spam).")
+    else:
+        messages.error(
+            request,
+            "The mail server refused or did not answer. Check the EMAIL_ settings in .env "
+            "(see Outgoing email below), restart, and try again.",
+        )
+    return redirect("system_status")
+
+
 @login_required
 def system_status(request):
     """Operations view for sysadmins: health only, no owner data (decision D9)."""
     policy.require(request.user, "system.view_status")
+    if request.method == "POST" and request.POST.get("action") == "test_email":
+        return _send_test_email(request)
+    if request.method == "POST" and request.POST.get("action") in (
+        "check_updates",
+        "install_update",
+    ):
+        return _update_action(request, request.POST["action"])
     executor = MigrationExecutor(connection)
     pending = executor.migration_plan(executor.loader.graph.leaf_nodes())
     with connection.cursor() as cursor:
@@ -55,6 +145,7 @@ def system_status(request):
             "thin": policy.thinly_covered_actions(),
             "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),
             "health": run_checks(),
+            "update": _update_status(),
             "scanner": settings.DOCUMENT_SCANNER,
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
         },
@@ -78,3 +169,30 @@ def export_my_data(request):
     response["Content-Disposition"] = 'attachment; filename="my-portal-data.json"'
     response["Cache-Control"] = "no-store"
     return response
+
+
+@login_required
+def feature_settings(request):
+    """Board: switch optional features on and off."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from core import features
+
+    policy.require(request.user, "features.manage")
+    if request.method == "POST":
+        key = request.POST.get("feature", "")
+        if key not in features.BY_KEY:
+            messages.error(request, "Unknown feature.")
+        else:
+            on = request.POST.get("enabled") == "on"
+            features.set_feature(key, on, actor=request.user, request=request)
+            label = features.BY_KEY[key].label
+            messages.success(request, f"{label} switched {'on' if on else 'off'}.")
+        return redirect("feature_settings")
+    states = features.states(request)
+    return render(
+        request,
+        "core/features.html",
+        {"rows": [(f, states[f.key]) for f in features.FEATURES]},
+    )

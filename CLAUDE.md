@@ -8,7 +8,7 @@ This file is the source of truth for architecture and rules. If a task conflicts
 
 - Milestone 1 (done): accounts and MFA, lots and ownership, role-scoped access, audit log.
 - Milestone 2 (directed 2026-11-25, see `docs/milestone-2-plan.md`): community definition (rules with citations, dues, common areas), owner profile and opt-in directory, calendar, announcements, board tasks, data exports, document library, meetings, resolutions and policies, records requests, voting (informal polls and formal votes), architectural review, violations, vendors and work orders, invoice approval, owner ledger with monthly dues and prepayment drawdown, budgets, collections tracking, resale certificates, reports, Stripe placeholder.
-- Milestone 3 (done, `docs/milestone-3-plan.md`): accounts and contacts, owner requests and threads, committees, folders, contracts, roster, FAQ, ARC neighbor sign-off.
+- Milestone 3 (done, `docs/milestone-3-plan.md`): accounts and contacts, owner requests and threads, committees, folders, contracts, roster, FAQ, ARC neighbor acknowledgements.
 - Milestone 4 (directed 2026-11-25, `docs/milestone-4-plan.md`): backups and restore, monitoring, email preferences and digest, bulk onboarding; annual meeting and elections, budget notices, compliance calendar, written consent; accounting export, reconciliation, reminders and collections letters; reservations, PWA, SMS, access reviews, retention, accessibility.
 - Decided 2026-11-25 (D21): late fees can be automatic but start manual; formal votes are binding; secret ballots are stored unlinkable; payments by card and bank transfer through Stripe hosted pages with an owner-paid convenience fee; board seats need a second approval in production; malware scanning on.
 - Still requires a decision before use: live Stripe keys and the HOA's Stripe account.
@@ -68,6 +68,7 @@ This file is the source of truth for architecture and rules. If a task conflicts
 - Proxy headers (client IP, scheme) are trusted only from `TRUSTED_PROXY_CIDRS`.
 - The application never handles card or bank account numbers. (Later: Stripe hosted Checkout only.)
 - Treat all user input and uploaded files as hostile.
+- No anonymous access: every page needs sign-in except the sign-in steps themselves (login, invitation, reset code). Emailed links lead to signed-in pages; links that record a vote are personal and single-use, and casting needs recent re-authentication (D24).
 
 ## Audit
 
@@ -78,7 +79,7 @@ This file is the source of truth for architecture and rules. If a task conflicts
 
 ## ARC workflow (Milestone 3)
 
-States: draft, submitted, completeness_check, in_review, decided (approved / approved_with_conditions / denied), appeal, completed. Required fields and deadlines are configuration derived from the Declaration, each with a section citation. Track the review clock (including any deemed-approval rule). Generate a decision letter PDF that cites the governing section. Keep every version of every submitted document.
+States: draft, neighbors (awaiting neighbor acknowledgements), submitted, completeness_check, in_review, decided (approved / approved_with_conditions / denied), appeal, completed. Required fields and deadlines are configuration derived from the Declaration, each with a section citation. Track the review clock (including any deemed-approval rule). Generate a decision letter PDF that cites the governing section. Keep every version of every submitted document.
 
 ## Testing and quality
 
@@ -118,11 +119,14 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Lists with an owner side and a board side use `?mine=1` (`core.scoping.own_records`); the Homeowner menu links there
 - Threads on requests, ARC, violations and work orders: `comms.threads` (subject fetched through its own scoping; `internal` notes staff-only and hidden from recused reviewers; emails carry a link only). Render with `{% thread_panel kind obj %}`; follow-up dates with `{% follow_up_form kind obj %}`
 - New governing rule: add its `RuleSpec` in `community/rules.py` and its PA guidance in `community/pa_law.py` (a test fails otherwise); add a `fallback` only where the statute itself supplies the value
-- ARC neighbor sign-off: `arc/signoffs.py` (adjacency, portal or single-use hashed link, printable form, scanned-form reading via `core/ai.py` with `GEMINI_API_KEY`; proposals need a person unless `arc.signoff_auto_confirm` is on; sign-offs never decide a request)
+- ARC neighbor acknowledgements (code says "signoff", people see "acknowledgement"): `arc/signoffs.py` (plan neighbors locked on every request, board removes; "Request Neighbor Acknowledgements" moves draft to `neighbors` and emails review links; board review starts automatically when none are waiting; emailed links need sign-in (no anonymous access to any page except the sign-in steps; neighbors without a login and outside addresses use the printable form), printable form, scanned-form reading via `core/ai.py` with `GEMINI_API_KEY`; proposals need a person unless `arc.signoff_auto_confirm` is on; acknowledgements never decide a request)
 - My items queue (`core/my_items.py`): add new "waiting on someone" work there, from scoped queries
 - Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
+- Optional features (board, Admin → Features): register in `core/features.py` (`FEATURES`, with every URL name); switched-off features 404 and leave the menu
+- Money tools: `ledger/accounting.py` (journal CSV export, deposit batches, bank reconciliation, 1099 worksheet, courtesy reminders, collections letter sequence); letters and resale certificate wording: `ledger/letters.py`, Finance → Letters
 - Security review findings and fixes: `docs/security-review-2026-11.md`
-- POC VM: see `infra/poc/README.md` and `docs/runbook.md`; update in one step with `sudo bash infra/poc/update-portal.sh`
+- Updates without a terminal: System status → Check now / Install update (sysadmin); the VM's `infra/poc/portal-agent.sh` timer does the work (D25)
+- POC VM: see `infra/poc/README.md` and `docs/runbook.md`; update in one step with `sudo bash infra/poc/update-portal.sh`; test outgoing mail with `sudo bash infra/poc/test-email.sh [address]`
 
 ## Never
 

@@ -7,11 +7,13 @@ balance negative, and each monthly assessment draws it down. Mistakes are
 corrected with a reversing entry.
 """
 
+from __future__ import annotations
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from core.append_only import ScopedAppendOnlyModel
+from core.append_only import AppendOnlyModel, ScopedAppendOnlyModel
 from core.scoping import ScopedModel, ScopedQuerySet
 
 
@@ -226,3 +228,193 @@ class ResaleRequest(ScopedModel):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Resale requests are cancelled, not deleted.")
+
+
+# --- Letter templates (Milestone 4) ------------------------------------------------------
+
+
+class LetterKind(models.TextChoices):
+    STATEMENT = "statement", "Account statement message"
+    FIRST = "first", "First delinquency notice"
+    SECOND = "second", "Second delinquency notice"
+    FINAL = "final", "Final notice before referral"
+
+
+class LetterTemplate(models.Model):
+    """Board-edited wording for statements and delinquency notices. Plain
+    text with {placeholders}; nothing else is interpreted."""
+
+    kind = models.CharField(max_length=10, choices=LetterKind.choices, primary_key=True)
+    subject = models.CharField(max_length=200, blank=True)  # the "RE:" line
+    body = models.TextField()
+    certified = models.BooleanField(default=False)  # "CERTIFIED AND REGULAR MAIL"
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return self.get_kind_display()
+
+
+# --- Money tools (Milestone 4 part 3) ---------------------------------------------------
+
+DEFAULT_GL = (
+    "cash = 1000 Operating cash\n"
+    "receivable = 1200 Owner receivables\n"
+    "assessment = 4000 Assessment income\n"
+    "late_fee = 4100 Late fee income\n"
+    "resale_fee = 4200 Resale certificate fees\n"
+    "other_charge = 4900 Other owner charges\n"
+    "credit = 4950 Owner credits and adjustments"
+)
+
+
+class AccountingSetup(models.Model):
+    """One row: chart-of-accounts mapping for the export, and the bank
+    balance the cash book starts from."""
+
+    gl_accounts = models.TextField(default=DEFAULT_GL)
+    opening_cash_cents = models.BigIntegerField(default=0)
+    opening_cash_on = models.DateField(null=True, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return "accounting setup"
+
+    @classmethod
+    def get(cls) -> AccountingSetup:
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def accounts(self) -> dict[str, str]:
+        out = {}
+        for line in (self.gl_accounts or DEFAULT_GL).splitlines():
+            key, sep, value = line.partition("=")
+            if sep and key.strip() and value.strip():
+                out[key.strip()] = value.strip()[:80]
+        defaults = {
+            k.strip(): v.strip()
+            for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
+        }
+        return {**defaults, **out}
+
+
+class DepositBatch(AppendOnlyModel):
+    """Owner payments taken to the bank together. A mistaken batch is voided by
+    a reversing batch (negative total, ``voids`` set), never edited."""
+
+    deposited_on = models.DateField()
+    bank_reference = models.CharField(max_length=40, blank=True)
+    total_cents = models.BigIntegerField()
+    voids = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="voided_by"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-deposited_on", "-id"]
+
+    def __str__(self) -> str:
+        return f"deposit #{self.pk}"
+
+
+class DepositItem(ScopedAppendOnlyModel):
+    scope_lot_path = "entry__lot"
+
+    batch = models.ForeignKey(DepositBatch, on_delete=models.PROTECT, related_name="items")
+    entry = models.ForeignKey(LedgerEntry, on_delete=models.PROTECT, related_name="+")
+    amount_cents = models.BigIntegerField()
+
+    def __str__(self) -> str:
+        return f"deposit item #{self.pk}"
+
+
+class BankReconciliation(AppendOnlyModel):
+    """A month's bank statement matched to the cash book. Kept as recorded;
+    a redo is a new reconciliation for the same date."""
+
+    statement_date = models.DateField()
+    statement_balance_cents = models.BigIntegerField()
+    book_balance_cents = models.BigIntegerField()
+    outstanding_deposits_cents = models.BigIntegerField()
+    outstanding_payments_cents = models.BigIntegerField()
+    difference_cents = models.BigIntegerField()
+    note = models.TextField(blank=True)
+    reconciled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-statement_date", "-id"]
+
+    def __str__(self) -> str:
+        return f"reconciliation {self.statement_date}"
+
+
+class ReconciledItem(AppendOnlyModel):
+    """A deposit or vendor payment marked as cleared on a statement."""
+
+    reconciliation = models.ForeignKey(
+        BankReconciliation, on_delete=models.PROTECT, related_name="items"
+    )
+    kind = models.CharField(
+        max_length=8,
+        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
+    )
+    object_id = models.PositiveBigIntegerField()
+    amount_cents = models.BigIntegerField()
+
+    def __str__(self) -> str:
+        return f"cleared {self.kind} #{self.object_id}"
+
+
+class CourtesyReminder(ScopedAppendOnlyModel):
+    """One courtesy email per lot per month, so a re-run never repeats it."""
+
+    scope_lot_path = "lot"
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    period = models.CharField(max_length=7)  # YYYY-MM
+    amount_cents = models.BigIntegerField()
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["lot", "period"], name="courtesy_once_per_month")
+        ]
+
+    def __str__(self) -> str:
+        return f"courtesy reminder {self.period}"
+
+
+class CollectionLetter(ScopedAppendOnlyModel):
+    """A delinquency notice generated for a collection case (printed and
+    mailed by the board; nothing is sent from the portal)."""
+
+    scope_lot_path = "case__lot"
+
+    case = models.ForeignKey(CollectionCase, on_delete=models.PROTECT, related_name="letters")
+    kind = models.CharField(max_length=10, choices=LetterKind.choices)
+    amount_cents = models.BigIntegerField()
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    generated_on = models.DateField(default=timezone.localdate)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["case", "kind"], name="collection_letter_once_per_kind")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.kind} letter"
