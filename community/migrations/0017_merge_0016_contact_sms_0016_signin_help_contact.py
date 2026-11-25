@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("community", "0016_contact_sms"),
         ("community", "0016_signin_help_contact"),
