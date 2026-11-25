@@ -2,6 +2,7 @@
 FAQ and the welcome message."""
 
 import datetime
+import re
 
 import pytest
 from django.urls import reverse
@@ -106,7 +107,7 @@ def test_date_range_filter(client, w):
     client.force_login(w["board"])
     since = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
     page = client.get(reverse("violations"), {"from": since, "show": "all"}).content.decode()
-    assert page.count("V-") == 1
+    assert len(re.findall(r'href="/violations/\d+/"', page)) == 1
 
 
 def test_owners_cannot_export_board_lists(client, w):

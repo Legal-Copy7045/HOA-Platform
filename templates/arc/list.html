@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}{% if mine %}My architectural requests{% else %}Architectural review{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if mine %}Home improvement approvals (ARC){% else %}Architectural review{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{% if mine %}My architectural requests{% else %}Architectural review{% endif %}</h1><p class="subtitle">{% if mine %}Exterior changes need approval before work starts. Start a request, attach plans and photos, then submit it to the committee.{% else %}Every request from the community, for review.{% endif %}</p></div>
+  <div class="page-head"><div><h1>{% if mine %}Home improvement approvals (ARC){% else %}Architectural review{% endif %}</h1><p class="subtitle">{% if mine %}Exterior changes need approval before work starts. Start a request, attach plans and photos, then submit it to the committee.{% else %}Every request from the community, for review.{% endif %}</p></div>
     {% if can_view_all and user|can:"arc.submit" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'arc_list' %}">Board review list</a>{% else %}<a class="btn secondary" href="{% url 'arc_list' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
   {% include "partials/list_tools.html" %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Project</th><th>Property</th><th>Status</th><th>Decision due</th></tr></thead>
-    <tbody>{% for r in rows %}<tr><td><a href="{% url 'arc_detail' r.pk %}">ARC-{{ r.pk }}</a></td><td><a href="{% url 'arc_detail' r.pk %}">{{ r.title }}</a></td><td>{{ r.lot.street_address|default:r.lot }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.review_due_on|date:"M j, Y"|default:"" }}</td></tr>
+    <tbody>{% for r in rows %}<tr><td><a href="{% url 'arc_detail' r.pk %}">#{{ r.pk }}</a></td><td><a href="{% url 'arc_detail' r.pk %}">{{ r.title }}</a></td><td>{{ r.lot.street_address|default:r.lot }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.review_due_on|date:"M j, Y"|default:"" }}</td></tr>
     {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="pencil" title="No requests yet" text="Planning a fence, shed, deck, paint colour or other exterior change? Start a request below." %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% include "partials/pager.html" %}

@@ -44,6 +44,7 @@ VIOLATION = Workflow(
             "violation.manage",
             "Send notice",
             after=_set_cure_by,
+            confirm="Send the notice? The owner gets a letter with the date to fix it by.",
         ),
         Transition(
             "respond",
@@ -60,6 +61,7 @@ VIOLATION = Workflow(
             "violation.manage",
             "Schedule hearing",
             note_required=True,
+            confirm="Schedule a hearing? The owner sees your note with the date and place.",
         ),
         Transition(
             "mark_cured",
@@ -67,6 +69,7 @@ VIOLATION = Workflow(
             S.CURED,
             "violation.manage",
             "Mark cured",
+            confirm="Mark this as fixed? The owner is no longer asked to act.",
         ),
         Transition(
             "uphold",
@@ -75,6 +78,10 @@ VIOLATION = Workflow(
             "violation.decide",
             "Uphold (board)",
             note_required=True,
+            confirm=(
+                "Uphold this violation? The owner is told the board's "
+                "decision and any fine that follows."
+            ),
         ),
         Transition(
             "dismiss",
@@ -83,8 +90,16 @@ VIOLATION = Workflow(
             "violation.decide",
             "Dismiss (board)",
             note_required=True,
+            confirm="Dismiss this notice? It closes with no action against the owner.",
         ),
-        Transition("close", {S.CURED, S.UPHELD}, S.CLOSED, "violation.manage", "Close"),
+        Transition(
+            "close",
+            {S.CURED, S.UPHELD},
+            S.CLOSED,
+            "violation.manage",
+            "Close",
+            confirm="Close this record? It stays in the lot's history.",
+        ),
     ],
 )
 

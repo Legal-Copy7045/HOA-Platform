@@ -23,6 +23,6 @@
         <p><label><input type="checkbox" name="notices"> Send notices here (emails only)</label></p>
         <div class="form-actions"><button type="submit" class="secondary">Add</button></div>
       </form></section>{% endif %}
-      <section class="card"><h3>Your data</h3><p class="small muted">A JSON file of everything the portal holds about you.</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
+      <section class="card"><h3>Your data</h3><p class="small muted">A file with everything the portal holds about you, for your records.</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
   </div>
 {% endblock %}

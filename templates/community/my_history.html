@@ -18,7 +18,7 @@
     </section>
   {% empty %}{% include "partials/empty.html" with icon="clock" title="No past ownership" text="There are no earlier ownership periods on your record." %}{% endfor %}
   <div class="grid grid-3">
-    <section class="card"><h3>Architectural requests</h3>
+    <section class="card"><h3>Home improvement approvals (ARC)</h3>
       {% if arc %}<ul class="list">{% for r in arc %}<li><span class="grow">{{ r.title|default:r }}</span><span class="small muted">{{ r.get_state_display }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}</section>
     <section class="card"><h3>Notices</h3>
       {% if violations %}<ul class="list">{% for v in violations %}<li><span class="grow">{{ v }}</span><span class="small muted">{{ v.get_state_display }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}</section>

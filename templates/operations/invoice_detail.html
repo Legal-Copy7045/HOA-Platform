@@ -7,7 +7,7 @@
   <div class="page-head">
     <div>
       <h1>{{ obj.vendor }} · {{ obj.number }}</h1>
-      <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.category.name }}</span><span>Dated {{ obj.invoice_date|date:"M j, Y" }}</span>{% if obj.due_date %}<span>Due {{ obj.due_date|date:"M j, Y" }}</span>{% endif %}{% if obj.work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% endif %}</div>
+      <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.category.name }}</span><span>Dated {{ obj.invoice_date|date:"M j, Y" }}</span>{% if obj.due_date %}<span>Due {{ obj.due_date|date:"M j, Y" }}</span>{% endif %}{% if obj.work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">Work order #{{ obj.work_order_id }}</a>{% endif %}</div>
     </div>
     <div class="amount-big">{{ obj.amount_cents|cents }}</div>
   </div>
@@ -19,8 +19,8 @@
           <h2>Your approval</h2>
           <p class="muted">{{ approvals|length }} of {{ needed }} approval{{ needed|pluralize }} recorded.</p>
           <div class="wf-actions">
-            <form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="wf-action">{% csrf_token %}<input name="note" placeholder="Note (optional)" aria-label="Note"><button type="submit">{% icon "check" %} Approve</button></form>
-            <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="wf-action" data-confirm="Reject this invoice?">{% csrf_token %}<input name="note" placeholder="Reason (required)" required aria-label="Reason"><button type="submit" class="danger">Reject</button></form>
+            <form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="wf-action" data-confirm="Approve this invoice for payment?">{% csrf_token %}<label for="approve-note" class="wf-label">Note for &ldquo;Approve&rdquo; <span class="muted">(optional)</span></label><div class="wf-row"><input id="approve-note" name="note"><button type="submit">{% icon "check" %} Approve</button></div></form>
+            <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="wf-action" data-confirm="Reject this invoice? It will not be paid.">{% csrf_token %}<label for="reject-note" class="wf-label">Reason for rejecting<span class="required-mark" aria-hidden="true">*</span></label><div class="wf-row"><input id="reject-note" name="note" required><button type="submit" class="danger">Reject</button></div></form>
           </div>
         </section>
       {% endif %}

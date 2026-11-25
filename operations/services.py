@@ -255,6 +255,7 @@ INVOICE = Workflow(
             "pending_approval",
             "invoice.enter",
             "Submit for approval",
+            confirm="Submit this invoice? Board members other than you are asked to approve it.",
             after=_fix_required_approvals,
         ),
         Transition(
@@ -263,6 +264,7 @@ INVOICE = Workflow(
             "approved",
             "invoice.approve",
             "Approved",
+            confirm="Approve this invoice for payment?",
             guard=_enough_approvals,
         ),
         Transition(
@@ -271,6 +273,7 @@ INVOICE = Workflow(
             "rejected",
             "invoice.approve",
             "Reject",
+            confirm="Reject this invoice? It will not be paid.",
             guard=_not_entrant,
             note_required=True,
         ),
@@ -280,6 +283,7 @@ INVOICE = Workflow(
             "paid",
             "invoice.record_payment",
             "Paid in full",
+            confirm="Record this invoice as paid in full?",
             guard=_fully_paid,
         ),
         Transition(
@@ -288,6 +292,7 @@ INVOICE = Workflow(
             "void",
             "invoice.enter",
             "Void",
+            confirm="Void this invoice? It stays on record but can't be paid.",
             note_required=True,
         ),
     ],
