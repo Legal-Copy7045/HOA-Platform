@@ -202,7 +202,7 @@ def test_draft_checklist_with_submit_inside_and_no_note_box(client, w):
     assert "Note for Submit for review" not in page
     assert 'accept="image/*,application/pdf" multiple' in page
     # The breadcrumb leads back to the owner's own list.
-    assert f'href="{reverse("arc_list")}?mine=1">My architectural requests' in page
+    assert f'href="{reverse("arc_list")}?mine=1">Home improvement approvals (ARC)' in page
 
 
 def test_checklist_sends_to_neighbors_when_there_are_some(client, w):
@@ -221,7 +221,7 @@ def test_board_viewer_gets_no_checklist(client, w):
     client.force_login(w["reviewer"])
     page = client.get(reverse("arc_detail", args=[w["req"].pk])).content.decode()
     assert "Get your request ready" not in page
-    assert "Architectural review</a> / ARC-" in page
+    assert "Architectural review</a> / Request #" in page
 
 
 def test_blocked_step_is_shown_with_its_reason(client, w):

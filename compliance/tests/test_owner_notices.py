@@ -87,4 +87,4 @@ def test_no_owner_photo_once_closed(client, w):
 def test_board_still_sees_board_wording(client, w):
     client.force_login(w["board"])
     page = client.get(reverse("violation_detail", args=[w["v"].pk])).content.decode()
-    assert f"V-{w['v'].pk}" in page and "Cure by" in page
+    assert f"Notice #{w['v'].pk}" in page and "Fix by" in page
