@@ -128,7 +128,7 @@ def test_lockout_is_per_address(client, owner):
     for _ in range(5):
         client.post(
             reverse("account_login"),
-            {"login": owner.email, "password": "nope nope"},
+            {"login": owner.email, "password": "nope nope"},  # nosec B105
             REMOTE_ADDR="198.51.100.1",
         )
     response = client.post(

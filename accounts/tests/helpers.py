@@ -10,4 +10,4 @@ def current_totp(secret: str) -> str:
     return format_hotp_value(hotp_value(secret, counter))
 
 
-PASSWORD = "correct horse battery staple 42"
+PASSWORD = "correct horse battery staple 42"  # nosec B105 - test-only
