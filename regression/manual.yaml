@@ -49,3 +49,7 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: reservation booking on a phone
+  check: "With Common area reservations switched on, an owner books an area on a phone (date and time pickers work), gets the email, and a board member confirms it from My items."
+  steps: "Admin > Features: switch on reservations; Booking rules: make one area bookable; as an owner request a slot on a phone; as a board member confirm it; check the owner's email and the Calendar page."
+  last: ""

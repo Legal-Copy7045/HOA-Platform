@@ -17,3 +17,6 @@
 - feature: "Login model, session invalidation and lockout"
   since: M1
   match: ["^unit:accounts/tests/test_user_model"]
+- feature: "Quarterly access review: every login with roles, seats, offices, last sign-in, MFA and flags; append-only review record by a board member; My items reminder after 90 days; board only"
+  since: M4
+  match: ["^unit:accounts/tests/test_access_review"]

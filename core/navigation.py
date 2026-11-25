@@ -43,6 +43,7 @@ SECTIONS = [
             ("FAQ", "faq", "info", "announcement.view"),
             ("Directory", "directory", "users", "directory.view"),
             ("Committees", "committees", "users", "committee.view"),
+            ("Common area bookings", "reservations", "calendar", "reservation.view"),
         ],
     ),
     (
@@ -90,6 +91,8 @@ SECTIONS = [
             ("Branding", "branding_settings", "sliders", "branding.manage"),
             ("Invitations", "invitations", "mail", "invite.resend"),
             ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
+            ("Access review", "access_review", "shield", "access_review.record"),
+            ("Contact retention", "retention", "clock", "retention.manage"),
         ],
     ),
 ]

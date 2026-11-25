@@ -176,6 +176,15 @@ REGISTRY: dict[str, RuleSpec] = {
             "Online payments",
             "Added to bank transfer payments and shown before the owner pays.",
         ),
+        RuleSpec(
+            "retention.former_owner_contact_days",
+            "Days after someone leaves before their contact details are cleared",
+            DAYS,
+            "730",
+            "Privacy",
+            "Former owners and contacts: phone, mailing address, extra contact methods and "
+            "directory choices are cleared; names and records are kept. 0 means never.",
+        ),
         *[
             RuleSpec(
                 f"request.sla_days.{key}",

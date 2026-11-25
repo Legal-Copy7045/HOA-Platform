@@ -125,6 +125,8 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 - Optional features (board, Admin → Features): register in `core/features.py` (`FEATURES`, with every URL name); switched-off features 404 and leave the menu
 - Money tools: `ledger/accounting.py` (journal CSV export, deposit batches, bank reconciliation, 1099 worksheet, courtesy reminders, collections letter sequence); letters and resale certificate wording: `ledger/letters.py`, Finance → Letters
 - Security review findings and fixes: `docs/security-review-2026-11.md`
+- Common-area reservations (optional feature `reservations`): `community/reservations.py` (per-area `ReservationSettings` with citation; no double booking by exclusion constraint `reservation_no_double_booking`; owners see other homes only as "Booked")
+- Quarterly access review (board only, append-only `accounts.AccessReview`, My items after 90 days): `accounts/access_review.py`; contact-details retention for people who left (rule `retention.former_owner_contact_days`, nightly task, board preview at Admin → Contact retention): `community/retention.py`
 - Updates without a terminal: System status → Check now / Install update (sysadmin); the VM's `infra/poc/portal-agent.sh` timer does the work (D25)
 - POC VM: see `infra/poc/README.md` and `docs/runbook.md`; update in one step with `sudo bash infra/poc/update-portal.sh`; test outgoing mail with `sudo bash infra/poc/test-email.sh [address]`
 

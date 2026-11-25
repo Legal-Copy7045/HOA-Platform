@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from accounts import board_views, views
+from accounts import access_review, board_views, views
 
 urlpatterns = [
     path("invite/accept/", views.invite_accept, name="invite_accept"),
@@ -20,5 +20,11 @@ urlpatterns = [
         r"^board/resets/(?P<pk>[0-9]+)/(?P<decision>approve|cancel)/$",
         board_views.reset_decide,
         name="reset_decide",
+    ),
+    path("board/access-review/", access_review.access_review, name="access_review"),
+    path(
+        "board/access-review/record/",
+        access_review.access_review_record,
+        name="access_review_record",
     ),
 ]

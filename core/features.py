@@ -133,7 +133,13 @@ FEATURES: list[Feature] = [
         "reservations",
         "Common area reservations",
         "Owners book common areas (clubhouse, pavilion). Not needed yet.",
-        set(),
+        {
+            "reservations",
+            "reservation_detail",
+            "reservation_action",
+            "reservation_settings",
+            "reservation_area_save",
+        },
         default=False,
     ),
 ]

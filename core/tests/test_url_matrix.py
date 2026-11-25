@@ -72,6 +72,7 @@ BOARD_ONLY_MARKERS = (
     b"Board note on lot B",
     b"Lot B pond",
     b"Lot B nephew",
+    b"Lot B pavilion party",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -92,6 +93,7 @@ MEMBER_PAGES = {
     "signoffs_mine",
     "elections",
     "owner_budget",
+    "reservations",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -237,6 +239,15 @@ PROTECTED = {
     "resale_pdf": ("GET", "resale_b"),
     "reports": ("GET", None),
     "report_run": ("GET", "report"),
+    # Reservations, access review, retention (Milestone 4)
+    "reservation_detail": ("GET", "reservation_b"),
+    "reservation_action": ("POST", "reservation_b"),
+    "reservation_settings": ("GET", None),
+    "reservation_area_save": ("POST", "area"),
+    "access_review": ("GET", None),
+    "access_review_record": ("POST", None),
+    "retention": ("GET", None),
+    "retention_run": ("POST", None),
 }
 
 
@@ -439,7 +450,27 @@ def world():
         method_b = services.add_contact_method(
             person_b, kind="phone", value="555-0100", actor=SYSTEM
         )
+        # Reservations are an optional feature: switched on to check its pages.
+        from community import reservations
+        from community.models import CommonArea
+        from core.models import FeatureSetting
+
+        FeatureSetting.objects.create(key="reservations", enabled=True)
+        area = CommonArea.objects.create(name="Pavilion", kind="amenity")
+        reservations.save_area_settings(area, bookable=True, actor=SYSTEM)
+        start = timezone.now() + timedelta(days=3)
+        reservation_b = reservations.request_reservation(
+            area=area,
+            lot_id=lot_b.pk,
+            starts_at=start,
+            ends_at=start + timedelta(hours=2),
+            purpose="Lot B pavilion party",
+            actor=owner_b,
+        )
+        reservations.approve(reservation_b, actor=board)
     targets = {
+        "reservation_b": reservation_b.pk,
+        "area": area.pk,
         "account_b": account_b.pk,
         "proxy_b": proxy_b.pk,
         "election": election.pk,
@@ -571,6 +602,8 @@ def _url(name, key, targets):
         kwargs["action"] = "issue"
     elif name == "report_run":
         kwargs = {"key": "ar_aging"}
+    elif name == "reservation_action":
+        kwargs["action"] = "cancel"
     return reverse(name, kwargs=kwargs)
 
 

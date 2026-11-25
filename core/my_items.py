@@ -345,6 +345,37 @@ def items_for(user) -> list[Item]:
                 )
             )
 
+    # Reservations, access review (Milestone 4).
+    if can(user, "reservation.manage"):
+        from community.reservations import pending_for_staff
+
+        for r in pending_for_staff(user):
+            out.append(
+                Item(
+                    "Approvals",
+                    f"Booking: {r.area.name} (lot {r.lot.number})",
+                    f"Confirm or decline · {timezone.localtime(r.starts_at):%b %-d, %-I:%M %p}",
+                    reverse("reservation_detail", args=[r.pk]),
+                    "warning",
+                    timezone.localdate(r.starts_at),
+                    nav="reservations",
+                )
+            )
+    if can(user, "access_review.record"):
+        from accounts.access_review import REVIEW_EVERY_DAYS, is_due
+
+        if is_due():
+            out.append(
+                Item(
+                    "Compliance",
+                    "Quarterly access review",
+                    f"Review every login's access (due every {REVIEW_EVERY_DAYS} days)",
+                    reverse("access_review"),
+                    "warning",
+                    nav="access_review",
+                )
+            )
+
     # Homeowner side: things waiting on them as an owner.
     if g & policy.RESIDENTS:
         from operations.models import OwnerRequest
