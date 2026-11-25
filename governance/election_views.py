@@ -1,5 +1,6 @@
 """Elections, proxies, quorum and written-consent pages."""
 
+from allauth.account.decorators import reauthentication_required
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -114,6 +115,7 @@ def election_detail(request, pk):
 
 @login_required
 @require_POST
+@reauthentication_required(enabled=lambda r: r.resolver_match.kwargs.get("action") == "ballot")
 def election_action(request, pk, action):
     election = get_object_or_404(Election, pk=pk)
     user = request.user

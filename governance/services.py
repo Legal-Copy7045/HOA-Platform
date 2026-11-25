@@ -371,6 +371,10 @@ def open_vote(vote: Vote, *, actor, request=None) -> Vote:
         "vote.opened", actor=actor, request=request, target=vote, metadata={"kind": vote.kind}
     )
     vote.refresh_from_db()
+    if vote.kind == VoteKind.FORMAL:
+        from governance import ballot_links
+
+        ballot_links.issue(vote)  # personal, single-use, signed-in links (D24)
     return vote
 
 

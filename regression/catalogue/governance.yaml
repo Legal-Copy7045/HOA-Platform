@@ -44,3 +44,9 @@
 - feature: "ARC new request: kind of project always a list (starter types), planned start required, the property shown as its address (dropdown only for owners of several lots)"
   since: M4
   match: ["^unit:community/tests/test_owner_side.py::test_(board_configures_types|new_request_form|retired_types)"]
+- feature: "D24 personal ballot links: one link per owner per formal vote or election, only its hash stored, sign-in required, opens only for its owner (a forwarded link shows nothing), single use, dead after close; casting needs a recent password or passkey (never an emailed code)"
+  since: M4
+  match: ["^unit:governance/tests/test_ballot_links"]
+- feature: "Elections review fixes: ballot fixed once voting opens (service + DB trigger), withdraw/accept audited, proxy ends when the grantor sells, nominate by address not owner names, leap-day term end, stuck consents withdrawable"
+  since: M4
+  match: ["^unit:governance/tests/test_elections.py::test_(ballot_is_fixed|withdrawal_during|selling_the_lot|bad_form_values|leap_day|any_board_member|nomination_list)"]

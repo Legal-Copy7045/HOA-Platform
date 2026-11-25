@@ -44,7 +44,7 @@ PUBLIC = {
 }
 # Links emailed before sign-in became mandatory (D24): sign-in first, then
 # only the neighboring lot's owner is sent on to their review page.
-OLD_EMAIL_LINKS = {"signoff_link", "signoff_link_file"}
+OLD_EMAIL_LINKS = {"signoff_link", "signoff_link_file", "ballot_link"}
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")

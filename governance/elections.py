@@ -193,6 +193,9 @@ def open_voting(election: Election, *, actor, request=None) -> Election:
     )
     record_event("election.voting_opened", actor=actor, request=request, target=election)
     election.refresh_from_db()
+    from governance import ballot_links
+
+    ballot_links.issue(election)  # personal, single-use, signed-in links (D24)
     return election
 
 

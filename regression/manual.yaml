@@ -41,3 +41,11 @@
   check: "Stopping the worker produces a health email to the sysadmins within 30 minutes, and a recovery email after restarting it."
   steps: "docker compose ... stop worker; wait; check inbox; docker compose ... start worker"
   last: ""
+- key: ballot link on a phone
+  check: "A personal ballot link opens on a phone after sign-in, asks for the password or passkey before the ballot is recorded, and a forwarded copy does nothing."
+  steps: "Open a test election; open the email on a phone; sign in; cast; forward the same email to a second test owner and open it there (expect 'can't be used')."
+  last: ""
+- key: install update button
+  check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
+  steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
+  last: ""

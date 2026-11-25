@@ -1,3 +1,4 @@
+from allauth.account.decorators import reauthentication_required
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -304,8 +305,27 @@ def vote_detail(request, pk):
     )
 
 
+def _casting_formal(request, *args, **kwargs) -> bool:
+    """Casting a formal vote needs a recent password or passkey (D24)."""
+    if kwargs.get("action") != "cast":
+        return False
+    vote = Vote.objects.filter(pk=kwargs.get("pk")).only("kind").first()
+    return vote is not None and vote.kind == VoteKind.FORMAL
+
+
+@login_required
+def ballot_link(request, token):
+    from governance import ballot_links
+
+    target = ballot_links.resolve(token, request.user)
+    if target is None:
+        return render(request, "governance/ballot_link_invalid.html", status=404)
+    return redirect(target)
+
+
 @login_required
 @require_POST
+@reauthentication_required(enabled=lambda r: _casting_formal(r, **r.resolver_match.kwargs))
 def vote_action(request, pk, action):
     vote = get_object_or_404(Vote, pk=pk)
     if action == "cast":

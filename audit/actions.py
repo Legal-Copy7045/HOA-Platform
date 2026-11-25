@@ -143,6 +143,8 @@ _SPECS = [
     _spec("arc.scan_reading_done", "Signed form read", "proposals", "automatic"),
     _spec("election.created", "Election created", "seats"),
     _spec("election.nominated", "Candidate nominated", "person_id"),
+    _spec("vote.links_sent", "Personal ballot links emailed", "count", "kind"),
+    _spec("vote.link_refused", "Ballot link opened by someone else", "reason"),
     _spec("election.candidate_accepted", "Nomination accepted", "candidate_id"),
     _spec("election.candidate_withdrawn", "Candidate withdrawn", "candidate_id"),
     _spec("election.voting_opened", "Election voting opened"),

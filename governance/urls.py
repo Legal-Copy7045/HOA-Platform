@@ -50,6 +50,7 @@ urlpatterns = [
         name="records_request_action",
     ),
     path("votes/", views.votes, name="votes"),
+    path("ballot/<str:token>/", views.ballot_link, name="ballot_link"),
     path("votes/<int:pk>/", views.vote_detail, name="vote_detail"),
     re_path(
         r"^votes/(?P<pk>[0-9]+)/(?P<action>cast|open|close)/$",
