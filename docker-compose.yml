@@ -1,0 +1,126 @@
+# Local development stack: `cp .env.example .env && docker compose up`.
+#
+# Ports bind to 127.0.0.1 only. Postgres and the object store publish no
+# ports at all (CLAUDE.md: never expose them). The web and worker containers
+# receive only the runtime (app-role) database credentials; the owner-role
+# credentials go to the one-shot `migrate` service alone (decision Q8).
+name: oak-creek-portal
+
+x-app-env: &app-env
+  DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.local}
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in .env}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+  DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+  SITE_NAME: ${SITE_NAME:-Oak Creek Farms HOA}
+  TIME_ZONE: ${TIME_ZONE:-America/New_York}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATABASE_URL: postgres://${HOA_APP_DB_USER:?}:${HOA_APP_DB_PASSWORD:?}@postgres:5432/${HOA_DB_NAME:-hoa}
+  DB_APP_ROLE: ${HOA_APP_DB_USER}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://seaweedfs:8333}
+  S3_BUCKET: ${S3_BUCKET:-hoa-private}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+  EMAIL_PORT: ${EMAIL_PORT:-1025}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-false}
+  EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Oak Creek Farms HOA <portal@example.com>}
+  EMAIL_REDIRECT_ALL_TO: ${EMAIL_REDIRECT_ALL_TO:-}
+  SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+  CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-false}
+  ADMIN_ENABLED: ${ADMIN_ENABLED:-false}
+
+x-app: &app
+  build: .
+  image: oak-creek-portal:local
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env}
+      HOA_DB_NAME: ${HOA_DB_NAME:-hoa}
+      HOA_OWNER_DB_USER: ${HOA_OWNER_DB_USER:?}
+      HOA_OWNER_DB_PASSWORD: ${HOA_OWNER_DB_PASSWORD:?}
+      HOA_APP_DB_USER: ${HOA_APP_DB_USER:?}
+      HOA_APP_DB_PASSWORD: ${HOA_APP_DB_PASSWORD:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-roles.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${HOA_DB_NAME:-hoa}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.55
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/start.sh"]
+    environment:
+      S3_BUCKET: ${S3_BUCKET:-hoa-private}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?}
+    volumes:
+      - objectdata:/data
+      - ./docker/seaweedfs/start.sh:/start.sh:ro
+
+  create-bucket:
+    <<: *app
+    restart: "no"
+    command: ["python", "/app/docker/seaweedfs/create-bucket.py"]
+    environment: *app-env
+    depends_on: [seaweedfs]
+
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"   # web inbox: http://localhost:8025
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["migrate"]
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgres://${HOA_OWNER_DB_USER:?}:${HOA_OWNER_DB_PASSWORD:?}@postgres:5432/${HOA_DB_NAME:-hoa}
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  web:
+    <<: *app
+    command: ["web"]
+    environment: *app-env
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      create-bucket: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "/app/docker/healthcheck.py"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    environment: *app-env
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+volumes:
+  pgdata:
+  objectdata:
