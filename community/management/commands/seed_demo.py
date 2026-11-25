@@ -32,12 +32,15 @@ from community.models import (
 from core.policy import SYSTEM
 from core.scoping import system_access
 
-STREETS = [
-    "Fictional Meadow Lane",
-    "Imaginary Orchard Way",
-    "Pretend Mill Court",
-    "Example Ridge Road",
-]
+# Two fictional roads of 22 homes each, the same shape as the real
+# development (no real names or addresses: POC data is synthetic).
+STREETS = ["Fictional Meadow Lane", "Imaginary Orchard Way"]
+
+
+def _address(number: int) -> str:
+    if number <= 22:
+        return f"{100 + (number - 1) * 2} {STREETS[0]}"
+    return f"{151 + (number - 23) * 2} {STREETS[1]}"
 FIRST = [
     "Avery",
     "Blake",
@@ -111,7 +114,7 @@ class Command(BaseCommand):
             for number in range(1, 45):
                 lot = Lot.objects.create(
                     number=number,
-                    street_address=f"{100 + number * 2} {STREETS[(number - 1) // 11]}",
+                    street_address=_address(number),
                 )
                 count = 2 if number in JOINT_LOTS else 1
                 kind = OwnershipType.JOINT if count == 2 else OwnershipType.SOLE
