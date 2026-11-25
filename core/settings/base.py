@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "comms",
     "operations",
     "documents",
+    "governance",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

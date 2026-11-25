@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Records request #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Records request #{{ obj.pk }}</h1>
+  <p><span class="status">{{ obj.state }}</span>{% if obj.due_on %} · response due {{ obj.due_on }}{% endif %}</p>
+  <div class="card">{{ obj.description|linebreaks }}</div>
+  {% include "partials/workflow.html" with obj=obj %}
+  <p><a href="{% url 'records_requests' %}">All requests</a></p>
+{% endblock %}

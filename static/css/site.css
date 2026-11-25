@@ -26,3 +26,8 @@ th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(
 details { margin: 0.6rem 0; }
 summary { cursor: pointer; color: var(--accent); }
 @media (max-width: 40rem) { table, tbody, tr, td, th { display: block; } thead { display: none; } tr { border-bottom: 1px solid var(--line); padding: 0.4rem 0; } td, th { border: 0; padding: 0.15rem 0; } }
+.inline-block { display: inline-block; margin: 0.25rem 0.5rem 0.25rem 0; }
+.status { display: inline-block; padding: 0.1rem 0.45rem; border: 1px solid var(--line); border-radius: 3px; font-size: 0.9em; background: #fff; }
+.overdue { color: #a33; font-weight: 600; }
+label.choice { font-weight: normal; display: block; }
+textarea { width: 100%; max-width: 40rem; }

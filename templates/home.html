@@ -11,6 +11,7 @@
       {% if can.invite_send and not can.person_manage %}<li><a href="{% url 'invitations' %}">Invitations</a></li>{% endif %}
       <li><a href="{% url 'announcements' %}">Announcements</a> <span class="muted">news from the board</span></li>
       <li><a href="{% url 'documents' %}">Documents</a> <span class="muted">governing documents, minutes, policies, forms</span></li>
+      <li><a href="{% url 'meetings' %}">Meetings</a> · <a href="{% url 'votes' %}">Votes</a> · <a href="{% url 'resolutions' %}">Resolutions and policies</a> · <a href="{% url 'records_requests' %}">Records requests</a></li>
       <li><a href="{% url 'calendar' %}">Calendar</a> <span class="muted">meetings and events</span></li>
       {% if can.lot_view_own %}<li><a href="{% url 'directory' %}">Owner directory</a> <span class="muted">neighbours who chose to be listed</span></li>{% endif %}
       <li><a href="{% url 'my_profile' %}">My profile</a> <span class="muted">contact details, email notices, directory listing, download my data</span></li>

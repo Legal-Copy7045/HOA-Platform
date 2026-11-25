@@ -1,0 +1,16 @@
+{# Expects: actions (list of Transition), history (WorkflowEvents), action_url_name, obj #}
+{% if actions %}
+  <div class="card">
+    <h3>Next steps</h3>
+    {% for t in actions %}
+      <form method="post" action="{% url action_url_name obj.pk t.action %}" class="inline-block">{% csrf_token %}
+        {% if t.note_required %}<input name="note" placeholder="Note (required)" required aria-label="Note">{% else %}<input name="note" placeholder="Note (optional)" aria-label="Note">{% endif %}
+        <button type="submit">{{ t.label }}</button>
+      </form>
+    {% endfor %}
+  </div>
+{% endif %}
+<h3>History</h3>
+<table><tbody>
+  {% for e in history %}<tr><td class="muted">{{ e.created_at|date:"Y-m-d H:i" }}</td><td>{{ e.action|capfirst }}</td><td>{% if e.actor %}{{ e.actor.email }}{% else %}system{% endif %}</td><td>{{ e.note }}</td></tr>{% empty %}<tr><td class="muted">No steps yet.</td></tr>{% endfor %}
+</tbody></table>

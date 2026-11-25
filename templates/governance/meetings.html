@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Meetings · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Meetings</h1>
+  <table><tbody>
+    {% for m in meetings %}<tr><td>{{ m.starts_at|date:"D M j, Y g:i A" }}</td><td><a href="{% url 'meeting_detail' m.pk %}">{{ m.title }}</a> <span class="muted">({{ m.get_kind_display }})</span></td><td><span class="status">{{ m.get_status_display }}</span></td></tr>{% empty %}<tr><td class="muted">No meetings yet.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_manage %}<details><summary>Schedule a meeting</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Schedule</button></form></details>{% endif %}
+  <p><a href="{% url 'resolutions' %}">Resolutions and policies</a> · <a href="{% url 'votes' %}">Votes</a> · <a href="{% url 'records_requests' %}">Records requests</a></p>
+{% endblock %}

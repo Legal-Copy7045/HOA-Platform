@@ -113,6 +113,17 @@ _SPECS = [
     _spec("document.restored", "Document restored"),
     _spec("document.downloaded", "Document downloaded", "version"),
     _spec("document.viewed", "Document page viewed"),
+    _spec("meeting.created", "Meeting scheduled", "kind"),
+    _spec("meeting.noticed", "Meeting notice sent", "emailed", "paper", "short_days"),
+    _spec("meeting.status_changed", "Meeting held or cancelled", "status"),
+    _spec("meeting.minutes_attached", "Minutes attached to meeting"),
+    _spec("meeting.attendance", "Attendance recorded", "person_id", "present"),
+    _spec("resolution.recorded", "Resolution or policy recorded", "number", "kind", "supersedes"),
+    _spec("records_request.submitted", "Records request submitted", "due_on"),
+    _spec("vote.created", "Vote created", "kind", "options"),
+    _spec("vote.opened", "Vote opened", "kind"),
+    _spec("vote.closed", "Vote closed"),
+    _spec("vote.ballot_cast", "Ballot cast", "lot_id"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

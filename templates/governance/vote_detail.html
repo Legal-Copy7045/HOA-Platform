@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ vote.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>{{ vote.title }}</h1>
+  <p>{{ vote.get_kind_display }} · <span class="status">{{ vote.get_status_display }}</span>{% if vote.closes_at %} · closes {{ vote.closes_at|date:"M j, Y g:i A" }}{% endif %}{% if vote.secret %} · secret ballot{% endif %}</p>
+  {% if vote.kind == "formal" %}<p class="warning">Formal vote: not for binding use until counsel has reviewed the voting rules.{% if vote.rules_citation %} Rules applied: quorum {{ vote.quorum_percent }}%, pass {{ vote.pass_percent }}% ({{ vote.rules_citation }}).{% endif %}</p>{% endif %}
+  {% if vote.description %}<div class="card">{{ vote.description|linebreaks }}</div>{% endif %}
+  {% if choices.can_vote %}
+    <h2>Your ballot</h2>
+    <form method="post" action="{% url 'vote_action' vote.pk 'cast' %}">{% csrf_token %}
+      {% for o in vote.options.all %}<label class="choice"><input type="radio" name="option" value="{{ o.pk }}" required> {{ o.label }}</label>{% endfor %}
+      {% if vote.kind == "formal" %}<label for="lot">For lot</label><select id="lot" name="lot">{% for lot in choices.lots %}<option value="{{ lot.pk }}">Lot {{ lot.number }}</option>{% endfor %}</select>{% endif %}
+      <p class="muted">Ballots cannot be changed once cast.</p>
+      <button type="submit">Cast ballot</button></form>
+  {% endif %}
+  {% if results %}
+    <h2>Results{% if vote.status != "closed" %} so far{% endif %}</h2>
+    <table><tbody>{% for r in results.rows %}<tr><td>{{ r.option.label }}</td><td>{{ r.count }}</td><td class="muted">{{ r.percent }}%</td></tr>{% endfor %}</tbody></table>
+    <p class="muted">{{ results.total }} ballot(s).{% if results.outcome %} Turnout {{ results.outcome.turnout }}% of lots; quorum {{ results.outcome.quorum_met|yesno:"met,not met" }}; leading option "{{ results.outcome.leading }}" {{ results.outcome.meets_threshold|yesno:"meets,does not meet" }} the pass threshold.{% endif %}</p>
+  {% endif %}
+  {% if voters %}<details><summary>Who voted (not shown for secret ballots)</summary><ul>{% for b in voters %}<li>{{ b.person.display_name }}{% if b.lot %} (lot {{ b.lot.number }}){% endif %}: {{ b.option.label }}</li>{% endfor %}</ul></details>{% endif %}
+  {% if can_manage %}
+    {% if vote.status == "draft" %}<form method="post" action="{% url 'vote_action' vote.pk 'open' %}">{% csrf_token %}<button type="submit">Open voting</button></form>{% endif %}
+    {% if vote.status == "open" %}<form method="post" action="{% url 'vote_action' vote.pk 'close' %}">{% csrf_token %}<button type="submit">Close voting</button></form>{% endif %}
+  {% endif %}
+  <p><a href="{% url 'votes' %}">All votes</a></p>
+{% endblock %}

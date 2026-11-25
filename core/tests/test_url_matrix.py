@@ -45,9 +45,21 @@ BOARD_ONLY_MARKERS = (
     b"pond contractor",
     b"counsel letter",
     b"Lot B drainage survey",
+    b"Executive session: litigation",
+    b"Lot B wants the 2019 audit",
+    b"Draft: special assessment",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
-MEMBER_PAGES = {"announcements", "calendar", "directory", "documents"}
+MEMBER_PAGES = {
+    "announcements",
+    "calendar",
+    "directory",
+    "documents",
+    "meetings",
+    "resolutions",
+    "votes",
+    "records_requests",
+}
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
 # pointed at owner B's data, and send anonymous visitors to sign in.
@@ -90,6 +102,12 @@ PROTECTED = {
     "document_version_download": ("GET", "board_document"),
     "document_add_version": ("POST", "board_document"),
     "document_archive": ("POST", "board_document"),
+    "meeting_detail": ("GET", "executive_meeting"),
+    "meeting_action": ("POST", "executive_meeting"),
+    "records_request_detail": ("GET", "records_request_b"),
+    "records_request_action": ("POST", "records_request_b"),
+    "vote_detail": ("GET", "draft_vote"),
+    "vote_action": ("POST", "draft_vote"),
 }
 
 
@@ -163,6 +181,20 @@ def world():
             file=pdf(),
             actor=board,
         )
+        from governance import services as governance
+
+        executive_meeting = governance.create_meeting(
+            title="Executive session: litigation",
+            kind="executive",
+            starts_at=timezone.now() + timedelta(days=5),
+            actor=board,
+        )
+        records_request_b = governance.submit_records_request(
+            description="Lot B wants the 2019 audit", actor=owner_b
+        )
+        draft_vote = governance.create_vote(
+            title="Draft: special assessment", kind="informal", options=["Yes", "No"], actor=board
+        )
     targets = {
         "lot": lot_b.pk,
         "person": person_b.pk,
@@ -178,6 +210,9 @@ def world():
         "task": task.pk,
         "board_document": board_document.pk,
         "lot_b_document": lot_b_document.pk,
+        "executive_meeting": executive_meeting.pk,
+        "records_request_b": records_request_b.pk,
+        "draft_vote": draft_vote.pk,
     }
     return {
         "owner_a": owner_a,
@@ -204,6 +239,12 @@ def _url(name, key, targets):
         kwargs["version"] = 1
     elif name == "document_archive":
         kwargs["action"] = "archive"
+    elif name == "meeting_action":
+        kwargs["action"] = "notice"
+    elif name == "records_request_action":
+        kwargs["action"] = "withdraw"
+    elif name == "vote_action":
+        kwargs["action"] = "open"
     return reverse(name, kwargs=kwargs)
 
 

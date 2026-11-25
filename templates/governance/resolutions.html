@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Resolutions and policies · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Resolutions and policies</h1>
+  <p class="muted">Adopted records are permanent. A change is recorded as a new resolution that supersedes the old one. {% if show_all %}<a href="?">Show only those in force</a>{% else %}<a href="?all=1">Show all, including superseded</a>{% endif %}</p>
+  <table><thead><tr><th>No.</th><th>Title</th><th>Adopted</th><th>Vote</th></tr></thead><tbody>
+    {% for r in rows %}<tr><td>{{ r.number }}</td><td><strong>{{ r.title }}</strong> <span class="muted">({{ r.get_kind_display }}){% if r.supersedes %} · supersedes {{ r.supersedes.number }}{% endif %}{% if r.citation %} · {{ r.citation }}{% endif %}</span><div>{{ r.text|linebreaksbr }}</div></td><td>{{ r.adopted_on }}</td><td class="muted">{{ r.votes_for }}-{{ r.votes_against }}-{{ r.abstentions }}</td></tr>{% empty %}<tr><td class="muted">None recorded.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_record %}<details><summary>Record a resolution or policy</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Record</button></form></details>{% endif %}
+{% endblock %}
