@@ -85,6 +85,7 @@ MEMBER_PAGES = {
     "my_account",
     "resales",
     "requests",
+    "faq",
 }
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
@@ -95,6 +96,7 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "roster": ("GET", None),
     "contracts": ("GET", None),
     "contract_detail": ("GET", "contract"),
     "contract_action": ("POST", "contract"),

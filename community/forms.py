@@ -101,6 +101,12 @@ class RoleForm(forms.Form):
 class ProfileForm(forms.Form):
     legal_name = forms.CharField(max_length=200)
     fiscal_year_start_month = forms.IntegerField(min_value=1, max_value=12)
+    welcome_message = forms.CharField(
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Shown at the top of everyone's dashboard. Plain text; leave empty for none.",
+    )
 
 
 class RuleForm(forms.Form):

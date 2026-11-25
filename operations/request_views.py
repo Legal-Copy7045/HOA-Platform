@@ -56,6 +56,30 @@ def requests_list(request):
     kind = request.GET.get("type")
     if kind in RequestType.values:
         qs = qs.filter(request_type=kind)
+    from core.lists import csv_response, filter_list, wants_csv
+
+    qs, tools = filter_list(request, qs, date_field="created_at")
+    tools["has_states"] = False  # the Open/Closed/All tabs above do this
+    if wants_csv(request) and staff and not mine:
+        return csv_response(
+            request,
+            "owner-requests",
+            ["Number", "Subject", "Type", "Lot", "Assigned", "Respond by", "Answered", "Status"],
+            (
+                [
+                    r.pk,
+                    r.subject,
+                    r.get_request_type_display(),
+                    r.lot.number,
+                    r.assignee.display_name if r.assignee else "",
+                    r.respond_by or "",
+                    r.first_response_at.date() if r.first_response_at else "",
+                    r.get_state_display(),
+                ]
+                for r in qs
+            ),
+            audit_kind="requests",
+        )
     form = None
     if mine and policy.can(user, "request.submit"):
         lots = services.request_lots(user)
@@ -91,6 +115,8 @@ def requests_list(request):
             "staff": staff and not mine,
             "is_staff": staff,
             "mine": mine,
+            "tools": tools,
+            "can_export": staff and not mine,
             "form": form,
             "types": RequestType.choices,
             "type": kind,

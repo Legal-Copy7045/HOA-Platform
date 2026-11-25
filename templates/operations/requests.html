@@ -13,6 +13,7 @@
         <a href="?show=all{% if mine %}&amp;mine=1{% endif %}"{% if show == "all" %} aria-current="page"{% endif %}>All</a>
         {% if staff %}<a href="?show={{ show }}&amp;assigned=1"{% if request.GET.assigned == "1" %} aria-current="page"{% endif %}>Assigned to me</a>{% endif %}
       </nav>
+      {% include "partials/list_tools.html" %}
       <section class="card">
         {% if page.object_list %}
           <div class="table-wrap"><table>

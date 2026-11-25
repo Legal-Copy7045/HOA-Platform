@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}FAQ · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Frequently asked questions</h1><p class="subtitle">Quick answers about living here.{% if user|can:"request.submit" %} Can't find yours? <a href="{% url 'requests' %}?mine=1">Ask the board</a>.{% endif %}</p></div></div>
+  <form method="get" class="inline-form search-form" role="search"><input type="search" name="q" value="{{ q }}" placeholder="Search questions and answers" aria-label="Search the FAQ"><button type="submit" class="secondary">Search</button>{% if q %}<a class="small" href="?">Clear</a>{% endif %}</form>
+  {% for group, entries in groups.items %}
+    <section class="card"><h2>{{ group }}</h2>
+      {% for e in entries %}<details class="faq"{% if q %} open{% endif %}><summary>{{ e.question }}{% if not e.published %} <span class="badge">Hidden</span>{% endif %}</summary>
+        <div class="prose">{{ e.answer|linebreaks }}</div>
+        {% if can_manage %}<details class="panel"><summary class="small">Edit</summary><div class="panel-body"><form method="post">{% csrf_token %}<input type="hidden" name="pk" value="{{ e.pk }}">
+          <p><label>Question <input type="text" name="question" value="{{ e.question }}" maxlength="300" required></label></p>
+          <p><label>Answer <textarea name="answer" rows="4" required>{{ e.answer }}</textarea></label></p>
+          <p><label>Section <input type="text" name="category" value="{{ e.category }}" maxlength="80"></label> <label>Order <input type="number" name="sort_order" value="{{ e.sort_order }}" min="0" max="999"></label></p>
+          <p><label><input type="checkbox" name="published"{% if e.published %} checked{% endif %}> Published</label></p>
+          <div class="form-actions"><button type="submit" class="secondary small">Save</button></div></form></div></details>{% endif %}
+      </details>{% endfor %}
+    </section>
+  {% empty %}<section class="card">{% if q %}{% include "partials/empty.html" with icon="info" title="Nothing matches that search" %}{% else %}{% include "partials/empty.html" with icon="info" title="No questions yet" %}{% endif %}</section>{% endfor %}
+  {% if can_manage %}<details class="panel"><summary>Add a question</summary><div class="panel-body"><form method="post">{% csrf_token %}
+    <p><label>Question <input type="text" name="question" maxlength="300" required></label></p>
+    <p><label>Answer <textarea name="answer" rows="4" required></textarea></label></p>
+    <p><label>Section <input type="text" name="category" maxlength="80" placeholder="Trash and recycling"></label> <label>Order <input type="number" name="sort_order" value="100" min="0" max="999"></label></p>
+    <input type="hidden" name="published" value="on">
+    <div class="form-actions"><button type="submit">Add</button></div></form></div></details>{% endif %}
+{% endblock %}

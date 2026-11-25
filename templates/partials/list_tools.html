@@ -1,0 +1,9 @@
+{% load portal %}
+<form method="get" class="inline-form list-tools" aria-label="Filter the list">
+  {% for k, v in request.GET.items %}{% if k not in "show from to page export" %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+  {% if tools.has_states %}<label class="small">Show <select name="show"><option value="open"{% if tools.show == "open" %} selected{% endif %}>Open</option><option value="closed"{% if tools.show == "closed" %} selected{% endif %}>Closed</option><option value="all"{% if tools.show == "all" %} selected{% endif %}>All</option></select></label>{% endif %}
+  <label class="small">From <input type="date" name="from" value="{{ tools.date_from }}"></label>
+  <label class="small">To <input type="date" name="to" value="{{ tools.date_to }}"></label>
+  <button type="submit" class="secondary small">Apply</button>
+  {% if can_export %}<button type="submit" name="export" value="csv" class="secondary small">{% icon "download" %} Export CSV</button>{% endif %}
+</form>

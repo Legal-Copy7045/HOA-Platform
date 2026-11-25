@@ -11,6 +11,7 @@ urlpatterns = [
         name="login_background_image",
     ),
     path("my-home/", views.my_lot, name="my_lot"),
+    path("board/roster/", views.roster, name="roster"),
     path("my-lot/", RedirectView.as_view(pattern_name="my_lot", permanent=False)),
     path("my-history/", account_views.my_history, name="my_history"),
     path(

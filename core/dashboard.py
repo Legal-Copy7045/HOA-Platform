@@ -330,6 +330,10 @@ def build(user) -> dict:
 
     data["news"], data["events"] = [], []
     if policy.can(user, "announcement.view"):
+        from community.models import CommunityProfile
+
+        data["welcome"] = CommunityProfile.get().welcome_message
+    if policy.can(user, "announcement.view"):
         read = set(
             AnnouncementRead.objects.filter(user=user).values_list("announcement_id", flat=True)
         )

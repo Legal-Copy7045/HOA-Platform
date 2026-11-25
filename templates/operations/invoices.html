@@ -10,12 +10,14 @@
     <a href="?"{% if not state %} aria-current="true"{% endif %}>All</a>
     {% for s in states %}<a href="?state={{ s }}"{% if state == s %} aria-current="true"{% endif %}>{{ s|state_label }}</a>{% endfor %}
   </div>
+  {% include "partials/list_tools.html" %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Vendor</th><th>Invoice</th><th>Date</th><th>Category</th><th class="num">Amount</th><th>Status</th></tr></thead>
     <tbody>
     {% for i in rows %}<tr><td>{{ i.vendor }}</td><td><a href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td class="nowrap">{{ i.invoice_date|date:"M j, Y" }}</td><td>{{ i.category.name }}</td><td class="num">{{ i.amount_cents|cents }}</td><td>{% status i.state %}</td></tr>
     {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="receipt" title="No invoices here" %}</td></tr>{% endfor %}
     </tbody></table></div></div>
+  {% include "partials/pager.html" %}
   {% if can_enter %}
     {% if has_categories %}
       <details class="panel"{% if not rows %} open{% endif %}><summary>Enter an invoice</summary><div class="panel-body">

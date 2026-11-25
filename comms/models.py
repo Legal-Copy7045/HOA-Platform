@@ -130,3 +130,26 @@ class ThreadMessage(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"message #{self.pk}"
+
+
+class FaqEntry(models.Model):
+    """A question and answer on the FAQ page (board and manager keep it)."""
+
+    question = models.CharField(max_length=300)
+    answer = models.TextField()
+    category = models.CharField(max_length=80, blank=True)
+    sort_order = models.PositiveSmallIntegerField(default=100)
+    published = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["category", "sort_order", "question"]
+
+    def __str__(self) -> str:
+        return self.question
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("FAQ entries are unpublished, not deleted.")

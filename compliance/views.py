@@ -55,9 +55,38 @@ def violations(request):
 
     staff = policy.can(request.user, "violation.view_all")
     mine = wants_mine(request) or not staff
+    from core.lists import csv_response, filter_list, paginate, wants_csv
+
     rows = Violation.objects.for_user(request.user).select_related("lot")
     if mine and staff:
         rows = own_records(rows, request.user)
+    rows, tools = filter_list(
+        request,
+        rows,
+        date_field="observed_on",
+        open_states=("open", "noticed", "responded", "hearing"),
+    )
+    if wants_csv(request) and staff and not mine:
+        return csv_response(
+            request,
+            "violations",
+            ["Number", "Lot", "Category", "Status", "Observed", "Cure by", "Follow up"],
+            (
+                [
+                    f"V-{v.pk}",
+                    v.lot.number,
+                    v.get_category_display(),
+                    v.get_state_display(),
+                    v.observed_on,
+                    v.cure_by or "",
+                    v.follow_up_on or "",
+                ]
+                for v in rows
+            ),
+            audit_kind="violations",
+        )
+    page = paginate(request, rows)
+    rows = page.object_list
     return render(
         request,
         "compliance/list.html",
@@ -67,6 +96,9 @@ def violations(request):
             "can_manage": can_manage and not mine,
             "mine": mine,
             "staff": staff,
+            "page": page,
+            "tools": tools,
+            "can_export": staff and not mine,
         },
     )
 

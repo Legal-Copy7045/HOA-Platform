@@ -435,6 +435,7 @@ def community_settings(request):
                 initial={
                     "legal_name": profile.legal_name,
                     "fiscal_year_start_month": profile.fiscal_year_start_month,
+                    "welcome_message": profile.welcome_message,
                 }
             ),
             "areas": CommonArea.objects.all(),
@@ -487,3 +488,52 @@ def common_area_save(request):
     except CommunityError as exc:
         return _failed(request, exc, back)
     return _done(request, "Common area saved.", back)
+
+
+@login_required
+def roster(request):
+    """Board roster: every account with its people, contact details and balance."""
+    from core.lists import csv_response, wants_csv
+    from core.money import format_cents
+
+    policy.require(request.user, "roster.view")
+    include_dormant = request.GET.get("previous") == "1"
+    rows = services.roster_rows(actor=request.user, include_dormant=include_dormant)
+    if wants_csv(request):
+        return csv_response(
+            request,
+            "roster",
+            [
+                "Account",
+                "Lot",
+                "Address",
+                "Status",
+                "Owners",
+                "Other people",
+                "Emails",
+                "Phones",
+                "Balance",
+            ],
+            (
+                [
+                    r["account"].number,
+                    r["lot"].number,
+                    r["lot"].street_address,
+                    r["account"].status_label,
+                    "; ".join(p.display_name for p in r["owners"]),
+                    "; ".join(
+                        f"{c.person.display_name} ({c.get_kind_display()})" for c in r["contacts"]
+                    ),
+                    "; ".join(r["emails"]),
+                    "; ".join(r["phones"]),
+                    "" if r["balance_cents"] is None else format_cents(r["balance_cents"]),
+                ]
+                for r in rows
+            ),
+            audit_kind="roster",
+        )
+    return render(
+        request,
+        "community/roster.html",
+        {"rows": rows, "include_dormant": include_dormant},
+    )

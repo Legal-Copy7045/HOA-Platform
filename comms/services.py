@@ -129,3 +129,48 @@ def upcoming(user):
     return Event.objects.for_user(user).filter(
         starts_at__gte=timezone.now() - timezone.timedelta(hours=6)
     )
+
+
+# --- FAQ ----------------------------------------------------------------------------
+
+
+def save_faq(
+    *,
+    question: str,
+    answer: str,
+    category: str = "",
+    sort_order: int = 100,
+    published: bool = True,
+    entry=None,
+    actor,
+    request=None,
+):
+    from comms.models import FaqEntry
+
+    require(actor, "faq.manage")
+    question = single_line(question)[:300]
+    answer = (answer or "").strip()[:10_000]
+    if not question or not answer:
+        raise CommsError("A question and an answer are needed.")
+    fields = {
+        "question": question,
+        "answer": answer,
+        "category": single_line(category)[:80],
+        "sort_order": max(0, min(int(sort_order or 100), 999)),
+        "published": bool(published),
+        "updated_by": actor,
+        "updated_at": timezone.now(),
+    }
+    if entry is None:
+        entry = FaqEntry.objects.create(**fields)
+    else:
+        FaqEntry.objects.filter(pk=entry.pk).update(**fields)
+        entry.refresh_from_db()
+    record_event(
+        "faq.saved",
+        actor=actor,
+        request=request,
+        target=entry,
+        metadata={"published": entry.published},
+    )
+    return entry

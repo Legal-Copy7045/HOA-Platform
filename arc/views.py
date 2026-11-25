@@ -92,12 +92,40 @@ def arc_list(request):
         else:
             messages.error(request, "Check the form.")
         return redirect("arc_list")
+    from core.lists import csv_response, filter_list, paginate, wants_csv
     from core.scoping import own_records, wants_mine
 
     mine = wants_mine(request) or not can_view_all
     rows = ArcRequest.objects.for_user(request.user).select_related("lot")
     if mine and can_view_all:
         rows = own_records(rows, request.user)
+    rows, tools = filter_list(
+        request,
+        rows,
+        date_field="created_at",
+        open_states=("draft", "submitted", "completeness_check", "in_review", "appeal"),
+    )
+    if wants_csv(request) and can_view_all and not mine:
+        return csv_response(
+            request,
+            "arc-requests",
+            ["Number", "Project", "Type", "Lot", "Status", "Decision due", "Created"],
+            (
+                [
+                    f"ARC-{r.pk}",
+                    r.title,
+                    r.project_type,
+                    r.lot.number,
+                    r.get_state_display(),
+                    r.review_due_on or "",
+                    r.created_at.date(),
+                ]
+                for r in rows
+            ),
+            audit_kind="arc",
+        )
+    page = paginate(request, rows)
+    rows = page.object_list
     return render(
         request,
         "arc/list.html",
@@ -107,6 +135,9 @@ def arc_list(request):
             "can_submit": can_submit and mine,
             "can_view_all": can_view_all,
             "mine": mine,
+            "page": page,
+            "tools": tools,
+            "can_export": can_view_all and not mine,
         },
     )
 

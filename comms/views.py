@@ -130,3 +130,43 @@ def thread_post(request, kind, pk):
     else:
         messages.success(request, "Message posted.")
     return redirect(reverse(threads.DETAIL_URLS[kind], args=[obj.pk]) + "#thread")
+
+
+@login_required
+def faq(request):
+    from comms.models import FaqEntry
+
+    policy.require(request.user, "announcement.view")
+    can_manage = policy.can(request.user, "faq.manage")
+    if request.method == "POST":
+        policy.require(request.user, "faq.manage")
+        entry = None
+        if request.POST.get("pk"):
+            entry = get_object_or_404(FaqEntry, pk=request.POST["pk"])
+        try:
+            services.save_faq(
+                question=request.POST.get("question", ""),
+                answer=request.POST.get("answer", ""),
+                category=request.POST.get("category", ""),
+                sort_order=request.POST.get("sort_order") or 100,
+                published=request.POST.get("published") == "on",
+                entry=entry,
+                actor=request.user,
+                request=request,
+            )
+        except (services.CommsError, ValueError) as exc:
+            text = str(exc) if isinstance(exc, services.CommsError) else "Check the order number."
+            messages.error(request, text)
+        else:
+            messages.success(request, "Saved.")
+        return redirect("faq")
+    entries = FaqEntry.objects.all() if can_manage else FaqEntry.objects.filter(published=True)
+    q = " ".join((request.GET.get("q") or "").split())[:100]
+    if q:
+        from django.db.models import Q
+
+        entries = entries.filter(Q(question__icontains=q) | Q(answer__icontains=q))
+    groups: dict[str, list] = {}
+    for e in entries:
+        groups.setdefault(e.category or "General", []).append(e)
+    return render(request, "comms/faq.html", {"groups": groups, "can_manage": can_manage, "q": q})

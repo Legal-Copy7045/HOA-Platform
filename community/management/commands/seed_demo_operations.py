@@ -318,6 +318,32 @@ class Command(BaseCommand):
                 mowing, "approve", actor=b2, note="Approved at the January meeting (demo)"
             )
 
+        # FAQ and welcome message (Milestone 3).
+        for category, question, answer in [
+            (
+                "Trash and recycling",
+                "When is trash collected? (demo)",
+                "Tuesday mornings; recycling every other Tuesday.",
+            ),
+            (
+                "Architectural review",
+                "Do I need approval for a fence? (demo)",
+                "Yes. Apply under My architectural requests before work starts.",
+            ),
+            (
+                "Dues",
+                "When are dues due? (demo)",
+                "On the 1st of each month. Paying ahead is kept as a credit.",
+            ),
+        ]:
+            comms.save_faq(question=question, answer=answer, category=category, actor=b1)
+        community.update_profile(
+            legal_name="Oak Creek Farms Homeowners Association",
+            fiscal_year_start_month=1,
+            welcome_message="Welcome to the demo portal. Everything here is fictional.",
+            actor=b1,
+        )
+
         # ARC project types owners choose from (Milestone 3).
         from arc import services as arc_services
 

@@ -80,6 +80,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Communications
     "announcement.view": COMMUNITY,
     "announcement.publish": frozenset({BOARD, MANAGER}),
+    "faq.manage": frozenset({BOARD, MANAGER}),
     "calendar.view": COMMUNITY,
     "calendar.manage": frozenset({BOARD, MANAGER}),
     "task.manage": frozenset({BOARD, MANAGER}),
@@ -125,6 +126,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "ledger.view_own": ACCOUNT_VIEWERS,
     "history.view_own": frozenset({FORMER_OWNER}),
     "account.manage": frozenset({BOARD, MANAGER}),
+    "roster.view": frozenset({BOARD, MANAGER, AUDITOR}),
     # Owners (on the deed) ask to add or remove people; the board approves.
     "account.request_change": frozenset({OWNER}),
     "account.approve_change": frozenset({BOARD}),

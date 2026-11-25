@@ -435,6 +435,8 @@ class CommunityProfile(models.Model):
 
     legal_name = models.CharField(max_length=200, default="Oak Creek Farms Homeowners Association")
     fiscal_year_start_month = models.PositiveSmallIntegerField(default=1)
+    # Shown at the top of everyone's dashboard (Milestone 3); plain text.
+    welcome_message = models.TextField(blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
 

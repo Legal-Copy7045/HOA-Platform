@@ -902,7 +902,12 @@ def set_rule(
 
 
 def update_profile(
-    *, legal_name: str, fiscal_year_start_month: int, actor, request: HttpRequest | None = None
+    *,
+    legal_name: str,
+    fiscal_year_start_month: int,
+    welcome_message: str | None = None,
+    actor,
+    request: HttpRequest | None = None,
 ):
     from community.models import CommunityProfile
 
@@ -913,6 +918,8 @@ def update_profile(
         profile = CommunityProfile.get()
         profile.legal_name = legal_name.strip()[:200] or profile.legal_name
         profile.fiscal_year_start_month = int(fiscal_year_start_month)
+        if welcome_message is not None:
+            profile.welcome_message = welcome_message.strip()[:2000]
         profile.save()
         _audit(
             "community.profile_changed", actor=actor, request=request, target=profile, metadata={}
@@ -1163,3 +1170,51 @@ def withdraw_account_change(change, *, actor, request=None):
         target=change.account,
         metadata={"action": change.action},
     )
+
+
+# --- Board roster ------------------------------------------------------------------------
+
+
+def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
+    """One row per account: number, lot, address, owners, other people,
+    contact details on record, balance. Dormant (previous) accounts only when
+    asked. For the board, manager and auditor."""
+    require(actor, "roster.view")
+    from community.models import ContactProfile
+    from ledger.services import balances
+
+    with system_access("board roster"):
+        accounts = Account.objects.select_related("lot").order_by("lot__number", "-opened_on")
+        if not include_dormant:
+            accounts = accounts.filter(closed_on__isnull=True)
+        accounts = list(accounts)
+        ownerships = list(
+            Ownership.objects.filter(account__in=accounts).select_related("person", "account")
+        )
+        contacts = list(
+            AccountContact.objects.filter(account__in=accounts).select_related("person")
+        )
+        phones = dict(ContactProfile.objects.values_list("person_id", "phone"))
+        owed = balances()
+    by_account: dict[int, dict] = {a.pk: {"owners": [], "contacts": []} for a in accounts}
+    for o in ownerships:
+        if o.account_id in by_account and (o.end_date is None or not o.account.is_active):
+            by_account[o.account_id]["owners"].append(o.person)
+    for c in contacts:
+        if c.end_date is None:
+            by_account[c.account_id]["contacts"].append(c)
+    rows = []
+    for a in accounts:
+        owners = by_account[a.pk]["owners"]
+        rows.append(
+            {
+                "account": a,
+                "lot": a.lot,
+                "owners": owners,
+                "contacts": by_account[a.pk]["contacts"],
+                "emails": [p.email for p in owners if p.email],
+                "phones": [phones[p.pk] for p in owners if phones.get(p.pk)],
+                "balance_cents": owed.get(a.lot_id, 0) if a.is_active else None,
+            }
+        )
+    return rows

@@ -127,6 +127,7 @@ _SPECS = [
         "contract_id",
         "period",
     ),
+    _spec("faq.saved", "FAQ entry saved", "published"),
     _spec("committee.created", "Committee created"),
     _spec("committee.retired", "Committee retired"),
     _spec("committee.reactivated", "Committee reactivated"),
@@ -195,6 +196,7 @@ _SPECS = [
     _spec("resale.disclosures_saved", "Resale disclosures saved"),
     _spec("report.viewed", "Report viewed", "report", "rows"),
     _spec("report.exported", "Report exported (CSV)", "report", "rows"),
+    _spec("list.exported", "List exported (CSV)", "list", "rows"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

@@ -14,6 +14,7 @@
     </div>
   </div>
 
+  {% if dash.welcome %}<section class="card welcome">{% icon "home" %}<div class="prose">{{ dash.welcome|linebreaks }}</div></section>{% endif %}
   {% with o=dash.owner s=dash.staff %}
   {% if user|can:"history.view_own" and not o and not s %}
     <section class="card"><h2>Your records</h2>

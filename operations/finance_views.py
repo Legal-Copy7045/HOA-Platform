@@ -167,11 +167,44 @@ def work_orders(request):
             return redirect("work_order_detail", pk=wo.pk)
         messages.error(request, "Check the form.")
         return redirect("work_orders")
+    from core.lists import csv_response, filter_list, paginate, wants_csv
+
+    rows, tools = filter_list(
+        request,
+        WorkOrder.objects.select_related("vendor", "common_area"),
+        date_field="created_at",
+        open_states=("open", "assigned", "in_progress"),
+        default_show="open",
+    )
+    if wants_csv(request):
+        return csv_response(
+            request,
+            "work-orders",
+            ["Number", "Title", "Common area", "Vendor", "Priority", "Status", "Due", "Created"],
+            (
+                [
+                    f"WO-{w.pk}",
+                    w.title,
+                    w.common_area or "",
+                    w.vendor or "",
+                    w.get_priority_display(),
+                    w.state,
+                    w.due_on or "",
+                    w.created_at.date(),
+                ]
+                for w in rows
+            ),
+            audit_kind="work_orders",
+        )
+    page = paginate(request, rows)
     return render(
         request,
         "operations/work_orders.html",
         {
-            "rows": WorkOrder.objects.select_related("vendor", "common_area"),
+            "rows": page.object_list,
+            "page": page,
+            "tools": tools,
+            "can_export": True,
             "form": form,
             "can_manage": policy.can(request.user, "workorder.manage"),
         },
@@ -241,15 +274,41 @@ def invoices(request):
         else:
             messages.error(request, "Check the form.")
         return redirect("invoices")
+    from core.lists import csv_response, filter_list, paginate, wants_csv
+    from core.money import format_cents
+
     state = request.GET.get("state", "")
     rows = Invoice.objects.select_related("vendor", "category")
     if state:
         rows = rows.filter(state=state)
+    rows, tools = filter_list(request, rows, date_field="invoice_date")
+    if wants_csv(request):
+        return csv_response(
+            request,
+            "invoices",
+            ["Vendor", "Number", "Date", "Category", "Amount", "Status"],
+            (
+                [
+                    i.vendor.name,
+                    i.number,
+                    i.invoice_date,
+                    i.category.name,
+                    format_cents(i.amount_cents),
+                    i.state,
+                ]
+                for i in rows
+            ),
+            audit_kind="invoices",
+        )
+    page = paginate(request, rows)
     return render(
         request,
         "operations/invoices.html",
         {
-            "rows": rows[:500],
+            "rows": page.object_list,
+            "page": page,
+            "tools": tools,
+            "can_export": True,
             "form": form,
             "state": state,
             "states": ["draft", "pending_approval", "approved", "paid", "rejected", "void"],
