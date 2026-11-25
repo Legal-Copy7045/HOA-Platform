@@ -93,7 +93,7 @@ def test_new_request_with_photos(client, w):
     assert attachments_for(req).count() == 2
     page = client.get(reverse("request_detail", args=[req.pk])).content.decode()
     image = attachments_for(req).get(content_type="image/png")
-    assert f'<img src="{reverse("request_file", args=[req.pk, image.pk])}"' in page
+    assert f'<img src="{reverse("request_file", args=[req.pk, image.pk])}?view=thumb"' in page
     assert f'href="{reverse("requests")}?mine=1">My requests' in page
     assert "12 Oak Creek Drive" in page
 

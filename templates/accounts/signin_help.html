@@ -17,5 +17,5 @@
   <p>The board can reset your sign-in. For your safety this takes <strong>two board members</strong>: one checks it's really you and starts the reset, and a second approves it. The second one then gives you a one-time code in person or by phone (never by email).</p>
   <p>Next, sign in with your password, type that code, and add a new passkey or authenticator app within {{ window }}, in the same browser.</p>
   <div class="alert info">{% icon "info" %}<span>{% if contact %}To start a reset, contact {{ contact }}.{% else %}To start a reset, contact a board member.{% endif %}</span></div>
-  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+  <div class="form-actions">{% if user.is_authenticated %}<a class="btn secondary" href="{% url 'home' %}">Back to the portal</a>{% else %}<a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a>{% endif %}</div>
 {% endblock %}

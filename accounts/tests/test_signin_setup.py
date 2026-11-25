@@ -314,3 +314,11 @@ def test_lockout_wait_comes_from_the_setting(client, settings):
     page = client.post(reverse("account_login"), {"login": owner.email, "password": PASSWORD})
     assert page.status_code == 429
     assert b"try again in 2 hours" in page.content
+
+
+def test_help_page_links_signed_in_people_home_not_to_login(client):
+    from community.tests.factories import LotFactory, make_member
+
+    client.force_login(make_member(lots=[LotFactory()]))
+    page = client.get(reverse("signin_help")).content.decode()
+    assert "Back to the portal" in page and 'href="/accounts/login/"' not in page
