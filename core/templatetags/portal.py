@@ -126,7 +126,7 @@ def status_parts(state: str, label: str | None = None) -> tuple[str, str]:
 
 @register.simple_tag
 def status(state: str, label: str = ""):
-    """{% status obj.state %} -> a coloured, human-readable badge."""
+    """{% status obj.state %} -> a colored, human-readable badge."""
     from django.utils.html import format_html
 
     text, tone = status_parts(state, label or None)
@@ -169,6 +169,17 @@ def humanize_action(action: str) -> str:
     return text.capitalize()
 
 
+@register.filter
+def step_label(event) -> str:
+    """A workflow history entry as people see it: the step's own label
+    ("Submit for review"), not its code name ("submit")."""
+    from core.workflow import REGISTRY
+
+    workflow = REGISTRY.get(getattr(event, "workflow", ""))
+    step = workflow.transitions.get(event.action) if workflow else None
+    return step.label if step else humanize_action(getattr(event, "action", ""))
+
+
 @register.simple_tag(takes_context=True)
 def actor_label(context, actor) -> str:
     """Who took a workflow step, as an owner may see it (review A4).
@@ -199,13 +210,16 @@ def actor_label(context, actor) -> str:
 
 
 @register.inclusion_tag("partials/thread.html", takes_context=True)
-def thread_panel(context, kind, obj):
+def thread_panel(context, kind, obj, reply_hint=""):
     """The message thread on a request, ARC request, violation or work order.
-    ``obj`` was already fetched through its scoping by the page's view."""
+    ``obj`` was already fetched through its scoping by the page's view.
+    ``reply_hint``: for the owner side, show this instead of the message box
+    (a page with one formal reply box, e.g. a notice awaiting a response)."""
     from comms import threads
 
     user = context["user"]
     return {
+        "reply_hint": reply_hint,
         "kind": kind,
         "obj": obj,
         "messages_list": threads.messages_for(kind, obj, user),

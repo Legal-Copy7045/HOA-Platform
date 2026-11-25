@@ -67,6 +67,38 @@ def attach(
     return attachment
 
 
+MAX_FILES_PER_UPLOAD = 10
+
+
+def attach_many(
+    request, obj, uploads, *, actor, label: str = "", allowed: set[str] | None = None
+) -> int:
+    """Attach several files chosen at once (``<input type=file multiple>``).
+    The caller has already checked who may add files to ``obj``. Each file is
+    checked on its own; the page is told how many were added and why any was
+    refused. Returns the number added."""
+    from django.contrib import messages
+
+    uploads = list(uploads)
+    added, problems = 0, []
+    if len(uploads) > MAX_FILES_PER_UPLOAD:
+        problems.append(f"Please add at most {MAX_FILES_PER_UPLOAD} files at a time.")
+        uploads = uploads[:MAX_FILES_PER_UPLOAD]
+    for uploaded in uploads:
+        try:
+            attach(obj, uploaded, actor=actor, label=label, allowed=allowed, request=request)
+        except DocumentError as exc:
+            name = safe_filename(uploaded.name or "file", "x").rsplit(".", 1)[0][:80]
+            problems.append(f"{name}: {exc}")
+        else:
+            added += 1
+    if added:
+        messages.success(request, "File added." if added == 1 else f"{added} files added.")
+    for problem in problems:
+        messages.error(request, problem)
+    return added
+
+
 def attachments_for(obj):
     owner_type, owner_id = _owner_key(obj)
     return Attachment.objects.filter(owner_type=owner_type, owner_id=owner_id)
@@ -115,4 +147,4 @@ def pdf_response(data: bytes, filename: str):
     return response
 
 
-__all__ = ["Http404", "attach", "attachments_for", "pdf_response", "serve"]
+__all__ = ["Http404", "attach", "attach_many", "attachments_for", "pdf_response", "serve"]

@@ -1,5 +1,5 @@
-{% load portal %}{# Expects: actions (Transitions), history (WorkflowEvents), action_url_name, obj #}
-{% if actions %}
+{% load portal %}{# Expects: actions (Transitions), history (WorkflowEvents), action_url_name, obj. Optional: blocked_steps [(Transition, reason)] shown disabled with the reason. #}
+{% if actions or blocked_steps %}
 <section class="card">
   <h2>Next steps</h2>
   <div class="wf-actions">
@@ -10,6 +10,9 @@
         <button type="submit" class="{% if t.action|is_danger %}danger{% elif not forloop.first %}secondary{% endif %}">{{ t.label }}</button>
       </form>
     {% endfor %}
+    {% for t, reason in blocked_steps %}
+      <div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="blocked-{{ t.action }}">{{ t.label }}</button><p class="help" id="blocked-{{ t.action }}">{{ reason }}</p></div>
+    {% endfor %}
   </div>
 </section>
 {% endif %}
@@ -18,7 +21,7 @@
   {% if history %}
     <ol class="timeline">
       {% for e in history %}
-        <li><div class="what">{{ e.action|humanize_action }} <span class="muted small">→ {{ e.to_state|state_label }}</span></div>
+        <li><div class="what">{{ e|step_label }} <span class="muted small">→ {{ e.to_state|state_label }}</span></div>
           <div class="when">{{ e.created_at|date:"M j, Y g:i A" }} · {% actor_label e.actor %}</div>
           {% if e.note %}<div class="note">{{ e.note }}</div>{% endif %}</li>
       {% endfor %}

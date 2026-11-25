@@ -106,11 +106,10 @@ def _view_finance(request):
 def vendors(request):
     _view_finance(request)
     form = VendorForm(request.POST or None)
-    if request.method == "POST":
-        if form.is_valid():
-            vendor = services.save_vendor(actor=request.user, request=request, **form.cleaned_data)
-            return redirect("vendor_detail", pk=vendor.pk)
-        # Invalid: the page is shown again with what was typed and the errors.
+    if request.method == "POST" and form.is_valid():
+        vendor = services.save_vendor(actor=request.user, request=request, **form.cleaned_data)
+        return redirect("vendor_detail", pk=vendor.pk)
+    # Invalid: the page is shown again with what was typed and the errors.
     soon = timezone.localdate() + timezone.timedelta(days=30)
     return render(
         request,
@@ -132,13 +131,12 @@ def vendor_detail(request, pk):
     form = VendorForm(
         request.POST or None, initial={f: getattr(vendor, f) for f in VendorForm.base_fields}
     )
-    if request.method == "POST":
-        if form.is_valid():
-            services.save_vendor(
-                vendor=vendor, actor=request.user, request=request, **form.cleaned_data
-            )
-            messages.success(request, "Vendor saved.")
-            return redirect("vendor_detail", pk=vendor.pk)
+    if request.method == "POST" and form.is_valid():
+        services.save_vendor(
+            vendor=vendor, actor=request.user, request=request, **form.cleaned_data
+        )
+        messages.success(request, "Vendor saved.")
+        return redirect("vendor_detail", pk=vendor.pk)
     return render(
         request,
         "operations/vendor_detail.html",
@@ -158,12 +156,9 @@ def vendor_detail(request, pk):
 def work_orders(request):
     _view_finance(request)
     form = WorkOrderForm(request.POST or None)
-    if request.method == "POST":
-        if form.is_valid():
-            wo = services.create_work_order(
-                actor=request.user, request=request, **form.cleaned_data
-            )
-            return redirect("work_order_detail", pk=wo.pk)
+    if request.method == "POST" and form.is_valid():
+        wo = services.create_work_order(actor=request.user, request=request, **form.cleaned_data)
+        return redirect("work_order_detail", pk=wo.pk)
     from core.lists import csv_response, filter_list, paginate, wants_csv
 
     rows, tools = filter_list(
@@ -254,20 +249,17 @@ def work_order_action(request, pk, action):
 def invoices(request):
     _view_finance(request)
     form = InvoiceForm(request.POST or None)
-    if request.method == "POST":
-        if form.is_valid():
-            try:
-                inv = services.create_invoice(
-                    actor=request.user, request=request, **form.cleaned_data
-                )
-            except services.OperationsError as exc:
-                form.add_error(None, str(exc))
-            else:
-                messages.success(
-                    request,
-                    "Invoice entered as a draft. Attach the PDF, then submit it for approval.",
-                )
-                return redirect("invoice_detail", pk=inv.pk)
+    if request.method == "POST" and form.is_valid():
+        try:
+            inv = services.create_invoice(actor=request.user, request=request, **form.cleaned_data)
+        except services.OperationsError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(
+                request,
+                "Invoice entered as a draft. Attach the PDF, then submit it for approval.",
+            )
+            return redirect("invoice_detail", pk=inv.pk)
     from core.lists import csv_response, filter_list, paginate, wants_csv
     from core.money import format_cents
 

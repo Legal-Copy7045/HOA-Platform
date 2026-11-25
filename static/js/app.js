@@ -1,4 +1,4 @@
-// Portal behaviour: mobile navigation and confirmations. No inline scripts (CSP).
+// Portal behavior: mobile navigation and confirmations. No inline scripts (CSP).
 (function () {
   "use strict";
   var shell = document.querySelector(".shell");

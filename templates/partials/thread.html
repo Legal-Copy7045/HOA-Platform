@@ -10,7 +10,8 @@
       {% endfor %}
     </ul>
   {% else %}<p class="muted small">No messages yet.</p>{% endif %}
-  {% if acc.post %}
+  {% if acc.post and reply_hint and not acc.post_internal %}<p class="small muted">{{ reply_hint }}</p>
+  {% elif acc.post %}
     <form method="post" action="{% url 'thread_post' kind obj.pk %}">{% csrf_token %}
       <label for="thread-body-{{ obj.pk }}">Write a message</label>
       <textarea id="thread-body-{{ obj.pk }}" name="body" rows="4" maxlength="5000" required></textarea>
