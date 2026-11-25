@@ -25,6 +25,8 @@ from django.db.models import F, Func, Q
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from core.scoping import ScopedModel, ScopedQuerySet
+
 
 def today() -> datetime.date:
     return timezone.localdate()
@@ -46,10 +48,13 @@ def _active_q(start: str, end: str, on: datetime.date) -> Q:
     return Q(**{f"{start}__lte": on}) & (Q(**{f"{end}__isnull": True}) | Q(**{f"{end}__gt": on}))
 
 
-class Lot(NeverDeleteMixin, models.Model):
+class Lot(NeverDeleteMixin, ScopedModel):
     number = models.PositiveSmallIntegerField(unique=True)
     street_address = models.CharField(max_length=200)
     history = HistoricalRecords()
+
+    objects = ScopedQuerySet.as_manager()
+    scope_lot_path = ""  # the lot itself
 
     class Meta:
         ordering = ["number"]
@@ -58,7 +63,7 @@ class Lot(NeverDeleteMixin, models.Model):
         return f"Lot {self.number}"
 
 
-class Person(NeverDeleteMixin, models.Model):
+class Person(NeverDeleteMixin, ScopedModel):
     """A member of the community. May exist before (or without) a login."""
 
     display_name = models.CharField(max_length=150)
@@ -73,8 +78,17 @@ class Person(NeverDeleteMixin, models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     history = HistoricalRecords()
 
+    objects = ScopedQuerySet.as_manager()
+
     class Meta:
         ordering = ["display_name", "id"]
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Owners see themselves and their current co-owners - not past owners."""
+        co_owners = Ownership.objects.unscoped("co-owner lookup").active()
+        co_owners = co_owners.filter(lot_id__in=roles.owned_lot_ids).values("person_id")
+        return queryset.filter(models.Q(pk=roles.person_id) | models.Q(pk__in=co_owners))
 
     def __str__(self) -> str:
         return f"Person #{self.pk}"
@@ -87,12 +101,12 @@ class OwnershipType(models.TextChoices):
     ENTITY = "entity", "Entity (company, estate)"
 
 
-class OwnershipQuerySet(models.QuerySet):
+class OwnershipQuerySet(ScopedQuerySet):
     def active(self, on: datetime.date | None = None) -> OwnershipQuerySet:
         return self.filter(_active_q("start_date", "end_date", on or today()))
 
 
-class Ownership(NeverDeleteMixin, models.Model):
+class Ownership(NeverDeleteMixin, ScopedModel):
     person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="ownerships")
     lot = models.ForeignKey(Lot, on_delete=models.PROTECT, related_name="ownerships")
     ownership_type = models.CharField(max_length=16, choices=OwnershipType.choices)
@@ -107,6 +121,7 @@ class Ownership(NeverDeleteMixin, models.Model):
     history = HistoricalRecords()
 
     objects = OwnershipQuerySet.as_manager()
+    scope_lot_path = "lot"
 
     class Meta:
         ordering = ["lot__number", "start_date", "id"]
@@ -129,6 +144,11 @@ class Ownership(NeverDeleteMixin, models.Model):
     def __str__(self) -> str:
         return f"Ownership #{self.pk}"
 
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Owners see current ownerships of their lots, not the lot's past owners."""
+        return queryset.filter(lot_id__in=roles.owned_lot_ids).active()
+
     def is_active(self, on: datetime.date | None = None) -> bool:
         on = on or today()
         return self.start_date <= on and (self.end_date is None or self.end_date > on)
@@ -147,7 +167,7 @@ class SeatEndReason(models.TextChoices):
     OTHER = "other", "Other"
 
 
-class BoardSeatQuerySet(models.QuerySet):
+class BoardSeatQuerySet(ScopedQuerySet):
     def active(self, on: datetime.date | None = None) -> BoardSeatQuerySet:
         return self.filter(_active_q("term_start", "ended_on", on or today()))
 
@@ -157,7 +177,7 @@ class BoardSeatQuerySet(models.QuerySet):
         return self.active(on).filter(term_end__isnull=False, term_end__lt=on)
 
 
-class BoardSeat(NeverDeleteMixin, models.Model):
+class BoardSeat(NeverDeleteMixin, ScopedModel):
     person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="board_seats")
     seat_type = models.CharField(max_length=24, choices=SeatType.choices)
     term_start = models.DateField()
@@ -174,6 +194,7 @@ class BoardSeat(NeverDeleteMixin, models.Model):
     history = HistoricalRecords()
 
     objects = BoardSeatQuerySet.as_manager()
+    scope_person_path = "person"
 
     class Meta:
         ordering = ["term_start", "id"]
@@ -207,12 +228,12 @@ class Office(models.TextChoices):
     SECRETARY = "secretary", "Secretary"
 
 
-class OfficeHoldingQuerySet(models.QuerySet):
+class OfficeHoldingQuerySet(ScopedQuerySet):
     def active(self, on: datetime.date | None = None) -> OfficeHoldingQuerySet:
         return self.filter(_active_q("start_date", "end_date", on or today()))
 
 
-class OfficeHolding(NeverDeleteMixin, models.Model):
+class OfficeHolding(NeverDeleteMixin, ScopedModel):
     person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="offices")
     office = models.CharField(max_length=16, choices=Office.choices)
     start_date = models.DateField()
@@ -224,6 +245,7 @@ class OfficeHolding(NeverDeleteMixin, models.Model):
     history = HistoricalRecords()
 
     objects = OfficeHoldingQuerySet.as_manager()
+    scope_person_path = "person"
 
     class Meta:
         ordering = ["office", "start_date", "id"]
@@ -244,3 +266,64 @@ class OfficeHolding(NeverDeleteMixin, models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_office_display()} holding #{self.pk}"
+
+
+class Role(models.TextChoices):
+    ARC_REVIEWER = "arc_reviewer", "ARC reviewer"
+    AUDITOR = "auditor", "Auditor (read-only)"
+    SYSADMIN = "sysadmin", "System administrator"
+
+
+class AppointedBy(models.TextChoices):
+    BOARD = "board", "Board"
+    DECLARANT = "declarant", "Declarant"
+
+
+class RoleAssignmentQuerySet(ScopedQuerySet):
+    def active(self, on: datetime.date | None = None) -> RoleAssignmentQuerySet:
+        return self.filter(_active_q("start_date", "end_date", on or today()))
+
+
+class RoleAssignment(NeverDeleteMixin, ScopedModel):
+    """ARC reviewer, auditor and sysadmin roles (decision D1). Ended, never deleted."""
+
+    person = models.ForeignKey(Person, on_delete=models.PROTECT, related_name="roles")
+    role = models.CharField(max_length=16, choices=Role.choices)
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True, help_text="Exclusive.")
+    appointed_by = models.CharField(
+        max_length=16, choices=AppointedBy.choices, blank=True, help_text="Required for ARC."
+    )
+    citation = models.CharField(max_length=200, blank=True, help_text='e.g. "Declaration §9.1"')
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    objects = RoleAssignmentQuerySet.as_manager()
+    scope_person_path = "person"
+
+    class Meta:
+        ordering = ["role", "start_date", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(end_date__isnull=True) | Q(end_date__gte=F("start_date")),
+                name="role_end_not_before_start",
+            ),
+            models.CheckConstraint(
+                condition=~Q(role="arc_reviewer") | ~Q(appointed_by=""),
+                name="role_arc_records_appointer",
+            ),
+            ExclusionConstraint(
+                name="role_no_overlap_per_person",
+                expressions=[
+                    (F("person"), RangeOperators.EQUAL),
+                    (F("role"), RangeOperators.EQUAL),
+                    (DateRange("start_date", "end_date"), RangeOperators.OVERLAPS),
+                ],
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_role_display()} assignment #{self.pk}"

@@ -53,6 +53,15 @@ _SPECS = [
     _spec("seat.ended", "Board seat ended", "person_id", "ended_on", "reason"),
     _spec("office.recorded", "Office holding recorded", "person_id", "office", "start_date"),
     _spec("office.ended", "Office holding ended", "person_id", "office", "end_date"),
+    _spec(
+        "role.granted",
+        "Role granted",
+        "person_id",
+        "role",
+        "start_date",
+        "appointed_by",
+    ),
+    _spec("role.ended", "Role ended", "person_id", "role", "end_date"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

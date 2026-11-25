@@ -1,4 +1,5 @@
 import pytest
+from django.core.exceptions import PermissionDenied
 
 from audit.models import AuditEvent
 from community.models import BoardSeat, Office, OfficeHolding, SeatEndReason, SeatType, today
@@ -8,16 +9,14 @@ from community.services import (
     record_board_seat,
     record_office,
 )
-from community.tests.factories import PersonFactory, UserFactory, days_ago
+from community.tests.factories import PersonFactory, days_ago, make_member
 
 pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
 def board_user():
-    user = UserFactory()
-    PersonFactory(user=user)
-    return user
+    return make_member(board=True)
 
 
 def seat_for(person, actor, **kwargs):
@@ -35,15 +34,15 @@ def test_seat_records_type_term_and_citation(board_user):
         term_end=days_ago(-265),
         citation="Bylaws §3.2",
     )
-    assert BoardSeat.objects.active().get() == seat
+    assert BoardSeat.objects.unscoped("test").active().get(person=person) == seat
     assert seat.citation == "Bylaws §3.2"
     assert AuditEvent.objects.filter(action="seat.recorded", target_id=str(seat.pk)).exists()
 
 
 def test_seat_continues_past_term_end_until_ended_but_is_flagged(board_user):
     seat = seat_for(PersonFactory(), board_user, term_end=days_ago(1))
-    assert BoardSeat.objects.active().filter(pk=seat.pk).exists()
-    assert list(BoardSeat.objects.past_term_end()) == [seat]
+    assert BoardSeat.objects.unscoped("test").active().filter(pk=seat.pk).exists()
+    assert list(BoardSeat.objects.unscoped("test").past_term_end()) == [seat]
 
 
 def test_one_seat_at_a_time_per_person(board_user):
@@ -88,8 +87,8 @@ def test_ending_a_seat_ends_that_persons_offices_the_same_day(board_user):
 
     holding.refresh_from_db()
     assert holding.end_date == today()
-    assert not OfficeHolding.objects.active().exists()
-    assert not BoardSeat.objects.active().exists()
+    assert not OfficeHolding.objects.unscoped("test").filter(person=person).active().exists()
+    assert not BoardSeat.objects.unscoped("test").filter(person=person).active().exists()
     assert AuditEvent.objects.filter(action="office.ended").count() == 1
 
 
@@ -105,10 +104,18 @@ def test_end_reason_required_and_seat_ends_once(board_user):
 def test_no_self_grants_but_resigning_is_allowed(board_user):
     me = board_user.person
     with pytest.raises(CommunityError):
-        seat_for(me, board_user)
-    other = UserFactory()
-    PersonFactory(user=other)
-    seat = seat_for(me, other)
-    with pytest.raises(CommunityError):
         record_office(person=me, office=Office.PRESIDENT, start_date=today(), actor=board_user)
-    end_board_seat(seat, reason=SeatEndReason.RESIGNED, actor=board_user)
+    my_seat = BoardSeat.objects.unscoped("test").get(person=me)
+    end_board_seat(my_seat, reason=SeatEndReason.RESIGNED, actor=board_user)
+    assert not BoardSeat.objects.unscoped("test").filter(person=me).active().exists()
+
+
+def test_former_board_member_cannot_reseat_themselves(board_user):
+    me = board_user.person
+    end_board_seat(
+        BoardSeat.objects.unscoped("test").get(person=me),
+        reason=SeatEndReason.RESIGNED,
+        actor=board_user,
+    )
+    with pytest.raises(PermissionDenied):
+        seat_for(me, board_user, term_start=today())

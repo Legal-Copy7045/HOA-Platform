@@ -135,6 +135,23 @@ the image changed. Trade-off accepted: the edge connector updates without
 review, as it is Cloudflare's own component already trusted with all traffic.
 The portal image itself is still built from reviewed code.
 
+## D14. Authorization mechanics (step 4)
+
+- Roles are computed from dated records on every check, never cached on the
+  login, so revocation applies on the next request.
+- `RoleAssignment` lives in `community` with Person, seats and offices.
+- The default manager of every scoped model raises on any unscoped query,
+  including reverse relations (`lot.ownerships`). We chose loud failure over a
+  silently filtered default so a forgotten scope shows up in tests. Django's
+  own validation and forward foreign keys still work.
+- Owners see current co-owners of their lots but not past owners. Sysadmin and
+  ARC roles grant no owner data by themselves (D9).
+- Services enforce permissions themselves rather than trusting views; an
+  explicit `SYSTEM` actor covers bootstrap and seed data, and a missing actor
+  is an error.
+- Board members may end their own seat (resignation) without the manage
+  permission; they cannot grant themselves anything.
+
 ## Dependencies
 
 | Package | Why |

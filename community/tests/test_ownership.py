@@ -5,16 +5,14 @@ import pytest
 from audit.models import AuditEvent
 from community.models import Ownership, OwnershipType, today
 from community.services import CommunityError, end_ownership, record_ownership, transfer_lot
-from community.tests.factories import LotFactory, PersonFactory, UserFactory, days_ago
+from community.tests.factories import LotFactory, PersonFactory, days_ago, make_member
 
 pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
 def board_user():
-    user = UserFactory()
-    PersonFactory(user=user)
-    return user
+    return make_member(board=True)
 
 
 def test_active_means_start_inclusive_end_exclusive():
@@ -27,11 +25,11 @@ def test_active_means_start_inclusive_end_exclusive():
 def test_ending_an_ownership_today_removes_access_immediately(board_user):
     owner, lot = PersonFactory(), LotFactory()
     ownership = record_ownership(person=owner, lot=lot, start_date=days_ago(30), actor=board_user)
-    assert Ownership.objects.filter(person=owner).active().exists()
+    assert Ownership.objects.unscoped("test").filter(person=owner).active().exists()
 
     end_ownership(ownership, actor=board_user)
 
-    assert not Ownership.objects.filter(person=owner).active().exists()
+    assert not Ownership.objects.unscoped("test").filter(person=owner).active().exists()
     ownership.refresh_from_db()
     assert ownership.end_date == today()
     event = AuditEvent.objects.get(action="ownership.ended")
@@ -49,7 +47,7 @@ def test_multiple_active_owners_per_lot_are_allowed(board_user):
             ownership_type=OwnershipType.JOINT,
             actor=board_user,
         )
-    assert lot.ownerships.active().count() == 2
+    assert lot.ownerships.unscoped("test").active().count() == 2
 
 
 def test_transfer_ends_all_current_owners_and_keeps_history(board_user):
@@ -69,10 +67,10 @@ def test_transfer_ends_all_current_owners_and_keeps_history(board_user):
 
     assert [o.person for o in created] == [buyer]
     assert created[0].ownership_type == OwnershipType.SOLE
-    active = list(lot.ownerships.active())
+    active = list(lot.ownerships.unscoped("test").active())
     assert [o.person for o in active] == [buyer]
     # History stays on the lot: the sellers' records still exist, ended today.
-    ended = lot.ownerships.filter(person__in=sellers)
+    ended = lot.ownerships.unscoped("test").filter(person__in=sellers)
     assert ended.count() == 2
     assert all(o.end_date == today() for o in ended)
     assert all(o.history.count() == 2 for o in ended)  # created, then ended

@@ -53,9 +53,9 @@ def _validate_metadata(action: str, metadata: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_sysadmin(user) -> bool:
-    # Replaced in step 4 by the policy layer's role lookup.
-    checker = getattr(user, "is_sysadmin", None)
-    return bool(checker() if callable(checker) else checker)
+    from core.policy import is_sysadmin
+
+    return is_sysadmin(user)
 
 
 def record_event(

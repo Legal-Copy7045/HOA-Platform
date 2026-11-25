@@ -39,6 +39,8 @@ This file is the source of truth for architecture and rules. If a task conflicts
 - No self-grants. Granting sysadmin needs a nominator and a different approving board member; revoking needs one. Invitations grant nothing: they only link a login to an existing Person.
 - Owner access derives from an active `Ownership` record (person to lot, with start and end dates). Ending an ownership removes access automatically; history stays on the lot.
 - Every model that belongs to a lot or person must be reachable only through a scoped manager/queryset (e.g. `Model.objects.for_user(user)`). The default manager must not return unscoped data to owner-facing views. Views must never fetch by bare primary key without scoping.
+- Pattern (`core/scoping.py`): subclass `ScopedModel`, set `scope_lot_path` or `scope_person_path`, use a `ScopedQuerySet` manager. Unscoped queries raise `UnscopedQueryError`; services use `.unscoped(reason)` or `system_access(reason)`. Views use `PolicyRequiredMixin` / `ScopedObjectMixin` (`core/mixins.py`); out-of-scope objects are 404.
+- Services take an explicit `actor` and call `core.policy.require()` themselves. Trusted internal code (bootstrap, seed data) passes `core.policy.SYSTEM`; views always pass `request.user`.
 - Every feature ships with cross-owner access tests: owner A must get 403/404 for owner B's lot, documents, requests, and files, on every URL and download path.
 - ARC recusal: a reviewer who is the applicant, or whose lot is affected, cannot view deliberations or vote on that request. Enforced in the service layer and tested.
 - Sysadmin actions are audited and visible to the Board. Sysadmins get operations pages only, no owner data by virtue of the role. No Django admin in production. Break-glass management commands require `--actor` and `--reason` and are audited.
@@ -86,6 +88,7 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Security: `bandit -q -c pyproject.toml -r .` and `pip-audit --strict -r requirements/base.txt -r requirements/dev.txt`
 - Update dependencies: edit `requirements/*.in`, then `pip-compile --generate-hashes --allow-unsafe -o requirements/base.txt requirements/base.in` (and the same for dev)
 - Re-apply runtime DB grants: `python manage.py apply_db_grants`
+- Actions fewer than two people can perform: `python manage.py check_coverage`
 - Seed synthetic data: `python manage.py seed_demo` (planned, Milestone 1 step 9)
 
 ## Never
