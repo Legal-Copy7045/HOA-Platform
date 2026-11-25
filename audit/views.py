@@ -16,6 +16,7 @@ def sysadmin_activity(request):
             | Q(action__startswith="role.sysadmin")
             | Q(action__in=["role.granted", "role.ended"], metadata__role="sysadmin")
             | Q(action="sysadmin.breakglass")
+            | Q(channel="cli")
         )
         .select_related("actor")
         .order_by("-occurred_at", "-id")[:500]

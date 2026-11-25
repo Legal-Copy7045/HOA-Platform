@@ -18,16 +18,23 @@ def _date(value, default):
         return default
 
 
+_FORMULA_START = set("=+-@\t\r\n") | {"\uff1d", "\uff0b", "\uff0d", "\uff20"}
+
+
 def _safe_cell(value):
-    """Stop spreadsheet formula injection: text starting =, +, -, @ gets a quote."""
+    """Stop spreadsheet formula injection (review C5).
+
+    Text whose first non-blank character could start a formula (=, +, -, @,
+    their full-width forms, or a tab/CR/LF) gets a leading quote. Plain
+    numbers such as -12.50 or $1,000 are left alone.
+    """
     text = "" if value is None else str(value)
-    if (
-        text
-        and text[0] in "=+-@\t\r"
-        and not text.lstrip("-").replace(".", "").replace("$", "").replace(",", "").isdigit()
-    ):
-        return "'" + text
-    return text
+    stripped = text.lstrip(" \t\r\n\u00a0")
+    if not stripped or (stripped[0] not in _FORMULA_START and text[:1] not in _FORMULA_START):
+        return text
+    if stripped.lstrip("-").replace(".", "").replace("$", "").replace(",", "").isdigit():
+        return text
+    return "'" + text
 
 
 @login_required
@@ -68,7 +75,7 @@ def run(request, key):
         response["Content-Disposition"] = f'attachment; filename="{key}-{today}.csv"'
         response["Cache-Control"] = "private, no-store"
         writer = csv.writer(response)
-        writer.writerow(head)
+        writer.writerow([_safe_cell(h) for h in head])
         for row in rows:
             writer.writerow([_safe_cell(c) for c in row])
         return response

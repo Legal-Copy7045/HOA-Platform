@@ -28,6 +28,9 @@ services:
   web:
     ports: !reset []
     environment: *production-env
+    # The only service on both networks: cloudflared can reach web and
+    # nothing else (not Postgres, not the object store) - security review E3.
+    networks: [default, edge]
   worker:
     environment: *production-env
   migrate:
@@ -52,13 +55,17 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     networks:
-      default:
+      edge:
         ipv4_address: 172.30.50.10
     depends_on:
       web: {condition: service_healthy}
 
 networks:
-  default:
+  # edge: cloudflared <-> web only. Dynamic addresses come from the upper
+  # half, so nothing else can be handed cloudflared's fixed, trusted .10
+  # (review E9).
+  edge:
     ipam:
       config:
         - subnet: 172.30.50.0/24
+          ip_range: 172.30.50.128/25

@@ -6,6 +6,7 @@ from django.utils import timezone
 from audit.services import record_event
 from comms.models import Announcement, AnnouncementRead, Audience, Event
 from core.policy import require
+from core.text import single_line
 
 
 class CommsError(ValueError):
@@ -22,13 +23,13 @@ def publish_announcement(
     request=None,
 ) -> Announcement:
     require(actor, "announcement.publish")
-    if not title.strip() or not body.strip():
+    if not single_line(title) or not body.strip():
         raise CommsError("An announcement needs a title and a message.")
     if audience not in Audience.values:
         raise CommsError("Unknown audience.")
     with transaction.atomic():
         announcement = Announcement.objects.create(
-            title=title.strip()[:200],
+            title=single_line(title)[:200],
             body=body.strip(),
             audience=audience,
             urgent=urgent,
@@ -77,12 +78,12 @@ def create_event(
     request=None,
 ) -> Event:
     require(actor, "calendar.manage")
-    if not title.strip():
+    if not single_line(title):
         raise CommsError("An event needs a title.")
     if ends_at and ends_at < starts_at:
         raise CommsError("An event cannot end before it starts.")
     event = Event.objects.create(
-        title=title.strip()[:200],
+        title=single_line(title)[:200],
         starts_at=starts_at,
         ends_at=ends_at,
         location=location.strip()[:200],

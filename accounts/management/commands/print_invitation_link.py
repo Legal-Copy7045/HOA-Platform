@@ -2,8 +2,12 @@
 
     python manage.py print_invitation_link --email you@example.org
 
-Only for a person who has no login yet. Any earlier link for them stops
-working. Audited as invite.link_issued.
+Only while the portal has no logins at all, i.e. to finish the bootstrap of
+the first officer (security review E7): afterwards a printed link would let
+whoever runs the command take over the person's identity, so invitations go
+by email from the board instead. Any earlier link stops working. Audited as
+invite.link_issued (channel: command line) and shown on the board's
+sysadmin activity page.
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -23,6 +27,11 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         email = opts["email"].strip().lower()
         with system_access("print_invitation_link"):
+            if Person.objects.filter(user__isnull=False).exists():
+                raise CommandError(
+                    "Refusing: the portal already has logins. Ask the board to send the "
+                    "invitation by email from the person's page."
+                )
             person = Person.objects.filter(email__iexact=email, user__isnull=True).first()
         if person is None:
             raise CommandError("No person without a login has that email address.")

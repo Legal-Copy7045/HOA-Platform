@@ -254,3 +254,23 @@ def test_only_one_open_collection_case_per_lot(w):
     services.open_case(lot=w["lot"], actor=w["board"])
     with pytest.raises(IntegrityError), transaction.atomic(), system_access("t"):
         CollectionCase.objects.create(lot=w["lot"], opened_by=w["board"])
+
+
+def test_issued_resale_certificate_is_stored_and_served_unchanged(w, client):
+    """D5: every download used to rebuild the certificate from today's data."""
+    community.set_rule(key="resale.fee_cents", value="15000", citation="Demo", actor=w["board"])
+    req = services.request_resale(lot=w["lot"], requester_name="Seller", actor=w["owner"])
+    services.save_disclosures(req, "Pending roof claim (demo)", actor=w["manager"])
+    req = services.RESALE.apply(req, "issue", actor=w["manager"])
+    stored = services.issued_certificate(req)
+    assert stored is not None
+    with pytest.raises(services.LedgerError):
+        services.save_disclosures(req, "changed later", actor=w["manager"])
+    # Something changes after issue: the certificate given to the buyer does not.
+    services.post_charge(
+        lot=w["lot"], kind="other_charge", amount_cents=999, description="Later", actor=w["board"]
+    )
+    client.force_login(w["owner"])
+    response = client.get(reverse("resale_pdf", args=[req.pk]))
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content) == stored.file.open("rb").read()

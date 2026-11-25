@@ -53,6 +53,8 @@ def system_status(request):
             "jobs": jobs,
             "thin": policy.thinly_covered_actions(),
             "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),
+            "scanner": settings.DOCUMENT_SCANNER,
+            "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
         },
     )
 

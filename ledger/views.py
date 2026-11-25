@@ -12,6 +12,7 @@ from core import policy
 from core.money import MoneyField
 from core.scoping import system_access
 from core.workflow import WorkflowError
+from documents import attachments
 from documents.attachments import pdf_response
 from ledger import services
 from ledger.models import (
@@ -454,11 +455,14 @@ def resales(request):
 def resale_detail(request, pk):
     obj = get_object_or_404(ResaleRequest.objects.for_user(request.user), pk=pk)
     can_manage = policy.can(request.user, "resale.manage")
-    if request.method == "POST" and can_manage and obj.state in ("submitted", "in_progress"):
-        ResaleRequest.objects.for_user(request.user).filter(pk=obj.pk).update(
-            other_disclosures=request.POST.get("other_disclosures", "")[:5000]
+    if request.method == "POST" and can_manage:
+        _flash(
+            request,
+            lambda: services.save_disclosures(
+                obj, request.POST.get("other_disclosures", ""), actor=request.user, request=request
+            ),
+            "Disclosures saved.",
         )
-        messages.success(request, "Disclosures saved.")
         return redirect("resale_detail", pk=obj.pk)
     return render(
         request,
@@ -501,4 +505,9 @@ def resale_pdf(request, pk):
         target=obj,
         metadata={"lot_id": obj.lot_id},
     )
+    if obj.state == "issued":
+        stored = services.issued_certificate(obj)
+        if stored is None:
+            raise Http404
+        return attachments.serve(request, obj, stored.pk)
     return pdf_response(services.resale_certificate(obj), f"resale-certificate-{obj.pk}.pdf")

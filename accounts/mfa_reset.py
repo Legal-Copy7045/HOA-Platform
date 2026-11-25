@@ -172,4 +172,8 @@ def redeem_code(*, user: User, code: str, request=None) -> bool:
             outcome=Outcome.FAILURE,
             metadata={"user_id": user.pk, "attempts": reset.failed_attempts},
         )
+        if reset.failed_attempts == reset.MAX_CODE_ATTEMPTS:
+            # Someone may be guessing (review B4): tell the board, who can
+            # start a new reset once they have spoken to the owner.
+            _board_notice("mfa_reset_code_locked")
     return False

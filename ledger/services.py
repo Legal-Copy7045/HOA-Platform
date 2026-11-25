@@ -551,10 +551,28 @@ def budget_vs_actual(budget: Budget) -> dict:
 # --- Resale certificates ----------------------------------------------------------------------
 
 
+ISSUED_CERTIFICATE_LABEL = "Issued certificate"
+
+
 @internal("ledger service")
 def _issue(obj, actor):
     obj.issued_at = timezone.now()
     obj.save(update_fields=["issued_at"])
+    # Keep the certificate exactly as issued (review D5): later downloads serve
+    # this stored copy, never a fresh rendering from today's data.
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from documents.attachments import attach
+
+    attach(
+        obj,
+        SimpleUploadedFile(
+            f"resale-certificate-{obj.pk}.pdf", resale_certificate(obj), "application/pdf"
+        ),
+        actor=actor,
+        label=ISSUED_CERTIFICATE_LABEL,
+        allowed={"pdf"},
+    )
     if obj.fee_cents:
         LedgerEntry.objects.create(
             lot_id=obj.lot_id,
@@ -684,3 +702,21 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
         ),
     ]
     return pdf.render(body, title=f"Resale certificate {obj.pk}")
+
+
+def issued_certificate(obj: ResaleRequest):
+    """The stored PDF given to the buyer, or None before issue."""
+    from documents.attachments import attachments_for
+
+    return attachments_for(obj).filter(label=ISSUED_CERTIFICATE_LABEL).order_by("-id").first()
+
+
+@internal("ledger service")
+def save_disclosures(obj: ResaleRequest, text: str, *, actor, request=None) -> None:
+    require(actor, "resale.manage")
+    with transaction.atomic():
+        locked = ResaleRequest.objects.select_for_update().get(pk=obj.pk)
+        if locked.state not in ("submitted", "in_progress"):
+            raise LedgerError("Disclosures can be changed only before the certificate is issued.")
+        ResaleRequest.objects.filter(pk=obj.pk).update(other_disclosures=text[:5000])
+        record_event("resale.disclosures_saved", actor=actor, request=request, target=obj)

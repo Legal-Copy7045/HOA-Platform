@@ -14,6 +14,7 @@ from community.models import ContactProfile, Lot, Ownership, Person
 from community.rules import rule, rule_with_citation
 from core.policy import SYSTEM, can, require
 from core.scoping import system_access
+from core.text import single_line
 from core.workflow import Transition, Workflow
 from governance.models import (
     Attendance,
@@ -39,10 +40,10 @@ class GovernanceError(ValueError):
 
 def create_meeting(*, title, kind, starts_at, location="", agenda="", actor, request=None):
     require(actor, "meeting.manage")
-    if kind not in MeetingKind.values or not title.strip():
+    if kind not in MeetingKind.values or not single_line(title):
         raise GovernanceError("A meeting needs a title and a type.")
     meeting = Meeting.objects.create(
-        title=title.strip()[:200],
+        title=single_line(title)[:200],
         kind=kind,
         starts_at=starts_at,
         location=location[:200],
@@ -92,7 +93,7 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
         for person in owners:
             if person.pk in consent and (person.email or person.user_id):
                 send_mail(
-                    f"[{settings.SITE_NAME}] Meeting notice: {meeting.title}",
+                    f"[{settings.SITE_NAME}] Meeting notice: {single_line(meeting.title)}",
                     body,
                     None,
                     [person.user.email if person.user_id else person.email],
@@ -188,7 +189,7 @@ def record_resolution(
     request=None,
 ) -> Resolution:
     require(actor, "resolution.record")
-    if not title.strip() or not text.strip():
+    if not single_line(title) or not text.strip():
         raise GovernanceError("A resolution needs a title and its text.")
     if supersedes is not None and supersedes.superseded_by.exists():
         raise GovernanceError("That resolution has already been superseded.")
@@ -202,7 +203,7 @@ def record_resolution(
         resolution = Resolution.objects.create(
             number=next_resolution_number(adopted_on.year),
             kind=kind,
-            title=title.strip()[:200],
+            title=single_line(title)[:200],
             text=text.strip(),
             adopted_on=adopted_on,
             meeting=meeting,
@@ -315,13 +316,13 @@ def create_vote(
 ) -> Vote:
     require(actor, "vote.manage")
     options = [o.strip() for o in options if o and o.strip()]
-    if kind not in VoteKind.values or not title.strip():
+    if kind not in VoteKind.values or not single_line(title):
         raise GovernanceError("A vote needs a title and a type.")
     if len(options) < 2 or len(set(options)) != len(options):
         raise GovernanceError("Give at least two different options.")
     with transaction.atomic():
         vote = Vote.objects.create(
-            title=title.strip()[:200],
+            title=single_line(title)[:200],
             kind=kind,
             description=description,
             secret=secret,

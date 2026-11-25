@@ -191,6 +191,25 @@ def test_print_invitation_link_replaces_a_lost_bootstrap_link(client):
         run("print_invitation_link", email="nobody@example.com")
 
 
+def test_print_invitation_link_refuses_once_anyone_has_a_login():
+    """Review E7: after bootstrap, a printed link would hand whoever runs the
+    command another person's identity (for example a newly elected officer)."""
+    from community.tests.factories import PersonFactory, make_member
+
+    make_member(board=True)
+    PersonFactory(email="new.officer@example.com")
+    with pytest.raises(CommandError, match="already has logins"):
+        run("print_invitation_link", email="new.officer@example.com")
+
+
+def test_web_and_worker_refuse_to_run_as_the_database_owner(settings):
+    """Review E6: the test database connection is the owner role."""
+    with pytest.raises(CommandError, match="not the runtime role"):
+        call_command("check_db_role")
+    settings.DB_APP_ROLE = ""
+    call_command("check_db_role")  # single-role databases are allowed to skip
+
+
 def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
     """The whole demo community renders on every board and owner page."""
     from django.urls import reverse
@@ -230,3 +249,26 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
         "tasks",
     ):
         assert client.get(reverse(name)).status_code == 200, name
+
+
+def test_rescan_blocks_a_file_found_infected_later(client, sysadmin, settings):
+    """Review C2: attachments could never be rescanned or quarantined."""
+    from unittest import mock
+
+    from arc import services as arc
+    from documents import attachments
+    from documents.tests.helpers import pdf
+
+    lot = LotFactory()
+    owner = make_member(lots=[lot])
+    req = arc.create_request(lot=lot, title="Fence", description="x", actor=owner)
+    file = attachments.attach(req, pdf(), actor=owner)
+    client.force_login(owner)
+    url = reverse("arc_file", args=[req.pk, file.pk])
+    assert client.get(url).status_code == 200
+    with mock.patch(
+        "documents.management.commands.rescan_files.scan", return_value=("infected", "clamd")
+    ):
+        out = run("rescan_files", actor=sysadmin.email, reason="signatures updated today")
+    assert "infected: 1" in out
+    assert client.get(url).status_code == 404

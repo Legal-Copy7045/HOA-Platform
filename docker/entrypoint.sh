@@ -8,6 +8,7 @@ set -eu
 
 case "${1:-web}" in
   web)
+    python manage.py check_db_role
     exec gunicorn core.wsgi:application \
       --bind "0.0.0.0:${PORT:-8000}" \
       --workers "${WEB_CONCURRENCY:-3}" \
@@ -16,6 +17,7 @@ case "${1:-web}" in
       --error-logfile -
     ;;
   worker)
+    python manage.py check_db_role
     exec python manage.py procrastinate worker
     ;;
   migrate)

@@ -15,6 +15,9 @@ NOTICES = {
     "different board member must approve it in the portal.",
     "mfa_reset_approved": "A sign-in reset was approved. The account's authenticators were "
     "removed and all its sessions signed out.",
+    "mfa_reset_code_locked": "A sign-in reset code was locked after too many wrong entries. "
+    "Someone other than the owner may have been trying it. Contact the owner directly; "
+    "start a new reset once you are sure who you are speaking to.",
 }
 
 

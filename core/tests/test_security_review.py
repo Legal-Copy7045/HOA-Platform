@@ -230,3 +230,34 @@ def test_board_still_sees_the_whole_history(sold_lot, client):
     assert client.get(reverse("arc_detail", args=[sold_lot["old_arc"].pk])).status_code == 200
     page = client.get(reverse("violation_detail", args=[sold_lot["resolved"].pk]))
     assert b"SELLER-PRIVATE-REPLY" in page.content
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (" =HYPERLINK(1)", "' =HYPERLINK(1)"),
+        ("\n=1+1", "'\n=1+1"),
+        (chr(0xFF1D) + "1", "'" + chr(0xFF1D) + "1"),  # full-width equals
+        ("=SUM(A1)", "'=SUM(A1)"),
+        ("@x", "'@x"),
+        ("-12.50", "-12.50"),
+        ("$1,000", "$1,000"),
+        ("Plain", "Plain"),
+    ],
+)
+def test_csv_cells_cannot_start_a_formula(value, expected):
+    """C5: leading whitespace and full-width signs got past the old check."""
+    from reports.views import _safe_cell
+
+    assert _safe_cell(value) == expected
+
+
+def test_titles_are_single_line_for_email_subjects():
+    """C6: a newline in an announcement title made every send fail."""
+    from core.text import single_line
+
+    assert single_line("Pond\nclosed" + chr(0x2028) + "today\x0b!") == "Pond closed today !"
+
+
+def test_permissions_policy_header(client):
+    assert "camera=()" in client.get("/healthz")["Permissions-Policy"]

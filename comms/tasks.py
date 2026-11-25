@@ -5,6 +5,7 @@ from procrastinate.contrib.django import app
 
 from comms.models import Announcement
 from comms.services import recipients_for
+from core.text import single_line
 
 
 @app.task(queue="email", retry=3)
@@ -19,7 +20,12 @@ def email_announcement(announcement_id: int) -> int:
     )
     sent = 0
     for address in recipients_for(announcement.audience):
-        send_mail(f"[{settings.SITE_NAME}] {prefix}{announcement.title}", body, None, [address])
+        send_mail(
+            f"[{settings.SITE_NAME}] {prefix}{single_line(announcement.title)}",
+            body,
+            None,
+            [address],
+        )
         sent += 1
     Announcement.objects.filter(pk=announcement.pk).update(emailed_count=sent)
     return sent

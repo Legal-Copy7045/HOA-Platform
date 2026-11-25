@@ -24,6 +24,10 @@ export APP_VERSION="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || ec
 
 echo "==> Building the portal image"
 "${COMPOSE[@]}" build --pull
+echo "==> Stopping the old containers (data volumes are kept)"
+# A clean stop lets network layout changes apply (e.g. the separate edge
+# network added in the 2026-11 security review). Downtime is a few seconds.
+"${COMPOSE[@]}" down --remove-orphans
 echo "==> Starting (migrations run first, as the owner role)"
 "${COMPOSE[@]}" up -d --remove-orphans
 
