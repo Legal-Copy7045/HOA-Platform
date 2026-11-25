@@ -1,2 +1,30 @@
-# core has no models of its own. This module exists so Django sends core's
-# post_migrate signal, which applies runtime DB grants (see core.db_roles).
+"""Shared models. Also ensures Django sends core's post_migrate signal, which
+applies runtime DB grants (see core.db_roles)."""
+
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+
+from core.append_only import AppendOnlyModel
+
+
+class WorkflowEvent(AppendOnlyModel):
+    """One step in any workflow (ARC, invoice, violation, ...). Never changed."""
+
+    workflow = models.CharField(max_length=32)
+    object_id = models.CharField(max_length=32)
+    action = models.CharField(max_length=32)
+    from_state = models.CharField(max_length=32)
+    to_state = models.CharField(max_length=32)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["workflow", "object_id"])]
+
+    def __str__(self) -> str:
+        return f"{self.workflow}#{self.object_id} {self.action}"
