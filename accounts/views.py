@@ -154,5 +154,6 @@ def onboarding(request):
             "counts": counts,
             "labels": services.ONBOARDING_LABELS,
             "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
+            "remind_count": len(services.reminder_due(rows=rows)),
         },
     )

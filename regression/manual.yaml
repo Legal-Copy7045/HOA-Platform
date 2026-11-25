@@ -49,3 +49,15 @@
   check: "System status shows Update available after a push to main, and Install update brings the VM to the new version without terminal access."
   steps: "Push a harmless change to main; within 15 minutes System status shows Update available; press Install update; within a few minutes the Version box shows the new commit."
   last: ""
+- key: my account how to pay
+  check: "On a phone, My account reads clearly for an owner: amount and Due by, who to make checks payable to and where to mail them, a statement with Charges / Payments / Balance that fits or scrolls sideways."
+  steps: "Set Remit to under Finance, Letters; sign in as a demo owner with a balance on a phone; open My account."
+  last: ""
+- key: letters unsaved changes warning
+  check: "On Finance, Letters, typing in one section and then saving another asks first; leaving the page with unsaved edits asks first."
+  steps: "Edit the letterhead, press Save wording on a notice: a prompt names the letterhead section. Edit again and click another menu link: the browser asks to leave."
+  last: ""
+- key: settings dues confirmation
+  check: "Community settings shows '= $75.00 per month' while typing dues, and asks for confirmation when dues change by more than 25%."
+  steps: "Community settings, Monthly dues: type 75; then type 150 and save: a confirmation page names the old and new amounts."
+  last: ""

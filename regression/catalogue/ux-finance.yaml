@@ -14,3 +14,9 @@
 - feature: "Finance page fixes: month picker and preview for dues, labeled GL accounts, 1099 table, unsaved-changes warning on Letters, shared collection note, invoice file before approval"
   since: M4
   match: ["^unit:ledger/tests/test_finance_ux.py::test_(dues_form|posting_dues|accounting_setup|1099|letters|app_js|collection_case|invoice_file)", "^manual:letters unsaved changes warning"]
+- feature: "Board settings: dues shown back in dollars, confirmation for a dues change over 25%, needs-attention rules first"
+  since: M4
+  match: ["^unit:core/tests/test_board_settings_ux.py::test_(dues|saving_dues|big_dues|small_dues|rules_needing|owner_cannot_save_rules)", "^manual:settings dues confirmation"]
+- feature: "Board pages: counted confirmation before reminding invitees, named confirmation before switching a feature off, Save all on Lot neighbors"
+  since: M4
+  match: ["^unit:core/tests/test_board_settings_ux.py::test_(remind|switching|neighbors|owner_cannot_save_neighbors)"]
