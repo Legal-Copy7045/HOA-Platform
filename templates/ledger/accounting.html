@@ -29,13 +29,15 @@
         {% else %}<p class="muted small">None yet.</p>{% endif %}</section>
       <section class="card"><h2>1099 worksheet</h2>
         <form method="get" class="inline-form"><div><label for="yr">Calendar year</label><input id="yr" name="year" value="{{ year }}" inputmode="numeric" size="6"></div><button type="submit" class="secondary">Show</button><a class="btn secondary" href="{% url 'accounting_1099' year %}">{% icon "download" %} CSV</a></form>
-        {% if vendors_1099 %}<table class="table small"><thead><tr><th>Vendor</th><th>Paid</th><th>Over threshold</th><th>W-9</th></tr></thead><tbody>{% for r in vendors_1099 %}<tr><td>{{ r.vendor.name }}</td><td>{{ r.total_cents|cents }}</td><td>{% if r.over %}<strong>Yes</strong>{% endif %}</td><td>{% if r.w9 %}On file{% else %}<span class="status tone-warning">Missing</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+        {% if vendors_1099 %}<div class="table-wrap"><table><thead><tr><th>Vendor</th><th class="num">Paid</th><th>Over threshold</th><th>W-9</th></tr></thead><tbody>{% for r in vendors_1099 %}<tr><td>{{ r.vendor.name }}</td><td class="num">{{ r.total_cents|cents }}</td><td>{% if r.over %}<strong>Yes</strong>{% endif %}</td><td>{% if r.w9 %}On file{% else %}<span class="status tone-warning">Missing</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
         {% else %}<p class="muted small">No vendor payments that year.</p>{% endif %}
         <p class="small muted">A worksheet for the treasurer: corporations are generally exempt, and the IRS threshold is a setting under Community settings.</p></section>
       {% if can_manage %}<section class="card"><h2>Setup</h2>
         <form method="post">{% csrf_token %}<input type="hidden" name="section" value="setup">
-          <p><label>Accounts, one per line as "key = account" <textarea name="gl_accounts" rows="8">{{ setup.gl_accounts }}</textarea></label></p>
-          <p class="small muted">Keys: cash, receivable, assessment, late_fee, resale_fee, other_charge, credit. Expenses use each invoice's category code.</p>
+          <fieldset class="form-grid"><legend>Account for each kind of entry in the export</legend>
+            {% for g in gl_rows %}<div class="field"><label for="gl_{{ g.key }}">{{ g.label }}</label><input id="gl_{{ g.key }}" name="gl_{{ g.key }}" value="{{ g.value }}" maxlength="80"></div>{% endfor %}
+          </fieldset>
+          <p class="small muted">Account number and name as in your accounting package, e.g. "1000 Operating cash". Leave a box empty to use the standard account. Expenses use each invoice's category code.</p>
           <div class="inline-form"><div><label for="oc">Opening bank balance</label><input id="oc" name="opening_cash" value="{{ setup.opening_cash_cents|cents_plain }}" inputmode="decimal"></div><div><label for="od">as of</label><input id="od" type="date" name="opening_cash_on" value="{{ setup.opening_cash_on|date:'Y-m-d' }}"></div></div>
           <div class="form-actions"><button type="submit" class="secondary">Save setup</button></div></form></section>{% endif %}
     </div>

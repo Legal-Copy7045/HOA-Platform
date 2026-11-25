@@ -8,17 +8,18 @@
     <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<a href="{% url 'collection_detail' open_case.pk %}">{% icon "alert" %}Open collection case</a>{% endif %}</div></div>
     <div class="actions">
       <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">{% icon "download" %} Statement</a>
-      {% if user|can:"collections.manage" %}<details class="menu-details"><summary class="btn secondary">{% icon "mail" %} Delinquency notice</summary><div class="panel-body">
-        <a href="{% url 'lot_notice_pdf' lot.pk 'first' %}">First notice + statement</a><br>
-        <a href="{% url 'lot_notice_pdf' lot.pk 'second' %}">Second notice + statement</a><br>
-        <a href="{% url 'lot_notice_pdf' lot.pk 'final' %}">Final notice + statement</a></div></details>{% endif %}
+      {% if can_manage %}<a class="btn secondary" href="{% url 'record_payments' %}">{% icon "receipt" %} Record payments</a>{% endif %}
     </div>
   </div>
-  <div class="grid grid-4">
-    <div class="stat {% if balance > 0 %}tone-warning{% elif balance < 0 %}tone-success{% endif %}"><div class="label">Balance</div><div class="value">{{ balance|cents }}</div></div>
-    <div class="stat"><div class="label">Current</div><div class="value">{{ aging.current|cents }}</div></div>
-    <div class="stat"><div class="label">31-60 days</div><div class="value">{{ aging.31_60|cents }}</div></div>
-    <div class="stat {% if aging.61_90 or aging.over_90 %}tone-danger{% endif %}"><div class="label">Over 60 days</div><div class="value">{{ aging.61_90|add:aging.over_90|cents }}</div>{% if aging.credit %}<div class="hint">unapplied credit {{ aging.credit|cents }}</div>{% endif %}</div>
+  {% if user|can:"collections.manage" %}<div class="actions-row notice-buttons" role="group" aria-label="Delinquency notices">
+    <span class="small muted">Delinquency notice with statement (PDF):</span>
+    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'first' %}">{% icon "mail" %} First notice</a>
+    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'second' %}">{% icon "mail" %} Second notice</a>
+    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'final' %}">{% icon "mail" %} Final notice</a>
+  </div>{% endif %}
+  <div class="grid grid-3">
+    <div class="stat {% if balance > 0 %}tone-warning{% elif balance < 0 %}tone-success{% endif %}"><div class="label">Balance</div><div class="value">{{ balance|cents }}</div>{% if aging.credit %}<div class="hint">unapplied credit {{ aging.credit|cents }}</div>{% endif %}</div>
+    {% for label, amount in aging_columns %}<div class="stat{% if amount and forloop.counter > 3 %} tone-danger{% endif %}"><div class="label">{{ label }}</div><div class="value">{{ amount|cents }}</div></div>{% endfor %}
   </div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Date</th><th>Entry</th><th class="num">Amount</th>{% if can_manage %}<th><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>

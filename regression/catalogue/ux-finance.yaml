@@ -1,0 +1,16 @@
+# UX review fixes: owner account page, finance pages, board settings pages.
+- feature: "My account: how to pay (payee, mailing address), Due by, Charges / Payments / running Balance; Pay online and fees only when online payment works"
+  since: M4
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(my_account|statement_rows|amount_due)", "^unit:payments/tests/test_fees", "^manual:my account how to pay"]
+- feature: "Record payments: a stack of checks on one page (board and manager), all or nothing, audited, then into a deposit"
+  since: M4
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(record_payments|recorded_list|board_and_manager_can|owner_and_auditor_cannot)"]
+- feature: "One set of aging buckets (Current, 1-30, 31-60, 61-90, Over 90) on lot pages, collections and the AR aging report"
+  since: M4
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(aging|lot_page)", "^unit:ledger/tests/test_ledger.py::test_aging"]
+- feature: "One Finance tab bar on every finance page"
+  since: M4
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(every_finance_page|finance_tabs|manager_does_not_see)"]
+- feature: "Finance page fixes: month picker and preview for dues, labeled GL accounts, 1099 table, unsaved-changes warning on Letters, shared collection note, invoice file before approval"
+  since: M4
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(dues_form|posting_dues|accounting_setup|1099|letters|app_js|collection_case|invoice_file)", "^manual:letters unsaved changes warning"]

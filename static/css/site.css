@@ -388,3 +388,10 @@ input.narrow { width: 5.5rem; }
 /* Stacked full-width secondary actions (sign-in alternatives). */
 .stack-actions { display: flex; flex-direction: column; gap: .5rem; margin-top: 1rem; }
 .stack-actions button { width: 100%; }
+
+/* Finance pages (UX review: owner account, record payments) */
+.pay-by-check address { font-style: normal; margin: 0 0 .5rem; }
+.batch-table input, .batch-table select { width: 100%; min-width: 7rem; }
+.batch-table .row-error td { background: var(--danger-bg); }
+.batch-table .row-error .error { color: var(--danger); font-size: .9rem; }
+.parsed-money { color: var(--ink-2); margin-left: .35rem; }

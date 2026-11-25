@@ -57,6 +57,39 @@ def _cents(value) -> str:
 
 # --- Accounting setup -------------------------------------------------------------------
 
+# One labeled input per account key on the setup form (UX review). Storage
+# stays the "key = account" text in AccountingSetup.gl_accounts.
+GL_LABELS = {
+    "cash": "Bank (operating cash)",
+    "receivable": "Owner receivables",
+    "assessment": "Dues (assessment) income",
+    "late_fee": "Late fee income",
+    "resale_fee": "Resale certificate fees",
+    "other_charge": "Other owner charges",
+    "credit": "Owner credits and adjustments",
+}
+
+
+def gl_rows(setup: AccountingSetup) -> list[dict]:
+    accounts = setup.accounts()
+    return [
+        {"key": key, "label": label, "value": accounts.get(key, "")}
+        for key, label in GL_LABELS.items()
+    ]
+
+
+def gl_text(setup: AccountingSetup, values: dict[str, str]) -> str:
+    """The stored text from one value per key. A blank box keeps the default;
+    keys the form does not show are kept as they were."""
+    accounts = setup.accounts()
+    lines = []
+    for key in GL_LABELS:
+        value = " ".join((values.get(key) or "").replace("=", " ").split())[:80]
+        if value:
+            lines.append(f"{key} = {value}")
+    lines += [f"{k} = {v}" for k, v in accounts.items() if k not in GL_LABELS]
+    return "\n".join(lines)
+
 
 def save_setup(*, gl_accounts: str, opening_cash_cents: int, opening_cash_on, actor, request=None):
     require(actor, "accounting.manage")

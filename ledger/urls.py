@@ -8,6 +8,7 @@ urlpatterns = [
     path("my-account/<int:lot_id>/statement.pdf", views.my_statement_pdf, name="my_statement_pdf"),
     path("finance/ledger/", views.ledger_home, name="ledger_home"),
     path("finance/ledger/lot/<int:pk>/", views.lot_ledger, name="lot_ledger"),
+    path("finance/ledger/record-payments/", views.record_payments, name="record_payments"),
     re_path(
         r"^finance/ledger/lot/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
         views.lot_ledger_action,

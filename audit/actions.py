@@ -255,6 +255,13 @@ _SPECS = [
         "reason",
         "target_id",
     ),
+    # --- UX review: finance and board admin pages ---
+    _spec(
+        "ledger.payments_batch_recorded",
+        "Owner payments recorded together (Record payments page)",
+        "count",
+        "total_cents",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

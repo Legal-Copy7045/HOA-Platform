@@ -9,7 +9,19 @@
     <div class="actions"><div class="amount-big">{{ balance|cents }}</div></div>
   </div>
   <div class="split">
-    <div>{% include "partials/workflow.html" with obj=obj %}</div>
+    <div>
+      {% if actions %}<section class="card" aria-labelledby="steps-h">
+        <h2 id="steps-h">Next steps</h2>
+        <form method="post" class="collection-steps" data-shared-note>{% csrf_token %}
+          <div class="field"><label for="case-note">Note for this step{% if note_required_for %} <span class="small muted">(required for {{ note_required_for|join:", " }})</span>{% endif %}</label>
+            <textarea id="case-note" name="note" rows="3"></textarea></div>
+          <div class="wf-actions">
+            {% for t in actions %}<button type="submit" formaction="{% url action_url_name obj.pk t.action %}" class="{% if t.action|is_danger %}danger{% elif not forloop.first %}secondary{% endif %}"{% if t.action|is_danger %} data-confirm="{{ t.label }}: are you sure?"{% endif %}>{{ t.label }}</button>{% endfor %}
+          </div>
+        </form>
+      </section>{% endif %}
+      {% include "partials/workflow.html" with obj=obj actions=None %}
+    </div>
     <aside>{% follow_up_form "collection" obj %}<section class="card"><h3>Letters</h3>
       {% if next_letter and user|can:"collections.manage" %}<form method="post" action="{% url 'collection_letter' obj.pk %}">{% csrf_token %}<p class="small">Next: <strong>{{ next_letter.label }}</strong>{% if next_letter.due_on %}, due {{ next_letter.due_on|date:"M j, Y" }}{% endif %}.</p><button type="submit">{% icon "download" %} Generate {{ next_letter.label|lower }}</button></form><p class="small muted">Downloads the letter with the statement to print and mail, logs it, and moves the case on.</p>{% endif %}
       {% if letters %}<ul class="list">{% for l in letters %}<li><span class="grow">{{ l.get_kind_display }}</span><span class="small muted">{{ l.generated_on|date:"M j, Y" }} · {{ l.amount_cents|cents }}</span></li>{% endfor %}</ul>{% endif %}
