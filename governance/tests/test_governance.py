@@ -315,11 +315,15 @@ def test_a_buyer_does_not_see_how_the_seller_voted(board):
         actor=SYSTEM,
     )
     vote = services.open_vote(vote, actor=board)
-    from unittest import mock
-
-    earlier = timezone.now() - timedelta(days=2)
-    with mock.patch.object(Ballot._meta.get_field("cast_at"), "default", lambda: earlier):
-        services.cast_ballot(vote, option_id=yes.pk, lot_id=lot.pk, actor=seller)
+    # A ballot the seller cast two days ago (written directly to set its date).
+    Ballot.objects.create(
+        vote=vote,
+        option=yes,
+        person=Person.objects.unscoped("t").get(user=seller),
+        lot=lot,
+        cast_by=seller,
+        cast_at=timezone.now() - timedelta(days=2),
+    )
     assert services.my_ballots(vote, seller)
     ownership = Ownership.objects.unscoped("t").get(lot=lot)
     community.end_ownership(ownership, end_date=timezone.localdate(), actor=SYSTEM)

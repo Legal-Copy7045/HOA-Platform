@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-1450
+# highest issued: UNIT-1458
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -597,6 +597,14 @@ UNIT-1448: "documents/tests/test_library_ux.py::test_invalid_upload_keeps_the_ti
 UNIT-1449: "community/tests/test_reservation_concurrency.py::test_concurrent_approvals_confirm_only_one"
 UNIT-145: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[reset_start]"
 UNIT-1450: "community/tests/test_reservation_concurrency.py::test_concurrent_instant_bookings_confirm_only_one"
+UNIT-1451: "arc/tests/test_signoffs.py::test_thumbnail_views_are_logged_and_marked"
+UNIT-1452: "comms/tests/test_pwa_push.py::test_a_broken_server_key_never_deletes_subscriptions"
+UNIT-1453: "arc/tests/test_owner_ux.py::test_editing_a_returned_draft_asks_the_neighbors_again"
+UNIT-1454: "governance/tests/test_governance.py::test_a_buyer_does_not_see_how_the_seller_voted"
+UNIT-1455: "core/tests/test_backups.py::test_too_large_upload_gets_a_page_people_can_act_on"
+UNIT-1456: "accounts/tests/test_signin_setup.py::test_help_page_links_signed_in_people_home_not_to_login"
+UNIT-1457: "community/tests/test_retention.py::test_text_message_number_is_cleared_too"
+UNIT-1458: "compliance/tests/test_owner_notices.py::test_owner_photos_have_their_own_allowance"
 UNIT-146: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[role_end]"
 UNIT-147: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[seat_end]"
 UNIT-148: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[sysadmin_activity]"
