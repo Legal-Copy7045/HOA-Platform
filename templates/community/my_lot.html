@@ -5,14 +5,14 @@
   <div class="page-head"><div><h1>My home</h1><p class="subtitle">Your lot, the people on your account, and changes you have asked the board to make.</p></div></div>
   {% for lot, ownerships, acct in lots %}
     <section class="card">
-      <div class="card-head"><div><h2>{{ lot }}</h2><div class="muted">{% icon "pin" %} {{ lot.street_address }}</div></div>{% if acct.account %}<span class="badge">Account {{ acct.account.number }}</span>{% endif %}</div>
+      <div class="card-head"><div><h2>{{ lot }}</h2><div class="muted">{% icon "pin" %} {{ lot.street_address }}</div></div>{% if acct.account %}<span class="small muted">Account number {{ acct.account.number }}</span>{% endif %}</div>
       <h3>Owners on the deed</h3>
       <ul class="list">{% for o in ownerships %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow"><div class="title">{{ o.person.display_name }}</div><div class="small muted">{{ o.get_ownership_type_display }} · since {{ o.start_date|date:"M j, Y" }}</div></div></li>{% endfor %}</ul>
       <p class="small muted">Owners change only with the deed (a sale or a new deed recorded by the board).</p>
       {% if acct %}
         <h3>Other people on the account</h3>
         <ul class="list">{% for c in acct.contacts %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow"><div class="title">{{ c.person.display_name }}</div><div class="small muted">{{ c.get_kind_display }} · since {{ c.start_date|date:"M j, Y" }}</div></div>
-          {% if acct.can_request %}<details class="row-menu"><summary>Ask to remove</summary><form method="post" action="{% url 'account_change_request' acct.account.pk %}" class="inline-form">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="contact" value="{{ c.pk }}"><input type="text" name="reason" maxlength="500" placeholder="Reason (optional)" aria-label="Reason"><button type="submit" class="danger small">Send to board</button></form></details>{% endif %}
+          {% if acct.can_request %}<details class="row-menu"><summary>Ask to remove</summary><form method="post" action="{% url 'account_change_request' acct.account.pk %}" class="inline-form">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="contact" value="{{ c.pk }}"><div class="grow"><label for="remove-reason-{{ c.pk }}">Reason (optional)</label><input id="remove-reason-{{ c.pk }}" type="text" name="reason" maxlength="500"></div><button type="submit" class="danger small">Send to board</button></form></details>{% endif %}
         </li>{% empty %}<li class="muted small">Nobody else yet.</li>{% endfor %}</ul>
         {% if acct.can_request %}
           <details class="panel"><summary>Ask to add someone</summary><div class="panel-body">
@@ -34,7 +34,7 @@
     </section>
   {% endfor %}
   <div class="grid grid-3">
-    {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}?mine=1"><div class="label">{% icon "pencil" %} Architectural requests</div><div class="hint">Apply for exterior changes and track decisions</div></a>{% endif %}
+    {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}?mine=1"><div class="label">{% icon "pencil" %} Home improvement approvals (ARC)</div><div class="hint">Apply for exterior changes and track decisions</div></a>{% endif %}
     <a class="stat" href="{% url 'violations' %}?mine=1"><div class="label">{% icon "flag" %} Notices about my home</div><div class="hint">Covenant notices and your responses</div></a>
     <a class="stat" href="{% url 'documents' %}"><div class="label">{% icon "folder" %} Documents</div><div class="hint">Governing documents, minutes and forms</div></a>
   </div>

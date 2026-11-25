@@ -105,6 +105,9 @@ MEMBER_PAGES = {
     "elections",
     "owner_budget",
     "reservations",
+    # Navigation and UX review (ux_nav): hub pages.
+    "voting",
+    "community_info",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -122,6 +125,7 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "settings_hub": ("GET", None),
     "proxy_grant": ("POST", "executive_meeting"),
     "proxy_revoke": ("POST", "proxy_b"),
     "consents": ("GET", None),

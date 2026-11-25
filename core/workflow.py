@@ -46,6 +46,9 @@ class Transition:
     guard: Guard | None = None
     note_required: bool = False
     after: Callable[[object, object], None] | None = field(default=None, compare=False)
+    # What the confirmation dialog says, naming what happens next (UX review).
+    # Steps that close or refuse something get a generic one if this is empty.
+    confirm: str = ""
 
 
 class Workflow:

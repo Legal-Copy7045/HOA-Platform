@@ -62,7 +62,11 @@ _TONES = {
         "appeal_decided",
         "done",
         "clean",
+        "resolved",
+        "certified",
+        "success",
     },
+    "info": {"nominations"},
     "warning": {
         "pending_approval",
         "submitted",
@@ -83,6 +87,10 @@ _TONES = {
         "queued",
         "scheduled",
         "draft",
+        "waiting",
+        "voting",
+        "neighbors",
+        "objected",
     },
     "danger": {
         "denied",
@@ -94,6 +102,9 @@ _TONES = {
         "code_locked",
         "infected",
         "overdue",
+        "declined",
+        "failed",
+        "failure",
     },
     "neutral": {"void", "withdrawn", "cancelled", "revoked", "dropped", "unscanned"},
 }
@@ -157,6 +168,31 @@ _DANGER_ACTIONS = {
 def is_danger(action: str) -> bool:
     """Workflow steps that close or refuse something get a confirm and red styling."""
     return action in _DANGER_ACTIONS
+
+
+@register.simple_tag(takes_context=True)
+def feature_on(context, url_name: str) -> bool:
+    """{% feature_on "elections" as on %}: is this page's feature switched on?"""
+    from core import features
+
+    return features.url_name_enabled(url_name, context.get("request"))
+
+
+@register.filter
+def list_messages(messages) -> dict:
+    """Split flashed messages into errors (announced at once) and the rest."""
+    errors, others = [], []
+    for message in messages:
+        (errors if "error" in (message.tags or "").split() else others).append(message)
+    return {"errors": errors, "others": others}
+
+
+@register.filter
+def short_date(value) -> str:
+    """{{ d|short_date }}: "Nov 3" this month, "Nov 3, 2027" otherwise."""
+    from core.dates import short_date as _short
+
+    return _short(value)
 
 
 @register.filter

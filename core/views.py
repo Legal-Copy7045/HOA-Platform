@@ -30,7 +30,7 @@ def home(request):
     hour = timezone.localtime().hour
     greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
     return render(
-        request, "home.html", {"dash": dashboard.build(request.user), "greeting": greeting}
+        request, "home.html", {"dash": dashboard.build(request.user, request), "greeting": greeting}
     )
 
 

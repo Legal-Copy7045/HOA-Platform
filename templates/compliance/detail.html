@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}V-{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block title %}Notice #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'violations' %}">Violations</a> / V-{{ obj.pk }}</div>
+  <div class="crumbs">{% if user|can:"violation.view_all" %}<a href="{% url 'violations' %}">Violations</a>{% else %}<a href="{% url 'violations' %}?mine=1">Notices about my home</a>{% endif %} / Notice #{{ obj.pk }}</div>
   <div class="page-head">
     <div><h1>{{ obj.get_category_display }}</h1>
-      <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}Lot {{ obj.lot.number }}</span><span>Observed {{ obj.observed_on|date:"M j, Y" }}</span>{% if obj.cure_by %}<strong>{% icon "clock" %}Cure by {{ obj.cure_by|date:"M j, Y" }}</strong>{% endif %}</div></div>
+      <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}Lot {{ obj.lot.number }}</span><span>Observed {{ obj.observed_on|date:"M j, Y" }}</span>{% if obj.cure_by %}<strong>{% icon "clock" %}Fix by {{ obj.cure_by|date:"M j, Y" }}</strong>{% endif %}</div></div>
     {% if obj.noticed_at %}<div class="actions"><a class="btn secondary" href="{% url 'violation_letter' obj.pk %}">{% icon "download" %} Notice letter</a></div>{% endif %}
   </div>
   <div class="split">

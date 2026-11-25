@@ -84,4 +84,19 @@
 - key: reservation booking on a phone
   check: "With Common area reservations switched on, an owner books an area on a phone (date and time pickers work), gets the email, and a board member confirms it from My items."
   steps: "Admin > Features: switch on reservations; Booking rules: make one area bookable; as an owner request a slot on a phone; as a board member confirm it; check the owner's email and the Calendar page."
+- key: sidebar groups on a phone
+  check: "On a phone, the Menu button opens the sidebar with focus inside it; Board, Finance and Admin start closed unless the current page is inside; a group opened or closed stays that way on the next page."
+  steps: "Sign in as a board member on a phone; open Menu; open Finance; go to another page; open Menu again (Finance still open); press Escape or tap outside (focus returns to Menu)."
+  last: ""
+- key: keyboard and screen reader menu
+  check: "With the phone-width menu closed, Tab never reaches hidden menu links, and VoiceOver or TalkBack reads count bubbles as 'N waiting on you' and error messages at once."
+  steps: "Narrow a desktop browser below 820px; Tab through the page; then try a failed form (for example a proxy with no holder) with a screen reader on."
+  last: ""
+- key: election ballot limit
+  check: "On an election ballot with 2 seats, a third box can't be ticked, the count reads '2 of 2 chosen', and Cast ballot asks 'Cast your ballot for X and Y?' before the password or passkey step."
+  steps: "Open a test election to voting; sign in as a test owner; tick candidates; press Cast ballot."
+  last: ""
+- key: print a page with values
+  check: "Printing Community settings or an owner statement shows the values in the fields and leaves out buttons and menus."
+  steps: "Open the page; browser Print preview."
   last: ""

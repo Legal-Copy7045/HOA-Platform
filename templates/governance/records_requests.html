@@ -3,10 +3,11 @@
 {% block title %}Records requests · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "governance/gov_nav.html" %}
-  <div class="page-head"><div><h1>Records requests</h1><p class="subtitle">Owners may ask to inspect association records. Requests and responses are tracked with their due dates.</p></div></div>
+  <div class="page-head"><div><h1>Records requests</h1><p class="subtitle">{% if mine %}Pennsylvania law lets owners inspect the association's records. Ask here and follow your request to its due date.{% else %}Owners may ask to inspect association records. Requests and responses are tracked with their due dates.{% endif %}</p></div>
+    {% if can_submit and user|can:"records_request.manage" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'records_requests' %}">All requests (board)</a>{% else %}<a class="btn secondary" href="{% url 'records_requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>#</th>{% if can_manage %}<th>From</th>{% endif %}<th>Request</th><th>Status</th><th>Due</th></tr></thead>
-    <tbody>{% for r in rows %}<tr><td><a href="{% url 'records_request_detail' r.pk %}">R-{{ r.pk }}</a></td>{% if can_manage %}<td>{{ r.requester.display_name }}</td>{% endif %}<td>{{ r.description|truncatechars:80 }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.due_on|date:"M j, Y"|default:"" }}</td></tr>
+    <tbody>{% for r in rows %}<tr><td><a href="{% url 'records_request_detail' r.pk %}">#{{ r.pk }}</a></td>{% if can_manage %}<td>{{ r.requester.display_name }}</td>{% endif %}<td>{{ r.description|truncatechars:80 }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.due_on|date:"M j, Y"|default:"" }}</td></tr>
     {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="folder" title="No requests" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% if can_submit %}<details class="panel"><summary>Make a request</summary><div class="panel-body"><form method="post">{% csrf_token %}<label for="d">Which records would you like to see?</label><textarea id="d" name="description" rows="4" required></textarea><div class="form-actions"><button type="submit">Submit request</button></div></form></div></details>{% endif %}

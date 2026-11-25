@@ -35,7 +35,7 @@
         <p class="small muted">Write your address on the check so the payment reaches the right account.</p>
       </div>
       {% if a.account %}<h3>On this account</h3>
-      <p class="small muted">Account {{ a.account.number }}</p>
+      <p class="small muted">Account number {{ a.account.number }}</p>
       <ul class="list">
         {% for p in a.owners %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow">{{ p.display_name }} <span class="small muted">Owner</span></div></li>{% endfor %}
         {% for c in a.contacts %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow">{{ c.person.display_name }} <span class="small muted">{{ c.get_kind_display }}</span></div></li>{% endfor %}

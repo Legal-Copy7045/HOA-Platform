@@ -144,6 +144,10 @@ ARC = Workflow(
             "arc.submit",
             "Submit for review",
             guard=_may_submit,
+            confirm=(
+                "Submit this request? The board checks it is "
+                "complete, then starts the review clock."
+            ),
             after=_mark_submitted,
         ),
         Transition(
@@ -153,6 +157,10 @@ ARC = Workflow(
             "arc.submit",
             "Request Neighbor Acknowledgements",
             guard=_may_request_acknowledgements,
+            confirm=(
+                "Email your neighbors and ask them to acknowledge this project? "
+                "You can't edit the request while they respond."
+            ),
             after=_send_acknowledgement_requests,
         ),
         Transition(
@@ -171,6 +179,10 @@ ARC = Workflow(
             "arc.intake",
             "Complete: start review",
             guard=_not_recused,
+            confirm=(
+                "Accept this request as complete? The review clock "
+                "starts now and the owner is told."
+            ),
             after=_start_clock,
         ),
         Transition(
@@ -180,6 +192,10 @@ ARC = Workflow(
             "arc.intake",
             "Return as incomplete",
             guard=_not_recused,
+            confirm=(
+                "Return this request to the owner as incomplete? They "
+                "see your note and can submit again."
+            ),
             note_required=True,
         ),
         Transition(
@@ -189,6 +205,7 @@ ARC = Workflow(
             "arc.submit",
             "Withdraw",
             guard=_lot_owner,
+            confirm="Withdraw this request? The review stops. You can start a new request later.",
         ),
         # Decisions: applied only through decide() / decide_appeal(), which also
         # write the Decision record.
@@ -199,6 +216,7 @@ ARC = Workflow(
             "arc.decide",
             "Approve",
             guard=_not_recused,
+            confirm="Approve this request? The owner gets a decision letter.",
         ),
         Transition(
             "approve_with_conditions",
@@ -207,9 +225,18 @@ ARC = Workflow(
             "arc.decide",
             "Approve with conditions",
             guard=_not_recused,
+            confirm="Approve with conditions? The owner gets a decision letter listing them.",
         ),
         Transition(
-            "deny", {ArcState.IN_REVIEW}, ArcState.DENIED, "arc.decide", "Deny", guard=_not_recused
+            "deny",
+            {ArcState.IN_REVIEW},
+            ArcState.DENIED,
+            "arc.decide",
+            "Deny",
+            guard=_not_recused,
+            confirm=(
+                "Deny this request? The owner gets a decision letter and can appeal to the board."
+            ),
         ),
         Transition(
             "appeal",
@@ -218,6 +245,9 @@ ARC = Workflow(
             "arc.submit",
             "Appeal to the board",
             guard=_within_appeal_window,
+            confirm=(
+                "Appeal this decision to the board? The board reviews it and sends a new decision."
+            ),
             note_required=True,
         ),
         Transition(
@@ -227,6 +257,7 @@ ARC = Workflow(
             "arc.appeal_decide",
             "Decide appeal",
             guard=_not_recused,
+            confirm="Record the board's decision on this appeal? The owner gets a letter.",
         ),
         Transition(
             "complete",
@@ -235,6 +266,7 @@ ARC = Workflow(
             "arc.intake",
             "Mark project complete",
             guard=_may_complete,
+            confirm="Mark the project complete? This closes the request.",
         ),
     ],
 )
