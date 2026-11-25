@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Invoices · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "operations/finance_nav.html" %}
+  <h1>Invoices</h1>
+  <p class="muted">Filter: <a href="?">all</a>{% for s in states %} · <a href="?state={{ s }}">{{ s|cut:"_"|capfirst }}</a>{% endfor %}</p>
+  <table><thead><tr><th>Vendor</th><th>No.</th><th>Date</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+    {% for i in rows %}<tr><td>{{ i.vendor }}</td><td><a href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td>{{ i.invoice_date }}</td><td>{{ i.category.code }}</td><td>{{ i.amount_cents|cents }}</td><td><span class="status">{{ i.state }}</span></td></tr>{% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_enter %}{% if has_categories %}<details><summary>Enter an invoice</summary>
+    <p class="muted">Under the threshold (default $500) one board member who did not enter it approves; at or above it, two different board members.</p>
+    <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Save draft</button></form></details>
+  {% else %}<p class="warning">Add expense categories first (Board → Budget).</p>{% endif %}{% endif %}
+{% endblock %}

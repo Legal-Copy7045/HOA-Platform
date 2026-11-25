@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Invoice {{ obj.number }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "operations/finance_nav.html" %}
+  <h1>{{ obj.vendor }} invoice #{{ obj.number }}</h1>
+  <p><span class="status">{{ obj.state }}</span> · {{ obj.amount_cents|cents }} · {{ obj.category }} · dated {{ obj.invoice_date }}{% if obj.due_date %} · due {{ obj.due_date }}{% endif %}{% if obj.work_order %} · <a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% endif %}</p>
+  {% if obj.description %}<div class="card">{{ obj.description|linebreaks }}</div>{% endif %}
+  <h2>Invoice file</h2>
+  <ul>{% for f in files %}<li><a href="{% url 'invoice_file' obj.pk f.pk %}">{{ f.original_filename }}</a></li>{% empty %}<li class="muted">No file attached.</li>{% endfor %}</ul>
+  {% if can_attach %}<form method="post" action="{% url 'invoice_action' obj.pk 'attach' %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" required aria-label="Invoice file"> <button type="submit">Attach</button></form>{% endif %}
+  <h2>Approvals <span class="muted">({{ approvals|length }} recorded; {{ needed }} approval{{ needed|pluralize }} needed)</span></h2>
+  <ul>{% for a in approvals %}<li>{{ a.approver.email }}: {{ a.get_decision_display }} <span class="muted">{{ a.created_at|date:"M j" }}{% if a.note %} · {{ a.note }}{% endif %}</span></li>{% empty %}<li class="muted">None yet.</li>{% endfor %}</ul>
+  {% if can_approve %}<form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="inline-block">{% csrf_token %}<input name="note" placeholder="Note (optional)" aria-label="Note"> <button type="submit">Approve</button></form>
+    <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="inline-block">{% csrf_token %}<input name="note" placeholder="Reason (required)" required aria-label="Reason"> <button type="submit" class="link">Reject</button></form>{% endif %}
+  <h2>Payments <span class="muted">({{ paid|cents }} of {{ obj.amount_cents|cents }})</span></h2>
+  <ul>{% for p in payments %}<li>{{ p.paid_on }} {{ p.get_method_display }} {{ p.reference }} {{ p.amount_cents|cents }}</li>{% empty %}<li class="muted">None.</li>{% endfor %}</ul>
+  {% if can_pay %}<form method="post" action="{% url 'invoice_action' obj.pk 'pay' %}">{% csrf_token %}{{ payment_form.as_p }}<button type="submit">Record payment</button></form>{% endif %}
+  {% include "partials/workflow.html" with obj=obj %}
+{% endblock %}

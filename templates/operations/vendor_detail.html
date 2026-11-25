@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ vendor.name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "operations/finance_nav.html" %}
+  <h1>{{ vendor.name }}</h1>
+  {% if can_manage %}<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Save</button></form>
+  {% else %}<p>{{ vendor.contact_name }} {{ vendor.email }} {{ vendor.phone }}</p>{% endif %}
+  <h2>Invoices</h2>
+  <table><tbody>{% for i in invoices %}<tr><td><a href="{% url 'invoice_detail' i.pk %}">#{{ i.number }}</a></td><td>{{ i.invoice_date }}</td><td>{{ i.amount_cents|cents }}</td><td><span class="status">{{ i.state }}</span></td></tr>{% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Work orders · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "operations/finance_nav.html" %}
+  <h1>Work orders</h1>
+  <table><thead><tr><th>#</th><th>Work</th><th>Area</th><th>Vendor</th><th>Priority</th><th>Status</th><th>Due</th></tr></thead><tbody>
+    {% for w in rows %}<tr><td><a href="{% url 'work_order_detail' w.pk %}">WO-{{ w.pk }}</a></td><td>{{ w.title }}</td><td>{{ w.common_area|default:"" }}</td><td>{{ w.vendor|default:"" }}</td><td>{{ w.get_priority_display }}</td><td><span class="status">{{ w.state }}</span></td><td>{{ w.due_on|default:"" }}</td></tr>{% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_manage %}<details><summary>New work order</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Create</button></form></details>{% endif %}
+{% endblock %}

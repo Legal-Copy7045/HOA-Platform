@@ -126,6 +126,15 @@ PROTECTED = {
     "violation_photo": ("POST", "violation_b"),
     "violation_file": ("GET", "violation_b"),
     "violation_letter": ("GET", "violation_b"),
+    "vendors": ("GET", None),
+    "vendor_detail": ("GET", "vendor"),
+    "work_orders": ("GET", None),
+    "work_order_detail": ("GET", "work_order"),
+    "work_order_action": ("POST", "work_order"),
+    "invoices": ("GET", None),
+    "invoice_detail": ("GET", "invoice"),
+    "invoice_action": ("POST", "invoice"),
+    "invoice_file": ("GET", "invoice"),
 }
 
 
@@ -226,6 +235,20 @@ def world():
             lot=lot_b, category="parking", description="Lot B boat in driveway", actor=board
         )
         violation_b_file = attach(violation_b, pdf("boat.pdf"), actor=board)
+        from operations import services as operations
+        from operations.models import ExpenseCategory
+
+        vendor = operations.save_vendor(name="Pond Pros (demo)", actor=board)
+        work_order = operations.create_work_order(title="Fix pond pump", actor=board)
+        invoice = operations.create_invoice(
+            vendor=vendor,
+            number="INV-1",
+            invoice_date=timezone.localdate(),
+            amount_cents=12345,
+            category=ExpenseCategory.objects.create(code="5100", name="Pond"),
+            actor=board,
+        )
+        invoice_file = attach(invoice, pdf("invoice.pdf"), actor=board)
     targets = {
         "lot": lot_b.pk,
         "person": person_b.pk,
@@ -248,6 +271,10 @@ def world():
         "arc_b_file": arc_b_file.pk,
         "violation_b": violation_b.pk,
         "violation_b_file": violation_b_file.pk,
+        "vendor": vendor.pk,
+        "work_order": work_order.pk,
+        "invoice": invoice.pk,
+        "invoice_file": invoice_file.pk,
     }
     return {
         "owner_a": owner_a,
@@ -292,6 +319,12 @@ def _url(name, key, targets):
         kwargs["action"] = "send_notice"
     elif name == "violation_file":
         kwargs["file_id"] = targets["violation_b_file"]
+    elif name == "work_order_action":
+        kwargs["action"] = "cancel"
+    elif name == "invoice_action":
+        kwargs["action"] = "submit"
+    elif name == "invoice_file":
+        kwargs["file_id"] = targets["invoice_file"]
     return reverse(name, kwargs=kwargs)
 
 

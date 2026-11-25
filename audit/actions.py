@@ -132,6 +132,13 @@ _SPECS = [
     _spec("arc.letter_downloaded", "ARC decision letter downloaded"),
     _spec("violation.reported", "Violation reported", "lot_id", "category"),
     _spec("violation.letter_downloaded", "Violation notice downloaded"),
+    _spec("vendor.saved", "Vendor saved"),
+    _spec("category.created", "Expense category created"),
+    _spec("work_order.created", "Work order created", "priority"),
+    _spec("work_order.vendor_set", "Work order vendor set"),
+    _spec("invoice.entered", "Invoice entered", "amount_cents"),
+    _spec("invoice.approval_given", "Invoice approval given", "have", "need"),
+    _spec("invoice.payment_recorded", "Invoice payment recorded", "amount_cents", "method"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

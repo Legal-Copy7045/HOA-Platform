@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Vendors · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "operations/finance_nav.html" %}
+  <h1>Vendors</h1>
+  <table><thead><tr><th>Vendor</th><th>Services</th><th>Insurance</th><th>W-9</th></tr></thead><tbody>
+    {% for v in vendors %}<tr><td><a href="{% url 'vendor_detail' v.pk %}">{{ v.name }}</a>{% if not v.active %} <span class="muted">(inactive)</span>{% endif %}</td><td>{{ v.services }}</td>
+      <td>{% if v.insurance_expires_on %}{% if v.insurance_expires_on < today %}<span class="overdue">expired {{ v.insurance_expires_on }}</span>{% elif v.insurance_expires_on <= soon %}<span class="overdue">expires {{ v.insurance_expires_on }}</span>{% else %}{{ v.insurance_expires_on }}{% endif %}{% else %}<span class="muted">not recorded</span>{% endif %}</td><td>{{ v.w9_on_file|yesno:"yes,no" }}</td></tr>{% empty %}<tr><td class="muted">No vendors yet.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_manage %}<details><summary>Add a vendor</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Add</button></form></details>{% endif %}
+{% endblock %}
