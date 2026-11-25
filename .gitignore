@@ -14,3 +14,6 @@ staticfiles/
 
 # Regression run output (results, logs, report)
 regression/out/
+
+# Temporary working copies used by parallel builders
+.claude/worktrees/
