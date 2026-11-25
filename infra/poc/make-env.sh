@@ -67,6 +67,8 @@ EMAIL_REDIRECT_ALL_TO=${REDIRECT_TO}
 
 # POC only: fictional demo data allowed. Never true in production.
 SEED_DEMO_ALLOWED=true
+# Marks this deployment as the POC; production ignores SEED_DEMO_ALLOWED otherwise.
+DEPLOYMENT_STAGE=poc
 
 OFFICERS_REQUIRE_BOARD_SEAT=true
 OFFICERS_REQUIRE_BOARD_SEAT_CITATION=

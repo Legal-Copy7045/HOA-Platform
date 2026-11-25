@@ -6,6 +6,7 @@ urlpatterns = [
     path("invite/accept/", views.invite_accept, name="invite_accept"),
     path("invite/<str:token>/", views.invite_landing, name="invite_landing"),
     path("account/enroll-code/", views.enroll_with_code, name="enroll_with_code"),
+    path("account/setup-expired/", views.account_setup_expired, name="account_setup_expired"),
     path("board/invitations/", board_views.invitations, name="invitations"),
     path("board/people/<int:pk>/invite/", board_views.invite_person, name="invite_person"),
     re_path(

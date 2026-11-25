@@ -44,7 +44,7 @@
             <p class="muted small">For a lost authenticator. Only after confirming it really is them. A different board member must approve.</p>
             <form method="post" action="{% url 'reset_start' person.pk %}">{% csrf_token %}{{ reset_form }}<div class="form-actions"><button type="submit" class="secondary">Start reset</button></div></form></div></details>{% endif %}
         {% else %}
-          <form method="post" action="{% url 'invite_person' person.pk %}">{% csrf_token %}{{ invite_form }}<div class="form-actions"><button type="submit">{% icon "mail" %} Send invitation</button></div></form>
+          {% if person.email %}<p class="small muted">The invitation goes to {{ person.email }}.</p><form method="post" action="{% url 'invite_person' person.pk %}">{% csrf_token %}<div class="form-actions"><button type="submit">{% icon "mail" %} Send invitation</button></div></form>{% else %}<p class="small muted">Add an email address to this person's record before inviting them.</p>{% endif %}
           {% for inv in invitations %}<p class="muted small">Invitation {{ inv.status }} (created {{ inv.created_at|date:"M j" }})</p>{% endfor %}
         {% endif %}
       </section>

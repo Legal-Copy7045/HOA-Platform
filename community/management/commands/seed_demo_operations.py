@@ -46,6 +46,16 @@ class Command(BaseCommand):
         with system_access("seed checks"):
             if not Lot.objects.exists():
                 raise CommandError("Run seed_demo first (no lots yet).")
+            from community.models import Ownership
+
+            real = (
+                Ownership.objects.active().exclude(person__display_name__endswith="(demo)").exists()
+            )
+            if real:
+                raise CommandError(
+                    "Refusing: some lots have owners who are not demo people. Demo data is "
+                    "only added to a community created by seed_demo."
+                )
         if Vendor.objects.exists():
             raise CommandError("Operations demo data already exists.")
         with transaction.atomic(), system_access("seed_demo_operations"):

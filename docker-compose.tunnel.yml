@@ -16,6 +16,7 @@
 x-production-env: &production-env
   DJANGO_SETTINGS_MODULE: core.settings.production
   DJANGO_DEBUG: "false"
+  DEPLOYMENT_STAGE: ${DEPLOYMENT_STAGE:-production}
   SESSION_COOKIE_SECURE: "true"
   CSRF_COOKIE_SECURE: "true"
   ADMIN_ENABLED: "false"

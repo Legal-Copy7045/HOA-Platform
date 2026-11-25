@@ -62,7 +62,7 @@ SECTIONS = [
         "Admin",
         [
             ("System status", "system_status", "activity", "system.view_status"),
-            ("Invitations", "invitations", "mail", "invite.send"),
+            ("Invitations", "invitations", "mail", "invite.resend"),
             ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
         ],
     ),

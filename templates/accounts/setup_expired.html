@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Finish setting up your account · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Your account isn't set up yet</h1>
+  <div class="alert warning">{% icon "lock" %}<span>This account has no passkey or authenticator app, and the time to add one has run out.</span></div>
+  <p class="muted">For your security, a password alone never opens an account. Ask a board member to send you a new invitation, or to start a sign-in reset. You'll then have an hour to add a passkey or authenticator app in the same browser.</p>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+{% endblock %}

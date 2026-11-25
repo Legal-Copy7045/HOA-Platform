@@ -14,6 +14,7 @@ SAFE_ENV = {
     "DJANGO_DEBUG": "false",
     "ADMIN_ENABLED": "false",
     "AUDIT_HASH_KEY": "k" * 40,
+    "TRUSTED_PROXY_CIDRS": "172.30.50.10/32",
 }
 
 
@@ -63,8 +64,20 @@ def test_safe_configuration_loads(monkeypatch):
         {"TRUSTED_PROXY_CIDRS": "::/0"},
         {"TRUSTED_PROXY_CIDRS": "not-a-network"},
         {"PORTAL_BASE_URL": "http://localhost:8000"},
+        {"TRUSTED_PROXY_CIDRS": ""},  # review B5: rate limits would key on the proxy
     ],
 )
 def test_unsafe_configuration_is_refused(monkeypatch, overrides):
     with pytest.raises(ImproperlyConfigured):
         _load(monkeypatch, **overrides)
+
+
+def test_direct_connections_can_opt_out_of_a_proxy(monkeypatch):
+    module = _load(monkeypatch, TRUSTED_PROXY_CIDRS="", NO_TRUSTED_PROXY="true")
+    assert module.TRUSTED_PROXY_CIDRS == []
+
+
+@pytest.mark.parametrize("stage,allowed", [("production", False), ("poc", True)])
+def test_demo_data_only_on_a_deployment_marked_poc(monkeypatch, stage, allowed):
+    module = _load(monkeypatch, SEED_DEMO_ALLOWED="true", DEPLOYMENT_STAGE=stage)
+    assert module.SEED_DEMO_ALLOWED is allowed

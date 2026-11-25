@@ -72,6 +72,7 @@ if ADMIN_ENABLED:
 MIDDLEWARE = [
     "core.middleware.RequestIDMiddleware",
     "core.net.TrustedProxyMiddleware",
+    "core.uploads.RequestSizeLimitMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "csp.middleware.CSPMiddleware",
@@ -238,6 +239,17 @@ DOCUMENT_MAX_BYTES = env.int("DOCUMENT_MAX_BYTES", default=25 * 1024 * 1024)
 DOCUMENT_SCANNER = env("DOCUMENT_SCANNER", default="none")
 DOCUMENT_CLAMD_ADDRESS = env("DOCUMENT_CLAMD_ADDRESS", default="")
 DOCUMENT_REQUIRE_CLEAN_SCAN = env.bool("DOCUMENT_REQUIRE_CLEAN_SCAN", default=False)
+# Files per ARC request, violation or invoice. Attachments are permanent, so
+# this stops one account filling the bucket.
+# How long a new login (fresh invitation or assisted reset) has to enroll a
+# passkey or authenticator app, in that same browser session (finding B2).
+MFA_ENROLLMENT_WINDOW_SECONDS = env.int("MFA_ENROLLMENT_WINDOW_SECONDS", default=3600)
+ATTACHMENTS_PER_OBJECT_MAX = env.int("ATTACHMENTS_PER_OBJECT_MAX", default=40)
+FILE_UPLOAD_HANDLERS = [
+    "core.uploads.LimitedUploadHandler",
+    "django.core.files.uploadhandler.MemoryFileUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
 
 # Ledger: late fees cannot be posted until the board has reviewed PA law and
 # turned this on (decision recorded 2026-11-25).

@@ -20,7 +20,8 @@ RUN --mount=type=secret,id=extra_ca,required=false \
     if [ -f /run/secrets/extra_ca ]; then export PIP_CERT=/run/secrets/extra_ca; fi; \
     pip install --require-hashes -r requirements/base.txt
 
-COPY --chown=app:app . .
+# Copied as root: the runtime user can read the code but never change it.
+COPY . .
 
 # collectstatic needs settings to import; these values exist only for this step.
 RUN DJANGO_SETTINGS_MODULE=core.settings.local \
@@ -28,6 +29,10 @@ RUN DJANGO_SETTINGS_MODULE=core.settings.local \
     DATABASE_URL=sqlite:////tmp/build.sqlite3 \
     python manage.py collectstatic --noinput \
  && rm -f /tmp/build.sqlite3
+
+# Safe default: anything run from this image uses production settings unless
+# told otherwise (compose sets local settings explicitly for development).
+ENV DJANGO_SETTINGS_MODULE=core.settings.production
 
 USER app
 EXPOSE 8000

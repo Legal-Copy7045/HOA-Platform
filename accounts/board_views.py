@@ -8,7 +8,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from accounts import mfa_reset, services
-from accounts.board_forms import InviteForm, StartResetForm
+from accounts.board_forms import StartResetForm
 from accounts.models import Invitation, MfaReset
 from community.models import Person
 from core import policy
@@ -16,42 +16,28 @@ from core import policy
 
 @login_required
 def invitations(request):
-    policy.require(request.user, "invite.send")
+    policy.require(request.user, "invite.resend")
     rows = Invitation.objects.for_user(request.user).select_related("person")[:200]
     # Sysadmins see invitation status only, not the register (decision D9).
     return render(request, "accounts/board/invitations.html", {"invitations": rows})
 
 
-def _person_for_invite(request, pk):
-    # Board and sysadmins may invite; sysadmins cannot browse people (D9), so
-    # the person is looked up without exposing anything beyond this form.
-    if policy.can(request.user, "person.manage"):
-        return get_object_or_404(Person.objects.for_user(request.user), pk=pk)
-    return get_object_or_404(Person.objects.unscoped("invite by id (sysadmin)"), pk=pk)
-
-
 @login_required
 @require_POST
 def invite_person(request, pk):
+    # Board only: an invitation decides who controls a person's identity, so a
+    # sysadmin (who sees no people, D9) cannot create one (review finding A1).
     policy.require(request.user, "invite.send")
-    person = _person_for_invite(request, pk)
-    back = (
-        reverse("person_detail", args=[person.pk])
-        if policy.can(request.user, "person.manage")
-        else reverse("invitations")
-    )
-    form = InviteForm(request.POST)
-    if not form.is_valid():
-        messages.error(request, "Enter a valid email address.")
-        return redirect(back)
+    person = get_object_or_404(Person.objects.for_user(request.user), pk=pk)
+    back = reverse("person_detail", args=[person.pk])
     try:
-        services.create_invitation(
-            person=person, email=form.cleaned_data["email"], actor=request.user, request=request
-        )
+        services.create_invitation(person=person, actor=request.user, request=request)
     except services.InvitationError as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, "Invitation queued. The email goes out within a minute.")
+        messages.success(
+            request, "Invitation queued to the address on file. It goes out within a minute."
+        )
     return redirect(back)
 
 
@@ -59,7 +45,7 @@ def invite_person(request, pk):
 @require_POST
 def invitation_action(request, pk, action):
     pk = int(pk)
-    policy.require(request.user, "invite.send" if action == "resend" else "invite.revoke")
+    policy.require(request.user, "invite.resend" if action == "resend" else "invite.revoke")
     invitation = get_object_or_404(Invitation.objects.unscoped("invitation action"), pk=pk)
     try:
         if action == "resend":

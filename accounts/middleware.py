@@ -11,6 +11,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import Resolver404, resolve
 
+from accounts import enrollment
 from accounts.auth import has_strong_authenticator
 
 # Pages a not-yet-enrolled user may open.
@@ -23,6 +24,9 @@ ALLOWED_URL_NAMES = {
     "enroll_with_code",  # assisted reset (step 7)
 }
 
+
+# Reachable even when the enrollment window has expired.
+EXPIRED_ALLOWED_URL_NAMES = {"account_logout", "healthz", "account_setup_expired"}
 
 # While an approved assisted reset waits for its code, only these work.
 RESET_ALLOWED_URL_NAMES = {"enroll_with_code", "account_logout", "healthz"}
@@ -54,11 +58,31 @@ class RequireMFAMiddleware:
 
     def __call__(self, request):
         user = getattr(request, "user", None)
-        if user is not None and user.is_authenticated and not _is_static(request):
-            from accounts.mfa_reset import open_reset_for
+        from accounts.mfa_reset import open_reset_for
 
-            if open_reset_for(user) and _url_name(request) not in RESET_ALLOWED_URL_NAMES:
-                return redirect("enroll_with_code")
+        if (
+            user is not None
+            and user.is_authenticated
+            and not _is_static(request)
+            and open_reset_for(user)
+            and _url_name(request) not in RESET_ALLOWED_URL_NAMES
+        ):
+            return redirect("enroll_with_code")
+        if (
+            user is not None
+            and user.is_authenticated
+            and not _is_static(request)
+            and _url_name(request) not in EXPIRED_ALLOWED_URL_NAMES
+            and not has_strong_authenticator(user)
+            and not enrollment.allowed(request)
+            and not open_reset_for(user)
+        ):
+            # No authenticator and no enrollment window in this session: a
+            # password (or emailed reset) alone never opens the account.
+            from django.contrib.auth import logout
+
+            logout(request)
+            return redirect("account_setup_expired")
         if (
             user is not None
             and user.is_authenticated

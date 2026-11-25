@@ -76,9 +76,16 @@ def test_allauth_emails_name_the_community_not_the_server(client, owner):
     assert "testserver" not in body
 
 
+def _with_enrollment_window(client):
+    session = client.session
+    session["mfa_enrollment_until"] = 2**40
+    session.save()
+
+
 def test_account_without_authenticator_can_only_enroll(client):
     user = make_member(lots=[LotFactory()], mfa=False)
     client.force_login(user)
+    _with_enrollment_window(client)
     response = client.get(reverse("home"))
     assert response.status_code == 302
     assert response["Location"] == reverse("mfa_index")
@@ -96,7 +103,28 @@ def test_mfa_is_mandatory_for_every_kind_of_account(client, who):
         "sysadmin": {"roles": [Role.SYSADMIN]},
     }[who]
     client.force_login(make_member(mfa=False, **kwargs))
+    _with_enrollment_window(client)
     assert client.get(reverse("home"))["Location"] == reverse("mfa_index")
+
+
+@pytest.mark.parametrize("url_name", ["home", "mfa_index", "mfa_activate_totp"])
+def test_password_alone_never_opens_an_unenrolled_account(client, url_name):
+    """Review finding B2: someone who learned the password (or reset it from the
+    mailbox) must not be able to sign in and enroll their own authenticator.
+    Enrollment is only possible in the session that accepted the invitation."""
+    client.force_login(make_member(lots=[LotFactory()], mfa=False))
+    response = client.get(reverse(url_name))
+    assert response.status_code == 302
+    assert response["Location"] == reverse("account_setup_expired")
+    assert "_auth_user_id" not in client.session  # signed out
+
+
+def test_enrollment_window_expires(client, settings):
+    client.force_login(make_member(lots=[LotFactory()], mfa=False))
+    session = client.session
+    session["mfa_enrollment_until"] = 1  # long past
+    session.save()
+    assert client.get(reverse("mfa_index"))["Location"] == reverse("account_setup_expired")
 
 
 def test_failed_login_for_unknown_email_stores_only_a_hash(client):

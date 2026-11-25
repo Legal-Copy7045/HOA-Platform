@@ -47,9 +47,8 @@ def accept(client, token, password=PASSWORD):
 # --- Who may invite ---------------------------------------------------------------
 
 
-@pytest.mark.parametrize("who", ["board", "sysadmin"])
-def test_board_and_sysadmin_can_invite(who, django_capture_on_commit_callbacks):
-    actor = make_member(board=True) if who == "board" else make_member(roles=[Role.SYSADMIN])
+def test_board_can_invite(django_capture_on_commit_callbacks):
+    actor = make_member(board=True)
     with (
         mock.patch("accounts.tasks.send_invitation.defer") as defer,
         django_capture_on_commit_callbacks(execute=True),
@@ -57,6 +56,44 @@ def test_board_and_sysadmin_can_invite(who, django_capture_on_commit_callbacks):
         invitation = services.create_invitation(person=PersonFactory(), actor=actor)
     defer.assert_called_once_with(invitation_id=invitation.pk)  # only the ID is queued
     assert AuditEvent.objects.filter(action="invite.created", actor=actor).exists()
+
+
+def test_sysadmin_cannot_create_invitations_but_can_resend():
+    """Review finding A1: a sysadmin could point a board member's invitation at
+    their own mailbox and take over the seat."""
+    sysadmin = make_member(roles=[Role.SYSADMIN])
+    with pytest.raises(PermissionDenied):
+        services.create_invitation(person=PersonFactory(), actor=sysadmin)
+    invitation = services.create_invitation(person=PersonFactory(), actor=make_member(board=True))
+    services.resend_invitation(invitation, actor=sysadmin)
+
+
+def test_invitation_always_goes_to_the_address_on_file(client):
+    board = make_member(board=True)
+    person = PersonFactory(email="real.owner@example.com")
+    client.force_login(board)
+    response = client.post(
+        reverse("invite_person", args=[person.pk]), {"email": "attacker@example.net"}
+    )
+    assert response.status_code == 302
+    invitation = Invitation.objects.unscoped("t").get(person=person)
+    assert invitation.email == "real.owner@example.com"
+
+
+def test_person_without_email_cannot_be_invited():
+    with pytest.raises(services.InvitationError):
+        services.create_invitation(person=PersonFactory(email=""), actor=make_member(board=True))
+
+
+def test_resend_kills_the_old_link_and_any_half_finished_acceptance(client):
+    """Review finding B3."""
+    board = make_member(board=True)
+    invitation, token = invite_and_send(PersonFactory(), board)
+    assert client.get(reverse("invite_landing", args=[token])).status_code == 302
+    with mock.patch("accounts.tasks.send_invitation.defer"):
+        services.resend_invitation(invitation, actor=board)
+    assert services.find_open_invitation(token) is None
+    assert client.get(reverse("invite_accept")).status_code == 404
 
 
 @pytest.mark.parametrize("roles", [[Role.AUDITOR], [Role.ARC_REVIEWER]])

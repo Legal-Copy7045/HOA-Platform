@@ -168,3 +168,19 @@ class Attachment(AppendOnlyModel):
 
     def __str__(self) -> str:
         return self.original_filename
+
+
+class AttachmentScan(AppendOnlyModel):
+    """A later scan of an attachment (rescan after signatures update). The
+    newest row wins over ``Attachment.scan_result``; nothing is ever edited."""
+
+    attachment = models.ForeignKey(Attachment, on_delete=models.PROTECT, related_name="scans")
+    result = models.CharField(max_length=16, choices=ScanResult.choices)
+    scanner = models.CharField(max_length=50)
+    scanned_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-scanned_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"scan {self.result}"

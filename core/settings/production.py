@@ -38,6 +38,11 @@ for _cidr in TRUSTED_PROXY_CIDRS:  # noqa: F405
         continue
     if _net.prefixlen == 0:
         _problems.append("TRUSTED_PROXY_CIDRS must not trust every address")
+if not TRUSTED_PROXY_CIDRS and not env.bool("NO_TRUSTED_PROXY", default=False):  # noqa: F405
+    _problems.append(
+        "TRUSTED_PROXY_CIDRS must list the reverse proxy (for example the cloudflared "
+        "address); set NO_TRUSTED_PROXY=true only if clients connect directly"
+    )
 if not PORTAL_BASE_URL.startswith("https://"):
     _problems.append("PORTAL_BASE_URL must be the public https:// address")
 if ADMIN_ENABLED:  # noqa: F405
@@ -46,3 +51,9 @@ if env.bool("DJANGO_DEBUG", default=False):
     _problems.append("DJANGO_DEBUG must be false in production")
 if _problems:
     raise ImproperlyConfigured("Unsafe production configuration: " + "; ".join(_problems))
+
+# Demo data may only be loaded on a deployment explicitly marked as the POC
+# (security review 2026-11). Anywhere else the flag is ignored.
+DEPLOYMENT_STAGE = env("DEPLOYMENT_STAGE", default="production")
+if DEPLOYMENT_STAGE != "poc":
+    SEED_DEMO_ALLOWED = False

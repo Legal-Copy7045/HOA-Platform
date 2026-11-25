@@ -10,6 +10,7 @@ from community.models import Lot
 from core import policy
 from documents import services
 from documents.models import Category, Document, DocumentVersion, Visibility
+from documents.validation import download_filename
 
 
 class NewDocumentForm(forms.Form):
@@ -98,7 +99,7 @@ def _send(request, document, version):
     response = FileResponse(
         version.file.open("rb"),
         as_attachment=True,
-        filename=version.original_filename,
+        filename=download_filename(version.original_filename, version.content_type),
         content_type=version.content_type,
     )
     response["Cache-Control"] = "private, no-store"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 
 from django.conf import settings
 from django.db import transaction
@@ -12,16 +11,15 @@ from core.policy import require
 from core.scoping import system_access
 from documents.models import Document, DocumentVersion, ScanResult, VersionScan, Visibility
 from documents.scanning import scan
-from documents.validation import UploadRejected, check_upload
+from documents.validation import UploadRejected, check_upload, safe_filename
 
 
 class DocumentError(ValueError):
     pass
 
 
-def _safe_name(name: str) -> str:
-    base = os.path.basename(name or "file").replace("\\", "_")
-    return "".join(c for c in base if c.isalnum() or c in "._- ")[:150] or "file"
+def _safe_name(name: str, ext: str) -> str:
+    return safe_filename(name, ext)
 
 
 def _store_version(
@@ -58,7 +56,7 @@ def _store_version(
         version = DocumentVersion(
             document=document,
             number=number,
-            original_filename=_safe_name(uploaded.name),
+            original_filename=_safe_name(uploaded.name, kind.ext),
             content_type=kind.content_type,
             size=uploaded.size,
             sha256=digest.hexdigest(),
@@ -139,10 +137,15 @@ def set_archived(document: Document, *, archived: bool, actor, request=None) -> 
     return document
 
 
-def downloadable(version: DocumentVersion) -> bool:
-    latest = version.scans.first()
-    if latest is None or latest.result in (ScanResult.INFECTED, ScanResult.ERROR):
+def scan_allows_download(result: str | None) -> bool:
+    """One rule for every stored file (document versions and attachments)."""
+    if result is None or result in (ScanResult.INFECTED, ScanResult.ERROR):
         return False
     if settings.DOCUMENT_REQUIRE_CLEAN_SCAN:
-        return latest.result == ScanResult.CLEAN
+        return result == ScanResult.CLEAN
     return True
+
+
+def downloadable(version: DocumentVersion) -> bool:
+    latest = version.scans.first()
+    return scan_allows_download(latest.result if latest else None)

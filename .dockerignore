@@ -9,5 +9,8 @@
 htmlcov
 staticfiles
 .env
+.env.*
+*.env
 *.env.local
+!.env.example
 docs

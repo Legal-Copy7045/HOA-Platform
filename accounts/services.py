@@ -48,16 +48,17 @@ def _enqueue_send(invitation: Invitation) -> None:
 def create_invitation(
     *,
     person: Person,
-    email: str = "",
     actor,
     request: HttpRequest | None = None,
     send_email: bool = True,
 ) -> Invitation:
     if actor is not SYSTEM:
         require(actor, "invite.send")
-    email = normalize_email_address(email or person.email)
+    # Always the address on the person's record: an invitation can never be
+    # pointed at someone else's mailbox (security review 2026-11, finding A1).
+    email = normalize_email_address(person.email or "")
     if not email:
-        raise InvitationError("An email address is needed to send an invitation.")
+        raise InvitationError("Add an email address to this person's record before inviting them.")
     if person.user_id is not None:
         raise InvitationError("This person already has a login.")
     if User.objects.filter(email=email).exists():
@@ -88,13 +89,15 @@ def create_invitation(
 
 
 def resend_invitation(invitation: Invitation, *, actor, request=None) -> Invitation:
-    require(actor, "invite.send")
+    require(actor, "invite.resend")
     with transaction.atomic(), system_access("resend_invitation"):
         invitation = Invitation.objects.select_for_update().get(pk=invitation.pk)
         if invitation.accepted_at or invitation.revoked_at:
             raise InvitationError("Only an open invitation can be re-sent.")
         invitation.expires_at = timezone.now() + timedelta(hours=settings.INVITE_TTL_HOURS)
-        invitation.save(update_fields=["expires_at"])
+        # The old link stops working now, not when the worker sends the new one.
+        invitation.token_hash = ""  # nosec B105
+        invitation.save(update_fields=["expires_at", "token_hash"])
         record_event(
             "invite.resent",
             actor=actor,
@@ -159,6 +162,10 @@ def send_invitation_email(invitation_id: int) -> bool:
             metadata={"person_id": invitation.person_id, "send_count": invitation.send_count},
         )
     return True
+
+
+def token_hash(token: str) -> str:
+    return _hash(token)
 
 
 def find_open_invitation(token: str) -> Invitation | None:

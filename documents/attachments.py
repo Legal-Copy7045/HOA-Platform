@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import hashlib
 
+from django.conf import settings
 from django.http import FileResponse, Http404
 
 from audit.services import record_event
 from documents.models import Attachment, ScanResult
 from documents.scanning import scan
-from documents.services import DocumentError, _safe_name
-from documents.validation import UploadRejected, check_upload
+from documents.services import DocumentError, scan_allows_download
+from documents.validation import UploadRejected, check_upload, download_filename, safe_filename
 
 IMAGES_AND_PDF = {"pdf", "png", "jpg", "jpeg"}
 
@@ -23,6 +24,10 @@ def _owner_key(obj) -> tuple[str, str]:
 def attach(
     obj, uploaded, *, actor, label: str = "", allowed: set[str] | None = None, request=None
 ) -> Attachment:
+    if attachments_for(obj).count() >= settings.ATTACHMENTS_PER_OBJECT_MAX:
+        raise DocumentError(
+            "This item already has the maximum number of files. Ask the board if you need more."
+        )
     try:
         kind = check_upload(uploaded, allowed=allowed or IMAGES_AND_PDF)
     except UploadRejected as exc:
@@ -38,7 +43,7 @@ def attach(
     attachment = Attachment(
         owner_type=owner_type,
         owner_id=owner_id,
-        original_filename=_safe_name(uploaded.name),
+        original_filename=safe_filename(uploaded.name, kind.ext),
         content_type=kind.content_type,
         size=uploaded.size,
         sha256=digest.hexdigest(),
@@ -63,22 +68,27 @@ def attachments_for(obj):
     return Attachment.objects.filter(owner_type=owner_type, owner_id=owner_id)
 
 
+def current_scan(attachment: Attachment) -> str:
+    latest = attachment.scans.first()
+    return latest.result if latest else attachment.scan_result
+
+
 def serve(request, obj, attachment_id: int):
     """``obj`` must already have been fetched through a scoped manager."""
     attachment = attachments_for(obj).filter(pk=attachment_id).first()
-    if attachment is None or attachment.scan_result in (ScanResult.INFECTED, ScanResult.ERROR):
+    if attachment is None or not scan_allows_download(current_scan(attachment)):
         raise Http404
     record_event(
         "attachment.downloaded",
         request=request,
         actor=request.user,
         target=obj,
-        metadata={"owner_type": attachment.owner_type, "scan": attachment.scan_result},
+        metadata={"owner_type": attachment.owner_type, "scan": current_scan(attachment)},
     )
     response = FileResponse(
         attachment.file.open("rb"),
         as_attachment=True,
-        filename=attachment.original_filename,
+        filename=download_filename(attachment.original_filename, attachment.content_type),
         content_type=attachment.content_type,
     )
     response["Cache-Control"] = "private, no-store"

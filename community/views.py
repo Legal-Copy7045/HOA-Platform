@@ -200,7 +200,7 @@ def people(request):
 def person_detail(request, pk):
     policy.require(request.user, "person.manage")
     from accounts.auth import has_strong_authenticator
-    from accounts.board_forms import InviteForm, StartResetForm
+    from accounts.board_forms import StartResetForm
     from accounts.models import Invitation
 
     person = _scoped(Person, request, pk)
@@ -225,7 +225,6 @@ def person_detail(request, pk):
             "office_form": forms.OfficeForm(),
             "role_form": forms.RoleForm(),
             "end_form": forms.EndDateForm(),
-            "invite_form": InviteForm(),
             "reset_form": StartResetForm(),
         },
     )

@@ -4,7 +4,7 @@ from accounts.models import VerificationMethod
 
 
 class InviteForm(forms.Form):
-    email = forms.EmailField(required=False, help_text="Leave blank to use the address on file.")
+    """No fields: invitations always go to the address on the person's record."""
 
 
 class StartResetForm(forms.Form):

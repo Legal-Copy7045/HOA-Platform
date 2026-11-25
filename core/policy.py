@@ -54,7 +54,10 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "role.sysadmin.approve": frozenset({BOARD}),
     "role.sysadmin.revoke": frozenset({BOARD}),
     # Accounts
-    "invite.send": frozenset({BOARD, SYSADMIN}),
+    # Creating an invitation decides whose mailbox controls a person: board only.
+    # Sysadmins may re-send or revoke existing ones (review finding A1).
+    "invite.send": frozenset({BOARD}),
+    "invite.resend": frozenset({BOARD, SYSADMIN}),
     "invite.revoke": frozenset({BOARD, SYSADMIN}),
     "mfa_reset.start": frozenset({BOARD}),
     "mfa_reset.approve": frozenset({BOARD}),

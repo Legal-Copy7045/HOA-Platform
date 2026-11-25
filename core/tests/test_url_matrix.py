@@ -33,7 +33,7 @@ from core.policy import SYSTEM
 
 pytestmark = pytest.mark.django_db
 
-PUBLIC = {"home", "healthz", "invite_landing", "invite_accept"}
+PUBLIC = {"home", "healthz", "invite_landing", "invite_accept", "account_setup_expired"}
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")
