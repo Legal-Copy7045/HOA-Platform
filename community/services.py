@@ -710,3 +710,76 @@ def save_common_area(
             metadata={"kind": kind, "active": active},
         )
     return area
+
+
+# --- Owner's own profile and the directory ----------------------------------------
+
+
+def update_my_profile(
+    *,
+    user,
+    phone: str = "",
+    mailing_address: str = "",
+    electronic_notice_consent: bool = False,
+    in_directory: bool = False,
+    directory_show_email: bool = False,
+    directory_show_phone: bool = False,
+    request: HttpRequest | None = None,
+):
+    """Anyone with a linked Person edits only their own profile."""
+    from community.models import ContactProfile
+
+    with transaction.atomic(), system_access("update_my_profile"):
+        person = Person.objects.filter(user=user).first()
+        if person is None:
+            raise CommunityError("Your login is not linked to a person yet.")
+        profile, _ = ContactProfile.objects.select_for_update().get_or_create(person=person)
+        consent_changed = profile.electronic_notice_consent != electronic_notice_consent
+        profile.phone = phone.strip()[:40]
+        profile.mailing_address = mailing_address.strip()[:1000]
+        profile.electronic_notice_consent = electronic_notice_consent
+        if consent_changed:
+            profile.consent_changed_at = timezone.now()
+        profile.in_directory = in_directory
+        profile.directory_show_email = in_directory and directory_show_email
+        profile.directory_show_phone = in_directory and directory_show_phone
+        profile.save()
+        _audit(
+            "profile.updated",
+            actor=user,
+            request=request,
+            target=profile,
+            metadata={
+                "notice_consent": electronic_notice_consent,
+                "consent_changed": consent_changed,
+                "in_directory": in_directory,
+            },
+        )
+    return profile
+
+
+def directory_entries():
+    """Current owners who opted in, with only the fields they chose to share."""
+    from community.models import ContactProfile
+
+    with system_access("directory: opted-in fields only"):
+        profiles = {p.person_id: p for p in ContactProfile.objects.filter(in_directory=True)}
+        ownerships = (
+            Ownership.objects.active()
+            .filter(person_id__in=profiles)
+            .select_related("person", "lot")
+            .order_by("lot__number")
+        )
+        entries = []
+        for o in ownerships:
+            p = profiles[o.person_id]
+            entries.append(
+                {
+                    "name": o.person.display_name,
+                    "lot": o.lot.number,
+                    "street_address": o.lot.street_address,
+                    "email": o.person.email if p.directory_show_email else "",
+                    "phone": p.phone if p.directory_show_phone else "",
+                }
+            )
+    return entries

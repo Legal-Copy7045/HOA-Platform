@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ a.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>{% if a.urgent %}URGENT: {% endif %}{{ a.title }}</h1>
+  <p class="muted">{{ a.published_at|date:"F j, Y g:i A" }}</p>
+  <div class="card">{{ a.body|linebreaks }}</div>
+  <p><a href="{% url 'announcements' %}">All announcements</a></p>
+{% endblock %}

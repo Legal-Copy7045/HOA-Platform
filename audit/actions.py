@@ -93,6 +93,19 @@ _SPECS = [
     _spec("community.rule_changed", "Governing rule changed", "key", "has_citation"),
     _spec("community.profile_changed", "Community profile changed"),
     _spec("community.common_area_saved", "Common area saved", "kind", "active"),
+    _spec(
+        "profile.updated",
+        "Own profile updated",
+        "notice_consent",
+        "consent_changed",
+        "in_directory",
+    ),
+    _spec("export.own_data", "Downloaded own data"),
+    _spec("announcement.published", "Announcement published", "audience", "urgent"),
+    _spec("event.created", "Calendar event created", "audience"),
+    _spec("event.cancelled", "Calendar event cancelled"),
+    _spec("task.created", "Board task created"),
+    _spec("task.closed", "Board task closed", "status"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Calendar · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Calendar</h1>
+  <table><tbody>
+    {% for e in events %}
+      <tr><td>{{ e.starts_at|date:"D M j, g:i A" }}{% if e.ends_at %}–{{ e.ends_at|date:"g:i A" }}{% endif %}</td>
+        <td>{% if e.cancelled %}<s>{{ e.title }}</s> <strong>cancelled</strong>{% else %}{{ e.title }}{% endif %}{% if e.audience == "board" %} <span class="muted">(board only)</span>{% endif %}{% if e.location %}<div class="muted">{{ e.location }}</div>{% endif %}{% if e.description %}<div class="muted">{{ e.description|linebreaksbr }}</div>{% endif %}</td>
+        <td>{% if can_manage and not e.cancelled %}<form method="post" action="{% url 'event_cancel' e.pk %}" class="inline">{% csrf_token %}<button type="submit" class="link">Cancel</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td class="muted">Nothing scheduled.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_manage %}<details><summary>Add an event</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Add</button></form></details>{% endif %}
+{% endblock %}

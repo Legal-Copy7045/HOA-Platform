@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}My profile · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>My profile</h1>
+  {% if person %}
+    <p>{{ person.display_name }} <span class="muted">· {{ user.email }}</span></p>
+    <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Save</button></form>
+    <p class="muted">The directory is hidden unless you opt in, and shows only what you tick.</p>
+  {% else %}<p class="muted">Your login isn't linked to a person record yet. Ask a board member.</p>{% endif %}
+  <h2>Your data</h2>
+  <p><a href="{% url 'export_my_data' %}">Download my data</a> <span class="muted">(a JSON file of everything the portal holds about you)</span></p>
+{% endblock %}

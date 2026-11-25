@@ -436,3 +436,32 @@ class CommonArea(NeverDeleteMixin, models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class ContactProfile(ScopedModel):
+    """An owner's own contact details, notice consent and directory choices."""
+
+    person = models.OneToOneField(Person, on_delete=models.PROTECT, related_name="contact")
+    phone = models.CharField(max_length=40, blank=True)
+    mailing_address = models.TextField(
+        blank=True, help_text="Only if different from the lot address."
+    )
+    electronic_notice_consent = models.BooleanField(
+        default=False, help_text="Agree to receive official notices by email."
+    )
+    consent_changed_at = models.DateTimeField(null=True, blank=True)
+    # Directory: hidden unless the owner opts in, field by field (decision 5).
+    in_directory = models.BooleanField(default=False)
+    directory_show_email = models.BooleanField(default=False)
+    directory_show_phone = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "person"
+
+    def __str__(self) -> str:
+        return f"Contact profile #{self.pk}"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Profiles are edited, not deleted.")

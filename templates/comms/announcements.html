@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Announcements · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Announcements</h1>
+  <table><tbody>
+    {% for a, read in items %}
+      <tr><td>{% if a.urgent %}<strong>URGENT</strong> {% endif %}<a href="{% url 'announcement_detail' a.pk %}">{% if not read %}<strong>{{ a.title }}</strong>{% else %}{{ a.title }}{% endif %}</a>{% if a.audience == "board" %} <span class="muted">(board only)</span>{% endif %}</td><td class="muted">{{ a.published_at|date:"M j, Y" }}</td></tr>
+    {% empty %}<tr><td class="muted">No announcements yet.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if can_publish %}
+    <details><summary>Publish an announcement</summary>
+      <p class="muted">Published announcements can't be edited; publish a correction if needed. Members get an email with the title and a link.</p>
+      <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Publish</button></form></details>
+  {% endif %}
+{% endblock %}

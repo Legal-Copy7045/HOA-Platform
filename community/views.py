@@ -154,7 +154,8 @@ def ownership_end(request, pk):
 
 @login_required
 def board_home(request):
-    policy.require(request.user, "person.manage")
+    if not policy.can(request.user, "task.manage"):  # board and manager
+        policy.require(request.user, "person.manage")
     from accounts.models import Invitation, MfaReset
 
     return render(

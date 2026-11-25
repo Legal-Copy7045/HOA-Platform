@@ -59,3 +59,22 @@ def system_status(request):
             "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),
         },
     )
+
+
+@login_required
+def export_my_data(request):
+    """'Download my data' (JSON). Only the signed-in person's own records."""
+    import json
+
+    from django.http import HttpResponse
+
+    from audit.services import record_event
+    from core.exports import export_for
+
+    record_event("export.own_data", request=request, actor=request.user)
+    response = HttpResponse(
+        json.dumps(export_for(request.user), indent=2, default=str), content_type="application/json"
+    )
+    response["Content-Disposition"] = 'attachment; filename="my-portal-data.json"'
+    response["Cache-Control"] = "no-store"
+    return response

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Board tasks · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Board tasks</h1>
+  <table><thead><tr><th>Task</th><th>Assigned</th><th>Due</th><th></th></tr></thead><tbody>
+    {% for t in open %}
+      <tr><td>{{ t.title }}{% if t.description %}<div class="muted">{{ t.description }}</div>{% endif %}</td><td>{{ t.assignee.display_name|default:"-" }}</td><td>{{ t.due_date|default:"" }}</td>
+        <td><form method="post" action="{% url 'task_close' t.pk 'done' %}" class="inline">{% csrf_token %}<button type="submit">Done</button></form>
+            <form method="post" action="{% url 'task_close' t.pk 'dropped' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Drop</button></form></td></tr>
+    {% empty %}<tr><td class="muted">No open tasks.</td></tr>{% endfor %}
+  </tbody></table>
+  <details><summary>Add a task</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Add</button></form></details>
+  {% if closed %}<h2>Recently closed</h2><ul>{% for t in closed %}<li>{{ t.title }} <span class="muted">({{ t.get_status_display }})</span></li>{% endfor %}</ul>{% endif %}
+{% endblock %}

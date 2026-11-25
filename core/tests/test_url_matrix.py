@@ -7,10 +7,12 @@ Adding a URL without classifying it here fails
 test_every_named_url_is_classified - by design.
 """
 
+from datetime import timedelta
 from unittest import mock
 
 import pytest
 from django.urls import get_resolver, reverse
+from django.utils import timezone
 
 from accounts import mfa_reset
 from accounts import services as account_services
@@ -35,7 +37,9 @@ PUBLIC = {"home", "healthz", "invite_landing", "invite_accept"}
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")
-OWN_ACCOUNT = {"enroll_with_code"}
+OWN_ACCOUNT = {"enroll_with_code", "my_profile", "export_my_data"}
+# Pages any member may open; tests check board-only content never shows to owners.
+MEMBER_PAGES = {"announcements", "calendar", "directory"}
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
 # pointed at owner B's data, and send anonymous visitors to sign in.
@@ -69,6 +73,10 @@ PROTECTED = {
     "community_rule_save": ("POST", None),
     "community_profile_save": ("POST", None),
     "common_area_save": ("POST", None),
+    "announcement_detail": ("GET", "board_announcement"),
+    "event_cancel": ("POST", "event"),
+    "tasks": ("GET", None),
+    "task_close": ("POST", "task"),
 }
 
 
@@ -80,7 +88,7 @@ def test_every_named_url_is_classified():
     unclassified = {
         name
         for name in _named_urls()
-        if name not in PUBLIC | OWN_ACCOUNT | set(PROTECTED)
+        if name not in PUBLIC | OWN_ACCOUNT | MEMBER_PAGES | set(PROTECTED)
         and not name.startswith(OWN_ACCOUNT_PREFIXES)
     }
     assert unclassified == set(), f"Classify these URLs in {__name__}: {sorted(unclassified)}"
@@ -111,6 +119,19 @@ def world():
         reset = mfa_reset.start_reset(
             subject=owner_b, actor=board, verification_method=VerificationMethod.IN_PERSON
         )
+        from comms import services as comms
+        from operations.services import create_task
+
+        board_note = comms.publish_announcement(
+            title="Board only: legal matter", body="Confidential", audience="board", actor=board
+        )
+        board_event = comms.create_event(
+            title="Board executive session",
+            starts_at=timezone.now() + timedelta(days=3),
+            audience="board",
+            actor=board,
+        )
+        task = create_task(title="Chase the pond contractor", actor=board)
     targets = {
         "lot": lot_b.pk,
         "person": person_b.pk,
@@ -121,6 +142,9 @@ def world():
         "nomination": SysadminNomination.objects.unscoped("t").get(pk=nomination.pk).pk,
         "invitation": Invitation.objects.unscoped("t").get(pk=invitation.pk).pk,
         "reset": MfaReset.objects.unscoped("t").get(pk=reset.pk).pk,
+        "board_announcement": board_note.pk,
+        "event": board_event.pk,
+        "task": task.pk,
     }
     return {
         "owner_a": owner_a,
@@ -141,6 +165,8 @@ def _url(name, key, targets):
         kwargs["decision"] = "approve"
     elif name == "invitation_action":
         kwargs["action"] = "revoke"
+    elif name == "task_close":
+        kwargs["status"] = "done"
     return reverse(name, kwargs=kwargs)
 
 
@@ -257,3 +283,28 @@ def test_reset_code_is_shown_once_to_the_approver(client, world):
     assert code.encode() in response.content
     assert response["Cache-Control"].startswith("max-age=0")
     assert code not in str(list(AuditEvent.objects.values_list("metadata", flat=True)))
+
+
+@pytest.mark.parametrize("name", sorted(MEMBER_PAGES | {"my_profile", "export_my_data"}))
+def test_member_pages_require_sign_in(client, world, name):
+    response = client.get(reverse(name))
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("account_login"))
+
+
+@pytest.mark.parametrize("name", sorted(MEMBER_PAGES))
+def test_member_pages_hide_board_only_content_from_owners(client, world, name):
+    client.force_login(world["owner_a"])
+    response = client.get(reverse(name))
+    assert response.status_code == 200
+    for secret in (b"Board only: legal matter", b"Board executive session", b"pond contractor"):
+        assert secret not in response.content
+
+
+def test_export_contains_only_my_own_records(client, world):
+    import json
+
+    client.force_login(world["owner_a"])
+    data = json.loads(client.get(reverse("export_my_data")).content)
+    assert [o["lot"] for o in data["community"]["ownerships"]] == [world["lot_a"].number]
+    assert "Bravo" not in json.dumps(data)

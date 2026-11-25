@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     "accounts",
     "audit",
     "community",
+    "comms",
+    "operations",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

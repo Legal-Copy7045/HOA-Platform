@@ -9,6 +9,10 @@
       {% if can.audit_view_sysadmin_activity %}<li><a href="{% url 'sysadmin_activity' %}">Sysadmin activity</a> <span class="muted">everything system administrators did</span></li>{% endif %}
       {% if can.system_view_status %}<li><a href="{% url 'system_status' %}">System status</a></li>{% endif %}
       {% if can.invite_send and not can.person_manage %}<li><a href="{% url 'invitations' %}">Invitations</a></li>{% endif %}
+      <li><a href="{% url 'announcements' %}">Announcements</a> <span class="muted">news from the board</span></li>
+      <li><a href="{% url 'calendar' %}">Calendar</a> <span class="muted">meetings and events</span></li>
+      {% if can.lot_view_own %}<li><a href="{% url 'directory' %}">Owner directory</a> <span class="muted">neighbours who chose to be listed</span></li>{% endif %}
+      <li><a href="{% url 'my_profile' %}">My profile</a> <span class="muted">contact details, email notices, directory listing, download my data</span></li>
       <li><a href="{% url 'mfa_index' %}">Security</a> <span class="muted">passkeys, authenticator app, recovery codes</span></li>
     </ul>
     {% if not can.lot_view_own and not can.lot_view_all and not can.person_manage and not can.system_view_status %}
