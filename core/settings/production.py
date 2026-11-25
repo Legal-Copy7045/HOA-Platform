@@ -1,5 +1,7 @@
 """Production and POC settings. Refuses to start with an unsafe configuration."""
 
+import ipaddress
+
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
@@ -23,6 +25,14 @@ if not DB_APP_ROLE:  # noqa: F405
     _problems.append("DB_APP_ROLE must name the runtime database role (decision Q8)")
 if len(AUDIT_HASH_KEY) < 32:  # noqa: F405
     _problems.append("AUDIT_HASH_KEY must be a random value of 32+ characters")
+for _cidr in TRUSTED_PROXY_CIDRS:  # noqa: F405
+    try:
+        _net = ipaddress.ip_network(_cidr.strip(), strict=False)
+    except ValueError:
+        _problems.append(f"TRUSTED_PROXY_CIDRS entry {_cidr!r} is not a network")
+        continue
+    if _net.prefixlen == 0:
+        _problems.append("TRUSTED_PROXY_CIDRS must not trust every address")
 if ADMIN_ENABLED:  # noqa: F405
     _problems.append("ADMIN_ENABLED must be false in production (decision Q9)")
 if env.bool("DJANGO_DEBUG", default=False):

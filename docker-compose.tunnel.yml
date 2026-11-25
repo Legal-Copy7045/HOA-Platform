@@ -1,0 +1,63 @@
+# POC / production overlay: the site is reachable ONLY through a Cloudflare
+# Tunnel. Use with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+#
+# (infra/poc/start-portal.sh runs exactly this.)
+#
+# Differences from local development:
+#   - production settings (DEBUG off, secure cookies, HTTPS, strict hosts);
+#   - the web container publishes NO port; cloudflared reaches it over the
+#     private compose network, and the VM accepts no inbound connections;
+#   - cloudflared has a fixed address, and only that address is trusted to
+#     supply the client IP and scheme headers (decision D6);
+#   - Mailpit is not started; email goes through the SMTP settings in .env.
+
+x-production-env: &production-env
+  DJANGO_SETTINGS_MODULE: core.settings.production
+  DJANGO_DEBUG: "false"
+  SESSION_COOKIE_SECURE: "true"
+  CSRF_COOKIE_SECURE: "true"
+  ADMIN_ENABLED: "false"
+  TRUSTED_PROXY_CIDRS: 172.30.50.10/32
+  CLIENT_IP_HEADER: CF-Connecting-IP
+  SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-3600}
+
+services:
+  web:
+    ports: !reset []
+    environment: *production-env
+  worker:
+    environment: *production-env
+  migrate:
+    environment: *production-env
+  create-bucket:
+    environment: *production-env
+
+  mailpit:
+    profiles: ["local-only"]
+
+  cloudflared:
+    # Follows the latest release: cloudflared cannot self-update inside a
+    # container, and Cloudflare stops supporting old versions. The VM's
+    # hoa-cloudflared-update.timer pulls a new image daily and restarts this
+    # container only when the image changed.
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env (from the Cloudflare dashboard)}
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks:
+      default:
+        ipv4_address: 172.30.50.10
+    depends_on:
+      web: {condition: service_healthy}
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.50.0/24

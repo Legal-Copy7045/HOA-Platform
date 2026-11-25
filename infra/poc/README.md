@@ -37,9 +37,29 @@ connections from the internet or other VLANs.
    sudo bash provision-vm.sh
    ```
 
-4. **Secrets and start** - written after Milestone 1 step 5 (the tunnel
-   override and trusted-proxy handling). Secrets go only into
-   `/opt/hoa-portal/.env` on the VM and the HOA password manager.
+4. **Secrets and start** (VM console, as `hoa`). Get the latest code first:
+
+   ```bash
+   cd /opt/hoa-portal && git pull --ff-only
+   ```
+
+   Create `.env` with generated secrets. It asks for the tunnel token
+   (typing is hidden) and an optional catch-all email:
+
+   ```bash
+   bash infra/poc/make-env.sh
+   ```
+
+   Build and start everything, and install the daily cloudflared update:
+
+   ```bash
+   sudo bash infra/poc/start-portal.sh
+   ```
+
+   Then open https://portal-dev.oakcreekhoa.com. Cloudflare Access asks for
+   your email and sends a one-time code; after that you reach the portal.
+
+   Copy the generated secrets from `.env` into the HOA password manager.
 
 ## Settings
 

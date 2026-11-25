@@ -30,7 +30,8 @@ def _load(monkeypatch, **overrides):
 
 
 def test_safe_configuration_loads(monkeypatch):
-    module = _load(monkeypatch)
+    module = _load(monkeypatch, TRUSTED_PROXY_CIDRS="172.30.50.10/32")
+    assert module.TRUSTED_PROXY_CIDRS == ["172.30.50.10/32"]
     assert module.DEBUG is False
     assert module.SESSION_COOKIE_SECURE and module.CSRF_COOKIE_SECURE
     assert module.SECURE_SSL_REDIRECT is True
@@ -52,6 +53,9 @@ def test_safe_configuration_loads(monkeypatch):
         {"ADMIN_ENABLED": "true"},
         {"AUDIT_HASH_KEY": ""},
         {"AUDIT_HASH_KEY": "too-short"},
+        {"TRUSTED_PROXY_CIDRS": "0.0.0.0/0"},
+        {"TRUSTED_PROXY_CIDRS": "::/0"},
+        {"TRUSTED_PROXY_CIDRS": "not-a-network"},
     ],
 )
 def test_unsafe_configuration_is_refused(monkeypatch, overrides):

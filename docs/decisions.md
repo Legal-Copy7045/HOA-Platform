@@ -126,6 +126,15 @@ network into the isolated VLAN, would widen the set of hosts trusted to set
 client-IP headers, and could not be handed to the HOA later. The dedicated
 `hoa-portal-poc` tunnel's connector runs inside the VM.
 
+## D13. cloudflared follows the latest release
+
+cloudflared cannot update itself inside a container, and Cloudflare stops
+supporting old releases. The tunnel overlay uses `cloudflare/cloudflared:latest`;
+a systemd timer on the VM pulls daily and restarts only that container when
+the image changed. Trade-off accepted: the edge connector updates without
+review, as it is Cloudflare's own component already trusted with all traffic.
+The portal image itself is still built from reviewed code.
+
 ## Dependencies
 
 | Package | Why |

@@ -39,6 +39,30 @@ To re-apply grants by hand:
 docker compose run --rm migrate manage apply_db_grants
 ```
 
+## POC VM operations
+
+Everything runs from `/opt/hoa-portal` with both compose files:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml ps
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs --tail 50 web
+```
+
+Deploy new code:
+
+```bash
+git pull --ff-only && sudo bash infra/poc/start-portal.sh
+```
+
+cloudflared updates itself daily via `hoa-cloudflared-update.timer`:
+
+```bash
+systemctl list-timers hoa-cloudflared-update.timer
+```
+
 ## Direct database access
 
 Only for restore drills and declared incidents. Record each use in a written

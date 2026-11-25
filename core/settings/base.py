@@ -46,6 +46,7 @@ if ADMIN_ENABLED:
 
 MIDDLEWARE = [
     "core.middleware.RequestIDMiddleware",
+    "core.net.TrustedProxyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "csp.middleware.CSPMiddleware",
@@ -160,6 +161,12 @@ SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=False)
+# The container healthcheck calls /healthz over plain HTTP from inside.
+SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+
+# Reverse proxy trust (decision D6). Empty = trust no proxy headers.
+TRUSTED_PROXY_CIDRS = env.list("TRUSTED_PROXY_CIDRS", default=[])
+CLIENT_IP_HEADER = env("CLIENT_IP_HEADER", default="CF-Connecting-IP")
 SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
 SECURE_HSTS_PRELOAD = False
