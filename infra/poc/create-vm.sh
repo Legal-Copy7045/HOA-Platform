@@ -80,6 +80,7 @@ qm create "$VMID" \
   --net0 "virtio,bridge=$BRIDGE,tag=$VLAN_ID" \
   --scsihw virtio-scsi-single \
   --agent enabled=1 \
+  --serial0 socket \
   --onboot 1 \
   --description "HOA portal POC. Created by infra/poc/create-vm.sh"
 qm set "$VMID" --scsi0 "$STORAGE:0,import-from=$WORK/$IMAGE_NAME,discard=on,ssd=1"
@@ -100,6 +101,7 @@ Console login (store it in your password manager NOW; it is not shown again):
   user:     hoa
   password: $CONSOLE_PASSWORD
 
-Next: open the VM's Console in the Proxmox UI, log in, and run provision-vm.sh
+Next: in the Proxmox UI open the VM's Console -> xterm.js (supports paste),
+log in, and run provision-vm.sh
 (see infra/poc/README.md).
 MSG

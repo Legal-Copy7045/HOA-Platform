@@ -23,7 +23,7 @@ connections from the internet or other VLANs.
    ```
 
    Save the console password it prints in your password manager.
-3. **Provision the VM** (VM -> Console in the Proxmox UI, log in as `hoa`):
+3. **Provision the VM** (VM -> Console -> **xterm.js**, which supports paste; log in as `hoa`):
 
    ```bash
    curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/claude/ecstatic-bell-cnrpzi/infra/poc/provision-vm.sh
