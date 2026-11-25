@@ -83,7 +83,7 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 
 ## Testing and quality
 
-- Full regression (`/regression`, `regression/README.md`): every few features or when the owner asks. Every feature change keeps it current: tests, a `regression/catalogue/*.yaml` entry whose `match` finds them, `regression/manual.yaml` for anything only a person can check, and new IDs in `regression/ids/` committed. A regression run fixes nothing in product code; findings go to the report.
+- Full regression (`/regression`, `regression/README.md`): every few features or when the owner asks. Every run includes a full security audit (claims and whole codebase, plus the new code and the deployment surface). Every feature change keeps it current: tests, a `regression/catalogue/*.yaml` entry whose `match` finds them, `regression/manual.yaml` for anything only a person can check, and new IDs in `regression/ids/` committed. A regression run fixes nothing in product code; findings go to the report.
 
 - Every change includes tests. Authorization, ownership-transfer, recusal, and audit behaviors are mandatory test targets.
 - CI must pass: ruff, tests, bandit, pip-audit.
