@@ -116,6 +116,8 @@ def _has_details(profile: ContactProfile) -> bool:
         or profile.in_directory
         or profile.directory_show_email
         or profile.directory_show_phone
+        or profile.sms_number
+        or profile.sms_opt_in
     )
 
 
@@ -140,6 +142,10 @@ def run(*, actor, request=None, on: datetime.date | None = None) -> RetentionRun
                     profile.in_directory = False
                     profile.directory_show_email = False
                     profile.directory_show_phone = False
+                    # Text-message number too (review R2-006, D27.5).
+                    profile.sms_number = ""
+                    profile.sms_verified_at = None
+                    profile.sms_opt_in = False
                     profile.save()
                     profiles_cleared += 1
                 if c.methods:

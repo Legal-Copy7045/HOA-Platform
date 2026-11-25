@@ -194,3 +194,24 @@ function portalButtonConfirm() {
 portalWarnUnsaved();
 portalMoneyPreview();
 portalButtonConfirm();
+
+// Uploads: all the files in one submission share a size limit. Warn before
+// sending, so nothing typed is lost (review R2-004).
+(function () {
+  var meta = document.querySelector('meta[name="max-upload-bytes"]');
+  var limit = meta ? parseInt(meta.getAttribute("content"), 10) : 0;
+  if (!limit) return;
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form.querySelectorAll) return;
+    var total = 0;
+    Array.prototype.forEach.call(form.querySelectorAll("input[type=file]"), function (input) {
+      Array.prototype.forEach.call(input.files || [], function (f) { total += f.size; });
+    });
+    if (total > limit) {
+      e.preventDefault();
+      window.alert("These files are too large to send together (" + Math.round(limit / 1048576) +
+        " MB in all). Please choose fewer, or add them in smaller groups.");
+    }
+  }, true);
+})();

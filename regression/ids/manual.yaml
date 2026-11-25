@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-013
+# highest issued: MAN-029
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -13,3 +13,19 @@ MAN-010: "restore drill on the POC VM"
 MAN-011: "health alert email arrives"
 MAN-012: "ballot link on a phone"
 MAN-013: "install update button"
+MAN-014: "scanner reloads in place"
+MAN-015: "guided sign-in setup on a phone"
+MAN-016: "recovery codes print"
+MAN-017: "install the app"
+MAN-018: "push notification arrives"
+MAN-019: "urgent text arrives"
+MAN-020: "my account how to pay"
+MAN-021: "letters unsaved changes warning"
+MAN-022: "settings dues confirmation"
+MAN-023: "reservation booking on a phone"
+MAN-024: "sidebar groups on a phone"
+MAN-025: "keyboard and screen reader menu"
+MAN-026: "election ballot limit"
+MAN-027: "print a page with values"
+MAN-028: "owner ARC on a phone"
+MAN-029: "neighbor review page on a phone"

@@ -144,6 +144,14 @@ def deliver(user_ids, *, title: str, path: str) -> dict[str, int]:
     counts = {"sent": 0, "failed": 0, "removed": 0}
     if not configured() or _safe_path(path) != path:
         return counts
+    try:
+        # A broken server key is the server's fault, not the devices': stop
+        # here rather than delete every subscription (review R2-005).
+        webpush.private_key_from_b64u(settings.VAPID_PRIVATE_KEY)
+        webpush.b64u_decode(settings.VAPID_PUBLIC_KEY)
+    except (ValueError, TypeError):
+        logger.error("push.server_key_invalid")
+        return counts
     payload = json.dumps({"title": title[:TITLE_MAX], "url": path}).encode()
     subs = list(
         PushSubscription.objects.unscoped("push: deliver")

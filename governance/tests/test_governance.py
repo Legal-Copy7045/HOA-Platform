@@ -297,3 +297,37 @@ def test_open_ballots_still_record_the_choice(board):
     services.open_vote(vote, actor=board)
     ballot = services.cast_ballot(vote, option_id=yes.pk, actor=owner)
     assert ballot.option_id == yes.pk
+
+
+def test_a_buyer_does_not_see_how_the_seller_voted(board):
+    """Review R2-001."""
+    from community.models import Ownership
+
+    vote, (yes, _no) = _vote(board, VoteKind.FORMAL)
+    community.set_rule(key="vote.quorum_percent", value="10", citation="Bylaws", actor=board)
+    community.set_rule(key="vote.pass_percent", value="50", citation="Bylaws", actor=board)
+    lot = LotFactory()
+    seller = make_member()
+    community.record_ownership(
+        person=Person.objects.unscoped("t").get(user=seller),
+        lot=lot,
+        start_date=date(2020, 1, 1),
+        actor=SYSTEM,
+    )
+    vote = services.open_vote(vote, actor=board)
+    from unittest import mock
+
+    earlier = timezone.now() - timedelta(days=2)
+    with mock.patch.object(Ballot._meta.get_field("cast_at"), "default", lambda: earlier):
+        services.cast_ballot(vote, option_id=yes.pk, lot_id=lot.pk, actor=seller)
+    assert services.my_ballots(vote, seller)
+    ownership = Ownership.objects.unscoped("t").get(lot=lot)
+    community.end_ownership(ownership, end_date=timezone.localdate(), actor=SYSTEM)
+    buyer = make_member()
+    community.record_ownership(
+        person=Person.objects.unscoped("t").get(user=buyer),
+        lot=lot,
+        start_date=timezone.localdate(),
+        actor=SYSTEM,
+    )
+    assert services.my_ballots(vote, buyer) == []

@@ -53,3 +53,6 @@
 - feature: "Photo thumbnails are logged as file views marked view=thumbnail, apart from downloads"
   since: M4
   match: ["^unit:arc/tests/test_signoffs.py::test_thumbnail_views"]
+- feature: "Review 2 fixes: a buyer never sees the seller's ballots; editing a returned ARC draft asks neighbors again; owners' fix photos have their own allowance; too-large uploads warned before sending and answered with a page; a broken push server key never deletes subscriptions; retention clears the text-message number"
+  since: M4
+  match: ["^unit:governance/tests/test_governance.py::test_a_buyer_does_not_see", "^unit:arc/tests/test_owner_ux.py::test_editing_a_returned_draft", "^unit:compliance/tests/test_owner_notices.py::test_owner_photos_have", "^unit:comms/tests/test_pwa_push.py::test_a_broken_server_key", "^unit:community/tests/test_retention.py::test_text_message_number", "^unit:core/tests/test_backups.py::test_too_large_upload"]

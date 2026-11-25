@@ -170,6 +170,10 @@ def violation_respond(request, pk):
     return redirect("violation_detail", pk=v.pk)
 
 
+OWNER_FIX_LABEL = "Owner photo of the fix"
+OWNER_FIX_PHOTOS_MAX = 10
+
+
 @login_required
 @require_POST
 def violation_photo(request, pk):
@@ -183,12 +187,24 @@ def violation_photo(request, pk):
     if not uploads:
         messages.error(request, "Choose a photo first.")
     else:
-        label = (
-            "Owner photo of the fix"
-            if owner and not policy.can(request.user, "violation.manage")
-            else request.POST.get("label", "")
-        )
-        attachments.attach_many(request, v, uploads, actor=request.user, label=label)
+        by_owner = owner and not policy.can(request.user, "violation.manage")
+        label = OWNER_FIX_LABEL if by_owner else request.POST.get("label", "")
+        room = None
+        if by_owner:
+            # Owners have their own allowance, so their photos can never use
+            # up the board's room for evidence (review R2-003).
+            used = attachments.attachments_for(v).filter(label=OWNER_FIX_LABEL).count()
+            room = max(OWNER_FIX_PHOTOS_MAX - used, 0)
+        if room == 0:
+            messages.error(
+                request,
+                f"You've added {OWNER_FIX_PHOTOS_MAX} photos already. Send the board a message"
+                " if there's more to show.",
+            )
+        else:
+            attachments.attach_many(
+                request, v, uploads[:room] if room else uploads, actor=request.user, label=label
+            )
     return redirect("violation_detail", pk=v.pk)
 
 

@@ -111,3 +111,10 @@ def test_r2_switch_keeps_the_local_store_optional():
     script = Path("infra/poc/move-files-to-r2.sh").read_text()
     assert "read -r -s" in script  # the secret is never echoed
     assert "check_storage" in script and "import_files" in script
+
+
+@pytest.mark.django_db
+def test_too_large_upload_gets_a_page_people_can_act_on(client, settings):
+    settings.DOCUMENT_MAX_BYTES = 10
+    response = client.post("/", data=b"x" * 1_200_000, content_type="application/octet-stream")
+    assert response.status_code == 413 and b"smaller groups" in response.content

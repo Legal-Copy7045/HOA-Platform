@@ -406,3 +406,13 @@ def test_web_push_sender_encrypts_and_signs(client, w, push_on):
     assert endpoint == ENDPOINT
     assert b"my-items" not in body  # encrypted for the device
     assert post.call_args.kwargs["authorization"].startswith("vapid t=")
+
+
+def test_a_broken_server_key_never_deletes_subscriptions(client, w, push_on, settings):
+    """Review R2-005."""
+    client.force_login(w["owner"])
+    _subscribe(client)
+    settings.VAPID_PRIVATE_KEY = "not-a-key"
+    counts = push.deliver([w["owner"].pk], title="Hello", path="/")
+    assert counts["removed"] == 0
+    assert PushSubscription.objects.unscoped("t").filter(user=w["owner"]).count() == 1

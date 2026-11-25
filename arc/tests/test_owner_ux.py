@@ -4,6 +4,7 @@ the draft checklist, several files at once, plain wording."""
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 
 from arc import services, signoffs
 from arc.models import ArcProjectType, ArcRequest, ArcRequestRevision, ArcState
@@ -268,7 +269,7 @@ def test_several_files_at_once_with_thumbnails(client, w):
     assert "2 files added." in page
     assert "x:" in page  # the refused one is named
     image = attachments_for(w["req"]).get(content_type="image/png")
-    assert f'<img src="{reverse("arc_file", args=[w["req"].pk, image.pk])}"' in page
+    assert f'<img src="{reverse("arc_file", args=[w["req"].pk, image.pk])}?view=thumb"' in page
 
 
 def test_stranger_cannot_upload_or_read_files(client, w):
@@ -312,3 +313,16 @@ def test_history_uses_the_step_label(w):
     services.ARC.apply(w["req"], "submit", actor=w["owner"])
     event = services.ARC.history(w["req"]).get()
     assert step_label(event) == "Submit for review"
+
+
+def test_editing_a_returned_draft_asks_the_neighbors_again(w):
+    """Review R2-002."""
+    from arc.models import SignoffRequest
+
+    signoffs.add_signoff_lot(w["req"], LotFactory(), actor=w["owner"])
+    SignoffRequest.objects.unscoped("t").filter(arc_request=w["req"]).update(
+        state="approved", sent_at=timezone.now()
+    )
+    services.edit_request(w["req"], description="Now 6 ft and white", actor=w["owner"])
+    rows = SignoffRequest.objects.unscoped("t").filter(arc_request=w["req"])
+    assert all(r.state == "pending" and r.sent_at is None for r in rows)

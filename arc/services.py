@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from arc.models import DECIDED, ArcRequest, ArcState, Decision, Position, ReviewerVote
@@ -404,6 +404,17 @@ def edit_request(req: ArcRequest, *, actor, request=None, **changes) -> ArcReque
         for f in changed:
             setattr(req, f, fields[f])
         req.save(update_fields=changed)
+        # Neighbors acknowledged the earlier wording: after a change they are
+        # asked again (review R2-002). Their earlier answers stay on record.
+        from arc.models import SignoffRequest, SignoffState
+
+        SignoffRequest.objects.filter(arc_request=req).exclude(state=SignoffState.WITHDRAWN).filter(
+            models.Q(sent_at__isnull=False) | ~models.Q(state=SignoffState.PENDING)
+        ).update(
+            state=SignoffState.PENDING,
+            sent_at=None,
+            token_hash="",  # nosec B106 - clearing an old link's hash, not a password
+        )
     record_event(
         "arc.edited",
         actor=actor,

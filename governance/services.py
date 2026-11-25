@@ -426,12 +426,20 @@ def my_ballots(vote: Vote, user) -> list[Ballot]:
         return list(Ballot.objects.filter(vote=vote, person_id=roles.person_id, lot__isnull=True))
     if not roles.owned_lot_ids:
         return []
+    # Only ballots cast while this person has owned the lot: a buyer must not
+    # see how the seller voted (review R2-001).
+    since = dict(roles.owned_since)
     with system_access("my lots' ballots"):
-        return list(
+        rows = (
             Ballot.objects.filter(vote=vote, lot_id__in=roles.owned_lot_ids)
             .select_related("lot", "option")
             .order_by("lot__number")
         )
+        return [
+            b
+            for b in rows
+            if b.lot_id in since and timezone.localdate(b.cast_at) >= since[b.lot_id]
+        ]
 
 
 def cast_ballot(

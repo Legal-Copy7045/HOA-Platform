@@ -198,3 +198,16 @@ def test_daily_task_runs_as_the_system():
 
     _former_owner(800)
     assert contact_retention(timestamp=0) == 1
+
+
+def test_text_message_number_is_cleared_too():
+    """Review R2-006."""
+    from django.utils import timezone
+
+    person = _former_owner(800)
+    ContactProfile.objects.unscoped("t").filter(person=person).update(
+        sms_number="+15555550123", sms_opt_in=True, sms_verified_at=timezone.now()
+    )
+    retention.run(actor=SYSTEM)
+    profile = _profile(person)
+    assert profile.sms_number == "" and not profile.sms_opt_in and profile.sms_verified_at is None

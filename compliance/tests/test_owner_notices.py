@@ -88,3 +88,14 @@ def test_board_still_sees_board_wording(client, w):
     client.force_login(w["board"])
     page = client.get(reverse("violation_detail", args=[w["v"].pk])).content.decode()
     assert f"Notice #{w['v'].pk}" in page and "Fix by" in page
+
+
+def test_owner_photos_have_their_own_allowance(client, w):
+    """Review R2-003: owners can't use up the board's room for evidence."""
+    from compliance.views import OWNER_FIX_PHOTOS_MAX
+
+    client.force_login(w["owner"])
+    for i in range(OWNER_FIX_PHOTOS_MAX + 3):
+        client.post(reverse("violation_photo", args=[w["v"].pk]), {"file": png(f"f{i}.png")})
+    owner_photos = attachments_for(w["v"]).filter(label="Owner photo of the fix").count()
+    assert owner_photos == OWNER_FIX_PHOTOS_MAX

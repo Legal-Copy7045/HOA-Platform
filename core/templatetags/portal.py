@@ -19,6 +19,14 @@ def cents(value) -> str:
     return format_cents(value) if value is not None else ""
 
 
+@register.simple_tag
+def max_upload_bytes() -> int:
+    """The most one form submission may carry (all its files together)."""
+    from core.uploads import max_request_bytes
+
+    return max_request_bytes()
+
+
 @register.filter
 def cents_plain(value) -> str:
     """{{ amount_cents|cents_plain }} -> 1234.56 (for form inputs)."""
