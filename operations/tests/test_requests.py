@@ -363,8 +363,7 @@ def test_owner_sees_requests_waiting_on_them(w):
     from core.dashboard import build
 
     assert any(
-        "Photo" in t["detail"] or "more information" in t["detail"]
-        for t in build(w["owner"])["owner"]["todos"]
+        "Photo" in t.detail or "more information" in t.detail for t in build(w["owner"])["todos"]
     )
 
 

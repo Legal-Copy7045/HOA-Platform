@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core import policy
+from core.dates import short_date
 from core.scoping import own_records
 
 
@@ -29,10 +30,14 @@ class Item:
     # The sidebar entry that shows this item in its count bubble (a URL name,
     # with "?mine=1" for the homeowner side). Defaults from the area.
     nav: str = ""
+    # Icon in lists; defaults from the area (UX review: one icon per area).
+    icon: str = ""
 
     def __post_init__(self):
         if not self.nav:
             self.nav = AREA_NAV.get(self.area, "")
+        if not self.icon:
+            self.icon = AREA_ICONS.get(self.area, "clock")
 
     @property
     def overdue(self) -> bool:
@@ -58,6 +63,24 @@ AREA_NAV = {
     "Work orders": "work_orders",
     "Records requests": "records_requests",
     "Tasks": "tasks",
+    "Vendors": "vendors",
+    "Setup": "community_settings",
+}
+
+AREA_ICONS = {
+    "My home": "home",
+    "Requests": "mail",
+    "Approvals": "check-circle",
+    "Architectural review": "pencil",
+    "Violations": "flag",
+    "Collections": "dollar",
+    "Finance": "receipt",
+    "Work orders": "wrench",
+    "Vendors": "shield",
+    "Records requests": "inbox",
+    "Compliance": "calendar",
+    "Tasks": "list",
+    "Setup": "sliders",
 }
 
 AREAS = [
@@ -67,10 +90,13 @@ AREAS = [
     "Architectural review",
     "Violations",
     "Collections",
+    "Finance",
     "Work orders",
+    "Vendors",
     "Records requests",
     "Compliance",
     "Tasks",
+    "Setup",
 ]
 
 
@@ -108,7 +134,7 @@ def items_for(user) -> list[Item]:
         ):
             if r.first_response_at is None and r.respond_by:
                 lead = "Response overdue since" if r.is_overdue else "Respond by"
-                detail = f"{lead} {r.respond_by:%b %-d}"
+                detail = f"{lead} {short_date(r.respond_by)}"
                 tone = "danger" if r.is_overdue else _due_tone(r.respond_by, today)
             else:
                 detail, tone = r.get_state_display(), "info"
@@ -179,6 +205,37 @@ def items_for(user) -> list[Item]:
                     )
                 )
 
+    if can(user, "mfa_reset.approve"):
+        from accounts.models import MfaReset
+
+        for reset in MfaReset.objects.for_user(user):
+            if reset.status == "awaiting_approval" and reset.started_by_id != user.pk:
+                out.append(
+                    Item(
+                        "Approvals",
+                        "Sign-in reset",
+                        "Needs a second board member",
+                        reverse("approvals"),
+                        "warning",
+                        nav="approvals",
+                    )
+                )
+    if can(user, "invoice.record_payment"):
+        from operations.models import Invoice
+
+        to_pay = Invoice.objects.filter(state="approved").count()
+        if to_pay:
+            out.append(
+                Item(
+                    "Finance",
+                    f"{to_pay} approved invoice{'' if to_pay == 1 else 's'} to pay",
+                    "Record the payment when the check is cut",
+                    reverse("invoices") + "?state=approved",
+                    "info",
+                    nav="invoices",
+                )
+            )
+
     if can(user, "account.approve_change"):
         from community.models import AccountChangeRequest
 
@@ -229,7 +286,11 @@ def items_for(user) -> list[Item]:
                         "Architectural review",
                         f"ARC #{r.pk} {r.title}",
                         "Your position is needed"
-                        + (f" · decision due {r.review_due_on:%b %-d}" if r.review_due_on else ""),
+                        + (
+                            f" · decision due {short_date(r.review_due_on)}"
+                            if r.review_due_on
+                            else ""
+                        ),
                         reverse("arc_detail", args=[r.pk]),
                         _due_tone(r.review_due_on, today),
                         r.review_due_on,
@@ -248,7 +309,7 @@ def items_for(user) -> list[Item]:
                 Item(
                     "Violations",
                     f"{x} (lot {x.lot.number})",
-                    f"Follow up due {x.follow_up_on:%b %-d}",
+                    f"Follow up due {short_date(x.follow_up_on)}",
                     reverse("violation_detail", args=[x.pk]),
                     _due_tone(x.follow_up_on, today),
                     x.follow_up_on,
@@ -277,7 +338,7 @@ def items_for(user) -> list[Item]:
                 Item(
                     "Collections",
                     f"{c} (lot {c.lot.number})",
-                    f"Follow up due {c.follow_up_on:%b %-d}",
+                    f"Follow up due {short_date(c.follow_up_on)}",
                     reverse("collection_detail", args=[c.pk]),
                     _due_tone(c.follow_up_on, today),
                     c.follow_up_on,
@@ -293,10 +354,30 @@ def items_for(user) -> list[Item]:
                 Item(
                     "Work orders",
                     str(w),
-                    f"Follow up due {w.follow_up_on:%b %-d}",
+                    f"Follow up due {short_date(w.follow_up_on)}",
                     reverse("work_order_detail", args=[w.pk]),
                     _due_tone(w.follow_up_on, today),
                     w.follow_up_on,
+                )
+            )
+    if can(user, "vendor.manage"):
+        from operations.models import Vendor
+
+        for vendor in Vendor.objects.filter(
+            active=True,
+            insurance_expires_on__isnull=False,
+            insurance_expires_on__lte=today + datetime.timedelta(days=30),
+        ):
+            gone = vendor.insurance_expires_on < today
+            out.append(
+                Item(
+                    "Vendors",
+                    f"{vendor.name}: insurance {'expired' if gone else 'expires'} "
+                    f"{short_date(vendor.insurance_expires_on)}",
+                    "Ask for a new certificate",
+                    reverse("vendor_detail", args=[vendor.pk]),
+                    "danger" if gone else "warning",
+                    vendor.insurance_expires_on,
                 )
             )
     if can(user, "compliance.manage"):
@@ -307,7 +388,7 @@ def items_for(user) -> list[Item]:
                 Item(
                     "Compliance",
                     c.title,
-                    f"{'Overdue since' if c.due_on < today else 'Due'} {c.due_on:%b %-d, %Y}",
+                    f"{'Overdue since' if c.due_on < today else 'Due'} {short_date(c.due_on)}",
                     reverse("compliance"),
                     _due_tone(c.due_on, today),
                     c.due_on,
@@ -324,7 +405,7 @@ def items_for(user) -> list[Item]:
                 Item(
                     "Records requests",
                     f"Records request #{r.pk}",
-                    f"Due {r.due_on:%b %-d}" if r.due_on else "No due date",
+                    f"Due {short_date(r.due_on)}" if r.due_on else "No due date",
                     reverse("records_request_detail", args=[r.pk]),
                     _due_tone(r.due_on, today),
                     r.due_on,
@@ -338,10 +419,39 @@ def items_for(user) -> list[Item]:
                 Item(
                     "Tasks",
                     t.title,
-                    f"Due {t.due_date:%b %-d}" if t.due_date else "Assigned to you",
+                    f"Due {short_date(t.due_date)}" if t.due_date else "Assigned to you",
                     reverse("tasks"),
                     _due_tone(t.due_date, today),
                     t.due_date,
+                )
+            )
+
+    if can(user, "community.manage_rules"):
+        from community.rules import rules_needing_attention
+
+        missing = len(rules_needing_attention())
+        if missing:
+            out.append(
+                Item(
+                    "Setup",
+                    f"{missing} governing rule{' needs' if missing == 1 else 's need'}"
+                    " a value or citation",
+                    "Community settings",
+                    reverse("community_settings"),
+                    "warning",
+                )
+            )
+        thin = policy.thinly_covered_actions()
+        if thin:
+            out.append(
+                Item(
+                    "Setup",
+                    "Fewer than two people with two-step sign-in can act",
+                    f"{len(thin)} action{'' if len(thin) == 1 else 's'}: invite another"
+                    " board member",
+                    reverse("board_home"),
+                    "warning",
+                    nav="board_home",
                 )
             )
 
@@ -365,12 +475,20 @@ def items_for(user) -> list[Item]:
     if g & {policy.OWNER}:
         from compliance.models import Violation
 
-        for v in own_records(Violation.objects.for_user(user), user).filter(state="noticed"):
+        for v in own_records(Violation.objects.for_user(user), user).filter(
+            state__in=["noticed", "hearing"]
+        ):
+            if v.state == "hearing":
+                detail = "A hearing is scheduled: see the notice"
+            elif v.cure_by:
+                detail = f"Please fix by {short_date(v.cure_by)}"
+            else:
+                detail = "Please review and respond"
             out.append(
                 Item(
                     "My home",
                     f"Notice: {v.get_category_display()}",
-                    f"Cure by {v.cure_by:%b %-d}" if v.cure_by else "Please review and respond",
+                    detail,
                     reverse("violation_detail", args=[v.pk]),
                     _due_tone(v.cure_by, today),
                     v.cure_by,
@@ -414,9 +532,32 @@ def items_for(user) -> list[Item]:
                         "Your ballot is open",
                         reverse("vote_detail", args=[vote.pk]),
                         "info",
-                        nav="votes",
+                        nav="voting",
+                        icon="vote",
                     )
                 )
+    if can(user, "vote.view") and roles.person_id:
+        # Own lots and lots whose proxy this person holds.
+        from governance import elections
+        from governance.models import Election, ElectionState
+
+        for election in Election.objects.filter(state=ElectionState.VOTING):
+            lots = elections.lots_actor_may_vote_for(election, user)
+            if lots:
+                out.append(
+                    Item(
+                        "My home",
+                        f"Election: {election.title}",
+                        "Your ballot is open"
+                        + (f" ({len(lots)} lots: one ballot each)" if len(lots) > 1 else ""),
+                        reverse("election_detail", args=[election.pk]),
+                        "info",
+                        nav="voting",
+                        icon="vote",
+                    )
+                )
+    if can(user, "ledger.view_own"):
+        out.extend(_balance_items(user, roles))
 
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
@@ -424,6 +565,56 @@ def items_for(user) -> list[Item]:
 
     states = features.states()  # one query, not one per item (optimization A9)
     return [i for i in out if features.path_enabled(i.url, states_=states)]
+
+
+def oldest_unpaid_on(statement, since) -> datetime.date | None:
+    """The posting date of the oldest charge not yet covered by payments
+    (payments and credits pay the oldest charges first)."""
+    charges = []  # [posted_on, remaining]
+    if statement.brought_forward > 0:
+        charges.append([since, statement.brought_forward])
+    credit = -statement.brought_forward if statement.brought_forward < 0 else 0
+    for entry in sorted(statement.entries, key=lambda e: (e.posted_on, e.pk or 0)):
+        if entry.amount_cents > 0:
+            charges.append([entry.posted_on, entry.amount_cents])
+        else:
+            credit += -entry.amount_cents
+    for charge in charges:
+        used = min(credit, charge[1])
+        charge[1] -= used
+        credit -= used
+        if charge[1] > 0:
+            return charge[0]
+    return None
+
+
+def _balance_items(user, roles) -> list[Item]:
+    """A balance due on one of my accounts, with the amount and since when."""
+    from community.models import Lot
+    from core.money import format_cents
+    from ledger.services import owner_statement
+
+    out = []
+    for lot in Lot.objects.for_user(user).filter(pk__in=roles.account_lot_ids).order_by("number"):
+        since = roles.lot_since.get(lot.pk)
+        statement = owner_statement(lot.pk, since)
+        if statement.balance <= 0:
+            continue
+        oldest = oldest_unpaid_on(statement, since)
+        when = f" · due since {short_date(oldest)}" if oldest else ""
+        out.append(
+            Item(
+                "My home",
+                f"{format_cents(statement.balance)} due on lot {lot.number}",
+                f"See your account and how to pay{when}",
+                reverse("my_account"),
+                "warning",
+                oldest,
+                nav="my_account",
+                icon="wallet",
+            )
+        )
+    return out
 
 
 def counts(items: list[Item]) -> list[dict]:
@@ -437,11 +628,24 @@ def counts(items: list[Item]) -> list[dict]:
     return sorted(by_area.values(), key=lambda r: order.get(r["area"], 99))
 
 
-def nav_counts(user) -> dict[str, int]:
+def items_for_request(request) -> list[Item]:
+    """items_for(request.user), computed once per request: the sidebar counts
+    and the page itself (dashboard, My items, Board overview) share it.
+
+    Not cached across requests: a count must drop the moment the step is
+    taken, and the items come from many apps' records, so there is no single
+    place to invalidate a longer-lived cache."""
+    cached = getattr(request, "_my_items", None)
+    if cached is None:
+        cached = request._my_items = items_for(request.user)
+    return cached
+
+
+def nav_counts(user, request=None) -> dict[str, int]:
     """Items waiting on this person, by sidebar entry, plus the total
     ("my_items"). Computed once per page by core.navigation."""
     counts: dict[str, int] = {}
-    items = items_for(user)
+    items = items_for_request(request) if request is not None else items_for(user)
     for it in items:
         if it.nav:
             counts[it.nav] = counts.get(it.nav, 0) + 1

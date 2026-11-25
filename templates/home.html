@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Home · {{ SITE_NAME }}{% endblock %}
+{% block title %}Dashboard · {{ SITE_NAME }}{% endblock %}
 {% block content %}
 {% if not user.is_authenticated %}
   <h1>Welcome</h1>
@@ -21,6 +21,21 @@
       <p class="muted">You no longer own a lot here, so your login is read-only. You can still see your own account statements and requests from your time as an owner.</p>
       <a class="btn" href="{% url 'my_history' %}">{% icon "clock" %} View my history</a></section>
   {% endif %}
+
+  {# To-dos first (UX review): the same list as My items and the sidebar counts. #}
+  <section class="card" id="todos">
+    <div class="card-head"><h2>Needs your attention</h2>{% if dash.todos_more %}<a class="small" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}</div>
+    {% if dash.todos %}
+      <ul class="list">{% for t in dash.todos %}{% include "partials/todo.html" %}{% endfor %}</ul>
+    {% else %}
+      {% include "partials/empty.html" with icon="check-circle" title="You're all caught up" text="Nothing needs you right now." %}
+    {% endif %}
+  </section>
+
+  {% for m in o.proxy_meetings %}
+    <div class="alert info">{% icon "vote" %}<span><strong>{{ m.title }}</strong>, {{ m.starts_at|date:"l, F j, Y" }}: owners vote at this meeting. Can't attend? <a href="{% url 'meeting_detail' m.pk %}#proxy">Give a proxy</a></span></div>
+  {% endfor %}
+
   {% if o %}
     <div class="grid grid-4">
       {% for a in o.accounts %}
@@ -30,9 +45,9 @@
           <div class="hint">{% if a.balance > 0 %}due{% elif a.balance < 0 %}in credit{% else %}paid up{% endif %}</div>
         </a>
       {% endfor %}
-      {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}"><div class="label">Architectural requests</div><div class="value">{{ o.open_arc }}</div><div class="hint">open</div></a>{% endif %}
-      <a class="stat {% if o.notices %}tone-warning{% endif %}" href="{% url 'violations' %}"><div class="label">Notices</div><div class="value">{{ o.notices }}</div><div class="hint">about your lot</div></a>
-      {% if user|can:"vote.cast" %}<a class="stat {% if o.votes %}tone-success{% endif %}" href="{% url 'votes' %}"><div class="label">Open votes</div><div class="value">{{ o.votes }}</div><div class="hint">waiting for your ballot</div></a>{% endif %}
+      {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}?mine=1"><div class="label">Home improvement approvals (ARC)</div><div class="value">{{ o.open_arc }}</div><div class="hint">open</div></a>{% endif %}
+      <a class="stat {% if o.notices %}tone-warning{% endif %}" href="{% url 'violations' %}?mine=1"><div class="label">Notices about my home</div><div class="value">{{ o.notices }}</div><div class="hint">open</div></a>
+      {% if user|can:"vote.cast" %}<a class="stat {% if o.votes %}tone-success{% endif %}" href="{% url 'voting' %}"><div class="label">Open votes</div><div class="value">{{ o.votes }}</div><div class="hint">waiting for your ballot</div></a>{% endif %}
     </div>
   {% endif %}
 
@@ -46,18 +61,6 @@
 
   <div class="split">
     <div>
-      <section class="card">
-        <div class="card-head"><h2>Needs your attention</h2></div>
-        {% if s.todos or o.todos %}
-          <ul class="list">
-            {% for t in s.todos %}{% include "partials/todo.html" %}{% endfor %}
-            {% for t in o.todos %}{% include "partials/todo.html" %}{% endfor %}
-          </ul>
-        {% else %}
-          {% include "partials/empty.html" with icon="check-circle" title="You're all caught up" text="Nothing needs you right now." %}
-        {% endif %}
-      </section>
-
       {% if user|can:"announcement.view" %}<section class="card">
         <div class="card-head"><h2>Latest news</h2><a href="{% url 'announcements' %}" class="small">All announcements</a></div>
         {% with news=dash.news %}
@@ -65,7 +68,7 @@
           <ul class="list">
             {% for a, read in news %}
               <li>{% if not read %}<span class="dot-unread" title="Unread"></span>{% endif %}
-                <div class="grow"><a class="title" href="{% url 'announcement_detail' a.pk %}">{{ a.title }}</a>{% if a.urgent %} <span class="status tone-danger">Urgent</span>{% endif %}<div class="small muted">{{ a.published_at|date:"M j" }}</div></div></li>
+                <div class="grow"><a class="title" href="{% url 'announcement_detail' a.pk %}">{{ a.title }}</a>{% if a.urgent %} <span class="status tone-danger">Urgent</span>{% endif %}<div class="small muted">{{ a.published_at|short_date }}</div></div></li>
             {% endfor %}
           </ul>
         {% else %}{% include "partials/empty.html" with icon="megaphone" title="No announcements yet" %}{% endif %}
@@ -80,7 +83,7 @@
         {% if events %}
           <ul class="list">
             {% for e in events %}
-              <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><div class="title">{{ e.title }}</div><div class="small muted">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
+              <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><div class="title">{{ e.title }}</div><div class="small muted">{{ e.starts_at|date:"D M j, Y, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
             {% endfor %}
           </ul>
         {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
@@ -90,7 +93,7 @@
         <section class="card">
           <h2>Quick actions</h2>
           <ul class="list">
-            {% if user|can:"arc.submit" %}<li><a class="title" href="{% url 'arc_list' %}">{% icon "pencil" %} Request approval for a project</a></li>{% endif %}
+            {% if user|can:"arc.submit" %}<li><a class="title" href="{% url 'arc_list' %}?mine=1">{% icon "pencil" %} Home improvement approvals (ARC)</a></li>{% endif %}
             <li><a class="title" href="{% url 'documents' %}">{% icon "folder" %} Governing documents</a></li>
             <li><a class="title" href="{% url 'my_profile' %}">{% icon "user" %} Update my contact details</a></li>
             <li><a class="title" href="{% url 'mfa_index' %}">{% icon "lock" %} Passkeys and security</a></li>

@@ -18,7 +18,7 @@ pytestmark = pytest.mark.django_db
 def _bubble(html: str, label: str):
     """The number in the bubble after a menu label, or None."""
     m = re.search(
-        rf"<span>{re.escape(label)}</span>(?:<span class=\"badge-count\"[^>]*>(\d+)</span>)?", html
+        rf"<span>{re.escape(label)}</span>(?:<span class=\"badge-count\"[^>]*>(\d+)<)?", html
     )
     assert m, f"menu entry {label!r} not found"
     return int(m.group(1)) if m.group(1) else None
