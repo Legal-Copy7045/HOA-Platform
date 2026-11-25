@@ -490,3 +490,214 @@ def results(vote: Vote) -> dict:
 
 def can_see_voters(vote: Vote, user) -> bool:
     return not vote.secret and can(user, "vote.manage")
+
+
+# --- Committees (Milestone 3) -----------------------------------------------------------
+
+from django.core.exceptions import PermissionDenied  # noqa: E402
+
+from core import policy as _policy  # noqa: E402
+from governance.models import (  # noqa: E402
+    Committee,
+    CommitteeMembership,
+    CommitteeRole,
+    CommitteeTopic,
+)
+
+
+def is_committee_member(user, committee) -> bool:
+    if user is SYSTEM:
+        return True
+    return committee.pk in _policy.roles_for(user).committee_ids
+
+
+def can_view_committee(user, committee) -> bool:
+    return user is SYSTEM or can(user, "committee.view_all") or is_committee_member(user, committee)
+
+
+def can_work_in_committee(user, committee) -> bool:
+    """Post topics, add tasks and events: its members, and the board."""
+    if user is SYSTEM:
+        return True
+    if not committee.active:
+        return False
+    return is_committee_member(user, committee) or can(user, "committee.manage")
+
+
+def require_committee_member(user, committee) -> None:
+    if not can_work_in_committee(user, committee):
+        raise PermissionDenied("committee")
+
+
+def committees_for(user):
+    """Committees this person may open: all for the board, manager and
+    auditor; their own for members."""
+    if can(user, "committee.view_all"):
+        return Committee.objects.all()
+    return Committee.objects.filter(pk__in=_policy.roles_for(user).committee_ids)
+
+
+def create_committee(*, name: str, purpose: str = "", citation: str = "", actor, request=None):
+    require(actor, "committee.manage")
+    name = single_line(name)[:120]
+    if not name:
+        raise GovernanceError("A committee needs a name.")
+    try:
+        with transaction.atomic():
+            committee = Committee.objects.create(
+                name=name,
+                purpose=purpose.strip(),
+                citation=single_line(citation)[:200],
+                created_by=actor,
+            )
+            from documents.services import committee_folder
+
+            committee_folder(committee, actor=SYSTEM)
+    except IntegrityError as exc:
+        raise GovernanceError("A committee with that name already exists.") from exc
+    record_event("committee.created", actor=actor, request=request, target=committee)
+    return committee
+
+
+def set_committee_active(committee, *, active: bool, actor, request=None):
+    require(actor, "committee.manage")
+    Committee.objects.filter(pk=committee.pk).update(active=active)
+    committee.active = active
+    record_event(
+        "committee.retired" if not active else "committee.reactivated",
+        actor=actor,
+        request=request,
+        target=committee,
+    )
+    return committee
+
+
+def appoint_committee_member(
+    committee, *, person, role: str = CommitteeRole.MEMBER, actor, request=None
+):
+    """The board appoints (no self-appointment). A committee has one chair:
+    appointing a new chair makes the old one a member from today."""
+    require(actor, "committee.manage")
+    if role not in CommitteeRole.values:
+        raise GovernanceError("Choose chair or member.")
+    if not committee.active:
+        raise GovernanceError("This committee is retired.")
+    if actor is not SYSTEM and person.user_id == actor.pk:
+        raise GovernanceError("Ask another board member to appoint you.")
+    today_ = timezone.localdate()
+    with transaction.atomic(), system_access("appoint committee member"):
+        if not (
+            Ownership.objects.active().filter(person=person).exists()
+            or community_services.has_board_seat(person)
+        ):
+            raise GovernanceError("Committee members must be current owners or board members.")
+        open_rows = CommitteeMembership.objects.filter(
+            committee=committee, end_date__isnull=True
+        ).select_for_update()
+        if open_rows.filter(person=person).exists():
+            raise GovernanceError("That person is already on this committee.")
+        if role == CommitteeRole.CHAIR:
+            for old in open_rows.filter(role=CommitteeRole.CHAIR):
+                _end_membership(old, today_)
+                CommitteeMembership.objects.create(
+                    committee=committee,
+                    person_id=old.person_id,
+                    role=CommitteeRole.MEMBER,
+                    start_date=today_,
+                    appointed_by=None if actor is SYSTEM else actor,
+                )
+        membership = CommitteeMembership.objects.create(
+            committee=committee,
+            person=person,
+            role=role,
+            start_date=today_,
+            appointed_by=None if actor is SYSTEM else actor,
+        )
+    record_event(
+        "committee.member_appointed",
+        actor=actor,
+        request=request,
+        target=committee,
+        metadata={"person_id": person.pk, "role": role},
+    )
+    return membership
+
+
+def _end_membership(membership, on) -> None:
+    CommitteeMembership.objects.unscoped("end membership").filter(
+        pk=membership.pk, end_date__isnull=True
+    ).update(end_date=max(on, membership.start_date))
+
+
+def end_committee_membership(membership, *, actor, request=None):
+    require(actor, "committee.manage")
+    with system_access("end committee membership"):
+        _end_membership(membership, timezone.localdate())
+    record_event(
+        "committee.member_ended",
+        actor=actor,
+        request=request,
+        target=membership.committee,
+        metadata={"person_id": membership.person_id, "role": membership.role},
+    )
+
+
+def committee_members(committee, on=None):
+    """Current members (chair first), for the space and the directory."""
+    with system_access("committee members"):
+        return list(
+            CommitteeMembership.objects.filter(committee=committee)
+            .active(on)
+            .select_related("person")
+            .order_by("role", "person__display_name")
+        )
+
+
+def start_topic(committee, *, title: str, body: str, actor, request=None):
+    require_committee_member(actor, committee)
+    title = single_line(title)[:200]
+    if not title or not body.strip():
+        raise GovernanceError("A topic needs a title and a first message.")
+    from comms import threads
+
+    with transaction.atomic():
+        topic = CommitteeTopic.objects.create(committee=committee, title=title, created_by=actor)
+        record_event("committee.topic_started", actor=actor, request=request, target=committee)
+        threads.post("committee_topic", topic, body=body, actor=actor, request=request)
+    return topic
+
+
+def add_committee_task(committee, *, title: str, due_date=None, assignee=None, actor, request=None):
+    require_committee_member(actor, committee)
+    from operations.services import create_committee_task
+
+    return create_committee_task(
+        committee_id=committee.pk,
+        title=title,
+        due_date=due_date,
+        assignee=assignee,
+        actor=actor,
+        request=request,
+    )
+
+
+def close_committee_task(committee, task, *, status: str, actor, request=None):
+    require_committee_member(actor, committee)
+    from operations.services import close_committee_task as close
+
+    return close(task, committee_id=committee.pk, status=status, actor=actor, request=request)
+
+
+def committee_directory():
+    """Active committees and their members' names, for the directory."""
+    return [
+        {
+            "name": c.name,
+            "purpose": c.purpose,
+            "members": [
+                {"name": m.person.display_name, "chair": m.role == CommitteeRole.CHAIR}
+                for m in committee_members(c)
+            ],
+        }
+        for c in Committee.objects.filter(active=True)
+    ]

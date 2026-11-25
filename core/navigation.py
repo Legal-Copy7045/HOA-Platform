@@ -37,7 +37,8 @@ SECTIONS = [
             ("Meetings", "meetings", "book", "meeting.view"),
             ("Votes and polls", "votes", "vote", "vote.view"),
             ("Policies", "resolutions", "file", "resolution.view"),
-            ("Owner directory", "directory", "users", "directory.view"),
+            ("Directory", "directory", "users", "directory.view"),
+            ("Committees", "committees", "users", "committee.view"),
         ],
     ),
     (

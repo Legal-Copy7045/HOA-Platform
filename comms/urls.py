@@ -8,7 +8,7 @@ urlpatterns = [
     path("calendar/", views.calendar, name="calendar"),
     path("calendar/<int:pk>/cancel/", views.event_cancel, name="event_cancel"),
     re_path(
-        r"^threads/(?P<kind>request|arc|violation|work_order)/(?P<pk>[0-9]+)/post/$",
+        r"^threads/(?P<kind>request|arc|violation|work_order|committee_topic)/(?P<pk>[0-9]+)/post/$",
         views.thread_post,
         name="thread_post",
     ),

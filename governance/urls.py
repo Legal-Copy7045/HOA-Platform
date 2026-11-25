@@ -1,8 +1,27 @@
 from django.urls import path, re_path
 
+from governance import committee_views as cv
 from governance import views
 
 urlpatterns = [
+    path("committees/", cv.committee_list, name="committees"),
+    path("committees/<int:pk>/", cv.committee_detail, name="committee_detail"),
+    re_path(
+        r"^committees/(?P<pk>[0-9]+)/do/(?P<action>appoint|retire|reactivate|topic|task|event)/$",
+        cv.committee_action,
+        name="committee_action",
+    ),
+    path(
+        "committees/<int:pk>/tasks/<int:task_id>/close/",
+        cv.committee_task_close,
+        name="committee_task_close",
+    ),
+    path("committees/topics/<int:pk>/", cv.committee_topic_detail, name="committee_topic_detail"),
+    path(
+        "board/committee-members/<int:pk>/end/",
+        cv.committee_member_end,
+        name="committee_member_end",
+    ),
     path("meetings/", views.meetings, name="meetings"),
     path("meetings/<int:pk>/", views.meeting_detail, name="meeting_detail"),
     re_path(

@@ -302,6 +302,24 @@ class Command(BaseCommand):
             internal=True,
             actor=b1,
         )
+        # Committees with a space (Milestone 3).
+        social = governance.create_committee(
+            name="Social",
+            purpose="Plans community events (demo).",
+            citation="Board resolution (demo)",
+            actor=b1,
+        )
+        governance.appoint_committee_member(social, person=owner_of[3], role="chair", actor=b1)
+        governance.appoint_committee_member(social, person=owner_of[12], actor=b1)
+        governance.start_topic(
+            social, title="Summer picnic (demo)", body="Date ideas for the picnic?", actor=owner3
+        )
+        governance.add_committee_task(social, title="Book the pavilion (demo)", actor=owner3)
+        governance.create_committee(
+            name="Landscaping", purpose="Common area plantings (demo).", actor=b1
+        )
+        documents.create_folder(name="Pool and amenities", visibility="owners", actor=b1)
+        documents.create_folder(name="Legal (board)", visibility="board", actor=b1)
         ops.submit_request(
             lot=lots[12],
             request_type="billing",

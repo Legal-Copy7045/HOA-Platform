@@ -60,21 +60,27 @@ def _model(kind: str):
         from operations.models import WorkOrder
 
         return WorkOrder
+    if kind == "committee_topic":
+        from governance.models import CommitteeTopic
+
+        return CommitteeTopic
     raise Http404
 
 
-KINDS = ("request", "arc", "violation", "work_order")
+KINDS = ("request", "arc", "violation", "work_order", "committee_topic")
 LABELS = {
     "request": "request",
     "arc": "architectural request",
     "violation": "notice",
     "work_order": "work order",
+    "committee_topic": "committee discussion",
 }
 DETAIL_URLS = {
     "request": "request_detail",
     "arc": "arc_detail",
     "violation": "violation_detail",
     "work_order": "work_order_detail",
+    "committee_topic": "committee_topic_detail",
 }
 STAFF = {
     # kind: (view internal, post as staff)
@@ -88,6 +94,13 @@ STAFF = {
 def subject_for(kind: str, pk: int, user):
     """The subject, fetched through its own scoping (404 if out of scope)."""
     model = _model(kind)
+    if kind == "committee_topic":
+        from governance.services import can_view_committee
+
+        topic = model.objects.select_related("committee").filter(pk=pk).first()
+        if topic is None or not can_view_committee(user, topic.committee):
+            raise Http404
+        return topic
     if kind == "work_order":
         if not policy.can(user, "workorder.manage"):
             raise Http404
@@ -133,6 +146,14 @@ def _recused(kind: str, obj, user) -> bool:
 
 def access(kind: str, obj, user) -> Access:
     """What ``user`` may do on the thread of ``obj`` (already scoped)."""
+    if kind == "committee_topic":
+        from governance.services import can_view_committee, can_work_in_committee
+
+        committee = obj.committee
+        read = can_view_committee(user, committee)
+        return Access(
+            read=read, post=read and not obj.closed and can_work_in_committee(user, committee)
+        )
     view_perm, post_perm = STAFF[kind]
     if policy.can(user, view_perm) and not _recused(kind, obj, user):
         staff_post = policy.can(user, post_perm) or (
@@ -165,6 +186,8 @@ def post(kind: str, obj, *, body: str, internal: bool = False, actor, request=No
         raise ThreadError("Write a message first.")
     if len(body) > MAX_BODY:
         raise ThreadError(f"Please keep messages under {MAX_BODY:,} characters.")
+    if kind == "committee_topic" and internal:
+        raise ThreadError("Committee discussions have no internal notes.")
     staff = acc.post_internal
     with transaction.atomic(), system_access("post thread message"):
         message = ThreadMessage.objects.create(
@@ -181,7 +204,9 @@ def post(kind: str, obj, *, body: str, internal: bool = False, actor, request=No
         from operations.services import mark_request_responded
 
         mark_request_responded(obj)
-    if internal:
+    if kind == "committee_topic":
+        _notify_committee(obj, exclude=actor)
+    elif internal:
         pass  # internal notes notify nobody outside the staff page
     elif staff:
         notify_owner_side(kind, obj, exclude=actor)
@@ -260,3 +285,17 @@ def notify_staff(kind: str, obj, exclude=None) -> None:
     if exclude is not None:
         emails.discard(exclude.email)
     _send(kind, obj, emails)
+
+
+def _notify_committee(topic, exclude=None) -> None:
+    from governance.services import committee_members
+
+    with system_access("committee emails"):
+        emails = {
+            m.person.user.email
+            for m in committee_members(topic.committee)
+            if m.person.user_id and m.person.user.is_active
+        }
+    if exclude is not None:
+        emails.discard(exclude.email)
+    _send("committee_topic", topic, emails)

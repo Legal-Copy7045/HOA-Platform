@@ -17,6 +17,10 @@ class BoardTask(models.Model):
     assignee = models.ForeignKey(
         "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
+    # A committee's own task (shown in its space); None = a board task.
+    committee = models.ForeignKey(
+        "governance.Committee", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     due_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=TaskStatus.choices, default=TaskStatus.OPEN)
     created_by = models.ForeignKey(

@@ -12,7 +12,7 @@ from core import policy
 class AnnouncementForm(forms.Form):
     title = forms.CharField(max_length=200)
     body = forms.CharField(widget=forms.Textarea(attrs={"rows": 6}))
-    audience = forms.ChoiceField(choices=Audience.choices)
+    audience = forms.ChoiceField(choices=Audience.choices[:2])
     urgent = forms.BooleanField(required=False)
 
 
@@ -24,7 +24,7 @@ class EventForm(forms.Form):
     )
     location = forms.CharField(max_length=200, required=False)
     description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
-    audience = forms.ChoiceField(choices=Audience.choices)
+    audience = forms.ChoiceField(choices=Audience.choices[:2])
 
 
 @login_required

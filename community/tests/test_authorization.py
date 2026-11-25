@@ -299,6 +299,8 @@ MEMBER_READS = {
                 "violation.view_all",
                 "finance.view",
                 "reports.view",
+                "committee.view",
+                "committee.view_all",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

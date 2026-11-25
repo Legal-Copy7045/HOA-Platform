@@ -608,3 +608,46 @@ def set_work_order_follow_up(wo: WorkOrder, on, *, actor, request=None) -> WorkO
         metadata={"kind": "work_order", "object_id": wo.pk, "on": on.isoformat() if on else None},
     )
     return wo
+
+
+# --- Committee tasks (authorization by governance.services) ---------------------------
+
+
+def create_committee_task(
+    *, committee_id: int, title: str, due_date=None, assignee=None, actor, request=None
+) -> BoardTask:
+    """Called only by governance.services after its membership check."""
+    from governance.models import Committee
+    from governance.services import require_committee_member
+
+    require_committee_member(actor, Committee.objects.get(pk=committee_id))
+    if not title.strip():
+        raise OperationsError("A task needs a title.")
+    task = BoardTask.objects.create(
+        title=title.strip()[:200],
+        assignee=assignee,
+        due_date=due_date,
+        committee_id=committee_id,
+        created_by=actor,
+    )
+    record_event("task.created", actor=actor, request=request, target=task)
+    return task
+
+
+def close_committee_task(
+    task: BoardTask, *, committee_id: int, status: str, actor, request=None
+) -> BoardTask:
+    from governance.models import Committee
+    from governance.services import require_committee_member
+
+    require_committee_member(actor, Committee.objects.get(pk=committee_id))
+    if task.committee_id != committee_id:
+        raise OperationsError("That task belongs to another committee.")
+    if status not in (TaskStatus.DONE, TaskStatus.DROPPED) or task.status != TaskStatus.OPEN:
+        raise OperationsError("Only open tasks can be closed.")
+    BoardTask.objects.filter(pk=task.pk).update(status=status, closed_at=timezone.now())
+    task.status = status
+    record_event(
+        "task.closed", actor=actor, request=request, target=task, metadata={"status": status}
+    )
+    return task

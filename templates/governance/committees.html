@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Committees · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Committees</h1><p class="subtitle">{% if can_manage %}Committees the board has created, with their members.{% else %}The committees you sit on.{% endif %}</p></div></div>
+  <div class="split">
+    <div>
+      {% for c, members in rows %}
+        <section class="card"><div class="card-head"><div><h2><a href="{% url 'committee_detail' c.pk %}">{{ c.name }}</a></h2>{% if c.citation %}<div class="small muted">{{ c.citation }}</div>{% endif %}</div>{% if not c.active %}<span class="badge">Retired</span>{% endif %}</div>
+          {% if c.purpose %}<p class="small">{{ c.purpose|truncatechars:200 }}</p>{% endif %}
+          <p class="small muted">{% for m in members %}{{ m.person.display_name }}{% if m.role == "chair" %} (chair){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}No members yet.{% endfor %}</p>
+        </section>
+      {% empty %}<section class="card">{% include "partials/empty.html" with icon="users" title="No committees yet" %}</section>{% endfor %}
+    </div>
+    {% if can_manage %}<aside><section class="card"><h2>New committee</h2>
+      <form method="post">{% csrf_token %}
+        <p><label>Name <input type="text" name="name" maxlength="120" required></label></p>
+        <p><label>Purpose <textarea name="purpose" rows="3"></textarea></label></p>
+        <p><label>Created by <input type="text" name="citation" maxlength="200" placeholder="Board resolution 2027-06"></label></p>
+        <div class="form-actions"><button type="submit">Create committee</button></div>
+      </form></section></aside>{% endif %}
+  </div>
+{% endblock %}

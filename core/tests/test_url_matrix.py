@@ -67,6 +67,7 @@ BOARD_ONLY_MARKERS = (
     b"Lot B Buyer Agent",
     b"Lot B leaking gutter",
     b"Board note on lot B",
+    b"Lot B pond",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -93,6 +94,15 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "committees": ("GET", None),
+    "committee_detail": ("GET", "committee_b"),
+    "committee_action": ("POST", "committee_b"),
+    "committee_task_close": ("POST", "committee_b"),
+    "committee_topic_detail": ("GET", "topic_b"),
+    "committee_member_end": ("POST", "membership_b"),
+    "committee_upload": ("POST", "committee_b"),
+    "folder_create": ("POST", None),
+    "document_move": ("POST", "board_document"),
     "request_detail": ("GET", "request_b"),
     "request_action": ("POST", "request_b"),
     "request_assign": ("POST", "request_b"),
@@ -319,6 +329,16 @@ def world():
             actor=owner_b,
         )
         threads.post("request", request_b, body="Board note on lot B", actor=board)
+        from governance import services as gov
+        from governance.models import CommitteeMembership
+
+        committee_b = gov.create_committee(name="Lot B pond committee", actor=board)
+        gov.appoint_committee_member(committee_b, person=person_b, actor=board)
+        topic_b = gov.start_topic(
+            committee_b, title="Lot B pond plans", body="Board note on lot B", actor=owner_b
+        )
+        task_b = gov.add_committee_task(committee_b, title="Lot B pond task", actor=owner_b)
+        membership_b = CommitteeMembership.objects.unscoped("t").get(person=person_b)
         account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
         contact_b = services.add_account_contact(
             account_b,
@@ -332,6 +352,10 @@ def world():
     targets = {
         "account_b": account_b.pk,
         "request_b": request_b.pk,
+        "committee_b": committee_b.pk,
+        "topic_b": topic_b.pk,
+        "task_b": task_b.pk,
+        "membership_b": membership_b.pk,
         "account_contact_b": contact_b.pk,
         "contact_method_b": method_b.pk,
         "lot": lot_b.pk,
@@ -410,6 +434,10 @@ def _url(name, key, targets):
         kwargs["file_id"] = targets["violation_b_file"]
     elif name == "request_action":
         kwargs["action"] = "withdraw"
+    elif name == "committee_action":
+        kwargs["action"] = "topic"
+    elif name == "committee_task_close":
+        kwargs["task_id"] = targets["task_b"]
     elif name == "thread_post":
         kwargs["kind"] = "request"
     elif name == "follow_up_set":

@@ -32,6 +32,46 @@ class Visibility(models.TextChoices):
     OWNERS = "owners", "All owners"
     BOARD = "board", "Board, manager and auditor only"
     LOT = "lot", "Owners of one lot only"
+    COMMITTEE = "committee", "One committee (and the board)"
+
+
+class Folder(models.Model):
+    """A board-managed folder. Its visibility applies to every document filed
+    in it (owners, board only, or one committee). No public folders."""
+
+    name = models.CharField(max_length=120)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="children"
+    )
+    visibility = models.CharField(
+        max_length=10,
+        choices=[(v, label) for v, label in Visibility.choices if v != "lot"],
+        default=Visibility.OWNERS,
+    )
+    committee = models.ForeignKey(
+        "governance.Committee", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(visibility="committee") & models.Q(committee__isnull=False))
+                | (~models.Q(visibility="committee") & models.Q(committee__isnull=True)),
+                name="folder_committee_matches_visibility",
+            ),
+            models.UniqueConstraint(fields=["parent", "name"], name="folder_unique_name"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Folders are kept; move documents instead.")
 
 
 class DocumentQuerySet(ScopedQuerySet):
@@ -47,10 +87,16 @@ class Document(ScopedModel):
     title = models.CharField(max_length=200)
     category = models.CharField(max_length=16, choices=Category.choices)
     visibility = models.CharField(
-        max_length=8, choices=Visibility.choices, default=Visibility.OWNERS
+        max_length=10, choices=Visibility.choices, default=Visibility.OWNERS
     )
     lot = models.ForeignKey(
         "community.Lot", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    folder = models.ForeignKey(
+        Folder, null=True, blank=True, on_delete=models.PROTECT, related_name="documents"
+    )
+    committee = models.ForeignKey(
+        "governance.Committee", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     description = models.TextField(blank=True)
     current_version = models.ForeignKey(
@@ -71,7 +117,12 @@ class Document(ScopedModel):
                 condition=(models.Q(visibility="lot") & models.Q(lot__isnull=False))
                 | (~models.Q(visibility="lot") & models.Q(lot__isnull=True)),
                 name="document_lot_matches_visibility",
-            )
+            ),
+            models.CheckConstraint(
+                condition=(models.Q(visibility="committee") & models.Q(committee__isnull=False))
+                | (~models.Q(visibility="committee") & models.Q(committee__isnull=True)),
+                name="document_committee_matches_visibility",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -79,9 +130,12 @@ class Document(ScopedModel):
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):
-        """Owners: current owner-wide documents, plus documents for lots they own."""
-        visible = models.Q(visibility=Visibility.OWNERS) | models.Q(
-            visibility=Visibility.LOT, lot_id__in=roles.account_lot_ids
+        """Owners: current owner-wide documents, documents for lots on their
+        account, and documents of committees they sit on."""
+        visible = (
+            models.Q(visibility=Visibility.OWNERS)
+            | models.Q(visibility=Visibility.LOT, lot_id__in=roles.account_lot_ids)
+            | models.Q(visibility=Visibility.COMMITTEE, committee_id__in=roles.committee_ids)
         )
         return queryset.filter(visible, archived=False, current_version__isnull=False)
 

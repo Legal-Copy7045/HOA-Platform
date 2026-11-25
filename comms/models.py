@@ -6,6 +6,7 @@ from django.utils import timezone
 class Audience(models.TextChoices):
     MEMBERS = "members", "All owners and board"
     BOARD = "board", "Board, manager and auditor only"
+    COMMITTEE = "committee", "One committee (and the board)"
 
 
 class AudienceQuerySet(models.QuerySet):
@@ -16,6 +17,12 @@ class AudienceQuerySet(models.QuerySet):
             return self.none()
         if policy.can(user, "document.view_board"):
             return self
+        committees = policy.roles_for(user).committee_ids
+        if committees and self.model is Event:
+            return self.filter(
+                models.Q(audience=Audience.MEMBERS)
+                | models.Q(audience=Audience.COMMITTEE, committee_id__in=committees)
+            )
         return self.filter(audience=Audience.MEMBERS)
 
 
@@ -66,6 +73,9 @@ class Event(models.Model):
     description = models.TextField(blank=True)
     audience = models.CharField(max_length=16, choices=Audience.choices, default=Audience.MEMBERS)
     cancelled = models.BooleanField(default=False)
+    committee = models.ForeignKey(
+        "governance.Committee", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -80,7 +90,12 @@ class Event(models.Model):
                 condition=models.Q(ends_at__isnull=True)
                 | models.Q(ends_at__gte=models.F("starts_at")),
                 name="event_ends_after_start",
-            )
+            ),
+            models.CheckConstraint(
+                condition=(models.Q(audience="committee") & models.Q(committee__isnull=False))
+                | (~models.Q(audience="committee") & models.Q(committee__isnull=True)),
+                name="event_committee_matches_audience",
+            ),
         ]
 
     def __str__(self) -> str:

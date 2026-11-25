@@ -25,7 +25,7 @@ def publish_announcement(
     require(actor, "announcement.publish")
     if not single_line(title) or not body.strip():
         raise CommsError("An announcement needs a title and a message.")
-    if audience not in Audience.values:
+    if audience not in (Audience.MEMBERS, Audience.BOARD):
         raise CommsError("Unknown audience.")
     with transaction.atomic():
         announcement = Announcement.objects.create(
@@ -80,10 +80,21 @@ def create_event(
     location: str = "",
     description: str = "",
     audience: str = Audience.MEMBERS,
+    committee=None,
     actor,
     request=None,
 ) -> Event:
-    require(actor, "calendar.manage")
+    """Board/manager events; a committee's own event may also be created by
+    that committee's members (checked through governance.services)."""
+    if committee is not None:
+        from governance.services import require_committee_member
+
+        require_committee_member(actor, committee)
+        audience = Audience.COMMITTEE
+    else:
+        require(actor, "calendar.manage")
+        if audience not in (Audience.MEMBERS, Audience.BOARD):
+            raise CommsError("Unknown audience.")
     if not single_line(title):
         raise CommsError("An event needs a title.")
     if ends_at and ends_at < starts_at:
@@ -95,6 +106,7 @@ def create_event(
         location=location.strip()[:200],
         description=description,
         audience=audience,
+        committee=committee,
         created_by=actor,
     )
     record_event(

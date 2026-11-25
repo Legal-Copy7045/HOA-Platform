@@ -3,20 +3,29 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from audit.services import record_event
 from community.models import Lot
 from core import policy
 from documents import services
-from documents.models import Category, Document, DocumentVersion, Visibility
+from documents.models import Category, Document, DocumentVersion, Folder, Visibility
 from documents.validation import download_filename
 
 
 class NewDocumentForm(forms.Form):
     title = forms.CharField(max_length=200)
     category = forms.ChoiceField(choices=Category.choices)
-    visibility = forms.ChoiceField(choices=Visibility.choices)
+    folder = forms.ModelChoiceField(
+        queryset=Folder.objects.none(),
+        required=False,
+        help_text="A filed document takes the folder's visibility.",
+    )
+    visibility = forms.ChoiceField(
+        choices=[c for c in Visibility.choices if c[0] != "committee"],
+        help_text="Used only when no folder is chosen.",
+    )
     lot = forms.ModelChoiceField(
         queryset=Lot.objects.none(), required=False, help_text="Only for lot-specific documents."
     )
@@ -26,6 +35,7 @@ class NewDocumentForm(forms.Form):
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["lot"].queryset = Lot.objects.for_user(user)
+        self.fields["folder"].queryset = services.folders_for(user)
 
 
 class VersionForm(forms.Form):
@@ -53,17 +63,108 @@ def library(request):
         else:
             messages.error(request, "Check the form: a title, category and file are needed.")
         return redirect("documents")
-    documents = Document.objects.for_user(request.user).select_related("current_version", "lot")
+    documents = Document.objects.for_user(request.user).select_related(
+        "current_version", "lot", "folder"
+    )
     if not can_manage:
         documents = documents.filter(archived=False)
+    folders = list(services.folders_for(request.user).filter(parent__isnull=True))
+    current = None
+    if request.GET.get("folder"):
+        current = services.folders_for(request.user).filter(pk=request.GET["folder"]).first()
+        if current is None:
+            raise Http404
+        documents = documents.filter(folder=current)
+    q = (request.GET.get("q") or "").strip()
+    documents = services.search_documents(documents, q)
     groups: dict[str, list] = {}
     for d in documents:
         groups.setdefault(d.get_category_display(), []).append(d)
     return render(
         request,
         "documents/library.html",
-        {"groups": groups, "form": form, "can_manage": can_manage},
+        {
+            "groups": groups,
+            "form": form,
+            "can_manage": can_manage,
+            "folders": folders,
+            "current": current,
+            "subfolders": current.children.all() if current else [],
+            "q": q,
+            "folder_visibilities": [c for c in Visibility.choices if c[0] in ("owners", "board")],
+        },
     )
+
+
+@login_required
+@require_POST
+def folder_create(request):
+    policy.require(request.user, "document.manage")
+    parent = None
+    if request.POST.get("parent"):
+        parent = get_object_or_404(services.folders_for(request.user), pk=request.POST["parent"])
+    try:
+        folder = services.create_folder(
+            name=request.POST.get("name", ""),
+            visibility=parent.visibility if parent else request.POST.get("visibility", ""),
+            parent=parent,
+            committee=parent.committee if parent else None,
+            actor=request.user,
+            request=request,
+        )
+    except services.DocumentError as exc:
+        messages.error(request, str(exc))
+        return redirect("documents")
+    messages.success(request, "Folder created.")
+    return redirect(f"{reverse('documents')}?folder={folder.pk}")
+
+
+@login_required
+@require_POST
+def document_move(request, pk):
+    policy.require(request.user, "document.manage")
+    document = get_object_or_404(Document.objects.for_user(request.user), pk=pk)
+    folder = None
+    if request.POST.get("folder"):
+        folder = get_object_or_404(services.folders_for(request.user), pk=request.POST["folder"])
+    try:
+        services.move_document(document, folder, actor=request.user, request=request)
+    except services.DocumentError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Document filed.")
+    return redirect("document_detail", pk=document.pk)
+
+
+@login_required
+@require_POST
+def committee_upload(request, pk):
+    """A committee member adds a document to their committee's folder."""
+    from governance.models import Committee
+    from governance.services import can_view_committee
+
+    committee = get_object_or_404(Committee, pk=pk)
+    if not can_view_committee(request.user, committee):
+        raise Http404
+    upload = request.FILES.get("file")
+    if upload is None:
+        messages.error(request, "Choose a file.")
+        return redirect("committee_detail", pk=committee.pk)
+    try:
+        services.create_document(
+            title=request.POST.get("title", "") or upload.name,
+            category=Category.OTHER,
+            visibility=Visibility.COMMITTEE,
+            file=upload,
+            folder=services.committee_folder(committee, actor=request.user),
+            actor=request.user,
+            request=request,
+        )
+    except services.DocumentError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Document added to the committee folder.")
+    return redirect("committee_detail", pk=committee.pk)
 
 
 @login_required
@@ -81,6 +182,7 @@ def detail(request, pk):
             "versions": versions,
             "can_manage": can_manage,
             "version_form": VersionForm(),
+            "folders": services.folders_for(request.user) if can_manage else [],
         },
     )
 

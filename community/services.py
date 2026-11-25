@@ -415,6 +415,11 @@ def notice_emails(person: Person) -> list[str]:
         )
 
 
+def has_board_seat(person: Person) -> bool:
+    with system_access("has board seat"):
+        return BoardSeat.objects.filter(person=person).active().exists()
+
+
 def lots_by_ids(ids) -> list[Lot]:
     """Lots by id, for another app's service that has already checked the
     caller's scope (e.g. the lots someone may raise a request for)."""
@@ -989,6 +994,26 @@ def update_my_profile(
             },
         )
     return profile
+
+
+def board_roster_public():
+    """Who is on the board now: names, seat type, office and term end only."""
+    with system_access("directory: board roster"):
+        offices = {
+            h.person_id: h.get_office_display()
+            for h in OfficeHolding.objects.active().select_related("person")
+        }
+        return [
+            {
+                "name": seat.person.display_name,
+                "seat": seat.get_seat_type_display(),
+                "office": offices.get(seat.person_id, ""),
+                "term_end": seat.term_end,
+            }
+            for seat in BoardSeat.objects.active()
+            .select_related("person")
+            .order_by("person__display_name")
+        ]
 
 
 def directory_entries():

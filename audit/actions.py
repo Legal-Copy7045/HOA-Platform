@@ -112,6 +112,12 @@ _SPECS = [
     _spec("request.work_order_created", "Work order created from a request", "work_order_id"),
     _spec("thread.message_posted", "Thread message posted", "kind", "object_id", "internal"),
     _spec("followup.set", "Follow-up date set", "kind", "object_id", "on"),
+    _spec("committee.created", "Committee created"),
+    _spec("committee.retired", "Committee retired"),
+    _spec("committee.reactivated", "Committee reactivated"),
+    _spec("committee.member_appointed", "Committee member appointed", "person_id", "role"),
+    _spec("committee.member_ended", "Committee membership ended", "person_id", "role"),
+    _spec("committee.topic_started", "Committee topic started"),
     _spec(
         "branding.login_background_set", "Sign-in background uploaded", "variant", "width", "height"
     ),
@@ -123,6 +129,8 @@ _SPECS = [
     _spec("task.created", "Board task created"),
     _spec("task.closed", "Board task closed", "status"),
     _spec("document.created", "Document created", "visibility", "category"),
+    _spec("document.folder_created", "Document folder created", "visibility"),
+    _spec("document.moved", "Document filed in a folder", "folder_id", "visibility"),
     _spec("document.version_uploaded", "Document version uploaded", "version", "scan"),
     _spec("document.upload_blocked", "Upload blocked", "reason"),
     _spec("document.archived", "Document archived"),

@@ -2,9 +2,20 @@
 {% load portal %}
 {% block title %}Directory · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Owner directory</h1><p class="subtitle">Only owners who chose to be listed appear here, with only the details they chose to share.</p></div>
+  <div class="page-head"><div><h1>Directory</h1><p class="subtitle">Owners who chose to be listed, the board, and the community's committees.</p></div>
     <div class="actions"><a class="btn secondary" href="{% url 'my_profile' %}">{% icon "user" %} Change my listing</a></div></div>
-  {% if entries %}
+  <nav class="subnav" aria-label="Directory">
+    <a href="?tab=owners"{% if tab == "owners" %} aria-current="page"{% endif %}>Owners</a>
+    <a href="?tab=board"{% if tab == "board" %} aria-current="page"{% endif %}>Board</a>
+    <a href="?tab=committees"{% if tab == "committees" %} aria-current="page"{% endif %}>Committees</a>
+  </nav>
+  {% if tab == "board" %}
+    <div class="grid grid-3">{% for b in board %}<section class="card person-card"><div class="small muted">{{ b.office|default:"Board member" }}</div><div class="title">{{ b.name }}</div><div class="small muted">{{ b.seat }}{% if b.term_end %} · term to {{ b.term_end|date:"M Y" }}{% endif %}</div></section>{% empty %}<section class="card"><p class="muted">No board seats recorded.</p></section>{% endfor %}</div>
+  {% elif tab == "committees" %}
+    {% for c in committees %}<section class="card"><h2>{{ c.name }}</h2>{% if c.purpose %}<p class="small">{{ c.purpose }}</p>{% endif %}
+      <p class="small">{% for m in c.members %}{{ m.name }}{% if m.chair %} (chair){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}<span class="muted">No members yet.</span>{% endfor %}</p></section>
+    {% empty %}<section class="card">{% include "partials/empty.html" with icon="users" title="No committees yet" %}</section>{% endfor %}
+  {% elif entries %}
     <div class="grid grid-3">{% for e in entries %}<section class="card person-card"><div class="small muted">{{ e.lot }}</div><div class="title">{{ e.name }}</div>
       {% if e.email %}<div class="small">{% icon "mail" %} <a href="mailto:{{ e.email }}">{{ e.email }}</a></div>{% endif %}{% if e.phone %}<div class="small">{{ e.phone }}</div>{% endif %}</section>{% endfor %}</div>
   {% else %}<section class="card">{% include "partials/empty.html" with icon="users" title="Nobody has opted in yet" text="Listing is optional. You can add yourself from your profile." %}</section>{% endif %}

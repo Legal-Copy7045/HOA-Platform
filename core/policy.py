@@ -34,6 +34,7 @@ AUTHORIZED = "authorized_contact"  # sees the account, raises requests
 VIEW_ONLY = "view_only_contact"  # sees the account and notices, cannot act
 TENANT = "tenant"  # community documents and news, their own requests
 FORMER_OWNER = "former_owner"  # read-only: their own records from their time
+COMMITTEE_MEMBER = "committee_member"  # sees and works in their own committees' spaces
 ACCOUNT_VIEWERS = frozenset({OWNER, AUTHORIZED, VIEW_ONLY})
 RESIDENTS = ACCOUNT_VIEWERS | {TENANT}
 # Groups whose actions concern only their own lot or records.
@@ -122,6 +123,11 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "ledger.view_own": ACCOUNT_VIEWERS,
     "history.view_own": frozenset({FORMER_OWNER}),
     "account.manage": frozenset({BOARD, MANAGER}),
+    # Committees: the board creates them and appoints members; members work
+    # in their own committee's space (checked per committee in governance).
+    "committee.view": frozenset({BOARD, MANAGER, AUDITOR, COMMITTEE_MEMBER}),
+    "committee.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
+    "committee.manage": frozenset({BOARD}),
     "ledger.manage": frozenset({BOARD, MANAGER}),
     "budget.manage": frozenset({BOARD}),
     "collections.manage": frozenset({BOARD, MANAGER}),
@@ -166,6 +172,8 @@ class Roles:
     tenant_lot_ids: frozenset[int] = frozenset()
     # The login these roles belong to (None in the homeowner view).
     user_id: int | None = None
+    committee_ids: frozenset[int] = frozenset()
+    chair_committee_ids: frozenset[int] = frozenset()
     # Former owners: (lot_id, start, end) of each past ownership period, and
     # the dormant accounts they were on (read-only history).
     former_periods: tuple[tuple[int, datetime.date, datetime.date], ...] = ()
@@ -241,6 +249,7 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         )
         contacts = _account_contacts(person, on)
         former = _former_ownerships(person, lots | frozenset(contacts["account"]), on)
+        committees = _committees(person, on) if (lots or BOARD in groups) else {}
     if contacts["authorized"]:
         groups.add(AUTHORIZED)
     if contacts["view_only"]:
@@ -249,6 +258,8 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         groups.add(TENANT)
     if former["periods"]:
         groups.add(FORMER_OWNER)
+    if committees:
+        groups.add(COMMITTEE_MEMBER)
     contact_since = {k: v for k, v in contacts["since"].items() if k not in lots}
     return Roles(
         frozenset(groups),
@@ -262,7 +273,22 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         former_periods=tuple(sorted(former["periods"])),
         former_account_ids=frozenset(former["accounts"]),
         user_id=user.pk,
+        committee_ids=frozenset(committees),
+        chair_committee_ids=frozenset(k for k, v in committees.items() if v == "chair"),
     )
+
+
+def _committees(person, on) -> dict[int, str]:
+    """Active committee memberships: committee id -> role. Only counted while
+    the person owns a lot or sits on the board (a seller leaves with the lot)."""
+    from governance.models import CommitteeMembership
+
+    rows = (
+        CommitteeMembership.objects.filter(person=person, committee__active=True)
+        .active(on)
+        .values_list("committee_id", "role")
+    )
+    return dict(rows)
 
 
 def _account_contacts(person, on) -> dict:

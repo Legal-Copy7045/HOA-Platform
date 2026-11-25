@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ topic.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'committees' %}">Committees</a> / <a href="{% url 'committee_detail' topic.committee_id %}">{{ topic.committee.name }}</a> / Discussion</div>
+  <div class="page-head"><div><h1>{{ topic.title }}</h1><div class="meta"><span>Started {{ topic.created_at|date:"M j, Y" }}</span></div></div></div>
+  {% thread_panel "committee_topic" topic %}
+{% endblock %}

@@ -3,13 +3,20 @@ from __future__ import annotations
 import hashlib
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Max
 
 from audit.services import record_event
 from core.policy import require
 from core.scoping import system_access
-from documents.models import Document, DocumentVersion, ScanResult, VersionScan, Visibility
+from documents.models import (
+    Category,
+    Document,
+    DocumentVersion,
+    ScanResult,
+    VersionScan,
+    Visibility,
+)
 from documents.scanning import scan
 from documents.validation import UploadRejected, check_upload, safe_filename
 
@@ -86,11 +93,20 @@ def create_document(
     visibility: str,
     file,
     lot=None,
+    folder=None,
     description: str = "",
     actor,
     request=None,
 ) -> Document:
-    require(actor, "document.manage")
+    committee = None
+    if folder is not None:
+        # A filed document takes its folder's visibility (and committee).
+        _require_folder_writer(actor, folder)
+        visibility, committee, lot = folder.visibility, folder.committee, None
+    else:
+        require(actor, "document.manage")
+        if visibility == Visibility.COMMITTEE:
+            raise DocumentError("Committee documents go in the committee's folder.")
     if visibility == Visibility.LOT and lot is None:
         raise DocumentError("Choose the lot this document belongs to.")
     if visibility != Visibility.LOT:
@@ -103,6 +119,8 @@ def create_document(
             category=category,
             visibility=visibility,
             lot=lot,
+            folder=folder,
+            committee=committee,
             description=description,
             created_by=actor,
         )
@@ -119,7 +137,10 @@ def create_document(
 
 
 def add_version(document: Document, *, file, note: str = "", actor, request=None):
-    require(actor, "document.manage")
+    if document.folder_id and document.committee_id:
+        _require_folder_writer(actor, document.folder)
+    else:
+        require(actor, "document.manage")
     return _store_version(document, file, actor=actor, note=note, request=request)
 
 
@@ -149,3 +170,140 @@ def scan_allows_download(result: str | None) -> bool:
 def downloadable(version: DocumentVersion) -> bool:
     latest = version.scans.first()
     return scan_allows_download(latest.result if latest else None)
+
+
+# --- Folders and search (Milestone 3) --------------------------------------------------
+
+from documents.models import Folder  # noqa: E402
+
+
+def _require_folder_writer(actor, folder: Folder) -> None:
+    """Board and manager file anywhere; a committee's members file in its folder."""
+    from core.policy import SYSTEM, can
+
+    if actor is SYSTEM or can(actor, "document.manage"):
+        return
+    if folder.committee_id:
+        from governance.services import require_committee_member
+
+        require_committee_member(actor, folder.committee)
+        return
+    require(actor, "document.manage")
+
+
+def create_folder(
+    *, name: str, visibility: str, parent=None, committee=None, actor, request=None
+) -> Folder:
+    require(actor, "document.manage")
+    name = " ".join((name or "").split())[:120]
+    if not name:
+        raise DocumentError("A folder needs a name.")
+    if visibility not in (Visibility.OWNERS, Visibility.BOARD, Visibility.COMMITTEE):
+        raise DocumentError("Choose who can see this folder (there are no public folders).")
+    if (visibility == Visibility.COMMITTEE) != (committee is not None):
+        raise DocumentError("Committee folders need a committee, and only they have one.")
+    if parent is not None and parent.visibility != visibility:
+        raise DocumentError("A subfolder must have the same visibility as its parent.")
+    try:
+        with transaction.atomic():
+            folder = Folder.objects.create(
+                name=name,
+                parent=parent,
+                visibility=visibility,
+                committee=committee,
+                created_by=None if _is_system(actor) else actor,
+            )
+    except IntegrityError as exc:
+        raise DocumentError("A folder with that name already exists here.") from exc
+    record_event(
+        "document.folder_created",
+        actor=None if _is_system(actor) else actor,
+        request=request,
+        target=folder,
+        metadata={"visibility": visibility},
+    )
+    return folder
+
+
+def _is_system(actor) -> bool:
+    from core.policy import SYSTEM
+
+    return actor is SYSTEM
+
+
+def committee_folder(committee, *, actor) -> Folder:
+    """The committee's folder, created with the committee's name on first use."""
+    from core.policy import SYSTEM
+
+    existing = Folder.objects.filter(committee=committee, parent__isnull=True).first()
+    if existing:
+        return existing
+    return create_folder(
+        name=f"{committee.name} committee",
+        visibility=Visibility.COMMITTEE,
+        committee=committee,
+        actor=SYSTEM,  # structural: every committee has one
+    )
+
+
+def committee_documents(user, committee):
+    return (
+        Document.objects.for_user(user)
+        .filter(committee=committee, archived=False)
+        .select_related("current_version")
+    )
+
+
+def move_document(document: Document, folder: Folder | None, *, actor, request=None) -> Document:
+    """File a document in a folder (it takes the folder's visibility) or take it
+    out of folders. Lot documents stay unfiled."""
+    require(actor, "document.manage")
+    if document.visibility == Visibility.LOT:
+        raise DocumentError("Lot documents are not filed in folders.")
+    fields = {"folder": folder}
+    if folder is not None:
+        fields.update(visibility=folder.visibility, committee=folder.committee)
+    elif document.visibility == Visibility.COMMITTEE:
+        raise DocumentError("Committee documents stay in a committee folder.")
+    Document.objects.unscoped("move document").filter(pk=document.pk).update(**fields)
+    for key, value in fields.items():
+        setattr(document, key, value)
+    record_event(
+        "document.moved",
+        actor=actor,
+        request=request,
+        target=document,
+        metadata={"folder_id": folder.pk if folder else None, "visibility": document.visibility},
+    )
+    return document
+
+
+def folders_for(user):
+    """Folders whose documents this person may see."""
+    from core import policy
+
+    if policy.can(user, "lot.view_all"):
+        return Folder.objects.all()
+    roles = policy.roles_for(user)
+    from django.db.models import Q
+
+    return Folder.objects.filter(
+        Q(visibility=Visibility.OWNERS)
+        | Q(visibility=Visibility.COMMITTEE, committee_id__in=roles.committee_ids)
+    )
+
+
+def search_documents(queryset, q: str):
+    """Title, description, category label or folder name contains ``q``."""
+    from django.db.models import Q
+
+    q = " ".join((q or "").split())[:100]
+    if not q:
+        return queryset
+    categories = [v for v, label in Category.choices if q.lower() in label.lower()]
+    return queryset.filter(
+        Q(title__icontains=q)
+        | Q(description__icontains=q)
+        | Q(folder__name__icontains=q)
+        | Q(category__in=categories)
+    )

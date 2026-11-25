@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ committee.name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'committees' %}">Committees</a> / {{ committee.name }}</div>
+  <div class="page-head"><div><h1>{{ committee.name }}</h1>
+    <div class="meta">{% if committee.citation %}<span>{% icon "book" %}{{ committee.citation }}</span>{% endif %}{% if not committee.active %}<span class="badge">Retired</span>{% endif %}</div>
+    {% if committee.purpose %}<p class="subtitle">{{ committee.purpose }}</p>{% endif %}</div>
+    {% if can_manage %}<div class="actions"><form method="post" action="{% url 'committee_action' committee.pk committee.active|yesno:'retire,reactivate' %}">{% csrf_token %}<button type="submit" class="secondary small">{% if committee.active %}Retire committee{% else %}Reactivate{% endif %}</button></form></div>{% endif %}</div>
+  <div class="split">
+    <div>
+      <section class="card"><h2>Discussions</h2>
+        {% if topics %}<ul class="list">{% for t in topics %}<li><div class="todo-icon">{% icon "mail" %}</div><div class="grow"><a class="title" href="{% url 'committee_topic_detail' t.pk %}">{{ t.title }}</a><div class="small muted">Started {{ t.created_at|date:"M j, Y" }}{% if t.closed %} · closed{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">No discussions yet.</p>{% endif %}
+        {% if can_work %}<details class="panel"><summary>Start a discussion</summary><div class="panel-body">
+          <form method="post" action="{% url 'committee_action' committee.pk 'topic' %}">{% csrf_token %}
+            <p><label>Title <input type="text" name="title" maxlength="200" required></label></p>
+            <p><label>First message <textarea name="body" rows="4" maxlength="5000" required></textarea></label></p>
+            <div class="form-actions"><button type="submit">Start</button></div></form></div></details>{% endif %}
+      </section>
+      <section class="card"><h2>Documents</h2>
+        {% if documents %}<ul class="list">{% for d in documents %}<li><div class="todo-icon">{% icon "file" %}</div><a class="grow title" href="{% url 'document_detail' d.pk %}">{{ d.title }}</a>{% if d.current_version %}<a class="btn secondary small" href="{% url 'document_download' d.pk %}">{% icon "download" %}</a>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted small">No documents yet.</p>{% endif %}
+        {% if can_work %}<form method="post" enctype="multipart/form-data" action="{% url 'committee_upload' committee.pk %}" class="inline-form">{% csrf_token %}
+          <input type="text" name="title" maxlength="200" placeholder="Title" aria-label="Title"><input type="file" name="file" required aria-label="File"><button type="submit" class="secondary small">Add</button></form>
+          <p class="small muted">Visible to this committee and the board only.</p>{% endif %}
+      </section>
+    </div>
+    <aside>
+      <section class="card"><h3>Members</h3>
+        <ul class="list">{% for m in members %}<li><span class="grow">{{ m.person.display_name }}{% if m.role == "chair" %} <span class="badge tone-info">Chair</span>{% endif %}</span>
+          {% if can_manage %}<form method="post" action="{% url 'committee_member_end' m.pk %}" data-confirm="End this membership?">{% csrf_token %}<button type="submit" class="danger small">End</button></form>{% endif %}</li>{% empty %}<li class="muted small">No members yet.</li>{% endfor %}</ul>
+        {% if can_manage and committee.active %}<form method="post" action="{% url 'committee_action' committee.pk 'appoint' %}">{% csrf_token %}
+          <select name="person" aria-label="Person">{% for p in people %}<option value="{{ p.pk }}">{{ p.display_name }}</option>{% endfor %}</select>
+          <select name="role" aria-label="Role">{% for v, l in roles %}<option value="{{ v }}"{% if v == "member" %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+          <div class="form-actions"><button type="submit" class="secondary small">Appoint</button></div></form>{% endif %}
+      </section>
+      <section class="card"><h3>Tasks</h3>
+        {% if tasks %}<ul class="list">{% for t in tasks %}<li><span class="grow">{{ t.title }}{% if t.due_date %} <span class="small muted">due {{ t.due_date|date:"M j" }}</span>{% endif %}</span>
+          {% if can_work %}<form method="post" action="{% url 'committee_task_close' committee.pk t.pk %}">{% csrf_token %}<input type="hidden" name="status" value="done"><button type="submit" class="secondary small">Done</button></form>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted small">No open tasks.</p>{% endif %}
+        {% if can_work %}<form method="post" action="{% url 'committee_action' committee.pk 'task' %}">{% csrf_token %}<input type="text" name="title" maxlength="200" placeholder="New task" aria-label="Task" required><input type="date" name="due_date" aria-label="Due date"><div class="form-actions"><button type="submit" class="secondary small">Add task</button></div></form>{% endif %}
+      </section>
+      <section class="card"><h3>Events</h3>
+        {% if events %}<ul class="list">{% for e in events %}<li><div class="grow"><div class="title">{{ e.title }}</div><div class="small muted">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">Nothing scheduled.</p>{% endif %}
+        {% if can_work %}<form method="post" action="{% url 'committee_action' committee.pk 'event' %}">{% csrf_token %}<input type="text" name="title" maxlength="200" placeholder="Meeting or event" aria-label="Event title" required><input type="datetime-local" name="starts_at" aria-label="Starts" required><input type="text" name="location" maxlength="200" placeholder="Where" aria-label="Location"><div class="form-actions"><button type="submit" class="secondary small">Add event</button></div></form>{% endif %}
+      </section>
+    </aside>
+  </div>
+{% endblock %}

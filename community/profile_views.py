@@ -63,4 +63,15 @@ def my_profile(request):
 @login_required
 def directory(request):
     policy.require(request.user, "directory.view")
-    return render(request, "community/directory.html", {"entries": services.directory_entries()})
+    tab = request.GET.get("tab", "owners")
+    context = {"tab": tab}
+    if tab == "board":
+        context["board"] = services.board_roster_public()
+    elif tab == "committees":
+        from governance.services import committee_directory
+
+        context["committees"] = committee_directory()
+    else:
+        context["tab"] = "owners"
+        context["entries"] = services.directory_entries()
+    return render(request, "community/directory.html", context)

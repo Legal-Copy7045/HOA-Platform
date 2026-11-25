@@ -236,3 +236,106 @@ class Ballot(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"ballot #{self.pk}"
+
+
+# --- Committees (Milestone 3) -----------------------------------------------------------
+
+from community.models import NeverDeleteMixin  # noqa: E402
+
+
+class Committee(models.Model):
+    """A board-created committee (social, landscaping, ARC...) with a space of
+    its own: discussion topics, a document folder, tasks and events."""
+
+    name = models.CharField(max_length=120, unique=True)
+    purpose = models.TextField(blank=True)
+    # The board resolution or Bylaws section that created it.
+    citation = models.CharField(max_length=200, blank=True)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Committees are retired, not deleted.")
+
+
+class CommitteeRole(models.TextChoices):
+    CHAIR = "chair", "Chair"
+    MEMBER = "member", "Member"
+
+
+class CommitteeMembershipQuerySet(ScopedQuerySet):
+    def active(self, on=None):
+        on = on or timezone.localdate()
+        return self.filter(start_date__lte=on).filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gt=on)
+        )
+
+
+class CommitteeMembership(NeverDeleteMixin, ScopedModel):
+    committee = models.ForeignKey(Committee, on_delete=models.PROTECT, related_name="memberships")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    role = models.CharField(
+        max_length=8, choices=CommitteeRole.choices, default=CommitteeRole.MEMBER
+    )
+    start_date = models.DateField(default=timezone.localdate)
+    end_date = models.DateField(null=True, blank=True)
+    appointed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    objects = CommitteeMembershipQuerySet.as_manager()
+    scope_person_path = "person"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Your own memberships and the members of your committees."""
+        mine = models.Q(person_id=roles.person_id) if roles.person_id else models.Q(pk__in=[])
+        return queryset.filter(mine | models.Q(committee_id__in=roles.committee_ids))
+
+    class Meta:
+        ordering = ["committee", "role", "start_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["committee", "person"],
+                condition=models.Q(end_date__isnull=True),
+                name="committee_one_open_membership",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(end_date__isnull=True)
+                | models.Q(end_date__gte=models.F("start_date")),
+                name="committee_membership_end_after_start",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"membership #{self.pk}"
+
+
+class CommitteeTopic(models.Model):
+    """A discussion in a committee's space; its messages are a thread."""
+
+    committee = models.ForeignKey(Committee, on_delete=models.PROTECT, related_name="topics")
+    title = models.CharField(max_length=200)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    closed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["closed", "-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Topics are closed, not deleted.")

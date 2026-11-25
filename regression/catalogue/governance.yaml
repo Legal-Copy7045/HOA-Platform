@@ -17,3 +17,12 @@
 - feature: "Document library: versions, visibility, hostile-file checks, scans, audited downloads"
   since: M2
   match: ["^unit:documents/tests"]
+- feature: "Committees: board creates and appoints (one chair), member-only spaces with discussions, tasks, events and a private document folder; access ends with the lot"
+  since: M3
+  match: ["^unit:governance/tests/test_committees.py::test_(members_get|only_the_board|no_self|members_must|new_chair|ending_membership|selling_the_lot|outsiders|member_sees|retired|topics_are|members_add|committee_events|announcements_cannot|each_committee)"]
+- feature: "Document folders (owners, board or committee; no public), filing applies folder visibility, search"
+  since: M3
+  match: ["^unit:governance/tests/test_committees.py::test_(no_public|filing_a|owners_cannot_create|search_finds|owner_cannot_open)"]
+- feature: "Directory tabs: owners, board, committees"
+  since: M3
+  match: ["^unit:governance/tests/test_committees.py::test_directory"]

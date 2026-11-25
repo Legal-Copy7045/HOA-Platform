@@ -2,19 +2,29 @@
 {% load portal %}
 {% block title %}Documents · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Documents</h1><p class="subtitle">Governing documents, minutes, financials and forms. Every version is kept.</p></div></div>
+  <div class="page-head"><div><h1>{% if current %}{{ current.name }}{% else %}Documents{% endif %}</h1><p class="subtitle">{% if current %}{{ current.get_visibility_display }}{% if current.committee %}: {{ current.committee }}{% endif %}{% else %}Governing documents, minutes, financials and forms. Every version is kept.{% endif %}</p></div></div>
+  {% if current %}<div class="crumbs"><a href="{% url 'documents' %}">Documents</a>{% if current.parent %} / <a href="?folder={{ current.parent_id }}">{{ current.parent }}</a>{% endif %} / {{ current.name }}</div>{% endif %}
+  <form method="get" class="inline-form search-form" role="search">{% if current %}<input type="hidden" name="folder" value="{{ current.pk }}">{% endif %}
+    <input type="search" name="q" value="{{ q }}" placeholder="Search titles, descriptions, folders" aria-label="Search documents"><button type="submit" class="secondary">Search</button>{% if q %}<a class="small" href="?{% if current %}folder={{ current.pk }}{% endif %}">Clear</a>{% endif %}</form>
+  {% if not current and folders or subfolders %}<div class="grid grid-4 folders">{% for f in subfolders|default:folders %}<a class="stat" href="?folder={{ f.pk }}"><div class="label">{% icon "folder" %} {{ f.name }}</div><div class="hint">{% if f.visibility == "board" %}Board only{% elif f.visibility == "committee" %}Committee{% else %}All owners{% endif %}</div></a>{% endfor %}</div>{% endif %}
   {% for group, docs in groups.items %}
     <section class="card">
       <h2>{{ group }}</h2>
       <ul class="list">{% for d in docs %}<li>
         <div class="todo-icon">{% icon "file" %}</div>
         <div class="grow"><a class="title" href="{% url 'document_detail' d.pk %}">{{ d.title }}</a>
-          <div class="small muted">{% if d.current_version %}v{{ d.current_version.number }} · {{ d.current_version.uploaded_at|date:"M j, Y" }}{% endif %}{% if d.visibility == "board" %} · Board only{% elif d.visibility == "lot" %} · Lot {{ d.lot.number }} only{% endif %}{% if d.archived %} · Archived{% endif %}</div></div>
+          <div class="small muted">{% if d.current_version %}v{{ d.current_version.number }} · {{ d.current_version.uploaded_at|date:"M j, Y" }}{% endif %}{% if d.folder and not current %} · {{ d.folder.name }}{% endif %}{% if d.visibility == "board" %} · Board only{% elif d.visibility == "lot" %} · Lot {{ d.lot.number }} only{% elif d.visibility == "committee" %} · Committee only{% endif %}{% if d.archived %} · Archived{% endif %}</div></div>
         {% if d.current_version %}<a class="btn secondary small" href="{% url 'document_download' d.pk %}" aria-label="Download {{ d.title }}">{% icon "download" %}<span class="hide-sm">Download</span></a>{% endif %}
       </li>{% endfor %}</ul>
     </section>
-  {% empty %}<section class="card">{% include "partials/empty.html" with icon="folder" title="No documents yet" %}</section>{% endfor %}
+  {% empty %}<section class="card">{% if q %}{% include "partials/empty.html" with icon="folder" title="Nothing matches that search" %}{% else %}{% include "partials/empty.html" with icon="folder" title="No documents here yet" %}{% endif %}</section>{% endfor %}
   {% if can_manage %}
+    <details class="panel"><summary>New folder{% if current %} inside {{ current.name }}{% endif %}</summary><div class="panel-body">
+      <form method="post" action="{% url 'folder_create' %}" class="inline-form">{% csrf_token %}{% if current %}<input type="hidden" name="parent" value="{{ current.pk }}">{% endif %}
+        <input type="text" name="name" maxlength="120" placeholder="Folder name" aria-label="Folder name" required>
+        {% if not current %}<select name="visibility" aria-label="Who can see it">{% for v, l in folder_visibilities %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>{% endif %}
+        <button type="submit" class="secondary">Create</button></form>
+      <p class="small muted">There are no public folders. Committee folders are created with each committee.</p></div></details>
     <details class="panel"><summary>Upload a document</summary><div class="panel-body">
       <p class="muted small">PDF, Word (.docx, no macros), Excel (.xlsx), images (PNG/JPG), text or CSV. Each upload is kept forever; publish a new version rather than replacing.</p>
       <form method="post" enctype="multipart/form-data" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Upload</button></div></form></div></details>

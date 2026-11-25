@@ -15,6 +15,12 @@
       <tbody>{% for v in versions %}<tr><td>v{{ v.number }}</td><td>{{ v.original_filename }}{% if v.note %}<div class="small muted">{{ v.note }}</div>{% endif %}</td><td class="nowrap">{{ v.uploaded_at|date:"M j, Y" }}</td><td class="num">{{ v.size|filesizeformat }}</td><td class="actions"><a href="{% url 'document_version_download' document.pk v.number %}">Download</a></td></tr>{% endfor %}</tbody>
     </table></div></div>
   {% endif %}
+  {% if can_manage and document.visibility != "lot" %}
+    <details class="panel"><summary>File in a folder{% if document.folder %} (now: {{ document.folder.name }}){% endif %}</summary><div class="panel-body">
+      <form method="post" action="{% url 'document_move' document.pk %}" class="inline-form" data-confirm="The document takes the folder's visibility. Continue?">{% csrf_token %}
+        <select name="folder" aria-label="Folder"><option value="">(no folder)</option>{% for f in folders %}<option value="{{ f.pk }}"{% if f.pk == document.folder_id %} selected{% endif %}>{{ f.name }} · {{ f.get_visibility_display }}</option>{% endfor %}</select>
+        <button type="submit" class="secondary">File</button></form></div></details>
+  {% endif %}
   {% if can_manage %}
     <details class="panel"><summary>Publish a new version</summary><div class="panel-body"><form method="post" action="{% url 'document_add_version' document.pk %}" enctype="multipart/form-data">{% csrf_token %}{{ version_form }}<div class="form-actions"><button type="submit">Publish</button></div></form></div></details>
     <form method="post" action="{% url 'document_archive' document.pk document.archived|yesno:'restore,archive' %}"{% if not document.archived %} data-confirm="Archive this document? Owners will no longer see it."{% endif %}>{% csrf_token %}<button type="submit" class="{% if document.archived %}secondary{% else %}danger{% endif %}">{% if document.archived %}Restore{% else %}Archive (hide from owners){% endif %}</button></form>
