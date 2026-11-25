@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Booking rules · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Booking rules</h1><p class="subtitle">Rules for each common area. Record where they come from (Declaration, Rules and Regulations or a board resolution). Fees and deposits are shown to owners only; the portal does not charge them.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'reservations' %}">Bookings</a></div></div>
+  {% for area, rules, form in rows %}<details class="panel"{% if rules.bookable %} open{% endif %}><summary>{{ area.name }} · {% if rules.bookable %}bookable{% else %}not bookable{% endif %}{% if rules.citation %} · {{ rules.citation }}{% endif %}</summary>
+    <div class="panel-body"><form method="post" action="{% url 'reservation_area_save' area.pk %}" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form></div></details>
+  {% empty %}{% include "partials/empty.html" with icon="map" title="No common areas yet" text="Add them on Community settings." %}{% endfor %}
+{% endblock %}

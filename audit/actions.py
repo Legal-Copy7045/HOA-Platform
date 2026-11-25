@@ -278,6 +278,32 @@ _SPECS = [
         "count",
         "total_cents",
     ),
+    # --- Reservations, access review, retention (Milestone 4) ---
+    _spec(
+        "reservation.settings_saved", "Booking rules saved for a common area", "area_id", "bookable"
+    ),
+    _spec("reservation.requested", "Common area booking requested", "area_id", "lot_id", "state"),
+    _spec("reservation.approved", "Common area booking confirmed", "area_id", "lot_id"),
+    _spec("reservation.declined", "Common area booking declined", "area_id", "lot_id"),
+    _spec("reservation.cancelled", "Common area booking cancelled", "area_id", "lot_id", "by"),
+    _spec("access_review.viewed", "Access review page viewed", "logins", "flagged"),
+    _spec(
+        "access_review.recorded",
+        "Access review recorded",
+        "logins",
+        "flagged",
+        "inactive",
+        "without_mfa",
+    ),
+    _spec(
+        "retention.run",
+        "Former owners' contact details cleared under the retention rule",
+        "days",
+        "people",
+        "profiles_cleared",
+        "methods_removed",
+        "mode",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

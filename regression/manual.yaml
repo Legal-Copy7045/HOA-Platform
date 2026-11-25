@@ -81,4 +81,7 @@
 - key: settings dues confirmation
   check: "Community settings shows '= $75.00 per month' while typing dues, and asks for confirmation when dues change by more than 25%."
   steps: "Community settings, Monthly dues: type 75; then type 150 and save: a confirmation page names the old and new amounts."
+- key: reservation booking on a phone
+  check: "With Common area reservations switched on, an owner books an area on a phone (date and time pickers work), gets the email, and a board member confirms it from My items."
+  steps: "Admin > Features: switch on reservations; Booking rules: make one area bookable; as an owner request a slot on a phone; as a board member confirm it; check the owner's email and the Calendar page."
   last: ""

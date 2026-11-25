@@ -13,5 +13,9 @@
     </li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
   </section>
+  {% if bookings %}<section class="card"><h2>Common area bookings</h2><ul class="list">{% for b in bookings %}<li>
+    <div class="date-chip"><span>{{ b.starts_at|date:"M" }}</span><strong>{{ b.starts_at|date:"j" }}</strong></div>
+    <div class="grow"><div class="title">{{ b.area }}</div><div class="small muted">{{ b.starts_at|date:"D g:i A" }} to {{ b.ends_at|date:"D g:i A" }} · {% if b.mine %}Your booking{% else %}Booked{% endif %}</div></div>
+  </li>{% endfor %}</ul><p class="small"><a href="{% url 'reservations' %}">Book a common area</a></p></section>{% endif %}
   {% if can_manage %}<details class="panel"><summary>Add an event</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Add event</button></div></form></div></details>{% endif %}
 {% endblock %}

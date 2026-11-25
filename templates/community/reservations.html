@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Common area bookings · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Common area bookings</h1><p class="subtitle">Book a common area for your home. Other homes' bookings show only as "Booked".</p></div>
+    {% if can_configure %}<div class="actions"><a class="btn secondary" href="{% url 'reservation_settings' %}">{% icon "sliders" %} Booking rules</a></div>{% endif %}</div>
+
+  {% if is_staff %}<section class="card"><h2>Waiting for approval</h2>
+    {% if pending %}<ul class="list">{% for r in pending %}<li><div class="todo-icon tone-warning">{% icon "calendar" %}</div>
+      <div class="grow"><div class="title"><a href="{% url 'reservation_detail' r.pk %}">{{ r.area.name }} · Lot {{ r.lot.number }}</a></div>
+        <div class="small muted">{{ r.starts_at|date:"D M j, g:i A" }} to {{ r.ends_at|date:"g:i A" }}</div></div>
+      <form method="post" action="{% url 'reservation_action' r.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit" class="small">Confirm</button></form>
+    </li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="check-circle" title="None waiting" %}{% endif %}
+  </section>{% endif %}
+
+  <section class="card"><h2>Coming up</h2>
+    {% if schedule %}<ul class="list">{% for s in schedule %}<li>
+      <div class="date-chip"><span>{{ s.starts_at|date:"M" }}</span><strong>{{ s.starts_at|date:"j" }}</strong></div>
+      <div class="grow"><div class="title">{% if s.pk %}<a href="{% url 'reservation_detail' s.pk %}">{{ s.area }}</a>{% else %}{{ s.area }}{% endif %}</div>
+        <div class="small muted">{{ s.starts_at|date:"D g:i A" }} to {{ s.ends_at|date:"D g:i A" }} · {{ s.label }}{% if s.purpose %} · {{ s.purpose }}{% endif %}</div></div>
+      {% if s.state == "pending" %}{% status "pending" "Waiting for approval" %}{% else %}{% status "confirmed" "Booked" %}{% endif %}
+    </li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing booked in the next 60 days" %}{% endif %}
+  </section>
+
+  <section class="card"><h2>Areas you can book</h2>
+    {% if areas %}<ul class="list">{% for a, rules, lines in areas %}<li><div class="todo-icon">{% icon "map" %}</div>
+      <div class="grow"><div class="title">{{ a.name }}</div>
+        <div class="small">{% for line in lines %}{{ line }} {% endfor %}{% if rules.citation %}<span class="muted">({{ rules.citation }})</span>{% endif %}</div>
+        {% if rules.terms %}<div class="small muted">{{ rules.terms|linebreaksbr }}</div>{% endif %}</div></li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="map" title="No areas can be booked yet" %}{% endif %}
+  </section>
+
+  {% if form %}<section class="card"><h2>Request a booking</h2>
+    <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Request</button></div></form>
+  </section>{% endif %}
+
+  {% if mine %}<section class="card"><h2>My bookings</h2><ul class="list">{% for r in mine %}<li>
+    <div class="grow"><div class="title"><a href="{% url 'reservation_detail' r.pk %}">{{ r.area.name }}</a></div>
+      <div class="small muted">{{ r.starts_at|date:"D M j, Y g:i A" }} to {{ r.ends_at|date:"g:i A" }} · Lot {{ r.lot.number }}</div></div>
+    {% status r.state r.get_state_display %}</li>{% endfor %}</ul></section>{% endif %}
+{% endblock %}

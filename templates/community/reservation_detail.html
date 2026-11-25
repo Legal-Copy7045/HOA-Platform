@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Booking #{{ res.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>{{ res.area.name }}</h1><p class="subtitle">Booking #{{ res.pk }} for Lot {{ res.lot.number }}</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'reservations' %}">All bookings</a></div></div>
+  <section class="card">
+    <dl class="kv">
+      <dt>Status</dt><dd>{% status res.state res.get_state_display %}</dd>
+      <dt>Starts</dt><dd>{{ res.starts_at|date:"l, F j, Y g:i A" }}</dd>
+      <dt>Ends</dt><dd>{{ res.ends_at|date:"l, F j, Y g:i A" }}</dd>
+      {% if res.purpose %}<dt>For</dt><dd>{{ res.purpose }}</dd>{% endif %}
+      {% if requester %}<dt>Requested by</dt><dd>{{ requester.display_name }}</dd>{% endif %}
+      <dt>Requested</dt><dd>{{ res.created_at|date:"M j, Y g:i A" }}</dd>
+      {% if res.note %}<dt>Note</dt><dd>{{ res.note|linebreaksbr }}</dd>{% endif %}
+    </dl>
+    {% if rule_lines %}<p class="small muted">{% for line in rule_lines %}{{ line }} {% endfor %}{% if rules.citation %}({{ rules.citation }}){% endif %}</p>{% endif %}
+  </section>
+  {% if is_staff and res.state == "pending" %}<section class="card"><h2>Decide</h2>
+    <form method="post" action="{% url 'reservation_action' res.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit">Confirm booking</button></form>
+    <form method="post" action="{% url 'reservation_action' res.pk 'decline' %}" class="form-grid" data-confirm="Decline this booking?">{% csrf_token %}
+      <div><label for="decline-note">Reason (the owner sees it on this page)</label><textarea id="decline-note" name="note" rows="2"></textarea></div>
+      <div class="form-actions"><button type="submit" class="danger">Decline</button></div></form>
+  </section>{% endif %}
+  {% if can_cancel %}<section class="card"><h2>Cancel</h2>
+    <form method="post" action="{% url 'reservation_action' res.pk 'cancel' %}" class="form-grid" data-confirm="Cancel this booking?">{% csrf_token %}
+      <div><label for="cancel-note">Note (optional)</label><textarea id="cancel-note" name="note" rows="2"></textarea></div>
+      <div class="form-actions"><button type="submit" class="danger">Cancel booking</button></div></form>
+  </section>{% endif %}
+{% endblock %}

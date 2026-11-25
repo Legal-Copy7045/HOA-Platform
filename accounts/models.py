@@ -10,6 +10,7 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from core.append_only import AppendOnlyModel
 from core.scoping import ScopedModel, ScopedQuerySet
 
 
@@ -195,3 +196,24 @@ class MfaReset(ScopedModel):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Resets are cancelled, never deleted.")
+
+
+class AccessReview(AppendOnlyModel):
+    """A board member confirmed they reviewed every login and its access
+    (quarterly access review, Milestone 4). Counts only, no names.
+    Append-only: a later review is a new row."""
+
+    reviewed_by = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="+")
+    reviewed_at = models.DateTimeField(default=timezone.now)
+    logins = models.PositiveIntegerField(default=0)
+    flagged = models.PositiveIntegerField(default=0)
+    inactive = models.PositiveIntegerField(default=0, help_text="No sign-in for 90+ days.")
+    without_mfa = models.PositiveIntegerField(default=0)
+    sysadmins = models.PositiveIntegerField(default=0)
+    managers = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-reviewed_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Access review #{self.pk}"
