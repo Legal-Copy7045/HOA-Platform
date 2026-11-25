@@ -6,6 +6,7 @@ from operations import views
 
 urlpatterns = [
     path("board/tasks/", views.tasks, name="tasks"),
+    path("board/compliance/", views.compliance, name="compliance"),
     re_path(
         r"^board/tasks/(?P<pk>[0-9]+)/(?P<status>done|dropped)/$",
         views.task_close,

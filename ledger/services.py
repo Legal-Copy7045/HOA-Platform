@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
+from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import record_event
@@ -876,3 +877,78 @@ def post_late_fees(*, year: int, month: int, actor, request=None, on=None) -> in
         },
     )
     return created
+
+
+# --- Budget notices to owners (Milestone 4) ------------------------------------------
+
+
+def budget_summary(budget: Budget) -> dict:
+    lines = list(budget.lines.all())
+    income = sum(line.annual_cents for line in lines if line.kind == "income")
+    expense = sum(line.annual_cents for line in lines if line.kind != "income")
+    return {"lines": lines, "income": income, "expense": expense, "net": income - expense}
+
+
+def send_budget_notice(budget: Budget, *, stage: str, actor, request=None) -> dict:
+    """Email owners who consented to electronic notice; list those needing
+    paper. ``stage`` is "proposed" (before the meeting) or "adopted" (with the
+    monthly dues). Counsel should confirm the notice period for your Bylaws."""
+    require(actor, "budget.manage")
+    from django.core.mail import send_mail
+
+    from community.services import owner_notice_recipients
+
+    if stage == "proposed":
+        if budget.status != BudgetStatus.DRAFT or not budget.lines.exists():
+            raise LedgerError("Send the proposed budget while it is a draft with lines.")
+    elif stage == "adopted":
+        if budget.status != BudgetStatus.ADOPTED:
+            raise LedgerError("Adopt the budget first.")
+    else:
+        raise LedgerError("Unknown notice.")
+    summary = budget_summary(budget)
+    link = settings.PORTAL_BASE_URL + reverse("owner_budget")
+    dues, cite = rule_with_citation("dues.monthly_cents")
+    if stage == "proposed":
+        subject = f"[{settings.SITE_NAME}] Proposed budget for {budget}"
+        body = (
+            f"The board has proposed the {budget}: income {format_cents(summary['income'])}, "
+            f"expenses {format_cents(summary['expense'])}.\n\nSee the details:\n{link}\n"
+        )
+    else:
+        subject = f"[{settings.SITE_NAME}] Adopted budget and dues for {budget}"
+        body = (
+            f"The board adopted the {budget} on {budget.adopted_on:%B %-d, %Y}.\n"
+            + (
+                f"Monthly dues: {format_cents(dues)}" + (f" ({cite})" if cite else "") + "\n"
+                if dues
+                else ""
+            )
+            + f"\nSee the details:\n{link}\n"
+        )
+    body += f"\n-- \n{settings.SITE_NAME}"
+    emails, paper = owner_notice_recipients()
+    for address in emails:
+        send_mail(subject, body, None, [address], fail_silently=True)
+    field = "proposed_notice_sent_at" if stage == "proposed" else "adopted_notice_sent_at"
+    Budget.objects.filter(pk=budget.pk).update(**{field: timezone.now()})
+    record_event(
+        "budget.notice_sent",
+        actor=actor,
+        request=request,
+        target=budget,
+        metadata={"stage": stage, "emailed": len(emails), "paper": len(paper)},
+    )
+    return {"emailed": len(emails), "paper": paper}
+
+
+def owner_visible_budget():
+    """The budget owners see: the adopted one for the current or latest year,
+    or a proposed one the board has sent out."""
+    proposed = Budget.objects.filter(
+        status=BudgetStatus.DRAFT, proposed_notice_sent_at__isnull=False
+    ).first()
+    adopted = Budget.objects.filter(status=BudgetStatus.ADOPTED).first()
+    if proposed and (adopted is None or proposed.fiscal_year > adopted.fiscal_year):
+        return proposed
+    return adopted

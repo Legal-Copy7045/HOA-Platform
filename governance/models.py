@@ -360,3 +360,204 @@ class CommitteeTopic(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Topics are closed, not deleted.")
+
+
+# --- Elections, proxies and written consent (Milestone 4) -------------------------------
+
+
+class ElectionState(models.TextChoices):
+    NOMINATIONS = "nominations", "Taking nominations"
+    VOTING = "voting", "Voting open"
+    CLOSED = "closed", "Voting closed"
+    CERTIFIED = "certified", "Results certified"
+
+
+class Election(models.Model):
+    """Electing owners to the board, usually at the annual meeting. One ballot
+    per lot, choosing up to ``seats`` candidates. Ballots are stored like
+    secret votes: who voted apart from the choices (decision D21)."""
+
+    title = models.CharField(max_length=200)
+    meeting = models.ForeignKey(
+        Meeting, null=True, blank=True, on_delete=models.PROTECT, related_name="elections"
+    )
+    seats = models.PositiveSmallIntegerField()
+    term_years = models.PositiveSmallIntegerField(default=2)
+    citation = models.CharField(max_length=200, blank=True)  # e.g. Bylaws §3.2
+    state = models.CharField(
+        max_length=12, choices=ElectionState.choices, default=ElectionState.NOMINATIONS
+    )
+    eligible_lots = models.PositiveSmallIntegerField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    certified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    certified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Elections are kept.")
+
+
+class Candidate(models.Model):
+    election = models.ForeignKey(Election, on_delete=models.PROTECT, related_name="candidates")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    statement = models.TextField(blank=True)
+    nominated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    accepted = models.BooleanField(default=False)  # the nominee agreed to stand
+    withdrawn = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["person__display_name"]
+        constraints = [
+            models.UniqueConstraint(fields=["election", "person"], name="candidate_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"candidate #{self.pk}"
+
+
+class ElectionParticipation(AppendOnlyModel):
+    """That a lot voted (and who cast it, in person or by proxy). No choices."""
+
+    election = models.ForeignKey(Election, on_delete=models.PROTECT, related_name="+")
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    cast_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    by_proxy = models.BooleanField(default=False)
+    cast_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["election", "lot"], name="election_one_ballot_per_lot")
+        ]
+
+    def __str__(self) -> str:
+        return f"participation #{self.pk}"
+
+
+class ElectionChoice(AppendOnlyModel):
+    """One selected candidate on some ballot. No voter, lot, time or sequence."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    election = models.ForeignKey(Election, on_delete=models.PROTECT, related_name="+")
+    candidate = models.ForeignKey(Candidate, on_delete=models.PROTECT, related_name="+")
+
+    def __str__(self) -> str:
+        return "election choice"
+
+
+class ElectionResult(AppendOnlyModel):
+    """The certified count for one candidate. Never changed."""
+
+    election = models.ForeignKey(Election, on_delete=models.PROTECT, related_name="results")
+    candidate = models.ForeignKey(Candidate, on_delete=models.PROTECT, related_name="+")
+    votes = models.PositiveIntegerField()
+    elected = models.BooleanField()
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-votes", "candidate__person__display_name"]
+
+    def __str__(self) -> str:
+        return f"result #{self.pk}"
+
+
+class Proxy(ScopedModel):
+    """An owner appoints someone to vote for their lot at a meeting (PA allows
+    proxies; the Bylaws may set conditions). Revocable until it is used."""
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.PROTECT, related_name="proxies")
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    grantor = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    holder = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(default=timezone.now)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    objects = ScopedQuerySet.as_manager()
+    scope_lot_path = "lot"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Proxies for my lots, and proxies naming me as holder."""
+        mine = models.Q(lot_id__in=roles.owned_lot_ids)
+        if roles.person_id:
+            mine |= models.Q(holder_id=roles.person_id)
+        return queryset.filter(mine)
+
+    class Meta:
+        ordering = ["meeting", "lot__number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["meeting", "lot"],
+                condition=models.Q(revoked_at__isnull=True),
+                name="proxy_one_live_per_lot_meeting",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"proxy #{self.pk}"
+
+
+class ConsentState(models.TextChoices):
+    OPEN = "open", "Waiting for signatures"
+    ADOPTED = "adopted", "Adopted"
+    FAILED = "failed", "Not adopted"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+
+
+class ConsentRequest(models.Model):
+    """A board resolution by unanimous written consent, without a meeting.
+    Every board member serving when it is proposed must approve."""
+
+    title = models.CharField(max_length=200)
+    text = models.TextField()
+    citation = models.CharField(max_length=200, blank=True)
+    signers = models.ManyToManyField("community.Person", related_name="+")
+    state = models.CharField(max_length=12, choices=ConsentState.choices, default=ConsentState.OPEN)
+    resolution = models.OneToOneField(
+        Resolution, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Consent requests are kept.")
+
+
+class ConsentSignature(AppendOnlyModel):
+    consent = models.ForeignKey(ConsentRequest, on_delete=models.PROTECT, related_name="signatures")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    signed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    approve = models.BooleanField()
+    signed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["consent", "person"], name="consent_sign_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"signature #{self.pk}"

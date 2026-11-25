@@ -92,6 +92,10 @@ class Budget(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     notes = models.TextField(blank=True)
+    # Owner notices (Milestone 4): the proposed budget before the meeting, and
+    # the adopted budget with the new dues afterwards.
+    proposed_notice_sent_at = models.DateTimeField(null=True, blank=True)
+    adopted_notice_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-fiscal_year"]

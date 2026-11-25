@@ -1,6 +1,7 @@
 from django.urls import path, re_path
 
 from governance import committee_views as cv
+from governance import election_views as ev
 from governance import views
 
 urlpatterns = [
@@ -22,6 +23,17 @@ urlpatterns = [
         cv.committee_member_end,
         name="committee_member_end",
     ),
+    path("elections/", ev.election_list, name="elections"),
+    path("elections/<int:pk>/", ev.election_detail, name="election_detail"),
+    re_path(
+        r"^elections/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
+        ev.election_action,
+        name="election_action",
+    ),
+    path("meetings/<int:pk>/proxy/", ev.proxy_grant, name="proxy_grant"),
+    path("proxies/<int:pk>/revoke/", ev.proxy_revoke, name="proxy_revoke"),
+    path("board/consents/", ev.consents, name="consents"),
+    path("board/consents/<int:pk>/", ev.consent_detail, name="consent_detail"),
     path("meetings/", views.meetings, name="meetings"),
     path("meetings/<int:pk>/", views.meeting_detail, name="meeting_detail"),
     re_path(

@@ -353,6 +353,14 @@ class Command(BaseCommand):
             beside = [lots[n] for n in (number - 1, number + 1) if n in same_road]
             arc_signoffs.set_neighbours(lot, beside, actor=b1)
 
+        # Compliance calendar suggestions and an annual election (Milestone 4).
+        ops.add_starter_items(actor=b1)
+        from governance import elections as gov_elections
+
+        gov_elections.create_election(
+            title="Annual board election (demo)", seats=2, citation="Bylaws (demo)", actor=b1
+        )
+
         # ARC project types owners choose from (Milestone 3).
         from arc import services as arc_services
 

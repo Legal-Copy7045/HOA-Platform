@@ -6,7 +6,11 @@
   <div class="crumbs"><a href="{% url 'budgets' %}">Budgets</a> / FY{{ budget.fiscal_year }}</div>
   <div class="page-head">
     <div><h1>FY{{ budget.fiscal_year }} budget</h1><div class="meta">{% status budget.status %}<span>Expense actuals from approved and paid invoices; income actuals from the owner ledger.</span></div></div>
-    {% if can_manage and budget.status == "draft" %}<div class="actions"><form method="post" data-confirm="Adopt this budget? Its lines will be locked.">{% csrf_token %}<input type="hidden" name="adopt" value="1"><button type="submit">{% icon "check" %} Adopt budget</button></form></div>{% endif %}
+    {% if can_manage %}<div class="actions">
+      {% if budget.status == "draft" %}<form method="post" data-confirm="Email the proposed budget to owners now?">{% csrf_token %}<input type="hidden" name="notice" value="proposed"><button type="submit" class="secondary">{% icon "mail" %} Send proposed budget to owners{% if budget.proposed_notice_sent_at %} again{% endif %}</button></form>
+      <form method="post" data-confirm="Adopt this budget? Its lines will be locked.">{% csrf_token %}<input type="hidden" name="adopt" value="1"><button type="submit">{% icon "check" %} Adopt budget</button></form>{% else %}
+      <form method="post" data-confirm="Email owners the adopted budget and their monthly dues?">{% csrf_token %}<input type="hidden" name="notice" value="adopted"><button type="submit" class="secondary">{% icon "mail" %} Send adopted budget and dues notice{% if budget.adopted_notice_sent_at %} again{% endif %}</button></form>{% endif %}
+    </div>{% endif %}
   </div>
   <div class="table-card"><div class="table-wrap"><table class="dense">
     <thead><tr><th>Line</th>{% for y, m in report.months %}<th class="num">{{ m }}/{{ y|stringformat:"d"|slice:"2:" }}</th>{% endfor %}<th class="num">Budget</th><th class="num">Actual</th><th class="num">Variance</th></tr></thead>

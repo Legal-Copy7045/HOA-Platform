@@ -120,6 +120,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "workorder.manage": frozenset({BOARD, MANAGER}),
     "invoice.enter": frozenset({BOARD, MANAGER}),
     "contract.manage": frozenset({BOARD, MANAGER}),
+    "compliance.manage": frozenset({BOARD, MANAGER}),
     "invoice.approve": frozenset({BOARD}),
     "invoice.record_payment": frozenset({BOARD, MANAGER}),
     "finance.view": frozenset({BOARD, AUDITOR, MANAGER}),
@@ -139,6 +140,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Charging a late fee is a board decision (the manager prepares the list).
     "late_fee.post": frozenset({BOARD}),
     "budget.manage": frozenset({BOARD}),
+    "budget.view_owner": ACCOUNT_VIEWERS | {BOARD, MANAGER, AUDITOR},
     "collections.manage": frozenset({BOARD, MANAGER}),
     "collections.refer": frozenset({BOARD}),
     "resale.request": frozenset({OWNER, BOARD, MANAGER}),

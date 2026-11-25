@@ -287,6 +287,7 @@ MEMBER_READS = {
                 "request.submit",
                 "request.view_own",
                 "account.request_change",
+                "budget.view_owner",
             },
         ),
         (
@@ -303,6 +304,7 @@ MEMBER_READS = {
                 "committee.view",
                 "committee.view_all",
                 "roster.view",
+                "budget.view_owner",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

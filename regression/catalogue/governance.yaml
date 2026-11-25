@@ -32,3 +32,6 @@
 - feature: "ARC neighbour sign-off: adjacency from the development plan, extra addresses, portal answers or single-use expiring links, plans shown (not signed forms), printable prefilled form, scanned forms read into proposals a person confirms (automatic only when switched on), recusal"
   since: M3
   match: ["^unit:arc/tests/test_signoffs"]
+- feature: "Elections: nominations with acceptance, one unlinkable ballot per lot (owner or proxy holder), tie for last seat flagged, certification by a non-candidate proposes seats; proxies and live quorum; resolutions by unanimous written consent"
+  since: M4
+  match: ["^unit:governance/tests/test_elections"]

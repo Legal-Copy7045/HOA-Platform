@@ -396,6 +396,19 @@ def budget_detail(request, pk):
     budget = get_object_or_404(Budget, pk=pk)
     if request.method == "POST":
         policy.require(request.user, "budget.manage")
+        if request.POST.get("notice") in ("proposed", "adopted"):
+            result = _flash(
+                request,
+                lambda: services.send_budget_notice(
+                    budget, stage=request.POST["notice"], actor=request.user, request=request
+                ),
+                "Notice sent to owners who accepted email notice.",
+            )
+            if result and result["paper"]:
+                messages.warning(
+                    request, f"{len(result['paper'])} owner(s) need a paper copy of this notice."
+                )
+            return redirect("budget_detail", pk=budget.pk)
         if request.POST.get("adopt"):
             _flash(
                 request,
@@ -531,3 +544,19 @@ def resale_pdf(request, pk):
             raise Http404
         return attachments.serve(request, obj, stored.pk)
     return pdf_response(services.resale_certificate(obj), f"resale-certificate-{obj.pk}.pdf")
+
+
+@login_required
+def owner_budget(request):
+    """The association's budget as owners see it (summary lines only)."""
+    policy.require(request.user, "budget.view_owner")
+    budget = services.owner_visible_budget()
+    return render(
+        request,
+        "ledger/owner_budget.html",
+        {
+            "budget": budget,
+            "summary": services.budget_summary(budget) if budget else None,
+            "dues": rule_with_citation("dues.monthly_cents"),
+        },
+    )

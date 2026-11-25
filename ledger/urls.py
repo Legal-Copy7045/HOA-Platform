@@ -3,6 +3,7 @@ from django.urls import path, re_path
 from ledger import views
 
 urlpatterns = [
+    path("budget/", views.owner_budget, name="owner_budget"),
     path("my-account/", views.my_account, name="my_account"),
     path("my-account/<int:lot_id>/statement.pdf", views.my_statement_pdf, name="my_statement_pdf"),
     path("finance/ledger/", views.ledger_home, name="ledger_home"),

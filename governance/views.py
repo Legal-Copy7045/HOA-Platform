@@ -9,6 +9,7 @@ from core import policy
 from core.workflow_views import transition_view
 from documents.models import Document
 from governance import services
+from governance.election_views import meeting_extras
 from governance.models import (
     Ballot,
     Meeting,
@@ -87,6 +88,7 @@ def meeting_detail(request, pk):
             "minutes_choices": minutes_choices,
             "attendance": meeting.attendance.select_related("person") if can_manage else [],
             "short_days": services.notice_shortfall_days(meeting) if can_manage else None,
+            **meeting_extras(request.user, meeting),
         },
     )
 

@@ -90,6 +90,15 @@ MEMBER_PAGES = {
     "requests",
     "faq",
     "signoffs_mine",
+    "elections",
+    "owner_budget",
+}
+
+# Detail pages every member may open by design (community-wide, not lot
+# data): checked for sign-in and that nothing board-only shows.
+COMMUNITY_DETAIL = {
+    "election_detail": ("GET", "election"),
+    "election_action": ("POST", "election"),
 }
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
@@ -100,6 +109,11 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "proxy_grant": ("POST", "executive_meeting"),
+    "proxy_revoke": ("POST", "proxy_b"),
+    "consents": ("GET", None),
+    "consent_detail": ("GET", "consent"),
+    "compliance": ("GET", None),
     "onboarding": ("GET", None),
     "arc_signoff_action": ("POST", "arc_b"),
     "arc_signoff_form": ("GET", "arc_b"),
@@ -226,7 +240,7 @@ def test_every_named_url_is_classified():
     unclassified = {
         name
         for name in _named_urls()
-        if name not in PUBLIC | OWN_ACCOUNT | MEMBER_PAGES | set(PROTECTED)
+        if name not in PUBLIC | OWN_ACCOUNT | MEMBER_PAGES | set(PROTECTED) | set(COMMUNITY_DETAIL)
         and not name.startswith(OWN_ACCOUNT_PREFIXES)
     }
     assert unclassified == set(), f"Classify these URLs in {__name__}: {sorted(unclassified)}"
@@ -383,6 +397,21 @@ def world():
         make_member(lots=[lot_c])
         arc_signoffs.add_signoff_lot(arc_b, lot_c, actor=owner_b)
         signoff_b = SignoffRequest.objects.unscoped("t").get(arc_request=arc_b, lot=lot_c)
+        from governance import elections as gov_elections
+
+        annual = governance.create_meeting(
+            title="Annual meeting",
+            kind="annual",
+            starts_at=timezone.now() + timedelta(days=30),
+            actor=board,
+        )
+        proxy_b = gov_elections.grant_proxy(
+            annual, lot=lot_b, holder=Person.objects.unscoped("t").get(user=board), actor=owner_b
+        )
+        election = gov_elections.create_election(title="Board election", seats=1, actor=board)
+        consent = gov_elections.propose_consent(
+            title="Board only: legal matter consent", text="x", actor=board
+        )
         account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
         change_b = services.request_account_change(
             account_b, action="add", name="Lot B nephew", kind="view_only", actor=owner_b
@@ -398,6 +427,9 @@ def world():
         )
     targets = {
         "account_b": account_b.pk,
+        "proxy_b": proxy_b.pk,
+        "election": election.pk,
+        "consent": consent.pk,
         "signoff_b": signoff_b.pk,
         "seat_proposal": seat_proposal.pk,
         "contract": contract.pk,
@@ -491,6 +523,8 @@ def _url(name, key, targets):
         kwargs["action"] = "prepare"
     elif name == "signoff_file":
         kwargs["file_id"] = targets["arc_b_file"]
+    elif name == "election_action":
+        kwargs["action"] = "nominate"
     elif name == "contract_action":
         kwargs["action"] = "approve"
     elif name == "committee_action":
@@ -660,3 +694,18 @@ def test_export_contains_only_my_own_records(client, world):
     data = json.loads(client.get(reverse("export_my_data")).content)
     assert [o["lot"] for o in data["community"]["ownerships"]] == [world["lot_a"].number]
     assert "Bravo" not in json.dumps(data)
+
+
+@pytest.mark.parametrize("name", sorted(COMMUNITY_DETAIL))
+def test_community_detail_pages_require_sign_in_and_hide_board_content(client, world, name):
+    method, key = COMMUNITY_DETAIL[name]
+    url = _url(name, key, world["targets"])
+    response = client.get(url) if method == "GET" else client.post(url, {})
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("account_login"))
+    if method == "GET":
+        client.force_login(world["owner_a"])
+        page = client.get(url)
+        assert page.status_code == 200
+        for secret in BOARD_ONLY_MARKERS:
+            assert secret not in page.content

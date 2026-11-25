@@ -372,3 +372,51 @@ class OwnerRequest(ScopedModel):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Requests are closed or withdrawn, not deleted.")
+
+
+# --- Compliance calendar (Milestone 4) -------------------------------------------------
+
+
+class Recurrence(models.TextChoices):
+    ONCE = "once", "Once"
+    MONTHLY = "monthly", "Every month"
+    QUARTERLY = "quarterly", "Every quarter"
+    ANNUAL = "annual", "Every year"
+
+
+class ComplianceCategory(models.TextChoices):
+    INSURANCE = "insurance", "Insurance"
+    TAX = "tax", "Tax filing"
+    CORPORATE = "corporate", "Corporate filing"
+    RESERVE = "reserve", "Reserve study"
+    CONTRACT = "contract", "Seasonal or contract work"
+    GOVERNANCE = "governance", "Meetings and elections"
+    OTHER = "other", "Other"
+
+
+class ComplianceItem(models.Model):
+    """A recurring obligation with a due date and a reminder window."""
+
+    title = models.CharField(max_length=200)
+    category = models.CharField(max_length=12, choices=ComplianceCategory.choices)
+    due_on = models.DateField()
+    recurrence = models.CharField(max_length=10, choices=Recurrence.choices)
+    remind_days = models.PositiveSmallIntegerField(default=30)
+    responsible = models.ForeignKey(
+        "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    notes = models.TextField(blank=True)
+    citation = models.CharField(max_length=200, blank=True)
+    active = models.BooleanField(default=True)
+    last_done_on = models.DateField(null=True, blank=True)
+    reminded_for = models.DateField(null=True, blank=True)  # due date last reminded
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["due_on", "title"]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Compliance items are retired, not deleted.")

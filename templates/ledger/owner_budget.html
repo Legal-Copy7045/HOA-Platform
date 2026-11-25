@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Budget · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>{% if budget %}{{ budget }}{% else %}Budget{% endif %}</h1>
+    <p class="subtitle">{% if budget.status == "adopted" %}Adopted by the board on {{ budget.adopted_on|date:"F j, Y" }}.{% elif budget %}Proposed by the board: owners may comment before it is adopted.{% endif %}</p></div></div>
+  {% if budget %}
+    <div class="grid grid-3">
+      <div class="stat"><div class="label">Income</div><div class="value">{{ summary.income|cents }}</div></div>
+      <div class="stat"><div class="label">Expenses</div><div class="value">{{ summary.expense|cents }}</div></div>
+      <div class="stat"><div class="label">Monthly dues per lot</div><div class="value">{% if dues.0 %}{{ dues.0|cents }}{% else %}-{% endif %}</div>{% if dues.1 %}<div class="hint">{{ dues.1 }}</div>{% endif %}</div>
+    </div>
+    <div class="table-card"><div class="table-wrap"><table>
+      <thead><tr><th>Line</th><th>Kind</th><th class="num">For the year</th></tr></thead>
+      <tbody>{% for l in summary.lines %}<tr><td>{{ l.name }}</td><td>{{ l.get_kind_display }}</td><td class="num">{{ l.annual_cents|cents }}</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+    {% if budget.status != "adopted" and user|can:"request.submit" %}<p><a href="{% url 'requests' %}?mine=1">Comment or ask a question about the budget</a></p>{% endif %}
+  {% else %}<section class="card">{% include "partials/empty.html" with icon="chart" title="No budget published yet" %}</section>{% endif %}
+{% endblock %}

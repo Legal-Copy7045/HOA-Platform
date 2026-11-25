@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ c.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'consents' %}">Written consents</a> / {{ c.title }}</div>
+  <div class="page-head"><div><h1>{{ c.title }}</h1><div class="meta">{% status c.state %}{% if c.citation %}<span>{% icon "book" %}{{ c.citation }}</span>{% endif %}{% if c.resolution %}<span>Recorded as resolution {{ c.resolution.number }}</span>{% endif %}</div></div></div>
+  <div class="split"><section class="card prose">{{ c.text|linebreaks }}</section>
+    <aside><section class="card"><h3>Signatures</h3><ul class="list">{% for p, s in signers %}<li><span class="grow">{{ p.display_name }}</span>{% if s %}<span class="badge {% if s.approve %}tone-success{% else %}tone-danger{% endif %}">{% if s.approve %}Approved{% else %}Declined{% endif %} {{ s.signed_at|date:"M j" }}</span>{% else %}<span class="small muted">Waiting</span>{% endif %}</li>{% endfor %}</ul>
+      {% if can_sign %}<form method="post" class="form-actions">{% csrf_token %}<button type="submit" name="action" value="approve">Approve</button><button type="submit" name="action" value="decline" class="danger">Decline</button></form>{% endif %}
+      {% if c.state == "open" and c.created_by_id == user.pk %}<form method="post">{% csrf_token %}<button type="submit" name="action" value="withdraw" class="secondary small">Withdraw</button></form>{% endif %}
+    </section></aside></div>
+{% endblock %}

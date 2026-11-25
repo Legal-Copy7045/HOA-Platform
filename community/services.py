@@ -1348,3 +1348,30 @@ def decide_seat_nomination(nomination, *, approve: bool, actor, request=None):
         )
     nomination.refresh_from_db()
     return nomination
+
+
+def owner_notice_recipients() -> tuple[list[str], list[Person]]:
+    """Official notices: (emails of current owners who consented to electronic
+    notice, plus their consented extra addresses; owners who need paper)."""
+    from community.models import ContactProfile
+
+    with system_access("notice recipients"):
+        owners = list(
+            Person.objects.filter(
+                pk__in=Ownership.objects.active().values("person_id")
+            ).select_related("user")
+        )
+        consent = set(
+            ContactProfile.objects.filter(electronic_notice_consent=True).values_list(
+                "person_id", flat=True
+            )
+        )
+    emails, paper = [], []
+    for person in owners:
+        address = person.user.email if person.user_id else person.email
+        if person.pk in consent and address:
+            emails.append(address)
+            emails.extend(e for e in notice_emails(person) if e not in emails)
+        else:
+            paper.append(person)
+    return sorted(set(emails)), paper

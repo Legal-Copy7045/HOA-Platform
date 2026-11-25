@@ -42,6 +42,7 @@ class Item:
 # Who has a queue page (staff); owners see items waiting on them on Home.
 MY_ITEMS_PERMISSIONS = (
     "request.manage",
+    "compliance.manage",
     "account.approve_change",
     "invoice.approve",
     "arc.intake",
@@ -68,6 +69,7 @@ AREAS = [
     "Collections",
     "Work orders",
     "Records requests",
+    "Compliance",
     "Tasks",
 ]
 
@@ -295,6 +297,21 @@ def items_for(user) -> list[Item]:
                     reverse("work_order_detail", args=[w.pk]),
                     _due_tone(w.follow_up_on, today),
                     w.follow_up_on,
+                )
+            )
+    if can(user, "compliance.manage"):
+        from operations.services import due_soon
+
+        for c in due_soon(today):
+            out.append(
+                Item(
+                    "Compliance",
+                    c.title,
+                    f"{'Overdue since' if c.due_on < today else 'Due'} {c.due_on:%b %-d, %Y}",
+                    reverse("compliance"),
+                    _due_tone(c.due_on, today),
+                    c.due_on,
+                    nav="compliance",
                 )
             )
     if can(user, "records_request.manage"):

@@ -801,3 +801,180 @@ def contract_status(contract: Contract, on=None) -> dict:
         "total_cents": sum(i.amount_cents for i in invoices),
         "count": len(invoices),
     }
+
+
+# --- Compliance calendar (Milestone 4) ------------------------------------------------
+
+import calendar as _calendar  # noqa: E402
+import datetime as _dt  # noqa: E402
+
+from operations.models import ComplianceItem, Recurrence  # noqa: E402
+
+
+def _add_months(day: _dt.date, months: int) -> _dt.date:
+    month = day.month - 1 + months
+    year, month = day.year + month // 12, month % 12 + 1
+    return _dt.date(year, month, min(day.day, _calendar.monthrange(year, month)[1]))
+
+
+def next_due(item: ComplianceItem) -> _dt.date | None:
+    step = {Recurrence.MONTHLY: 1, Recurrence.QUARTERLY: 3, Recurrence.ANNUAL: 12}.get(
+        item.recurrence
+    )
+    return _add_months(item.due_on, step) if step else None
+
+
+def save_compliance_item(*, item=None, actor, request=None, **fields) -> ComplianceItem:
+    require(actor, "compliance.manage")
+    title = " ".join((fields.get("title") or "").split())[:200]
+    if not title or not fields.get("due_on"):
+        raise OperationsError("An item needs a title and a due date.")
+    fields["title"] = title
+    if item is None:
+        item = ComplianceItem.objects.create(**fields)
+    else:
+        ComplianceItem.objects.filter(pk=item.pk).update(**fields)
+        item.refresh_from_db()
+    record_event("compliance.saved", actor=actor, request=request, target=item)
+    return item
+
+
+def complete_compliance_item(item: ComplianceItem, *, actor, done_on=None, request=None):
+    """Mark done; a recurring item moves to its next due date."""
+    require(actor, "compliance.manage")
+    done_on = done_on or timezone.localdate()
+    nxt = next_due(item)
+    fields = {"last_done_on": done_on}
+    if nxt:
+        fields.update(due_on=nxt, reminded_for=None)
+    else:
+        fields.update(active=False)
+    ComplianceItem.objects.filter(pk=item.pk).update(**fields)
+    record_event(
+        "compliance.done",
+        actor=actor,
+        request=request,
+        target=item,
+        metadata={"recurring": bool(nxt)},
+    )
+    item.refresh_from_db()
+    return item
+
+
+def due_soon(on=None):
+    on = on or timezone.localdate()
+    out = []
+    for item in ComplianceItem.objects.filter(active=True):
+        if item.due_on - _dt.timedelta(days=item.remind_days) <= on:
+            out.append(item)
+    return out
+
+
+def send_compliance_reminders(on=None) -> int:
+    """Email the board once per due date when an item enters its window."""
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    from community.services import board_emails
+
+    on = on or timezone.localdate()
+    fresh = [i for i in due_soon(on) if i.reminded_for != i.due_on]
+    if not fresh:
+        return 0
+    lines = "\n".join(
+        f"- {i.title}: due {i.due_on:%B %-d, %Y}" + (" (overdue)" if i.due_on < on else "")
+        for i in fresh
+    )
+    body = (
+        f"Coming up on the compliance calendar:\n\n{lines}\n\n"
+        f"{settings.PORTAL_BASE_URL}/board/compliance/\n\n-- \n{settings.SITE_NAME}"
+    )
+    for address in board_emails():
+        send_mail(
+            f"[{settings.SITE_NAME}] Compliance reminders",
+            body,
+            None,
+            [address],
+            fail_silently=True,
+        )
+    for i in fresh:
+        ComplianceItem.objects.filter(pk=i.pk).update(reminded_for=i.due_on)
+    return len(fresh)
+
+
+COMPLIANCE_STARTERS = [
+    # (title, category, month, day, recurrence, remind_days, notes)
+    (
+        "Association insurance renewal (property, liability, D&O, fidelity)",
+        "insurance",
+        None,
+        None,
+        "annual",
+        60,
+        "Get renewal quotes; check limits against the Declaration.",
+    ),
+    (
+        "Federal tax return (Form 1120-H)",
+        "tax",
+        4,
+        15,
+        "annual",
+        45,
+        "Due the 15th day of the 4th month after the fiscal year ends.",
+    ),
+    (
+        "Pennsylvania corporate annual report",
+        "corporate",
+        None,
+        None,
+        "annual",
+        45,
+        "Check the due date with the PA Department of State.",
+    ),
+    (
+        "Reserve study update",
+        "reserve",
+        None,
+        None,
+        "annual",
+        90,
+        "Many associations update every 3-5 years; set the real date.",
+    ),
+    (
+        "Annual owners' meeting and election",
+        "governance",
+        None,
+        None,
+        "annual",
+        75,
+        "Notice to owners 10 to 60 days before (68 Pa.C.S. § 5308).",
+    ),
+    ("Snow removal contract", "contract", 10, 1, "annual", 30, ""),
+]
+
+
+def add_starter_items(*, actor) -> int:
+    """Suggested items to edit; dates the board doesn't know yet are set a year
+    out so they show up for review."""
+    require(actor, "compliance.manage")
+    today = timezone.localdate()
+    added = 0
+    for title, category, month, day, recurrence, remind, notes in COMPLIANCE_STARTERS:
+        if ComplianceItem.objects.filter(title=title).exists():
+            continue
+        if month:
+            due = _dt.date(today.year, month, day)
+            if due < today:
+                due = _dt.date(today.year + 1, month, day)
+        else:
+            due = _add_months(today, 12)
+        ComplianceItem.objects.create(
+            title=title,
+            category=category,
+            due_on=due,
+            recurrence=recurrence,
+            remind_days=remind,
+            notes=notes,
+        )
+        added += 1
+    return added

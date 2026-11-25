@@ -29,3 +29,6 @@
 - feature: "Late fees: late list after the grace period, board posts once per lot and month, automatic posting off by default; owner-paid convenience fees for card and bank shown before paying (D21)"
   since: M3
   match: ["^unit:ledger/tests/test_late_fees", "^unit:payments/tests/test_fees"]
+- feature: "Compliance calendar (recurring items, one reminder per due date, My items) and budget notices to owners (proposed, then adopted with dues; paper list)"
+  since: M4
+  match: ["^unit:operations/tests/test_compliance"]
