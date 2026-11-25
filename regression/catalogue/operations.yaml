@@ -35,3 +35,6 @@
 - feature: "Statements and delinquency notices: board-edited wording with plain placeholders (never str.format), first/second/final notice with the statement attached, second and final certified, running-balance statement with remittance stub, downloads audited and board/manager only; resale certificate fills application data in bold, separate from the delinquency packet"
   since: M4
   match: ["^unit:ledger/tests/test_letters"]
+- feature: "Money tools: balanced journal CSV export (owners by lot only, formula-injection safe), deposit batches with void, bank reconciliation with outstanding items, 1099 worksheet at the threshold rule, courtesy reminders (off until set, once a month), collections letter sequence first/second/final with referral left to the board"
+  since: M4
+  match: ["^unit:ledger/tests/test_money_tools"]
