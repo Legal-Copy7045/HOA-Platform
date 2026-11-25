@@ -131,8 +131,23 @@ def set_meeting_status(meeting, status, *, actor, request=None):
 
 def attach_minutes(meeting, document, *, actor, request=None):
     require(actor, "meeting.manage")
-    Meeting.objects.filter(pk=meeting.pk).update(minutes_document=document)
-    record_event("meeting.minutes_attached", actor=actor, request=request, target=meeting)
+    with transaction.atomic():
+        current = Meeting.objects.select_for_update().get(pk=meeting.pk)
+        if current.minutes_document_id and current.minutes_document_id != document.pk:
+            # Review D6: corrections are new versions of the same document, so
+            # the record of which minutes were adopted never silently changes.
+            raise GovernanceError(
+                "Minutes are already attached. Publish a corrected version of that "
+                "document instead."
+            )
+        Meeting.objects.filter(pk=meeting.pk).update(minutes_document=document)
+    record_event(
+        "meeting.minutes_attached",
+        actor=actor,
+        request=request,
+        target=meeting,
+        metadata={"document_id": document.pk},
+    )
 
 
 def record_attendance(meeting, person, *, present=True, by_proxy=False, actor, request=None):
@@ -178,6 +193,12 @@ def record_resolution(
     if supersedes is not None and supersedes.superseded_by.exists():
         raise GovernanceError("That resolution has already been superseded.")
     with transaction.atomic():
+        if supersedes is not None:
+            # Lock the old resolution so two can't supersede it at once (D10);
+            # the unique constraint is the backstop.
+            Resolution.objects.select_for_update().filter(pk=supersedes.pk).first()
+            if Resolution.objects.filter(supersedes=supersedes).exists():
+                raise GovernanceError("That resolution has already been superseded.")
         resolution = Resolution.objects.create(
             number=next_resolution_number(adopted_on.year),
             kind=kind,
@@ -351,9 +372,12 @@ def open_vote(vote: Vote, *, actor, request=None) -> Vote:
 def close_vote(vote: Vote, *, actor, request=None) -> Vote:
     if actor is not SYSTEM:
         require(actor, "vote.manage")
-    if vote.status != VoteStatus.OPEN:
-        raise GovernanceError("Only an open vote can be closed.")
-    Vote.objects.filter(pk=vote.pk).update(status=VoteStatus.CLOSED, closed_at=timezone.now())
+    with transaction.atomic():
+        # Lock the vote so no ballot can slip in while it closes (review D3).
+        locked = Vote.objects.select_for_update().get(pk=vote.pk)
+        if locked.status != VoteStatus.OPEN:
+            raise GovernanceError("Only an open vote can be closed.")
+        Vote.objects.filter(pk=vote.pk).update(status=VoteStatus.CLOSED, closed_at=timezone.now())
     record_event(
         "vote.closed", actor=None if actor is SYSTEM else actor, request=request, target=vote
     )
@@ -383,22 +407,27 @@ def cast_ballot(
     vote: Vote, *, option_id: int, lot_id: int | None = None, actor, request=None
 ) -> Ballot:
     require(actor, "vote.cast")
-    choices = ballot_choices_for(vote, actor)
-    if not choices["can_vote"]:
-        raise GovernanceError("You cannot vote on this (already voted, closed, or not eligible).")
-    option = VoteOption.objects.filter(vote=vote, pk=option_id).first()
-    if option is None:
-        raise GovernanceError("Choose one of the options.")
     from core import policy
 
-    person_id = policy.roles_for(actor).person_id
-    lot = None
-    if vote.kind == VoteKind.FORMAL:
-        lot = next((lot for lot in choices["lots"] if lot.pk == lot_id), None)
-        if lot is None:
-            raise GovernanceError("Choose which of your lots this ballot is for.")
     try:
         with transaction.atomic():
+            # Re-read the vote under a row lock: a page loaded before the vote
+            # closed must not be able to add a ballot afterwards (review D3).
+            vote = Vote.objects.select_for_update().get(pk=vote.pk)
+            choices = ballot_choices_for(vote, actor)
+            if not choices["can_vote"]:
+                raise GovernanceError(
+                    "You cannot vote on this (already voted, closed, or not eligible)."
+                )
+            option = VoteOption.objects.filter(vote=vote, pk=option_id).first()
+            if option is None:
+                raise GovernanceError("Choose one of the options.")
+            person_id = policy.roles_for(actor).person_id
+            lot = None
+            if vote.kind == VoteKind.FORMAL:
+                lot = next((lot for lot in choices["lots"] if lot.pk == lot_id), None)
+                if lot is None:
+                    raise GovernanceError("Choose which of your lots this ballot is for.")
             ballot = Ballot.objects.create(
                 vote=vote, option=option, person_id=person_id, lot=lot, cast_by=actor
             )
@@ -434,13 +463,22 @@ def results(vote: Vote) -> dict:
     outcome = None
     if vote.kind == VoteKind.FORMAL and vote.eligible_lots:
         turnout = round(100 * total / vote.eligible_lots, 1)
-        quorum_met = turnout >= (vote.quorum_percent or 0)
-        leader = max(rows, key=lambda r: r["count"]) if rows else None
-        passed = bool(quorum_met and leader and leader["percent"] >= (vote.pass_percent or 101))
+        # Exact integer comparisons, never rounded percentages (review D4).
+        quorum_met = total * 100 >= (vote.quorum_percent or 0) * vote.eligible_lots
+        top = max((r["count"] for r in rows), default=0)
+        leaders = [r for r in rows if r["count"] == top and top > 0]
+        # A tie has no leading option and passes nothing.
+        leader = leaders[0] if len(leaders) == 1 else None
+        passed = bool(
+            quorum_met
+            and leader
+            and vote.pass_percent is not None
+            and leader["count"] * 100 >= vote.pass_percent * total
+        )
         outcome = {
             "turnout": turnout,
             "quorum_met": quorum_met,
-            "leading": leader["option"].label if leader else None,
+            "leading": leader["option"].label if leader else ("tie" if len(leaders) > 1 else None),
             "meets_threshold": passed,
         }
     return {"rows": rows, "total": total, "outcome": outcome}

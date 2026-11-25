@@ -9,6 +9,7 @@ as needing attention on the board dashboard.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 CENTS, DAYS, INT, PERCENT, BOOL, TEXT = "cents", "days", "int", "percent", "bool", "text"
@@ -139,7 +140,9 @@ def validate_value(key: str, raw: str) -> str:
     if raw == "":
         return raw
     if spec.kind in (CENTS, DAYS, INT, PERCENT):
-        if not raw.isdigit():
+        # ASCII digits only and a sane size (review D9): str.isdigit() also
+        # accepts characters like "²" that int() then refuses on every read.
+        if not re.fullmatch(r"[0-9]{1,12}", raw):
             raise ValueError(f"{spec.label}: enter a whole number.")
         if spec.kind == PERCENT and int(raw) > 100:
             raise ValueError(f"{spec.label}: must be 0-100.")

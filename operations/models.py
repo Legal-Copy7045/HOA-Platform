@@ -127,6 +127,9 @@ class Invoice(models.Model):
     category = models.ForeignKey(ExpenseCategory, on_delete=models.PROTECT, related_name="+")
     state = models.CharField(max_length=24, default="draft")
     state_changed_at = models.DateTimeField(default=timezone.now)
+    # Fixed when the invoice is submitted, so changing the threshold rule
+    # afterwards cannot reduce the approvals it needs (review A6).
+    required_approvals = models.PositiveSmallIntegerField(null=True, blank=True)
     entered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -159,6 +162,8 @@ class InvoiceApproval(AppendOnlyModel):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
     decision = models.CharField(max_length=8, choices=ApprovalDecision.choices)
+    # The amount the approver saw (review D6).
+    amount_cents = models.PositiveBigIntegerField(null=True, blank=True)
     note = models.TextField(blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 

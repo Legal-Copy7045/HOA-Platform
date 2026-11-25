@@ -264,6 +264,11 @@ BUCKETS = ("current", "31_60", "61_90", "over_90")
 def aging(lot_id: int, as_of: datetime.date | None = None) -> dict[str, int]:
     as_of = as_of or timezone.localdate()
     entries = list(LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of))
+    # A reversal cancels the entry it reverses (review D2): drop both, so a
+    # bounced payment brings back the original charges' ages and a reversed
+    # mistaken charge does not age as if paid down the oldest debt.
+    cancelled = {e.reverses_id for e in entries if e.reverses_id}
+    entries = [e for e in entries if e.pk not in cancelled and not e.reverses_id]
     charges = [[e.posted_on, e.amount_cents] for e in entries if e.amount_cents > 0]
     credit = -sum(e.amount_cents for e in entries if e.amount_cents < 0)
     for charge in sorted(charges):
@@ -388,7 +393,11 @@ def open_case(*, lot: Lot, notes: str = "", actor, request=None) -> CollectionCa
     require(actor, "collections.manage")
     if CollectionCase.objects.filter(lot=lot).exclude(state="closed").exists():
         raise LedgerError("This lot already has an open collection case.")
-    case = CollectionCase.objects.create(lot=lot, opened_by=actor, notes=notes)
+    try:
+        with transaction.atomic():
+            case = CollectionCase.objects.create(lot=lot, opened_by=actor, notes=notes)
+    except IntegrityError as exc:
+        raise LedgerError("This lot already has an open collection case.") from exc
     record_event(
         "collection.opened",
         actor=actor,

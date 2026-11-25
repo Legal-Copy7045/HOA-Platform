@@ -141,3 +141,43 @@ def test_work_order_flow(w):
     services.WORK_ORDER.apply(wo, "complete", actor=w["manager"], note="Done Tuesday")
     wo.refresh_from_db()
     assert wo.state == "completed"
+
+
+# --- Security review 2026-11 ------------------------------------------------------
+
+
+def test_approvals_needed_are_fixed_when_submitted(w):
+    """A6: one board member could clear the threshold, then approve alone."""
+    community.set_rule(
+        key="invoice.dual_approval_cents",
+        value="50000",
+        citation="Board res. (demo)",
+        actor=w["b1"],
+    )
+    inv = invoice(w, 90000)
+    assert services.approvals_required(inv) == 2
+    community.set_rule(key="invoice.dual_approval_cents", value="", citation="", actor=w["b1"])
+    inv = services.approve(inv, actor=w["b1"])
+    assert inv.state == "pending_approval"  # still needs a second, different approver
+    assert inv.approvals.get().amount_cents == 90000  # D6: the amount approved is recorded
+
+
+def test_submitted_invoice_amount_cannot_change(w):
+    """D6: enforced by a database trigger, not just the forms."""
+    from django.db import IntegrityError, transaction
+
+    from operations.models import Invoice
+
+    inv = invoice(w, 10000)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Invoice.objects.filter(pk=inv.pk).update(amount_cents=1)
+
+
+@pytest.mark.parametrize("amount", [-5000, 0])
+def test_invoice_payment_must_be_positive(w, amount):
+    """D8."""
+    inv = services.approve(invoice(w, 10000), actor=w["b1"])
+    with pytest.raises(services.OperationsError):
+        services.record_payment(
+            inv, paid_on=TODAY, method="check", amount_cents=amount, actor=w["manager"]
+        )

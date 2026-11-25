@@ -114,6 +114,14 @@ class Resolution(AppendOnlyModel):
 
     class Meta:
         ordering = ["-adopted_on", "-number"]
+        constraints = [
+            # A resolution is superseded at most once (review D10).
+            models.UniqueConstraint(
+                fields=["supersedes"],
+                condition=models.Q(supersedes__isnull=False),
+                name="resolution_superseded_once",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.number} {self.title}"

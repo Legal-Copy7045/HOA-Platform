@@ -12,7 +12,7 @@ from core.append_only import AppendOnlyError
 from core.policy import SYSTEM
 from core.workflow import WorkflowError
 from governance import services
-from governance.models import Ballot, Meeting, VoteKind
+from governance.models import Ballot, Meeting, Vote, VoteKind
 
 pytestmark = pytest.mark.django_db
 
@@ -206,3 +206,55 @@ def test_closed_vote_takes_no_ballots(board):
     with pytest.raises(services.GovernanceError):
         services.cast_ballot(vote, option_id=yes.pk, actor=owner)
     assert Ballot.objects.count() == 0
+
+
+# --- Security review 2026-11 ------------------------------------------------------
+
+
+def test_ballot_from_a_page_loaded_before_close_is_refused(board):
+    """D3: the vote's status was checked on a stale object, with no lock."""
+    owner = make_member(lots=[LotFactory()])
+    vote, (yes, _) = _vote(board)
+    vote = services.open_vote(vote, actor=board)
+    stale = Vote.objects.get(pk=vote.pk)  # loaded while open
+    services.close_vote(vote, actor=board)
+    with pytest.raises(services.GovernanceError):
+        services.cast_ballot(stale, option_id=yes.pk, actor=owner)
+
+
+def _formal_with_ballots(board, yes_count, no_count, quorum="10", passing="50"):
+    community.set_rule(key="vote.quorum_percent", value=quorum, citation="Bylaws §2.6", actor=board)
+    community.set_rule(key="vote.pass_percent", value=passing, citation="Decl. §14", actor=board)
+    voters = []
+    for _ in range(yes_count + no_count):
+        lot = LotFactory()
+        voters.append((lot, make_member(lots=[lot])))
+    vote, (yes, no) = _vote(board, VoteKind.FORMAL)
+    vote = services.open_vote(vote, actor=board)
+    for i, (lot, member) in enumerate(voters):
+        option = yes if i < yes_count else no
+        services.cast_ballot(vote, option_id=option.pk, lot_id=lot.pk, actor=member)
+    return vote
+
+
+def test_a_tie_passes_nothing(board):
+    """D4: a 1-1 vote at a 50% threshold was reported as passing."""
+    vote = _formal_with_ballots(board, 1, 1)
+    outcome = services.results(vote)["outcome"]
+    assert outcome["leading"] == "tie"
+    assert outcome["meets_threshold"] is False
+
+
+def test_threshold_uses_exact_counts_not_rounded_percentages(board):
+    # 2 of 3 is 66.67%: rounds to 66.7, which must not satisfy a 67% threshold...
+    vote = _formal_with_ballots(board, 2, 1, passing="67")
+    assert services.results(vote)["outcome"]["meets_threshold"] is False
+
+
+def test_open_vote_rules_are_fixed_in_the_database(board):
+    """D6."""
+    from django.db import IntegrityError, transaction
+
+    vote = _formal_with_ballots(board, 1, 0)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Vote.objects.filter(pk=vote.pk).update(pass_percent=1)

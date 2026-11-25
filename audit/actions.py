@@ -116,7 +116,7 @@ _SPECS = [
     _spec("meeting.created", "Meeting scheduled", "kind"),
     _spec("meeting.noticed", "Meeting notice sent", "emailed", "paper", "short_days"),
     _spec("meeting.status_changed", "Meeting held or cancelled", "status"),
-    _spec("meeting.minutes_attached", "Minutes attached to meeting"),
+    _spec("meeting.minutes_attached", "Minutes attached to meeting", "document_id"),
     _spec("meeting.attendance", "Attendance recorded", "person_id", "present"),
     _spec("resolution.recorded", "Resolution or policy recorded", "number", "kind", "supersedes"),
     _spec("records_request.submitted", "Records request submitted", "due_on"),

@@ -161,6 +161,14 @@ class CollectionCase(ScopedModel):
 
     class Meta:
         ordering = ["-opened_at"]
+        constraints = [
+            # One open case per lot, even under concurrent requests (review D10).
+            models.UniqueConstraint(
+                fields=["lot"],
+                condition=~models.Q(state="closed"),
+                name="collection_one_open_case_per_lot",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"Collection case #{self.pk}"

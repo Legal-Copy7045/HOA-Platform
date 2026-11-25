@@ -127,8 +127,11 @@ def meeting_action(request, pk, action):
         doc = get_object_or_404(
             Document.objects.for_user(request.user), pk=request.POST.get("document")
         )
-        services.attach_minutes(meeting, doc, actor=request.user, request=request)
-        messages.success(request, "Minutes attached.")
+        _flash(
+            request,
+            lambda: services.attach_minutes(meeting, doc, actor=request.user, request=request),
+            "Minutes attached.",
+        )
     return redirect("meeting_detail", pk=meeting.pk)
 
 

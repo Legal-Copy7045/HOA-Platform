@@ -19,6 +19,7 @@ Corrections are new records that reference the one they correct.
 from __future__ import annotations
 
 from django.db import migrations, models
+from django.db.models.signals import class_prepared
 
 
 class AppendOnlyError(Exception):
@@ -37,6 +38,11 @@ class AppendOnlyQuerySet(models.QuerySet):
 
     def update_or_create(self, *args, **kwargs):
         raise AppendOnlyError(f"{self.model.__name__} records cannot be updated")
+
+    def bulk_create(self, objs, *args, **kwargs):
+        if kwargs.get("update_conflicts") or (len(args) >= 3 and args[2]):
+            raise AppendOnlyError(f"{self.model.__name__} records cannot be updated")
+        return super().bulk_create(objs, *args, **kwargs)
 
 
 class AppendOnlyModel(models.Model):
@@ -101,3 +107,24 @@ def _scoped_append_only():
 
 
 ScopedAppendOnlyQuerySet, ScopedAppendOnlyModel = _scoped_append_only()
+
+
+def _append_only_base_manager(sender, **kwargs) -> None:
+    """Make Django's internal "base manager" refuse changes too (review D7).
+
+    ``Model._base_manager`` is a plain QuerySet by default, so
+    ``Model._base_manager.filter(...).update(...)`` skipped the model layer
+    (the database trigger still refused it). Scoped models keep the default,
+    because related-object access goes through the base manager.
+    """
+    if (
+        issubclass(sender, AppendOnlyModel)
+        and not sender._meta.abstract
+        and not getattr(sender, "scope_lot_path", None)
+        and not getattr(sender, "scope_person_path", None)
+        and not hasattr(sender, "scope_for_owner")
+    ):
+        sender._meta.base_manager_name = "objects"
+
+
+class_prepared.connect(_append_only_base_manager)

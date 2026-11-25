@@ -195,3 +195,62 @@ def test_resale_certificate_fee_posted_on_issue(w):
 def test_owner_requests_resale_only_for_own_lot(w):
     with pytest.raises(services.LedgerError):
         services.request_resale(lot=LotFactory(), requester_name="x", actor=w["owner"])
+
+
+# --- Security review 2026-11 ------------------------------------------------------
+
+
+def test_bounced_payment_restores_the_age_of_the_old_charge(w):
+    """D2: the reversal was aged as a new charge dated today."""
+    old = datetime.date.today() - datetime.timedelta(days=120)
+    services.post_charge(
+        lot=w["lot"],
+        kind="other_charge",
+        amount_cents=10000,
+        description="Old charge",
+        posted_on=old,
+        actor=w["board"],
+    )
+    payment = services.record_payment(
+        lot=w["lot"], amount_cents=10000, received_on=old, actor=w["board"]
+    )
+    services.reverse_entry(payment, reason="Check returned", actor=w["board"])
+    aging = services.aging(w["lot"].pk)
+    assert aging["over_90"] == 10000
+    assert aging["current"] == 0
+
+
+def test_reversed_mistaken_charge_does_not_pay_down_old_debt(w):
+    old = datetime.date.today() - datetime.timedelta(days=120)
+    services.post_charge(
+        lot=w["lot"],
+        kind="other_charge",
+        amount_cents=10000,
+        description="Old",
+        posted_on=old,
+        actor=w["board"],
+    )
+    mistake = services.post_charge(
+        lot=w["lot"], kind="other_charge", amount_cents=5000, description="Oops", actor=w["board"]
+    )
+    services.reverse_entry(mistake, reason="Entered on wrong lot", actor=w["board"])
+    aging = services.aging(w["lot"].pk)
+    assert aging["over_90"] == 10000 and aging["current"] == 0
+
+
+@pytest.mark.parametrize("value", ["²", "1" * 20, "-5", "4.5"])
+def test_rule_values_must_be_plain_whole_numbers(w, value):
+    """D9: "²" passed isdigit() and then broke every read of the rule."""
+    with pytest.raises((ValueError, community.CommunityError)):
+        community.set_rule(key="dues.monthly_cents", value=value, citation="x", actor=w["board"])
+
+
+def test_only_one_open_collection_case_per_lot(w):
+    """D10: enforced by a database constraint, not only a check-then-insert."""
+    from django.db import IntegrityError, transaction
+
+    from ledger.models import CollectionCase
+
+    services.open_case(lot=w["lot"], actor=w["board"])
+    with pytest.raises(IntegrityError), transaction.atomic(), system_access("t"):
+        CollectionCase.objects.create(lot=w["lot"], opened_by=w["board"])

@@ -169,9 +169,19 @@ def set_work_order_vendor(wo: WorkOrder, vendor: Vendor, *, actor, request=None)
 # above it (rule invoice.dual_approval_cents, default $500).
 
 
-def approvals_required(invoice: Invoice) -> int:
+def _approvals_by_rule(invoice: Invoice) -> int:
     threshold = rule("invoice.dual_approval_cents")
     return 2 if threshold is not None and invoice.amount_cents >= threshold else 1
+
+
+def approvals_required(invoice: Invoice) -> int:
+    if invoice.required_approvals:
+        return invoice.required_approvals
+    return _approvals_by_rule(invoice)
+
+
+def _fix_required_approvals(obj, actor) -> None:
+    Invoice.objects.filter(pk=obj.pk).update(required_approvals=_approvals_by_rule(obj))
 
 
 def approvers(invoice: Invoice) -> set[int]:
@@ -200,7 +210,14 @@ def _fully_paid(obj, actor):
 INVOICE = Workflow(
     "invoice",
     [
-        Transition("submit", {"draft"}, "pending_approval", "invoice.enter", "Submit for approval"),
+        Transition(
+            "submit",
+            {"draft"},
+            "pending_approval",
+            "invoice.enter",
+            "Submit for approval",
+            after=_fix_required_approvals,
+        ),
         Transition(
             "approve",
             {"pending_approval"},
@@ -294,7 +311,11 @@ def approve(invoice: Invoice, *, note: str = "", actor, request=None) -> Invoice
                 "member must give the second approval."
             )
         InvoiceApproval.objects.create(
-            invoice=invoice, approver=actor, decision=ApprovalDecision.APPROVE, note=note
+            invoice=invoice,
+            approver=actor,
+            decision=ApprovalDecision.APPROVE,
+            amount_cents=invoice.amount_cents,
+            note=note,
         )
         record_event(
             "invoice.approval_given",
@@ -313,7 +334,11 @@ def approve(invoice: Invoice, *, note: str = "", actor, request=None) -> Invoice
 def reject(invoice: Invoice, *, note: str, actor, request=None) -> Invoice:
     with transaction.atomic():
         InvoiceApproval.objects.create(
-            invoice=invoice, approver=actor, decision=ApprovalDecision.REJECT, note=note
+            invoice=invoice,
+            approver=actor,
+            decision=ApprovalDecision.REJECT,
+            amount_cents=invoice.amount_cents,
+            note=note,
         )
         return INVOICE.apply(invoice, "reject", actor=actor, note=note, request=request)
 
@@ -346,7 +371,7 @@ def record_payment(
         if invoice.state != "approved":
             raise OperationsError("Only approved invoices can be paid.")
         remaining = invoice.amount_cents - paid_cents(invoice)
-        if amount_cents == 0 or amount_cents > remaining:
+        if not isinstance(amount_cents, int) or amount_cents <= 0 or amount_cents > remaining:
             raise OperationsError(
                 f"Amount must be between 1 cent and the remaining {remaining} cents."
             )
