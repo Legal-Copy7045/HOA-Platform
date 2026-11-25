@@ -288,6 +288,7 @@ MEMBER_READS = {
                 "request.view_own",
                 "account.request_change",
                 "budget.view_owner",
+                "sms.opt_in",
             },
         ),
         (

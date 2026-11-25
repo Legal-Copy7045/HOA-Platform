@@ -153,6 +153,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "resale.request": frozenset({OWNER, BOARD, MANAGER}),
     "resale.manage": frozenset({BOARD, MANAGER}),
     "reports.view": frozenset({BOARD, AUDITOR, MANAGER}),
+    # Text alerts (Milestone 4): owners opt in; the board sends urgent notices.
+    "sms.opt_in": frozenset({OWNER}),
+    "sms.send_urgent": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

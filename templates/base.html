@@ -6,9 +6,12 @@
   <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
   <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'css/site.css' %}">
+  {% if user.is_authenticated %}<link rel="manifest" href="{% url 'pwa_manifest' %}" crossorigin="use-credentials">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+  <meta name="theme-color" content="#1f5a43">{% endif %}
   {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body{% if user.is_authenticated %} data-sw="{% url 'pwa_service_worker' %}"{% endif %}>
   <a class="skip-link" href="#main">Skip to content</a>
 {% if user.is_authenticated and nav %}
   <div class="shell">

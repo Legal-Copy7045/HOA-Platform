@@ -21,4 +21,10 @@
     var message = form.getAttribute && form.getAttribute("data-confirm");
     if (message && !window.confirm(message)) e.preventDefault();
   }, true);
+
+  // Installable app: the service worker caches static files only (signed-in pages).
+  var sw = document.body.getAttribute("data-sw");
+  if (sw && "serviceWorker" in navigator) {
+    navigator.serviceWorker.register(sw, { scope: "/" }).catch(function () {});
+  }
 })();

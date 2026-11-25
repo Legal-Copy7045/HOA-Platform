@@ -255,6 +255,22 @@ _SPECS = [
         "reason",
         "target_id",
     ),
+    # Installable app, push and text alerts (Milestone 4). Counts only: never
+    # phone numbers, codes or device addresses.
+    _spec("push.subscribed", "Push notifications turned on for a device", "new"),
+    _spec("push.unsubscribed", "Push notifications turned off", "devices"),
+    _spec("sms.code_sent", "Text message confirmation code sent"),
+    _spec("sms.opted_in", "Urgent text messages turned on"),
+    _spec("sms.opted_out", "Urgent text messages turned off", "by"),
+    _spec("sms.urgent_queued", "Urgent text notice sent", "notice_id", "recipients"),
+    _spec(
+        "sms.urgent_delivered",
+        "Urgent text notice delivered",
+        "notice_id",
+        "sent",
+        "failed",
+        "opted_out",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

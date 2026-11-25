@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Urgent texts · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Urgent texts</h1>
+    <p class="subtitle">Text a short urgent notice to owners who opted in. For emergencies only; everything else goes out as an announcement.</p></div></div>
+  <div class="split">
+    <section class="card">
+      <h2>Send an urgent text</h2>
+      {% if not can_send %}
+        <p class="notice tone-warning" role="alert">Text messages aren't set up: the server has no SMS provider yet (SMS_PROVIDER in its settings).</p>
+      {% endif %}
+      <p class="small muted">{{ opted_in }} owner{{ opted_in|pluralize }} opted in. Each text reads "{{ SITE_NAME }} urgent:", your message, a link to sign in, and "{{ stop_note }}"</p>
+      <form method="post" data-confirm="Text this to every owner who opted in?">{% csrf_token %}{{ form }}
+        <div class="form-actions"><button type="submit"{% if not can_send or not opted_in %} disabled{% endif %}>Send text</button></div>
+      </form>
+    </section>
+    <aside><section class="card"><h3>Sent</h3>
+      {% if notices %}<ul class="list">{% for n in notices %}<li><div class="grow"><div>{{ n.message }}</div>
+        <div class="small muted">{{ n.created_at|date:"M j, Y g:i A" }} · {{ n.recipients }} opted in{% if n.finished_at %} · {{ n.sent_count }} sent{% if n.failed_count %}, {{ n.failed_count }} failed{% endif %}{% else %} · sending{% endif %}</div></div></li>{% endfor %}</ul>
+      {% else %}{% include "partials/empty.html" with icon="megaphone" title="No urgent texts yet" %}{% endif %}
+    </section></aside>
+  </div>
+{% endblock %}

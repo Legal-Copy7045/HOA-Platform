@@ -21,10 +21,12 @@ def w():
     }
 
 
-def test_defaults_reservations_off_everything_else_on():
+OFF_BY_DEFAULT = {"reservations", "push", "sms"}
+
+
+def test_defaults_reservations_alerts_off_everything_else_on():
     states = features.states()
-    assert states["reservations"] is False
-    assert all(v for k, v in states.items() if k != "reservations")
+    assert {k for k, v in states.items() if not v} == OFF_BY_DEFAULT
 
 
 def test_switched_off_feature_leaves_menu_and_pages_404(client, w):

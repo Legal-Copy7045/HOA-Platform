@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load portal app_alerts %}
 {% block title %}My profile · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>My profile</h1>{% if person %}<div class="meta"><span>{% icon "user" %}{{ person.display_name }}</span><span>{% icon "mail" %}{{ user.email }}</span></div>{% endif %}</div>
@@ -23,6 +23,7 @@
         <p><label><input type="checkbox" name="notices"> Send notices here (emails only)</label></p>
         <div class="form-actions"><button type="submit" class="secondary">Add</button></div>
       </form></section>{% endif %}
+      {% app_alerts_panel %}
       <section class="card"><h3>Your data</h3><p class="small muted">A JSON file of everything the portal holds about you.</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
   </div>
 {% endblock %}

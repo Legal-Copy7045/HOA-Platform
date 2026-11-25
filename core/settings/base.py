@@ -303,6 +303,36 @@ LEDGER_LATE_FEES_ENABLED = env.bool("LEDGER_LATE_FEES_ENABLED", default=True)
 # Online payments: "none" (placeholder) or "stripe" (hosted Checkout, later).
 PAYMENTS_PROVIDER = env("PAYMENTS_PROVIDER", default="none")
 
+# --- Installable app: push notifications (Milestone 4) ---------------------------------
+# Web Push (VAPID) keys: base64url, as printed by `manage.py generate_vapid_keys`.
+# Push is off while either key is empty (and while the board leaves the
+# "push" feature off). The subject is a mailto: or https: contact for the
+# push services.
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", default="")
+VAPID_SUBJECT = env("VAPID_SUBJECT", default="")
+# Push services the portal will post to (subscriptions elsewhere are refused,
+# so a browser cannot point the server at an arbitrary address).
+PUSH_ALLOWED_HOSTS = env.list(
+    "PUSH_ALLOWED_HOSTS",
+    default=[
+        "fcm.googleapis.com",
+        "updates.push.services.mozilla.com",
+        "push.services.mozilla.com",
+        "web.push.apple.com",
+        "notify.windows.com",
+    ],
+)
+
+# --- Text messages for urgent notices (Milestone 4) -------------------------------------
+# "none" (off) or "twilio" (Twilio's Messages API, or a compatible service at
+# SMS_API_BASE). Credentials from the environment only.
+SMS_PROVIDER = env("SMS_PROVIDER", default="none")
+SMS_ACCOUNT_SID = env("SMS_ACCOUNT_SID", default="")
+SMS_AUTH_TOKEN = env("SMS_AUTH_TOKEN", default="")
+SMS_FROM = env("SMS_FROM", default="")
+SMS_API_BASE = env("SMS_API_BASE", default="https://api.twilio.com")
+
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).
 EMAIL_BACKEND = "core.email.RedirectingBackend"
@@ -360,6 +390,9 @@ CONTENT_SECURITY_POLICY = {
         "frame-ancestors": ["'none'"],
         "base-uri": ["'none'"],
         "object-src": ["'none'"],
+        # Installable app: the service worker and manifest come from this site only.
+        "worker-src": ["'self'"],
+        "manifest-src": ["'self'"],
     },
 }
 
