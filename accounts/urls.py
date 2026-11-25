@@ -8,6 +8,8 @@ urlpatterns = [
     path("invite/<str:token>/", views.invite_landing, name="invite_landing"),
     path("account/enroll-code/", views.enroll_with_code, name="enroll_with_code"),
     path("account/setup-expired/", views.account_setup_expired, name="account_setup_expired"),
+    path("account/setup/done/", views.account_setup_done, name="account_setup_done"),
+    path("sign-in-help/", views.signin_help, name="signin_help"),
     path("board/invitations/", board_views.invitations, name="invitations"),
     path("board/people/<int:pk>/invite/", board_views.invite_person, name="invite_person"),
     re_path(

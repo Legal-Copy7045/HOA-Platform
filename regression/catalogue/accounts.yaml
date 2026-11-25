@@ -17,3 +17,6 @@
 - feature: "Login model, session invalidation and lockout"
   since: M1
   match: ["^unit:accounts/tests/test_user_model"]
+- feature: "Guided sign-in setup (step bar, passkey first, recovery codes with Print and I've saved them; no sidebar until done); labelled login page with the passkey first; sign-in help page naming the board contact; lockout wait from the setting"
+  since: M4
+  match: ["^unit:accounts/tests/test_signin_setup::test_", "^manual:(guided sign-in setup on a phone|recovery codes print)"]

@@ -32,7 +32,7 @@
         <div class="who-sub">{{ nav.roles|join:" · "|default:user.email }}</div>
         <div class="foot-links">
           <a href="{% url 'my_profile' %}">Profile</a>
-          <a href="{% url 'mfa_index' %}">Security</a>
+          <a href="{% url 'mfa_index' %}">Sign-in and security</a>
           <form method="post" action="{% url 'account_logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>
         </div>
       </div>

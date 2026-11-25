@@ -93,7 +93,7 @@
             {% if user|can:"arc.submit" %}<li><a class="title" href="{% url 'arc_list' %}">{% icon "pencil" %} Request approval for a project</a></li>{% endif %}
             <li><a class="title" href="{% url 'documents' %}">{% icon "folder" %} Governing documents</a></li>
             <li><a class="title" href="{% url 'my_profile' %}">{% icon "user" %} Update my contact details</a></li>
-            <li><a class="title" href="{% url 'mfa_index' %}">{% icon "lock" %} Passkeys and security</a></li>
+            <li><a class="title" href="{% url 'mfa_index' %}">{% icon "lock" %} Sign-in and security</a></li>
           </ul>
         </section>
       {% endif %}

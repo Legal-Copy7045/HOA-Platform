@@ -928,6 +928,7 @@ def update_profile(
     welcome_message: str | None = None,
     arc_form_return_to: str | None = None,
     arc_form_conditions: str | None = None,
+    signin_help_contact: str | None = None,
     actor,
     request: HttpRequest | None = None,
 ):
@@ -946,6 +947,8 @@ def update_profile(
             profile.arc_form_return_to = " ".join(arc_form_return_to.split())[:300]
         if arc_form_conditions is not None:
             profile.arc_form_conditions = arc_form_conditions.strip()[:3000]
+        if signin_help_contact is not None:
+            profile.signin_help_contact = " ".join(signin_help_contact.split())[:200]
         profile.save()
         _audit(
             "community.profile_changed", actor=actor, request=request, target=profile, metadata={}

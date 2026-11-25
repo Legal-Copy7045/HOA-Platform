@@ -1,0 +1,62 @@
+{# Local override of allauth's MFA page (UX review #2): the guided setup's step 2 while #}
+{# the account has no passkey or app, otherwise the "Sign-in and security" page. #}
+{% extends "allauth/layouts/base.html" %}
+{% load portal %}
+{% block head_title %}{% if signin_setup %}Set up your sign-in{% else %}Sign-in and security{% endif %}{% endblock head_title %}
+{% block content %}
+{% if signin_setup.step == 2 %}
+  {% include "accounts/_setup_steps.html" with steps=signin_setup.steps %}
+  <h1>Add a second way to prove it's you</h1>
+  <p>Every account needs one as well as a password, so nobody can get in with your password alone.</p>
+  <div class="setup-choices">
+    <a class="btn block setup-main" href="{% url 'mfa_add_webauthn' %}">{% icon "key" %}<span>Use this phone's fingerprint or face (passkey)</span></a>
+    <p class="small muted">Recommended. Nothing to type: next time, sign in with your fingerprint, face or screen lock.</p>
+    <a class="btn secondary block" href="{% url 'mfa_activate_totp' %}">Use an authenticator app instead</a>
+    <p class="small muted">An app on your phone shows a new 6-digit code every 30 seconds.</p>
+  </div>
+  <details>
+    <summary>What's this?</summary>
+    <p class="small">A <strong>passkey</strong> is a secure key your phone or computer keeps for this portal. You unlock it the way you unlock your device: fingerprint, face or PIN. It can't be guessed or phished, and there's nothing to remember.</p>
+    <p class="small">An <strong>authenticator app</strong> (for example Google Authenticator, Microsoft Authenticator, or your password manager) shows a short code you type after your password.</p>
+    <p class="small">An emailed sign-in code never counts: it only replaces the password, and you still need your passkey or app.</p>
+  </details>
+  <form method="post" action="{% url 'account_logout' %}" class="setup-signout" data-confirm="Sign out now? You'll need a new invitation or reset from the board to finish setting up.">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>
+{% elif signin_setup.step == 3 %}
+  {% include "accounts/_setup_steps.html" with steps=signin_setup.steps %}
+  <h1>Last step: save your recovery codes</h1>
+  <p>If you ever lose your phone or passkey, a recovery code lets you sign in once without it.</p>
+  <div class="form-actions">
+    {% if authenticators.recovery_codes %}<a class="btn block" href="{% url 'mfa_view_recovery_codes' %}">Show my recovery codes</a>
+    {% else %}<a class="btn block" href="{% url 'mfa_generate_recovery_codes' %}">Make my recovery codes</a>{% endif %}
+  </div>
+{% else %}
+  <div class="page-head"><div><h1>Sign-in and security</h1><p class="subtitle">How you prove it's you when you sign in. Keep at least one passkey or authenticator app.</p></div></div>
+  <div class="grid grid-2">
+    <section class="card"><h2>{% icon "key" %} Passkeys</h2>
+      {% with n=authenticators.webauthn|length %}
+      <p class="muted small">{% if n %}You have {{ n }} passkey{{ n|pluralize }}.{% else %}No passkeys yet. A passkey lets you sign in with your fingerprint, face or screen lock.{% endif %}</p>
+      <div class="form-actions">{% if n %}<a class="btn secondary" href="{% url 'mfa_list_webauthn' %}">Manage passkeys</a>{% endif %}<a class="btn{% if n %} secondary{% endif %}" href="{% url 'mfa_add_webauthn' %}">{% icon "plus" %} Add a passkey</a></div>
+      {% endwith %}
+    </section>
+    <section class="card"><h2>{% icon "clock" %} Authenticator app</h2>
+      {% if authenticators.totp %}<p class="muted small"><span class="badge tone-success">On</span> You type a 6-digit code from the app after your password.</p>
+        <div class="form-actions"><a class="btn danger" href="{% url 'mfa_deactivate_totp' %}">Turn off</a></div>
+      {% else %}<p class="muted small">Not set up. An app on your phone shows a new 6-digit code every 30 seconds.</p>
+        <div class="form-actions"><a class="btn secondary" href="{% url 'mfa_activate_totp' %}">Set up an authenticator app</a></div>{% endif %}
+    </section>
+    <section class="card"><h2>{% icon "lock" %} Recovery codes</h2>
+      {% if authenticators.recovery_codes %}
+        {% with unused=authenticators.recovery_codes.get_unused_codes|length %}
+        <p class="muted small">{{ unused }} unused code{{ unused|pluralize }} left. Each one signs you in once if you lose your phone or passkey.</p>
+        <div class="form-actions">{% if unused %}<a class="btn secondary" href="{% url 'mfa_view_recovery_codes' %}">Show codes</a>{% endif %}<a class="btn secondary" href="{% url 'mfa_generate_recovery_codes' %}">Make new codes</a></div>
+        {% endwith %}
+      {% else %}<p class="muted small">None yet.</p>{% if is_mfa_enabled %}<div class="form-actions"><a class="btn secondary" href="{% url 'mfa_generate_recovery_codes' %}">Make recovery codes</a></div>{% endif %}{% endif %}
+    </section>
+    <section class="card"><h2>{% icon "user" %} Password</h2>
+      <p class="muted small">A password alone never signs you in: you also need your passkey or authenticator app.</p>
+      <div class="form-actions"><a class="btn secondary" href="{% url 'account_change_password' %}">Change password</a></div>
+    </section>
+  </div>
+  <p class="small muted">Lost every passkey and your phone? Two board members can reset your sign-in. <a href="{% url 'signin_help' %}">How sign-in help works</a></p>
+{% endif %}
+{% endblock content %}

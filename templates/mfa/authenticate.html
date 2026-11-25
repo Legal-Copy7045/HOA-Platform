@@ -13,11 +13,12 @@
     {% element p %}
         Enter the 6-digit code from your authenticator app.
     {% endelement %}
+    <p class="small muted">Lost your phone? Type one of your recovery codes instead. <a href="{% url 'signin_help' %}">More help</a></p>
     {% url 'mfa_authenticate' as action_url %}
     {% element form form=form method="post" action=action_url %}
         {% slot body %}
             {% csrf_token %}
-            {% element fields form=form unlabeled=True %}
+            {% element fields form=form %}
             {% endelement %}
         {% endslot %}
         {% slot actions %}

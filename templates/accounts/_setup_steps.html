@@ -1,0 +1,2 @@
+{# The guided sign-in setup step bar (UX review #2). Pass steps=[{label, done, current}]. #}
+<ol class="steps setup-steps" aria-label="Setting up your sign-in">{% for s in steps %}<li class="{% if s.done %}done{% elif s.current %}current{% endif %}"{% if s.current %} aria-current="step"{% endif %}>{{ s.label }}{% if s.done %}<span class="sr-only"> (done)</span>{% endif %}</li>{% endfor %}</ol>

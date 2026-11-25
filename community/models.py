@@ -441,6 +441,9 @@ class CommunityProfile(models.Model):
     # and the conditions owners agree to. Set by the board; not hard-coded.
     arc_form_return_to = models.CharField(max_length=300, blank=True)
     arc_form_conditions = models.TextField(blank=True)
+    # Who owners contact about sign-in trouble (UX review): shown on the
+    # sign-in help page, which anyone can open, so association contacts only.
+    signin_help_contact = models.CharField(max_length=200, blank=True)
     # Letters and statements (Milestone 4): set by the board, never hard-coded.
     letterhead = models.TextField(
         blank=True, help_text="Lines at the top of letters, e.g. name, c/o manager, address, email."

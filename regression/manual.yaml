@@ -52,4 +52,11 @@
 - key: scanner reloads in place
   check: "On the VM, ClamAV runs with ConcurrentDatabaseReload disabled and memory stays near one signature copy during a reload."
   steps: "docker compose exec clamav clamconf -n | grep Concurrent (expect disabled); watch docker stats during a freshclam update; upload a test file just after and see it scanned once the reload finishes."
+- key: guided sign-in setup on a phone
+  check: "A new owner accepts an invitation on a phone and follows the three steps: password (show-password toggle works), 'Use this phone's fingerprint or face' creates a passkey, recovery codes shown; no menu until 'I've saved them'."
+  steps: "Invite a test person; open the link on an iPhone and an Android phone; finish all three steps; confirm the home page then shows the menu."
+  last: ""
+- key: recovery codes print
+  check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer)."
+  steps: "During setup or from Sign-in and security > Show codes, press Print and look at the print preview."
   last: ""

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load portal signin %}
+{% block title %}Sign-in help · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% signin_contact as contact %}{% enrollment_window as window %}
+  <h1>Sign-in help</h1>
+  <h2>I forgot my password</h2>
+  <p>We can email you a link to choose a new one. You'll still need your passkey or authenticator app afterwards.</p>
+  <div class="form-actions"><a class="btn secondary block" href="{% url 'account_reset_password' %}">{% icon "mail" %} Email me a password reset link</a></div>
+  <p class="small muted">Have a passkey? You don't need your password at all: use "Sign in with a passkey".</p>
+
+  <h2>I lost my phone or passkey</h2>
+  <p>Sign in with your password as usual. When asked for the 6-digit code, type one of your <strong>recovery codes</strong> instead. Then add a new passkey or app under "Sign-in and security".</p>
+  <p class="small muted">If you have a passkey on another device, you can use that instead.</p>
+
+  <h2>I have no recovery codes either</h2>
+  <p>The board can reset your sign-in. For your safety this takes <strong>two board members</strong>: one checks it's really you and starts the reset, and a second approves it. The second one then gives you a one-time code in person or by phone (never by email).</p>
+  <p>Next, sign in with your password, type that code, and add a new passkey or authenticator app within {{ window }}, in the same browser.</p>
+  <div class="alert info">{% icon "info" %}<span>{% if contact %}To start a reset, contact {{ contact }}.{% else %}To start a reset, contact a board member.{% endif %}</span></div>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+{% endblock %}

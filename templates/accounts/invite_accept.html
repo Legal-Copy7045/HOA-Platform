@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Create your account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <h1>Create your account</h1>
   <p>You're setting up the login for <strong>{{ email }}</strong>.</p>
-  <ol class="steps"><li class="current">Choose a passphrase</li><li>Add a passkey or authenticator app</li><li>Save your recovery codes</li></ol>
-  <p class="muted small">Use a long passphrase you don't use anywhere else: four or five unrelated words work well.</p>
-  <form method="post" novalidate>{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit" class="block">Create account</button></div></form>
+  <ol class="steps setup-steps" aria-label="Setting up your sign-in"><li class="current" aria-current="step">Choose a password</li><li>Add a passkey or app</li><li>Save recovery codes</li></ol>
+  <p class="muted small">Your password needs at least {{ form.min_length }} characters. That's the only rule: no symbols or numbers needed.</p>
+  <form method="post" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</span></div>{% endif %}
+    {% include "accounts/_password_field.html" with field=form.password1 minlength=form.min_length %}
+    {% include "accounts/_password_field.html" with field=form.password2 %}
+    <label class="choice show-password"><input type="checkbox" data-show-password="{{ form.password1.auto_id }} {{ form.password2.auto_id }}"> Show password</label>
+    <p class="small muted"><span class="required-mark" aria-hidden="true">*</span> required</p>
+    <div class="form-actions"><button type="submit" class="block">Save password and continue</button></div>
+  </form>
 {% endblock %}

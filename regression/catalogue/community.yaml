@@ -54,3 +54,6 @@
 - feature: "Board seats need a second board member in production (proposal, approval, withdraw; first seats exempt; off on the POC)"
   since: M3
   match: ["^unit:community/tests/test_seat_approval"]
+- feature: "Owner profile grouped into fieldsets (how to reach you, official notices, directory, email updates); reset approvals name the person, email, lot and who started it; declining a seat asks first"
+  since: M4
+  match: ["^unit:community/tests/test_profile_and_approvals_ux::test_"]

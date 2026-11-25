@@ -372,13 +372,28 @@ def nomination_decide(request, pk, decision):
     return _done(request, message, back)
 
 
-def _named(resets):
+def _named(resets, viewer):
+    """Who each reset is for (name, email, current lots) and who started it, so
+    the approving board member knows exactly whose authenticators go (UX review)."""
+    from community.models import Ownership
     from core.people import display_name
 
-    out = []
-    for r in resets:
+    out = list(resets)
+    lots: dict[int, list[str]] = {}
+    ownerships = (
+        Ownership.objects.for_user(viewer)
+        .active()
+        .filter(person__user_id__in={r.subject_id for r in out})
+        .select_related("lot", "person")
+        .order_by("lot__number")
+    )
+    for o in ownerships:
+        lots.setdefault(o.person.user_id, []).append(str(o.lot.number))
+    for r in out:
         r.subject_name = display_name(r.subject)
-        out.append(r)
+        r.subject_email = r.subject.email
+        r.subject_lots = lots.get(r.subject_id, [])
+        r.started_by_name = display_name(r.started_by)
     return out
 
 
@@ -404,7 +419,9 @@ def approvals(request):
         {
             "seat_proposals": seat_proposals,
             "nominations": [n for n in nominations if n.is_open],
-            "resets": _named(r for r in resets[:50] if r.status == "awaiting_approval"),
+            "resets": _named(
+                (r for r in resets[:50] if r.status == "awaiting_approval"), request.user
+            ),
             "me": request.user,
         },
     )
@@ -457,6 +474,7 @@ def community_settings(request):
                     "welcome_message": profile.welcome_message,
                     "arc_form_return_to": profile.arc_form_return_to,
                     "arc_form_conditions": profile.arc_form_conditions,
+                    "signin_help_contact": profile.signin_help_contact,
                 }
             ),
             "areas": CommonArea.objects.all(),

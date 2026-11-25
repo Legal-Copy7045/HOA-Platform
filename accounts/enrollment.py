@@ -14,10 +14,14 @@ import time
 from django.conf import settings
 
 SESSION_KEY = "mfa_enrollment_until"
+# How the window was opened ("invite" or "reset"): only changes the wording of
+# the first step in the guided setup. Grants nothing by itself.
+VIA_KEY = "mfa_enrollment_via"
 
 
-def grant(request) -> None:
+def grant(request, via: str = "invite") -> None:
     request.session[SESSION_KEY] = int(time.time()) + settings.MFA_ENROLLMENT_WINDOW_SECONDS
+    request.session[VIA_KEY] = "reset" if via == "reset" else "invite"
 
 
 def allowed(request) -> bool:
@@ -28,5 +32,10 @@ def allowed(request) -> bool:
     return until > time.time()
 
 
+def via(request) -> str:
+    return request.session.get(VIA_KEY) or "invite"
+
+
 def clear(request) -> None:
     request.session.pop(SESSION_KEY, None)
+    request.session.pop(VIA_KEY, None)

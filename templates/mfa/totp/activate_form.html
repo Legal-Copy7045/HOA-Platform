@@ -1,0 +1,32 @@
+{# Local override of allauth's authenticator-app page: plain steps, visible labels, #}
+{# and the setup step bar while the account is being set up (UX review #2). #}
+{% extends "allauth/layouts/base.html" %}
+{% load portal %}
+{% block head_title %}Set up an authenticator app{% endblock head_title %}
+{% block content %}
+  {% if signin_setup %}{% include "accounts/_setup_steps.html" with steps=signin_setup.steps %}{% endif %}
+  <h1>Set up an authenticator app</h1>
+  <form method="post" action="{% url 'mfa_activate_totp' %}" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{% for e in form.non_field_errors %}{{ e }} {% endfor %}</span></div>{% endif %}
+    <ol class="setup-list">
+      <li>Open an authenticator app on your phone, for example Google Authenticator, Microsoft Authenticator, or your password manager. Install one first if you need to.</li>
+      <li>In the app, add an account and scan this code.
+        <img class="totp-qr" src="{{ totp_svg_data_uri }}" alt="QR code for your authenticator app" width="200" height="200">
+        <details><summary>Can't scan it?</summary>
+          <p class="small">Type this key into the app instead:</p>
+          <p><code class="totp-secret" id="authenticator_secret">{{ form.secret }}</code></p>
+          <p class="small muted">Keep this key private.</p>
+        </details>
+      </li>
+      <li>
+        <div class="field{% if form.code.errors %} has-error{% endif %}">
+          <label for="id_code">Type the 6-digit code the app shows<span class="required-mark" aria-hidden="true">*</span></label>
+          <input type="text" name="code" id="id_code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required{% if form.code.errors %} aria-invalid="true" aria-describedby="id_code_errors"{% endif %}>
+          {% if form.code.errors %}<ul class="errorlist" id="id_code_errors" role="alert">{% for e in form.code.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </li>
+    </ol>
+    <div class="form-actions"><button type="submit" class="block">Turn on the app</button></div>
+  </form>
+  <p class="small">{% if signin_setup %}<a href="{% url 'mfa_index' %}">Back: use a passkey instead</a>{% else %}<a href="{% url 'mfa_index' %}">Back to sign-in and security</a>{% endif %}</p>
+{% endblock content %}

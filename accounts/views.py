@@ -6,9 +6,10 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from accounts import enrollment, services
+from accounts.auth import has_strong_authenticator
 from accounts.forms import AcceptInvitationForm
 from accounts.models import Invitation
 from core import policy
@@ -74,12 +75,8 @@ def invite_accept(request):
                 request, user, method="password", email=user.email, reauthenticated=True
             )
             login(request, user, backend="allauth.account.auth_backends.AuthenticationBackend")
-            enrollment.grant(request)
-            messages.success(
-                request,
-                "Welcome! One more step: set up a passkey or an authenticator app. "
-                "Every account needs one.",
-            )
+            enrollment.grant(request, via="invite")
+            messages.success(request, "Your password is saved.")
             return redirect("mfa_index")
     return render(request, "accounts/invite_accept.html", {"form": form, "email": invitation.email})
 
@@ -100,10 +97,8 @@ def enroll_with_code(request):
         if mfa_reset.redeem_code(
             user=request.user, code=request.POST.get("code", ""), request=request
         ):
-            enrollment.grant(request)
-            messages.success(
-                request, "Code accepted. Now set up a passkey or an authenticator app."
-            )
+            enrollment.grant(request, via="reset")
+            messages.success(request, "Code accepted.")
             return redirect("mfa_index")
         reset.refresh_from_db()
         error = "That code is not right."
@@ -114,6 +109,30 @@ def enroll_with_code(request):
 @require_GET
 def account_setup_expired(request):
     return render(request, "accounts/setup_expired.html", status=403)
+
+
+@never_cache
+@require_POST
+def account_setup_done(request):
+    """Step 3's "I've saved them": ends the guided setup in this session.
+
+    Closing the enrollment window early only narrows access; the middleware
+    already sends anyone without a passkey or app back to step 2.
+    """
+    if not request.user.is_authenticated:
+        return redirect("account_login")
+    if not has_strong_authenticator(request.user):
+        return redirect("mfa_index")
+    enrollment.clear(request)
+    messages.success(request, "You're all set. Next time, sign in with your passkey or password.")
+    return redirect("home")
+
+
+@never_cache
+@require_GET
+def signin_help(request):
+    """Forgot password or lost my phone: one of the sign-in steps, so no sign-in needed."""
+    return render(request, "accounts/signin_help.html")
 
 
 # --- Bulk onboarding (Milestone 4) ---------------------------------------------------

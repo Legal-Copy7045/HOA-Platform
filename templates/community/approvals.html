@@ -7,7 +7,7 @@
     {% if seat_proposals %}<ul class="list">{% for n in seat_proposals %}<li><div class="todo-icon tone-warning">{% icon "users" %}</div>
       <div class="grow"><div class="title">{{ n.person.display_name }}</div><div class="small muted">{{ n.get_seat_type_display }} · term from {{ n.term_start|date:"M j, Y" }}{% if n.citation %} · {{ n.citation }}{% endif %}</div></div>
       {% if n.nominated_by_id != me.pk and n.person.user_id != me.pk %}<form method="post" action="{% url 'seat_nomination_decide' n.pk 'approve' %}" class="inline" data-confirm="Record this board seat?">{% csrf_token %}<button type="submit" class="small">Approve</button></form>{% else %}<span class="muted small">Needs another board member</span>{% endif %}
-      <form method="post" action="{% url 'seat_nomination_decide' n.pk 'decline' %}" class="inline">{% csrf_token %}<button type="submit" class="danger small">{% if n.nominated_by_id == me.pk %}Withdraw{% else %}Decline{% endif %}</button></form></li>{% endfor %}</ul>
+      <form method="post" action="{% url 'seat_nomination_decide' n.pk 'decline' %}" class="inline" data-confirm="{% if n.nominated_by_id == me.pk %}Withdraw this board seat proposal?{% else %}Decline this board seat for {{ n.person.display_name }}?{% endif %}">{% csrf_token %}<button type="submit" class="danger small">{% if n.nominated_by_id == me.pk %}Withdraw{% else %}Decline{% endif %}</button></form></li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="check-circle" title="None waiting" %}{% endif %}
   </section>
   <section class="card"><h2>Sysadmin nominations</h2>
@@ -19,8 +19,8 @@
   </section>
   <section class="card"><h2>Sign-in resets</h2>
     {% if resets %}<ul class="list">{% for r in resets %}<li><div class="todo-icon tone-warning">{% icon "key" %}</div>
-      <div class="grow"><div class="title">Sign-in reset for {{ r.subject_name }}</div><div class="small muted">Identity checked by {{ r.get_verification_method_display|lower }} · started {{ r.started_at|date:"M j" }}</div></div>
-      {% if r.started_by_id != me.pk and r.subject_id != me.pk %}<form method="post" action="{% url 'reset_decide' r.pk 'approve' %}" class="inline" data-confirm="Approve? This removes all of their authenticators and signs them out everywhere.">{% csrf_token %}<button type="submit" class="small">Approve and show code</button></form>{% else %}<span class="muted small">Needs another board member</span>{% endif %}
+      <div class="grow"><div class="title">Sign-in reset for {{ r.subject_name }}</div><div class="small muted">{{ r.subject_email }} · {% if r.subject_lots %}Lot{{ r.subject_lots|length|pluralize }} {{ r.subject_lots|join:", " }}{% else %}no current lot{% endif %}</div><div class="small muted">Started by {{ r.started_by_name }} on {{ r.started_at|date:"M j" }} · identity checked by {{ r.get_verification_method_display|lower }}</div></div>
+      {% if r.started_by_id != me.pk and r.subject_id != me.pk %}<form method="post" action="{% url 'reset_decide' r.pk 'approve' %}" class="inline" data-confirm="Approve the reset for {{ r.subject_name }} ({{ r.subject_email }})? This removes all of their passkeys and authenticator apps and signs them out everywhere.">{% csrf_token %}<button type="submit" class="small">Approve and show code</button></form>{% else %}<span class="muted small">Needs another board member</span>{% endif %}
       <form method="post" action="{% url 'reset_decide' r.pk 'cancel' %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Cancel</button></form></li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="check-circle" title="None waiting" %}{% endif %}
   </section>
