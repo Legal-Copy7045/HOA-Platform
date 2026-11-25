@@ -7,9 +7,9 @@
   {% include "partials/list_tools.html" %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Project</th><th>Property</th><th>Status</th><th>Decision due</th></tr></thead>
-    <tbody>{% for r in rows %}<tr><td><a href="{% url 'arc_detail' r.pk %}">ARC-{{ r.pk }}</a></td><td><a href="{% url 'arc_detail' r.pk %}">{{ r.title }}</a></td><td>{{ r.lot.street_address|default:r.lot }}</td><td>{% status r.state %}</td><td class="nowrap">{{ r.review_due_on|date:"M j, Y"|default:"" }}</td></tr>
+    <tbody>{% for r in rows %}<tr><td><a href="{% url 'arc_detail' r.pk %}">ARC-{{ r.pk }}</a></td><td><a href="{% url 'arc_detail' r.pk %}">{{ r.title }}</a></td><td>{{ r.lot.street_address|default:r.lot }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.review_due_on|date:"M j, Y"|default:"" }}</td></tr>
     {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="pencil" title="No requests yet" text="Planning a fence, shed, deck, paint colour or other exterior change? Start a request below." %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% include "partials/pager.html" %}
-  {% if can_submit %}<details class="panel"{% if not rows %} open{% endif %}><summary>Start a new request</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% if form.only_lot %}<div class="field"><label>Property</label><p><strong>{{ form.only_lot.street_address|default:form.only_lot }}</strong></p></div>{% endif %}{{ form }}<div class="form-actions"><button type="submit">Create draft</button></div></form><p class="muted small">Drafts are only visible to you until you submit them.</p></div></details>{% endif %}
+  {% if can_submit %}<details class="panel"{% if not rows or form.errors %} open{% endif %}><summary>Start a new request</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% if form.only_lot %}<div class="field"><label>Property</label><p><strong>{{ form.only_lot.street_address|default:form.only_lot }}</strong></p></div>{% endif %}{{ form }}<div class="form-actions"><button type="submit">Create draft</button></div></form><p class="muted small">Drafts are only visible to you until you submit them.</p></div></details>{% endif %}
 {% endblock %}

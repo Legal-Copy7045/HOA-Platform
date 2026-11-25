@@ -25,7 +25,6 @@ from __future__ import annotations
 import contextlib
 import datetime
 import hashlib
-import secrets
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
@@ -46,7 +45,7 @@ from arc.models import (
     SignoffState,
 )
 from audit.services import record_event
-from comms.notify import send_now, send_update
+from comms.notify import send_update
 from community.models import Lot, Ownership
 from community.rules import rule
 from core import policy
@@ -331,17 +330,18 @@ def _owners_of(lot_id: int):
 
 
 def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
-    """Email every waiting neighbor: portal users get a sign-in link, everyone
-    else a single-use link. Emails carry only the link and the address of the
-    project, never the plans or anyone's details."""
+    """Email every waiting neighbor who has a portal login a link to their
+    review page. The page needs sign-in: there is no anonymous access to any
+    part of the portal (owner's rule, D24). Neighbors without a login, and
+    addresses outside the community, use the printed form. Emails carry only
+    the link and the project's address, never the plans or anyone's details."""
     _require_arrange(actor, req)
     base = settings.PORTAL_BASE_URL
-    sent = {"portal": 0, "link": 0, "no_contact": 0}
-    messages: list[tuple[str, str, bool]] = []  # (email, link, single-use link?)
+    sent = {"portal": 0, "no_contact": 0}
+    messages: list[tuple[str, str]] = []
     # A neighbor is emailed at most once a day, however often the button is
     # pressed (SEC-006).
     recent = timezone.now() - datetime.timedelta(hours=23)
-    expires = timezone.now() + datetime.timedelta(days=settings.SIGNOFF_LINK_DAYS)
     with transaction.atomic(), system_access("send signoffs"):
         pending = SignoffRequest.objects.select_for_update(of=("self",)).filter(
             arc_request=req, state=SignoffState.PENDING
@@ -349,49 +349,32 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
         for signoff in pending.select_related("lot"):
             if signoff.sent_at and signoff.sent_at > recent:
                 continue
-            portal_emails, link_emails = set(), set()
+            emails = set()
             if signoff.lot_id:
                 for o in _owners_of(signoff.lot_id):
                     user = o.person.user
-                    if user is not None:
-                        if user.is_active:  # a locked login gets no link (SEC-006)
-                            portal_emails.add(user.email)
-                    elif o.person.email:
-                        link_emails.add(o.person.email)
-            elif signoff.email:
-                link_emails.add(signoff.email)
-            token = None
-            if link_emails:
-                token = secrets.token_urlsafe(32)
-                SignoffRequest.objects.filter(pk=signoff.pk).update(
-                    token_hash=_hash(token), token_expires_at=expires
-                )
-            if not portal_emails and not link_emails:
+                    if user is not None and user.is_active:
+                        emails.add(user.email)
+            if not emails:
                 sent["no_contact"] += 1
                 continue
-            for email in portal_emails:
-                messages.append((email, base + reverse("signoff_detail", args=[signoff.pk]), False))
+            link = base + reverse("signoff_detail", args=[signoff.pk])
+            for email in emails:
+                messages.append((email, link))
                 sent["portal"] += 1
-            for email in link_emails:
-                messages.append((email, base + reverse("signoff_link", args=[token]), True))
-                sent["link"] += 1
             SignoffRequest.objects.filter(pk=signoff.pk).update(sent_at=timezone.now())
     where = single_line(req.lot.street_address)
     subject = f"[{settings.SITE_NAME}] Please review your neighbor's project"
-    for email, link, single_use in messages:
+    for email, link in messages:
         body = (
             f"Your neighbor at {where} is applying to the architectural committee for "
             "an exterior project. Before the committee reviews it, each neighbor is asked "
             "to acknowledge it, and may comment or object.\n\n"
-            f"Review the details and plans, and acknowledge, here:\n{link}\n\n"
+            f"Sign in to the portal to review the details and plans, and acknowledge:\n{link}\n\n"
             "Your acknowledgement and any comments go to the committee, which makes the "
             f"decision. If you did not expect this, you can ignore it.\n\n-- \n{settings.SITE_NAME}"
         )
-        if single_use:
-            # Never into the weekly digest: only the link's hash is stored (SEC-006).
-            send_now({email}, subject=subject, body=body)
-        else:
-            send_update({email}, subject=subject, body=body, link=link)
+        send_update({email}, subject=subject, body=body, link=link)
     record_event(
         "arc.signoffs_sent",
         actor=_user(actor),

@@ -9,7 +9,7 @@
     <tbody>{% for c, st in rows %}<tr>
       <td><a href="{% url 'contract_detail' c.pk %}">{{ c.title }}</a></td><td>{{ c.vendor }}</td><td>{{ c.get_schedule_display }}</td><td class="num">{{ c.amount_cap_cents|cents }}</td>
       <td>{% if c.state == "active" %}{% if st.this_period %}<a href="{% url 'invoice_detail' st.this_period.pk %}">{{ st.period }} received</a>{% else %}<span class="muted">{{ st.period }}: not yet</span>{% endif %}{% endif %}</td>
-      <td>{% status c.state %}{% if c.ends_on %} <span class="small muted">to {{ c.ends_on|date:"M j, Y" }}</span>{% endif %}</td></tr>
+      <td>{% status c.state c.get_state_display %}{% if c.ends_on %} <span class="small muted">to {{ c.ends_on|date:"M j, Y" }}</span>{% endif %}</td></tr>
     {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="file" title="No contracts yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% if can_manage %}<details class="panel"><summary>Enter a contract</summary><div class="panel-body">

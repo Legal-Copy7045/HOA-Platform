@@ -4,7 +4,7 @@
 {% block content %}
   <div class="crumbs"><a href="{% url 'requests' %}">Requests</a> / #{{ obj.pk }}</div>
   <div class="page-head"><div><h1>{{ obj.subject }}</h1>
-    <div class="meta">{% status obj.state %}<span>{{ obj.get_request_type_display }}</span><span>{% icon "pin" %}Lot {{ obj.lot.number }}</span>
+    <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_request_type_display }}</span><span>{% icon "pin" %}Lot {{ obj.lot.number }}</span>
       {% if obj.first_response_at %}<span>{% icon "check" %}Answered {{ obj.first_response_at|date:"M j" }}</span>{% elif obj.respond_by %}<span>{% icon "clock" %}{% if obj.is_overdue %}Response overdue since{% else %}Response expected by{% endif %} {{ obj.respond_by|date:"M j" }}</span>{% endif %}</div></div></div>
   <div class="split">
     <div>
@@ -21,7 +21,7 @@
         </section>
         {% if obj.sla_citation %}<section class="card"><h3>Response target</h3><p class="small muted">{{ obj.sla_citation }}</p></section>{% endif %}
       {% endif %}
-      {% if obj.work_order %}<section class="card"><h3>Work order</h3><p>{% if can_see_work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% else %}A work order has been raised.{% endif %} {% status obj.work_order.state %}</p></section>
+      {% if obj.work_order %}<section class="card"><h3>Work order</h3><p>{% if can_see_work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% else %}A work order has been raised.{% endif %} {% status obj.work_order.state obj.work_order.get_state_display %}</p></section>
       {% elif can_make_work_order %}<section class="card"><h3>Work order</h3><form method="post" action="{% url 'request_work_order' obj.pk %}">{% csrf_token %}<button type="submit" class="secondary">{% icon "wrench" %} Create a work order</button></form></section>{% endif %}
     </aside>
   </div>

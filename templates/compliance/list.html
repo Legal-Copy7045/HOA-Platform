@@ -7,7 +7,7 @@
   {% include "partials/list_tools.html" %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>#</th><th>Lot</th><th>Category</th><th>Status</th><th>Cure by</th></tr></thead>
-    <tbody>{% for v in rows %}<tr><td><a href="{% url 'violation_detail' v.pk %}">V-{{ v.pk }}</a></td><td>Lot {{ v.lot.number }}</td><td>{{ v.get_category_display }}</td><td>{% status v.state %}</td><td class="nowrap">{{ v.cure_by|date:"M j, Y"|default:"" }}</td></tr>
+    <tbody>{% for v in rows %}<tr><td><a href="{% url 'violation_detail' v.pk %}">V-{{ v.pk }}</a></td><td>Lot {{ v.lot.number }}</td><td>{{ v.get_category_display }}</td><td>{% status v.state v.get_state_display %}</td><td class="nowrap">{{ v.cure_by|date:"M j, Y"|default:"" }}</td></tr>
     {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="check-circle" title="No violations" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% include "partials/pager.html" %}

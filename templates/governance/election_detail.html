@@ -3,7 +3,7 @@
 {% block title %}{{ e.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'elections' %}">Elections</a> / {{ e.title }}</div>
-  <div class="page-head"><div><h1>{{ e.title }}</h1><div class="meta">{% status e.state %}<span>{{ e.seats }} seat{{ e.seats|pluralize }} · {{ e.term_years }}-year terms</span>{% if e.citation %}<span>{% icon "book" %}{{ e.citation }}</span>{% endif %}{% if e.meeting %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' e.meeting_id %}">{{ e.meeting.title }}</a></span>{% endif %}</div></div>
+  <div class="page-head"><div><h1>{{ e.title }}</h1><div class="meta">{% status e.state e.get_state_display %}<span>{{ e.seats }} seat{{ e.seats|pluralize }} · {{ e.term_years }}-year terms</span>{% if e.citation %}<span>{% icon "book" %}{{ e.citation }}</span>{% endif %}{% if e.meeting %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' e.meeting_id %}">{{ e.meeting.title }}</a></span>{% endif %}</div></div>
     {% if can_manage %}<div class="actions">
       {% if e.state == "nominations" %}<form method="post" action="{% url 'election_action' e.pk 'open' %}" data-confirm="Close nominations and open voting?">{% csrf_token %}<button type="submit">Open voting</button></form>{% endif %}
       {% if e.state == "voting" %}<form method="post" action="{% url 'election_action' e.pk 'close' %}" data-confirm="Close voting now?">{% csrf_token %}<button type="submit">Close voting</button></form>{% endif %}

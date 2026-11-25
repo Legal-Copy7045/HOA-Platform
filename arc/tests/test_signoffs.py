@@ -144,61 +144,58 @@ def test_only_the_applicant_or_arc_staff_arrange(w):
 # --- Sending and answering ----------------------------------------------------------------
 
 
-def test_portal_users_get_a_sign_in_link_others_a_single_use_link(
-    w, django_capture_on_commit_callbacks
-):
-    sent = _send(w, django_capture_on_commit_callbacks)
-    assert sent == {"portal": 1, "link": 1, "no_contact": 0}
-    by_to = {m.to[0]: m for m in mail.outbox}
-    assert "/signoffs/" in by_to[w["neighbor"].email].body
-    assert _link_token(by_to["pat.paper@example.com"])
-    for m in mail.outbox:
-        assert "4 ft aluminium" not in m.body  # details only behind the link
-
-
-def test_single_use_link_shows_the_request_and_works_once(
+def test_only_neighbors_with_a_login_are_emailed_and_the_link_needs_sign_in(
     client, w, django_capture_on_commit_callbacks
 ):
-    _send(w, django_capture_on_commit_callbacks)
-    token = _link_token(next(m for m in mail.outbox if m.to == ["pat.paper@example.com"]))
-    page = client.get(reverse("signoff_link", args=[token]))
-    assert page.status_code == 200 and b"4 ft aluminium" in page.content
-    assert b"plans.pdf" in page.content
-    response = client.post(
-        reverse("signoff_link", args=[token]),
-        {"position": "objected", "signer_name": "Pat Paper", "comment": "Blocks my view"},
-    )
-    assert b"Thank you" in response.content
+    sent = _send(w, django_capture_on_commit_callbacks)
+    # The neighbor without a login answers on the printed form (D24).
+    assert sent == {"portal": 1, "no_contact": 1}
+    (message,) = mail.outbox
+    assert message.to == [w["neighbor"].email]
     with system_access("t"):
-        signoff = SignoffRequest.objects.get(lot=w["paper_lot"])
-    assert signoff.state == "objected" and signoff.token_hash == ""  # nosec B105 - asserting a cleared hash
-    assert client.get(reverse("signoff_link", args=[token])).status_code == 404
-    assert client.get(reverse("signoff_link", args=["x" * 43])).status_code == 404
+        row = SignoffRequest.objects.get(lot=w["portal_lot"])
+    assert reverse("signoff_detail", args=[row.pk]) in message.body
+    assert "4 ft aluminium" not in message.body  # details only behind sign-in
+    response = client.get(reverse("signoff_detail", args=[row.pk]))
+    assert response.status_code == 302 and "/accounts/login/" in response["Location"]
 
 
-def test_link_downloads_plans_but_not_signed_forms(client, w, django_capture_on_commit_callbacks):
+def test_neighbor_downloads_plans_but_not_signed_forms(
+    client, w, django_capture_on_commit_callbacks
+):
     from documents.attachments import attachments_for
 
     _send(w, django_capture_on_commit_callbacks)
     signed = attach(w["req"], pdf("signed.pdf"), actor=w["board"], label="Signed sign-off form")
-    token = _link_token(next(m for m in mail.outbox if m.to == ["pat.paper@example.com"]))
+    with system_access("t"):
+        row = SignoffRequest.objects.get(lot=w["portal_lot"])
     plans = attachments_for(w["req"]).get(original_filename="plans.pdf")
-    ok = client.get(reverse("signoff_link_file", args=[token, plans.pk]))
-    assert ok.status_code == 200
-    assert client.get(reverse("signoff_link_file", args=[token, signed.pk])).status_code == 404
+    client.force_login(w["neighbor"])
+    assert client.get(reverse("signoff_file", args=[row.pk, plans.pk])).status_code == 200
+    assert client.get(reverse("signoff_file", args=[row.pk, signed.pk])).status_code == 404
 
 
-def test_link_expires(client, w, django_capture_on_commit_callbacks):
-    import datetime
+def test_an_old_emailed_link_sends_the_owner_to_sign_in_then_their_page(client, w):
+    import secrets
 
-    from django.utils import timezone
-
-    _send(w, django_capture_on_commit_callbacks)
-    token = _link_token(next(m for m in mail.outbox if m.to == ["pat.paper@example.com"]))
-    SignoffRequest.objects.unscoped("t").filter(lot=w["paper_lot"]).update(
-        token_expires_at=timezone.now() - datetime.timedelta(minutes=1)
-    )
+    token = secrets.token_urlsafe(32)
+    with system_access("t"):
+        row = SignoffRequest.objects.get(lot=w["portal_lot"])
+        SignoffRequest.objects.filter(pk=row.pk).update(
+            token_hash=signoffs._hash(token),
+            token_expires_at=__import__("django.utils.timezone").utils.timezone.now()
+            + __import__("datetime").timedelta(days=3),
+            sent_at=__import__("django.utils.timezone").utils.timezone.now(),
+        )
+    arc.ArcRequest.objects.unscoped("t").filter(pk=w["req"].pk).update(state="neighbors")
+    anonymous = client.get(reverse("signoff_link", args=[token]))
+    assert anonymous.status_code == 302 and "/accounts/login/" in anonymous["Location"]
+    client.force_login(w["outsider"])  # forwarded to someone else: nothing
     assert client.get(reverse("signoff_link", args=[token])).status_code == 404
+    client.force_login(w["neighbor"])
+    response = client.get(reverse("signoff_link", args=[token]))
+    assert response.status_code == 302
+    assert response["Location"] == reverse("signoff_detail", args=[row.pk])
 
 
 def test_portal_neighbor_answers_others_cannot(client, w, django_capture_on_commit_callbacks):
@@ -391,12 +388,18 @@ def test_board_review_waits_for_every_acknowledgement(
         portal_row, position="approved", signer_name="Nina", channel="portal", actor=w["neighbor"]
     )
     assert _req_state(w) == "neighbors"
-    token = _link_token(by_to["pat.paper@example.com"])
+    assert "pat.paper@example.com" not in by_to  # no login: the printed form
+    with system_access("t"):
+        paper_row = SignoffRequest.objects.get(lot=w["paper_lot"])
     mail.outbox.clear()
     with django_capture_on_commit_callbacks(execute=True):
-        client.post(
-            reverse("signoff_link", args=[token]),
-            {"position": "objected", "signer_name": "Pat Paper", "comment": "Too tall"},
+        signoffs.respond(
+            paper_row,
+            position="objected",
+            signer_name="Pat Paper",
+            comment="Too tall",
+            channel="paper",
+            actor=w["board"],
         )
     assert _req_state(w) == "submitted"
     assert any(m.to == [w["applicant"].email] for m in mail.outbox)
@@ -518,22 +521,18 @@ def test_neighbors_do_not_see_a_draft_or_a_closed_request(
     with django_capture_on_commit_callbacks(execute=True):
         arc.ARC.apply(w["req"], "request_acknowledgements", actor=w["applicant"])
     assert client.get(reverse("signoff_detail", args=[row.pk])).status_code == 200
-    token = _link_token(next(m for m in mail.outbox if m.to == ["pat.paper@example.com"]))
     arc.ARC.apply(w["req"], "withdraw", actor=w["applicant"])
     assert client.get(reverse("signoff_detail", args=[row.pk])).status_code == 404
-    assert client.get(reverse("signoff_link", args=[token])).status_code == 404
 
 
-def test_reminders_at_most_daily_and_links_never_in_the_digest(
-    w, django_capture_on_commit_callbacks
-):
+def test_reminders_at_most_daily(w, django_capture_on_commit_callbacks):
     from comms.models import DigestItem
 
     _send(w, django_capture_on_commit_callbacks)
     first = len(mail.outbox)
     with django_capture_on_commit_callbacks(execute=True):
         again = signoffs.send_signoffs(w["req"], actor=w["applicant"])
-    assert again == {"portal": 0, "link": 0, "no_contact": 0} and len(mail.outbox) == first
+    assert again == {"portal": 0, "no_contact": 1} and len(mail.outbox) == first
     assert not DigestItem.objects.filter(link__contains="/s/").exists()
 
 

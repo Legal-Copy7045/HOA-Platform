@@ -3,6 +3,6 @@
 {% block title %}Neighbor acknowledgements · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Neighbor acknowledgements</h1><p class="subtitle">Neighbors planning exterior projects ask you to review and acknowledge them. You can comment, or object.</p></div></div>
-  <section class="card">{% if rows %}<ul class="list">{% for s in rows %}<li><div class="grow"><a class="title" href="{% url 'signoff_detail' s.pk %}">{{ s.arc_request.title }}</a><div class="small muted">{{ s.arc_request.lot.street_address }} · asked about {{ s.label }}</div></div>{% status s.state %}</li>{% endfor %}</ul>
+  <section class="card">{% if rows %}<ul class="list">{% for s in rows %}<li><div class="grow"><a class="title" href="{% url 'signoff_detail' s.pk %}">{{ s.arc_request.title }}</a><div class="small muted">{{ s.arc_request.lot.street_address }} · asked about {{ s.label }}</div></div>{% status s.state s.get_state_display %}</li>{% endfor %}</ul>
   {% else %}{% include "partials/empty.html" with icon="users" title="Nothing to acknowledge" text="When a neighbor asks you to acknowledge a project, it appears here." %}{% endif %}</section>
 {% endblock %}

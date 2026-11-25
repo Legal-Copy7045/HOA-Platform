@@ -317,40 +317,23 @@ def _answer_context(signoff, *, can_answer, token=None):
 # --- The single-use emailed link (no login) ------------------------------------------
 
 
+@login_required
 def signoff_link(request, token):
+    """Links emailed before sign-in became mandatory (D24): after signing in,
+    an owner of the neighboring lot goes to their review page. Nobody sees
+    anything without signing in."""
     signoff = signoffs.signoff_for_token(token)
-    if signoff is None:
+    if signoff is None or signoff.lot_id not in policy.roles_for(request.user).owned_lot_ids:
         return render(request, "arc/signoff_link_expired.html", status=404)
-    if request.method == "POST":
-        try:
-            signoffs.respond(
-                signoff,
-                position=request.POST.get("position", ""),
-                signer_name=request.POST.get("signer_name", ""),
-                comment=request.POST.get("comment", ""),
-                channel=SignoffChannel.LINK,
-                request=request,
-            )
-        except signoffs.SignoffError as exc:
-            messages.error(request, str(exc))
-            return render(
-                request,
-                "arc/signoff_answer.html",
-                _answer_context(signoff, can_answer=True, token=token),
-            )
-        return render(request, "arc/signoff_thanks.html")
-    return render(
-        request, "arc/signoff_answer.html", _answer_context(signoff, can_answer=True, token=token)
-    )
+    return redirect("signoff_detail", pk=signoff.pk)
 
 
+@login_required
 def signoff_link_file(request, token, file_id):
     signoff = signoffs.signoff_for_token(token)
-    if signoff is None:
+    if signoff is None or signoff.lot_id not in policy.roles_for(request.user).owned_lot_ids:
         raise Http404
-    return attachments.serve(
-        request, signoff.arc_request, file_id, exclude_labels=SIGNED_FORM_LABELS
-    )
+    return redirect("signoff_file", pk=signoff.pk, file_id=file_id)
 
 
 # --- Board: the adjacency list ---------------------------------------------------------

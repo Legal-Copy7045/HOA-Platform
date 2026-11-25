@@ -4,7 +4,7 @@
 {% block content %}
   <div class="crumbs"><a href="{% url 'arc_list' %}">Architectural review</a> / ARC-{{ obj.pk }}</div>
   <div class="page-head"><div><h1>{{ obj.title }}</h1>
-    <div class="meta">{% status obj.state %}<span>{% icon "home" %}Lot {{ obj.lot.number }}</span>{% if obj.review_due_on %}<span>{% icon "clock" %}Decision due {{ obj.review_due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.appeal_due_on %}<span>Appeal by {{ obj.appeal_due_on|date:"M j, Y" }}</span>{% endif %}</div></div></div>
+    <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.street_address|default:obj.lot }}</span>{% if obj.review_due_on %}<span>{% icon "clock" %}Decision due {{ obj.review_due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.appeal_due_on %}<span>Appeal by {{ obj.appeal_due_on|date:"M j, Y" }}</span>{% endif %}</div></div></div>
   {% if recused %}<div class="alert warning">{% icon "alert" %}<span>You are recused from this request (you are the applicant or own an affected lot). Deliberations are hidden and you cannot decide.</span></div>{% endif %}
   <div class="split">
     <div>

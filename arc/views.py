@@ -129,8 +129,9 @@ def arc_list(request):
                 messages.success(request, "Draft created. Attach plans or photos, then submit.")
                 return redirect("arc_detail", pk=req.pk)
         else:
-            messages.error(request, "Check the form.")
-        return redirect("arc_list")
+            # Show the form again with what was typed and the errors beside
+            # each field, instead of throwing the input away.
+            messages.error(request, "Please check the highlighted fields.")
     from core.lists import csv_response, filter_list, paginate, wants_csv
     from core.scoping import own_records, wants_mine
 

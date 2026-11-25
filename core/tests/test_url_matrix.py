@@ -41,10 +41,10 @@ PUBLIC = {
     "invite_accept",
     "account_setup_expired",
     "login_background_image",
-    # Single-use sign-off links: the 256-bit token is the credential.
-    "signoff_link",
-    "signoff_link_file",
 }
+# Links emailed before sign-in became mandatory (D24): sign-in first, then
+# only the neighboring lot's owner is sent on to their review page.
+OLD_EMAIL_LINKS = {"signoff_link", "signoff_link_file"}
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")
@@ -248,7 +248,13 @@ def test_every_named_url_is_classified():
     unclassified = {
         name
         for name in _named_urls()
-        if name not in PUBLIC | OWN_ACCOUNT | MEMBER_PAGES | set(PROTECTED) | set(COMMUNITY_DETAIL)
+        if name
+        not in PUBLIC
+        | OLD_EMAIL_LINKS
+        | OWN_ACCOUNT
+        | MEMBER_PAGES
+        | set(PROTECTED)
+        | set(COMMUNITY_DETAIL)
         and not name.startswith(OWN_ACCOUNT_PREFIXES)
     }
     assert unclassified == set(), f"Classify these URLs in {__name__}: {sorted(unclassified)}"
@@ -590,6 +596,16 @@ def test_anonymous_visitors_are_sent_to_sign_in(client, world, name):
     method, key = PROTECTED[name]
     url = _url(name, key, world["targets"])
     response = client.get(url) if method == "GET" else client.post(url, {})
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("account_login"))
+
+
+@pytest.mark.parametrize("name", sorted(OLD_EMAIL_LINKS))
+def test_no_anonymous_access_through_emailed_links(client, world, name):
+    kwargs = {"token": "x" * 43}
+    if name == "signoff_link_file":
+        kwargs["file_id"] = 1
+    response = client.get(reverse(name, kwargs=kwargs))
     assert response.status_code == 302
     assert response["Location"].startswith(reverse("account_login"))
 

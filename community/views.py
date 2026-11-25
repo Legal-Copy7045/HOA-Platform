@@ -434,7 +434,8 @@ def community_settings(request):
             {
                 "spec": spec,
                 "row": row,
-                "raw": raw,
+                # Money is typed in dollars, like every other money field.
+                "raw": _dollars(raw) if spec.kind == "cents" and raw.lstrip("-").isdigit() else raw,
                 "shown": shown,
                 "guide": guide,
                 "origin": origin,
@@ -465,11 +466,31 @@ def community_settings(request):
     )
 
 
+def _dollars(cents_text: str) -> str:
+    cents = int(cents_text)
+    sign = "-" if cents < 0 else ""
+    return f"{sign}{abs(cents) // 100}.{abs(cents) % 100:02d}"
+
+
 @login_required
 @require_POST
 def community_rule_save(request):
     policy.require(request.user, "community.manage_rules")
-    form = forms.RuleForm(request.POST)
+    from community.rules import REGISTRY
+    from core.money import parse_cents
+
+    data = request.POST.copy()
+    spec = REGISTRY.get(data.get("key", ""))
+    if spec is not None and spec.kind == "cents" and (data.get("value") or "").strip():
+        try:
+            data["value"] = str(parse_cents(data["value"]))
+        except ValueError:
+            return _failed(
+                request,
+                CommunityError("Enter the amount in dollars, e.g. 75.00."),
+                reverse("community_settings"),
+            )
+    form = forms.RuleForm(data)
     back = reverse("community_settings")
     if not form.is_valid():
         return _invalid(request, form, back)

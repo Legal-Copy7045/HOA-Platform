@@ -5,7 +5,7 @@
   {% if signoff.rows %}<ul class="list">{% for s in signoff.rows %}<li>
     <div class="grow"><div class="title">{{ s.label }}{% if s.locked %} <span class="small muted">· neighbor</span>{% endif %}</div>
       <div class="small muted">{% with last=s.last_response %}{% if last %}{{ last.get_position_display }} · {{ last.signer_name }} · {{ last.get_channel_display|lower }}{% if last.comment %} · “{{ last.comment|truncatechars:120 }}”{% endif %}{% else %}Waiting{% if s.sent_at %} · asked {{ s.sent_at|date:"M j" }}{% else %} · not asked yet{% endif %}{% endif %}{% endwith %}</div></div>
-    {% status s.state %}
+    {% status s.state s.get_state_display %}
     {% if signoff_can_arrange and s.state == "pending" %}{% if not s.locked or signoff_board %}<form method="post" action="{% url 'arc_signoff_action' obj.pk 'withdraw' %}"{% if s.locked %} data-confirm="Remove this neighbor from the list? Only the board can do this."{% endif %}>{% csrf_token %}<input type="hidden" name="signoff" value="{{ s.pk }}"><button type="submit" class="secondary small">Remove</button></form>{% endif %}{% endif %}
   </li>{% endfor %}</ul>{% else %}<p class="muted small">No neighbors on the list.</p>{% endif %}
   {% if signoff_can_arrange %}
@@ -16,13 +16,13 @@
     </div>
     <details class="panel"><summary>Ask another homeowner</summary><div class="panel-body">
       <form method="post" action="{% url 'arc_signoff_action' obj.pk 'add_lot' %}" class="inline-form">{% csrf_token %}<label>Homeowner <select name="lot" required><option value="">Choose an address...</option>{% for pk, label in signoff_lot_choices %}<option value="{{ pk }}">{{ label }}</option>{% endfor %}</select></label><button type="submit" class="secondary small">Add</button></form>
-      <p class="small muted">Their name and address come from the association's records; they are emailed a review link.</p>
+      <p class="small muted">Their name and address come from the association's records. If they have a portal login they are emailed a link to sign in and review; otherwise use the printed form.</p>
     </div></details>
     <details class="panel"><summary>Ask someone outside the community</summary><div class="panel-body">
+      <p class="small muted">They answer on the printed form (the portal is for members only).</p>
       <form method="post" action="{% url 'arc_signoff_action' obj.pk 'add_address' %}">{% csrf_token %}
         <p><label>Name <input type="text" name="name" maxlength="200"></label></p>
         <p><label>Address <input type="text" name="address" maxlength="300" required placeholder="e.g. 136 Oak Creek Drive"></label></p>
-        <p><label>Email (for a review link; optional) <input type="email" name="email" maxlength="254"></label></p>
         <div class="form-actions"><button type="submit" class="secondary small">Add</button></div></form>
     </div></details>
     <details class="panel"><summary>Neighbor not online? Use the paper form</summary><div class="panel-body">

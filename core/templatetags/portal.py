@@ -113,6 +113,7 @@ _LABELS = {
     "in_progress": "In progress",
     "submitted": "Submitted",
     "referred": "Referred to counsel",
+    "neighbors": "Awaiting neighbor acknowledgements",
 }
 
 

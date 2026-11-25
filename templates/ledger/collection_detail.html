@@ -5,7 +5,7 @@
   {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'collections' %}">Collections</a> / Case #{{ obj.pk }}</div>
   <div class="page-head">
-    <div><h1>Collection case #{{ obj.pk }}</h1><div class="meta">{% status obj.state %}<a href="{% url 'lot_ledger' obj.lot_id %}">Lot {{ obj.lot.number }} account</a></div></div>
+    <div><h1>Collection case #{{ obj.pk }}</h1><div class="meta">{% status obj.state obj.get_state_display %}<a href="{% url 'lot_ledger' obj.lot_id %}">Lot {{ obj.lot.number }} account</a></div></div>
     <div class="actions"><div class="amount-big">{{ balance|cents }}</div></div>
   </div>
   <div class="split">

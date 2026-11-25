@@ -5,7 +5,7 @@
   {% include "governance/gov_nav.html" %}
   <div class="page-head"><div><h1>Board elections</h1><p class="subtitle">Owners nominate owners; one ballot per lot, in person online or by proxy.</p></div></div>
   <div class="split"><div>
-    <section class="card">{% if rows %}<ul class="list">{% for e in rows %}<li><a class="grow title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a><span class="small muted">{{ e.seats }} seat{{ e.seats|pluralize }}</span>{% status e.state %}</li>{% endfor %}</ul>
+    <section class="card">{% if rows %}<ul class="list">{% for e in rows %}<li><a class="grow title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a><span class="small muted">{{ e.seats }} seat{{ e.seats|pluralize }}</span>{% status e.state e.get_state_display %}</li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="users" title="No elections yet" %}{% endif %}</section></div>
     {% if can_manage %}<aside><section class="card"><h2>New election</h2><form method="post">{% csrf_token %}
       <p><label>Title <input type="text" name="title" maxlength="200" required placeholder="2027 board election"></label></p>

@@ -72,7 +72,13 @@ def test_board_owner_raises_their_own_arc_from_the_homeowner_side(client, w):
     assert b"Start a new request" not in board
     response = client.post(
         reverse("arc_list"),
-        {"lot": w["lot"].pk, "title": "My fence", "description": "Rear, 4 ft"},
+        {
+            "lot": w["lot"].pk,
+            "title": "My fence",
+            "description": "Rear, 4 ft",
+            "project_type": "Fence",
+            "planned_start": "2027-04-01",
+        },
     )
     assert response.status_code == 302
 
@@ -247,3 +253,22 @@ def test_demo_make_me_owner(settings, w):
     settings.SEED_DEMO_ALLOWED = False
     with pytest.raises(CommandError, match="demo deployment"):
         call_command("demo_make_me_owner", email="officer@example.com", lot=demo_lot.number)
+
+
+def test_an_invalid_arc_form_keeps_what_was_typed(client, w):
+    client.force_login(w["owner"])
+    response = client.post(
+        reverse("arc_list"),
+        {"lot": w["other"].pk, "title": "Long typed title", "description": "A long description"},
+    )
+    assert response.status_code == 200
+    page = response.content.decode()
+    assert "A long description" in page and "Long typed title" in page
+    assert "This field is required" in page  # the missing kind and start are marked
+
+
+def test_badges_use_the_records_own_words(client, w):
+    from core.templatetags.portal import status
+
+    assert "Awaiting neighbor acknowledgements" in status("neighbors")
+    assert "no objection" in status("approved", "Acknowledged, no objection")
