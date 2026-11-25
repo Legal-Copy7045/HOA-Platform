@@ -125,7 +125,7 @@ def test_five_wrong_codes_lock_the_reset(client, owner, board_a, board_b):
 
 def test_expired_code_cannot_be_used(client, owner, board_a, board_b):
     reset, code = approved_reset(owner, board_a, board_b)
-    MfaReset.objects.filter(pk=reset.pk).update(
+    MfaReset.objects.unscoped("test").filter(pk=reset.pk).update(
         code_expires_at=timezone.now() - timedelta(minutes=1)
     )
     owner.refresh_from_db()  # approval bumped session_generation

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Sysadmin activity · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Sysadmin activity</h1>
+  <p class="muted">Everything done by anyone holding the sysadmin role, every change to who holds it, and every break-glass command run on the server. Most recent first.</p>
+  <table>
+    <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr><td>{{ e.occurred_at|date:"Y-m-d H:i" }}</td><td>{% if e.actor %}{{ e.actor.email }}{% else %}{{ e.get_actor_type_display }}{% endif %}{% if e.channel != "web" %} <span class="muted">({{ e.get_channel_display }})</span>{% endif %}</td>
+        <td>{{ e.action }}</td><td class="muted">{% for k, v in e.metadata.items %}{{ k }}={{ v }} {% endfor %}</td></tr>
+    {% empty %}<tr><td class="muted">No sysadmin activity recorded.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

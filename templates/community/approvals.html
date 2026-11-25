@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Approvals · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Approvals</h1>
+  <p class="muted">These need a second board member: whoever started a request cannot approve it.</p>
+  <h2>Sysadmin nominations</h2>
+  <table><tbody>
+    {% for n in nominations %}
+      <tr><td>{{ n.person.display_name }}</td><td class="muted">nominated {{ n.nominated_at|date:"M j" }}, expires {{ n.expires_at|date:"M j" }}</td>
+        <td>{% if n.nominated_by_id != me.pk and n.person.user_id != me.pk %}<form method="post" action="{% url 'nomination_decide' n.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit">Approve</button></form>{% else %}<span class="muted">needs another board member</span>{% endif %}
+          <form method="post" action="{% url 'nomination_decide' n.pk 'decline' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Decline</button></form></td></tr>
+    {% empty %}<tr><td class="muted">None waiting.</td></tr>{% endfor %}
+  </tbody></table>
+  <h2>Sign-in resets</h2>
+  <table><tbody>
+    {% for r in resets %}
+      <tr><td>Account #{{ r.subject_id }}</td><td class="muted">identity checked by: {{ r.get_verification_method_display }}; started {{ r.started_at|date:"M j" }}</td>
+        <td>{% if r.started_by_id != me.pk and r.subject_id != me.pk %}<form method="post" action="{% url 'reset_decide' r.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit">Approve and show code</button></form>{% else %}<span class="muted">needs another board member</span>{% endif %}
+          <form method="post" action="{% url 'reset_decide' r.pk 'cancel' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Cancel</button></form></td></tr>
+    {% empty %}<tr><td class="muted">None waiting.</td></tr>{% endfor %}
+  </tbody></table>
+{% endblock %}

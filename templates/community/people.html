@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}People · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>People</h1>
+  <table>
+    <thead><tr><th>Name</th><th>Login</th></tr></thead>
+    <tbody>{% for p in people %}<tr><td><a href="{% url 'person_detail' p.pk %}">{{ p.display_name }}</a></td><td>{% if p.user_id %}yes{% else %}<span class="muted">not yet</span>{% endif %}</td></tr>{% endfor %}</tbody>
+  </table>
+  <h2>Add a person</h2>
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Add</button></form>
+{% endblock %}

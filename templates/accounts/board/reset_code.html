@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Enrollment code · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Reset approved</h1>
+  <p>The account's authenticators were removed and it was signed out everywhere.</p>
+  <p>Give this code to the person <strong>directly</strong>: in person or by phone to the number on file. Never by email or text.</p>
+  <p class="secret">{{ code }}</p>
+  <p class="muted">It works once, within 24 hours. This is the only time it is shown; it is not stored.</p>
+  <p><a href="{% url 'approvals' %}">Back to approvals</a></p>
+{% endblock %}

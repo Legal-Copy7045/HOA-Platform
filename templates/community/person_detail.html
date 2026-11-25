@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ person.display_name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>{{ person.display_name }}</h1>
+  <p class="muted">{{ person.email|default:"No email on file" }}</p>
+
+  <h2>Login</h2>
+  {% if person.user_id %}
+    <p>Has a login. MFA: {% if has_mfa %}enrolled{% else %}<strong>not enrolled</strong>{% endif %}.</p>
+    {% if not is_me %}
+      <details><summary>Start a sign-in reset (lost authenticator)</summary>
+        <p class="muted">Only after confirming it really is them. A different board member must approve.</p>
+        <form method="post" action="{% url 'reset_start' person.pk %}">{% csrf_token %}{{ reset_form.as_p }}<button type="submit">Start reset</button></form>
+      </details>
+    {% endif %}
+  {% else %}
+    <form method="post" action="{% url 'invite_person' person.pk %}">{% csrf_token %}{{ invite_form.as_p }}<button type="submit">Send invitation</button></form>
+    {% for inv in invitations %}<p class="muted">Invitation {{ inv.status }} (created {{ inv.created_at|date:"M j" }})</p>{% endfor %}
+  {% endif %}
+
+  <h2>Ownership</h2>
+  <table><tbody>
+    {% for o in ownerships %}
+      <tr><td><a href="{% url 'lot_detail' o.lot_id %}">{{ o.lot }}</a></td><td>{{ o.get_ownership_type_display }}</td><td>{{ o.start_date }} to {{ o.end_date|default:"present" }}</td>
+        <td>{% if not o.end_date %}<form method="post" action="{% url 'ownership_end' o.pk %}" class="inline">{% csrf_token %}<input type="hidden" name="back" value="person"><input type="date" name="end_date" required aria-label="End date"><button type="submit">End</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if not is_me %}<details><summary>Record an ownership</summary><form method="post" action="{% url 'person_add_ownership' person.pk %}">{% csrf_token %}{{ ownership_form.as_p }}<button type="submit">Record</button></form></details>{% endif %}
+
+  <h2>Board seat and offices</h2>
+  <table><tbody>
+    {% for s in seats %}
+      <tr><td>{{ s.get_seat_type_display }} seat</td><td>{{ s.term_start }} to {{ s.ended_on|default:"present" }}{% if s.term_end %} (term to {{ s.term_end }}){% endif %}</td>
+        <td>{% if not s.ended_on %}<form method="post" action="{% url 'seat_end' s.pk %}" class="inline">{% csrf_token %}{{ end_seat_form.reason }} <input type="date" name="ended_on" required aria-label="End date"> <button type="submit">End seat</button></form>{% endif %}</td></tr>
+    {% endfor %}
+    {% for o in offices %}
+      <tr><td>{{ o.get_office_display }}</td><td>{{ o.start_date }} to {{ o.end_date|default:"present" }}</td>
+        <td>{% if not o.end_date %}<form method="post" action="{% url 'office_end' o.pk %}" class="inline">{% csrf_token %}<input type="date" name="end_date" required aria-label="End date"> <button type="submit">End</button></form>{% endif %}</td></tr>
+    {% endfor %}
+    {% if not seats and not offices %}<tr><td class="muted">None.</td></tr>{% endif %}
+  </tbody></table>
+  {% if not is_me %}
+    <details><summary>Record a board seat</summary><form method="post" action="{% url 'person_add_seat' person.pk %}">{% csrf_token %}{{ seat_form.as_p }}<button type="submit">Record seat</button></form></details>
+    <details><summary>Record an office</summary><form method="post" action="{% url 'person_add_office' person.pk %}">{% csrf_token %}{{ office_form.as_p }}<button type="submit">Record office</button></form></details>
+  {% endif %}
+
+  <h2>Roles</h2>
+  <table><tbody>
+    {% for r in roles %}
+      <tr><td>{{ r.get_role_display }}</td><td>{{ r.start_date }} to {{ r.end_date|default:"present" }}</td>
+        <td>{% if not r.end_date %}<form method="post" action="{% url 'role_end' r.pk %}" class="inline">{% csrf_token %}<input type="date" name="end_date" required aria-label="End date"> <button type="submit">End</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}
+  </tbody></table>
+  {% if not is_me %}
+    <details><summary>Grant ARC or auditor role</summary><form method="post" action="{% url 'person_add_role' person.pk %}">{% csrf_token %}{{ role_form.as_p }}<button type="submit">Grant</button></form></details>
+    <details><summary>Nominate as sysadmin</summary>
+      <p class="muted">A different board member must approve. The whole board is notified.</p>
+      <form method="post" action="{% url 'sysadmin_nominate' person.pk %}">{% csrf_token %}<button type="submit">Nominate</button></form></details>
+  {% endif %}
+{% endblock %}

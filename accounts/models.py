@@ -143,7 +143,7 @@ class VerificationMethod(models.TextChoices):
     OTHER = "other", "Other (explain to the approving board member)"
 
 
-class MfaReset(models.Model):
+class MfaReset(ScopedModel):
     """Assisted reset after losing every authenticator (decision D5).
 
     Board member A starts it, a different board member B approves it. Approval
@@ -170,6 +170,9 @@ class MfaReset(models.Model):
     cancelled_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "subject__person"
 
     class Meta:
         ordering = ["-started_at", "-id"]

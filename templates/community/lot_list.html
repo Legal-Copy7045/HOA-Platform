@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}All lots · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>All lots</h1>
+  <table>
+    <thead><tr><th>Lot</th><th>Address</th><th>Current owners</th></tr></thead>
+    <tbody>
+    {% for lot, owners in rows %}
+      <tr>
+        <td><a href="{% url 'lot_detail' lot.pk %}">{{ lot.number }}</a></td>
+        <td>{{ lot.street_address }}</td>
+        <td>{% for p in owners %}{{ p.display_name }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="muted">none recorded</span>{% endfor %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

@@ -88,6 +88,15 @@ _SPECS = [
     _spec("mfa_reset.cancelled", "Sign-in reset cancelled", "user_id"),
     _spec("mfa_reset.code_redeemed", "Enrollment code used", "user_id"),
     _spec("mfa_reset.code_failed", "Wrong enrollment code entered", "user_id", "attempts"),
+    # sysadmin visibility (D9)
+    _spec("sysadmin.request", "Portal request by a sysadmin", "view", "method", "status"),
+    _spec(
+        "sysadmin.breakglass",
+        "Break-glass command run on the server",
+        "command",
+        "reason",
+        "target_id",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

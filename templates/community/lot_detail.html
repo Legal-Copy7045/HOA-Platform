@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ lot }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>{{ lot }}</h1>
+  <p>{{ lot.street_address }}</p>
+  <h2>Current owners</h2>
+  <table>
+    <tbody>
+    {% for o in current %}
+      <tr>
+        <td>{% if can_manage %}<a href="{% url 'person_detail' o.person_id %}">{{ o.person.display_name }}</a>{% else %}{{ o.person.display_name }}{% endif %}</td>
+        <td>{{ o.get_ownership_type_display }}</td><td>since {{ o.start_date }}</td>
+        {% if can_manage %}<td>
+          <form method="post" action="{% url 'ownership_end' o.pk %}" class="inline">{% csrf_token %}
+            <input type="date" name="end_date" required aria-label="End date">
+            <button type="submit">End ownership</button>
+          </form></td>{% endif %}
+      </tr>
+    {% empty %}<tr><td class="muted">No current owner recorded.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% if can_manage %}
+    <h2>Transfer this lot</h2>
+    <p class="muted">Ends every current ownership on the transfer date and records the new owners. Previous owners lose access from that date.</p>
+    <form method="post" action="{% url 'lot_transfer' lot.pk %}">{% csrf_token %}{{ transfer_form.as_p }}<button type="submit">Record transfer</button></form>
+    <h2>Ownership history</h2>
+    <table><tbody>
+      {% for o in history %}<tr><td>{{ o.person.display_name }}</td><td>{{ o.start_date }} to {{ o.end_date|default:"" }}</td></tr>{% empty %}<tr><td class="muted">No earlier owners recorded.</td></tr>{% endfor %}
+    </tbody></table>
+  {% endif %}
+{% endblock %}

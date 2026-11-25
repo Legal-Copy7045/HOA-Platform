@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Board · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Board</h1>
+  {% if thin %}
+    <div class="warning"><strong>Fewer than two people with MFA can do these:</strong>
+      <ul>{% for action, n in thin.items %}<li><code>{{ action }}</code>: {{ n }}</li>{% endfor %}</ul>
+      Every action should be possible for at least two people, so nothing stalls if someone is away.</div>
+  {% endif %}
+  {% for seat in past_term %}
+    <div class="warning">{{ seat.person.display_name }}'s board term was due to end on {{ seat.term_end }}. If a successor has been elected, end this seat.</div>
+  {% endfor %}
+  <ul class="tiles">
+    <li><a href="{% url 'people' %}">People</a> <span class="muted">owners, board seats, offices, roles, logins</span></li>
+    <li><a href="{% url 'lot_list' %}">Lots</a> <span class="muted">ownership and transfers</span></li>
+    <li><a href="{% url 'approvals' %}">Approvals</a> <span class="muted">{{ open_nominations|length }} sysadmin nomination(s), {{ resets_waiting|length }} sign-in reset(s) waiting</span></li>
+    <li><a href="{% url 'invitations' %}">Invitations</a> <span class="muted">{{ invites_open }} open</span></li>
+    <li><a href="{% url 'sysadmin_activity' %}">Sysadmin activity</a></li>
+  </ul>
+{% endblock %}

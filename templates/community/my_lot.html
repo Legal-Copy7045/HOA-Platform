@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}My lot · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>My lot</h1>
+  {% for lot, ownerships in lots %}
+    <section class="card">
+      <h2>{{ lot }}</h2>
+      <p>{{ lot.street_address }}</p>
+      <h3>Current owners</h3>
+      <ul>{% for o in ownerships %}<li>{{ o.person.display_name }} <span class="muted">({{ o.get_ownership_type_display }}, since {{ o.start_date }})</span></li>{% endfor %}</ul>
+    </section>
+  {% endfor %}
+  <p class="muted">Documents, account statements and architectural requests will appear here in later milestones.</p>
+{% endblock %}

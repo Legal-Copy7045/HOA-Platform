@@ -2,7 +2,18 @@
 {% block content %}
   <h1>{{ SITE_NAME }} portal</h1>
   {% if user.is_authenticated %}
-    <p>You are signed in.</p>
+    <ul class="tiles">
+      {% if can.lot_view_own %}<li><a href="{% url 'my_lot' %}">My lot</a> <span class="muted">your lot and its owners</span></li>{% endif %}
+      {% if can.lot_view_all %}<li><a href="{% url 'lot_list' %}">All lots</a> <span class="muted">every lot and its current owners</span></li>{% endif %}
+      {% if can.person_manage %}<li><a href="{% url 'board_home' %}">Board</a> <span class="muted">people, ownership, seats, roles, invitations, approvals</span></li>{% endif %}
+      {% if can.audit_view_sysadmin_activity %}<li><a href="{% url 'sysadmin_activity' %}">Sysadmin activity</a> <span class="muted">everything system administrators did</span></li>{% endif %}
+      {% if can.system_view_status %}<li><a href="{% url 'system_status' %}">System status</a></li>{% endif %}
+      {% if can.invite_send and not can.person_manage %}<li><a href="{% url 'invitations' %}">Invitations</a></li>{% endif %}
+      <li><a href="{% url 'mfa_index' %}">Security</a> <span class="muted">passkeys, authenticator app, recovery codes</span></li>
+    </ul>
+    {% if not can.lot_view_own and not can.lot_view_all and not can.person_manage and not can.system_view_status %}
+      <p class="muted">Your account isn't linked to a lot or a role yet. Ask a board member if that's unexpected.</p>
+    {% endif %}
   {% else %}
     <p>This portal is for owners and board members of {{ SITE_NAME }}. Accounts are by invitation.</p>
     <p><a class="button" href="{% url 'account_login' %}">Sign in</a></p>

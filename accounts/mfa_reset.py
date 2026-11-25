@@ -16,6 +16,7 @@ from accounts.models import MfaReset, User, VerificationMethod
 from audit.models import Outcome
 from audit.services import record_event
 from core.policy import require
+from core.scoping import system_access
 
 # No 0/O or 1/I/L: the code is read aloud or copied by hand.
 _ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -44,7 +45,8 @@ def _board_notice(kind: str) -> None:
 def open_reset_for(user: User) -> MfaReset | None:
     """The reset blocking this user's account, if any (approved, code not used)."""
     return (
-        MfaReset.objects.filter(
+        MfaReset.objects.unscoped("open reset check")
+        .filter(
             subject=user,
             approved_at__isnull=False,
             code_used_at__isnull=True,
@@ -61,7 +63,7 @@ def start_reset(*, subject: User, verification_method: str, actor, request=None)
         raise MfaResetError("Choose how you confirmed the person's identity.")
     if subject.pk == actor.pk:
         raise MfaResetError("Another board member must start a reset of your own account.")
-    with transaction.atomic():
+    with transaction.atomic(), system_access("mfa reset"):
         pending = MfaReset.objects.select_for_update().filter(
             subject=subject,
             approved_at__isnull=True,
@@ -90,7 +92,7 @@ def start_reset(*, subject: User, verification_method: str, actor, request=None)
 def approve_reset(reset: MfaReset, *, actor, request=None) -> str:
     """Approve; returns the enrollment code, which is shown once and never stored."""
     require(actor, "mfa_reset.approve")
-    with transaction.atomic():
+    with transaction.atomic(), system_access("mfa reset"):
         reset = MfaReset.objects.select_for_update().get(pk=reset.pk)
         if reset.status != "awaiting_approval":
             raise MfaResetError("This reset is not waiting for approval.")
@@ -123,7 +125,7 @@ def approve_reset(reset: MfaReset, *, actor, request=None) -> str:
 
 def cancel_reset(reset: MfaReset, *, actor, request=None) -> MfaReset:
     require(actor, "mfa_reset.start")
-    with transaction.atomic():
+    with transaction.atomic(), system_access("mfa reset"):
         reset = MfaReset.objects.select_for_update().get(pk=reset.pk)
         if reset.status != "awaiting_approval":
             raise MfaResetError("Only a reset waiting for approval can be cancelled.")
@@ -141,7 +143,7 @@ def cancel_reset(reset: MfaReset, *, actor, request=None) -> MfaReset:
 
 
 def redeem_code(*, user: User, code: str, request=None) -> bool:
-    with transaction.atomic():
+    with transaction.atomic(), system_access("mfa reset"):
         reset = open_reset_for(user)
         if reset is None:
             return False
