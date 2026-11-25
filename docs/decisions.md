@@ -297,3 +297,16 @@ From the optimization review, accepted without a decision because they change no
 ## D26. Malware scanner reloads signatures in place (2026-11-25)
 
 ClamAV holds its signature database in memory (~1.2 GB) and, by default, loads a fresh copy alongside the old one at each signature update (~2.4 GB for about a minute), close to the 4 GB the POC VM has. The owner chose "reload in place": `ConcurrentDatabaseReload no` (`docker/clamav/clamd.conf`, the image's own defaults plus this one line, checked with `clamconf`). Peak memory stays near one copy; scanning pauses for about a minute during each reload, and files uploaded in that window wait as "not yet scanned" until it is back (DOCUMENT_REQUIRE_CLEAN_SCAN keeps them from being downloaded meanwhile). Scanning stays on (D21).
+
+## D27. Owner's answers on the open items (2026-11-25)
+
+1. Secret ballots: the residual risk in D23 (linkable only with direct database or backup access) is accepted; no mixing step.
+2. Online payments stay a placeholder until the HOA's Stripe account and live keys exist.
+3. Counsel review (online voting, proxies, quorum, collection letters, resale certificate, convenience-fee wording): the owner is arranging it.
+4. SMS stays dormant until a provider account exists.
+5. Former owners' contact details: cleared two years after their last ownership or contact role ends (a board setting).
+6. Common-area reservations: dormant (feature switch off) until areas and rules are set.
+7. Production hosting and HOA-owned accounts: to be decided.
+8. Building images in CI and pulling them on the VM: only if faster overall (see the note below); R2 for the POC's files: under consideration.
+
+Note on 8: with the layer cache the VM rebuilds a code-only change in well under a minute and a docs-only change in about a second, and a dependency change in two to three minutes. Pulling a CI-built image would save at most a minute or two on dependency changes, add the CI build time before an update is available, and need a registry token stored on the VM. Not faster overall, so not done.
