@@ -50,6 +50,7 @@ BOARD_ONLY_MARKERS = (
     b"Draft: special assessment",
     b"Lot B hot tub",
     b"Lot B boat in driveway",
+    b"Lot B Buyer Agent",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -63,6 +64,8 @@ MEMBER_PAGES = {
     "records_requests",
     "arc_list",
     "violations",
+    "my_account",
+    "resales",
 }
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
@@ -135,6 +138,19 @@ PROTECTED = {
     "invoice_detail": ("GET", "invoice"),
     "invoice_action": ("POST", "invoice"),
     "invoice_file": ("GET", "invoice"),
+    "my_statement_pdf": ("GET", "lot_id_b"),
+    "ledger_home": ("GET", None),
+    "lot_ledger": ("GET", "lot"),
+    "lot_ledger_action": ("POST", "lot"),
+    "lot_statement_pdf": ("GET", "lot"),
+    "collections": ("GET", None),
+    "collection_detail": ("GET", "collection"),
+    "collection_action": ("POST", "collection"),
+    "budgets": ("GET", None),
+    "budget_detail": ("GET", "budget"),
+    "resale_detail": ("GET", "resale_b"),
+    "resale_action": ("POST", "resale_b"),
+    "resale_pdf": ("GET", "resale_b"),
 }
 
 
@@ -249,6 +265,16 @@ def world():
             actor=board,
         )
         invoice_file = attach(invoice, pdf("invoice.pdf"), actor=board)
+        from ledger import services as ledger
+
+        ledger.post_charge(
+            lot=lot_b, kind="other_charge", amount_cents=5000, description="Lot B fine", actor=board
+        )
+        collection = ledger.open_case(lot=lot_b, actor=board)
+        budget = ledger.create_budget(fiscal_year=2027, actor=board)
+        resale_b = ledger.request_resale(
+            lot=lot_b, requester_name="Lot B Buyer Agent", actor=owner_b
+        )
     targets = {
         "lot": lot_b.pk,
         "person": person_b.pk,
@@ -275,6 +301,10 @@ def world():
         "work_order": work_order.pk,
         "invoice": invoice.pk,
         "invoice_file": invoice_file.pk,
+        "lot_id_b": lot_b.pk,
+        "collection": collection.pk,
+        "budget": budget.pk,
+        "resale_b": resale_b.pk,
     }
     return {
         "owner_a": owner_a,
@@ -325,6 +355,16 @@ def _url(name, key, targets):
         kwargs["action"] = "submit"
     elif name == "invoice_file":
         kwargs["file_id"] = targets["invoice_file"]
+    elif name == "my_statement_pdf":
+        kwargs = {"lot_id": targets["lot_id_b"]}
+    elif name == "lot_ledger_action":
+        kwargs["action"] = "credit"
+    elif name == "lot_statement_pdf":
+        kwargs["kind"] = "statement"
+    elif name == "collection_action":
+        kwargs["action"] = "send_reminder"
+    elif name == "resale_action":
+        kwargs["action"] = "issue"
     return reverse(name, kwargs=kwargs)
 
 

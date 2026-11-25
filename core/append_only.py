@@ -83,3 +83,21 @@ def append_only_trigger_operations(table: str) -> list[migrations.RunSQL]:
             reverse_sql=f'DROP TRIGGER IF EXISTS "{stmt}" ON "{table}";',
         ),
     ]
+
+
+def _scoped_append_only():
+    from core.scoping import ScopedModel, ScopedQuerySet
+
+    class ScopedAppendOnlyQuerySet(AppendOnlyQuerySet, ScopedQuerySet):
+        """Append-only and scoped: refuses changes, and refuses unscoped reads."""
+
+    class ScopedAppendOnlyModel(AppendOnlyModel, ScopedModel):
+        objects = ScopedAppendOnlyQuerySet.as_manager()
+
+        class Meta:
+            abstract = True
+
+    return ScopedAppendOnlyQuerySet, ScopedAppendOnlyModel
+
+
+ScopedAppendOnlyQuerySet, ScopedAppendOnlyModel = _scoped_append_only()

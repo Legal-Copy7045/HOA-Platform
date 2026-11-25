@@ -1,0 +1,197 @@
+import datetime
+
+import pytest
+from django.core.exceptions import PermissionDenied
+from django.urls import reverse
+
+from community import services as community
+from community.models import Ownership, Person, Role
+from community.tests.factories import LotFactory, make_member
+from core.append_only import AppendOnlyError
+from core.policy import SYSTEM
+from core.scoping import UnscopedQueryError, system_access
+from ledger import services
+from ledger.models import LedgerEntry
+from operations.models import ExpenseCategory, Invoice, Vendor
+
+pytestmark = pytest.mark.django_db
+D = datetime.date
+
+
+@pytest.fixture
+def w():
+    board = make_member(board=True)
+    community.set_rule(
+        key="dues.monthly_cents", value="4500", citation="Declaration §7.2 (demo)", actor=board
+    )
+    lot = LotFactory()
+    return {
+        "board": board,
+        "lot": lot,
+        "owner": make_member(lots=[lot]),
+        "manager": make_member(roles=[Role.MANAGER]),
+    }
+
+
+def test_monthly_dues_post_once_per_lot_per_month(w):
+    assert services.post_monthly_assessments(year=2026, month=1, actor=w["manager"]) == 1
+    assert services.post_monthly_assessments(year=2026, month=1, actor=w["manager"]) == 0
+    assert services.balance(w["lot"].pk) == 4500
+
+
+def test_dues_need_the_rule():
+    board = make_member(board=True)
+    with pytest.raises(services.LedgerError, match="monthly dues"):
+        services.post_monthly_assessments(year=2026, month=1, actor=board)
+
+
+def test_prepayment_is_drawn_down_month_by_month(w):
+    services.record_payment(
+        lot=w["lot"],
+        amount_cents=4500 * 12,
+        received_on=D(2025, 12, 20),
+        reference="1001",
+        actor=w["manager"],
+    )
+    for month in (1, 2, 3):
+        services.post_monthly_assessments(year=2026, month=month, actor=w["manager"])
+    assert services.balance(w["lot"].pk) == -4500 * 9  # nine months of credit left
+    assert services.aging(w["lot"].pk, as_of=D(2026, 3, 15))["credit"] == 4500 * 9
+
+
+def test_aging_applies_credits_to_the_oldest_charges_first(w):
+    for month in (1, 2, 3, 4):
+        services.post_monthly_assessments(year=2026, month=month, actor=w["manager"])
+    services.record_payment(
+        lot=w["lot"], amount_cents=4500, received_on=D(2026, 4, 2), actor=w["manager"]
+    )
+    a = services.aging(w["lot"].pk, as_of=D(2026, 4, 15))
+    # January paid; Feb (73 days) 61-90, Mar (45 days) 31-60, Apr current.
+    assert a == {"current": 4500, "31_60": 4500, "61_90": 4500, "over_90": 0, "credit": 0}
+
+
+def test_late_fees_are_blocked_until_enabled(w, settings):
+    with pytest.raises(services.LedgerError, match="Pennsylvania law"):
+        services.post_charge(
+            lot=w["lot"],
+            kind="late_fee",
+            amount_cents=600,
+            description="Late fee",
+            actor=w["board"],
+        )
+    settings.LEDGER_LATE_FEES_ENABLED = True
+    services.post_charge(
+        lot=w["lot"], kind="late_fee", amount_cents=600, description="Late fee", actor=w["board"]
+    )
+
+
+def test_corrections_are_reversals_never_edits(w):
+    entry = services.post_charge(
+        lot=w["lot"],
+        kind="other_charge",
+        amount_cents=2500,
+        description="Key fob",
+        actor=w["manager"],
+    )
+    with pytest.raises(AppendOnlyError):
+        entry.delete()
+    reversal = services.reverse_entry(entry, reason="Entered on wrong lot", actor=w["manager"])
+    assert services.balance(w["lot"].pk) == 0
+    with pytest.raises(services.LedgerError, match="already been reversed"):
+        services.reverse_entry(entry, reason="again", actor=w["manager"])
+    with pytest.raises(services.LedgerError, match="cannot itself"):
+        services.reverse_entry(reversal, reason="undo", actor=w["manager"])
+
+
+def test_account_numbers_refused_on_payments(w):
+    with pytest.raises(services.LedgerError, match="account number"):
+        services.record_payment(
+            lot=w["lot"],
+            amount_cents=100,
+            received_on=D(2026, 1, 1),
+            reference="123456789012",
+            actor=w["manager"],
+        )
+
+
+def test_owners_cannot_post_and_ledger_is_scoped(w):
+    with pytest.raises(PermissionDenied):
+        services.post_credit(lot=w["lot"], amount_cents=100, description="x", actor=w["owner"])
+    with pytest.raises(UnscopedQueryError):
+        LedgerEntry.objects.count()
+    other = make_member(lots=[LotFactory()])
+    services.post_monthly_assessments(year=2026, month=1, actor=w["manager"])
+    assert not LedgerEntry.objects.for_user(other).filter(lot=w["lot"]).exists()
+
+
+def test_new_owner_sees_brought_forward_not_previous_owners_history(client, w):
+    services.post_monthly_assessments(year=2026, month=1, actor=w["manager"])
+    buyer = make_member()
+    with system_access("t"):
+        buyer_person = Person.objects.get(user=buyer)
+    community.transfer_lot(
+        w["lot"], new_owners=[buyer_person], transfer_date=D(2026, 2, 15), actor=SYSTEM
+    )
+    st = services.owner_statement(w["lot"].pk, D(2026, 2, 15))
+    assert st.brought_forward == 4500 and st.entries == []
+    client.force_login(buyer)
+    page = client.get(reverse("my_account")).content.decode()
+    assert "Balance brought forward" in page and "Assessment January 2026" not in page
+    with system_access("t"):
+        assert not Ownership.objects.filter(person__user=w["owner"]).active().exists()
+
+
+def test_budget_lock_and_actuals(w):
+    cat = ExpenseCategory.objects.create(code="5100", name="Pond")
+    budget = services.create_budget(fiscal_year=2026, actor=w["board"])
+    services.add_line(
+        budget,
+        kind="expense",
+        name="Pond care",
+        annual_cents=120000,
+        category=cat,
+        actor=w["board"],
+    )
+    services.add_line(
+        budget,
+        kind="income",
+        name="Dues",
+        annual_cents=4500 * 12,
+        income_source="assessments",
+        actor=w["board"],
+    )
+    services.adopt_budget(budget, actor=w["board"])
+    with pytest.raises(services.LedgerError, match="adopted"):
+        services.add_line(
+            budget, kind="expense", name="x", annual_cents=1, category=cat, actor=w["board"]
+        )
+    Invoice.objects.create(
+        vendor=Vendor.objects.create(name="V"),
+        number="1",
+        invoice_date=D(2026, 3, 3),
+        amount_cents=15000,
+        category=cat,
+        state="paid",
+        entered_by=w["manager"],
+    )
+    services.post_monthly_assessments(year=2026, month=3, actor=w["manager"])
+    report = services.budget_vs_actual(budget)
+    expense = next(r for r in report["rows"] if r["line"].kind == "expense")
+    income = next(r for r in report["rows"] if r["line"].kind == "income")
+    assert expense["actual"][2] == 15000 and expense["planned"][2] == 10000
+    assert income["actual_total"] == 4500 and income["planned_total"] == 54000
+
+
+def test_resale_certificate_fee_posted_on_issue(w):
+    community.set_rule(key="resale.fee_cents", value="15000", citation="Demo", actor=w["board"])
+    community.set_rule(key="resale.deadline_days", value="10", citation="Demo", actor=w["board"])
+    req = services.request_resale(lot=w["lot"], requester_name="Seller", actor=w["owner"])
+    assert req.fee_cents == 15000 and req.due_on
+    services.RESALE.apply(req, "issue", actor=w["manager"])
+    assert services.balance(w["lot"].pk) == 15000
+    assert services.resale_certificate(req).startswith(b"%PDF")
+
+
+def test_owner_requests_resale_only_for_own_lot(w):
+    with pytest.raises(services.LedgerError):
+        services.request_resale(lot=LotFactory(), requester_name="x", actor=w["owner"])

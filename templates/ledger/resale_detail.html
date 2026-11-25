@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Resale #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Resale certificate #{{ obj.pk }}</h1>
+  <p>Lot {{ obj.lot.number }} · requested by {{ obj.requester_name }} · <span class="status">{{ obj.state }}</span>{% if obj.due_on %} · due {{ obj.due_on }}{% endif %}{% if obj.fee_cents %} · fee {{ obj.fee_cents|cents }}{% endif %}</p>
+  {% if obj.state == "issued" or can_manage %}<p><a href="{% url 'resale_pdf' obj.pk %}">{% if obj.state == "issued" %}Certificate (PDF){% else %}Preview certificate (PDF){% endif %}</a></p>{% endif %}
+  {% if can_manage and obj.state != "issued" and obj.state != "cancelled" %}
+    <form method="post">{% csrf_token %}<label for="d">Other disclosures (statements the law requires that the portal does not hold)</label><textarea id="d" name="other_disclosures" rows="5">{{ obj.other_disclosures }}</textarea><p><button type="submit">Save</button></p></form>
+    <p class="warning">Before issuing, confirm with counsel that the certificate covers everything 68 Pa.C.S. § 5407 requires.</p>
+  {% endif %}
+  {% include "partials/workflow.html" with obj=obj %}
+{% endblock %}

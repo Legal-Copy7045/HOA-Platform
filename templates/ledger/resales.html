@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Resale certificates · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Resale certificates</h1>
+  <p class="muted">When a lot is sold, the buyer must receive a certificate from the association. Request one here.</p>
+  <table><tbody>{% for r in rows %}<tr><td><a href="{% url 'resale_detail' r.pk %}">#{{ r.pk }}</a></td><td>Lot {{ r.lot.number }}</td><td>{{ r.requester_name }}</td><td><span class="status">{{ r.state }}</span></td><td>{% if r.due_on %}due {{ r.due_on }}{% endif %}</td></tr>{% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}</tbody></table>
+  <details><summary>Request a certificate</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Request</button></form></details>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Collections · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <h1>Collections</h1>
+  <p class="muted">Tracking only: reminders, payment plans and referrals are recorded by people. Nothing is charged or filed automatically.</p>
+  <h2>Overdue balances (over 30 days)</h2>
+  <table><thead><tr><th>Lot</th><th>Balance</th><th>31-60</th><th>61-90</th><th>Over 90</th></tr></thead><tbody>
+    {% for lot, bal, a in delinquent %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">{{ lot.number }}</a></td><td>{{ bal|cents }}</td><td>{{ a.31_60|cents }}</td><td>{{ a.61_90|cents }}</td><td>{{ a.over_90|cents }}</td></tr>{% empty %}<tr><td class="muted">No overdue balances.</td></tr>{% endfor %}
+  </tbody></table>
+  <h2>Cases</h2>
+  <table><tbody>{% for c in cases %}<tr><td><a href="{% url 'collection_detail' c.pk %}">#{{ c.pk }}</a></td><td>Lot {{ c.lot.number }}</td><td><span class="status">{{ c.state }}</span></td><td class="muted">opened {{ c.opened_at|date:"M j, Y" }}</td></tr>{% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

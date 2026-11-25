@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Owner accounts · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <h1>Owner accounts</h1>
+  <p>Owed: <strong>{{ total_owed|cents }}</strong> · credits (prepayments): {{ total_credit|cents }}</p>
+  {% if can_manage %}
+    <form method="post" class="card">{% csrf_token %}<strong>Post monthly dues</strong> for <input name="year" value="{{ year }}" size="5" aria-label="Year"> / <input name="month" value="{{ month }}" size="3" aria-label="Month"> <button type="submit">Post to every lot</button>
+      <div class="muted">Uses the monthly dues rule. A lot already charged for that month is skipped, so posting twice is safe.</div></form>
+  {% endif %}
+  <table><thead><tr><th>Lot</th><th>Address</th><th>Balance</th></tr></thead><tbody>
+    {% for lot, bal in rows %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">{{ lot.number }}</a></td><td>{{ lot.street_address }}</td><td>{% if bal > 0 %}<span class="overdue">{{ bal|cents }}</span>{% elif bal < 0 %}{{ bal|cents }} credit{% else %}-{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+{% endblock %}

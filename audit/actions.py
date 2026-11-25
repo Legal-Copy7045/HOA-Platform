@@ -139,6 +139,20 @@ _SPECS = [
     _spec("invoice.entered", "Invoice entered", "amount_cents"),
     _spec("invoice.approval_given", "Invoice approval given", "have", "need"),
     _spec("invoice.payment_recorded", "Invoice payment recorded", "amount_cents", "method"),
+    _spec(
+        "ledger.assessments_posted", "Monthly assessments posted", "period", "lots", "amount_cents"
+    ),
+    _spec("ledger.payment_recorded", "Owner payment recorded", "lot_id", "amount_cents"),
+    _spec("ledger.charge_posted", "Charge posted", "lot_id", "kind", "amount_cents"),
+    _spec("ledger.credit_posted", "Credit posted", "lot_id", "amount_cents"),
+    _spec("ledger.entry_reversed", "Ledger entry reversed", "lot_id", "reverses"),
+    _spec("ledger.statement_downloaded", "Statement downloaded", "lot_id"),
+    _spec("collection.opened", "Collection case opened", "lot_id", "balance_cents"),
+    _spec("budget.created", "Budget created", "fiscal_year"),
+    _spec("budget.line_added", "Budget line added", "kind", "annual_cents"),
+    _spec("budget.adopted", "Budget adopted", "fiscal_year"),
+    _spec("resale.requested", "Resale certificate requested", "lot_id"),
+    _spec("resale.certificate_downloaded", "Resale certificate downloaded", "lot_id"),
     _spec("invite.link_issued", "Invitation link printed on the server (bootstrap)", "person_id"),
     _spec(
         "system.bootstrap", "First officer created on the server", "person_id", "sysadmin_person_id"

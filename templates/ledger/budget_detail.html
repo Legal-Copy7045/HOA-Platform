@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}FY{{ budget.fiscal_year }} budget · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <h1>FY{{ budget.fiscal_year }} budget <span class="status">{{ budget.get_status_display }}</span></h1>
+  <p class="muted">Expense actuals come from approved and paid invoices by category; income actuals from the owner ledger.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Line</th>{% for y, m in report.months %}<th>{{ m }}/{{ y|stringformat:"d"|slice:"2:" }}</th>{% endfor %}<th>Budget</th><th>Actual</th><th>Variance</th></tr></thead>
+    <tbody>{% for r in report.rows %}
+      <tr><td><strong>{{ r.line.name }}</strong> <span class="muted">{{ r.line.get_kind_display }}</span></td>{% for p in r.planned %}<td class="muted">{{ p|cents }}</td>{% endfor %}<td>{{ r.planned_total|cents }}</td><td></td><td></td></tr>
+      <tr><td class="muted">actual</td>{% for a in r.actual %}<td>{{ a|cents }}</td>{% endfor %}<td></td><td>{{ r.actual_total|cents }}</td><td>{{ r.variance|cents }}</td></tr>
+    {% empty %}<tr><td class="muted">No lines yet.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if can_manage and budget.status == "draft" %}
+    <details><summary>Add a line</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Add</button></form></details>
+    <form method="post">{% csrf_token %}<input type="hidden" name="adopt" value="1"><button type="submit">Adopt budget (locks the lines)</button></form>
+  {% endif %}
+{% endblock %}

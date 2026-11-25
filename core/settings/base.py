@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     "governance",
     "arc",
     "compliance",
+    "ledger",
+    "payments",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -230,6 +232,12 @@ DOCUMENT_MAX_BYTES = env.int("DOCUMENT_MAX_BYTES", default=25 * 1024 * 1024)
 DOCUMENT_SCANNER = env("DOCUMENT_SCANNER", default="none")
 DOCUMENT_CLAMD_ADDRESS = env("DOCUMENT_CLAMD_ADDRESS", default="")
 DOCUMENT_REQUIRE_CLEAN_SCAN = env.bool("DOCUMENT_REQUIRE_CLEAN_SCAN", default=False)
+
+# Ledger: late fees cannot be posted until the board has reviewed PA law and
+# turned this on (decision recorded 2026-11-25).
+LEDGER_LATE_FEES_ENABLED = env.bool("LEDGER_LATE_FEES_ENABLED", default=False)
+# Online payments: "none" (placeholder) or "stripe" (hosted Checkout, later).
+PAYMENTS_PROVIDER = env("PAYMENTS_PROVIDER", default="none")
 
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).

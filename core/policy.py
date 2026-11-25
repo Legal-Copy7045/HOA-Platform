@@ -99,6 +99,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "ledger.manage": frozenset({BOARD, MANAGER}),
     "budget.manage": frozenset({BOARD}),
     "collections.manage": frozenset({BOARD, MANAGER}),
+    "collections.refer": frozenset({BOARD}),
     "resale.request": frozenset({OWNER, BOARD, MANAGER}),
     "resale.manage": frozenset({BOARD, MANAGER}),
     "reports.view": frozenset({BOARD, AUDITOR, MANAGER}),

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Budgets · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <h1>Budgets</h1>
+  <ul>{% for b in budgets %}<li><a href="{% url 'budget_detail' b.pk %}">FY{{ b.fiscal_year }}</a> <span class="status">{{ b.get_status_display }}</span></li>{% empty %}<li class="muted">No budgets yet.</li>{% endfor %}</ul>
+  {% if can_manage %}<form method="post">{% csrf_token %}<label for="fy">New budget for fiscal year</label><input id="fy" name="fiscal_year" value="{{ year }}" size="6"> <button type="submit">Create</button></form>{% endif %}
+  <h2>Expense categories</h2>
+  <ul>{% for c in categories %}<li>{{ c.code }} {{ c.name }}</li>{% empty %}<li class="muted">None yet.</li>{% endfor %}</ul>
+  {% if can_manage %}<form method="post">{% csrf_token %}<input name="code" placeholder="Code e.g. 5100" aria-label="Code" size="8"> <input name="name" placeholder="Name e.g. Pond maintenance" aria-label="Name"> <button type="submit">Add category</button></form>{% endif %}
+{% endblock %}

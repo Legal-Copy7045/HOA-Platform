@@ -41,6 +41,22 @@ class UnscopedQueryError(RuntimeError):
     """A scoped model was queried without for_user(), unscoped() or system_access()."""
 
 
+def internal(reason: str):
+    """Decorator form of system_access for trusted service functions."""
+
+    def decorator(fn):
+        import functools
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with system_access(reason):
+                return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 @contextlib.contextmanager
 def system_access(reason: str):
     """Allow unscoped queries inside this block (internal code only)."""

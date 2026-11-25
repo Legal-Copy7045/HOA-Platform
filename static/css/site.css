@@ -31,3 +31,4 @@ summary { cursor: pointer; color: var(--accent); }
 .overdue { color: #a33; font-weight: 600; }
 label.choice { font-weight: normal; display: block; }
 textarea { width: 100%; max-width: 40rem; }
+.scroll { overflow-x: auto; }

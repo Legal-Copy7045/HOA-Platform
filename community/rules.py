@@ -37,6 +37,14 @@ REGISTRY: dict[str, RuleSpec] = {
         ),
         RuleSpec("dues.due_day", "Day of month dues are due", DAYS, "1", "Dues"),
         RuleSpec(
+            "dues.auto_post",
+            "Post monthly dues automatically on the 1st",
+            BOOL,
+            "false",
+            "Dues",
+            "Board decision. Otherwise the board posts each month with a button.",
+        ),
+        RuleSpec(
             "late_fee.cents",
             "Late fee (recorded only)",
             CENTS,
