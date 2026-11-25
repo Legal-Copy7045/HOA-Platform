@@ -3,15 +3,19 @@
 {% block title %}Elections · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "governance/gov_nav.html" %}
-  <div class="page-head"><div><h1>Board elections</h1><p class="subtitle">Owners nominate owners; one ballot per lot, in person online or by proxy.</p></div></div>
+  <div class="page-head"><div><h1>Elections</h1><p class="subtitle">Board elections. Owners nominate owners; one ballot per lot, cast online or by proxy.</p></div></div>
   <div class="split"><div>
     <section class="card">{% if rows %}<ul class="list">{% for e in rows %}<li><a class="grow title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a><span class="small muted">{{ e.seats }} seat{{ e.seats|pluralize }}</span>{% status e.state e.get_state_display %}</li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="users" title="No elections yet" %}{% endif %}</section></div>
     {% if can_manage %}<aside><section class="card"><h2>New election</h2><form method="post">{% csrf_token %}
-      <p><label>Title <input type="text" name="title" maxlength="200" required placeholder="2027 board election"></label></p>
-      <p><label>Seats open <input type="number" name="seats" min="1" max="15" value="2" required></label> <label>Term (years) <input type="number" name="term_years" min="1" max="6" value="2"></label></p>
-      <p><label>At meeting <select name="meeting"><option value="">(none)</option>{% for m in meetings %}<option value="{{ m.pk }}">{{ m.title }} · {{ m.starts_at|date:"M j" }}</option>{% endfor %}</select></label></p>
-      <p><label>Authority <input type="text" name="citation" maxlength="200" placeholder="Bylaws §3.2"></label></p>
+      <p class="small muted"><span class="required-mark" aria-hidden="true">*</span> required</p>
+      <p><label for="el-title">Title<span class="required-mark" aria-hidden="true">*</span></label><input id="el-title" type="text" name="title" maxlength="200" required></p>
+      <p class="help">For example: 2027 board election.</p>
+      <p><label for="el-seats">Seats open<span class="required-mark" aria-hidden="true">*</span></label><input id="el-seats" type="number" name="seats" min="1" max="15" value="2" required></p>
+      <p><label for="el-term">Term (years)</label><input id="el-term" type="number" name="term_years" min="1" max="6" value="2"></p>
+      <p><label for="el-meeting">At meeting</label><select id="el-meeting" name="meeting"><option value="">(none)</option>{% for m in meetings %}<option value="{{ m.pk }}">{{ m.title }} · {{ m.starts_at|date:"M j, Y" }}</option>{% endfor %}</select></p>
+      <p><label for="el-citation">Authority</label><input id="el-citation" type="text" name="citation" maxlength="200"></p>
+      <p class="help">The section of the Bylaws or Declaration, for example Bylaws §3.2.</p>
       <div class="form-actions"><button type="submit">Open nominations</button></div></form></section></aside>{% endif %}
   </div>
 {% endblock %}

@@ -5,7 +5,7 @@
   {% include "governance/gov_nav.html" %}
   <div class="crumbs"><a href="{% url 'votes' %}">Votes and polls</a> / {{ vote.title|truncatechars:40 }}</div>
   <div class="page-head"><div><h1>{{ vote.title }}</h1>
-    <div class="meta">{% status vote.status %}<span>{{ vote.get_kind_display }}</span>{% if vote.closes_at %}<span>{% icon "clock" %}Closes {{ vote.closes_at|date:"M j, Y g:i A" }}</span>{% endif %}{% if vote.secret %}<span>{% icon "lock" %}Secret ballot</span>{% endif %}</div></div>
+    <div class="meta">{% status vote.status vote.get_status_display %}<span>{{ vote.get_kind_display }}</span>{% if vote.closes_at %}<span>{% icon "clock" %}Closes {{ vote.closes_at|date:"M j, Y g:i A" }}</span>{% endif %}{% if vote.secret %}<span>{% icon "lock" %}Secret ballot</span>{% endif %}</div></div>
     {% if can_manage %}<div class="actions">
       {% if vote.status == "draft" %}<form method="post" action="{% url 'vote_action' vote.pk 'open' %}" data-confirm="Open voting? Options and rules are frozen once open.">{% csrf_token %}<button type="submit">Open voting</button></form>{% endif %}
       {% if vote.status == "open" %}<form method="post" action="{% url 'vote_action' vote.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit" class="danger">Close voting</button></form>{% endif %}
@@ -15,16 +15,29 @@
   <div class="split">
     <div>
       {% if vote.description %}<section class="card prose">{{ vote.description|linebreaks }}</section>{% endif %}
+      {% if my_ballots %}
+        <section class="card" id="ballot-recorded"><h2>Your ballot</h2>
+          <ul class="list">{% for b in my_ballots %}<li class="voted">{% icon "check-circle" %}<span class="grow">{% if vote.secret %}{% if b.lot %}Lot {{ b.lot.number }}: your{% else %}Your{% endif %} ballot was recorded.{% else %}{% if b.lot %}Lot {{ b.lot.number }}: you{% else %}You{% endif %} voted on {{ b.cast_at|date:"M j, Y" }}{% if b.option %} for &ldquo;{{ b.option.label }}&rdquo;{% endif %}.{% endif %}</span></li>{% endfor %}</ul>
+        </section>
+      {% endif %}
       {% if choices.can_vote %}
-        <section class="card"><h2>Your ballot</h2>
-          <form method="post" action="{% url 'vote_action' vote.pk 'cast' %}" data-confirm="Cast this ballot? It cannot be changed afterwards.">{% csrf_token %}
-            <fieldset class="choices"><legend class="sr-only">Options</legend>{% for o in vote.options.all %}<label class="choice"><input type="radio" name="option" value="{{ o.pk }}" required><span>{{ o.label }}</span></label>{% endfor %}</fieldset>
-            {% if vote.kind == "formal" %}<label for="lot">For lot</label><select id="lot" name="lot">{% for lot in choices.lots %}<option value="{{ lot.pk }}">Lot {{ lot.number }}</option>{% endfor %}</select>{% endif %}
-            <p class="help">Ballots cannot be changed once cast.</p>
+        <section class="card" id="ballot"><h2>{% if my_ballots %}Another ballot to cast{% else %}Your ballot{% endif %}</h2>
+          <form method="post" action="{% url 'vote_action' vote.pk 'cast' %}" data-confirm="Cast this ballot? It can't be changed afterwards.">{% csrf_token %}
+            {% if vote.kind == "formal" %}
+              {% if choices.lots|length > 1 %}
+                <div class="alert info">{% icon "info" %}<span>You have {{ choices.lots|length }} lots still to vote for. A formal vote is one ballot per lot: choose the lot, cast its ballot, then come back for the next.</span></div>
+                <p><label for="lot">Ballot for<span class="required-mark" aria-hidden="true">*</span></label><select id="lot" name="lot" required>{% for lot in choices.lots %}<option value="{{ lot.pk }}">Lot {{ lot.number }}{% if lot.street_address %}, {{ lot.street_address }}{% endif %}</option>{% endfor %}</select></p>
+              {% else %}
+                <input type="hidden" name="lot" value="{{ choices.lots.0.pk }}"><p>Ballot for lot {{ choices.lots.0.number }}{% if choices.lots.0.street_address %}, {{ choices.lots.0.street_address }}{% endif %}.</p>
+              {% endif %}
+            {% endif %}
+            <fieldset class="choices"><legend>Your choice<span class="required-mark" aria-hidden="true">*</span></legend>{% for o in vote.options.all %}<label class="choice"><input type="radio" name="option" value="{{ o.pk }}" required><span>{{ o.label }}</span></label>{% endfor %}</fieldset>
+            <p class="help">Ballots can't be changed once cast.{% if vote.kind == "formal" %} Casting asks for your password or passkey again.{% endif %}</p>
             <div class="form-actions"><button type="submit">{% icon "vote" %} Cast ballot</button></div>
           </form>
         </section>
       {% endif %}
+      {% for m in proxy_meetings %}<p class="small">Owners vote at {{ m.title }}, {{ m.starts_at|date:"F j, Y" }}. Can't attend? <a href="{% url 'meeting_detail' m.pk %}#proxy">Give a proxy</a></p>{% endfor %}
       {% if results %}
         <section class="card"><h2>Results{% if vote.status != "closed" %} so far{% endif %}</h2>
           {% for r in results.rows %}<div class="bar-row"><div class="bar-label"><span>{{ r.option.label }}</span><span class="muted">{{ r.count }} · {{ r.percent }}%</span></div><meter class="bar" min="0" max="100" value="{{ r.percent }}">{{ r.percent }}%</meter></div>{% endfor %}

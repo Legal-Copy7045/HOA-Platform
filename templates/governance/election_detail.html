@@ -2,32 +2,47 @@
 {% load portal %}
 {% block title %}{{ e.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  {% include "governance/gov_nav.html" %}
   <div class="crumbs"><a href="{% url 'elections' %}">Elections</a> / {{ e.title }}</div>
   <div class="page-head"><div><h1>{{ e.title }}</h1><div class="meta">{% status e.state e.get_state_display %}<span>{{ e.seats }} seat{{ e.seats|pluralize }} · {{ e.term_years }}-year terms</span>{% if e.citation %}<span>{% icon "book" %}{{ e.citation }}</span>{% endif %}{% if e.meeting %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' e.meeting_id %}">{{ e.meeting.title }}</a></span>{% endif %}</div></div>
     {% if can_manage %}<div class="actions">
-      {% if e.state == "nominations" %}<form method="post" action="{% url 'election_action' e.pk 'open' %}" data-confirm="Close nominations and open voting?">{% csrf_token %}<button type="submit">Open voting</button></form>{% endif %}
-      {% if e.state == "voting" %}<form method="post" action="{% url 'election_action' e.pk 'close' %}" data-confirm="Close voting now?">{% csrf_token %}<button type="submit">Close voting</button></form>{% endif %}
+      {% if e.state == "nominations" %}<form method="post" action="{% url 'election_action' e.pk 'open' %}" data-confirm="Close nominations and open voting? Owners are emailed a link to their ballot.">{% csrf_token %}<button type="submit">Open voting</button></form>{% endif %}
+      {% if e.state == "voting" %}<form method="post" action="{% url 'election_action' e.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit">Close voting</button></form>{% endif %}
       {% if e.state == "closed" %}<form method="post" action="{% url 'election_action' e.pk 'certify' %}" data-confirm="Certify these results? They are recorded permanently and the elected are proposed for board seats.">{% csrf_token %}<button type="submit">Certify results</button></form>{% endif %}
     </div>{% endif %}</div>
   <div class="split"><div>
-    {% if my_lots %}<section class="card"><h2>Your ballot</h2><form method="post" action="{% url 'election_action' e.pk 'ballot' %}">{% csrf_token %}
-      <p><label>For <select name="lot">{% for row in my_lots %}<option value="{{ row.lot.pk }}">Lot {{ row.lot.number }}{% if row.by_proxy %} (by proxy){% endif %}</option>{% endfor %}</select></label></p>
-      <p class="small muted">Choose up to {{ e.seats }}. Your choices are stored apart from your name: nobody can see how a lot voted.</p>
-      <ul class="list">{% for c in ballot %}<li><label class="grow"><input type="checkbox" name="candidates" value="{{ c.pk }}"> <strong>{{ c.person.display_name }}</strong>{% if c.statement %}<div class="small muted">{{ c.statement|truncatechars:240 }}</div>{% endif %}</label></li>{% endfor %}</ul>
-      <div class="form-actions"><button type="submit">Cast ballot</button></div></form></section>{% endif %}
+    {% if recorded %}<section class="card" id="ballot-recorded"><h2>Your ballot</h2>
+      <ul class="list">{% for r in recorded %}<li class="voted">{% icon "check-circle" %}<span class="grow">Lot {{ r.lot.number }}: your ballot was recorded.</span></li>{% endfor %}</ul>
+      <p class="small muted">Choices are stored apart from names, so nobody can see how a lot voted.</p></section>{% endif %}
+    {% if my_lots %}<section class="card" id="ballot"><h2>{% if recorded %}Another ballot to cast{% else %}Your ballot{% endif %}</h2>
+      <form method="post" action="{% url 'election_action' e.pk 'ballot' %}" data-confirm-ballot>{% csrf_token %}
+      {% if my_lots|length > 1 %}
+        <div class="alert info">{% icon "info" %}<span>You can cast {{ my_lots|length }} ballots here, one for each lot (including any you hold a proxy for). Choose the lot, cast its ballot, then come back for the next.</span></div>
+        <p><label for="ballot-lot">Ballot for<span class="required-mark" aria-hidden="true">*</span></label><select id="ballot-lot" name="lot" required>{% for row in my_lots %}<option value="{{ row.lot.pk }}">Lot {{ row.lot.number }}{% if row.lot.street_address %}, {{ row.lot.street_address }}{% endif %}{% if row.by_proxy %} (by proxy){% endif %}</option>{% endfor %}</select></p>
+      {% else %}
+        <input type="hidden" name="lot" value="{{ my_lots.0.lot.pk }}">
+        <p>Ballot for lot {{ my_lots.0.lot.number }}{% if my_lots.0.lot.street_address %}, {{ my_lots.0.lot.street_address }}{% endif %}{% if my_lots.0.by_proxy %} (by proxy){% endif %}.</p>
+      {% endif %}
+        <fieldset class="choices" data-max-choices="{{ e.seats }}">
+          <legend>Choose up to {{ e.seats }} <span class="ballot-count" data-choice-count aria-live="polite"></span></legend>
+          {% for c in ballot %}<label class="choice"><input type="checkbox" name="candidates" value="{{ c.pk }}" data-name="{{ c.person.display_name }}"><span class="choice-body"><strong>{{ c.person.display_name }}</strong>{% if c.statement %}{% if c.statement|length > 240 %}<details><summary>Read {{ c.person.display_name }}'s statement</summary><span class="statement">{{ c.statement|linebreaksbr }}</span></details>{% else %}<span class="statement small">{{ c.statement|linebreaksbr }}</span>{% endif %}{% endif %}</span></label>{% endfor %}
+        </fieldset>
+        <p class="small muted">Your choices are stored apart from your name: nobody can see how a lot voted. A ballot can't be changed once cast. Casting asks for your password or passkey again.</p>
+        <div class="form-actions"><button type="submit">{% icon "vote" %} Cast ballot</button></div></form></section>{% endif %}
+    {% if proxy_meeting %}<p class="small">Voting at {{ proxy_meeting.title }}, {{ proxy_meeting.starts_at|date:"F j, Y" }}? Can't attend? <a href="{% url 'meeting_detail' proxy_meeting.pk %}#proxy">Give a proxy</a></p>{% endif %}
     {% if results %}<section class="card"><h2>Certified results</h2><ul class="list">{% for r in results %}<li><span class="grow">{{ r.candidate.person.display_name }}</span><span class="num">{{ r.votes }}</span>{% if r.elected %}<span class="badge tone-success">Elected</span>{% endif %}</li>{% endfor %}</ul>
       <p class="small muted">Certified {{ e.certified_at|date:"M j, Y" }}.</p></section>
     {% elif tally %}<section class="card"><h2>Count (not yet certified)</h2><ul class="list">{% for r in tally.rows %}<li><span class="grow">{{ r.candidate.person.display_name }}</span><span class="num">{{ r.votes }}</span>{% if r.elected %}<span class="badge tone-success">Would be elected</span>{% elif r.tied %}<span class="badge tone-warning">Tied</span>{% endif %}</li>{% endfor %}</ul>
       <p class="small muted">{{ tally.ballots }} ballot{{ tally.ballots|pluralize }} of {{ e.eligible_lots }} lots.{% if tally.tie_for_last %} A tie for the last seat: resolve it as the Bylaws say, then record the seat.{% endif %} A board member who is not a candidate certifies.</p></section>{% endif %}
     <section class="card"><h2>Candidates</h2>
       {% if candidates %}<ul class="list">{% for c in candidates %}<li><div class="grow"><div class="title">{{ c.person.display_name }}{% if c.withdrawn %} <span class="badge">Withdrawn</span>{% elif not c.accepted %} <span class="badge tone-warning">Not yet accepted</span>{% endif %}</div>{% if c.statement %}<div class="small">{{ c.statement|linebreaksbr }}</div>{% endif %}</div>
-        {% if me and c.person_id == me.pk and not c.withdrawn %}{% if not c.accepted %}<form method="post" action="{% url 'election_action' e.pk 'accept' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><input type="text" name="statement" maxlength="3000" placeholder="A short statement (optional)" aria-label="Statement"><button type="submit" class="small">Accept</button></form>{% endif %}
-          <form method="post" action="{% url 'election_action' e.pk 'withdraw' %}">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><button type="submit" class="secondary small">Withdraw</button></form>{% elif can_manage and not c.accepted and not c.withdrawn %}<form method="post" action="{% url 'election_action' e.pk 'accept' %}">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><button type="submit" class="secondary small">Record acceptance</button></form>{% endif %}
+        {% if me and c.person_id == me.pk and not c.withdrawn %}{% if not c.accepted %}<form method="post" action="{% url 'election_action' e.pk 'accept' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><div class="grow"><label for="statement-{{ c.pk }}">Your statement (optional)</label><input id="statement-{{ c.pk }}" type="text" name="statement" maxlength="3000"></div><button type="submit" class="small">Accept</button></form>{% endif %}
+          <form method="post" action="{% url 'election_action' e.pk 'withdraw' %}" data-confirm="Withdraw from this election? You leave the ballot.">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><button type="submit" class="secondary small">Withdraw</button></form>{% elif can_manage and not c.accepted and not c.withdrawn %}<form method="post" action="{% url 'election_action' e.pk 'accept' %}">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><button type="submit" class="secondary small">Record acceptance</button></form>{% endif %}
       </li>{% endfor %}</ul>{% else %}<p class="muted small">No nominations yet.</p>{% endif %}
     </section></div>
     {% if can_nominate %}<aside><section class="card"><h2>Nominate</h2><form method="post" action="{% url 'election_action' e.pk 'nominate' %}">{% csrf_token %}
-      <p><label>Who <select name="lot"><option value="">Myself</option>{% for lot in owners %}<option value="{{ lot.pk }}">The owner at {{ lot.street_address|default:lot }}</option>{% endfor %}</select></label></p>
-      <p><label>Why (optional) <textarea name="statement" rows="3" maxlength="3000"></textarea></label></p>
+      <p><label for="nominee">Who</label><select id="nominee" name="lot"><option value="">Myself</option>{% for lot in owners %}<option value="{{ lot.pk }}">The owner at {{ lot.street_address|default:lot }}</option>{% endfor %}</select></p>
+      <p><label for="nominate-why">Why (optional)</label><textarea id="nominate-why" name="statement" rows="3" maxlength="3000"></textarea></p>
       <div class="form-actions"><button type="submit" class="secondary">Nominate</button></div>
       <p class="small muted">You may nominate yourself. Others must accept to appear on the ballot.</p></form></section></aside>{% endif %}
   </div>

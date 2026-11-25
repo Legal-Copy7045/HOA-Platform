@@ -29,13 +29,18 @@
     <p><strong>{{ quorum.represented }}</strong> of {{ quorum.eligible }} lots represented ({{ quorum.in_person }} in person, {{ quorum.by_proxy }} by proxy). Needed: {{ quorum.needed }} ({{ quorum.percent }}%).
       {% if quorum.met %}<span class="badge tone-success">Quorum met</span>{% else %}<span class="badge tone-warning">No quorum yet</span>{% endif %}</p>
     <p class="small muted">Counts owners marked present above, and proxies whose holder is present.</p></section>{% endif %}
-  {% if proxy_lots and m.status == "scheduled" %}<section class="card"><h2>Proxy</h2>
-    {% for p in proxies_mine %}<p class="small">Lot {{ p.lot.number }}: proxy held by {{ p.holder.display_name }}. <form method="post" action="{% url 'proxy_revoke' p.pk %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Revoke</button></form></p>{% endfor %}
-    <form method="post" action="{% url 'proxy_grant' m.pk %}" class="form-grid">{% csrf_token %}
-      <p><label>For my lot <select name="lot">{% for l in proxy_lots %}<option value="{{ l.pk }}">Lot {{ l.number }}</option>{% endfor %}</select></label></p>
-      <p><label>Give my proxy to a board member <select name="holder"><option value="">(choose)</option>{% for b in proxy_board %}<option value="{{ b.pk }}">{{ b.display_name }}</option>{% endfor %}</select></label></p>
-      <p><label>or to the owner of lot number <input type="number" name="holder_lot" min="1"></label></p>
+  {% if proxy_lots and m.status == "scheduled" %}<section class="card" id="proxy"><h2>Give a proxy</h2>
+    <p>Can't attend? A proxy lets someone you trust vote for your lot at this meeting.</p>
+    {% if proxies_mine %}<ul class="list">{% for p in proxies_mine %}<li><span class="grow">Lot {{ p.lot.number }}: your proxy is held by {{ p.holder.display_name }}.</span><form method="post" action="{% url 'proxy_revoke' p.pk %}" class="inline" data-confirm="Revoke the proxy for lot {{ p.lot.number }}? {{ p.holder.display_name }} can no longer vote for it.">{% csrf_token %}<button type="submit" class="secondary small">Revoke</button></form></li>{% endfor %}</ul>{% endif %}
+    <form method="post" action="{% url 'proxy_grant' m.pk %}" data-confirm="Give your proxy for this meeting? The person you chose can vote for your lot. You can revoke it until it is used.">{% csrf_token %}
+      {% if proxy_lots|length > 1 %}<p><label for="proxy-lot">For my lot<span class="required-mark" aria-hidden="true">*</span></label><select id="proxy-lot" name="lot" required>{% for l in proxy_lots %}<option value="{{ l.pk }}">Lot {{ l.number }}{% if l.street_address %}, {{ l.street_address }}{% endif %}</option>{% endfor %}</select></p>
+      <p class="help">You own {{ proxy_lots|length }} lots: give a proxy for each one separately.</p>
+      {% else %}<input type="hidden" name="lot" value="{{ proxy_lots.0.pk }}"><p>For lot {{ proxy_lots.0.number }}{% if proxy_lots.0.street_address %}, {{ proxy_lots.0.street_address }}{% endif %}.</p>{% endif %}
+      <fieldset><legend class="field-label">Who will hold your proxy<span class="required-mark" aria-hidden="true">*</span></legend>
+        <p><label for="proxy-holder">A board member</label><select id="proxy-holder" name="holder"><option value="">(choose)</option>{% for b in proxy_board %}<option value="{{ b.pk }}">{{ b.display_name }}</option>{% endfor %}</select></p>
+        <p><label for="proxy-home">or the owner at</label><select id="proxy-home" name="holder_home"><option value="">(choose a home)</option>{% for lot in proxy_homes %}<option value="{{ lot.pk }}">{{ lot.street_address|default:lot }}</option>{% endfor %}</select></p>
+      </fieldset>
       <div class="form-actions"><button type="submit" class="secondary">Give proxy</button></div></form>
-    <p class="small muted">The holder can vote for your lot at this meeting. Giving a new proxy replaces the old one.</p></section>{% endif %}
+    <p class="small muted">Giving a new proxy replaces the old one. Owners' names are not listed: choose a neighbor by their address.</p></section>{% endif %}
   {% if proxies_held %}<section class="card"><h2>Proxies you hold</h2><p class="small">{% for p in proxies_held %}Lot {{ p.lot.number }}{% if not forloop.last %}, {% endif %}{% endfor %}</p></section>{% endif %}
 {% endblock %}
