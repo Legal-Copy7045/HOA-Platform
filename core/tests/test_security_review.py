@@ -142,3 +142,91 @@ def test_attachments_obey_require_clean_scan(settings):
     settings.DOCUMENT_REQUIRE_CLEAN_SCAN = False
     assert scan_allows_download("unscanned") is True
     assert scan_allows_download("infected") is False
+
+
+# --- Ownership transfer privacy (A4, A7) ----------------------------------------
+
+
+@pytest.fixture
+def sold_lot(db):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from arc import services as arc
+    from arc.models import ArcRequest
+    from community import services as community
+    from community.models import Person
+    from community.tests.factories import LotFactory, make_member
+    from compliance import services as compliance
+    from compliance.models import Violation
+    from core.policy import SYSTEM
+    from core.scoping import system_access
+
+    lot = LotFactory()
+    board = make_member(board=True)
+    seller = make_member(lots=[lot])
+    old_arc = arc.create_request(lot=lot, title="Seller's deck", description="x", actor=seller)
+    resolved = compliance.report(lot=lot, category="trash", description="bins", actor=board)
+    compliance.VIOLATION.apply(resolved, "send_notice", actor=board)
+    compliance.respond(resolved, text="SELLER-PRIVATE-REPLY", actor=seller)
+    unresolved = compliance.report(lot=lot, category="trash", description="weeds", actor=board)
+    compliance.VIOLATION.apply(unresolved, "send_notice", actor=board)
+    a_month_ago = timezone.now() - timedelta(days=30)
+    with system_access("t"):
+        ArcRequest.objects.filter(pk=old_arc.pk).update(created_at=a_month_ago)
+        Violation.objects.filter(pk__in=[resolved.pk, unresolved.pk]).update(created_at=a_month_ago)
+        Violation.objects.filter(pk=resolved.pk).update(state="closed")
+    draft = compliance.report(lot=lot, category="trash", description="draft", actor=board)
+    buyer = make_member()
+    with system_access("t"):
+        buyer_person = Person.objects.get(user=buyer)
+    community.transfer_lot(
+        lot, new_owners=[buyer_person], transfer_date=timezone.localdate(), actor=SYSTEM
+    )
+    return {
+        "lot": lot,
+        "seller": seller,
+        "buyer": buyer,
+        "board": board,
+        "old_arc": old_arc,
+        "resolved": resolved,
+        "unresolved": unresolved,
+        "draft": draft,
+    }
+
+
+def test_buyer_cannot_see_sellers_arc_requests_or_closed_notices(sold_lot, client):
+    from django.urls import reverse
+
+    client.force_login(sold_lot["buyer"])
+    assert client.get(reverse("arc_detail", args=[sold_lot["old_arc"].pk])).status_code == 404
+    assert (
+        client.get(reverse("violation_detail", args=[sold_lot["resolved"].pk])).status_code == 404
+    )
+
+
+def test_buyer_sees_unresolved_notice_but_not_the_sellers_reply(sold_lot, client):
+    from django.urls import reverse
+
+    client.force_login(sold_lot["buyer"])
+    response = client.get(reverse("violation_detail", args=[sold_lot["unresolved"].pk]))
+    assert response.status_code == 200
+    assert b"SELLER-PRIVATE-REPLY" not in response.content
+    assert sold_lot["board"].email.encode() not in response.content  # role, not email
+
+
+def test_owner_never_sees_a_violation_before_notice(sold_lot, client):
+    from django.urls import reverse
+
+    client.force_login(sold_lot["buyer"])
+    assert client.get(reverse("violation_detail", args=[sold_lot["draft"].pk])).status_code == 404
+
+
+def test_board_still_sees_the_whole_history(sold_lot, client):
+    from django.urls import reverse
+
+    client.force_login(sold_lot["board"])
+    assert client.get(reverse("arc_detail", args=[sold_lot["old_arc"].pk])).status_code == 200
+    page = client.get(reverse("violation_detail", args=[sold_lot["resolved"].pk]))
+    assert b"SELLER-PRIVATE-REPLY" in page.content

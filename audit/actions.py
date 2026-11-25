@@ -127,7 +127,7 @@ _SPECS = [
     _spec("attachment.added", "File attached", "owner_type", "scan"),
     _spec("attachment.downloaded", "Attached file downloaded", "owner_type", "scan"),
     _spec("arc.created", "ARC request started", "lot_id"),
-    _spec("arc.affected_lots_set", "ARC affected lots recorded", "count"),
+    _spec("arc.affected_lots_set", "ARC affected lots recorded", "count", "added", "removed"),
     _spec("arc.position_recorded", "ARC reviewer position recorded"),
     _spec("arc.letter_downloaded", "ARC decision letter downloaded"),
     _spec("violation.reported", "Violation reported", "lot_id", "category"),

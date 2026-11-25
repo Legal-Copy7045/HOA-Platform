@@ -11,6 +11,7 @@ from community import services as community
 from community.models import Role
 from community.tests.factories import LotFactory, make_member
 from core.append_only import AppendOnlyError
+from core.scoping import system_access
 from core.workflow import WorkflowError
 from documents.tests.helpers import pdf
 
@@ -167,3 +168,80 @@ def test_files_are_kept_and_served_only_in_scope(client, w):
     assert client.get(reverse("arc_file", args=[req.pk, f.pk])).status_code == 200
     client.force_login(w["stranger"])
     assert client.get(reverse("arc_file", args=[req.pk, f.pk])).status_code == 404
+
+
+# --- Security review 2026-11 ------------------------------------------------------
+
+
+def test_recused_reviewer_cannot_clear_affected_lots_to_escape_recusal(w, client):
+    """Finding A2: clearing the list un-recused the reviewer, who then decided."""
+    req = submitted(w)
+    neighbour = w["neighbour_reviewer"]
+    with pytest.raises(services.ArcError, match="recused"):
+        services.set_affected_lots(req, [], actor=neighbour)
+    client.force_login(neighbour)
+    client.post(reverse("arc_affected", args=[req.pk]), {"lots": ""})
+    req.refresh_from_db()
+    assert services.is_recused(neighbour, req)
+    with pytest.raises(WorkflowError, match="recused"):
+        services.decide(req, outcome=ArcState.DENIED, reasons="No", citation="x", actor=neighbour)
+
+
+def test_affected_lots_can_only_be_added_once_review_starts(w):
+    req = submitted(w)  # in review, neighbour lot listed
+    with pytest.raises(services.ArcError, match="only be added"):
+        services.set_affected_lots(req, [], actor=w["manager"])
+    extra = LotFactory()
+    services.set_affected_lots(req, [w["neighbour_lot"], extra], actor=w["manager"])
+    with system_access("t"):
+        listed = set(req.affected_lots.values_list("pk", flat=True))
+    assert listed == {w["neighbour_lot"].pk, extra.pk}
+
+
+def test_affected_lots_frozen_after_decision(w):
+    req = submitted(w)
+    services.decide(req, outcome=ArcState.APPROVED, citation="x", actor=w["reviewer"])
+    req.refresh_from_db()
+    with pytest.raises(services.ArcError, match="only while the request is open"):
+        services.set_affected_lots(req, [LotFactory()], actor=w["manager"])
+
+
+def test_board_member_applicant_cannot_complete_own_request(w):
+    """Finding A5."""
+    lot = LotFactory()
+    board_owner = make_member(board=True, lots=[lot])
+    req = services.create_request(lot=lot, title="Shed", description="8x10", actor=board_owner)
+    services.ARC.apply(req, "submit", actor=board_owner)
+    req = services.ARC.apply(req, "accept", actor=w["manager"])
+    services.decide(req, outcome=ArcState.APPROVED, citation="x", actor=w["reviewer"])
+    req.refresh_from_db()
+    with pytest.raises(WorkflowError, match="recused"):
+        services.ARC.apply(req, "complete", actor=board_owner)
+    services.ARC.apply(req, "complete", actor=w["manager"])
+
+
+def test_denied_appeal_cannot_be_marked_complete(w):
+    req = submitted(w)
+    services.decide(req, outcome=ArcState.DENIED, reasons="Too tall", actor=w["reviewer"])
+    req.refresh_from_db()
+    services.ARC.apply(req, "appeal", actor=w["owner"], note="Please reconsider")
+    services.decide_appeal(req, outcome=ArcState.DENIED, reasons="Upheld", actor=w["board"])
+    req.refresh_from_db()
+    with pytest.raises(WorkflowError, match="denied"):
+        services.ARC.apply(req, "complete", actor=w["manager"])
+
+
+def test_deemed_approval_skips_a_request_decided_meanwhile(w, monkeypatch):
+    """Finding D11: one race aborted the whole daily run."""
+    first, second = submitted(w), submitted(w)
+    past = timezone.localdate() - timedelta(days=1)
+    ArcRequest.objects.unscoped("t").filter(pk__in=[first.pk, second.pk]).update(review_due_on=past)
+    real_apply = services.ARC.apply
+
+    def racing_apply(req, action, **kwargs):
+        if req.pk == first.pk and kwargs.get("actor") is services.SYSTEM:
+            raise WorkflowError("already decided")
+        return real_apply(req, action, **kwargs)
+
+    monkeypatch.setattr(services.ARC, "apply", racing_apply)
+    assert services.apply_deemed_approvals() == 1

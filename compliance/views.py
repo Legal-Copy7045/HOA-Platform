@@ -69,7 +69,11 @@ def violation_detail(request, pk):
             "actions": actions,
             "history": services.VIOLATION.history(v),
             "action_url_name": "violation_action",
-            "responses": v.responses.all(),
+            # Owners see only their own written responses, never an earlier
+            # owner's (review A4); the board sees them all.
+            "responses": v.responses.all()
+            if policy.can(request.user, "lot.view_all")
+            else v.responses.filter(person_id=policy.roles_for(request.user).person_id),
             "photos": attachments.attachments_for(v),
             "can_respond": any(
                 t.action == "respond" for t in services.VIOLATION.available(v, request.user)

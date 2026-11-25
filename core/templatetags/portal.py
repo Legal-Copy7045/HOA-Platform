@@ -156,3 +156,30 @@ def humanize_action(action: str) -> str:
         head, _, tail = text.partition(".")
         return f"{head.capitalize()}: {tail.replace('.', ' ')}"
     return text.capitalize()
+
+
+@register.simple_tag(takes_context=True)
+def actor_label(context, actor) -> str:
+    """Who took a workflow step, as an owner may see it (review A4).
+
+    Board, managers and auditors see the login; owners see a role, never a
+    staff member's or a previous owner's email address.
+    """
+    from core import policy
+
+    if actor is None:
+        return "automatic"
+    viewer = context.get("user")
+    if viewer is not None and getattr(viewer, "pk", None) == actor.pk:
+        return "you"
+    if viewer is not None and policy.can(viewer, "lot.view_all"):
+        return actor.email
+    groups = policy.roles_for(actor).groups
+    for group, label in (
+        (policy.BOARD, "the board"),
+        (policy.ARC_REVIEWER, "the architectural committee"),
+        (policy.MANAGER, "the management company"),
+    ):
+        if group in groups:
+            return label
+    return "an owner"

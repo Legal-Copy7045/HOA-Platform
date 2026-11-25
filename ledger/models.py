@@ -174,6 +174,13 @@ class CollectionCase(ScopedModel):
 
 class ResaleRequest(ScopedModel):
     scope_lot_path = "lot"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        from core.scoping import owner_era_q
+
+        return queryset.filter(owner_era_q(roles))
+
     objects = ScopedQuerySet.as_manager()
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")

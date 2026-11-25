@@ -176,3 +176,15 @@ class ScopedModel(models.Model):
     def validate_constraints(self, exclude=None):
         with system_access("model validation"):
             return super().validate_constraints(exclude)
+
+
+def owner_era_q(roles, *, lot_path: str = "lot", created_field: str = "created_at") -> models.Q:
+    """Rows about the owner's lots created since *this* owner's ownership began.
+
+    A buyer must not read the seller's ARC requests, notices or resale
+    paperwork (security review 2026-11, finding A4).
+    """
+    condition = models.Q(pk__in=[])
+    for lot_id, since in roles.owned_since:
+        condition |= models.Q(**{f"{lot_path}_id": lot_id, f"{created_field}__date__gte": since})
+    return condition

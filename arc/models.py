@@ -60,6 +60,13 @@ class ArcRequest(ScopedModel):
     objects = ArcRequestQuerySet.as_manager()
     scope_lot_path = "lot"
 
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        from core.scoping import owner_era_q
+
+        mine = models.Q(applicant_id=roles.person_id) if roles.person_id else models.Q(pk__in=[])
+        return queryset.filter(owner_era_q(roles) | mine)
+
     class Meta:
         ordering = ["-created_at"]
 

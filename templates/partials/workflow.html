@@ -19,7 +19,7 @@
     <ol class="timeline">
       {% for e in history %}
         <li><div class="what">{{ e.action|humanize_action }} <span class="muted small">→ {{ e.to_state|state_label }}</span></div>
-          <div class="when">{{ e.created_at|date:"M j, Y g:i A" }} · {% if e.actor %}{{ e.actor.email }}{% else %}automatic{% endif %}</div>
+          <div class="when">{{ e.created_at|date:"M j, Y g:i A" }} · {% actor_label e.actor %}</div>
           {% if e.note %}<div class="note">{{ e.note }}</div>{% endif %}</li>
       {% endfor %}
     </ol>

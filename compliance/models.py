@@ -52,6 +52,19 @@ class Violation(ScopedModel):
     objects = ScopedQuerySet.as_manager()
     scope_lot_path = "lot"
 
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        """Owners see a violation once notice is sent (review A7), and only
+        those from their own time owning the lot, plus any still unresolved
+        (the new owner inherits the condition to cure) (review A4)."""
+        from core.scoping import owner_era_q
+
+        unresolved = models.Q(
+            lot_id__in=roles.owned_lot_ids,
+            state__in=[ViolationState.NOTICED, ViolationState.RESPONDED, ViolationState.HEARING],
+        )
+        return queryset.exclude(state=ViolationState.OPEN).filter(owner_era_q(roles) | unresolved)
+
     class Meta:
         ordering = ["-created_at"]
 

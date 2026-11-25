@@ -132,6 +132,9 @@ class Roles:
     owned_lot_ids: frozenset[int] = frozenset()
     person_id: int | None = None
     offices: frozenset[str] = field(default_factory=frozenset)
+    # (lot_id, start date of the current ownership) for each owned lot, so lot
+    # records from before this owner's time can be hidden (review A4).
+    owned_since: tuple[tuple[int, datetime.date], ...] = ()
 
     def has(self, group: str) -> bool:
         return group in self.groups
@@ -150,9 +153,12 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         person = Person.objects.filter(user=user).only("pk").first()
         if person is None:
             return NO_ROLES
-        lots = frozenset(
-            Ownership.objects.filter(person=person).active(on).values_list("lot_id", flat=True)
-        )
+        since: dict[int, datetime.date] = {}
+        for lot_id, start in (
+            Ownership.objects.filter(person=person).active(on).values_list("lot_id", "start_date")
+        ):
+            since[lot_id] = min(start, since.get(lot_id, start))
+        lots = frozenset(since)
         groups = set()
         if lots:
             groups.add(OWNER)
@@ -164,7 +170,7 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
         offices = frozenset(
             OfficeHolding.objects.filter(person=person).active(on).values_list("office", flat=True)
         )
-    return Roles(frozenset(groups), lots, person.pk, offices)
+    return Roles(frozenset(groups), lots, person.pk, offices, tuple(sorted(since.items())))
 
 
 def can(user, action: str, on: datetime.date | None = None) -> bool:

@@ -59,6 +59,9 @@ def test_only_board_decides_and_needs_a_note(w):
 
 
 def test_owners_see_only_their_lot(client, w):
+    # Not before notice is sent: a reported violation is internal (review A7).
+    assert not Violation.objects.for_user(w["owner"]).exists()
+    services.VIOLATION.apply(w["v"], "send_notice", actor=w["manager"])
     assert list(Violation.objects.for_user(w["owner"])) == [w["v"]]
     assert not Violation.objects.for_user(w["other"]).exists()
     client.force_login(w["other"])

@@ -199,8 +199,12 @@ def arc_position(request, pk):
 @require_POST
 def arc_attach(request, pk):
     req = _get(request, pk)
+    # The owner adds files to their draft; intake adds them while the request
+    # is open, and never to a request they are recused from (review A5).
     allowed = (services.owns_lot(request.user, req) and req.state == ArcState.DRAFT) or (
         policy.can(request.user, "arc.intake")
+        and req.state in services.AFFECTED_LOTS_STATES
+        and not services.is_recused(request.user, req)
     )
     if not allowed or "file" not in request.FILES:
         messages.error(request, "Files can be added to a draft by the owner, or by intake.")
@@ -245,6 +249,10 @@ def arc_affected(request, pk):
     ]
     # Intake roles name neighbouring lots by number; only the numbers are used.
     lots = list(Lot.objects.unscoped("affected lots by number").filter(number__in=numbers))
-    services.set_affected_lots(req, lots, actor=request.user, request=request)
-    messages.success(request, "Affected lots recorded.")
+    try:
+        services.set_affected_lots(req, lots, actor=request.user, request=request)
+    except services.ArcError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Affected lots recorded.")
     return redirect("arc_detail", pk=req.pk)

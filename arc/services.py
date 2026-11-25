@@ -49,6 +49,17 @@ def _lot_owner(obj, actor):
     return None if owns_lot(actor, obj) else "Only an owner of this lot can do this."
 
 
+def _may_complete(obj, actor):
+    problem = _not_recused(obj, actor)
+    if problem:
+        return problem
+    if obj.state == ArcState.APPEAL_DECIDED:
+        latest = obj.decisions.order_by("-decided_at", "-id").first()
+        if latest is None or latest.outcome == ArcState.DENIED:
+            return "A denied project cannot be marked complete."
+    return None
+
+
 def _within_appeal_window(obj, actor):
     problem = _lot_owner(obj, actor)
     if problem:
@@ -152,6 +163,7 @@ ARC = Workflow(
             ArcState.COMPLETED,
             "arc.intake",
             "Mark project complete",
+            guard=_may_complete,
         ),
     ],
 )
@@ -189,23 +201,53 @@ def create_request(
     return req
 
 
+AFFECTED_LOTS_STATES = {ArcState.SUBMITTED, ArcState.IN_REVIEW, ArcState.APPEAL}
+
+
 def set_affected_lots(req: ArcRequest, lots, *, actor, request=None) -> None:
+    """Neighbouring lots whose owners must not review this request.
+
+    Security review 2026-11 (A2): a reviewer who owned an affected lot could
+    clear the list and then decide. Now a recused person can never change it,
+    changes are allowed only while the request is open, and once review has
+    started lots can only be added (removing one could un-recuse someone).
+    """
     require(actor, "arc.intake")
-    with system_access("set affected lots"):
-        req.affected_lots.set(lots)
+    with transaction.atomic(), system_access("set affected lots"):
+        req = ArcRequest.objects.select_for_update().get(pk=req.pk)
+        if req.state not in AFFECTED_LOTS_STATES:
+            raise ArcError("Affected lots can be changed only while the request is open.")
+        if is_recused(actor, req):
+            raise ArcError("You are recused from this request.")
+        current = set(req.affected_lots.values_list("pk", flat=True))
+        wanted = {lot.pk for lot in lots} - {req.lot_id}
+        removed = current - wanted
+        if removed and req.state != ArcState.SUBMITTED:
+            raise ArcError(
+                "Once review has started, affected lots can only be added. "
+                "Ask the board if one was added by mistake."
+            )
+        req.affected_lots.set(wanted)
     record_event(
         "arc.affected_lots_set",
         actor=actor,
         request=request,
         target=req,
-        metadata={"count": len(lots)},
+        metadata={
+            "count": len(wanted),
+            "added": " ".join(sorted(str(n) for n in wanted - current)),
+            "removed": " ".join(sorted(str(n) for n in removed)),
+        },
     )
 
 
+@transaction.atomic
 def record_position(
     req: ArcRequest, *, position: str, comment: str = "", actor, request=None
 ) -> ReviewerVote:
     require(actor, "arc.decide")
+    with system_access("lock arc request"):
+        req = ArcRequest.objects.select_for_update().get(pk=req.pk)
     if req.state != ArcState.IN_REVIEW:
         raise ArcError("Positions are recorded while a request is in review.")
     if is_recused(actor, req):
@@ -326,19 +368,23 @@ def apply_deemed_approvals(today: datetime.date | None = None) -> int:
     with system_access("deemed approvals"):
         overdue = list(ArcRequest.objects.filter(state=ArcState.IN_REVIEW, review_due_on__lt=today))
     for req in overdue:
-        with transaction.atomic():
-            req = ARC.apply(
-                req, "approve", actor=SYSTEM, note="Deemed approved: review period expired."
-            )
-            _record_decision(
-                req,
-                outcome=ArcState.APPROVED,
-                reasons="Review period expired.",
-                conditions="",
-                citation=citation or "deemed-approval rule",
-                actor=SYSTEM,
-                deemed=True,
-            )
+        try:
+            with transaction.atomic():
+                req = ARC.apply(
+                    req, "approve", actor=SYSTEM, note="Deemed approved: review period expired."
+                )
+                _record_decision(
+                    req,
+                    outcome=ArcState.APPROVED,
+                    reasons="Review period expired.",
+                    conditions="",
+                    citation=citation or "deemed-approval rule",
+                    actor=SYSTEM,
+                    deemed=True,
+                )
+        except WorkflowError:
+            # Decided by a person in the meantime: leave it, carry on with the rest.
+            continue
         count += 1
     return count
 
@@ -375,14 +421,14 @@ def decision_letter(req: ArcRequest, decision: Decision) -> bytes:
     if decision.reasons:
         body += [("normal", ""), ("normal", "Reasons:"), ("normal", decision.reasons)]
     body += [("normal", ""), ("normal", f"Governing provision: {decision.citation}")]
-    days = rule("arc.appeal_days")
-    if days and not decision.is_appeal:
+    if req.appeal_due_on and not decision.is_appeal:
+        # The deadline fixed when the decision was made, not today's rule.
         body += [
             ("normal", ""),
             (
                 "normal",
-                f"You may appeal this decision to the board within "
-                f"{days} days through the owner portal.",
+                f"You may appeal this decision to the board through the owner portal "
+                f"until {req.appeal_due_on:%B} {req.appeal_due_on.day}, {req.appeal_due_on.year}.",
             ),
         ]
     body += [("normal", ""), ("small", "Generated by the association's owner portal.")]
