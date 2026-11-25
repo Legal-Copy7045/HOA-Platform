@@ -157,3 +157,19 @@ def test_mfa_changes_are_audited(rf, owner):
     )
     event = AuditEvent.objects.get(action="mfa.authenticator_removed")
     assert event.metadata == {"type": "totp"}
+
+
+def test_code_from_the_previous_window_is_accepted(client, owner):
+    from accounts.tests.helpers import totp_code
+
+    _password_login(client, owner.email)
+    client.post(reverse("mfa_authenticate"), {"code": totp_code(owner.totp_secret, -1)})
+    assert _session_user(client) == str(owner.pk)
+
+
+def test_code_from_two_windows_ago_is_refused(client, owner):
+    from accounts.tests.helpers import totp_code
+
+    _password_login(client, owner.email)
+    client.post(reverse("mfa_authenticate"), {"code": totp_code(owner.totp_secret, -3)})
+    assert _session_user(client) is None

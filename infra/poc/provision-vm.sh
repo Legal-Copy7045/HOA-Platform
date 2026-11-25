@@ -34,6 +34,9 @@ apt-get -y -q upgrade
 apt-get -y -q install ca-certificates curl git ufw unattended-upgrades qemu-guest-agent
 systemctl enable --now qemu-guest-agent >/dev/null 2>&1 || true
 
+say "Enabling network time sync (authenticator-app codes depend on an accurate clock)"
+timedatectl set-ntp true
+
 say "Enabling automatic security updates"
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'CONF'
 APT::Periodic::Update-Package-Lists "1";

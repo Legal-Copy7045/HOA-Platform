@@ -150,6 +150,9 @@ MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_PASSKEY_SIGNUP_ENABLED = False
 MFA_TRUST_ENABLED = False  # never skip the second factor on a "trusted" browser
 MFA_TOTP_ISSUER = env("SITE_NAME", default="Oak Creek Farms HOA")
+# Accept the code from the neighbouring 30-second window too (RFC 6238 s.5.2),
+# so a code typed as it rolls over, or a few seconds of clock drift, still works.
+MFA_TOTP_TOLERANCE = 1
 MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = False
 MFA_RECOVERY_CODE_COUNT = 10
 
