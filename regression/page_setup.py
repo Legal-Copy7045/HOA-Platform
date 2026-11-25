@@ -66,7 +66,8 @@ def sessions(out: str) -> None:
         owned = Ownership.objects.active().exclude(person__board_seats__isnull=False)
         # The owner of the last lot: the board's crawl reaches low-numbered lots
         # first, so "owner is refused board page" tests someone else's lot.
-        owner = owned.select_related("person").order_by("-lot__number").first().person
+        first = owned.select_related("person", "lot").order_by("-lot__number").first()
+        owner, owner_lot = first.person, first.lot
     result = {
         "board": login(board, "reg-board@example.com"),
         "owner": login(owner, "reg-owner@example.com"),
@@ -79,7 +80,35 @@ def sessions(out: str) -> None:
     }
     Path(out).write_text(json.dumps(result), encoding="utf-8")
 
+    # A signed-out tester for the passkey stage: password + authenticator app.
+    from accounts.tests.helpers import PASSWORD
+    from community.tests.factories import days_ago
+
+    email = "reg-passkey@example.com"
+    tester = User.objects.filter(email=email).first()
+    if tester is None:
+        tester = User.objects.create_user(email, password=PASSWORD)
+        person = services.record_person(display_name="Passkey Tester", email=email, actor=SYSTEM)
+        services.link_login(person, tester, actor=SYSTEM)
+        services.record_ownership(
+            person=person, lot=owner_lot, start_date=days_ago(10), actor=SYSTEM
+        )
+    Authenticator.objects.filter(user=tester).delete()
+    secret = enroll_totp(tester)
+    Path(out).with_name("passkey-user.json").write_text(
+        json.dumps({"email": email, "password": PASSWORD, "secret": secret}), encoding="utf-8"
+    )
+
+
+def totp(secret: str) -> None:
+    import django
+
+    django.setup()
+    from accounts.tests.helpers import current_totp
+
+    print(current_totp(secret))
+
 
 if __name__ == "__main__":
     command, arg = sys.argv[1], sys.argv[2]
-    reset_db(arg) if command == "reset-db" else sessions(arg)
+    {"reset-db": reset_db, "sessions": sessions, "totp": totp}[command](arg)

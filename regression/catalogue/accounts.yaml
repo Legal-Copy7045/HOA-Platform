@@ -6,7 +6,7 @@
 - feature: "Mandatory MFA (passkey or app) for every account; enrollment only in the accepting session"
   since: M1
   docs: docs/decisions.md
-  match: ["^unit:accounts/tests/test_signin", "^manual:(passkey sign-in|authenticator app|enrollment window)"]
+  match: ["^unit:accounts/tests/test_signin", "^page:passkey: ", "^manual:(passkey sign-in|authenticator app|enrollment window)"]
 - feature: "Passwords: 12+ characters, common and breached-password checks (fail-open)"
   since: M1
   match: ["^unit:accounts/tests/test_passwords"]

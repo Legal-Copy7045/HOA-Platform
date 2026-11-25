@@ -66,5 +66,7 @@
   </main>
 {% endif %}
   <script src="{% static 'js/app.js' %}"></script>
+  {# allauth puts page scripts here (passkey sign-in form and script, recovery codes). #}
+  {% block extra_body %}{% endblock %}
 </body>
 </html>

@@ -357,6 +357,7 @@ def stage_page(st: Stage) -> None:
     env["DATABASE_URL"] = f"postgres://hoa_owner:hoa_owner@localhost:5432/{db}"
     steps = [
         ("fresh database", [PY, "regression/page_setup.py", "reset-db", db]),
+        ("cache table", [PY, "manage.py", "createcachetable"]),
         ("migrate", [PY, "manage.py", "migrate", "--noinput"]),
         ("seed demo community", [PY, "manage.py", "seed_demo"]),
         (
@@ -410,6 +411,36 @@ def stage_page(st: Stage) -> None:
                 item["status"],
                 item.get("detail", ""),
                 "regression/out/logs/page-crawl.log",
+            )
+        # Passkey sign-in end to end (WebAuthn needs a host name, not an IP).
+        totp_cmd = f"{PY} {HERE / 'page_setup.py'} totp"
+        code, text = run(
+            [
+                "node",
+                str(HERE / "passkey.js"),
+                f"http://localhost:{PAGE_PORT}",
+                str(OUT / "passkey-user.json"),
+                totp_cmd,
+            ],
+            env=env,
+            log="page-passkey.log",
+            timeout=300,
+        )
+        lines = [ln for ln in text.splitlines() if ln.startswith("{")]
+        for line in lines:
+            item = json.loads(line)
+            st.add(
+                item["check"],
+                item["status"],
+                item.get("detail", ""),
+                "regression/out/logs/page-passkey.log",
+            )
+        if not lines:
+            st.add(
+                "passkey: flow completed",
+                "fail",
+                tail(text),
+                "regression/out/logs/page-passkey.log",
             )
     finally:
         os.killpg(server.pid, signal.SIGTERM)

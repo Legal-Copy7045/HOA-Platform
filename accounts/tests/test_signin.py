@@ -211,3 +211,12 @@ def test_reauthentication_never_offers_an_emailed_code():
     ids = {flow["id"] for flow in get_reauthentication_flows(user)}
     assert "reauthenticate_by_code" not in ids
     assert ids & {"reauthenticate", "mfa_reauthenticate"}
+
+
+def test_sign_in_page_carries_the_passkey_form_and_script(client):
+    """The passkey button submits a hidden form that allauth adds in the
+    layout's extra_body slot; without the slot the button did nothing."""
+    page = client.get(reverse("account_login")).content
+    assert b'id="passkey_login"' in page
+    assert b'<form id="mfa_login"' in page
+    assert b'data-allauth-onload="allauth.webauthn.forms.loginForm"' in page

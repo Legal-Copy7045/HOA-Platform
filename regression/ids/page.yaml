@@ -1,6 +1,6 @@
 # Stable check IDs for the page stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: PAGE-565
+# highest issued: PAGE-569
 PAGE-001: "board: / loads"
 PAGE-002: "board: / has no console or CSP errors"
 PAGE-003: "board: / fits a phone screen"
@@ -566,3 +566,7 @@ PAGE-562: "board: /board/branding/ has no console or CSP errors"
 PAGE-563: "board: /board/branding/ fits a phone screen"
 PAGE-564: "owner is refused board page /board/branding/"
 PAGE-565: "setup: fresh database"
+PAGE-566: "passkey: signs in with password and authenticator app"
+PAGE-567: "passkey: adds a passkey"
+PAGE-568: "passkey: signs in with the passkey alone"
+PAGE-569: "passkey: no console errors during passkey flows"
