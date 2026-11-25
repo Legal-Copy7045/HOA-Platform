@@ -4,7 +4,7 @@ from django.urls import include, path, re_path
 
 from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
-from core import preview
+from core import hub_views, preview
 from core.followups import set_follow_up
 from core.my_items_views import my_items_page
 from core.views import export_my_data, feature_settings, healthz, home, system_status
@@ -26,6 +26,8 @@ urlpatterns = [
     path("board/sysadmin-activity/", sysadmin_activity, name="sysadmin_activity"),
     path("my-items/", my_items_page, name="my_items"),
     path("board/features/", feature_settings, name="feature_settings"),
+    path("board/setup/", hub_views.settings_hub, name="settings_hub"),
+    path("community-info/", hub_views.community_info, name="community_info"),
     re_path(
         r"^follow-up/(?P<kind>violation|collection|work_order)/(?P<pk>[0-9]+)/$",
         set_follow_up,

@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from core import policy
+from core.dashboard import proxy_meetings
 from core.workflow_views import transition_view
 from documents.models import Document
 from governance import services
@@ -209,11 +210,21 @@ def records_requests(request):
         return (
             redirect("records_request_detail", pk=obj.pk) if obj else redirect("records_requests")
         )
+    from core.scoping import own_records, wants_mine
+
     rows = RecordsRequest.objects.for_user(request.user).select_related("requester")
+    mine = wants_mine(request) or not can_manage
+    if mine and can_manage:
+        rows = own_records(rows, request.user)
     return render(
         request,
         "governance/records_requests.html",
-        {"rows": rows, "can_submit": can_submit, "can_manage": can_manage},
+        {
+            "rows": rows,
+            "can_submit": can_submit,
+            "can_manage": can_manage and not mine,
+            "mine": mine,
+        },
     )
 
 
@@ -235,6 +246,57 @@ def records_request_detail(request, pk):
 records_request_action = transition_view(
     model=RecordsRequest, workflow=services.RECORDS, detail_url_name="records_request_detail"
 )
+
+
+# --- Voting (votes and elections on one page) -------------------------------------------
+
+
+@login_required
+def voting(request):
+    """Owners' one "Voting" page: open and past votes and polls, and board
+    elections. Each half follows its own feature switch."""
+    from core import features
+    from governance import elections as election_services
+    from governance.models import Election, ElectionParticipation
+
+    policy.require(request.user, "vote.view")
+    show_votes = features.enabled("votes", request)
+    show_elections = features.enabled("elections", request)
+    if not (show_votes or show_elections):
+        raise Http404
+    user = request.user
+    can_manage = policy.can(user, "vote.manage")
+    roles = policy.roles_for(user)
+    vote_rows, election_rows = [], []
+    if show_votes:
+        rows = Vote.objects.all()
+        if not can_manage:
+            rows = rows.exclude(status="draft")
+        for v in sorted(rows[:50], key=lambda v: v.status != "open"):
+            vote_rows.append({"vote": v, "voted": services.my_ballots(v, user)})
+    if show_elections:
+        for e in Election.objects.all()[:20]:
+            election_rows.append(
+                {
+                    "election": e,
+                    "can_vote": bool(election_services.lots_actor_may_vote_for(e, user)),
+                    "voted": ElectionParticipation.objects.filter(
+                        election=e, lot_id__in=roles.owned_lot_ids
+                    ).exists()
+                    if roles.owned_lot_ids
+                    else False,
+                }
+            )
+    return render(
+        request,
+        "governance/voting.html",
+        {
+            "vote_rows": vote_rows,
+            "election_rows": election_rows,
+            "show_votes": show_votes,
+            "show_elections": show_elections,
+        },
+    )
 
 
 # --- Votes ---------------------------------------------------------------------------------
@@ -298,6 +360,8 @@ def vote_detail(request, pk):
         {
             "vote": vote,
             "choices": services.ballot_choices_for(vote, request.user),
+            "my_ballots": services.my_ballots(vote, request.user),
+            "proxy_meetings": proxy_meetings(request.user),
             "results": services.results(vote) if show_results else None,
             "can_manage": can_manage,
             "voters": voters,

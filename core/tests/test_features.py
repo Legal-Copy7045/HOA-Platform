@@ -29,10 +29,10 @@ def test_defaults_reservations_off_everything_else_on():
 
 def test_switched_off_feature_leaves_menu_and_pages_404(client, w):
     client.force_login(w["owner"])
-    assert b'href="/faq/"' in client.get(reverse("home")).content
+    assert b'href="/faq/"' in client.get(reverse("community_info")).content
     features.set_feature("faq", False, actor=w["board"])
     assert client.get(reverse("faq")).status_code == 404
-    assert b'href="/faq/"' not in client.get(reverse("home")).content
+    assert b'href="/faq/"' not in client.get(reverse("community_info")).content
     features.set_feature("faq", True, actor=w["board"])
     assert client.get(reverse("faq")).status_code == 200
 

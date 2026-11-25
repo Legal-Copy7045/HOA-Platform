@@ -46,9 +46,9 @@ def test_board_dashboard_lists_invoice_waiting_for_me(client):
     )
     ops.INVOICE.apply(inv, "submit", actor=manager)
     client.force_login(board)
-    assert "1 invoice needs your approval" in client.get(reverse("home")).content.decode()
+    assert "Needs your approval" in client.get(reverse("home")).content.decode()
     client.force_login(manager)  # entered it: never asked to approve
-    assert "needs your approval" not in client.get(reverse("home")).content.decode()
+    assert "Needs your approval" not in client.get(reverse("home")).content.decode()
 
 
 @pytest.mark.parametrize(
@@ -56,7 +56,7 @@ def test_board_dashboard_lists_invoice_waiting_for_me(client):
     [
         ([Role.SYSADMIN], ["System status", "Invitations"], ["Owner accounts", "People", "My lot"]),
         ([Role.AUDITOR], ["Owner accounts", "Reports"], ["Approvals", "People"]),
-        ([Role.MANAGER], ["Invoices", "Tasks"], ["Approvals", "People"]),
+        ([Role.MANAGER], ["Invoices", "Board tasks"], ["Approvals", "People"]),
     ],
 )
 def test_sidebar_by_role(client, roles, present, absent):

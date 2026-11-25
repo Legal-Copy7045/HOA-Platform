@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ heading }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>{{ heading }}</h1><p class="subtitle">{{ subtitle }}</p></div></div>
+  <ul class="tiles">
+    {% for link in links %}<li><a class="tile" href="{{ link.url }}">{% icon link.icon %}<div><strong>{{ link.label }}</strong><span>{{ link.text }}</span></div></a></li>{% endfor %}
+  </ul>
+{% endblock %}

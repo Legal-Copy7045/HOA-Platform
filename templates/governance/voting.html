@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Voting · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "governance/gov_nav.html" %}
+  <div class="page-head"><div><h1>Voting</h1><p class="subtitle">Votes and polls of the owners, and board elections. Open ballots are listed first.</p></div></div>
+  {% if show_votes %}
+  <section class="card">
+    <div class="card-head"><h2>Votes and polls</h2><a class="small" href="{% url 'votes' %}">All votes and polls</a></div>
+    {% if vote_rows %}<ul class="list">{% for row in vote_rows %}{% with v=row.vote %}
+      <li><div class="todo-icon">{% icon "vote" %}</div>
+        <div class="grow"><a class="title" href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a>
+          <div class="small muted">{{ v.get_kind_display }}{% if v.closes_at %} · closes {{ v.closes_at|short_date }}{% endif %}{% if row.voted %} · {% if v.secret %}Your ballot was recorded{% else %}You voted on {{ row.voted.0.cast_at|date:"M j, Y" }}{% endif %}{% endif %}</div></div>
+        {% status v.status v.get_status_display %}</li>
+    {% endwith %}{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="vote" title="No votes yet" %}{% endif %}
+  </section>
+  {% endif %}
+  {% if show_elections %}
+  <section class="card">
+    <div class="card-head"><h2>Board elections</h2><a class="small" href="{% url 'elections' %}">All elections</a></div>
+    {% if election_rows %}<ul class="list">{% for row in election_rows %}{% with e=row.election %}
+      <li><div class="todo-icon">{% icon "users" %}</div>
+        <div class="grow"><a class="title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a>
+          <div class="small muted">{{ e.seats }} seat{{ e.seats|pluralize }}{% if row.can_vote %} · Your ballot is open{% elif row.voted %} · Your ballot was recorded{% endif %}</div></div>
+        {% status e.state e.get_state_display %}</li>
+    {% endwith %}{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="users" title="No elections yet" %}{% endif %}
+  </section>
+  {% endif %}
+  {% if user|can:"vote.cast" %}<p class="small muted">Can't attend a meeting where owners vote? Open the meeting from <a href="{% url 'meetings' %}">Meetings</a> and give a proxy.</p>{% endif %}
+{% endblock %}
