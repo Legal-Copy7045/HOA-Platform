@@ -216,3 +216,12 @@ def follow_up_form(context, kind, obj):
         "allowed": policy.can(user, perms[kind]),
         "csrf_token": context.get("csrf_token"),
     }
+
+
+@register.filter
+def get_item(mapping, key):
+    """{{ dict|get_item:key }} for dictionaries keyed by a variable."""
+    try:
+        return mapping.get(key)
+    except AttributeError:
+        return None

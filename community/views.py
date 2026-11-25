@@ -387,22 +387,28 @@ def approvals(request):
 @login_required
 def community_settings(request):
     policy.require(request.user, "lot.view_all")
+    from community import pa_law
     from community.models import CommonArea, CommunityProfile, GoverningRule
-    from community.rules import REGISTRY, cents_display
+    from community.rules import REGISTRY, cents_display, rule_origin
 
     rows = {r.key: r for r in GoverningRule.objects.all()}
     needing = {s.key for s in rules_needing_attention()}
     groups: dict[str, list] = {}
     for spec in REGISTRY.values():
         row = rows.get(spec.key)
+        guide = pa_law.guide(spec.key)
+        origin = rule_origin(spec.key)
         raw = row.value if row and row.value != "" else (spec.default or "")
-        shown = cents_display(int(raw)) if spec.kind == "cents" and raw else raw
+        effective = raw or (guide.fallback if guide and origin == "pa_law" else "")
+        shown = cents_display(int(effective)) if spec.kind == "cents" and effective else effective
         groups.setdefault(spec.group, []).append(
             {
                 "spec": spec,
                 "row": row,
                 "raw": raw,
                 "shown": shown,
+                "guide": guide,
+                "origin": origin,
                 "needs_attention": spec.key in needing,
             }
         )
@@ -412,6 +418,8 @@ def community_settings(request):
         "community/settings.html",
         {
             "groups": groups,
+            "group_notes": pa_law.GROUP_NOTES,
+            "pa_disclaimer": pa_law.DISCLAIMER,
             "profile_form": forms.ProfileForm(
                 initial={
                     "legal_name": profile.legal_name,

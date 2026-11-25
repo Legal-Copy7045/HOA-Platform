@@ -167,33 +167,62 @@ def validate_value(key: str, raw: str) -> str:
     return raw
 
 
-def rule(key: str):
-    """The rule's current value (parsed), the default, or None if unset."""
+def _resolve(key: str) -> tuple[str | None, str, str]:
+    """(raw value, citation, origin) where origin is "recorded", "default",
+    "pa_law" (a statutory fallback, community/pa_law.py) or "unset"."""
     from community.models import GoverningRule
+    from community.pa_law import guide
 
     spec = REGISTRY[key]
     row = GoverningRule.objects.filter(key=key).first()
-    raw = row.value if row and row.value != "" else spec.default
-    return _parse(spec, raw)
+    citation = row.citation if row else ""
+    if row and row.value != "":
+        return row.value, citation, "recorded"
+    if spec.default is not None:
+        return spec.default, citation, "default"
+    g = guide(key)
+    if g and g.fallback is not None:
+        return g.fallback, g.fallback_citation, "pa_law"
+    return None, citation, "unset"
+
+
+def rule(key: str):
+    """The rule's value (parsed): the board's recorded value, else the default,
+    else the Pennsylvania statutory fallback, else None."""
+    raw, _citation, _origin = _resolve(key)
+    return _parse(REGISTRY[key], raw)
 
 
 def rule_with_citation(key: str) -> tuple[object, str]:
-    from community.models import GoverningRule
+    raw, citation, _origin = _resolve(key)
+    return _parse(REGISTRY[key], raw), citation
 
-    row = GoverningRule.objects.filter(key=key).first()
-    return rule(key), (row.citation if row else "")
+
+def rule_origin(key: str) -> str:
+    return _resolve(key)[2]
 
 
 def rules_needing_attention() -> list[RuleSpec]:
-    """Rules with no value, or a value but no citation."""
+    """Rules with no value, or a value but no citation. A statutory fallback
+    carries its own citation, so it does not need attention (though the
+    board should still check its documents don't set something stricter)."""
     from community.models import GoverningRule
+    from community.pa_law import guide
 
     rows = {r.key: r for r in GoverningRule.objects.all()}
     missing = []
     for spec in REGISTRY.values():
         row = rows.get(spec.key)
-        has_value = (row and row.value != "") or spec.default is not None
-        if not has_value or not (row and row.citation):
+        if row and row.value != "":
+            if not row.citation:
+                missing.append(spec)
+            continue
+        if spec.default is not None:
+            if not (row and row.citation):
+                missing.append(spec)
+            continue
+        g = guide(spec.key)
+        if not (g and g.fallback is not None):
             missing.append(spec)
     return missing
 

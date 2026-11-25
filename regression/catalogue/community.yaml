@@ -36,3 +36,6 @@
 - feature: "Former owners: read-only login showing only their own records from their time"
   since: M3
   match: ["^unit:community/tests/test_accounts.py::test_(former_owner|owners_cannot_open_my_history)"]
+- feature: "Community settings show PA law guidance (source, statute, example); statutory fallbacks for meeting notice, quorum and resale deadline"
+  since: M3
+  match: ["^unit:community/tests/test_pa_law"]

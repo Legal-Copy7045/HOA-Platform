@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-797
+# highest issued: UNIT-801
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -795,3 +795,7 @@ UNIT-794: "operations/tests/test_requests.py::test_invoice_approval_is_in_my_ite
 UNIT-795: "core/tests/test_append_only_coverage.py::test_append_only_model_is_fully_protected[comms.ThreadMessage]"
 UNIT-796: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[my_items]"
 UNIT-797: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[my_items]"
+UNIT-798: "community/tests/test_pa_law.py::test_every_setting_has_guidance_and_every_group_a_note"
+UNIT-799: "community/tests/test_pa_law.py::test_statutory_fallbacks_apply_when_nothing_is_recorded"
+UNIT-800: "community/tests/test_pa_law.py::test_a_recorded_value_overrides_the_fallback"
+UNIT-801: "community/tests/test_pa_law.py::test_settings_page_shows_the_guidance"

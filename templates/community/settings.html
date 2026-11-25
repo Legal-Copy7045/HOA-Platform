@@ -2,7 +2,8 @@
 {% load portal %}
 {% block title %}Community settings · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Community settings</h1><p class="subtitle">Numbers here come from the Declaration, the bylaws or a recorded board decision. Each needs a citation. Money is entered in cents (e.g. 600 for $6.00).</p></div></div>
+  <div class="page-head"><div><h1>Community settings</h1><p class="subtitle">Numbers here come from the Declaration, the Bylaws, the Rules and Regulations or a recorded board decision. Each needs a citation. Money is entered in cents (e.g. 600 for $6.00).</p></div></div>
+  <div class="alert info">{% icon "book" %}<span>Each setting shows where it usually comes from, what Pennsylvania law says, and an example. Where the Act supplies a value when your documents are silent, it is used as a <strong>PA law fallback</strong> until you record your own. {{ pa_disclaimer }}</span></div>
 
   <section class="card"><h2>Association</h2>
     {% if can_edit %}<form method="post" action="{% url 'community_profile_save' %}" class="form-grid">{% csrf_token %}{{ profile_form }}<div class="form-actions"><button type="submit">Save</button></div></form>
@@ -11,8 +12,14 @@
 
   {% for group, rules in groups.items %}
     <section class="card rules"><h2>{{ group }}</h2>
+      {% with note=group_notes|get_item:group %}{% if note %}<p class="small muted pa-note">{% icon "book" %} {{ note }}</p>{% endif %}{% endwith %}
       <ul class="list">{% for r in rules %}<li class="rule{% if r.needs_attention %} attention{% endif %}">
-        <div class="grow rule-text"><div class="title">{{ r.spec.label }}{% if r.needs_attention %} <span class="status tone-warning">needs attention</span>{% endif %}</div>{% if r.spec.help %}<div class="small muted">{{ r.spec.help }}</div>{% endif %}</div>
+        <div class="grow rule-text"><div class="title">{{ r.spec.label }}{% if r.needs_attention %} <span class="status tone-warning">needs attention</span>{% elif r.origin == "pa_law" %} <span class="status tone-info">PA law fallback</span>{% endif %}</div>{% if r.spec.help %}<div class="small muted">{{ r.spec.help }}</div>{% endif %}
+          {% if r.guide %}<details class="rule-guide"><summary class="small">Usually set in: {{ r.guide.source }} · PA law and an example</summary>
+            <dl class="kv small"><dt>PA law</dt><dd>{{ r.guide.law }}</dd>
+              <dt>Example</dt><dd>{{ r.guide.example }}</dd>
+              {% if r.guide.fallback %}<dt>Fallback</dt><dd>{{ r.guide.fallback }}{% if r.spec.kind == "percent" %}%{% elif r.spec.kind == "days" %} days{% endif %} ({{ r.guide.fallback_citation }}), used until you record a value.</dd>{% endif %}</dl>
+          </details>{% endif %}</div>
         {% if can_edit %}
           <form method="post" action="{% url 'community_rule_save' %}" class="rule-form inline-form">{% csrf_token %}
             <input type="hidden" name="key" value="{{ r.spec.key }}">
@@ -20,7 +27,7 @@
             <div class="grow"><label class="small" for="c-{{ r.spec.key }}">Citation</label><input id="c-{{ r.spec.key }}" name="citation" value="{{ r.row.citation|default:'' }}" placeholder="Declaration §"></div>
             <button type="submit" class="secondary small">Save</button>
           </form>
-        {% else %}<div class="rule-value"><strong>{{ r.shown|default:"-" }}</strong><div class="small muted">{{ r.row.citation|default:"No citation" }}</div></div>{% endif %}
+        {% else %}<div class="rule-value"><strong>{{ r.shown|default:"-" }}</strong><div class="small muted">{% if r.origin == "pa_law" %}{{ r.guide.fallback_citation }}{% else %}{{ r.row.citation|default:"No citation" }}{% endif %}</div></div>{% endif %}
       </li>{% endfor %}</ul>
     </section>
   {% endfor %}
