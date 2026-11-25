@@ -34,6 +34,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from arc.models import (
+    NEIGHBOR_VISIBLE_STATES,
     ArcRequest,
     ArcState,
     LotNeighbor,
@@ -45,7 +46,7 @@ from arc.models import (
     SignoffState,
 )
 from audit.services import record_event
-from comms.notify import send_update
+from comms.notify import send_now, send_update
 from community.models import Lot, Ownership
 from community.rules import rule
 from core import policy
@@ -296,11 +297,15 @@ def submit_if_acknowledged(req: ArcRequest) -> bool:
     """Once nothing is waiting, a request awaiting acknowledgements goes to
     the board, and the applicant is told."""
     from arc.services import ARC, _waiting_acknowledgements
+    from core.workflow import WorkflowError
 
     req.refresh_from_db()
     if req.state != ArcState.NEIGHBORS or _waiting_acknowledgements(req):
         return False
-    ARC.apply(req, "acknowledged", actor=SYSTEM)
+    try:
+        ARC.apply(req, "acknowledged", actor=SYSTEM)
+    except WorkflowError:
+        return False  # another answer arriving at the same moment already sent it on
     with system_access("applicant email"):
         user = getattr(req.applicant, "user", None)
     if user is not None and user.is_active and user.email:
@@ -332,19 +337,25 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
     _require_arrange(actor, req)
     base = settings.PORTAL_BASE_URL
     sent = {"portal": 0, "link": 0, "no_contact": 0}
-    messages: list[tuple[str, str]] = []
+    messages: list[tuple[str, str, bool]] = []  # (email, link, single-use link?)
+    # A neighbor is emailed at most once a day, however often the button is
+    # pressed (SEC-006).
+    recent = timezone.now() - datetime.timedelta(hours=23)
     expires = timezone.now() + datetime.timedelta(days=settings.SIGNOFF_LINK_DAYS)
     with transaction.atomic(), system_access("send signoffs"):
         pending = SignoffRequest.objects.select_for_update(of=("self",)).filter(
             arc_request=req, state=SignoffState.PENDING
         )
         for signoff in pending.select_related("lot"):
+            if signoff.sent_at and signoff.sent_at > recent:
+                continue
             portal_emails, link_emails = set(), set()
             if signoff.lot_id:
                 for o in _owners_of(signoff.lot_id):
                     user = o.person.user
-                    if user is not None and user.is_active:
-                        portal_emails.add(user.email)
+                    if user is not None:
+                        if user.is_active:  # a locked login gets no link (SEC-006)
+                            portal_emails.add(user.email)
                     elif o.person.email:
                         link_emails.add(o.person.email)
             elif signoff.email:
@@ -359,15 +370,15 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
                 sent["no_contact"] += 1
                 continue
             for email in portal_emails:
-                messages.append((email, base + reverse("signoff_detail", args=[signoff.pk])))
+                messages.append((email, base + reverse("signoff_detail", args=[signoff.pk]), False))
                 sent["portal"] += 1
             for email in link_emails:
-                messages.append((email, base + reverse("signoff_link", args=[token])))
+                messages.append((email, base + reverse("signoff_link", args=[token]), True))
                 sent["link"] += 1
             SignoffRequest.objects.filter(pk=signoff.pk).update(sent_at=timezone.now())
     where = single_line(req.lot.street_address)
     subject = f"[{settings.SITE_NAME}] Please review your neighbor's project"
-    for email, link in messages:
+    for email, link, single_use in messages:
         body = (
             f"Your neighbor at {where} is applying to the architectural committee for "
             "an exterior project. Before the committee reviews it, each neighbor is asked "
@@ -376,7 +387,11 @@ def send_signoffs(req: ArcRequest, *, actor, request=None) -> dict:
             "Your acknowledgement and any comments go to the committee, which makes the "
             f"decision. If you did not expect this, you can ignore it.\n\n-- \n{settings.SITE_NAME}"
         )
-        send_update({email}, subject=subject, body=body, link=link)
+        if single_use:
+            # Never into the weekly digest: only the link's hash is stored (SEC-006).
+            send_now({email}, subject=subject, body=body)
+        else:
+            send_update({email}, subject=subject, body=body, link=link)
     record_event(
         "arc.signoffs_sent",
         actor=_user(actor),
@@ -402,11 +417,15 @@ def signoff_for_token(token: str) -> SignoffRequest | None:
         )
     if signoff is None or not signoff.token_expires_at or signoff.token_expires_at < timezone.now():
         return None
+    if signoff.arc_request.state not in NEIGHBOR_VISIBLE_STATES:
+        return None  # withdrawn or decided: the plans are no longer shown (SEC-005)
     return signoff
 
 
 def may_answer_in_portal(user, signoff: SignoffRequest) -> bool:
-    if signoff.state != SignoffState.PENDING or not signoff.lot_id:
+    if signoff.state != SignoffState.PENDING or not signoff.lot_id or not signoff.sent_at:
+        return False
+    if signoff.arc_request.state not in NEIGHBOR_VISIBLE_STATES:
         return False
     if not can(user, "arc.submit"):  # owners on the deed answer for their lot
         return False
@@ -444,6 +463,11 @@ def respond(
     elif channel in (SignoffChannel.PAPER, SignoffChannel.AI):
         if actor is not SYSTEM and not can(actor, "arc.intake"):
             raise PermissionDenied("signoff")
+        if actor is not SYSTEM:
+            from arc.services import is_recused
+
+            if is_recused(actor, signoff.arc_request):
+                raise PermissionDenied("recused")
     elif channel != SignoffChannel.LINK:
         raise SignoffError("Unknown channel.")
     with transaction.atomic(), system_access("record signoff"):
@@ -765,15 +789,31 @@ def _date(value):
 
 
 def confirm_proposal(
-    proposal: SignoffProposal, *, actor, position=None, signer_name=None, request=None
+    proposal: SignoffProposal,
+    *,
+    actor,
+    position=None,
+    signer_name=None,
+    retarget: SignoffRequest | None = None,
+    request=None,
 ) -> SignoffResponse:
     """A person (or SYSTEM when automatic confirming is on) accepts what the
     reader proposed, optionally correcting it. Recorded as a paper sign-off
     with the scanned form as evidence."""
     if actor is not SYSTEM and not can(actor, "arc.intake"):
         raise PermissionDenied("signoff")
+    if actor is not SYSTEM:
+        from arc.services import is_recused
+
+        if is_recused(actor, proposal.reading.arc_request):
+            raise PermissionDenied("recused")
     if proposal.state != "pending":
         raise SignoffError("This has already been dealt with.")
+    if retarget is not None:
+        if retarget.arc_request_id != proposal.reading.arc_request_id:
+            raise SignoffError("That neighbor is not on this request.")
+        SignoffProposal.objects.filter(pk=proposal.pk).update(signoff=retarget)
+        proposal.refresh_from_db()
     if proposal.signoff is None:
         raise SignoffError("Choose which neighbor this signature belongs to.")
     reading = proposal.reading
@@ -795,6 +835,10 @@ def confirm_proposal(
 
 def reject_proposal(proposal: SignoffProposal, *, actor) -> None:
     require(actor, "arc.intake")
+    from arc.services import is_recused
+
+    if is_recused(actor, proposal.reading.arc_request):
+        raise PermissionDenied("recused")
     SignoffProposal.objects.filter(pk=proposal.pk, state="pending").update(
         state="rejected", decided_by=actor
     )

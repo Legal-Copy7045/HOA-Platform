@@ -34,10 +34,45 @@ def home(request):
     )
 
 
+def _send_test_email(request):
+    """Only to the signed-in person's own address, so the button cannot be
+    used to email anyone else. Audited."""
+    from django.contrib import messages
+    from django.core.mail import send_mail
+    from django.shortcuts import redirect
+
+    from audit.services import record_event
+    from core.email import EmailUnavailable
+
+    ok = True
+    try:
+        send_mail(
+            f"[{settings.SITE_NAME}] Test email",
+            "This is a test email from the portal. If you can read it, outgoing email works.",
+            None,
+            [request.user.email],
+        )
+    except EmailUnavailable:
+        ok = False
+    record_event("system.test_email_sent", actor=request.user, request=request, metadata={"ok": ok})
+    if ok:
+        where = "the redirect inbox" if settings.EMAIL_REDIRECT_ALL_TO else "your email address"
+        messages.success(request, f"Test email sent to {where}. Check the inbox (and spam).")
+    else:
+        messages.error(
+            request,
+            "The mail server refused or did not answer. Check the EMAIL_ settings in .env "
+            "(see Outgoing email below), restart, and try again.",
+        )
+    return redirect("system_status")
+
+
 @login_required
 def system_status(request):
     """Operations view for sysadmins: health only, no owner data (decision D9)."""
     policy.require(request.user, "system.view_status")
+    if request.method == "POST" and request.POST.get("action") == "test_email":
+        return _send_test_email(request)
     executor = MigrationExecutor(connection)
     pending = executor.migration_plan(executor.loader.graph.leaf_nodes())
     with connection.cursor() as cursor:

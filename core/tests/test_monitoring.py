@@ -68,3 +68,20 @@ def test_status_page_shows_checks_to_sysadmins_only(client):
     assert b"Health checks" in page and b"Background worker" in page
     client.force_login(make_member(lots=[]))
     assert client.get(reverse("system_status")).status_code == 403
+
+
+def test_send_me_a_test_email_goes_only_to_me(client, settings):
+    from audit.models import AuditEvent
+
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    admin = make_member(roles=[Role.SYSADMIN])
+    client.force_login(admin)
+    response = client.post(
+        reverse("system_status"), {"action": "test_email", "to": "someone@example.com"}
+    )
+    assert response.status_code == 302
+    assert [m.to for m in mail.outbox] == [[admin.email]]
+    assert AuditEvent.objects.filter(action="system.test_email_sent").exists()
+    owner = make_member(lots=[])
+    client.force_login(owner)
+    assert client.post(reverse("system_status"), {"action": "test_email"}).status_code == 403

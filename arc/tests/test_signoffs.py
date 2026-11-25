@@ -70,6 +70,10 @@ def applicant_lot_start():
 
 def _send(w, django_capture_on_commit_callbacks):
     signoffs.prepare_signoffs(w["req"], actor=w["applicant"])
+    # As after "Request Neighbor Acknowledgements": neighbors see only a
+    # request that has left draft.
+    arc.ArcRequest.objects.unscoped("t").filter(pk=w["req"].pk).update(state="neighbors")
+    w["req"].refresh_from_db()
     with django_capture_on_commit_callbacks(execute=True):
         return signoffs.send_signoffs(w["req"], actor=w["applicant"])
 
@@ -477,3 +481,79 @@ def test_forms_uploaded_under_the_old_label_stay_hidden_from_neighbors(
     page = client.get(reverse("signoff_detail", args=[row.pk])).content
     assert b"old.pdf" not in page
     assert client.get(reverse("signoff_file", args=[row.pk, old.pk])).status_code == 404
+
+
+# --- Regression review fixes (SEC-002, SEC-005, SEC-006, BUG-001/002/007/008/009) ----------
+
+
+def test_recused_staff_cannot_record_paper_answers_on_their_own_request(w):
+    from arc.models import ScanReading, SignoffProposal
+
+    own_lot = LotFactory()
+    applicant_board = make_member(board=True, lots=[own_lot])
+    signoffs.set_neighbors(own_lot, left=w["far_lot"], actor=w["board"])
+    req = arc.create_request(lot=own_lot, title="Shed", description="8x10", actor=applicant_board)
+    with system_access("t"):
+        row = SignoffRequest.objects.get(arc_request=req)
+    with pytest.raises(PermissionDenied):
+        signoffs.respond(
+            row, position="approved", signer_name="X", channel="paper", actor=applicant_board
+        )
+    reading = ScanReading.objects.create(arc_request=req, attachment_id=0, requested_by=w["board"])
+    proposal = SignoffProposal.objects.create(reading=reading, signoff=None, position="approved")
+    with pytest.raises(PermissionDenied):
+        signoffs.confirm_proposal(proposal, actor=applicant_board, retarget=row)
+    proposal.refresh_from_db()
+    assert proposal.signoff_id is None  # the retarget did not stick
+
+
+def test_neighbors_do_not_see_a_draft_or_a_closed_request(
+    client, w, django_capture_on_commit_callbacks
+):
+    with system_access("t"):
+        row = SignoffRequest.objects.get(arc_request=w["req"], lot=w["portal_lot"])
+    client.force_login(w["neighbor"])
+    assert client.get(reverse("signoff_detail", args=[row.pk])).status_code == 404
+    assert b"Rear fence" not in client.get(reverse("signoffs_mine")).content
+    with django_capture_on_commit_callbacks(execute=True):
+        arc.ARC.apply(w["req"], "request_acknowledgements", actor=w["applicant"])
+    assert client.get(reverse("signoff_detail", args=[row.pk])).status_code == 200
+    token = _link_token(next(m for m in mail.outbox if m.to == ["pat.paper@example.com"]))
+    arc.ARC.apply(w["req"], "withdraw", actor=w["applicant"])
+    assert client.get(reverse("signoff_detail", args=[row.pk])).status_code == 404
+    assert client.get(reverse("signoff_link", args=[token])).status_code == 404
+
+
+def test_reminders_at_most_daily_and_links_never_in_the_digest(
+    w, django_capture_on_commit_callbacks
+):
+    from comms.models import DigestItem
+
+    _send(w, django_capture_on_commit_callbacks)
+    first = len(mail.outbox)
+    with django_capture_on_commit_callbacks(execute=True):
+        again = signoffs.send_signoffs(w["req"], actor=w["applicant"])
+    assert again == {"portal": 0, "link": 0, "no_contact": 0} and len(mail.outbox) == first
+    assert not DigestItem.objects.filter(link__contains="/s/").exists()
+
+
+def test_a_neighbor_on_the_board_is_recused_before_submission(w):
+    board_neighbor = make_member(board=True)
+    with system_access("t"):
+        bn = Person.objects.get(user=board_neighbor)
+    community.record_ownership(
+        person=bn, lot=w["portal_lot"], start_date=applicant_lot_start(), actor=SYSTEM
+    )
+    assert arc.is_recused(board_neighbor, w["req"])
+
+
+def test_simultaneous_last_answers_do_not_error(w, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        arc.ARC.apply(w["req"], "request_acknowledgements", actor=w["applicant"])
+    with system_access("t"):
+        SignoffRequest.objects.filter(arc_request=w["req"]).update(state="approved")
+    assert signoffs.submit_if_acknowledged(w["req"]) is True
+    arc.ArcRequest.objects.unscoped("t").filter(pk=w["req"].pk).update(state="neighbors")
+    # A second call that finds the state already moved simply returns False.
+    arc.ArcRequest.objects.unscoped("t").filter(pk=w["req"].pk).update(state="submitted")
+    assert signoffs.submit_if_acknowledged(w["req"]) is False

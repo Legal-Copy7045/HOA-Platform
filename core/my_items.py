@@ -378,11 +378,16 @@ def items_for(user) -> list[Item]:
                 )
             )
     if can(user, "arc.submit") and roles.owned_lot_ids:
-        from arc.models import SignoffRequest
+        from arc.models import NEIGHBOR_VISIBLE_STATES, SignoffRequest
 
         for so in (
             SignoffRequest.objects.for_user(user)
-            .filter(lot_id__in=roles.owned_lot_ids, state="pending", sent_at__isnull=False)
+            .filter(
+                lot_id__in=roles.owned_lot_ids,
+                state="pending",
+                sent_at__isnull=False,
+                arc_request__state__in=NEIGHBOR_VISIBLE_STATES,
+            )
             .select_related("arc_request__lot")
         ):
             out.append(

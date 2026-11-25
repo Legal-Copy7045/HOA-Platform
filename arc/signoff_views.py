@@ -195,10 +195,9 @@ def arc_signoff_action(request, pk, action):
             signoffs.reject_proposal(proposal, actor=user)
             messages.success(request, "Proposal discarded.")
         else:
+            target = None
             if request.POST.get("signoff"):
                 target = get_object_or_404(_of(req), pk=request.POST["signoff"])
-                SignoffProposal.objects.filter(pk=proposal.pk).update(signoff=target)
-                proposal.refresh_from_db()
             _flash(
                 request,
                 lambda: signoffs.confirm_proposal(
@@ -206,6 +205,7 @@ def arc_signoff_action(request, pk, action):
                     actor=user,
                     position=request.POST.get("position") or None,
                     signer_name=request.POST.get("signer_name") or None,
+                    retarget=target,
                     request=request,
                 ),
                 "Acknowledgement recorded from the scanned form.",

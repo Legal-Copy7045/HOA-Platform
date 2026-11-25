@@ -32,8 +32,13 @@ def is_recused(user, req: ArcRequest) -> bool:
         return False
     if person_id == req.applicant_id:
         return True
+    from arc.signoffs import neighbors_of
+
     with system_access("recusal check"):
         lots = {req.lot_id, *req.affected_lots.values_list("pk", flat=True)}
+        # The lot's recorded neighbors are affected from the start, not only
+        # once submitted (BUG-007).
+        lots |= {lot.pk for lot in neighbors_of(req.lot)}
         return Ownership.objects.active().filter(person_id=person_id, lot_id__in=lots).exists()
 
 

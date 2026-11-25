@@ -210,6 +210,15 @@ class SignoffState(models.TextChoices):
     WITHDRAWN = "withdrawn", "No longer asked"
 
 
+# Request states in which a neighbor can still view and answer a waiting request.
+NEIGHBOR_VISIBLE_STATES = (
+    ArcState.NEIGHBORS,
+    ArcState.SUBMITTED,
+    ArcState.IN_REVIEW,
+    ArcState.APPEAL,
+)
+
+
 class SignoffRequest(ScopedModel):
     """One neighbor (a lot, or an extra address) asked to sign off on an ARC
     request. Their answer is an append-only SignoffResponse; ``state`` mirrors
@@ -243,10 +252,18 @@ class SignoffRequest(ScopedModel):
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):
-        """Owners see the sign-offs asked of their own lot (their neighbors'
-        projects), and those on their own ARC requests."""
+        """Owners see the acknowledgements asked of their own lot (their
+        neighbors' projects) once they were actually asked: never a draft, and
+        a waiting one only while the request is still open (BUG-002, BUG-008);
+        and those on their own ARC requests."""
+        asked = models.Q(lot_id__in=roles.owned_lot_ids, sent_at__isnull=False) & ~models.Q(
+            arc_request__state=ArcState.DRAFT
+        )
+        still_open = ~models.Q(state=SignoffState.PENDING) | models.Q(
+            arc_request__state__in=NEIGHBOR_VISIBLE_STATES
+        )
         return queryset.filter(
-            models.Q(lot_id__in=roles.owned_lot_ids)
+            (asked & still_open)
             | models.Q(
                 arc_request__applicant_id=roles.person_id,
                 arc_request__lot_id__in=roles.owned_lot_ids,
