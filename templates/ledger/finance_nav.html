@@ -1,4 +1,4 @@
-{% with p=request.path %}
+{% load portal %}{% with p=request.path %}
 <nav class="subnav" aria-label="Finance">
   <a href="{% url 'ledger_home' %}"{% if "/finance/ledger" in p %} aria-current="page"{% endif %}>Owner accounts</a>
   <a href="{% url 'invoices' %}"{% if "/finance/invoices" in p %} aria-current="page"{% endif %}>Invoices</a>
@@ -6,7 +6,7 @@
   <a href="{% url 'vendors' %}"{% if "/finance/vendors" in p %} aria-current="page"{% endif %}>Vendors</a>
   <a href="{% url 'budgets' %}"{% if "/finance/budgets" in p %} aria-current="page"{% endif %}>Budgets</a>
   <a href="{% url 'collections' %}"{% if "/finance/collections" in p %} aria-current="page"{% endif %}>Collections</a>
-  <a href="{% url 'resales' %}"{% if "/resale" in p %} aria-current="page"{% endif %}>Resale</a>
+  {% if user|can:"resale.request" %}<a href="{% url 'resales' %}"{% if "/resale" in p %} aria-current="page"{% endif %}>Resale</a>{% endif %}
   <a href="{% url 'reports' %}"{% if "/reports" in p %} aria-current="page"{% endif %}>Reports</a>
 </nav>
 {% endwith %}

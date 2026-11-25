@@ -346,3 +346,25 @@ def test_coverage_warns_when_fewer_than_two_people_can_act(world):
     assert policy.thinly_covered_actions()["ownership.manage"] == 1
     make_member(board=True)
     assert "ownership.manage" not in policy.thinly_covered_actions()
+
+
+def test_whole_board_is_told_when_a_seat_is_recorded(django_capture_on_commit_callbacks):
+    """Review A3 mitigation: a single member could otherwise quietly create a
+    second board login for themselves."""
+    from unittest import mock
+
+    from community.models import SeatType
+    from community.tests.factories import PersonFactory, days_ago
+
+    board = make_member(board=True)
+    with (
+        mock.patch("community.tasks.notify_board.defer") as defer,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        services.record_board_seat(
+            person=PersonFactory(),
+            seat_type=SeatType.OWNER_ELECTED,
+            term_start=days_ago(1),
+            actor=board,
+        )
+    defer.assert_called_once_with(kind="board_seat_recorded")

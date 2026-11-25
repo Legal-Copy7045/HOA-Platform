@@ -272,6 +272,10 @@ def record_board_seat(
             )
     except IntegrityError as exc:
         raise CommunityError("That person already holds a seat during that period.") from exc
+    if actor is not SYSTEM:
+        # Review A3: one member recording a seat could create a second board
+        # login for themselves; the whole board now hears about every seat.
+        _board_notice("board_seat_recorded")
     return seat
 
 
@@ -415,6 +419,8 @@ def grant_role(
     if role == Role.ARC_REVIEWER and appointed_by not in AppointedBy.values:
         raise CommunityError("Record who appointed this ARC member (board or declarant).")
     _refuse_self_grant(actor, person, "a role")
+    if actor is not SYSTEM:
+        _board_notice("role_granted")
     return _record_role(
         person=person,
         role=role,

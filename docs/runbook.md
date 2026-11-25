@@ -46,8 +46,15 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
 git pull --ff-only && sudo bash infra/poc/start-portal.sh
 ```
 
-The `migrate` service applies migrations (as the owner role) before web and
-worker start. The sysadmin **System status** page shows the deployed commit.
+The script stops the containers first (data volumes are kept), so expect a
+few seconds of downtime. The `migrate` service applies migrations (as the
+owner role) before web and worker start; web and worker then check they are
+connected as the app role and refuse to start otherwise. The sysadmin
+**System status** page shows the deployed commit.
+
+POC only: to (re)load demo data the `.env` must also contain
+`DEPLOYMENT_STAGE=poc` (added by `make-env.sh` since the 2026-11 security
+review; add it by hand to an older `.env`).
 
 ## Day-to-day checks
 
@@ -125,6 +132,20 @@ Board → Community settings. Every value needs a citation (Declaration,
 bylaws, or the board resolution that set it). Demo data cites "DEMO -
 replace": replace every one before real use.
 
+## Malware scanning
+
+Off on the POC (`DOCUMENT_SCANNER=none`; System status shows it). To enable:
+add a ClamAV container, set `DOCUMENT_SCANNER=clamd`,
+`DOCUMENT_CLAMD_ADDRESS=clamav:3310` and `DOCUMENT_REQUIRE_CLEAN_SCAN=true`,
+restart, then scan what is already stored:
+
+```bash
+dc exec web python manage.py rescan_files --actor you@example.org --reason "scanner enabled"
+```
+
+Run it again whenever the scanner's signatures update; a file found infected
+later is blocked from download immediately.
+
 ## Break-glass (sysadmin, on the server)
 
 For data fixes the portal cannot do. Each requires your sysadmin login email
@@ -194,3 +215,8 @@ password manager and the POC VM's `.env`.
 - [ ] At least two board members with MFA for every action
       (`check_coverage` clean).
 - [ ] Owner sign-in help page and spare hardware security keys ready.
+- [ ] Malware scanning on (`DOCUMENT_SCANNER=clamd`,
+      `DOCUMENT_REQUIRE_CLEAN_SCAN=true`) and `rescan_files` run.
+- [ ] HSTS one year with subdomains (`SECURE_HSTS_SECONDS=31536000`,
+      `SECURE_HSTS_INCLUDE_SUBDOMAINS=true`) once every subdomain serves HTTPS.
+- [ ] Board decisions in `docs/security-review-2026-11.md` section 3 made.

@@ -17,6 +17,8 @@ ignore = ["RUF012"]
 "**/tests/**" = ["S101", "S105", "S106", "S608"]
 "**/migrations/**" = ["E501", "RUF"]
 "conftest.py" = ["S101"]
+# Local test tooling: runs fixed commands and parses its own pytest output.
+"regression/**" = ["S603", "S607", "S314", "S310", "E501"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings.test"

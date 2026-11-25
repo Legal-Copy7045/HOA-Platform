@@ -15,6 +15,11 @@ NOTICES = {
     "different board member must approve it in the portal.",
     "mfa_reset_approved": "A sign-in reset was approved. The account's authenticators were "
     "removed and all its sessions signed out.",
+    "board_seat_recorded": "A board seat was recorded in the portal. If you did not expect "
+    "a new board member, check the People page and the audit log now: board members can "
+    "approve invoices, resets and sysadmin nominations.",
+    "role_granted": "An ARC, auditor or manager role was granted in the portal. Check the "
+    "People page if you did not expect it.",
     "mfa_reset_code_locked": "A sign-in reset code was locked after too many wrong entries. "
     "Someone other than the owner may have been trying it. Contact the owner directly; "
     "start a new reset once you are sure who you are speaking to.",

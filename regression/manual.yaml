@@ -1,0 +1,31 @@
+# Checks that need a person (a real phone, a real mailbox, the real VM). Not run
+# automatically: every report lists them as "need a person" until done.
+# `last` = when it was last done and what happened (no names, no addresses).
+- key: passkey sign-in on a phone
+  check: "Sign in with a passkey on an iPhone and an Android phone through portal-dev (Cloudflare Access first)."
+  steps: "New private window; Access login; portal 'Sign in with a passkey'; confirm the home page loads."
+  last: "2026-11-25: passkey and authenticator app set up by the first officer on desktop"
+- key: authenticator app codes accepted
+  check: "A code from an authenticator app is accepted at sign-in, including one taken just before it rolls over."
+  steps: "Sign out; sign in with password; enter a code with 2-3 seconds left on it."
+  last: "2026-11-25: works after the tolerance fix"
+- key: invitation email arrives and works
+  check: "A board invitation reaches a real mailbox (Hostinger, SPF/DKIM pass) and the link creates the account in that browser."
+  steps: "Invite a test person; check the message headers for dkim=pass; accept; add a passkey within the hour."
+  last: "not done yet (POC redirects mail to one inbox)"
+- key: enrollment window expiry
+  check: "An invited person who closes the browser before adding a passkey or app is shown 'Your account isn't set up yet' next time and needs a new invitation."
+  steps: "Accept an invitation, close the browser without enrolling; sign in again with the password."
+  last: "not done yet"
+- key: assisted reset end to end
+  check: "Two board members reset a lost authenticator; the code works once in the owner's browser; the owner enrolls a new one."
+  steps: "Board member A starts the reset, B approves and reads the code by phone, the owner signs in and enters it."
+  last: "not done yet (needs a second board member)"
+- key: restore drill
+  check: "Restore last night's encrypted backup into a scratch VM and run migrations (required before real data)."
+  steps: "docs/runbook.md 'Backups'; record the time it took."
+  last: "not done yet"
+- key: deploy on the POC VM
+  check: "git pull and start-portal.sh on the VM bring every service up healthy, tunnel registered."
+  steps: "VM console as hoa: cd /opt/hoa-portal && git pull --ff-only && sudo bash infra/poc/start-portal.sh"
+  last: "2026-11-25: Milestone 1 deploy healthy"

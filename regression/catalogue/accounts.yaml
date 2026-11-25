@@ -1,0 +1,19 @@
+# Sign-in, MFA, invitations, recovery (accounts app). `match` runs over "<stage>:<check>".
+- feature: "Invite-only accounts: invitations to the address on file, board-created, single-use links"
+  since: M1
+  docs: docs/decisions.md
+  match: ["^unit:accounts/tests/test_invitations", "^manual:invitation email"]
+- feature: "Mandatory MFA (passkey or app) for every account; enrollment only in the accepting session"
+  since: M1
+  docs: docs/decisions.md
+  match: ["^unit:accounts/tests/test_signin", "^manual:(passkey sign-in|authenticator app|enrollment window)"]
+- feature: "Passwords: 12+ characters, common and breached-password checks (fail-open)"
+  since: M1
+  match: ["^unit:accounts/tests/test_passwords"]
+- feature: "Assisted reset of a lost authenticator by two board members"
+  since: M1
+  docs: docs/runbook.md
+  match: ["^unit:accounts/tests/test_mfa_reset", "^manual:assisted reset"]
+- feature: "Login model, session invalidation and lockout"
+  since: M1
+  match: ["^unit:accounts/tests/test_user_model"]

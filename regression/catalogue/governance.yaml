@@ -1,0 +1,19 @@
+# Meetings, resolutions, records requests, votes; ARC; violations; comms; documents.
+- feature: "Meetings, notices, minutes, resolutions, records requests"
+  since: M2
+  match: ["^unit:governance/tests/test_governance.py::test_(notice|executive|resolutions|only_the_board|records|only_the_requester)"]
+- feature: "Voting: informal polls, formal votes, secret ballots, exact thresholds"
+  since: M2
+  match: ["^unit:governance/tests/test_governance.py::test_(informal|formal|manager_and_auditor|secret|closed_vote|ballot|a_tie|threshold|open_vote)"]
+- feature: "Architectural review: workflow, clock, deemed approval, recusal, appeal, letters"
+  since: M2
+  match: ["^unit:arc/tests"]
+- feature: "Violations: notice, response, hearing, outcome; owners see only after notice"
+  since: M2
+  match: ["^unit:compliance/tests"]
+- feature: "Announcements and calendar"
+  since: M2
+  match: ["^unit:comms/tests"]
+- feature: "Document library: versions, visibility, hostile-file checks, scans, audited downloads"
+  since: M2
+  match: ["^unit:documents/tests"]

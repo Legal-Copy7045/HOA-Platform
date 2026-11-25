@@ -201,6 +201,32 @@ The portal image itself is still built from reviewed code.
   68 Pa.C.S. § 5407.
 - Manager role added (data entry and workflow steps only).
 
+## D17. Security review changes (2026-11)
+
+Full findings and fixes: `docs/security-review-2026-11.md`. Decisions that
+change earlier ones:
+
+- **Invitations (changes D4/D9):** only the board creates invitations, and
+  only to the email on the person's record. Sysadmins may re-send or revoke.
+  A printed invitation link exists only to finish the first-officer bootstrap.
+- **Enrollment window (refines D5/D15):** a login with no authenticator can
+  enroll one only in the session that accepted the invitation or redeemed a
+  reset code, within `MFA_ENROLLMENT_WINDOW_SECONDS` (1 hour). This closes the
+  "accepted residual gap" in D15. Re-authentication never accepts an emailed
+  code.
+- **Owner visibility of lot history:** owners see ARC requests, violations
+  and resale records from their own ownership period (plus unresolved
+  notices); violations only after notice. The board sees everything.
+- **Frozen decisions:** vote rules once open, invoice amount/vendor/number
+  once submitted, and the approvals an invoice needs are fixed (database
+  triggers). Issued resale certificates are stored, not regenerated.
+- **Deployment:** production needs `TRUSTED_PROXY_CIDRS` (or
+  `NO_TRUSTED_PROXY=true`); demo data only with `DEPLOYMENT_STAGE=poc`;
+  web/worker refuse to run as the database owner; cloudflared has its own
+  network with only web.
+- **Open for the board:** a second board member to approve new seats (A3);
+  whether formal secret ballots must be anonymous in the database (D12).
+
 ## Dependencies
 
 | Package | Why |

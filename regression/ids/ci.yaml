@@ -1,0 +1,14 @@
+# Stable check IDs for the ci stage (regression/run.py). Append-only: never
+# renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
+# highest issued: CI-011
+CI-001: "ruff lint"
+CI-002: "ruff format"
+CI-003: "bandit security scan"
+CI-004: "migrations up to date"
+CI-005: "dependency audit (pip-audit)"
+CI-006: "production settings pass check --deploy"
+CI-007: "no .env files tracked"
+CI-008: "CI actions pinned to commits"
+CI-009: "CI workflows declare permissions"
+CI-010: "no pull_request_target"
+CI-011: "regression output git-ignored"

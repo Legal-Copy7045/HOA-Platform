@@ -1,0 +1,26 @@
+# People, lots, ownership, seats, roles, settings, directory (community app).
+- feature: "Role-scoped access: owners see only their lots; board, ARC, auditor, manager, sysadmin limits"
+  since: M1
+  match: ["^unit:community/tests/test_authorization", "^unit:core/tests/test_scoping", "^unit:core/tests/test_mixins", "^page:owner is refused"]
+- feature: "Every page refuses another owner's lot (cross-owner URL matrix)"
+  since: M1
+  match: ["^unit:core/tests/test_url_matrix"]
+- feature: "Ownership and lot transfers; access ends with ownership"
+  since: M1
+  match: ["^unit:community/tests/test_ownership"]
+- feature: "Board pages, seats, offices, approvals"
+  since: M1
+  match: ["^unit:community/tests/test_board", "^unit:community/tests/test_sysadmin_nomination"]
+- feature: "Community definition: governing rules with citations, dues, common areas"
+  since: M2
+  match: ["^unit:community/tests/test_community_definition"]
+- feature: "Owner profile and opt-in directory"
+  since: M2
+  match: ["^unit:community/tests/test_profile_directory"]
+- feature: "Management commands: bootstrap, demo data, break-glass, rescan"
+  since: M1
+  docs: docs/runbook.md
+  match: ["^unit:community/tests/test_commands"]
+- feature: "Change history protected"
+  since: M1
+  match: ["^unit:community/tests/test_history_protection"]

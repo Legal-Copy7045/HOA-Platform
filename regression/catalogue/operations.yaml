@@ -1,0 +1,16 @@
+# Money and operations: ledger, invoices, vendors, budgets, collections, resale, reports.
+- feature: "Owner ledger: monthly dues, payments, prepayment drawdown, reversals, aging"
+  since: M2
+  match: ["^unit:ledger/tests/test_ledger.py::test_(?!issued_resale|resale)", "^unit:core/tests/test_money"]
+- feature: "Resale certificates: deadline, fee, stored certificate"
+  since: M2
+  match: ["^unit:ledger/tests/test_ledger.py::test_.*resale"]
+- feature: "Invoice approval: one or two board approvals, never the entrant; payments"
+  since: M2
+  match: ["^unit:operations/tests/test_invoices"]
+- feature: "Board tasks, vendors and work orders"
+  since: M2
+  match: ["^unit:operations/tests/test_tasks"]
+- feature: "Reports and CSV downloads"
+  since: M2
+  match: ["^unit:reports/tests"]

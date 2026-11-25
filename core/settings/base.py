@@ -150,6 +150,10 @@ ACCOUNT_SESSION_REMEMBER = False
 ACCOUNT_LOGIN_ON_PASSWORD_RESET = False
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = False
 ACCOUNT_REAUTHENTICATION_REQUIRED = True
+# Re-authentication before sensitive changes (adding or removing an
+# authenticator, recovery codes) never accepts an emailed code: email is not
+# a factor (D5; security review B6). Password or an authenticator only.
+ACCOUNT_REAUTHENTICATION_METHODS = ("password", "mfa")
 # Emailed sign-in code instead of a password (D5): first factor only.
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
 ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 600

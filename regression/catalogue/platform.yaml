@@ -1,0 +1,36 @@
+# Platform: audit, append-only, workflow, configuration, security review, pages, deployment.
+- feature: "Audit log: append-only events, IP retention, metadata allowlist"
+  since: M1
+  match: ["^unit:audit/tests", "^unit:core/tests/test_request_id"]
+- feature: "Append-only records enforced in code, by trigger and by database grants"
+  since: M1
+  match: ["^unit:core/tests/test_append_only_coverage", "^unit:core/tests/test_db_roles"]
+- feature: "Workflow engine"
+  since: M2
+  match: ["^unit:core/tests/test_workflow"]
+- feature: "Two people can perform every action (coverage check)"
+  since: M1
+  match: ["^unit:core/tests/test_check_coverage"]
+- feature: "Production settings refuse unsafe configuration; trusted proxy only"
+  since: M1
+  match: ["^unit:core/tests/test_production_settings", "^unit:core/tests/test_trusted_proxy", "^ci:production settings"]
+- feature: "Logs and email carry no personal data or tokens"
+  since: M1
+  match: ["^unit:core/tests/test_logging", "^unit:core/tests/test_email"]
+- feature: "Security review 2026-11 regressions"
+  since: 2026-11
+  docs: docs/security-review-2026-11.md
+  match: ["^unit:core/tests/test_security_review"]
+- feature: "Navigation and home dashboards"
+  since: UI sprint
+  match: ["^unit:core/tests/test_dashboard_nav", "^unit:core/tests/test_health"]
+- feature: "Every page renders for every role without errors, on desktop and phone"
+  since: UI sprint
+  match: ["^page:(board|owner|manager|auditor): "]
+- feature: "Code quality and supply chain (lint, bandit, migrations, dependencies, CI hygiene)"
+  since: M1
+  match: ["^ci:"]
+- feature: "POC deployment: Cloudflare Access, tunnel, TLS, deploy and restore"
+  since: M1
+  docs: docs/runbook.md
+  match: ["^live:", "^manual:(deploy|restore)"]

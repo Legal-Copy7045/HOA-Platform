@@ -52,9 +52,11 @@ This file is the source of truth for architecture and rules. If a task conflicts
 - Invite-only accounts tied to a lot or board role. No open signup.
 - Strong authentication is mandatory for every account, owners included: a passkey, or a password or emailed sign-in code followed by TOTP or a passkey. Never password-only. Email codes never count as a second factor.
 - Lost authenticators: two-board-member assisted reset plus a single-use enrollment code handed over out of band. No self-service bypass.
+- A login with no authenticator may enroll one only in the browser session that accepted its invitation or redeemed a reset code, within `MFA_ENROLLMENT_WINDOW_SECONDS`; otherwise it is signed out. Re-authentication accepts a password or an authenticator, never an emailed code.
+- Invitations go only to the email on the Person record and are created only by the board.
 - Passwords: 12+ characters, no composition rules, common-password and breached-password (HIBP k-anonymity, fail-open) checks.
 - Secure cookies, CSRF, HSTS, CSP, strict `ALLOWED_HOSTS`, `DEBUG=False` outside local dev.
-- File uploads: type allowlist, size limits, malware scan hook, stored in a private bucket, served only via short-lived signed URLs after an authorization check. Published document versions are immutable.
+- File uploads: type allowlist (by content, with Office macro/embedded-object/remote-template checks), size limits enforced before buffering, malware scan hook (rescans are new append-only records), stored in a private bucket under random keys, streamed only through the app after an authorization check (never signed URLs), with names that always end in the validated extension. Published document versions are immutable.
 - No secrets, tokens, or real personal data in the repository, fixtures, logs, or error reports. Local and POC data is synthetic only.
 - Log structured events without personal data. Do not log request bodies, exception messages, or URLs carrying tokens (gunicorn access logs are off).
 - Proxy headers (client IP, scheme) are trusted only from `TRUSTED_PROXY_CIDRS`.
@@ -74,6 +76,8 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 
 ## Testing and quality
 
+- Full regression (`/regression`, `regression/README.md`): every few features or when the owner asks. Every feature change keeps it current: tests, a `regression/catalogue/*.yaml` entry whose `match` finds them, `regression/manual.yaml` for anything only a person can check, and new IDs in `regression/ids/` committed. A regression run fixes nothing in product code; findings go to the report.
+
 - Every change includes tests. Authorization, ownership-transfer, recusal, and audit behaviors are mandatory test targets.
 - CI must pass: ruff, tests, bandit, pip-audit.
 - Prefer small, reviewable commits with clear messages. Do not commit generated secrets.
@@ -86,6 +90,7 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - First time: `cp .env.example .env`
 - Run locally: `docker compose up` (site http://localhost:8000, mail http://localhost:8025)
 - All CI checks, stopping at the first failure: `scripts/check.sh`
+- Full regression (stages, stable IDs, report): `python3 regression/run.py` then `python3 regression/report.py` (the `/regression` skill does the whole run)
 - Tests (needs Postgres with the two roles from `docker/postgres/init-roles.sh`): `pytest`
 - Lint: `ruff check . && ruff format --check .`
 - Security: `bandit -q -c pyproject.toml -r .` and `pip-audit --strict -r requirements/base.txt -r requirements/dev.txt`
@@ -96,7 +101,10 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Seed synthetic data (needs `SEED_DEMO_ALLOWED=true`): `python manage.py seed_demo` (also runs `seed_demo_operations`; run that alone on a community seeded before Milestone 2)
 - New list/detail pages: register every URL in `core/tests/test_url_matrix.py` (PROTECTED with a lot-B target, or MEMBER_PAGES with a BOARD_ONLY_MARKERS entry)
 - Workflows: declare transitions with `core.workflow.Workflow`; decisions that create records go through a service, not the generic action URL
-- Break-glass (sysadmin, audited): `breakglass_end_ownership`, `breakglass_end_role`, `breakglass_lock_user`, each with `--actor` and `--reason`
+- Break-glass (sysadmin, audited): `breakglass_end_ownership`, `breakglass_end_role`, `breakglass_lock_user`, `rescan_files`, each with `--actor` and `--reason`
+- Web/worker refuse to run as the DB owner: `python manage.py check_db_role` (run by the entrypoint)
+- Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
+- Security review findings and fixes: `docs/security-review-2026-11.md`
 - POC VM: see `infra/poc/README.md` and `docs/runbook.md`
 
 ## Never

@@ -11,3 +11,6 @@ staticfiles/
 *.env
 *.env.local
 !.env.example
+
+# Regression run output (results, logs, report)
+regression/out/

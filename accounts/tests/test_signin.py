@@ -201,3 +201,13 @@ def test_code_from_two_windows_ago_is_refused(client, owner):
     _password_login(client, owner.email)
     client.post(reverse("mfa_authenticate"), {"code": totp_code(owner.totp_secret, -3)})
     assert _session_user(client) is None
+
+
+def test_reauthentication_never_offers_an_emailed_code():
+    """Review B6: allauth's default lets an emailed code re-authenticate."""
+    from allauth.account.internal.flows.reauthentication import get_reauthentication_flows
+
+    user = make_member(lots=[LotFactory()])
+    ids = {flow["id"] for flow in get_reauthentication_flows(user)}
+    assert "reauthenticate_by_code" not in ids
+    assert ids & {"reauthenticate", "mfa_reauthenticate"}
