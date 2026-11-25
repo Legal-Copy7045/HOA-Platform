@@ -3,13 +3,17 @@
 {% block title %}Lot neighbors · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Lot neighbors</h1><p class="subtitle">For each lot, record its left and right neighbors from the development plan, and any other lots a project there affects. They are asked to acknowledge that lot's architectural requests (the homeowner cannot remove them), and their owners are recused from reviewing them. Enter lot numbers.</p></div></div>
-  <div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th>Lot</th><th>Left neighbor</th><th>Right neighbor</th><th>Also affected</th><th></th></tr></thead>
-    <tbody>{% for r in rows %}<tr id="lot-{{ r.lot.number }}">
-      <td><strong>{{ r.lot.number }}</strong><div class="small muted">{{ r.lot.street_address }}{% if r.owners %}<br>{{ r.owners }}{% endif %}</div></td>
-      <td><input form="n{{ r.lot.pk }}" type="number" name="left" min="1" value="{{ r.left.number|default_if_none:'' }}" aria-label="Left neighbor of lot {{ r.lot.number }}" class="narrow">{% if r.left %}<div class="small muted">{{ r.left_name|default:r.left.street_address }}</div>{% endif %}</td>
-      <td><input form="n{{ r.lot.pk }}" type="number" name="right" min="1" value="{{ r.right.number|default_if_none:'' }}" aria-label="Right neighbor of lot {{ r.lot.number }}" class="narrow">{% if r.right %}<div class="small muted">{{ r.right_name|default:r.right.street_address }}</div>{% endif %}</td>
-      <td><input form="n{{ r.lot.pk }}" type="text" name="others" value="{% for o in r.others %}{{ o.number }}{% if not forloop.last %} {% endif %}{% endfor %}" aria-label="Other lots affected by lot {{ r.lot.number }}" size="10" placeholder="e.g. 14 15"></td>
-      <td><form method="post" id="n{{ r.lot.pk }}">{% csrf_token %}<input type="hidden" name="lot" value="{{ r.lot.number }}"><button type="submit" class="secondary small">Save</button></form></td></tr>{% endfor %}</tbody>
-  </table></div></div>
+  <form method="post" id="neighbors-all" data-warn-unsaved="Lot neighbors">{% csrf_token %}
+    <div class="form-actions"><button type="submit" name="save_all" value="1">Save all</button><span class="small muted">Saves every row you changed (a row's own Save does the same).</span><span class="small status tone-warning" data-unsaved-note hidden>Unsaved changes</span></div>
+    <div class="table-card"><div class="table-wrap"><table>
+      <thead><tr><th>Lot</th><th>Left neighbor</th><th>Right neighbor</th><th>Also affected</th><th><span class="sr-only">Save this row</span></th></tr></thead>
+      <tbody>{% for r in rows %}<tr id="lot-{{ r.lot.number }}">
+        <td><strong>{{ r.lot.number }}</strong><div class="small muted">{{ r.lot.street_address }}{% if r.owners %}<br>{{ r.owners }}{% endif %}</div></td>
+        <td><input type="number" name="left_{{ r.lot.number }}" min="1" value="{{ r.left.number|default_if_none:'' }}" aria-label="Left neighbor of lot {{ r.lot.number }}" class="narrow">{% if r.left %}<div class="small muted">{{ r.left_name|default:r.left.street_address }}</div>{% endif %}</td>
+        <td><input type="number" name="right_{{ r.lot.number }}" min="1" value="{{ r.right.number|default_if_none:'' }}" aria-label="Right neighbor of lot {{ r.lot.number }}" class="narrow">{% if r.right %}<div class="small muted">{{ r.right_name|default:r.right.street_address }}</div>{% endif %}</td>
+        <td><input type="text" name="others_{{ r.lot.number }}" value="{% for o in r.others %}{{ o.number }}{% if not forloop.last %} {% endif %}{% endfor %}" aria-label="Other lots affected by lot {{ r.lot.number }}" size="10" placeholder="e.g. 14 15"></td>
+        <td><button type="submit" name="lot" value="{{ r.lot.number }}" class="secondary small" aria-label="Save lot {{ r.lot.number }}">Save</button></td></tr>{% endfor %}</tbody>
+    </table></div></div>
+    <div class="form-actions"><button type="submit" name="save_all" value="1">Save all</button></div>
+  </form>
 {% endblock %}

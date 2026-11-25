@@ -66,8 +66,15 @@ def test_aging_applies_credits_to_the_oldest_charges_first(w):
         lot=w["lot"], amount_cents=4500, received_on=D(2026, 4, 2), actor=w["manager"]
     )
     a = services.aging(w["lot"].pk, as_of=D(2026, 4, 15))
-    # January paid; Feb (73 days) 61-90, Mar (45 days) 31-60, Apr current.
-    assert a == {"current": 4500, "31_60": 4500, "61_90": 4500, "over_90": 0, "credit": 0}
+    # January paid; Feb (73 days) 61-90, Mar (45 days) 31-60, Apr (14 days) 1-30.
+    assert a == {
+        "current": 0,
+        "1_30": 4500,
+        "31_60": 4500,
+        "61_90": 4500,
+        "over_90": 0,
+        "credit": 0,
+    }
 
 
 def test_late_fees_stop_when_the_emergency_switch_is_off(w, settings):

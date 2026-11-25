@@ -300,7 +300,7 @@ def work_orders_report(start, end):
 )
 def ar_aging(as_of):
     from community.models import Lot, Ownership
-    from ledger.services import aging, balance
+    from ledger.services import BUCKET_LABELS, BUCKETS, aging, balance
 
     rows = []
     with system_access("report"):
@@ -317,15 +317,13 @@ def ar_aging(as_of):
                 [
                     lot.number,
                     owners,
-                    money(a["current"]),
-                    money(a["31_60"]),
-                    money(a["61_90"]),
-                    money(a["over_90"]),
+                    *(money(a[b]) for b in BUCKETS),
                     money(-a["credit"]),
                     money(bal),
                 ]
             )
-    return ["Lot", "Owner(s)", "Current", "31-60", "61-90", "Over 90", "Credit", "Balance"], rows
+    labels = [BUCKET_LABELS[b] for b in BUCKETS]
+    return ["Lot", "Owner(s)", *labels, "Credit", "Balance"], rows
 
 
 def _budget(fiscal_year):

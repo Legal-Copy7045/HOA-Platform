@@ -12,7 +12,7 @@
   </div>
   <div class="form-actions">
     <form method="post" data-confirm="Send an invitation to every owner with an email who hasn't been invited (or whose invitation expired)?">{% csrf_token %}<input type="hidden" name="action" value="invite_all"><button type="submit">{% icon "mail" %} Invite everyone not yet invited ({{ counts.not_invited|add:counts.expired }})</button></form>
-    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary">Remind those who haven't signed up ({{ counts.invited }})</button></form>
+    <form method="post" data-confirm="Email a new invitation link to {{ remind_count }} {% if remind_count == 1 %}person who was{% else %}people who were{% endif %} invited more than 3 days ago and {% if remind_count == 1 %}has{% else %}have{% endif %} not signed up yet? Their old links stop working.">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary"{% if not remind_count %} disabled{% endif %}>Remind those who haven't signed up ({{ remind_count }})</button></form>{% if counts.invited and counts.invited != remind_count %}<span class="small muted">Invitations sent in the last 3 days are not reminded yet.</span>{% endif %}
   </div>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Lot</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>

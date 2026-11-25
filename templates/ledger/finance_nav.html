@@ -1,14 +1,5 @@
-{% load portal %}{% with p=request.path %}
+{% load finance_tags %}{% finance_tabs as tabs %}
 <nav class="subnav" aria-label="Finance">
-  <a href="{% url 'ledger_home' %}"{% if "/finance/ledger" in p %} aria-current="page"{% endif %}>Owner accounts</a>
-  <a href="{% url 'invoices' %}"{% if "/finance/invoices" in p %} aria-current="page"{% endif %}>Invoices</a>
-  <a href="{% url 'work_orders' %}"{% if "/finance/work-orders" in p %} aria-current="page"{% endif %}>Work orders</a>
-  <a href="{% url 'vendors' %}"{% if "/finance/vendors" in p %} aria-current="page"{% endif %}>Vendors</a>
-  <a href="{% url 'budgets' %}"{% if "/finance/budgets" in p %} aria-current="page"{% endif %}>Budgets</a>
-  <a href="{% url 'accounting' %}"{% if "/finance/accounting" in p %} aria-current="page"{% endif %}>Accounting</a>
-  <a href="{% url 'collections' %}"{% if "/finance/collections" in p %} aria-current="page"{% endif %}>Collections</a>
-  {% if user|can:"letters.manage" %}<a href="{% url 'letters_settings' %}"{% if "/finance/letters" in p %} aria-current="page"{% endif %}>Letters</a>{% endif %}
-  {% if user|can:"resale.request" %}<a href="{% url 'resales' %}"{% if "/resale" in p %} aria-current="page"{% endif %}>Resale</a>{% endif %}
-  <a href="{% url 'reports' %}"{% if "/reports" in p %} aria-current="page"{% endif %}>Reports</a>
+  {% for t in tabs %}<a href="{{ t.url }}"{% if t.current %} aria-current="page"{% endif %}>{{ t.label }}</a>
+  {% endfor %}
 </nav>
-{% endwith %}

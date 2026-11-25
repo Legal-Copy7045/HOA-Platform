@@ -228,6 +228,7 @@ PROTECTED = {
     "invoice_file": ("GET", "invoice"),
     "my_statement_pdf": ("GET", "lot_id_b"),
     "ledger_home": ("GET", None),
+    "record_payments": ("GET", None),
     "lot_ledger": ("GET", "lot"),
     "lot_ledger_action": ("POST", "lot"),
     "lot_statement_pdf": ("GET", "lot"),

@@ -9,13 +9,15 @@
         <div class="balance {% if a.statement.balance > 0 %}is-due{% else %}is-clear{% endif %}">
           <div class="small muted">{% if a.statement.balance > 0 %}Amount due{% elif a.statement.balance < 0 %}Credit on account{% else %}Balance{% endif %}</div>
           <div class="amount-big">{% if a.statement.balance > 0 %}{{ a.statement.balance|cents }}{% elif a.statement.balance < 0 %}{{ a.statement.balance|cents|cut:"-" }}{% else %}Paid up{% endif %}</div>
+          {% if a.statement.balance > 0 and a.due.due_on %}<div class="small" data-testid="due-by">{% if a.due.past_due %}<span class="status tone-danger">Past due since {{ a.due.due_on|date:"M j, Y" }}</span>{% else %}Due by {{ a.due.due_on|date:"M j, Y" }}{% endif %}</div>{% endif %}
         </div>
       </div>
+      <h3>Statement</h3>
       <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th><th class="num">Charges</th><th class="num">Payments</th><th class="num">Balance</th></tr></thead>
         <tbody>
-        {% if a.statement.brought_forward %}<tr><td></td><td>Balance brought forward</td><td class="num">{{ a.statement.brought_forward|cents }}</td></tr>{% endif %}
-        {% for e in a.statement.entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}</td><td class="num">{{ e.amount_cents|cents }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No activity yet.</td></tr>{% endfor %}
+        {% for r in a.rows %}<tr><td class="nowrap">{{ r.posted_on|date:"M j, Y" }}</td><td>{{ r.description }}</td><td class="num">{% if r.charge_cents %}{{ r.charge_cents|cents }}{% endif %}</td><td class="num">{% if r.payment_cents %}{{ r.payment_cents|cents }}{% endif %}</td><td class="num">{% if r.balance_cents < 0 %}{{ r.balance_cents|cents|cut:"-" }} credit{% else %}{{ r.balance_cents|cents }}{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="5" class="muted">No activity yet.</td></tr>{% endfor %}
         </tbody>
       </table></div>
       {% if a.upcoming %}<h3>Upcoming charges</h3>
@@ -23,6 +25,15 @@
         <thead><tr><th>Due</th><th>Description</th><th class="num">Amount</th></tr></thead>
         <tbody>{% for c in a.upcoming %}<tr><td class="nowrap">{{ c.due_on|date:"M j, Y" }}</td><td>{{ c.description }}{% if c.covered_by_credit %} <span class="badge tone-success">covered by credit</span>{% endif %}</td><td class="num">{{ c.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
       </table></div>{% endif %}
+      <h3>How to pay</h3>
+      {% if online %}
+        {% if a.statement.balance > 0 %}<div class="small muted pay-options">{% for p in a.pay_options %}<div>{{ p.label }}: {{ a.statement.balance|cents }}{% if p.fee_cents %} + {{ p.fee_cents|cents }} convenience fee = <strong>{{ p.total_cents|cents }}</strong>{% else %} (no fee){% endif %}</div>{% endfor %}</div>{% endif %}
+      {% endif %}
+      <div class="pay-by-check" data-testid="pay-by-check">
+        <p>{% if online %}Or pay by check. {% endif %}Make checks payable to <strong>{{ payable_to }}</strong>{% if remit_lines %} and mail them to:{% else %}.{% endif %}</p>
+        {% if remit_lines %}<address>{% for line in remit_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% else %}<p class="small muted">Ask the board where to send checks.</p>{% endif %}
+        <p class="small muted">Write your address on the check so the payment reaches the right account.</p>
+      </div>
       {% if a.account %}<h3>On this account</h3>
       <p class="small muted">Account {{ a.account.number }}</p>
       <ul class="list">
@@ -32,10 +43,8 @@
       <p class="small muted">To add or remove someone, ask the board.</p>{% endif %}
       <div class="form-actions">
         <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
-        <button type="button" class="btn" disabled>Pay online</button>
+        {% if online and a.statement.balance > 0 %}<button type="button" class="btn">Pay online</button>{% endif %}
       </div>
-      {% if a.statement.balance > 0 %}<div class="small muted pay-options">{% for p in a.pay_options %}<div>{{ p.label }}: {{ a.statement.balance|cents }}{% if p.fee_cents %} + {{ p.fee_cents|cents }} convenience fee = <strong>{{ p.total_cents|cents }}</strong>{% else %} (no fee){% endif %}</div>{% endfor %}</div>{% endif %}
-      {% if not online %}<p class="muted small">Online payment is coming soon. For now, pay by check as usual.</p>{% endif %}
     </section>
   {% endfor %}
   <p><a href="{% url 'resales' %}">Selling your home? Request a resale certificate</a></p>

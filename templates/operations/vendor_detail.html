@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}{{ vendor.name }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "operations/finance_nav.html" %}
+  {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'vendors' %}">Vendors</a> / {{ vendor.name }}</div>
   <div class="page-head"><div><h1>{{ vendor.name }}</h1><div class="meta">{% if vendor.services %}<span>{{ vendor.services }}</span>{% endif %}{% if vendor.email %}<span>{% icon "mail" %}{{ vendor.email }}</span>{% endif %}{% if vendor.phone %}<span>{{ vendor.phone }}</span>{% endif %}</div></div></div>
   <div class="split">

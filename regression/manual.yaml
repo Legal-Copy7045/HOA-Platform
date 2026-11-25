@@ -70,4 +70,15 @@
 - key: urgent text arrives
   check: "With a Twilio test account and the sms feature on, an owner confirms a number by code and receives the board's urgent text with the link and STOP note; replying STOP stops later texts."
   steps: "Set SMS_PROVIDER=twilio and test credentials; Admin, Features: Urgent text messages on; My profile: enter a mobile number, enter the texted code; Board, Urgent texts: send; reply STOP; send again and check the owner is no longer counted."
+- key: my account how to pay
+  check: "On a phone, My account reads clearly for an owner: amount and Due by, who to make checks payable to and where to mail them, a statement with Charges / Payments / Balance that fits or scrolls sideways."
+  steps: "Set Remit to under Finance, Letters; sign in as a demo owner with a balance on a phone; open My account."
+  last: ""
+- key: letters unsaved changes warning
+  check: "On Finance, Letters, typing in one section and then saving another asks first; leaving the page with unsaved edits asks first."
+  steps: "Edit the letterhead, press Save wording on a notice: a prompt names the letterhead section. Edit again and click another menu link: the browser asks to leave."
+  last: ""
+- key: settings dues confirmation
+  check: "Community settings shows '= $75.00 per month' while typing dues, and asks for confirmation when dues change by more than 25%."
+  steps: "Community settings, Monthly dues: type 75; then type 150 and save: a confirmation page names the old and new amounts."
   last: ""

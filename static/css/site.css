@@ -419,3 +419,9 @@ p.center { text-align: center; }
 .profile-form legend { font-weight: 700; font-size: 1rem; padding: 0; margin-bottom: .4rem; }
 .profile-form fieldset.nested { border: 0; margin: .25rem 0 .5rem 1.6rem; padding: 0; }
 .profile-form fieldset.nested legend { font-weight: 600; font-size: .9rem; }
+/* Finance pages (UX review: owner account, record payments) */
+.pay-by-check address { font-style: normal; margin: 0 0 .5rem; }
+.batch-table input, .batch-table select { width: 100%; min-width: 7rem; }
+.batch-table .row-error td { background: var(--danger-bg); }
+.batch-table .row-error .error { color: var(--danger); font-size: .9rem; }
+.parsed-money { color: var(--ink-2); margin-left: .35rem; }
