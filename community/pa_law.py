@@ -151,6 +151,12 @@ GUIDES: dict[str, Guide] = {
         "Not set by the Act.",
         "30 days to appeal to the board: Declaration §9.6 or ARC guidelines.",
     ),
+    "arc.signoff_auto_confirm": Guide(
+        BOARD,
+        "Not covered by the Act. Neighbour sign-offs are information for the reviewers; the "
+        "decision stays with the committee under the Declaration.",
+        "Off: a person confirms each signature read from a scanned form (Board resolution).",
+    ),
     "violation.cure_days": Guide(
         RULES,
         "Not set by the Act.",

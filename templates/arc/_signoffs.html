@@ -1,0 +1,52 @@
+{% load portal %}
+<section class="card" id="signoffs"><div class="card-head"><h2>Neighbour sign-offs</h2>
+  <div class="small">{{ signoff.counts.approved }} approve · {{ signoff.counts.objected }} object · {{ signoff.counts.pending }} waiting</div></div>
+  <p class="small muted">Neighbours' views inform the committee; they do not decide the request.</p>
+  {% if signoff.rows %}<ul class="list">{% for s in signoff.rows %}<li>
+    <div class="grow"><div class="title">{{ s.label }}</div>
+      <div class="small muted">{% with last=s.last_response %}{% if last %}{{ last.get_position_display }} · {{ last.signer_name }} · {{ last.get_channel_display|lower }}{% if last.comment %} · “{{ last.comment|truncatechars:80 }}”{% endif %}{% else %}Waiting{% if s.sent_at %} · asked {{ s.sent_at|date:"M j" }}{% else %} · not sent yet{% endif %}{% endif %}{% endwith %}</div></div>
+    {% status s.state %}
+    {% if signoff_can_arrange and s.state == "pending" %}<form method="post" action="{% url 'arc_signoff_action' obj.pk 'withdraw' %}">{% csrf_token %}<input type="hidden" name="signoff" value="{{ s.pk }}"><button type="submit" class="secondary small">Remove</button></form>{% endif %}
+  </li>{% endfor %}</ul>{% else %}<p class="muted small">No neighbours added yet.</p>{% endif %}
+  {% if signoff_can_arrange %}
+    <div class="form-actions">
+      {% if signoff_neighbours %}<form method="post" action="{% url 'arc_signoff_action' obj.pk 'prepare' %}">{% csrf_token %}<button type="submit" class="secondary">{% icon "users" %} Add neighbours from the plan ({{ signoff_neighbours|length }})</button></form>{% endif %}
+      {% if signoff.counts.pending %}<form method="post" action="{% url 'arc_signoff_action' obj.pk 'send' %}" data-confirm="Email the waiting neighbours? Owners with a login sign in the portal; others get a single-use link.">{% csrf_token %}<button type="submit">{% icon "mail" %} Send sign-off requests</button></form>{% endif %}
+      <a class="btn secondary" href="{% url 'arc_signoff_form' obj.pk %}">{% icon "download" %} Printable form (PDF)</a>
+    </div>
+    <details class="panel"><summary>Add another lot or address</summary><div class="panel-body">
+      <form method="post" action="{% url 'arc_signoff_action' obj.pk 'add_lot' %}" class="inline-form">{% csrf_token %}<label>Lot number <input type="number" name="lot_number" min="1" required></label><button type="submit" class="secondary small">Add lot</button></form>
+      <form method="post" action="{% url 'arc_signoff_action' obj.pk 'add_address' %}">{% csrf_token %}
+        <p><label>Name <input type="text" name="name" maxlength="200"></label></p>
+        <p><label>Address <input type="text" name="address" maxlength="300" required></label></p>
+        <p><label>Email (for a single-use link; optional) <input type="email" name="email" maxlength="254"></label></p>
+        <div class="form-actions"><button type="submit" class="secondary small">Add address</button></div></form>
+    </div></details>
+    <details class="panel"><summary>Upload the signed paper form</summary><div class="panel-body">
+      <form method="post" action="{% url 'arc_signoff_action' obj.pk 'upload_form' %}" enctype="multipart/form-data" class="inline-form">{% csrf_token %}<input type="file" name="file" required aria-label="Scanned form"><button type="submit" class="secondary small">Upload</button></form>
+      <p class="small muted">A PDF or photo of the signed form. {% if signoff_has_reader %}The board or manager can then have it read automatically.{% else %}The board or manager enters the answers from it.{% endif %}</p></div></details>
+  {% endif %}
+  {% if signoff_staff %}
+    {% if signoff_forms %}<h3>Signed forms</h3><ul class="list">{% for f in signoff_forms %}<li><a class="grow" href="{% url 'arc_file' obj.pk f.pk %}">{{ f.original_filename }}</a><span class="small muted">{{ f.uploaded_at|date:"M j" }}</span>
+      {% if signoff_has_reader %}<form method="post" action="{% url 'arc_signoff_action' obj.pk 'read_form' %}">{% csrf_token %}<input type="hidden" name="attachment" value="{{ f.pk }}"><button type="submit" class="secondary small">Read automatically</button></form>{% endif %}</li>{% endfor %}</ul>{% endif %}
+    {% for r in signoff_readings %}{% if r.state != "done" %}<p class="small muted">Reading {{ r.created_at|date:"M j, g:i A" }}: {% if r.state == "failed" %}failed ({{ r.error }}){% else %}in progress{% endif %}</p>{% endif %}{% endfor %}
+    {% if signoff_proposals %}<h3>Read from the scanned form: please check</h3>
+      <ul class="list">{% for p in signoff_proposals %}<li><div class="grow">
+        <form method="post" action="{% url 'arc_signoff_action' obj.pk 'confirm' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="proposal" value="{{ p.pk }}">
+          <select name="signoff" aria-label="Neighbour">{% for s in signoff.rows %}<option value="{{ s.pk }}"{% if s.pk == p.signoff_id %} selected{% endif %}>{{ s.label }}</option>{% endfor %}</select>
+          <select name="position" aria-label="Position"><option value="approved"{% if p.position == "approved" %} selected{% endif %}>Approves</option><option value="objected"{% if p.position == "objected" %} selected{% endif %}>Objects</option></select>
+          <input type="text" name="signer_name" value="{{ p.signer_name }}" aria-label="Name" maxlength="200">
+          <span class="small muted">{{ p.confidence }}% sure</span>
+          <button type="submit" class="small">Confirm</button></form>
+        <form method="post" action="{% url 'arc_signoff_action' obj.pk 'reject' %}">{% csrf_token %}<input type="hidden" name="proposal" value="{{ p.pk }}"><button type="submit" class="secondary small">Discard</button></form>
+      </div></li>{% endfor %}</ul>{% endif %}
+    {% if signoff.counts.pending %}<details class="panel"><summary>Enter a paper answer by hand</summary><div class="panel-body">
+      <form method="post" action="{% url 'arc_signoff_action' obj.pk 'paper' %}" class="form-grid">{% csrf_token %}
+        <p><label>Neighbour <select name="signoff">{% for s in signoff.rows %}{% if s.state == "pending" %}<option value="{{ s.pk }}">{{ s.label }}</option>{% endif %}{% endfor %}</select></label></p>
+        <p><label>Answer <select name="position"><option value="approved">Approves</option><option value="objected">Objects</option></select></label></p>
+        <p><label>Name as signed <input type="text" name="signer_name" maxlength="200" required></label></p>
+        <p><label>Date signed <input type="date" name="signed_on"></label></p>
+        <p><label>Comment <input type="text" name="comment" maxlength="500"></label></p>
+        <div class="form-actions"><button type="submit" class="secondary small">Record</button></div></form></div></details>{% endif %}
+  {% endif %}
+</section>

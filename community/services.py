@@ -266,6 +266,18 @@ def _account_for(lot: Lot, on: datetime.date) -> Account:
         .first()
     )
     if account is None:
+        # A co-owner whose deed date is earlier than the current account's
+        # opening (e.g. recorded later, or a register import) joins the open
+        # account, which then counts from that earlier date - as long as no
+        # earlier, closed account covers it.
+        current = (
+            Account.objects.select_for_update().filter(lot=lot, closed_on__isnull=True).first()
+        )
+        overlaps = Account.objects.filter(lot=lot, closed_on__gt=on).exclude(closed_on__isnull=True)
+        if current is not None and not overlaps.exists():
+            Account.objects.filter(pk=current.pk).update(opened_on=on)
+            current.opened_on = on
+            return current
         account = Account.objects.create(lot=lot, number=_next_account_number(lot), opened_on=on)
     return account
 

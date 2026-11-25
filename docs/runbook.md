@@ -257,3 +257,27 @@ password manager and the POC VM's `.env`.
 - [ ] HSTS one year with subdomains (`SECURE_HSTS_SECONDS=31536000`,
       `SECURE_HSTS_INCLUDE_SUBDOMAINS=true`) once every subdomain serves HTTPS.
 - [ ] Board decisions in `docs/security-review-2026-11.md` section 3 made.
+
+
+## ARC neighbour sign-off and Gemini
+
+1. Record each lot's neighbours once (Board > Lot neighbours), from the
+   development plan. They are pre-selected on every architectural request.
+2. On a request, the applicant (or the board or manager) adds the
+   neighbours, adds any other addresses, and sends the requests. Owners with
+   a login answer in the portal; everyone else gets a single-use link that
+   expires after `SIGNOFF_LINK_DAYS`. Anyone can also print the prefilled
+   form, sign it on paper, scan it and upload it.
+3. To have scanned forms read automatically, put a Gemini API key in the
+   VM's `.env` (never in chat or the repository), then restart:
+
+   ```bash
+   sudo nano /opt/hoa-portal/.env        # set GEMINI_API_KEY=...
+   sudo hoa-update --force
+   ```
+
+   A board member or the manager confirms each signature it reads. To accept
+   confident readings automatically, switch on "Accept automatically read
+   sign-offs" in Community settings. The free tier may use submitted forms to
+   improve Google's products: use a paid key once forms carry real names
+   (decision D21).

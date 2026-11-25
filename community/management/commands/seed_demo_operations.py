@@ -344,6 +344,15 @@ class Command(BaseCommand):
             actor=b1,
         )
 
+        # Lot neighbours from the (fictional) development plan: next-door lots
+        # on each of the two roads (Milestone 3 phase 7).
+        from arc import signoffs as arc_signoffs
+
+        for number, lot in lots.items():
+            same_road = range(1, 23) if number <= 22 else range(23, 45)
+            beside = [lots[n] for n in (number - 1, number + 1) if n in same_road]
+            arc_signoffs.set_neighbours(lot, beside, actor=b1)
+
         # ARC project types owners choose from (Milestone 3).
         from arc import services as arc_services
 

@@ -7,6 +7,7 @@ from django.views.decorators.http import require_POST
 
 from arc import services
 from arc.models import ArcRequest, ArcState, Decision, Position
+from arc.signoff_views import panel_context
 from audit.services import record_event
 from community.models import Lot
 from core import policy
@@ -166,6 +167,7 @@ def arc_detail(request, pk):
         request,
         "arc/detail.html",
         {
+            **panel_context(user, req),
             "obj": req,
             "actions": actions,
             "history": services.ARC.history(req),

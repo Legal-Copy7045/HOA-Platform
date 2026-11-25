@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Neighbour sign-offs · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Neighbour sign-offs</h1><p class="subtitle">Neighbours planning exterior projects ask whether you approve or object.</p></div></div>
+  <section class="card">{% if rows %}<ul class="list">{% for s in rows %}<li><div class="grow"><a class="title" href="{% url 'signoff_detail' s.pk %}">{{ s.arc_request.title }}</a><div class="small muted">{{ s.arc_request.lot.street_address }} · asked about {{ s.label }}</div></div>{% status s.state %}</li>{% endfor %}</ul>
+  {% else %}{% include "partials/empty.html" with icon="users" title="Nothing to sign" text="When a neighbour asks for your sign-off, it appears here." %}{% endif %}</section>
+{% endblock %}

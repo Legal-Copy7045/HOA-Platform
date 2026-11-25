@@ -114,6 +114,7 @@ States: draft, submitted, completeness_check, in_review, decided (approved / app
 - Lists with an owner side and a board side use `?mine=1` (`core.scoping.own_records`); the Homeowner menu links there
 - Threads on requests, ARC, violations and work orders: `comms.threads` (subject fetched through its own scoping; `internal` notes staff-only and hidden from recused reviewers; emails carry a link only). Render with `{% thread_panel kind obj %}`; follow-up dates with `{% follow_up_form kind obj %}`
 - New governing rule: add its `RuleSpec` in `community/rules.py` and its PA guidance in `community/pa_law.py` (a test fails otherwise); add a `fallback` only where the statute itself supplies the value
+- ARC neighbour sign-off: `arc/signoffs.py` (adjacency, portal or single-use hashed link, printable form, scanned-form reading via `core/ai.py` with `GEMINI_API_KEY`; proposals need a person unless `arc.signoff_auto_confirm` is on; sign-offs never decide a request)
 - My items queue (`core/my_items.py`): add new "waiting on someone" work there, from scoped queries
 - Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era: use `core.scoping.owner_era_q` in `scope_for_owner`
 - Security review findings and fixes: `docs/security-review-2026-11.md`

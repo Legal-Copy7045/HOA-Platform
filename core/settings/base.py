@@ -29,6 +29,13 @@ SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
 # Decision D21 (security review A3): a new board seat needs a second board
 # member's approval. On in production; the POC turns it off (see production.py).
 BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=True)
+
+# ARC neighbour sign-off (Milestone 3): single-use links expire after this
+# many days. Gemini reads scanned signed forms when a key is set; a person
+# confirms what it reads unless the board switches on automatic confirming.
+SIGNOFF_LINK_DAYS = env.int("SIGNOFF_LINK_DAYS", default=14)
+GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-2.5-flash")
 # Absolute address used in emailed links (the worker has no request to ask).
 PORTAL_BASE_URL = (env("PORTAL_BASE_URL", default="") or "http://localhost:8000").rstrip("/")
 INVITE_TTL_HOURS = env.int("INVITE_TTL_HOURS", default=168)

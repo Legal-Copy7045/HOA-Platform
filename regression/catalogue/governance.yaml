@@ -29,3 +29,6 @@
 - feature: "Secret ballots stored unlinkable: the ballot records who voted, the choice is a separate row with no voter, lot, time or sequential id; database refuses a linked secret ballot; formal votes binding (D21)"
   since: M3
   match: ["^unit:governance/tests/test_governance.py::test_(secret_ballot_choice|open_ballots_still)"]
+- feature: "ARC neighbour sign-off: adjacency from the development plan, extra addresses, portal answers or single-use expiring links, plans shown (not signed forms), printable prefilled form, scanned forms read into proposals a person confirms (automatic only when switched on), recusal"
+  since: M3
+  match: ["^unit:arc/tests/test_signoffs"]

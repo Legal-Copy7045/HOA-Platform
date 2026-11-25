@@ -20,6 +20,7 @@
       {% endif %}
       {% if can_decide %}<details class="panel"><summary>Record the decision</summary><div class="panel-body"><form method="post" action="{% url 'arc_decide' obj.pk 'decision' %}">{% csrf_token %}{{ decision_form }}<div class="form-actions"><button type="submit">Record decision</button></div></form></div></details>{% endif %}
       {% if can_decide_appeal %}<details class="panel"><summary>Decide the appeal (board)</summary><div class="panel-body"><form method="post" action="{% url 'arc_decide' obj.pk 'appeal' %}">{% csrf_token %}{{ decision_form }}<div class="form-actions"><button type="submit">Record appeal decision</button></div></form></div></details>{% endif %}
+      {% include "arc/_signoffs.html" %}
       {% thread_panel "arc" obj %}
       {% include "partials/workflow.html" with obj=obj %}
     </div>

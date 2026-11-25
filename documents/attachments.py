@@ -77,15 +77,19 @@ def current_scan(attachment: Attachment) -> str:
     return latest.result if latest else attachment.scan_result
 
 
-def serve(request, obj, attachment_id: int):
-    """``obj`` must already have been fetched through a scoped manager."""
-    attachment = attachments_for(obj).filter(pk=attachment_id).first()
+def serve(request, obj, attachment_id: int, *, exclude_labels=()):
+    """``obj`` must already have been fetched through a scoped manager (or, for
+    a single-use sign-off link, the link must already have been checked)."""
+    files = attachments_for(obj)
+    if exclude_labels:
+        files = files.exclude(label__in=list(exclude_labels))
+    attachment = files.filter(pk=attachment_id).first()
     if attachment is None or not scan_allows_download(current_scan(attachment)):
         raise Http404
     record_event(
         "attachment.downloaded",
         request=request,
-        actor=request.user,
+        actor=request.user if request.user.is_authenticated else None,
         target=obj,
         metadata={"owner_type": attachment.owner_type, "scan": current_scan(attachment)},
     )

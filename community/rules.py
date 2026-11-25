@@ -104,6 +104,14 @@ REGISTRY: dict[str, RuleSpec] = {
             None,
             "Architectural review",
         ),
+        RuleSpec(
+            "arc.signoff_auto_confirm",
+            "Accept automatically read sign-offs without a person confirming",
+            BOOL,
+            "false",
+            "Architectural review",
+            "Off: a board member or the manager confirms each signature read from a scanned form.",
+        ),
         RuleSpec("violation.cure_days", "Days given to cure a violation", DAYS, None, "Violations"),
         RuleSpec(
             "violation.hearing_notice_days",

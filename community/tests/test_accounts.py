@@ -306,3 +306,13 @@ def test_meeting_notice_goes_to_consented_extra_emails(w):
     sent_to = {a for m in mail.outbox for a in m.to}
     assert "extra@example.test" in sent_to
     assert "quiet@example.test" not in sent_to
+
+
+def test_co_owner_with_an_earlier_deed_date_joins_the_open_account(w):
+    """Recording a joint owner dated before the account opened (e.g. a late
+    entry or a register import) must not try to open a second account."""
+    spouse = services.record_person(display_name="Spouse", actor=SYSTEM)
+    services.record_ownership(person=spouse, lot=w["lot"], start_date=days_ago(900), actor=SYSTEM)
+    with system_access("test"):
+        accounts = list(Account.objects.filter(lot=w["lot"]))
+    assert len(accounts) == 1 and accounts[0].opened_on == days_ago(900)

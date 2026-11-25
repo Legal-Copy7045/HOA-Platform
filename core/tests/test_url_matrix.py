@@ -41,6 +41,9 @@ PUBLIC = {
     "invite_accept",
     "account_setup_expired",
     "login_background_image",
+    # Single-use sign-off links: the 256-bit token is the credential.
+    "signoff_link",
+    "signoff_link_file",
 }
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
@@ -86,6 +89,7 @@ MEMBER_PAGES = {
     "resales",
     "requests",
     "faq",
+    "signoffs_mine",
 }
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
@@ -96,6 +100,11 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "arc_signoff_action": ("POST", "arc_b"),
+    "arc_signoff_form": ("GET", "arc_b"),
+    "arc_neighbours": ("GET", None),
+    "signoff_detail": ("GET", "signoff_b"),
+    "signoff_file": ("GET", "signoff_b"),
     "seat_nomination_decide": ("POST", "seat_proposal"),
     "roster": ("GET", None),
     "contracts": ("GET", None),
@@ -366,6 +375,13 @@ def world():
             term_start=days_ago(1),
             actor=board,
         )
+        from arc import signoffs as arc_signoffs
+        from arc.models import SignoffRequest
+
+        lot_c = LotFactory(street_address="3 Charlie Way")
+        make_member(lots=[lot_c])
+        arc_signoffs.add_signoff_lot(arc_b, lot_c, actor=owner_b)
+        signoff_b = SignoffRequest.objects.unscoped("t").get(arc_request=arc_b, lot=lot_c)
         account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
         change_b = services.request_account_change(
             account_b, action="add", name="Lot B nephew", kind="view_only", actor=owner_b
@@ -381,6 +397,7 @@ def world():
         )
     targets = {
         "account_b": account_b.pk,
+        "signoff_b": signoff_b.pk,
         "seat_proposal": seat_proposal.pk,
         "contract": contract.pk,
         "change_b": change_b.pk,
@@ -469,6 +486,10 @@ def _url(name, key, targets):
         kwargs["action"] = "withdraw"
     elif name == "account_change_decide" or name == "seat_nomination_decide":
         kwargs["decision"] = "approve"
+    elif name == "arc_signoff_action":
+        kwargs["action"] = "prepare"
+    elif name == "signoff_file":
+        kwargs["file_id"] = targets["arc_b_file"]
     elif name == "contract_action":
         kwargs["action"] = "approve"
     elif name == "committee_action":

@@ -360,6 +360,24 @@ def items_for(user) -> list[Item]:
                     nav="violations?mine=1",
                 )
             )
+    if can(user, "arc.submit") and roles.owned_lot_ids:
+        from arc.models import SignoffRequest
+
+        for so in (
+            SignoffRequest.objects.for_user(user)
+            .filter(lot_id__in=roles.owned_lot_ids, state="pending", sent_at__isnull=False)
+            .select_related("arc_request__lot")
+        ):
+            out.append(
+                Item(
+                    "My home",
+                    f"Sign-off: {so.arc_request.title}",
+                    f"Your neighbour at {so.arc_request.lot.street_address} asks for your view",
+                    reverse("signoff_detail", args=[so.pk]),
+                    "info",
+                    nav="signoffs_mine",
+                )
+            )
     if can(user, "vote.cast"):
         from governance.models import Vote
         from governance.services import ballot_choices_for
