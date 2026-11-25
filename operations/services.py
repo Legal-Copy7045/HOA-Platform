@@ -175,13 +175,52 @@ def _approvals_by_rule(invoice: Invoice) -> int:
 
 
 def approvals_required(invoice: Invoice) -> int:
-    if invoice.required_approvals:
+    if invoice.required_approvals is not None:
         return invoice.required_approvals
     return _approvals_by_rule(invoice)
 
 
 def _fix_required_approvals(obj, actor) -> None:
+    """On submit: fix the approvals the invoice needs. An invoice under an
+    active contract, within its cap and the first for its period, needs none:
+    the board approved it in advance (recorded, and audited as such)."""
+    period = _contract_period(obj)
+    if period:
+        Invoice.objects.filter(pk=obj.pk).update(required_approvals=0, contract_period=period)
+        obj.required_approvals, obj.contract_period = 0, period
+        INVOICE.apply(
+            obj, "approve", actor=SYSTEM, note=f"Pre-approved under contract #{obj.contract_id}"
+        )
+        record_event(
+            "invoice.contract_preapproved",
+            actor=None,
+            target=obj,
+            metadata={"contract_id": obj.contract_id, "period": period},
+        )
+        return
     Invoice.objects.filter(pk=obj.pk).update(required_approvals=_approvals_by_rule(obj))
+
+
+def _contract_period(invoice) -> str:
+    """The contract period this invoice is pre-approved for, or "" if it is not."""
+    if not invoice.contract_id:
+        return ""
+    contract = Contract.objects.get(pk=invoice.contract_id)
+    if (
+        contract.state != "active"
+        or contract.vendor_id != invoice.vendor_id
+        or invoice.amount_cents > contract.amount_cap_cents
+        or not contract.covers(invoice.invoice_date)
+    ):
+        return ""
+    period = contract.period_for(invoice.invoice_date)
+    taken = (
+        Invoice.objects.filter(contract=contract, contract_period=period)
+        .exclude(state__in=["void", "rejected"])
+        .exclude(pk=invoice.pk)
+        .exists()
+    )
+    return "" if taken else period
 
 
 def approvers(invoice: Invoice) -> set[int]:
@@ -265,12 +304,15 @@ def create_invoice(
     due_date=None,
     description: str = "",
     work_order=None,
+    contract=None,
     actor,
     request=None,
 ) -> Invoice:
     require(actor, "invoice.enter")
     if amount_cents <= 0 or not number.strip():
         raise OperationsError("An invoice needs a number and a positive amount.")
+    if contract is not None and contract.vendor_id != vendor.pk:
+        raise OperationsError("That contract is with a different vendor.")
     try:
         with transaction.atomic():
             invoice = Invoice.objects.create(
@@ -282,6 +324,7 @@ def create_invoice(
                 due_date=due_date,
                 description=description,
                 work_order=work_order,
+                contract=contract,
                 entered_by=actor,
             )
     except IntegrityError as exc:
@@ -651,3 +694,110 @@ def close_committee_task(
         "task.closed", actor=actor, request=request, target=task, metadata={"status": status}
     )
     return task
+
+
+# --- Contracts (recurring invoices, Milestone 3) -------------------------------------
+
+from operations.models import Contract, Schedule  # noqa: E402
+
+
+def _not_contract_entrant(obj, actor):
+    if actor is not SYSTEM and obj.entered_by_id == actor.pk:
+        return "You entered this contract; another board member must approve it."
+    return None
+
+
+CONTRACT = Workflow(
+    "contract",
+    [
+        Transition(
+            "approve",
+            {"draft"},
+            "active",
+            "invoice.approve",
+            "Approved by the board",
+            guard=_not_contract_entrant,
+            note_required=True,
+        ),
+        Transition("discard", {"draft"}, "discarded", "contract.manage", "Discard"),
+    ],
+)
+
+
+def create_contract(
+    *,
+    vendor: Vendor,
+    title: str,
+    category,
+    schedule: str,
+    amount_cap_cents: int,
+    starts_on,
+    citation: str,
+    ends_on=None,
+    actor,
+    request=None,
+) -> Contract:
+    require(actor, "contract.manage")
+    title = " ".join((title or "").split())[:200]
+    citation = " ".join((citation or "").split())[:200]
+    if not title or not citation:
+        raise OperationsError("A contract needs a title and the resolution that approves it.")
+    if schedule not in Schedule.values:
+        raise OperationsError("Choose how often the vendor invoices.")
+    if not amount_cap_cents or amount_cap_cents <= 0:
+        raise OperationsError("Set the most one invoice may be.")
+    if ends_on and ends_on < starts_on:
+        raise OperationsError("A contract cannot end before it starts.")
+    contract = Contract.objects.create(
+        vendor=vendor,
+        title=title,
+        category=category,
+        schedule=schedule,
+        amount_cap_cents=amount_cap_cents,
+        starts_on=starts_on,
+        ends_on=ends_on,
+        citation=citation,
+        entered_by=actor,
+    )
+    record_event(
+        "contract.entered",
+        actor=actor,
+        request=request,
+        target=contract,
+        metadata={"amount_cap_cents": amount_cap_cents, "schedule": schedule},
+    )
+    return contract
+
+
+def end_contract(contract: Contract, *, ends_on, actor, request=None) -> Contract:
+    """Set the last day an active contract covers (once)."""
+    require(actor, "contract.manage")
+    with transaction.atomic():
+        contract = Contract.objects.select_for_update().get(pk=contract.pk)
+        if contract.state != "active" or contract.ends_on is not None:
+            raise OperationsError("Only an open-ended active contract can be given an end date.")
+        if ends_on < contract.starts_on:
+            raise OperationsError("A contract cannot end before it starts.")
+        Contract.objects.filter(pk=contract.pk).update(ends_on=ends_on)
+        contract.ends_on = ends_on
+    record_event(
+        "contract.ended",
+        actor=actor,
+        request=request,
+        target=contract,
+        metadata={"ends_on": ends_on.isoformat()},
+    )
+    return contract
+
+
+def contract_status(contract: Contract, on=None) -> dict:
+    """This period's invoice (if received) and spend to date."""
+    on = on or timezone.localdate()
+    period = contract.period_for(on)
+    invoices = list(contract.invoices.exclude(state__in=["void", "rejected"]))
+    return {
+        "period": period,
+        "this_period": next((i for i in invoices if i.contract_period == period), None),
+        "total_cents": sum(i.amount_cents for i in invoices),
+        "count": len(invoices),
+    }

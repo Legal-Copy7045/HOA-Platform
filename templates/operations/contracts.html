@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Contracts · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "operations/finance_nav.html" %}
+  <div class="page-head"><div><h1>Contracts</h1><p class="subtitle">Recurring services the board has approved. Each invoice under a contract, within its cap and one per period, is pre-approved; anything more needs the usual approvals.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Contract</th><th>Vendor</th><th>Invoiced</th><th class="num">Cap</th><th>This period</th><th>Status</th></tr></thead>
+    <tbody>{% for c, st in rows %}<tr>
+      <td><a href="{% url 'contract_detail' c.pk %}">{{ c.title }}</a></td><td>{{ c.vendor }}</td><td>{{ c.get_schedule_display }}</td><td class="num">{{ c.amount_cap_cents|cents }}</td>
+      <td>{% if c.state == "active" %}{% if st.this_period %}<a href="{% url 'invoice_detail' st.this_period.pk %}">{{ st.period }} received</a>{% else %}<span class="muted">{{ st.period }}: not yet</span>{% endif %}{% endif %}</td>
+      <td>{% status c.state %}{% if c.ends_on %} <span class="small muted">to {{ c.ends_on|date:"M j, Y" }}</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="file" title="No contracts yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  {% if can_manage %}<details class="panel"><summary>Enter a contract</summary><div class="panel-body">
+    <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Enter contract</button></div></form>
+    <p class="small muted">A board member other than the one who enters it approves it. After approval its terms can't change; a new term is a new contract.</p></div></details>{% endif %}
+{% endblock %}

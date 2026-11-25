@@ -302,6 +302,22 @@ class Command(BaseCommand):
             internal=True,
             actor=b1,
         )
+        # A board-approved recurring contract (Milestone 3).
+        mowing = ops.create_contract(
+            vendor=green,
+            title="Common area mowing (demo)",
+            category=ExpenseCategory.objects.filter(active=True).first(),
+            schedule="monthly",
+            amount_cap_cents=85000,
+            starts_on=t.replace(month=1, day=1),
+            citation="Board resolution (demo)",
+            actor=b1,
+        )
+        if b2 is not b1:
+            ops.CONTRACT.apply(
+                mowing, "approve", actor=b2, note="Approved at the January meeting (demo)"
+            )
+
         # ARC project types owners choose from (Milestone 3).
         from arc import services as arc_services
 

@@ -62,6 +62,7 @@ SECTIONS = [
         [
             ("Owner accounts", "ledger_home", "wallet", "finance.view"),
             ("Invoices", "invoices", "receipt", "finance.view"),
+            ("Contracts", "contracts", "file", "finance.view"),
             ("Work orders", "work_orders", "wrench", "finance.view"),
             ("Vendors", "vendors", "users", "finance.view"),
             ("Budgets", "budgets", "chart", "finance.view"),

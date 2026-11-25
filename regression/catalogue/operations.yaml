@@ -23,3 +23,6 @@
 - feature: "Follow-up dates and the My items queue with per-area counts"
   since: M3
   match: ["^unit:operations/tests/test_requests.py::test_(follow_up|owners_cannot_set|my_items|owner_sees_requests|invoice_approval_is)"]
+- feature: "Recurring invoices: board-approved contracts (second board member, terms frozen by the database); one invoice per period within the cap is pre-approved and audited"
+  since: M3
+  match: ["^unit:operations/tests/test_contracts"]

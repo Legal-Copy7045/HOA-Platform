@@ -119,6 +119,14 @@ _SPECS = [
     _spec(
         "register.imported", "Lot and owner register imported", "lots", "owners", "people_created"
     ),
+    _spec("contract.entered", "Contract entered", "amount_cap_cents", "schedule"),
+    _spec("contract.ended", "Contract end date set", "ends_on"),
+    _spec(
+        "invoice.contract_preapproved",
+        "Invoice pre-approved under a contract",
+        "contract_id",
+        "period",
+    ),
     _spec("committee.created", "Committee created"),
     _spec("committee.retired", "Committee retired"),
     _spec("committee.reactivated", "Committee reactivated"),

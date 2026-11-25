@@ -118,6 +118,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "followup.view": frozenset({BOARD, MANAGER}),
     "workorder.manage": frozenset({BOARD, MANAGER}),
     "invoice.enter": frozenset({BOARD, MANAGER}),
+    "contract.manage": frozenset({BOARD, MANAGER}),
     "invoice.approve": frozenset({BOARD}),
     "invoice.record_payment": frozenset({BOARD, MANAGER}),
     "finance.view": frozenset({BOARD, AUDITOR, MANAGER}),

@@ -29,6 +29,7 @@
           <form method="post" action="{% url 'invoice_action' obj.pk 'pay' %}" class="form-grid">{% csrf_token %}{{ payment_form }}<div class="form-actions"><button type="submit">Record payment</button></div></form>
         </section>
       {% endif %}
+      {% if obj.contract %}<section class="card"><p class="small">{% icon "book" %} Under contract <a href="{% url 'contract_detail' obj.contract_id %}">{{ obj.contract.title }}</a>{% if obj.contract_period %}: pre-approved for {{ obj.contract_period }}{% elif obj.state != "draft" %}: outside the contract's cap or period, so it needs the usual approvals{% endif %}.</p></section>{% endif %}
       {% include "partials/workflow.html" with obj=obj %}
     </div>
     <aside>

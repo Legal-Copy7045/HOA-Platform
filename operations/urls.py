@@ -29,6 +29,13 @@ urlpatterns = [
         fv.work_order_action,
         name="work_order_action",
     ),
+    path("finance/contracts/", fv.contracts, name="contracts"),
+    path("finance/contracts/<int:pk>/", fv.contract_detail, name="contract_detail"),
+    re_path(
+        r"^finance/contracts/(?P<pk>[0-9]+)/do/(?P<action>[a-z_]+)/$",
+        fv.contract_action,
+        name="contract_action",
+    ),
     path("finance/invoices/", fv.invoices, name="invoices"),
     path("finance/invoices/<int:pk>/", fv.invoice_detail, name="invoice_detail"),
     re_path(

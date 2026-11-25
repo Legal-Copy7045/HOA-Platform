@@ -15,11 +15,13 @@ from documents import attachments
 from documents.services import DocumentError
 from operations import services
 from operations.models import (
+    Contract,
     ExpenseCategory,
     Invoice,
     OwnerRequest,
     PaymentMethod,
     Priority,
+    Schedule,
     Vendor,
     WorkOrder,
 )
@@ -60,7 +62,25 @@ class InvoiceForm(forms.Form):
     work_order = forms.ModelChoiceField(
         queryset=WorkOrder.objects.exclude(state__in=["cancelled"]), required=False
     )
+    contract = forms.ModelChoiceField(
+        queryset=Contract.objects.filter(state="active"),
+        required=False,
+        help_text="Within the contract's cap and the first for its period: pre-approved.",
+    )
     description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+
+class ContractForm(forms.Form):
+    vendor = forms.ModelChoiceField(queryset=Vendor.objects.filter(active=True))
+    title = forms.CharField(max_length=200, help_text="e.g. 'Lawn mowing, April-October'")
+    category = forms.ModelChoiceField(queryset=ExpenseCategory.objects.filter(active=True))
+    schedule = forms.ChoiceField(choices=Schedule.choices, label="Invoiced")
+    amount_cap_cents = MoneyField(label="Most per invoice ($)")
+    starts_on = _date()
+    ends_on = _date(required=False)
+    citation = forms.CharField(
+        max_length=200, label="Approved by", help_text="Board resolution or minutes, e.g. 2027-08"
+    )
 
 
 class PaymentForm(forms.Form):
@@ -308,3 +328,82 @@ def invoice_action(request, pk, action):
 def invoice_file(request, pk, file_id):
     _view_finance(request)
     return attachments.serve(request, get_object_or_404(Invoice, pk=pk), file_id)
+
+
+# --- Contracts ------------------------------------------------------------------------------
+
+
+@login_required
+def contracts(request):
+    _view_finance(request)
+    form = ContractForm(request.POST or None)
+    if request.method == "POST":
+        policy.require(request.user, "contract.manage")
+        if form.is_valid():
+            try:
+                contract = services.create_contract(
+                    actor=request.user, request=request, **form.cleaned_data
+                )
+            except services.OperationsError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, "Contract entered. Another board member approves it.")
+                return redirect("contract_detail", pk=contract.pk)
+        else:
+            messages.error(request, "Check the form.")
+        return redirect("contracts")
+    rows = [
+        (c, services.contract_status(c))
+        for c in Contract.objects.select_related("vendor").exclude(state="discarded")
+    ]
+    return render(
+        request,
+        "operations/contracts.html",
+        {"rows": rows, "form": form, "can_manage": policy.can(request.user, "contract.manage")},
+    )
+
+
+@login_required
+def contract_detail(request, pk):
+    _view_finance(request)
+    contract = get_object_or_404(Contract.objects.select_related("vendor", "category"), pk=pk)
+    if request.method == "POST":
+        policy.require(request.user, "contract.manage")
+        import datetime
+
+        try:
+            ends_on = datetime.date.fromisoformat(request.POST.get("ends_on", ""))
+            services.end_contract(contract, ends_on=ends_on, actor=request.user, request=request)
+        except ValueError:
+            messages.error(request, "Enter a date.")
+        except services.OperationsError as exc:
+            messages.error(request, str(exc))
+        return redirect("contract_detail", pk=contract.pk)
+    return render(
+        request,
+        "operations/contract_detail.html",
+        {
+            "obj": contract,
+            "status": services.contract_status(contract),
+            "invoices": contract.invoices.order_by("-invoice_date"),
+            "actions": services.CONTRACT.available(contract, request.user),
+            "history": services.CONTRACT.history(contract),
+            "action_url_name": "contract_action",
+            "can_manage": policy.can(request.user, "contract.manage"),
+        },
+    )
+
+
+@login_required
+@require_POST
+def contract_action(request, pk, action):
+    contract = get_object_or_404(Contract, pk=pk)
+    try:
+        if action not in services.CONTRACT.transitions:
+            raise WorkflowError("Unknown action.")
+        services.CONTRACT.apply(
+            contract, action, actor=request.user, note=request.POST.get("note", ""), request=request
+        )
+    except WorkflowError as exc:
+        messages.error(request, str(exc))
+    return redirect("contract_detail", pk=contract.pk)

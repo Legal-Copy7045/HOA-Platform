@@ -95,6 +95,9 @@ PROTECTED = {
     "lot_detail": ("GET", "lot"),
     "lot_transfer": ("POST", "lot"),
     "my_items": ("GET", None),
+    "contracts": ("GET", None),
+    "contract_detail": ("GET", "contract"),
+    "contract_action": ("POST", "contract"),
     "account_change_request": ("POST", "account_b"),
     "account_change_withdraw": ("POST", "change_b"),
     "account_change_decide": ("POST", "change_b"),
@@ -304,6 +307,16 @@ def world():
 
         vendor = operations.save_vendor(name="Pond Pros (demo)", actor=board)
         work_order = operations.create_work_order(title="Fix pond pump", actor=board)
+        contract = operations.create_contract(
+            vendor=vendor,
+            title="Pond contract",
+            category=ExpenseCategory.objects.create(code="9100", name="Pond"),
+            schedule="monthly",
+            amount_cap_cents=10000,
+            starts_on=days_ago(30),
+            citation="R-1",
+            actor=board,
+        )
         invoice = operations.create_invoice(
             vendor=vendor,
             number="INV-1",
@@ -359,6 +372,7 @@ def world():
         )
     targets = {
         "account_b": account_b.pk,
+        "contract": contract.pk,
         "change_b": change_b.pk,
         "request_b": request_b.pk,
         "committee_b": committee_b.pk,
@@ -445,6 +459,8 @@ def _url(name, key, targets):
         kwargs["action"] = "withdraw"
     elif name == "account_change_decide":
         kwargs["decision"] = "approve"
+    elif name == "contract_action":
+        kwargs["action"] = "approve"
     elif name == "committee_action":
         kwargs["action"] = "topic"
     elif name == "committee_task_close":

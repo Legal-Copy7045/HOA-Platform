@@ -2,6 +2,7 @@
 <nav class="subnav" aria-label="Finance">
   <a href="{% url 'ledger_home' %}"{% if "/finance/ledger" in p %} aria-current="page"{% endif %}>Owner accounts</a>
   <a href="{% url 'invoices' %}"{% if "/finance/invoices" in p %} aria-current="page"{% endif %}>Invoices</a>
+  <a href="{% url 'contracts' %}"{% if "/finance/contracts" in p %} aria-current="page"{% endif %}>Contracts</a>
   <a href="{% url 'work_orders' %}"{% if "/finance/work-orders" in p %} aria-current="page"{% endif %}>Work orders</a>
   <a href="{% url 'vendors' %}"{% if "/finance/vendors" in p %} aria-current="page"{% endif %}>Vendors</a>
   <a href="{% url 'budgets' %}"{% if "/finance/budgets" in p %} aria-current="page"{% endif %}>Budgets</a>

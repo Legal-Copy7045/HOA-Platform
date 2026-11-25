@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ obj.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "operations/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'contracts' %}">Contracts</a> / {{ obj.title }}</div>
+  <div class="page-head"><div><h1>{{ obj.title }}</h1>
+    <div class="meta">{% status obj.state %}<span>{{ obj.vendor }}</span><span>{{ obj.get_schedule_display }}, up to {{ obj.amount_cap_cents|cents }} each</span><span>{% icon "book" %}{{ obj.citation }}</span></div></div></div>
+  <div class="split">
+    <div>
+      <section class="card"><h2>Invoices under this contract</h2>
+        {% if invoices %}<ul class="list">{% for i in invoices %}<li><a class="grow" href="{% url 'invoice_detail' i.pk %}">#{{ i.number }} · {{ i.invoice_date|date:"M j, Y" }}{% if i.contract_period %} · {{ i.contract_period }} (pre-approved){% endif %}</a><span class="num">{{ i.amount_cents|cents }}</span>{% status i.state %}</li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
+        <p class="small muted">{{ status.count }} invoice{{ status.count|pluralize }}, {{ status.total_cents|cents }} in total.</p>
+      </section>
+      {% include "partials/workflow.html" with obj=obj %}
+    </div>
+    <aside>
+      <section class="card"><h3>Terms</h3><dl class="kv small">
+        <dt>Category</dt><dd>{{ obj.category }}</dd>
+        <dt>Covers</dt><dd>{{ obj.starts_on|date:"M j, Y" }} – {{ obj.ends_on|date:"M j, Y"|default:"open-ended" }}</dd>
+        <dt>Approved by</dt><dd>{{ obj.citation }}</dd></dl></section>
+      {% if can_manage and obj.state == "active" and not obj.ends_on %}<section class="card"><h3>End the contract</h3>
+        <form method="post" class="inline-form" data-confirm="Set the last day this contract covers? This can't be changed afterwards.">{% csrf_token %}<input type="date" name="ends_on" required aria-label="Last day"><button type="submit" class="secondary small">Set end date</button></form></section>{% endif %}
+    </aside>
+  </div>
+{% endblock %}

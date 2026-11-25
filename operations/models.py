@@ -119,8 +119,74 @@ class WorkOrder(models.Model):
         raise PermissionError("Work orders are cancelled, not deleted.")
 
 
+class Schedule(models.TextChoices):
+    MONTHLY = "monthly", "Monthly"
+    QUARTERLY = "quarterly", "Quarterly"
+    ANNUAL = "annual", "Annually"
+
+
+class Contract(models.Model):
+    """A board-approved recurring service contract (landscaping, pond care,
+    trash...). Each invoice under it within the cap, one per period, is
+    pre-approved; anything over the cap needs the normal approvals. Once
+    approved, its terms are fixed (database trigger); a change is a new
+    contract."""
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="contracts")
+    title = models.CharField(max_length=200)
+    category = models.ForeignKey("ExpenseCategory", on_delete=models.PROTECT, related_name="+")
+    schedule = models.CharField(max_length=10, choices=Schedule.choices)
+    amount_cap_cents = models.PositiveBigIntegerField(
+        help_text="Most that one invoice may be and still be pre-approved."
+    )
+    starts_on = models.DateField()
+    ends_on = models.DateField(null=True, blank=True)
+    # The board resolution or minutes that approved it.
+    citation = models.CharField(max_length=200)
+    state = models.CharField(max_length=12, default="draft")
+    state_changed_at = models.DateTimeField(default=timezone.now)
+    entered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["vendor__name", "title"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount_cap_cents__gt=0), name="contract_cap_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ends_on__isnull=True)
+                | models.Q(ends_on__gte=models.F("starts_on")),
+                name="contract_ends_after_start",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor}: {self.title}"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Contracts are ended, not deleted.")
+
+    def period_for(self, day) -> str:
+        if self.schedule == Schedule.MONTHLY:
+            return f"{day.year:04d}-{day.month:02d}"
+        if self.schedule == Schedule.QUARTERLY:
+            return f"{day.year:04d}-Q{(day.month - 1) // 3 + 1}"
+        return f"{day.year:04d}"
+
+    def covers(self, day) -> bool:
+        return self.starts_on <= day and (self.ends_on is None or day <= self.ends_on)
+
+
 class Invoice(models.Model):
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="invoices")
+    contract = models.ForeignKey(
+        Contract, null=True, blank=True, on_delete=models.PROTECT, related_name="invoices"
+    )
+    # The contract period this invoice is for (e.g. 2027-03), when pre-approved.
+    contract_period = models.CharField(max_length=10, blank=True)
     work_order = models.ForeignKey(
         WorkOrder, null=True, blank=True, on_delete=models.PROTECT, related_name="invoices"
     )
@@ -144,6 +210,12 @@ class Invoice(models.Model):
         ordering = ["-invoice_date", "-id"]
         constraints = [
             models.UniqueConstraint(fields=["vendor", "number"], name="invoice_unique_per_vendor"),
+            # One pre-approved invoice per contract period (void/rejected free it).
+            models.UniqueConstraint(
+                fields=["contract", "contract_period"],
+                condition=~models.Q(contract_period="") & ~models.Q(state__in=["void", "rejected"]),
+                name="invoice_one_per_contract_period",
+            ),
             models.CheckConstraint(
                 condition=models.Q(amount_cents__gt=0), name="invoice_amount_positive"
             ),
