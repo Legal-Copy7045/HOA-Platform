@@ -41,3 +41,17 @@ def test_registered_append_only_table_loses_update_and_delete(settings):
 def test_grants_are_noop_without_role(settings):
     settings.DB_APP_ROLE = ""
     assert db_roles.apply_runtime_grants() is False
+
+
+def test_migrations_never_depend_on_a_moving_target():
+    """A dependency on another app's "__latest__" changes meaning whenever that
+    app gains a migration, which breaks databases that already applied it."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    offenders = [
+        str(p.relative_to(root))
+        for p in root.glob("*/migrations/0*.py")
+        if "__latest__" in p.read_text(encoding="utf-8")
+    ]
+    assert offenders == []

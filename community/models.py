@@ -465,3 +465,36 @@ class ContactProfile(ScopedModel):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Profiles are edited, not deleted.")
+
+
+def _branding_key(instance, filename):
+    import uuid
+
+    return f"branding/{uuid.uuid4().hex}"
+
+
+class LoginBackground(models.Model):
+    """The picture behind the sign-in page. Uploaded by the board (or a
+    sysadmin), re-encoded on upload so no hidden data (GPS, camera details)
+    or crafted content survives. The newest row is the one shown; removing
+    the picture adds a row with no file, so the history is kept."""
+
+    class Variant(models.TextChoices):
+        DESKTOP = "desktop", "Desktop and tablet"
+        PHONE = "phone", "Phone"
+
+    variant = models.CharField(max_length=8, choices=Variant.choices, default=Variant.DESKTOP)
+    file = models.FileField(upload_to=_branding_key, max_length=200, blank=True)
+    content_type = models.CharField(max_length=40, blank=True)
+    width = models.PositiveIntegerField(default=0)
+    height = models.PositiveIntegerField(default=0)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    uploaded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-uploaded_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"login background #{self.pk}"

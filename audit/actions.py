@@ -102,6 +102,10 @@ _SPECS = [
     ),
     _spec("export.own_data", "Downloaded own data"),
     _spec("preview.owner_started", "Homeowner view started", "lot_id"),
+    _spec(
+        "branding.login_background_set", "Sign-in background uploaded", "variant", "width", "height"
+    ),
+    _spec("branding.login_background_removed", "Sign-in background removed", "variant"),
     _spec("preview.owner_stopped", "Homeowner view ended", "lot_id"),
     _spec("announcement.published", "Announcement published", "audience", "urgent"),
     _spec("event.created", "Calendar event created", "audience"),

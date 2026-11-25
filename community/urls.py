@@ -1,8 +1,14 @@
 from django.urls import path, re_path
 
-from community import views
+from community import branding_views, views
 
 urlpatterns = [
+    path("board/branding/", branding_views.branding_settings, name="branding_settings"),
+    path(
+        "branding/login-background/<int:pk>.jpg",
+        branding_views.login_background_image,
+        name="login_background_image",
+    ),
     path("my-lot/", views.my_lot, name="my_lot"),
     path("lots/", views.lot_list, name="lot_list"),
     path("lots/<int:pk>/", views.lot_detail, name="lot_detail"),

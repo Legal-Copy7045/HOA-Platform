@@ -62,6 +62,7 @@ SECTIONS = [
         "Admin",
         [
             ("System status", "system_status", "activity", "system.view_status"),
+            ("Branding", "branding_settings", "sliders", "branding.manage"),
             ("Invitations", "invitations", "mail", "invite.resend"),
             ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
         ],

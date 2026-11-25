@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Branding · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Branding</h1><p class="subtitle">Pictures behind the sign-in page. Everyone sees them before signing in, so use community photos with no faces, house numbers or car plates.</p></div></div>
+  <div class="grid grid-2">
+    {% for slot in slots %}
+      <section class="card">
+        <h2>{% if slot.variant == "phone" %}{% icon "user" %}{% else %}{% icon "home" %}{% endif %} {{ slot.title }}</h2>
+        {% if slot.image %}
+          <img class="branding-preview{% if slot.variant == 'phone' %} phone{% endif %}" src="{% url 'login_background_image' slot.image.pk %}" alt="Current {{ slot.title|lower }} sign-in background">
+          <p class="muted small">{{ slot.image.width }} × {{ slot.image.height }} · uploaded {{ slot.image.uploaded_at|date:"M j, Y" }}</p>
+        {% else %}
+          <p class="muted">{% if slot.variant == "phone" %}No phone picture: phones use the desktop picture (or the plain background).{% else %}No picture: the sign-in page uses the plain green background.{% endif %}</p>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data">{% csrf_token %}
+          <input type="hidden" name="variant" value="{{ slot.variant }}">
+          <label for="bg-{{ slot.variant }}">Upload a new picture</label>
+          <input id="bg-{{ slot.variant }}" type="file" name="image" accept="image/jpeg,image/png" required>
+          <p class="help">{{ slot.hint }} JPEG or PNG, up to {{ max_mb }} MB. It is resized and its hidden details (location, camera) are removed.</p>
+          <div class="form-actions"><button type="submit">Upload</button></div>
+        </form>
+        {% if slot.image %}
+          <form method="post" data-confirm="Remove this picture from the sign-in page?">{% csrf_token %}<input type="hidden" name="variant" value="{{ slot.variant }}"><input type="hidden" name="action" value="remove"><button type="submit" class="danger small">Remove picture</button></form>
+        {% endif %}
+      </section>
+    {% endfor %}
+  </div>
+  <section class="card"><h3>History</h3>
+    {% if history %}<ul class="list">{% for h in history %}<li><div class="grow"><div>{{ h.get_variant_display }}: {% if h.file %}picture uploaded{% else %}picture removed{% endif %}</div><div class="small muted">{{ h.uploaded_at|date:"M j, Y g:i A" }}</div></div></li>{% endfor %}</ul>
+    {% else %}<p class="muted small">No changes yet.</p>{% endif %}
+  </section>
+{% endblock %}

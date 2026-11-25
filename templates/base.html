@@ -49,7 +49,8 @@
             <form method="post" action="{% url 'owner_preview_stop' %}" class="inline">{% csrf_token %}<button type="submit" class="small">Exit homeowner view</button></form></div>
         {% endif %}
 {% else %}
-  <main id="main" class="auth">
+  <main id="main" class="auth{% if login_background_url %} has-bg{% endif %}">
+    {% if login_background_url %}<picture class="auth-bg"><source media="(max-width: 700px)" srcset="{{ login_background_phone_url }}"><img src="{{ login_background_url }}" alt=""></picture>{% endif %}
     <div class="auth-card">
       <a class="auth-brand" href="{% url 'home' %}"><span class="brand-mark"><svg aria-hidden="true"><use href="{% static 'img/icons.svg' %}#leaf"></use></svg></span><span>{{ SITE_NAME }}</span></a>
 {% endif %}

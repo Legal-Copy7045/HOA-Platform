@@ -19,6 +19,6 @@ def backfill(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("operations", "0003_invoice_frozen_approvals"),
-        ("community", "__latest__"),
+        ("community", "0005_contact_profile"),  # pinned (a moving "latest" broke history)
     ]
     operations = [migrations.RunPython(backfill, migrations.RunPython.noop)]

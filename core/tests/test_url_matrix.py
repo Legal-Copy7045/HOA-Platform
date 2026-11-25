@@ -33,7 +33,14 @@ from core.policy import SYSTEM
 
 pytestmark = pytest.mark.django_db
 
-PUBLIC = {"home", "healthz", "invite_landing", "invite_accept", "account_setup_expired"}
+PUBLIC = {
+    "home",
+    "healthz",
+    "invite_landing",
+    "invite_accept",
+    "account_setup_expired",
+    "login_background_image",
+}
 # Signed-in account pages provided by allauth (each acts only on the signed-in
 # user's own account) plus our enrollment-code page.
 OWN_ACCOUNT_PREFIXES = ("account_", "mfa_")
@@ -77,6 +84,7 @@ PROTECTED = {
     "lot_transfer": ("POST", "lot"),
     "board_home": ("GET", None),
     "owner_preview_start": ("POST", None),
+    "branding_settings": ("GET", None),
     "approvals": ("GET", None),
     "people": ("GET", None),
     "person_detail": ("GET", "person"),

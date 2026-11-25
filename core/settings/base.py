@@ -106,6 +106,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.site",
                 "core.context_processors.navigation",
+                "core.context_processors.login_background",
             ],
         },
     },

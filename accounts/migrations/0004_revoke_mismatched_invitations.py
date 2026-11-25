@@ -22,6 +22,6 @@ def revoke(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("accounts", "0003_mfa_reset"),
-        ("community", "__latest__"),
+        ("community", "0005_contact_profile"),  # pinned (a moving "latest" broke history)
     ]
     operations = [migrations.RunPython(revoke, migrations.RunPython.noop)]

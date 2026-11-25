@@ -293,7 +293,7 @@ MEMBER_READS = {
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
-        ("sysadmin", {"system.view_status", "invite.resend", "invite.revoke"}),
+        ("sysadmin", {"system.view_status", "invite.resend", "invite.revoke", "branding.manage"}),
         ("former", set()),
     ],
 )

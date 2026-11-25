@@ -39,6 +39,8 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "lot.view_all": frozenset({BOARD, AUDITOR, MANAGER}),
     # Homeowner view: see the portal as one lot's owner sees it (read-only).
     "portal.preview_as_owner": frozenset({BOARD, MANAGER}),
+    # Sign-in page picture (no owner data): board, or a sysadmin for operations.
+    "branding.manage": frozenset({BOARD, SYSADMIN}),
     "audit.view_sysadmin_activity": frozenset({BOARD, AUDITOR}),
     "system.view_status": frozenset({SYSADMIN}),
     # Community register and definition

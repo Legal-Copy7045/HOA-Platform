@@ -11,3 +11,4 @@ django-csp>=4
 django-simple-history
 django-allauth[mfa]
 django-axes
+Pillow

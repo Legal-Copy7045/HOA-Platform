@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-700
+# highest issued: UNIT-714
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -701,3 +701,17 @@ UNIT-697: "core/tests/test_owner_preview.py::test_exit_restores_the_board_view"
 UNIT-698: "core/tests/test_owner_preview.py::test_owners_cannot_use_homeowner_view"
 UNIT-699: "core/tests/test_owner_preview.py::test_preview_affects_only_the_viewer"
 UNIT-700: "core/tests/test_owner_preview.py::test_preview_ends_if_the_viewer_loses_the_role"
+UNIT-701: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[branding_settings]"
+UNIT-702: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[branding_settings]"
+UNIT-703: "core/tests/test_db_roles.py::test_migrations_never_depend_on_a_moving_target"
+UNIT-704: "community/tests/test_branding.py::test_board_uploads_and_the_sign_in_page_shows_it"
+UNIT-705: "community/tests/test_branding.py::test_hidden_data_is_removed"
+UNIT-706: "community/tests/test_branding.py::test_hostile_or_broken_files_are_refused[svg]"
+UNIT-707: "community/tests/test_branding.py::test_hostile_or_broken_files_are_refused[html-named-jpg]"
+UNIT-708: "community/tests/test_branding.py::test_hostile_or_broken_files_are_refused[broken-png]"
+UNIT-709: "community/tests/test_branding.py::test_owners_and_managers_cannot_change_it"
+UNIT-710: "community/tests/test_branding.py::test_sysadmin_can_change_it"
+UNIT-711: "community/tests/test_branding.py::test_only_the_current_picture_is_served"
+UNIT-712: "community/tests/test_branding.py::test_phone_picture_is_used_on_small_screens"
+UNIT-713: "community/tests/test_branding.py::test_phone_picture_alone_serves_both"
+UNIT-714: "community/tests/test_branding.py::test_unknown_variant_is_refused"
