@@ -174,3 +174,14 @@ def test_seed_demo_after_bootstrap_fills_only_free_offices(settings):
         assert BoardSeat.objects.active().count() == 5
         assert OfficeHolding.objects.active().filter(office="president").count() == 1
         assert OfficeHolding.objects.active().count() == 4
+
+
+def test_print_invitation_link_replaces_a_lost_bootstrap_link(client):
+    first = run("bootstrap_first_officer", name="First Officer", email="first@example.com")
+    old = re.search(r"localhost:8000(/invite/\S+/)", first).group(1)
+    out = run("print_invitation_link", email="FIRST@example.com")
+    new = re.search(r"localhost:8000(/invite/\S+/)", out).group(1)
+    assert client.get(old).status_code == 404
+    assert client.get(new).status_code == 302
+    with pytest.raises(CommandError):
+        run("print_invitation_link", email="nobody@example.com")

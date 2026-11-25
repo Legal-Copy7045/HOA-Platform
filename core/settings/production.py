@@ -15,7 +15,7 @@ SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=3600)
 # Emailed links must point at the public site. If PORTAL_BASE_URL was not
 # set (e.g. an older .env), use the public hostname rather than localhost.
 if not env("PORTAL_BASE_URL", default="") and ALLOWED_HOSTS:  # noqa: F405
-    PORTAL_BASE_URL = f"https://{ALLOWED_HOSTS[0]}"
+    PORTAL_BASE_URL = f"https://{ALLOWED_HOSTS[0]}"  # noqa: F405
 
 _problems = []
 if not ALLOWED_HOSTS:  # noqa: F405
