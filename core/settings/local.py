@@ -17,3 +17,6 @@ CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
 ADMIN_ENABLED = env.bool("ADMIN_ENABLED", default=True)
 if ADMIN_ENABLED and "django.contrib.admin" not in INSTALLED_APPS:  # noqa: F405
     INSTALLED_APPS.insert(0, "django.contrib.admin")  # noqa: F405
+
+# Passkeys on http://localhost (browsers allow WebAuthn there).
+MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = True

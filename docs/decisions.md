@@ -152,6 +152,24 @@ The portal image itself is still built from reviewed code.
 - Board members may end their own seat (resignation) without the manage
   permission; they cannot grant themselves anything.
 
+## D15. Sign-in mechanics (step 5)
+
+- allauth's MFA step applies after a password *or* an emailed code; only a
+  passkey sign-in skips it (a passkey is itself multi-factor). "Trust this
+  browser" is off.
+- `RequireMFAMiddleware`: a signed-in account without TOTP or a passkey can
+  reach only the enrollment pages and sign-out. Recovery codes alone do not
+  count. Applies to every account, checked on every request.
+- Lockout: django-axes, 5 failures per email+IP, 30 minutes, kept in the
+  shared database cache (no per-attempt rows holding emails or user agents).
+  The per-email ceiling (20 per hour, any IP) is allauth's rate limit; its
+  block lasts until the hour window passes rather than exactly 15 minutes.
+- Self-service email change and signup URLs return 404.
+- Residual gap, accepted: a new account is password-only between accepting the
+  invitation and enrolling (same session, enrollment forced immediately).
+- Recovery codes are shown by allauth after enrollment; we do not force a
+  "I saved them" confirmation in M1.
+
 ## Dependencies
 
 | Package | Why |
@@ -166,8 +184,8 @@ The portal image itself is still built from reviewed code.
 | django-csp | Content-Security-Policy headers (built into Django only from 6.0) |
 | django-simple-history | change history for lots, people, ownerships, seats, offices (CLAUDE.md stack); history tables are insert-only for the runtime role |
 
-Added in later steps, each justified when added: django-allauth[mfa],
-django-axes.
+| django-allauth[mfa] | sign-in, emailed codes, TOTP, passkeys (WebAuthn via `fido2`), recovery codes, reauthentication |
+| django-axes | per email+IP login lockout |
 
 Development only: pytest, pytest-django, pytest-cov, factory-boy, ruff, bandit,
 pip-audit, pip-tools.

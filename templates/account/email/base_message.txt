@@ -1,0 +1,6 @@
+{% autoescape off %}{{ site_name }}
+
+{% block content %}{% endblock content %}
+
+-- 
+{{ site_name }} owner portal. Do not reply to this message.{% endautoescape %}

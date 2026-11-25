@@ -37,11 +37,23 @@ def days_ago(n: int) -> datetime.date:
     return today() - datetime.timedelta(days=n)
 
 
-def make_member(*, board: bool = False, lots=(), roles=(), email: str | None = None):
+def enroll_totp(user) -> str:
+    """Give ``user`` an authenticator-app factor; returns the TOTP secret."""
+    from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+
+    secret = generate_totp_secret()
+    TOTP.activate(user, secret)
+    return secret
+
+
+def make_member(
+    *, board: bool = False, lots=(), roles=(), email: str | None = None, mfa: bool = True
+):
     """A User with a linked Person, set up through the services as SYSTEM.
 
     board: give them an active board seat. lots: Lots they currently own.
     roles: Role values (arc_reviewer, auditor, sysadmin) to hold.
+    mfa: enroll an authenticator app (every real account must have one).
     """
     from community import services
     from community.models import AppointedBy, Role, RoleAssignment, SeatType
@@ -68,4 +80,6 @@ def make_member(*, board: bool = False, lots=(), roles=(), email: str | None = N
                 appointed_by=AppointedBy.BOARD,
                 actor=SYSTEM,
             )
+    if mfa:
+        enroll_totp(user)
     return user

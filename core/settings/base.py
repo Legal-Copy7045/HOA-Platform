@@ -31,6 +31,10 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "simple_history",
     "procrastinate.contrib.django",
+    "allauth",
+    "allauth.account",
+    "allauth.mfa",
+    "axes",
     "core",
     "accounts",
     "audit",
@@ -55,8 +59,12 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
+    "accounts.middleware.RequireMFAMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Must be last: turns an axes lockout into the lockout page.
+    "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -87,6 +95,63 @@ DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 DB_APP_ROLE = env("DB_APP_ROLE", default="")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# --- Cache (shared by all processes: login throttling, allauth rate limits) ---
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "hoa_cache",
+    }
+}
+
+# --- Authentication (decisions D5, D6) ------------------------------------------
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",  # must be first
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+LOGIN_URL = "account_login"
+LOGIN_REDIRECT_URL = "home"
+
+ACCOUNT_ADAPTER = "accounts.adapter.AccountAdapter"
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]  # signup is closed anyway
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_UNIQUE_EMAIL = True
+# Invitations prove the address; there is no self-service email change.
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_PREVENT_ENUMERATION = True
+ACCOUNT_SESSION_REMEMBER = False
+ACCOUNT_LOGIN_ON_PASSWORD_RESET = False
+ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = False
+ACCOUNT_REAUTHENTICATION_REQUIRED = True
+# Emailed sign-in code instead of a password (D5): first factor only.
+ACCOUNT_LOGIN_BY_CODE_ENABLED = True
+ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 600
+ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
+ACCOUNT_RATE_LIMITS = {
+    # D6: per-email ceiling regardless of IP; axes handles email+IP below.
+    "login_failed": "10/m/ip,20/h/key",
+}
+ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
+
+MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
+MFA_PASSKEY_LOGIN_ENABLED = True
+MFA_PASSKEY_SIGNUP_ENABLED = False
+MFA_TRUST_ENABLED = False  # never skip the second factor on a "trusted" browser
+MFA_TOTP_ISSUER = env("SITE_NAME", default="Oak Creek Farms HOA")
+MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = False
+MFA_RECOVERY_CODE_COUNT = 10
+
+# django-axes: 5 failures for one email from one IP -> 30-minute lockout (D6).
+AXES_HANDLER = "axes.handlers.cache.AxesCacheHandler"  # no per-attempt DB rows
+AXES_FAILURE_LIMIT = env.int("AXES_FAILURE_LIMIT", default=5)
+AXES_COOLOFF_TIME = env.float("AXES_COOLOFF_HOURS", default=0.5)
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_RESET_ON_SUCCESS = True
+AXES_CLIENT_IP_CALLABLE = "core.net.client_ip"
+AXES_USERNAME_CALLABLE = "accounts.auth.axes_username"
+AXES_LOCKOUT_TEMPLATE = "account/lockout.html"
+AXES_VERBOSE = False
+
 # --- Passwords --------------------------------------------------------------
 # NIST SP 800-63B rev 4: length over composition. 12 minimum because every
 # account also needs a second factor (decisions Q5/Q5b).
@@ -97,7 +162,11 @@ AUTH_PASSWORD_VALIDATORS = [
         "OPTIONS": {"min_length": 12},
     },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "accounts.validators.BreachedPasswordValidator"},
 ]
+# HIBP k-anonymity check (decision D3). Only a 5-character hash prefix leaves.
+PASSWORD_BREACH_CHECK = env.bool("PASSWORD_BREACH_CHECK", default=True)
+PASSWORD_BREACH_CHECK_TIMEOUT = env.float("PASSWORD_BREACH_CHECK_TIMEOUT", default=3.0)
 
 # --- I18N -------------------------------------------------------------------
 LANGUAGE_CODE = "en-us"
@@ -133,7 +202,11 @@ STORAGES = {
 }
 
 # --- Email ------------------------------------------------------------------
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+# The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).
+EMAIL_BACKEND = "core.email.RedirectingBackend"
+EMAIL_TRANSPORT_BACKEND = env(
+    "EMAIL_TRANSPORT_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
+)
 EMAIL_HOST = env("EMAIL_HOST", default="localhost")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")

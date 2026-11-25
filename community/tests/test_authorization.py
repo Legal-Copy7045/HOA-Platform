@@ -284,5 +284,7 @@ def test_coverage_warns_when_fewer_than_two_people_can_act(world):
     assert thin["ownership.manage"] == 1
     assert thin["system.view_status"] == 1
     assert "lot.view_own" not in thin  # owner-only actions are exempt
+    make_member(board=True, mfa=False)  # without MFA they do not count (D4)
+    assert policy.thinly_covered_actions()["ownership.manage"] == 1
     make_member(board=True)
     assert "ownership.manage" not in policy.thinly_covered_actions()

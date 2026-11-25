@@ -5,13 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/site.css' %}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="{% url 'home' %}">{{ SITE_NAME }}</a>
+    <nav class="site-nav" aria-label="Main">
+      {% if user.is_authenticated %}
+        {% block nav %}{% include "partials/nav.html" %}{% endblock %}
+        <a href="{% url 'mfa_index' %}">Security</a>
+        <form method="post" action="{% url 'account_logout' %}" class="inline">
+          {% csrf_token %}<button type="submit" class="link">Sign out</button>
+        </form>
+      {% else %}
+        <a href="{% url 'account_login' %}">Sign in</a>
+      {% endif %}
+    </nav>
   </header>
   <main class="content">
-    {% block content %}{% endblock %}
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}<li class="message {{ message.tags }}">{{ message }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% block body %}{% block content %}{% endblock %}{% endblock %}
   </main>
 </body>
 </html>

@@ -19,6 +19,8 @@ case "${1:-web}" in
     exec python manage.py procrastinate worker
     ;;
   migrate)
+    # Cache table first, so the post-migrate runtime grants cover it too.
+    python manage.py createcachetable
     exec python manage.py migrate --noinput
     ;;
   manage)

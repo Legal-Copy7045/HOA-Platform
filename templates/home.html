@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>{{ SITE_NAME }} portal</h1>
-  <p>Sign-in arrives in a later step of Milestone 1.</p>
+  {% if user.is_authenticated %}
+    <p>You are signed in.</p>
+  {% else %}
+    <p>This portal is for owners and board members of {{ SITE_NAME }}. Accounts are by invitation.</p>
+    <p><a class="button" href="{% url 'account_login' %}">Sign in</a></p>
+  {% endif %}
 {% endblock %}
