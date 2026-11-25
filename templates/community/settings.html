@@ -1,39 +1,33 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Community settings · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Community settings</h1>
-  <p class="muted">Numbers here come from the Declaration, the bylaws or a recorded board decision. Each needs a citation; rules marked <strong>needs attention</strong> are missing a value or a citation. Money is entered in cents (e.g. 600 for $6.00).</p>
+  <div class="page-head"><div><h1>Community settings</h1><p class="subtitle">Numbers here come from the Declaration, the bylaws or a recorded board decision. Each needs a citation. Money is entered in cents (e.g. 600 for $6.00).</p></div></div>
 
-  <h2>Association</h2>
-  {% if can_edit %}
-    <form method="post" action="{% url 'community_profile_save' %}">{% csrf_token %}{{ profile_form.as_p }}<button type="submit">Save</button></form>
-  {% else %}<p>{{ profile_form.legal_name.value }}; fiscal year starts in month {{ profile_form.fiscal_year_start_month.value }}.</p>{% endif %}
+  <section class="card"><h2>Association</h2>
+    {% if can_edit %}<form method="post" action="{% url 'community_profile_save' %}" class="form-grid">{% csrf_token %}{{ profile_form }}<div class="form-actions"><button type="submit">Save</button></div></form>
+    {% else %}<dl class="kv"><dt>Legal name</dt><dd>{{ profile_form.legal_name.value }}</dd><dt>Fiscal year starts</dt><dd>Month {{ profile_form.fiscal_year_start_month.value }}</dd></dl>{% endif %}
+  </section>
 
   {% for group, rules in groups.items %}
-    <h2>{{ group }}</h2>
-    <table>
-      <thead><tr><th>Rule</th><th>Value</th><th>Citation</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
-      <tbody>
-      {% for r in rules %}
-        <tr>
-          <td>{{ r.spec.label }}{% if r.spec.help %}<div class="muted">{{ r.spec.help }}</div>{% endif %}{% if r.needs_attention %}<div><strong>needs attention</strong></div>{% endif %}</td>
-          {% if can_edit %}
-            <td colspan="3">
-              <form method="post" action="{% url 'community_rule_save' %}" class="rule-form">{% csrf_token %}
-                <input type="hidden" name="key" value="{{ r.spec.key }}">
-                <input name="value" value="{{ r.raw }}" aria-label="Value" size="10"> <span class="muted">{{ r.shown }}</span>
-                <input name="citation" value="{{ r.row.citation|default:'' }}" placeholder="Declaration §" aria-label="Citation">
-                <button type="submit">Save</button>
-              </form>
-            </td>
-          {% else %}<td>{{ r.shown|default:"-" }}</td><td>{{ r.row.citation|default:"-" }}</td>{% endif %}
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <section class="card rules"><h2>{{ group }}</h2>
+      <ul class="list">{% for r in rules %}<li class="rule{% if r.needs_attention %} attention{% endif %}">
+        <div class="grow rule-text"><div class="title">{{ r.spec.label }}{% if r.needs_attention %} <span class="status tone-warning">needs attention</span>{% endif %}</div>{% if r.spec.help %}<div class="small muted">{{ r.spec.help }}</div>{% endif %}</div>
+        {% if can_edit %}
+          <form method="post" action="{% url 'community_rule_save' %}" class="rule-form inline-form">{% csrf_token %}
+            <input type="hidden" name="key" value="{{ r.spec.key }}">
+            <div><label class="small" for="v-{{ r.spec.key }}">Value <span class="muted">{{ r.shown }}</span></label><input id="v-{{ r.spec.key }}" name="value" value="{{ r.raw }}" size="10"></div>
+            <div class="grow"><label class="small" for="c-{{ r.spec.key }}">Citation</label><input id="c-{{ r.spec.key }}" name="citation" value="{{ r.row.citation|default:'' }}" placeholder="Declaration §"></div>
+            <button type="submit" class="secondary small">Save</button>
+          </form>
+        {% else %}<div class="rule-value"><strong>{{ r.shown|default:"-" }}</strong><div class="small muted">{{ r.row.citation|default:"No citation" }}</div></div>{% endif %}
+      </li>{% endfor %}</ul>
+    </section>
   {% endfor %}
 
-  <h2>Common areas</h2>
-  <ul>{% for a in areas %}<li>{{ a.name }} <span class="muted">({{ a.get_kind_display }}){% if not a.active %}, inactive{% endif %}</span></li>{% empty %}<li class="muted">None recorded.</li>{% endfor %}</ul>
-  {% if can_edit %}<details><summary>Add a common area</summary><form method="post" action="{% url 'common_area_save' %}">{% csrf_token %}{{ area_form.as_p }}<button type="submit">Add</button></form></details>{% endif %}
+  <section class="card"><h2>Common areas</h2>
+    {% if areas %}<ul class="list">{% for a in areas %}<li><div class="todo-icon">{% icon "map" %}</div><div class="grow"><div class="title">{{ a.name }}</div><div class="small muted">{{ a.get_kind_display }}{% if not a.active %} · inactive{% endif %}</div></div></li>{% endfor %}</ul>
+    {% else %}<p class="muted">None recorded.</p>{% endif %}
+    {% if can_edit %}<details class="panel"><summary>Add a common area</summary><div class="panel-body"><form method="post" action="{% url 'common_area_save' %}" class="form-grid">{% csrf_token %}{{ area_form }}<div class="form-actions"><button type="submit">Add</button></div></form></div></details>{% endif %}
+  </section>
 {% endblock %}

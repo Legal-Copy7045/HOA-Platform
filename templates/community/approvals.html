@@ -1,22 +1,20 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Approvals · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Approvals</h1>
-  <p class="muted">These need a second board member: whoever started a request cannot approve it.</p>
-  <h2>Sysadmin nominations</h2>
-  <table><tbody>
-    {% for n in nominations %}
-      <tr><td>{{ n.person.display_name }}</td><td class="muted">nominated {{ n.nominated_at|date:"M j" }}, expires {{ n.expires_at|date:"M j" }}</td>
-        <td>{% if n.nominated_by_id != me.pk and n.person.user_id != me.pk %}<form method="post" action="{% url 'nomination_decide' n.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit">Approve</button></form>{% else %}<span class="muted">needs another board member</span>{% endif %}
-          <form method="post" action="{% url 'nomination_decide' n.pk 'decline' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Decline</button></form></td></tr>
-    {% empty %}<tr><td class="muted">None waiting.</td></tr>{% endfor %}
-  </tbody></table>
-  <h2>Sign-in resets</h2>
-  <table><tbody>
-    {% for r in resets %}
-      <tr><td>Account #{{ r.subject_id }}</td><td class="muted">identity checked by: {{ r.get_verification_method_display }}; started {{ r.started_at|date:"M j" }}</td>
-        <td>{% if r.started_by_id != me.pk and r.subject_id != me.pk %}<form method="post" action="{% url 'reset_decide' r.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit">Approve and show code</button></form>{% else %}<span class="muted">needs another board member</span>{% endif %}
-          <form method="post" action="{% url 'reset_decide' r.pk 'cancel' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Cancel</button></form></td></tr>
-    {% empty %}<tr><td class="muted">None waiting.</td></tr>{% endfor %}
-  </tbody></table>
+  <div class="page-head"><div><h1>Approvals</h1><p class="subtitle">These need a second board member: whoever started a request cannot approve it.</p></div></div>
+  <section class="card"><h2>Sysadmin nominations</h2>
+    {% if nominations %}<ul class="list">{% for n in nominations %}<li><div class="todo-icon tone-warning">{% icon "shield" %}</div>
+      <div class="grow"><div class="title">{{ n.person.display_name }}</div><div class="small muted">Nominated {{ n.nominated_at|date:"M j" }} · expires {{ n.expires_at|date:"M j" }}</div></div>
+      {% if n.nominated_by_id != me.pk and n.person.user_id != me.pk %}<form method="post" action="{% url 'nomination_decide' n.pk 'approve' %}" class="inline" data-confirm="Approve this person as sysadmin?">{% csrf_token %}<button type="submit" class="small">Approve</button></form>{% else %}<span class="muted small">Needs another board member</span>{% endif %}
+      <form method="post" action="{% url 'nomination_decide' n.pk 'decline' %}" class="inline" data-confirm="Decline this nomination?">{% csrf_token %}<button type="submit" class="danger small">Decline</button></form></li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="check-circle" title="None waiting" %}{% endif %}
+  </section>
+  <section class="card"><h2>Sign-in resets</h2>
+    {% if resets %}<ul class="list">{% for r in resets %}<li><div class="todo-icon tone-warning">{% icon "key" %}</div>
+      <div class="grow"><div class="title">Account #{{ r.subject_id }}</div><div class="small muted">Identity checked by {{ r.get_verification_method_display|lower }} · started {{ r.started_at|date:"M j" }}</div></div>
+      {% if r.started_by_id != me.pk and r.subject_id != me.pk %}<form method="post" action="{% url 'reset_decide' r.pk 'approve' %}" class="inline" data-confirm="Approve? This removes all of their authenticators and signs them out everywhere.">{% csrf_token %}<button type="submit" class="small">Approve and show code</button></form>{% else %}<span class="muted small">Needs another board member</span>{% endif %}
+      <form method="post" action="{% url 'reset_decide' r.pk 'cancel' %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Cancel</button></form></li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="check-circle" title="None waiting" %}{% endif %}
+  </section>
 {% endblock %}

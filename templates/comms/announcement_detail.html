@@ -1,8 +1,8 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}{{ a.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>{% if a.urgent %}URGENT: {% endif %}{{ a.title }}</h1>
-  <p class="muted">{{ a.published_at|date:"F j, Y g:i A" }}</p>
-  <div class="card">{{ a.body|linebreaks }}</div>
-  <p><a href="{% url 'announcements' %}">All announcements</a></p>
+  <div class="crumbs"><a href="{% url 'announcements' %}">Announcements</a> / {{ a.published_at|date:"M j, Y" }}</div>
+  <div class="page-head"><div><h1>{{ a.title }}</h1><div class="meta">{% if a.urgent %}<span class="status tone-danger">Urgent</span>{% endif %}<span>{{ a.published_at|date:"F j, Y g:i A" }}</span>{% if a.audience == "board" %}<span>{% icon "lock" %}Board only</span>{% endif %}</div></div></div>
+  <article class="card prose">{{ a.body|linebreaks }}</article>
 {% endblock %}

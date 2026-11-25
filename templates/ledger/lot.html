@@ -3,17 +3,30 @@
 {% block title %}Lot {{ lot.number }} account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <h1>Lot {{ lot.number }} account</h1>
-  <p>Balance: <strong>{{ balance|cents }}</strong> · current {{ aging.current|cents }} · 31-60 {{ aging.31_60|cents }} · 61-90 {{ aging.61_90|cents }} · over 90 {{ aging.over_90|cents }}{% if aging.credit %} · unapplied credit {{ aging.credit|cents }}{% endif %}</p>
-  <p><a href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">Statement PDF</a> · <a href="{% url 'lot_statement_pdf' lot.pk 'reminder' %}">Reminder letter PDF</a>{% if open_case %} · <a href="{% url 'collection_detail' open_case.pk %}">Open collection case</a>{% endif %}</p>
-  <table><thead><tr><th>Date</th><th>Entry</th><th>Amount</th><th></th></tr></thead><tbody>
-    {% for e in entries %}<tr><td>{{ e.posted_on }}</td><td>{{ e.description }}{% if e.reference %} <span class="muted">({{ e.reference }})</span>{% endif %}</td><td>{{ e.amount_cents|cents }}</td>
-      <td>{% if can_manage and e.kind != "reversal" %}{% if e.reversed_by %}<span class="muted">reversed</span>{% else %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'reverse' %}" class="inline">{% csrf_token %}<input type="hidden" name="entry" value="{{ e.pk }}"><input name="reason" placeholder="Reason" required aria-label="Reason" size="12"> <button type="submit" class="link">Reverse</button></form>{% endif %}{% endif %}</td></tr>{% empty %}<tr><td class="muted">No entries.</td></tr>{% endfor %}
-  </tbody></table>
+  <div class="crumbs"><a href="{% url 'ledger_home' %}">Owner accounts</a> / Lot {{ lot.number }}</div>
+  <div class="page-head">
+    <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<a href="{% url 'collection_detail' open_case.pk %}">{% icon "alert" %}Open collection case</a>{% endif %}</div></div>
+    <div class="actions">
+      <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">{% icon "download" %} Statement</a>
+      <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'reminder' %}">{% icon "download" %} Reminder letter</a>
+    </div>
+  </div>
+  <div class="grid grid-4">
+    <div class="stat {% if balance > 0 %}tone-warning{% elif balance < 0 %}tone-success{% endif %}"><div class="label">Balance</div><div class="value">{{ balance|cents }}</div></div>
+    <div class="stat"><div class="label">Current</div><div class="value">{{ aging.current|cents }}</div></div>
+    <div class="stat"><div class="label">31-60 days</div><div class="value">{{ aging.31_60|cents }}</div></div>
+    <div class="stat {% if aging.61_90 or aging.over_90 %}tone-danger{% endif %}"><div class="label">Over 60 days</div><div class="value">{{ aging.61_90|add:aging.over_90|cents }}</div>{% if aging.credit %}<div class="hint">unapplied credit {{ aging.credit|cents }}</div>{% endif %}</div>
+  </div>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Date</th><th>Entry</th><th class="num">Amount</th>{% if can_manage %}<th><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>
+    <tbody>{% for e in entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}{% if e.reference %} <span class="muted">({{ e.reference }})</span>{% endif %}</td><td class="num">{{ e.amount_cents|cents }}</td>
+      {% if can_manage %}<td>{% if e.kind != "reversal" %}{% if e.reversed_by %}<span class="status tone-neutral">Reversed</span>{% else %}<details class="row-menu"><summary>Reverse</summary><form method="post" action="{% url 'lot_ledger_action' lot.pk 'reverse' %}" class="inline-form" data-confirm="Post a reversing entry? The original stays on the record.">{% csrf_token %}<input type="hidden" name="entry" value="{{ e.pk }}"><input name="reason" placeholder="Reason" required aria-label="Reason"><button type="submit" class="danger small">Reverse</button></form></details>{% endif %}{% endif %}</td>{% endif %}</tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="receipt" title="No entries yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
   {% if can_manage %}
-    <details><summary>Record a payment</summary><form method="post" action="{% url 'lot_ledger_action' lot.pk 'payment' %}">{% csrf_token %}{{ payment_form.as_p }}<button type="submit">Record payment</button></form></details>
-    <details><summary>Post a charge</summary><form method="post" action="{% url 'lot_ledger_action' lot.pk 'charge' %}">{% csrf_token %}{{ charge_form.as_p }}<button type="submit">Post charge</button></form></details>
-    <details><summary>Post a credit</summary><form method="post" action="{% url 'lot_ledger_action' lot.pk 'credit' %}">{% csrf_token %}{{ credit_form.as_p }}<button type="submit">Post credit</button></form></details>
-    {% if not open_case and balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}">{% csrf_token %}<button type="submit">Open a collection case</button></form>{% endif %}
+    <details class="panel"><summary>Record a payment</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'payment' %}" class="form-grid">{% csrf_token %}{{ payment_form }}<div class="form-actions"><button type="submit">Record payment</button></div></form></div></details>
+    <details class="panel"><summary>Post a charge</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'charge' %}" class="form-grid">{% csrf_token %}{{ charge_form }}<div class="form-actions"><button type="submit">Post charge</button></div></form></div></details>
+    <details class="panel"><summary>Post a credit</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'credit' %}" class="form-grid">{% csrf_token %}{{ credit_form }}<div class="form-actions"><button type="submit">Post credit</button></div></form></div></details>
+    {% if not open_case and balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" data-confirm="Open a collection case for this lot?">{% csrf_token %}<button type="submit" class="secondary">Open a collection case</button></form>{% endif %}
   {% endif %}
 {% endblock %}

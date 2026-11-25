@@ -1,27 +1,39 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Board · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Board</h1>
+  <div class="page-head"><div><h1>Board</h1><p class="subtitle">Everything the board and manager run, in one place.</p></div></div>
   {% if thin %}
-    <div class="warning"><strong>Fewer than two people with MFA can do these:</strong>
-      <ul>{% for action, n in thin.items %}<li><code>{{ action }}</code>: {{ n }}</li>{% endfor %}</ul>
-      Every action should be possible for at least two people, so nothing stalls if someone is away.</div>
+    <div class="alert warning">{% icon "alert" %}<div><strong>{{ thin|length }} action{{ thin|length|pluralize }} can be done by fewer than two people with MFA.</strong>
+      Every action should be possible for at least two people, so nothing stalls if someone is away. <a href="{% url 'invitations' %}">Invite another board member</a>.
+      <details class="coverage"><summary>Show which</summary><ul class="small">{% for action, n in thin.items %}<li>{{ action|humanize_action }} <span class="muted">({{ n }})</span></li>{% endfor %}</ul></details></div></div>
   {% endif %}
   {% for seat in past_term %}
-    <div class="warning">{{ seat.person.display_name }}'s board term was due to end on {{ seat.term_end }}. If a successor has been elected, end this seat.</div>
+    <div class="alert warning">{% icon "clock" %}<span>{{ seat.person.display_name }}'s board term was due to end on {{ seat.term_end|date:"M j, Y" }}. If a successor has been elected, <a href="{% url 'person_detail' seat.person_id %}">end this seat</a>.</span></div>
   {% endfor %}
-  {% if rules_attention %}<div class="warning">{{ rules_attention }} governing rule(s) need a value or citation. <a href="{% url 'community_settings' %}">Community settings</a></div>{% endif %}
-  <ul class="tiles">
-    <li><a href="{% url 'reports' %}">Reports</a> <span class="muted">ARC, collections, invoices, transfers, violations, work orders, AR aging, budgets</span></li>
-    <li><a href="{% url 'ledger_home' %}">Owner accounts</a> · <a href="{% url 'collections' %}">Collections</a> · <a href="{% url 'budgets' %}">Budgets</a> · <a href="{% url 'resales' %}">Resale certificates</a></li>
-    <li><a href="{% url 'invoices' %}">Invoices</a> · <a href="{% url 'work_orders' %}">Work orders</a> · <a href="{% url 'vendors' %}">Vendors</a> <span class="muted">approvals, payments, insurance expiry</span></li>
-    <li><a href="{% url 'arc_list' %}">Architectural review</a> · <a href="{% url 'violations' %}">Violations</a> · <a href="{% url 'meetings' %}">Meetings</a> · <a href="{% url 'votes' %}">Votes</a> · <a href="{% url 'records_requests' %}">Records requests</a></li>
-    <li><a href="{% url 'tasks' %}">Board tasks</a> <span class="muted">follow-ups and assignments</span></li>
-    <li><a href="{% url 'community_settings' %}">Community settings</a> <span class="muted">dues, rules and citations, common areas</span></li>
-    <li><a href="{% url 'people' %}">People</a> <span class="muted">owners, board seats, offices, roles, logins</span></li>
-    <li><a href="{% url 'lot_list' %}">Lots</a> <span class="muted">ownership and transfers</span></li>
-    <li><a href="{% url 'approvals' %}">Approvals</a> <span class="muted">{{ open_nominations|length }} sysadmin nomination(s), {{ resets_waiting|length }} sign-in reset(s) waiting</span></li>
-    <li><a href="{% url 'invitations' %}">Invitations</a> <span class="muted">{{ invites_open }} open</span></li>
-    <li><a href="{% url 'sysadmin_activity' %}">Sysadmin activity</a></li>
-  </ul>
+  {% if rules_attention %}<div class="alert warning">{% icon "sliders" %}<span>{{ rules_attention }} governing rule{{ rules_attention|pluralize }} need{{ rules_attention|pluralize:"s," }} a value or citation. <a href="{% url 'community_settings' %}">Community settings</a></span></div>{% endif %}
+
+  <div class="grid grid-2">
+    <a class="stat {% if approvals_waiting %}tone-warning{% endif %}" href="{% url 'approvals' %}"><div class="label">Approvals waiting</div><div class="value">{{ approvals_waiting }}</div><div class="hint">sysadmin nominations and sign-in resets</div></a>
+    <a class="stat" href="{% url 'invitations' %}"><div class="label">Open invitations</div><div class="value">{{ invites_open }}</div><div class="hint">not yet accepted</div></a>
+  </div>
+
+  <div class="grid grid-3 hub">
+    <section class="card"><h2>{% icon "dollar" %} Finance</h2><ul class="links">
+      <li><a href="{% url 'ledger_home' %}">Owner accounts</a></li><li><a href="{% url 'invoices' %}">Invoices</a></li><li><a href="{% url 'budgets' %}">Budgets</a></li>
+      <li><a href="{% url 'collections' %}">Collections</a></li><li><a href="{% url 'resales' %}">Resale certificates</a></li><li><a href="{% url 'reports' %}">Reports</a></li></ul></section>
+    <section class="card"><h2>{% icon "pencil" %} Reviews and compliance</h2><ul class="links">
+      <li><a href="{% url 'arc_list' %}">Architectural review</a></li><li><a href="{% url 'violations' %}">Violations</a></li>
+      <li><a href="{% url 'work_orders' %}">Work orders</a></li><li><a href="{% url 'vendors' %}">Vendors</a></li></ul></section>
+    <section class="card"><h2>{% icon "vote" %} Governance</h2><ul class="links">
+      <li><a href="{% url 'meetings' %}">Meetings</a></li><li><a href="{% url 'votes' %}">Votes and polls</a></li>
+      <li><a href="{% url 'resolutions' %}">Resolutions and policies</a></li><li><a href="{% url 'records_requests' %}">Records requests</a></li></ul></section>
+    <section class="card"><h2>{% icon "users" %} People and lots</h2><ul class="links">
+      <li><a href="{% url 'people' %}">People</a> <span class="muted small">seats, offices, roles, logins</span></li><li><a href="{% url 'lot_list' %}">Lots</a> <span class="muted small">ownership and transfers</span></li>
+      <li><a href="{% url 'invitations' %}">Invitations</a></li><li><a href="{% url 'tasks' %}">Board tasks</a></li></ul></section>
+    <section class="card"><h2>{% icon "sliders" %} Community</h2><ul class="links">
+      <li><a href="{% url 'community_settings' %}">Community settings</a> <span class="muted small">dues, rules, citations</span></li></ul></section>
+    <section class="card"><h2>{% icon "shield" %} Oversight</h2><ul class="links">
+      <li><a href="{% url 'approvals' %}">Approvals</a></li><li><a href="{% url 'sysadmin_activity' %}">Sysadmin activity</a></li></ul></section>
+  </div>
 {% endblock %}

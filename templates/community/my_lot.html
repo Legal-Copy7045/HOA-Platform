@@ -1,18 +1,18 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}My lot · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>My lot</h1>
+  <div class="page-head"><div><h1>My lot</h1></div></div>
   {% for lot, ownerships in lots %}
     <section class="card">
-      <h2>{{ lot }}</h2>
-      <p>{{ lot.street_address }}</p>
-      <h3>Current owners</h3>
-      <ul>{% for o in ownerships %}<li>{{ o.person.display_name }} <span class="muted">({{ o.get_ownership_type_display }}, since {{ o.start_date }})</span></li>{% endfor %}</ul>
+      <div class="card-head"><div><h2>{{ lot }}</h2><div class="muted">{% icon "pin" %} {{ lot.street_address }}</div></div></div>
+      <h3>Owners on record</h3>
+      <ul class="list">{% for o in ownerships %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow"><div class="title">{{ o.person.display_name }}</div><div class="small muted">{{ o.get_ownership_type_display }} · since {{ o.start_date|date:"M j, Y" }}</div></div></li>{% endfor %}</ul>
     </section>
   {% endfor %}
-  <ul class="tiles">
-    <li><a href="{% url 'arc_list' %}">Architectural requests</a> <span class="muted">apply for exterior changes and track decisions</span></li>
-    <li><a href="{% url 'violations' %}">Notices about my lot</a> <span class="muted">covenant notices and your responses</span></li>
-    <li><a href="{% url 'documents' %}">Documents</a></li>
-  </ul>
+  <div class="grid grid-3">
+    <a class="stat" href="{% url 'arc_list' %}"><div class="label">{% icon "pencil" %} Architectural requests</div><div class="hint">Apply for exterior changes and track decisions</div></a>
+    <a class="stat" href="{% url 'violations' %}"><div class="label">{% icon "flag" %} Notices about my lot</div><div class="hint">Covenant notices and your responses</div></a>
+    <a class="stat" href="{% url 'documents' %}"><div class="label">{% icon "folder" %} Documents</div><div class="hint">Governing documents, minutes and forms</div></a>
+  </div>
 {% endblock %}

@@ -3,7 +3,13 @@
 {% block title %}Collection case #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <h1>Collection case #{{ obj.pk }}</h1>
-  <p>Lot {{ obj.lot.number }} · <span class="status">{{ obj.state }}</span> · balance {{ balance|cents }} · <a href="{% url 'lot_ledger' obj.lot_id %}">account</a> · <a href="{% url 'lot_statement_pdf' obj.lot_id 'reminder' %}">reminder letter PDF</a></p>
-  {% include "partials/workflow.html" with obj=obj %}
+  <div class="crumbs"><a href="{% url 'collections' %}">Collections</a> / Case #{{ obj.pk }}</div>
+  <div class="page-head">
+    <div><h1>Collection case #{{ obj.pk }}</h1><div class="meta">{% status obj.state %}<a href="{% url 'lot_ledger' obj.lot_id %}">Lot {{ obj.lot.number }} account</a></div></div>
+    <div class="actions"><div class="amount-big">{{ balance|cents }}</div></div>
+  </div>
+  <div class="split">
+    <div>{% include "partials/workflow.html" with obj=obj %}</div>
+    <aside><section class="card"><h3>Letters</h3><a class="btn secondary" href="{% url 'lot_statement_pdf' obj.lot_id 'reminder' %}">{% icon "download" %} Reminder letter (PDF)</a></section></aside>
+  </div>
 {% endblock %}

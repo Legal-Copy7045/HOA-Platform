@@ -125,3 +125,34 @@ def status(state: str, label: str = ""):
 @register.filter
 def state_label(state: str) -> str:
     return status_parts(state)[0]
+
+
+_DANGER_ACTIONS = {
+    "void",
+    "cancel",
+    "reject",
+    "deny",
+    "dismiss",
+    "withdraw",
+    "return_incomplete",
+    "refer",
+    "uphold",
+    "revoke",
+    "decline",
+}
+
+
+@register.filter
+def is_danger(action: str) -> bool:
+    """Workflow steps that close or refuse something get a confirm and red styling."""
+    return action in _DANGER_ACTIONS
+
+
+@register.filter
+def humanize_action(action: str) -> str:
+    """ "invoice.approve" -> "Invoice: approve"; "request_changes" -> "Request changes"."""
+    text = (action or "").replace("_", " ")
+    if "." in text:
+        head, _, tail = text.partition(".")
+        return f"{head.capitalize()}: {tail.replace('.', ' ')}"
+    return text.capitalize()

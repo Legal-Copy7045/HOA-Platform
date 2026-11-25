@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Directory · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Owner directory</h1>
-  <p class="muted">Only owners who chose to be listed appear here, with only the details they chose to share. <a href="{% url 'my_profile' %}">Change your listing</a>.</p>
-  <table>
-    <thead><tr><th>Lot</th><th>Name</th><th>Email</th><th>Phone</th></tr></thead>
-    <tbody>{% for e in entries %}<tr><td>{{ e.lot }}</td><td>{{ e.name }}</td><td>{{ e.email }}</td><td>{{ e.phone }}</td></tr>{% empty %}<tr><td class="muted">Nobody has opted in yet.</td></tr>{% endfor %}</tbody>
-  </table>
+  <div class="page-head"><div><h1>Owner directory</h1><p class="subtitle">Only owners who chose to be listed appear here, with only the details they chose to share.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'my_profile' %}">{% icon "user" %} Change my listing</a></div></div>
+  {% if entries %}
+    <div class="grid grid-3">{% for e in entries %}<section class="card person-card"><div class="small muted">{{ e.lot }}</div><div class="title">{{ e.name }}</div>
+      {% if e.email %}<div class="small">{% icon "mail" %} <a href="mailto:{{ e.email }}">{{ e.email }}</a></div>{% endif %}{% if e.phone %}<div class="small">{{ e.phone }}</div>{% endif %}</section>{% endfor %}</div>
+  {% else %}<section class="card">{% include "partials/empty.html" with icon="users" title="Nobody has opted in yet" text="Listing is optional. You can add yourself from your profile." %}</section>{% endif %}
 {% endblock %}

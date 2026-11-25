@@ -442,7 +442,11 @@ def resales(request):
     return render(
         request,
         "ledger/resales.html",
-        {"rows": ResaleRequest.objects.for_user(request.user).select_related("lot"), "form": form},
+        {
+            "rows": ResaleRequest.objects.for_user(request.user).select_related("lot"),
+            "form": form,
+            "can_manage": policy.can(request.user, "resale.manage"),
+        },
     )
 
 

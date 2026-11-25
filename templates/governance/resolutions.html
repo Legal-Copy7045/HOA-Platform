@@ -1,10 +1,16 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Resolutions and policies · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Resolutions and policies</h1>
-  <p class="muted">Adopted records are permanent. A change is recorded as a new resolution that supersedes the old one. {% if show_all %}<a href="?">Show only those in force</a>{% else %}<a href="?all=1">Show all, including superseded</a>{% endif %}</p>
-  <table><thead><tr><th>No.</th><th>Title</th><th>Adopted</th><th>Vote</th></tr></thead><tbody>
-    {% for r in rows %}<tr><td>{{ r.number }}</td><td><strong>{{ r.title }}</strong> <span class="muted">({{ r.get_kind_display }}){% if r.supersedes %} · supersedes {{ r.supersedes.number }}{% endif %}{% if r.citation %} · {{ r.citation }}{% endif %}</span><div>{{ r.text|linebreaksbr }}</div></td><td>{{ r.adopted_on }}</td><td class="muted">{{ r.votes_for }}-{{ r.votes_against }}-{{ r.abstentions }}</td></tr>{% empty %}<tr><td class="muted">None recorded.</td></tr>{% endfor %}
-  </tbody></table>
-  {% if can_record %}<details><summary>Record a resolution or policy</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Record</button></form></details>{% endif %}
+  {% include "governance/gov_nav.html" %}
+  <div class="page-head"><div><h1>Resolutions and policies</h1><p class="subtitle">Adopted records are permanent. A change is recorded as a new resolution that supersedes the old one.</p></div></div>
+  <div class="filters"><a href="?"{% if not show_all %} aria-current="true"{% endif %}>In force</a><a href="?all=1"{% if show_all %} aria-current="true"{% endif %}>All, including superseded</a></div>
+  {% for r in rows %}
+    <section class="card">
+      <div class="card-head"><div><div class="small muted">{{ r.number }} · {{ r.get_kind_display }}</div><h2>{{ r.title }}</h2></div><div class="small muted nowrap">Adopted {{ r.adopted_on|date:"M j, Y" }}<br>Vote {{ r.votes_for }}-{{ r.votes_against }}-{{ r.abstentions }}</div></div>
+      <div class="prose">{{ r.text|linebreaks }}</div>
+      {% if r.supersedes or r.citation %}<div class="meta small">{% if r.supersedes %}<span>Supersedes {{ r.supersedes.number }}</span>{% endif %}{% if r.citation %}<span>{{ r.citation }}</span>{% endif %}</div>{% endif %}
+    </section>
+  {% empty %}<section class="card">{% include "partials/empty.html" with icon="book" title="None recorded" %}</section>{% endfor %}
+  {% if can_record %}<details class="panel"><summary>Record a resolution or policy</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Record</button></div></form></div></details>{% endif %}
 {% endblock %}

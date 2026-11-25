@@ -1,11 +1,9 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Invitation · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <h1>This invitation link can't be used</h1>
-  {% if signed_in %}
-    <p>You're already signed in. Sign out first if you want to accept an invitation for someone else.</p>
-  {% else %}
-    <p>It may have expired, been replaced by a newer invitation, or already been used.
-       Ask a board member to send you a new one.</p>
-  {% endif %}
+  {% if signed_in %}<p class="muted">You're already signed in. Sign out first if you want to accept an invitation for someone else.</p>
+  {% else %}<p class="muted">It may have expired, been replaced by a newer invitation, or already been used. Ask a board member to send you a new one.</p>{% endif %}
+  <div class="form-actions"><a class="btn secondary" href="{% url 'home' %}">Go to the portal</a></div>
 {% endblock %}

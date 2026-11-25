@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}People · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>People</h1>
-  <table>
+  <div class="page-head"><div><h1>People</h1><p class="subtitle">Owners, board members and committee members. A person can exist before they have a login.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Name</th><th>Login</th></tr></thead>
-    <tbody>{% for p in people %}<tr><td><a href="{% url 'person_detail' p.pk %}">{{ p.display_name }}</a></td><td>{% if p.user_id %}yes{% else %}<span class="muted">not yet</span>{% endif %}</td></tr>{% endfor %}</tbody>
-  </table>
-  <h2>Add a person</h2>
-  <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Add</button></form>
+    <tbody>{% for p in people %}<tr><td><a href="{% url 'person_detail' p.pk %}">{{ p.display_name }}</a></td><td>{% if p.user_id %}<span class="status tone-success">Active</span>{% else %}<span class="status tone-neutral">Not yet</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="2">{% include "partials/empty.html" with icon="users" title="No people yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <details class="panel"><summary>Add a person</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Add person</button></div></form></div></details>
 {% endblock %}

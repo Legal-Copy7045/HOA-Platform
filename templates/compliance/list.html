@@ -1,9 +1,12 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Violations · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Violations</h1>
-  <table><thead><tr><th>#</th><th>Lot</th><th>Category</th><th>Status</th><th>Cure by</th></tr></thead><tbody>
-    {% for v in rows %}<tr><td><a href="{% url 'violation_detail' v.pk %}">{{ v.pk }}</a></td><td>{{ v.lot.number }}</td><td>{{ v.get_category_display }}</td><td><span class="status">{{ v.get_state_display }}</span></td><td>{{ v.cure_by|default:"" }}</td></tr>{% empty %}<tr><td class="muted">None.</td></tr>{% endfor %}
-  </tbody></table>
-  {% if can_manage %}<details><summary>Report a violation</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Report</button></form></details>{% endif %}
+  <div class="page-head"><div><h1>Violations</h1><p class="subtitle">Notices of covenant or rule issues, with the date by which they should be fixed.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Lot</th><th>Category</th><th>Status</th><th>Cure by</th></tr></thead>
+    <tbody>{% for v in rows %}<tr><td><a href="{% url 'violation_detail' v.pk %}">V-{{ v.pk }}</a></td><td>Lot {{ v.lot.number }}</td><td>{{ v.get_category_display }}</td><td>{% status v.state %}</td><td class="nowrap">{{ v.cure_by|date:"M j, Y"|default:"" }}</td></tr>
+    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="check-circle" title="No violations" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  {% if can_manage %}<details class="panel"><summary>Report a violation</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Report</button></div></form></div></details>{% endif %}
 {% endblock %}

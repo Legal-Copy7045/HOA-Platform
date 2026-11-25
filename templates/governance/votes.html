@@ -1,9 +1,14 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Votes · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Votes and polls</h1>
-  <table><tbody>{% for v in rows %}<tr><td><a href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a></td><td class="muted">{{ v.get_kind_display }}</td><td><span class="status">{{ v.get_status_display }}</span></td></tr>{% empty %}<tr><td class="muted">No votes yet.</td></tr>{% endfor %}</tbody></table>
-  {% if can_manage %}<details><summary>Create a vote or poll</summary>
-    <p class="warning">Formal votes use the quorum and pass rules from Community settings. They are <strong>not for binding use until the association's counsel has reviewed those settings</strong>.</p>
-    <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Create draft</button></form></details>{% endif %}
+  {% include "governance/gov_nav.html" %}
+  <div class="page-head"><div><h1>Votes and polls</h1><p class="subtitle">Informal polls are one per owner. Formal votes are one per lot.</p></div></div>
+  <section class="card">
+    {% if rows %}<ul class="list">{% for v in rows %}<li><div class="todo-icon">{% icon "vote" %}</div><div class="grow"><a class="title" href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a><div class="small muted">{{ v.get_kind_display }}{% if v.closes_at %} · closes {{ v.closes_at|date:"M j" }}{% endif %}</div></div>{% status v.status %}</li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="vote" title="No votes yet" %}{% endif %}
+  </section>
+  {% if can_manage %}<details class="panel"><summary>Create a vote or poll</summary><div class="panel-body">
+    <div class="alert warning">{% icon "alert" %}<span>Formal votes use the quorum and pass rules from Community settings. They are <strong>not for binding use until the association's counsel has reviewed those settings</strong>.</span></div>
+    <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
 {% endblock %}

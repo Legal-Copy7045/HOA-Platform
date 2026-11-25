@@ -2,19 +2,28 @@
 {% load portal %}
 {% block title %}My account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>My account</h1>
+  <div class="page-head"><div><h1>My account</h1><p class="subtitle">Dues are charged on the 1st of each month. Payments made in advance are kept as a credit and used up month by month.</p></div></div>
   {% for a in accounts %}
     <section class="card">
-      <h2>{{ a.lot }} · {{ a.lot.street_address }}</h2>
-      <p><strong>{% if a.statement.balance > 0 %}Amount due: {{ a.statement.balance|cents }}{% elif a.statement.balance < 0 %}Credit on account: {{ a.statement.balance|cents|cut:"-" }}{% else %}Paid up{% endif %}</strong></p>
-      <p class="muted">Dues are charged on the 1st of each month. Payments made in advance are kept as a credit and used up month by month.</p>
-      <table><tbody>
-        {% if a.statement.brought_forward %}<tr><td></td><td>Balance brought forward</td><td>{{ a.statement.brought_forward|cents }}</td></tr>{% endif %}
-        {% for e in a.statement.entries %}<tr><td>{{ e.posted_on }}</td><td>{{ e.description }}</td><td>{{ e.amount_cents|cents }}</td></tr>{% empty %}<tr><td class="muted">No activity yet.</td></tr>{% endfor %}
-      </tbody></table>
-      <p><a href="{% url 'my_statement_pdf' a.lot.pk %}">Download statement (PDF)</a></p>
-      <p><button type="button" disabled>Pay online</button> <span class="muted">{% if online %}{% else %}Online payment is coming soon. For now, pay by check as usual.{% endif %}</span></p>
+      <div class="card-head"><div><h2>Lot {{ a.lot.number }}</h2><div class="muted small">{{ a.lot.street_address }}</div></div>
+        <div class="balance {% if a.statement.balance > 0 %}is-due{% else %}is-clear{% endif %}">
+          <div class="small muted">{% if a.statement.balance > 0 %}Amount due{% elif a.statement.balance < 0 %}Credit on account{% else %}Balance{% endif %}</div>
+          <div class="amount-big">{% if a.statement.balance > 0 %}{{ a.statement.balance|cents }}{% elif a.statement.balance < 0 %}{{ a.statement.balance|cents|cut:"-" }}{% else %}Paid up{% endif %}</div>
+        </div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        {% if a.statement.brought_forward %}<tr><td></td><td>Balance brought forward</td><td class="num">{{ a.statement.brought_forward|cents }}</td></tr>{% endif %}
+        {% for e in a.statement.entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}</td><td class="num">{{ e.amount_cents|cents }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No activity yet.</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+      <div class="form-actions">
+        <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
+        <button type="button" class="btn" disabled>Pay online</button>
+      </div>
+      {% if not online %}<p class="muted small">Online payment is coming soon. For now, pay by check as usual.</p>{% endif %}
     </section>
   {% endfor %}
-  <p><a href="{% url 'resales' %}">Selling? Request a resale certificate</a></p>
+  <p><a href="{% url 'resales' %}">Selling your home? Request a resale certificate</a></p>
 {% endblock %}

@@ -3,17 +3,19 @@
 {% block title %}FY{{ budget.fiscal_year }} budget · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <h1>FY{{ budget.fiscal_year }} budget <span class="status">{{ budget.get_status_display }}</span></h1>
-  <p class="muted">Expense actuals come from approved and paid invoices by category; income actuals from the owner ledger.</p>
-  <div class="scroll"><table>
-    <thead><tr><th>Line</th>{% for y, m in report.months %}<th>{{ m }}/{{ y|stringformat:"d"|slice:"2:" }}</th>{% endfor %}<th>Budget</th><th>Actual</th><th>Variance</th></tr></thead>
+  <div class="crumbs"><a href="{% url 'budgets' %}">Budgets</a> / FY{{ budget.fiscal_year }}</div>
+  <div class="page-head">
+    <div><h1>FY{{ budget.fiscal_year }} budget</h1><div class="meta">{% status budget.status %}<span>Expense actuals from approved and paid invoices; income actuals from the owner ledger.</span></div></div>
+    {% if can_manage and budget.status == "draft" %}<div class="actions"><form method="post" data-confirm="Adopt this budget? Its lines will be locked.">{% csrf_token %}<input type="hidden" name="adopt" value="1"><button type="submit">{% icon "check" %} Adopt budget</button></form></div>{% endif %}
+  </div>
+  <div class="table-card"><div class="table-wrap"><table class="dense">
+    <thead><tr><th>Line</th>{% for y, m in report.months %}<th class="num">{{ m }}/{{ y|stringformat:"d"|slice:"2:" }}</th>{% endfor %}<th class="num">Budget</th><th class="num">Actual</th><th class="num">Variance</th></tr></thead>
     <tbody>{% for r in report.rows %}
-      <tr><td><strong>{{ r.line.name }}</strong> <span class="muted">{{ r.line.get_kind_display }}</span></td>{% for p in r.planned %}<td class="muted">{{ p|cents }}</td>{% endfor %}<td>{{ r.planned_total|cents }}</td><td></td><td></td></tr>
-      <tr><td class="muted">actual</td>{% for a in r.actual %}<td>{{ a|cents }}</td>{% endfor %}<td></td><td>{{ r.actual_total|cents }}</td><td>{{ r.variance|cents }}</td></tr>
-    {% empty %}<tr><td class="muted">No lines yet.</td></tr>{% endfor %}</tbody>
-  </table></div>
+      <tr class="group-start"><th scope="row">{{ r.line.name }} <span class="muted small">{{ r.line.get_kind_display }}</span></th>{% for p in r.planned %}<td class="num muted">{{ p|cents }}</td>{% endfor %}<td class="num"><strong>{{ r.planned_total|cents }}</strong></td><td></td><td></td></tr>
+      <tr><td class="muted small">actual</td>{% for a in r.actual %}<td class="num">{{ a|cents }}</td>{% endfor %}<td></td><td class="num"><strong>{{ r.actual_total|cents }}</strong></td><td class="num">{{ r.variance|cents }}</td></tr>
+    {% empty %}<tr><td colspan="16">{% include "partials/empty.html" with icon="chart" title="No lines yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
   {% if can_manage and budget.status == "draft" %}
-    <details><summary>Add a line</summary><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Add</button></form></details>
-    <form method="post">{% csrf_token %}<input type="hidden" name="adopt" value="1"><button type="submit">Adopt budget (locks the lines)</button></form>
+    <details class="panel"{% if not report.rows %} open{% endif %}><summary>Add a line</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Add line</button></div></form></div></details>
   {% endif %}
 {% endblock %}

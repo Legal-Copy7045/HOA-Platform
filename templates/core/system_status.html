@@ -1,13 +1,13 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}System status · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>System status</h1>
-  <table><tbody>
-    <tr><th>Version</th><td>{{ version }}</td></tr>
-    <tr><th>Unapplied migrations</th><td>{{ pending_migrations }}</td></tr>
-    <tr><th>Background jobs</th><td>{% for status, n in jobs %}{{ status }}: {{ n }}{% if not forloop.last %}, {% endif %}{% empty %}none{% endfor %}</td></tr>
-    <tr><th>Email redirect (POC)</th><td>{% if email_redirect %}<strong>ON</strong>: all mail goes to one inbox{% else %}off{% endif %}</td></tr>
-  </tbody></table>
-  {% if thin %}<div class="warning">Actions fewer than two people with MFA can perform: {% for a, n in thin.items %}<code>{{ a }}</code> ({{ n }}){% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}
-  <p class="muted">This page shows system health only. Sysadmins do not see owner data (decision D9).</p>
+  <div class="page-head"><div><h1>System status</h1><p class="subtitle">System health only. Sysadmins do not see owner data (decision D9).</p></div></div>
+  {% if thin %}<div class="alert warning">{% icon "alert" %}<span>Actions fewer than two people with MFA can perform: {% for a, n in thin.items %}{{ a|humanize_action }} ({{ n }}){% if not forloop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
+  <div class="grid grid-4">
+    <div class="stat"><div class="label">Version</div><div class="value small-value">{{ version }}</div></div>
+    <div class="stat {% if pending_migrations %}tone-danger{% else %}tone-success{% endif %}"><div class="label">Unapplied migrations</div><div class="value">{{ pending_migrations }}</div></div>
+    <div class="stat"><div class="label">Background jobs</div><div class="value small-value">{% for status, n in jobs %}{{ status }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}None{% endfor %}</div></div>
+    <div class="stat {% if email_redirect %}tone-warning{% endif %}"><div class="label">Email redirect (POC)</div><div class="value small-value">{% if email_redirect %}On{% else %}Off{% endif %}</div>{% if email_redirect %}<div class="hint">All mail goes to one inbox</div>{% endif %}</div>
+  </div>
 {% endblock %}

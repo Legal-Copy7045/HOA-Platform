@@ -2,12 +2,16 @@
 {% load portal %}
 {% block title %}Resale #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Resale certificate #{{ obj.pk }}</h1>
-  <p>Lot {{ obj.lot.number }} · requested by {{ obj.requester_name }} · <span class="status">{{ obj.state }}</span>{% if obj.due_on %} · due {{ obj.due_on }}{% endif %}{% if obj.fee_cents %} · fee {{ obj.fee_cents|cents }}{% endif %}</p>
-  {% if obj.state == "issued" or can_manage %}<p><a href="{% url 'resale_pdf' obj.pk %}">{% if obj.state == "issued" %}Certificate (PDF){% else %}Preview certificate (PDF){% endif %}</a></p>{% endif %}
+  {% if can_manage %}{% include "ledger/finance_nav.html" %}{% endif %}
+  <div class="crumbs"><a href="{% url 'resales' %}">Resale certificates</a> / #{{ obj.pk }}</div>
+  <div class="page-head">
+    <div><h1>Resale certificate #{{ obj.pk }}</h1>
+      <div class="meta">{% status obj.state %}<span>Lot {{ obj.lot.number }}</span><span>Requested by {{ obj.requester_name }}</span>{% if obj.due_on %}<span>{% icon "clock" %}Due {{ obj.due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.fee_cents %}<span>Fee {{ obj.fee_cents|cents }}</span>{% endif %}</div></div>
+    {% if obj.state == "issued" or can_manage %}<div class="actions"><a class="btn secondary" href="{% url 'resale_pdf' obj.pk %}">{% icon "download" %} {% if obj.state == "issued" %}Certificate (PDF){% else %}Preview certificate{% endif %}</a></div>{% endif %}
+  </div>
   {% if can_manage and obj.state != "issued" and obj.state != "cancelled" %}
-    <form method="post">{% csrf_token %}<label for="d">Other disclosures (statements the law requires that the portal does not hold)</label><textarea id="d" name="other_disclosures" rows="5">{{ obj.other_disclosures }}</textarea><p><button type="submit">Save</button></p></form>
-    <p class="warning">Before issuing, confirm with counsel that the certificate covers everything 68 Pa.C.S. § 5407 requires.</p>
+    <div class="alert warning">{% icon "alert" %}<span>Before issuing, confirm with counsel that the certificate covers everything 68 Pa.C.S. § 5407 requires.</span></div>
+    <section class="card"><form method="post">{% csrf_token %}<label for="d">Other disclosures</label><p class="help">Statements the law requires that the portal does not hold.</p><textarea id="d" name="other_disclosures" rows="5">{{ obj.other_disclosures }}</textarea><div class="form-actions"><button type="submit">Save</button></div></form></section>
   {% endif %}
   {% include "partials/workflow.html" with obj=obj %}
 {% endblock %}

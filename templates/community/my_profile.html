@@ -1,12 +1,17 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}My profile · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>My profile</h1>
-  {% if person %}
-    <p>{{ person.display_name }} <span class="muted">· {{ user.email }}</span></p>
-    <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Save</button></form>
-    <p class="muted">The directory is hidden unless you opt in, and shows only what you tick.</p>
-  {% else %}<p class="muted">Your login isn't linked to a person record yet. Ask a board member.</p>{% endif %}
-  <h2>Your data</h2>
-  <p><a href="{% url 'export_my_data' %}">Download my data</a> <span class="muted">(a JSON file of everything the portal holds about you)</span></p>
+  <div class="page-head"><div><h1>My profile</h1>{% if person %}<div class="meta"><span>{% icon "user" %}{{ person.display_name }}</span><span>{% icon "mail" %}{{ user.email }}</span></div>{% endif %}</div>
+    <div class="actions"><a class="btn secondary" href="{% url 'mfa_index' %}">{% icon "lock" %} Passkeys and security</a></div></div>
+  <div class="split">
+    <section class="card">
+      {% if person %}
+        <h2>Contact details and directory</h2>
+        <p class="muted small">The directory is hidden unless you opt in, and shows only what you tick.</p>
+        <form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save changes</button></div></form>
+      {% else %}{% include "partials/empty.html" with icon="user" title="Not linked yet" text="Your login isn't linked to a person record yet. Ask a board member." %}{% endif %}
+    </section>
+    <aside><section class="card"><h3>Your data</h3><p class="small muted">A JSON file of everything the portal holds about you.</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
+  </div>
 {% endblock %}

@@ -158,6 +158,10 @@ def board_home(request):
         policy.require(request.user, "person.manage")
     from accounts.models import Invitation, MfaReset
 
+    open_nominations = [n for n in SysadminNomination.objects.for_user(request.user) if n.is_open]
+    resets_waiting = [
+        r for r in MfaReset.objects.for_user(request.user) if r.status == "awaiting_approval"
+    ]
     return render(
         request,
         "community/board_home.html",
@@ -166,14 +170,9 @@ def board_home(request):
             "past_term": BoardSeat.objects.for_user(request.user)
             .past_term_end()
             .select_related("person"),
-            "open_nominations": [
-                n for n in SysadminNomination.objects.for_user(request.user) if n.is_open
-            ],
-            "resets_waiting": [
-                r
-                for r in MfaReset.objects.for_user(request.user)
-                if r.status == "awaiting_approval"
-            ],
+            "open_nominations": open_nominations,
+            "resets_waiting": resets_waiting,
+            "approvals_waiting": len(open_nominations) + len(resets_waiting),
             "invites_open": Invitation.objects.for_user(request.user).pending().count(),
         },
     )

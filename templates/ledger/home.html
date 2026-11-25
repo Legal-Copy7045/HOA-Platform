@@ -3,13 +3,25 @@
 {% block title %}Owner accounts · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <h1>Owner accounts</h1>
-  <p>Owed: <strong>{{ total_owed|cents }}</strong> · credits (prepayments): {{ total_credit|cents }}</p>
+  <div class="page-head"><div><h1>Owner accounts</h1><p class="subtitle">Every lot's balance. Positive is owed to the association; negative is a prepayment credit.</p></div></div>
+  <div class="grid grid-3">
+    <div class="stat {% if total_owed > 0 %}tone-warning{% endif %}"><div class="label">Owed by owners</div><div class="value">{{ total_owed|cents }}</div></div>
+    <div class="stat tone-success"><div class="label">Prepayment credits</div><div class="value">{{ total_credit|cents|cut:"-" }}</div></div>
+    <div class="stat"><div class="label">Lots</div><div class="value">{{ rows|length }}</div></div>
+  </div>
   {% if can_manage %}
-    <form method="post" class="card">{% csrf_token %}<strong>Post monthly dues</strong> for <input name="year" value="{{ year }}" size="5" aria-label="Year"> / <input name="month" value="{{ month }}" size="3" aria-label="Month"> <button type="submit">Post to every lot</button>
-      <div class="muted">Uses the monthly dues rule. A lot already charged for that month is skipped, so posting twice is safe.</div></form>
+    <section class="card">
+      <h2>Post monthly dues</h2>
+      <form method="post" class="inline-form">{% csrf_token %}
+        <div><label for="dy">Year</label><input id="dy" name="year" value="{{ year }}" inputmode="numeric" size="5"></div>
+        <div><label for="dm">Month</label><input id="dm" name="month" value="{{ month }}" inputmode="numeric" size="3"></div>
+        <button type="submit">Post to every lot</button>
+      </form>
+      <p class="muted small">Uses the monthly dues rule. A lot already charged for that month is skipped, so posting twice is safe.</p>
+    </section>
   {% endif %}
-  <table><thead><tr><th>Lot</th><th>Address</th><th>Balance</th></tr></thead><tbody>
-    {% for lot, bal in rows %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">{{ lot.number }}</a></td><td>{{ lot.street_address }}</td><td>{% if bal > 0 %}<span class="overdue">{{ bal|cents }}</span>{% elif bal < 0 %}{{ bal|cents }} credit{% else %}-{% endif %}</td></tr>{% endfor %}
-  </tbody></table>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Lot</th><th>Address</th><th class="num">Balance</th></tr></thead>
+    <tbody>{% for lot, bal in rows %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">Lot {{ lot.number }}</a></td><td>{{ lot.street_address }}</td><td class="num">{% if bal > 0 %}<span class="status tone-warning">{{ bal|cents }} due</span>{% elif bal < 0 %}<span class="status tone-success">{{ bal|cents|cut:"-" }} credit</span>{% else %}<span class="muted">Paid up</span>{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
 {% endblock %}

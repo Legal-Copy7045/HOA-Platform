@@ -3,17 +3,7 @@
 {% block content %}
   <h1>Create your account</h1>
   <p>You're setting up the login for <strong>{{ email }}</strong>.</p>
-  <p class="muted">Use a long passphrase you don't use anywhere else: four or five
-     unrelated words work well. Next you'll set up a passkey or an authenticator app.</p>
-  <form method="post" novalidate>
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    {% for field in form %}
-      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-      {{ field }}
-      {% if field.help_text %}<div class="muted">{{ field.help_text }}</div>{% endif %}
-      {{ field.errors }}
-    {% endfor %}
-    <p><button type="submit">Create account</button></p>
-  </form>
+  <ol class="steps"><li class="current">Choose a passphrase</li><li>Add a passkey or authenticator app</li><li>Save your recovery codes</li></ol>
+  <p class="muted small">Use a long passphrase you don't use anywhere else: four or five unrelated words work well.</p>
+  <form method="post" novalidate>{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit" class="block">Create account</button></div></form>
 {% endblock %}

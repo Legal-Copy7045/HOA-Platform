@@ -1,10 +1,13 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Reports · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <h1>Reports</h1>
+  <div class="page-head"><div><h1>Reports</h1><p class="subtitle">View any report on screen or download it as CSV for a spreadsheet.</p></div></div>
   {% for group, reports in groups.items %}
-    <h2>{{ group }}</h2>
-    <table><tbody>{% for r in reports %}<tr><td><strong>{{ r.title }}</strong><div class="muted">{{ r.description }}</div></td><td><a class="button" href="{% url 'report_run' r.key %}">View</a> <a href="{% url 'report_run' r.key %}?format=csv">Download CSV</a></td></tr>{% endfor %}</tbody></table>
+    <section class="card"><h2>{{ group }}</h2>
+      <ul class="list">{% for r in reports %}<li><div class="todo-icon">{% icon "chart" %}</div><div class="grow"><a class="title" href="{% url 'report_run' r.key %}">{{ r.title }}</a><div class="small muted">{{ r.description }}</div></div>
+        <a class="btn secondary small" href="{% url 'report_run' r.key %}?format=csv">{% icon "download" %}<span class="hide-sm">CSV</span></a></li>{% endfor %}</ul>
+    </section>
   {% endfor %}
 {% endblock %}

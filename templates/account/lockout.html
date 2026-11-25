@@ -1,8 +1,8 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Too many attempts · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <h1>Too many sign-in attempts</h1>
-  <p>For your security, sign-in is paused for a while. Please try again in 30 minutes,
-     or sign in with a passkey if you have one set up.</p>
-  <p>If you think someone else is trying to get into your account, tell a board member.</p>
+  <div class="alert warning">{% icon "clock" %}<span>For your security, sign-in is paused for a while. Please try again in 30 minutes, or sign in with a passkey if you have one set up.</span></div>
+  <p class="muted">If you think someone else is trying to get into your account, tell a board member.</p>
 {% endblock %}

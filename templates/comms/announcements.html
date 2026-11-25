@@ -1,15 +1,20 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Announcements · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Announcements</h1>
-  <table><tbody>
-    {% for a, read in items %}
-      <tr><td>{% if a.urgent %}<strong>URGENT</strong> {% endif %}<a href="{% url 'announcement_detail' a.pk %}">{% if not read %}<strong>{{ a.title }}</strong>{% else %}{{ a.title }}{% endif %}</a>{% if a.audience == "board" %} <span class="muted">(board only)</span>{% endif %}</td><td class="muted">{{ a.published_at|date:"M j, Y" }}</td></tr>
-    {% empty %}<tr><td class="muted">No announcements yet.</td></tr>{% endfor %}
-  </tbody></table>
+  <div class="page-head"><div><h1>Announcements</h1><p class="subtitle">News from the board. Unread items are marked.</p></div></div>
+  <section class="card">
+    {% if items %}<ul class="list">{% for a, read in items %}<li>
+      <div class="todo-icon {% if a.urgent %}tone-danger{% endif %}">{% icon "megaphone" %}</div>
+      <div class="grow"><a class="title" href="{% url 'announcement_detail' a.pk %}">{{ a.title }}</a>
+        <div class="small muted">{{ a.published_at|date:"M j, Y" }}{% if a.audience == "board" %} · Board only{% endif %}</div></div>
+      {% if a.urgent %}<span class="status tone-danger">Urgent</span>{% endif %}
+      {% if not read %}<span class="dot-unread" title="Unread"></span><span class="sr-only">Unread</span>{% endif %}</li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="megaphone" title="No announcements yet" %}{% endif %}
+  </section>
   {% if can_publish %}
-    <details><summary>Publish an announcement</summary>
-      <p class="muted">Published announcements can't be edited; publish a correction if needed. Members get an email with the title and a link.</p>
-      <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Publish</button></form></details>
+    <details class="panel"><summary>Publish an announcement</summary><div class="panel-body">
+      <p class="muted small">Published announcements can't be edited; publish a correction if needed. Members get an email with the title and a link.</p>
+      <form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Publish</button></div></form></div></details>
   {% endif %}
 {% endblock %}

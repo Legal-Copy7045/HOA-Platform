@@ -3,18 +3,51 @@
 {% block title %}Invoice {{ obj.number }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "operations/finance_nav.html" %}
-  <h1>{{ obj.vendor }} invoice #{{ obj.number }}</h1>
-  <p><span class="status">{{ obj.state }}</span> · {{ obj.amount_cents|cents }} · {{ obj.category }} · dated {{ obj.invoice_date }}{% if obj.due_date %} · due {{ obj.due_date }}{% endif %}{% if obj.work_order %} · <a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% endif %}</p>
-  {% if obj.description %}<div class="card">{{ obj.description|linebreaks }}</div>{% endif %}
-  <h2>Invoice file</h2>
-  <ul>{% for f in files %}<li><a href="{% url 'invoice_file' obj.pk f.pk %}">{{ f.original_filename }}</a></li>{% empty %}<li class="muted">No file attached.</li>{% endfor %}</ul>
-  {% if can_attach %}<form method="post" action="{% url 'invoice_action' obj.pk 'attach' %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" required aria-label="Invoice file"> <button type="submit">Attach</button></form>{% endif %}
-  <h2>Approvals <span class="muted">({{ approvals|length }} recorded; {{ needed }} approval{{ needed|pluralize }} needed)</span></h2>
-  <ul>{% for a in approvals %}<li>{{ a.approver.email }}: {{ a.get_decision_display }} <span class="muted">{{ a.created_at|date:"M j" }}{% if a.note %} · {{ a.note }}{% endif %}</span></li>{% empty %}<li class="muted">None yet.</li>{% endfor %}</ul>
-  {% if can_approve %}<form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="inline-block">{% csrf_token %}<input name="note" placeholder="Note (optional)" aria-label="Note"> <button type="submit">Approve</button></form>
-    <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="inline-block">{% csrf_token %}<input name="note" placeholder="Reason (required)" required aria-label="Reason"> <button type="submit" class="link">Reject</button></form>{% endif %}
-  <h2>Payments <span class="muted">({{ paid|cents }} of {{ obj.amount_cents|cents }})</span></h2>
-  <ul>{% for p in payments %}<li>{{ p.paid_on }} {{ p.get_method_display }} {{ p.reference }} {{ p.amount_cents|cents }}</li>{% empty %}<li class="muted">None.</li>{% endfor %}</ul>
-  {% if can_pay %}<form method="post" action="{% url 'invoice_action' obj.pk 'pay' %}">{% csrf_token %}{{ payment_form.as_p }}<button type="submit">Record payment</button></form>{% endif %}
-  {% include "partials/workflow.html" with obj=obj %}
+  <div class="crumbs"><a href="{% url 'invoices' %}">Invoices</a> / {{ obj.number }}</div>
+  <div class="page-head">
+    <div>
+      <h1>{{ obj.vendor }} · {{ obj.number }}</h1>
+      <div class="meta">{% status obj.state %}<span>{{ obj.category.name }}</span><span>Dated {{ obj.invoice_date|date:"M j, Y" }}</span>{% if obj.due_date %}<span>Due {{ obj.due_date|date:"M j, Y" }}</span>{% endif %}{% if obj.work_order %}<a href="{% url 'work_order_detail' obj.work_order_id %}">WO-{{ obj.work_order_id }}</a>{% endif %}</div>
+    </div>
+    <div class="amount-big">{{ obj.amount_cents|cents }}</div>
+  </div>
+  <div class="split">
+    <div>
+      {% if obj.description %}<section class="card prose">{{ obj.description|linebreaks }}</section>{% endif %}
+      {% if can_approve %}
+        <section class="card">
+          <h2>Your approval</h2>
+          <p class="muted">{{ approvals|length }} of {{ needed }} approval{{ needed|pluralize }} recorded.</p>
+          <div class="wf-actions">
+            <form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="wf-action">{% csrf_token %}<input name="note" placeholder="Note (optional)" aria-label="Note"><button type="submit">{% icon "check" %} Approve</button></form>
+            <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="wf-action" data-confirm="Reject this invoice?">{% csrf_token %}<input name="note" placeholder="Reason (required)" required aria-label="Reason"><button type="submit" class="danger">Reject</button></form>
+          </div>
+        </section>
+      {% endif %}
+      {% if can_pay %}
+        <section class="card"><h2>Record a payment</h2>
+          <form method="post" action="{% url 'invoice_action' obj.pk 'pay' %}" class="form-grid">{% csrf_token %}{{ payment_form }}<div class="form-actions"><button type="submit">Record payment</button></div></form>
+        </section>
+      {% endif %}
+      {% include "partials/workflow.html" with obj=obj %}
+    </div>
+    <aside>
+      <section class="card">
+        <h3>Invoice file</h3>
+        {% if files %}<ul class="list">{% for f in files %}<li>{% icon "file" %}<a class="grow" href="{% url 'invoice_file' obj.pk f.pk %}">{{ f.original_filename }}</a></li>{% endfor %}</ul>
+        {% else %}<p class="muted small">No file attached yet.</p>{% endif %}
+        {% if can_attach %}<form method="post" action="{% url 'invoice_action' obj.pk 'attach' %}" enctype="multipart/form-data">{% csrf_token %}<input type="file" name="file" required aria-label="Invoice file"><div class="form-actions"><button type="submit" class="secondary small">Attach</button></div></form>{% endif %}
+      </section>
+      <section class="card">
+        <h3>Approvals <span class="muted small">({{ needed }} needed)</span></h3>
+        {% if approvals %}<ul class="list">{% for a in approvals %}<li>{% if a.decision == "approve" %}{% icon "check-circle" %}{% else %}{% icon "alert" %}{% endif %}<div class="grow"><div>{{ a.approver.email }}</div><div class="small muted">{{ a.get_decision_display }} · {{ a.created_at|date:"M j" }}{% if a.note %} · {{ a.note }}{% endif %}</div></div></li>{% endfor %}</ul>
+        {% else %}<p class="muted small">None yet.</p>{% endif %}
+      </section>
+      <section class="card">
+        <h3>Payments</h3>
+        <p class="small">{{ paid|cents }} of {{ obj.amount_cents|cents }} paid</p>
+        {% if payments %}<ul class="list">{% for p in payments %}<li><div class="grow">{{ p.paid_on|date:"M j, Y" }} · {{ p.get_method_display }}{% if p.reference %} #{{ p.reference }}{% endif %}</div><span class="num">{{ p.amount_cents|cents }}</span></li>{% endfor %}</ul>{% endif %}
+      </section>
+    </aside>
+  </div>
 {% endblock %}

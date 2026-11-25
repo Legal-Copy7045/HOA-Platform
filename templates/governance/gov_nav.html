@@ -1,0 +1,8 @@
+{% with p=request.path %}
+<nav class="subnav" aria-label="Governance">
+  <a href="{% url 'meetings' %}"{% if "/meetings" in p %} aria-current="page"{% endif %}>Meetings</a>
+  <a href="{% url 'votes' %}"{% if "/votes" in p %} aria-current="page"{% endif %}>Votes and polls</a>
+  <a href="{% url 'resolutions' %}"{% if "/resolutions" in p %} aria-current="page"{% endif %}>Resolutions and policies</a>
+  <a href="{% url 'records_requests' %}"{% if "/records" in p %} aria-current="page"{% endif %}>Records requests</a>
+</nav>
+{% endwith %}

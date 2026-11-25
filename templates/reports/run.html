@@ -1,17 +1,18 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}{{ rep.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <h1>{{ rep.title }}</h1>
-  <p class="muted">{{ rep.description }}</p>
-  <form method="get" class="card">
-    {% if params.start %}From <input type="date" name="start" value="{{ params.start|date:'Y-m-d' }}" aria-label="From"> to <input type="date" name="end" value="{{ params.end|date:'Y-m-d' }}" aria-label="To">{% endif %}
-    {% if params.as_of %}As of <input type="date" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}" aria-label="As of">{% endif %}
-    {% if params.fiscal_year %}Fiscal year <input name="fiscal_year" value="{{ params.fiscal_year }}" size="6" aria-label="Fiscal year">{% endif %}
-    <button type="submit">Run</button> <button type="submit" name="format" value="csv" class="link">Download CSV</button>
+  <div class="crumbs"><a href="{% url 'reports' %}">Reports</a> / {{ rep.title }}</div>
+  <div class="page-head"><div><h1>{{ rep.title }}</h1><p class="subtitle">{{ rep.description }}</p></div></div>
+  <form method="get" class="card inline-form">
+    {% if params.start %}<div><label for="rs">From</label><input id="rs" type="date" name="start" value="{{ params.start|date:'Y-m-d' }}"></div><div><label for="re">To</label><input id="re" type="date" name="end" value="{{ params.end|date:'Y-m-d' }}"></div>{% endif %}
+    {% if params.as_of %}<div><label for="ra">As of</label><input id="ra" type="date" name="as_of" value="{{ params.as_of|date:'Y-m-d' }}"></div>{% endif %}
+    {% if params.fiscal_year %}<div><label for="rf">Fiscal year</label><input id="rf" name="fiscal_year" value="{{ params.fiscal_year }}" size="6" inputmode="numeric"></div>{% endif %}
+    <button type="submit">Run</button><button type="submit" name="format" value="csv" class="secondary">{% icon "download" %} Download CSV</button>
   </form>
-  <div class="scroll"><table><thead><tr>{% for h in head %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>
-    {% for row in rows %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% empty %}<tr><td class="muted">Nothing in this period.</td></tr>{% endfor %}
-  </tbody></table></div>
-  <p><a href="{% url 'reports' %}">All reports</a></p>
+  <div class="table-card"><div class="table-wrap"><table class="dense">
+    <thead><tr>{% for h in head %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for row in rows %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% empty %}<tr><td colspan="{{ head|length }}" class="muted">Nothing in this period.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
 {% endblock %}

@@ -1,11 +1,21 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Budgets · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <h1>Budgets</h1>
-  <ul>{% for b in budgets %}<li><a href="{% url 'budget_detail' b.pk %}">FY{{ b.fiscal_year }}</a> <span class="status">{{ b.get_status_display }}</span></li>{% empty %}<li class="muted">No budgets yet.</li>{% endfor %}</ul>
-  {% if can_manage %}<form method="post">{% csrf_token %}<label for="fy">New budget for fiscal year</label><input id="fy" name="fiscal_year" value="{{ year }}" size="6"> <button type="submit">Create</button></form>{% endif %}
-  <h2>Expense categories</h2>
-  <ul>{% for c in categories %}<li>{{ c.code }} {{ c.name }}</li>{% empty %}<li class="muted">None yet.</li>{% endfor %}</ul>
-  {% if can_manage %}<form method="post">{% csrf_token %}<input name="code" placeholder="Code e.g. 5100" aria-label="Code" size="8"> <input name="name" placeholder="Name e.g. Pond maintenance" aria-label="Name"> <button type="submit">Add category</button></form>{% endif %}
+  <div class="page-head"><div><h1>Budgets</h1><p class="subtitle">Fiscal year starts January 1. Adopted budgets are locked.</p></div></div>
+  <div class="split">
+    <section class="card">
+      <h2>Budgets</h2>
+      {% if budgets %}<ul class="list">{% for b in budgets %}<li><div class="todo-icon">{% icon "chart" %}</div><a class="grow title" href="{% url 'budget_detail' b.pk %}">FY{{ b.fiscal_year }}</a>{% status b.status %}</li>{% endfor %}</ul>
+      {% else %}{% include "partials/empty.html" with icon="chart" title="No budgets yet" %}{% endif %}
+      {% if can_manage %}<form method="post" class="inline-form">{% csrf_token %}<div><label for="fy">New budget for fiscal year</label><input id="fy" name="fiscal_year" value="{{ year }}" inputmode="numeric" size="6"></div><button type="submit">Create</button></form>{% endif %}
+    </section>
+    <section class="card">
+      <h2>Expense categories</h2>
+      {% if categories %}<ul class="list">{% for c in categories %}<li><span class="muted nowrap">{{ c.code }}</span><span class="grow">{{ c.name }}</span></li>{% endfor %}</ul>
+      {% else %}<p class="muted">None yet. Invoices need a category.</p>{% endif %}
+      {% if can_manage %}<form method="post" class="inline-form">{% csrf_token %}<div><label for="cc">Code</label><input id="cc" name="code" placeholder="5100" size="6"></div><div class="grow"><label for="cn">Name</label><input id="cn" name="name" placeholder="Pond maintenance"></div><button type="submit" class="secondary">Add</button></form>{% endif %}
+    </section>
+  </div>
 {% endblock %}

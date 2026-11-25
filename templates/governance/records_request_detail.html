@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Records request #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% load portal %}
+{% block title %}Records request R-{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Records request #{{ obj.pk }}</h1>
-  <p><span class="status">{{ obj.state }}</span>{% if obj.due_on %} · response due {{ obj.due_on }}{% endif %}</p>
-  <div class="card">{{ obj.description|linebreaks }}</div>
+  {% include "governance/gov_nav.html" %}
+  <div class="crumbs"><a href="{% url 'records_requests' %}">Records requests</a> / R-{{ obj.pk }}</div>
+  <div class="page-head"><div><h1>Records request R-{{ obj.pk }}</h1><div class="meta">{% status obj.state %}{% if obj.due_on %}<span>{% icon "clock" %}Response due {{ obj.due_on|date:"M j, Y" }}</span>{% endif %}</div></div></div>
+  <section class="card prose">{{ obj.description|linebreaks }}</section>
   {% include "partials/workflow.html" with obj=obj %}
-  <p><a href="{% url 'records_requests' %}">All requests</a></p>
 {% endblock %}

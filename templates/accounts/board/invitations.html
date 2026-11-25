@@ -1,16 +1,14 @@
 {% extends "base.html" %}
+{% load portal %}
 {% block title %}Invitations · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <h1>Invitations</h1>
-  <table>
-    <thead><tr><th>Sent to</th><th>Status</th><th>Created</th><th></th></tr></thead>
-    <tbody>
-    {% for inv in invitations %}
-      <tr><td>{{ inv.email }}</td><td>{{ inv.status }}</td><td>{{ inv.created_at|date:"M j, Y" }}</td>
-        <td>{% if inv.status == "pending" or inv.status == "queued" or inv.status == "expired" %}{% if not inv.accepted_at and not inv.revoked_at %}
-          <form method="post" action="{% url 'invitation_action' inv.pk 'resend' %}" class="inline">{% csrf_token %}<button type="submit">Re-send</button></form>
-          <form method="post" action="{% url 'invitation_action' inv.pk 'revoke' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Revoke</button></form>{% endif %}{% endif %}</td></tr>
-    {% empty %}<tr><td class="muted">No invitations yet.</td></tr>{% endfor %}
-    </tbody>
-  </table>
+  <div class="page-head"><div><h1>Invitations</h1><p class="subtitle">Invitations only link a login to an existing person. To invite someone, open their record under <a href="{% url 'people' %}">People</a>.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Sent to</th><th>Status</th><th>Created</th><th><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody>{% for inv in invitations %}<tr><td>{{ inv.email }}</td><td>{% status inv.status %}</td><td class="nowrap">{{ inv.created_at|date:"M j, Y" }}</td>
+      <td class="actions">{% if inv.status == "pending" or inv.status == "queued" or inv.status == "expired" %}{% if not inv.accepted_at and not inv.revoked_at %}
+        <form method="post" action="{% url 'invitation_action' inv.pk 'resend' %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Re-send</button></form>
+        <form method="post" action="{% url 'invitation_action' inv.pk 'revoke' %}" class="inline" data-confirm="Revoke this invitation?">{% csrf_token %}<button type="submit" class="danger small">Revoke</button></form>{% endif %}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="mail" title="No invitations yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
 {% endblock %}

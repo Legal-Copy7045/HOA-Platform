@@ -1,16 +1,27 @@
-{# Expects: actions (list of Transition), history (WorkflowEvents), action_url_name, obj #}
+{% load portal %}{# Expects: actions (Transitions), history (WorkflowEvents), action_url_name, obj #}
 {% if actions %}
-  <div class="card">
-    <h3>Next steps</h3>
+<section class="card">
+  <h2>Next steps</h2>
+  <div class="wf-actions">
     {% for t in actions %}
-      <form method="post" action="{% url action_url_name obj.pk t.action %}" class="inline-block">{% csrf_token %}
-        {% if t.note_required %}<input name="note" placeholder="Note (required)" required aria-label="Note">{% else %}<input name="note" placeholder="Note (optional)" aria-label="Note">{% endif %}
-        <button type="submit">{{ t.label }}</button>
+      <form method="post" action="{% url action_url_name obj.pk t.action %}" class="wf-action"{% if t.action|is_danger %} data-confirm="{{ t.label }}: are you sure?"{% endif %}>
+        {% csrf_token %}
+        <input name="note" aria-label="Note for {{ t.label }}" placeholder="{% if t.note_required %}Note (required){% else %}Note (optional){% endif %}"{% if t.note_required %} required{% endif %}>
+        <button type="submit" class="{% if t.action|is_danger %}danger{% elif not forloop.first %}secondary{% endif %}">{{ t.label }}</button>
       </form>
     {% endfor %}
   </div>
+</section>
 {% endif %}
-<h3>History</h3>
-<table><tbody>
-  {% for e in history %}<tr><td class="muted">{{ e.created_at|date:"Y-m-d H:i" }}</td><td>{{ e.action|capfirst }}</td><td>{% if e.actor %}{{ e.actor.email }}{% else %}system{% endif %}</td><td>{{ e.note }}</td></tr>{% empty %}<tr><td class="muted">No steps yet.</td></tr>{% endfor %}
-</tbody></table>
+<section class="card">
+  <h2>History</h2>
+  {% if history %}
+    <ol class="timeline">
+      {% for e in history %}
+        <li><div class="what">{{ e.action|humanize_action }} <span class="muted small">→ {{ e.to_state|state_label }}</span></div>
+          <div class="when">{{ e.created_at|date:"M j, Y g:i A" }} · {% if e.actor %}{{ e.actor.email }}{% else %}automatic{% endif %}</div>
+          {% if e.note %}<div class="note">{{ e.note }}</div>{% endif %}</li>
+      {% endfor %}
+    </ol>
+  {% else %}<p class="muted">No steps yet.</p>{% endif %}
+</section>
