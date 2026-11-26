@@ -344,8 +344,8 @@ def _approved_message(change) -> tuple[str, str]:
         return (
             "warning",
             "Approved: the account is updated, but the invitation could not be created"
-            " (for example, the email already belongs to a login). Send it from Invitations"
-            " and sign-ups.",
+            " (for example, the email already belongs to a login). Send it from their"
+            " record under People.",
         )
     if change.adds_person:
         return (
@@ -429,57 +429,113 @@ def _period_account(accounts, start, end):
     return max(accounts, key=overlap, default=None)
 
 
+def _former_period(roles, lot_id, start, end) -> dict:
+    """One former ownership period: its account and statement (shared by
+    My history and its statement PDF, so both show the same figures)."""
+    from ledger.accounts import ALL
+    from ledger.services import period_statement
+
+    with system_access("my history"):
+        # The account of this period (someone who sold, bought back and
+        # sold again has one per period, BUG-010): the one open on the
+        # day the period started, else the one overlapping it most.
+        mine = list(
+            Account.objects.filter(pk__in=roles.former_account_ids, lot_id=lot_id)
+            .select_related("lot")
+            .order_by("opened_on", "id")
+        )
+        account = _period_account(mine, start, end)
+        lot = account.lot if account else None
+    # Their own ownership account only (D33-acctfix-1). Once it is
+    # dormant nobody else is on it, so later entries on it (a refund of
+    # their credit) are theirs too; the credit still owed is shown.
+    dormant = account is not None and not account.is_active
+    statement = period_statement(
+        lot_id,
+        start,
+        end,
+        account=account.pk if account else ALL,
+        include_after_end=dormant,
+    )
+    sold = (
+        period_statement(lot_id, start, end, account=account.pk if account else ALL)
+        if dormant
+        else statement
+    )
+    return {
+        "lot": lot,
+        "account": account,
+        "start": start,
+        "end": end,
+        "statement": statement,
+        "sold_balance": sold.balance,
+        "credit_owed": -statement.balance if dormant and statement.balance < 0 else 0,
+    }
+
+
+@login_required
+def my_history_statement_pdf(request, index):
+    """A former owner's statement for one of their own periods (WT-010).
+    The period is picked from their own roles, so nobody can ask for
+    another's; read-only, and audited like any statement download."""
+    policy.require(request.user, "history.view_own")
+    from django.utils import timezone
+
+    from audit.services import record_event
+    from community.models import Person
+    from documents.attachments import pdf_response
+    from ledger.letters import former_statement_pdf
+
+    roles = policy.roles_for(request.user)
+    if not 0 <= index < len(roles.former_periods):
+        raise Http404
+    lot_id, start, end = roles.former_periods[index]
+    period = _former_period(roles, lot_id, start, end)
+    if period["lot"] is None:
+        raise Http404
+    with system_access("former owner's own name"):
+        person = Person.objects.filter(pk=roles.person_id).first()
+    record_event(
+        "ledger.statement_downloaded",
+        request=request,
+        actor=request.user,
+        target=period["lot"],
+        metadata={"lot_id": lot_id},
+    )
+    return pdf_response(
+        former_statement_pdf(
+            name=person.display_name if person else "",
+            lot=period["lot"],
+            account_number=period["account"].number,
+            start=start,
+            end=end or timezone.localdate(),
+            statement=period["statement"],
+        ),
+        f"statement-{period['account'].number}.pdf",
+    )
+
+
 @login_required
 def my_history(request):
     """Former owners: their own records from their time, read-only."""
     policy.require(request.user, "history.view_own")
     from arc.models import ArcRequest
     from compliance.models import Violation
-    from ledger.accounts import ALL
+    from ledger.disbursements import checks_for_account
+    from ledger.letters import balance_questions
     from ledger.models import ResaleRequest
-    from ledger.services import period_statement
+    from ledger.services import statement_rows
 
     roles = policy.roles_for(request.user)
     periods = []
-    for lot_id, start, end in roles.former_periods:
-        with system_access("my history"):
-            # The account of this period (someone who sold, bought back and
-            # sold again has one per period, BUG-010): the one open on the
-            # day the period started, else the one overlapping it most.
-            mine = list(
-                Account.objects.filter(pk__in=roles.former_account_ids, lot_id=lot_id)
-                .select_related("lot")
-                .order_by("opened_on", "id")
-            )
-            account = _period_account(mine, start, end)
-            lot = account.lot if account else None
-        # Their own ownership account only (D33-acctfix-1). Once it is
-        # dormant nobody else is on it, so later entries on it (a refund of
-        # their credit) are theirs too; the credit still owed is shown.
-        dormant = account is not None and not account.is_active
-        statement = period_statement(
-            lot_id,
-            start,
-            end,
-            account=account.pk if account else ALL,
-            include_after_end=dormant,
-        )
-        sold = (
-            period_statement(lot_id, start, end, account=account.pk if account else ALL)
-            if dormant
-            else statement
-        )
-        periods.append(
-            {
-                "lot": lot,
-                "account": account,
-                "start": start,
-                "end": end,
-                "statement": statement,
-                "sold_balance": sold.balance,
-                "credit_owed": -statement.balance if dormant and statement.balance < 0 else 0,
-            }
-        )
+    for index, (lot_id, start, end) in enumerate(roles.former_periods):
+        period = _former_period(roles, lot_id, start, end)
+        period["index"] = index
+        period["rows"] = statement_rows(period["statement"])
+        # Refund checks written to them for this period (D52).
+        account = period["account"]
+        period["checks"] = checks_for_account(account.pk if account else None)
+        periods.append(period)
     from django.db.models import Q
 
     from operations.models import OwnerRequest
@@ -493,6 +549,8 @@ def my_history(request):
         "community/my_history.html",
         {
             "periods": periods,
+            # Whom to ask about an old balance: contact details only (WT-010).
+            "questions": balance_questions(),
             "requests": OwnerRequest.objects.for_user(request.user)
             .filter(era)
             .select_related("lot"),

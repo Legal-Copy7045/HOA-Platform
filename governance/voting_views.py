@@ -269,6 +269,9 @@ def render_voting(request, *, open_panel: str = "", forms_: dict | None = None, 
     panel = open_panel or request.GET.get("new", "")
     context = {
         "rows": rows,
+        # Someone who can only answer surveys (a tenant) sees "Surveys", as
+        # their menu does (WT-018).
+        "heading": "Surveys" if [k for k, v in shown.items() if v] == ["surveys"] else "Voting",
         "open_count": sum(1 for r in all_rows if r["open"]),
         "past": past,
         "kind": kind,

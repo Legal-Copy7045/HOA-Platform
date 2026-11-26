@@ -110,6 +110,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Compliance
     "violation.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
     "violation.manage": frozenset({BOARD, MANAGER}),
+    # Uphold, dismiss and mark cured: decisions about an owner, board only (D49).
     "violation.decide": frozenset({BOARD}),
     # Operations and money
     "vendor.manage": frozenset({BOARD, MANAGER}),
@@ -225,6 +226,14 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # The board sees the history (who asked, when, the outcome); no owner data.
     "system.run_task": frozenset({SYSADMIN}),
     "system.view_tasks": frozenset({BOARD, SYSADMIN}),
+    # --- Disbursements (D52, optional feature "disbursements") ---
+    # The manager prepares (proposes, prints, records check numbers and
+    # clearing); approving, declining and voiding a check are board decisions.
+    "disbursement.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "disbursement.propose": frozenset({BOARD, MANAGER}),
+    "disbursement.approve": frozenset({BOARD}),
+    "disbursement.issue": frozenset({BOARD, MANAGER}),
+    "disbursement.void": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

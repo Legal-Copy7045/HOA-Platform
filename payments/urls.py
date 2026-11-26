@@ -19,4 +19,15 @@ urlpatterns = [
     path("my-account/<int:lot_id>/autopay/start/", views.autopay_start, name="autopay_start"),
     path("my-account/<int:lot_id>/autopay/cancel/", views.autopay_cancel, name="autopay_cancel"),
     path("my-account/autopay/<int:pk>/return/", views.autopay_return, name="autopay_return"),
+    # D47: schedule (monthly / once a year) and the board's review
+    path(
+        "my-account/<int:lot_id>/autopay/schedule/",
+        views.autopay_schedule,
+        name="autopay_schedule",
+    ),
+    path(
+        "finance/online-payments/autopay-reviews/<int:pk>/",
+        views.autopay_review,
+        name="autopay_review",
+    ),
 ]

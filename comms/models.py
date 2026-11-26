@@ -70,6 +70,9 @@ class Event(models.Model):
     starts_at = models.DateTimeField(db_index=True)
     ends_at = models.DateTimeField(null=True, blank=True)
     location = models.CharField(max_length=200, blank=True)
+    # Optional virtual join link (https only, comms.calendar_links.clean_join_url);
+    # a meeting's event mirrors its meeting's link (D49).
+    join_url = models.URLField(max_length=500, blank=True)
     description = models.TextField(blank=True)
     audience = models.CharField(max_length=16, choices=Audience.choices, default=Audience.MEMBERS)
     cancelled = models.BooleanField(default=False)

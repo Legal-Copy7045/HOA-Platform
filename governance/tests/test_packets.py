@@ -53,6 +53,7 @@ def world():
     previous = gov.create_meeting(
         title="October board meeting",
         kind="board",
+        location="Clubhouse",
         starts_at=timezone.now() - timedelta(days=30),
         actor=board,
     )
@@ -69,6 +70,7 @@ def world():
     meeting = gov.create_meeting(
         title="November board meeting",
         kind="board",
+        location="Clubhouse",
         starts_at=timezone.now() + timedelta(days=7),
         agenda="1. Call to order\n2. Pond repairs",
         actor=board,
@@ -189,6 +191,7 @@ def test_executive_session_has_board_packet_only(world):
     exec_meeting = gov.create_meeting(
         title="Executive session",
         kind="executive",
+        location="Clubhouse",
         starts_at=timezone.now() + timedelta(days=3),
         actor=world["board"],
     )
@@ -475,6 +478,7 @@ def test_pdf_escapes_hostile_text(world):
     meeting = gov.create_meeting(
         title="Evil) Tj ET BT /F2 99 Tf (x",
         kind="board",
+        location="Clubhouse",
         starts_at=timezone.now() + timedelta(days=9),
         agenda="Back\\slash ) Tj **bold** \N{RIGHT-TO-LEFT OVERRIDE} endobj\n%%EOF",
         actor=world["board"],
@@ -555,6 +559,7 @@ def _held_meeting_with_minutes(world, actor, title="December board meeting"):
     held = gov.create_meeting(
         title=title,
         kind="board",
+        location="Clubhouse",
         starts_at=timezone.now() - timedelta(days=3),
         actor=world["board"],
     )
@@ -568,6 +573,7 @@ def _next_meeting(world):
     return gov.create_meeting(
         title="January board meeting",
         kind="board",
+        location="Clubhouse",
         starts_at=timezone.now() + timedelta(days=20),
         actor=world["board"],
     )

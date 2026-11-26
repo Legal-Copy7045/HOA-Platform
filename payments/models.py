@@ -156,7 +156,8 @@ class AlertKind(models.TextChoices):
     SURCHARGE_REFUND = "surcharge", "Refund a surcharge"
     RECONCILIATION = "reconcile", "Stripe records do not match"
     FORMER_OWNER = "former", "Payment from a former owner"
-    # Autopay held back: the amount was over the ceiling (payments.autopay).
+    # Autopay held back (payments.autopay): before D47 an amount over the
+    # ceiling; since D47 an approved amount that grew before it was charged.
     AUTOPAY = "autopay", "Automatic payment held back"
 
 
@@ -279,6 +280,13 @@ class AutopayType(models.TextChoices):
     BANK = "us_bank_account", "Bank account"
 
 
+class AutopaySchedule(models.TextChoices):
+    """How often automatic payments charge (D47)."""
+
+    MONTHLY = "monthly", "Monthly"
+    ANNUAL = "annual", "Once a year"
+
+
 class StripeCustomer(ScopedAppendOnlyModel):
     """The Stripe Customer of one ownership account (created on first use, one
     per account and mode). Stripe holds only internal ids as its metadata:
@@ -326,6 +334,12 @@ class AutopaySetup(ScopedModel):
     person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     method_type = models.CharField(max_length=20, choices=AutopayType.choices)
+    # The schedule the payer chose on the set-up page (D47); the month of the
+    # annual charge (1-12) for "annual".
+    schedule = models.CharField(
+        max_length=8, choices=AutopaySchedule.choices, default=AutopaySchedule.MONTHLY
+    )
+    annual_month = models.PositiveSmallIntegerField(null=True, blank=True)
     customer_id = models.CharField(max_length=255)
     livemode = models.BooleanField(default=False)
     session_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
@@ -350,9 +364,23 @@ class AutopaySetup(ScopedModel):
         return f"as{self.pk}"
 
 
+def twelve_months_start(row):
+    """The first of the twelve months an annual attempt or review buys."""
+    import datetime
+
+    if row.covers_through:
+        year, month = (int(x) for x in row.covers_through.split("-"))
+        index = year * 12 + month - 1 - 11
+        return datetime.date(index // 12, index % 12 + 1, 1)
+    year, month = (int(x) for x in (row.covers_from or f"{row.period}-01").split("-"))
+    return datetime.date(year, month, 1)
+
+
 class AutopayAttempt(ScopedAppendOnlyModel):
-    """One automatic charge of one month's assessment (try 1 on the due day,
-    try 2 the one retry). Bound to a PendingCheckout so the existing
+    """One automatic charge (try 1 on the due day, try 2 the one retry): of
+    one month's assessment (schedule monthly, period "YYYY-MM"), or of the
+    next twelve months' assessments (schedule annual, period "YYYY": one per
+    account and year, D47). Bound to a PendingCheckout so the existing
     verification and recording path records the payment once Stripe says it
     succeeded; the unique (account, period, try) and the idempotency key
     make re-runs harmless."""
@@ -361,8 +389,20 @@ class AutopayAttempt(ScopedAppendOnlyModel):
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
     account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
-    charge = models.ForeignKey("ledger.LedgerEntry", on_delete=models.PROTECT, related_name="+")
+    # The month's assessment (monthly); for an annual charge, the first of the
+    # twelve months' assessments when it was already posted, else empty.
+    charge = models.ForeignKey(
+        "ledger.LedgerEntry", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    schedule = models.CharField(
+        max_length=8, choices=AutopaySchedule.choices, default=AutopaySchedule.MONTHLY
+    )
     period = models.CharField(max_length=7)
+    # Annual (D47): the months this charge pays for, "YYYY-MM" to "YYYY-MM":
+    # from the month it is charged to the end of the twelve months it buys
+    # (longer than twelve when it starts after earlier prepaid months end).
+    covers_from = models.CharField(max_length=7, blank=True)
+    covers_through = models.CharField(max_length=7, blank=True)
     try_number = models.PositiveSmallIntegerField(default=1)
     checkout = models.OneToOneField(
         PendingCheckout, on_delete=models.PROTECT, related_name="autopay_attempt"
@@ -382,6 +422,16 @@ class AutopayAttempt(ScopedAppendOnlyModel):
     def __str__(self) -> str:
         return f"Automatic payment {self.period} try {self.try_number}"
 
+    @property
+    def period_text(self) -> str:
+        """ "March 2027" (monthly) or "the year from January 2027" (annual)."""
+        import datetime
+
+        if self.schedule == AutopaySchedule.ANNUAL:
+            return f"twelve months from {twelve_months_start(self):%B %Y}"
+        year, month = (int(x) for x in self.period.split("-"))
+        return f"{datetime.date(year, month, 1):%B %Y}"
+
 
 class AutopayEventKind(models.TextChoices):
     ENROLLED = "enrolled", "Set up"
@@ -389,6 +439,8 @@ class AutopayEventKind(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
     FAILED = "failed", "Payment failed"
     PAUSED = "paused", "Paused"
+    # D47: the payer changed the schedule (monthly / once a year, and month).
+    SCHEDULE = "schedule", "Schedule changed"
 
 
 class AutopayEvent(ScopedAppendOnlyModel):
@@ -422,6 +474,10 @@ class AutopayEvent(ScopedAppendOnlyModel):
     bank_name = models.CharField(max_length=80, blank=True)
     last4 = models.CharField(max_length=4, blank=True)
     mandate_id = models.CharField(max_length=255, blank=True)
+    # The schedule set by this row (enrolled, replaced, schedule; D47). Blank
+    # on other kinds and on rows from before D47 (those mean monthly).
+    schedule = models.CharField(max_length=8, choices=AutopaySchedule.choices, blank=True)
+    annual_month = models.PositiveSmallIntegerField(null=True, blank=True)
     # Why: a Stripe decline or error code, or "owner", "ownership_ended"...
     code = models.CharField(max_length=60, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -431,3 +487,60 @@ class AutopayEvent(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"Automatic payments {self.kind}"
+
+
+class AutopayReview(ScopedAppendOnlyModel):
+    """An automatic charge above the review limit (rule
+    ``payments.autopay_review_cents``, D47), held for the board instead of
+    being charged. One per account and period; what happened to it is an
+    ``AutopayReviewDecision`` (approved, declined or expired)."""
+
+    scope_lot_path = "lot"
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
+    schedule = models.CharField(max_length=8, choices=AutopaySchedule.choices)
+    period = models.CharField(max_length=7)  # as on AutopayAttempt
+    covers_from = models.CharField(max_length=7, blank=True)  # annual: as on AutopayAttempt
+    covers_through = models.CharField(max_length=7, blank=True)
+    method = models.CharField(max_length=8, choices=Method.choices)
+    base_cents = models.BigIntegerField()
+    surcharge_cents = models.BigIntegerField(default=0)
+    total_cents = models.BigIntegerField()
+    limit_cents = models.BigIntegerField()
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["account", "period"], name="autopay_review_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"Automatic payment review #{self.pk}"
+
+
+class ReviewOutcome(models.TextChoices):
+    APPROVED = "approved", "Approved"
+    DECLINED = "declined", "Declined"
+    EXPIRED = "expired", "Expired"
+    CLOSED = "closed", "Closed: the payer changed the schedule"
+
+
+class AutopayReviewDecision(ScopedAppendOnlyModel):
+    """The board's answer to an ``AutopayReview`` (or its expiry after 14
+    days), once."""
+
+    scope_lot_path = "review__lot"
+
+    review = models.OneToOneField(AutopayReview, on_delete=models.PROTECT, related_name="decision")
+    outcome = models.CharField(max_length=8, choices=ReviewOutcome.choices)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    reason = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return f"Review #{self.review_id} {self.outcome}"

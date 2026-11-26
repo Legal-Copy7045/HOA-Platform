@@ -302,9 +302,11 @@ def test_owner_cannot_edit_another_owners_request_by_id(client, w):
 def test_workflow_blocked_lists_only_steps_the_actor_could_take(w):
     blocked = {t.action: reason for t, reason in services.ARC.blocked(w["req"], w["owner"])}
     assert blocked == {"request_acknowledgements": "There are no neighbors to ask."}
-    # A stranger is told why; board-only steps and other states never appear.
+    # Steps only an owner of this home may take are never a stranger's, so
+    # they are left out rather than shown disabled (WT-015); trying still fails.
     stranger = {t.action for t, _ in services.ARC.blocked(w["req"], w["stranger"])}
-    assert stranger == {"submit", "request_acknowledgements", "withdraw"}
+    assert stranger == set()
+    assert services.ARC._check(w["req"], services.ARC.transitions["submit"], w["stranger"])
 
 
 def test_history_uses_the_step_label(w):

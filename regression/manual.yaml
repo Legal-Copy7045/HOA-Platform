@@ -181,6 +181,10 @@
   check: "With test keys on the POC and Online payments and Automatic payments switched on: a demo owner sets up automatic payments with test card 4242 4242 4242 4242 (password asked again first; surcharge shown), the next due day the month's assessment is paid and the receipt email arrives; with 4000 0000 0000 9995 the payment fails, an email and a My items to-do appear, it retries once three days later and then shows Paused; turning it off detaches the card in the Stripe dashboard; a test bank account shows processing, then paid."
   steps: "Follow docs/runbook.md 'Automatic payments (D46)'; set dues.due_day to today to see the charge on the next hourly run; check Finance -> Online payments shows the account under Automatic payments; on a phone check the set-up page fits the screen."
   last: ""
+- key: stripe test autopay annual
+  check: "With test keys and Automatic payments on: a demo owner chooses Once a year and this month, Stripe's set-up page shows the message naming the schedule, the month and about the yearly amount; on the due day the payment waits for the board (above $500); a second board member approves it on My items and the next hourly run charges it once; My account shows the month paid from credit and the statement sentence says prepaid through; a declined one emails the owner."
+  steps: "Follow docs/runbook.md 'Automatic payments (D46)' step 6; set dues.due_day to today; sign in as a board member who does not own that home to approve; check the Stripe dashboard shows one payment."
+  last: ""
 - key: streamline pay shortcut phone
   check: "On a phone: the owner dashboard balance to-do shows \"Pay $X\" beside it without overlapping; it opens the ways to pay with the total for every open charge and \"Pay only some charges\" works; on a Home account (board) the \"Open collection case\" button fits and leads to the case, whose Letters panel prints the next notice."
   steps: "Online payments on (test mode); sign in as a demo owner with a balance on a phone; tap Pay $X; tap Pay only some charges; sign in as board; Finance > Owner accounts > a home with a balance; Open collection case."
@@ -232,4 +236,45 @@
 - key: how we reach you on a phone
   check: "On a phone, My profile's How we reach you sections stack with full-width buttons; ticking 'Receive text alerts' shows the number field; choosing 'A different address' shows the address fields."
   steps: "Open My profile on a phone as a demo owner; add an email and a phone; tick and untick text alerts; switch the mailing address choice."
+  last: ""
+- key: add to calendar on phones and desktop
+  check: "From a meeting page and an event page, Add to calendar works in each target: Google Calendar and Outlook.com / Microsoft 365 open prefilled in a new tab (title, times in the right zone, location, join link first in the details, portal link); Apple Calendar on an iPhone and a Mac and Outlook desktop import the .ics file with the same details; an online-only meeting's location is a tappable join link on the phone; a hybrid meeting shows 'place · join link'. After the meeting is cancelled, importing the file again marks it cancelled."
+  steps: "Seed demo data; as a demo owner open Calendar > Meetings > Board meeting (demo) (hybrid) and an event; try each menu entry on an iPhone, an Android phone and a desktop; cancel a test meeting as the board and import its file again."
+  last: ""
+- key: meeting page board actions on a phone
+  check: "On a phone the meeting page's Board actions panel starts closed below the agenda, opens with one tap, and shows only the steps that apply (send notice first; Mark held disabled with its reason until the meeting starts; minutes after Mark held)."
+  steps: "As a demo board member open a coming and a past demo meeting on a phone."
+  last: ""
+- key: community settings index and folding
+  check: "On Community settings the section index stays in view while scrolling, a section folds and unfolds, and a link in the 'needs attention' summary opens its section at the rule."
+  steps: "Sign in as a board member; open Settings, Community settings; scroll; click a section link and an attention link."
+  last: "not done yet"
+- key: phone menu sign out at the top
+  check: "On a phone, the menu drawer shows the name, Profile, Sign-in and security and Sign out at the top; for board, manager and ARC the sections with waiting items are open and My home and Community closed (new browser)."
+  steps: "Private window on a phone; sign in as board; open Menu."
+  last: "not done yet"
+- key: accounting setup on a phone
+  check: "Finance, Accounting, Setup on a phone: one column, each account input full width showing the whole value, the $ beside the opening balance, Save at the bottom."
+  steps: "Sign in as board on a phone; open Accounting; tap Setup."
+  last: "not done yet"
+- key: one control per form
+  check: "On My requests, Architectural review (Mine), Voting and Resolutions, the header button (Ask the board a question, Ask for approval of a project, New vote / election / survey, Record a resolution) opens its form in place and disappears while the form is open; closing the form brings the button back. With JavaScript off the button loads the page with the form open and no button."
+  steps: "As a demo owner and as the board, on a phone and a desktop, press each header button, close the form again; repeat once with JavaScript disabled."
+  last: ""
+- key: filters switch in place
+  check: "Filter and tab links (My requests Open / Closed / All, Voting Open / Past and type, Homes and owners, Owner accounts With a balance, Invoices status, Invitations status, Resolutions) change only the list: the page does not reload or jump to the top, the chosen tab is marked, Back and Forward step through the filters, and a reload keeps the filter."
+  steps: "Scroll so the filters are mid-screen, tap each filter, then use Back and Forward; check with a screen reader that the current filter is announced."
+  last: ""
+- key: phone tab bar
+  check: "On a phone every signed-in page has a bottom bar (owners: Dashboard, My account, Voting, Menu; board, manager and ARC: Dashboard, My items, Search, Menu) that never covers a page's last button, shows waiting counts, and whose Menu opens the drawer; it is absent on a desktop and in print."
+  steps: "Sign in as a demo owner and a board member on an iPhone and an Android phone; scroll to the bottom of a long page (My account, Owner accounts); open Menu from the bar; print a page."
+  last: ""
+- key: community setup wizard on a phone
+  check: "On a phone, Settings > Community setup > Start setup walks every step: one column, 'Step N of 16' with a progress bar, the What the law says panel and the legal footer readable, Save and continue stays at the bottom of the screen while scrolling and is the full-width button, Back and Skip for now fit beside each other; a wrong amount (e.g. 'forty') comes back with the error beside the field and the typed text kept; a big change to the monthly assessment asks first; switching a feature off asks first; the review lists every decision with Change links and flags; Finish setup removes 'Finish community setup' from My items; Run setup again starts run 2 with today's values and 'Changed since the last setup' on a rule changed in between; a screen reader announces each field's label, help and error."
+  steps: "Sign in as a demo board member on a phone; open Settings > Community setup; walk each step (skip one, go Back once); type 'forty' as the amount; save; switch Violations off and cancel; finish on the review; change one rule on Community settings; Run setup again and open its step; try VoiceOver or TalkBack on one rule step."
+  last: ""
+
+- key: check stock alignment
+  check: "Disbursements > Check printing > Alignment test prints on plain paper at 100% with the quarter-inch grid and a sample check; held over a blank check of the association's stock, the date, payee, amount, amount in words, memo and window-envelope address sit on their lines after adjusting the positions; a real refund check printed on a voided blank lines up, its address shows through a #10 window envelope, and the amount in words matches the figures."
+  steps: "Sign in as a demo board member; open Finance > Disbursements > Check printing; download the alignment test and print at 100% (no fit to page); compare against a blank check; adjust and save; propose and approve a demo refund; Print on check stock; print on a voided blank; fold into a window envelope."
   last: ""

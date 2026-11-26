@@ -238,7 +238,6 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
         "reports",
         "arc_list",
         "violations",
-        "meetings",
         "voting",
         "resolutions",
         "records_requests",
@@ -249,6 +248,10 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
         "tasks",
     ):
         assert client.get(reverse(name)).status_code == 200, name
+    # Meetings live on the Calendar (D49); the old address redirects there.
+    assert client.get(reverse("meetings"))["Location"] == reverse("calendar") + "?type=meetings"
+    for query in ("?type=meetings", "?type=past", "?type=events"):
+        assert client.get(reverse("calendar") + query).status_code == 200, query
     # The annual meeting's calendar entry is made by the meeting (not twice).
     from comms.models import Event
 

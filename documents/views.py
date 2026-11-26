@@ -84,6 +84,9 @@ def library(request):
     # policies, then the rest in the usual category order.
     order = {value: i for i, value in enumerate(Category.values)}
     pinned = (Category.GOVERNING, Category.POLICIES)
+    from governance.packets import FOLDER_NAMES
+
+    packet_folders = {name for name, _ in FOLDER_NAMES.values()}
     groups: dict[str, list] = {}
     for d in sorted(
         documents,
@@ -92,7 +95,9 @@ def library(request):
             order.get(d.category, 99),
         ),
     ):
-        groups.setdefault(d.get_category_display(), []).append(d)
+        # Packets sit with their folder's name, not under "Other" (WT-017).
+        in_packets = d.folder_id and d.folder.parent_id is None and d.folder.name in packet_folders
+        groups.setdefault(d.folder.name if in_packets else d.get_category_display(), []).append(d)
     return render(
         request,
         "documents/library.html",

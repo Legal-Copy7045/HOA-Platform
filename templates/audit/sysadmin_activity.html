@@ -2,11 +2,28 @@
 {% load portal %}
 {% block title %}Sysadmin activity · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Sysadmin activity</h1><p class="subtitle">Everything done by anyone holding the sysadmin role, every change to who holds it, and every break-glass command run on the server. Most recent first.</p></div></div>
-  <div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
-    <tbody>{% for e in events %}<tr><td class="nowrap">{{ e.occurred_at|date:"M j, Y H:i" }}</td><td>{% if e.actor %}{{ e.actor.email }}{% else %}{{ e.get_actor_type_display }}{% endif %}{% if e.channel != "web" %} <span class="status tone-warning">{{ e.get_channel_display }}</span>{% endif %}</td>
-      <td><code>{{ e.action }}</code></td><td class="small muted">{% for k, v in e.metadata.items %}{{ k }}={{ v }} {% endfor %}</td></tr>
-    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="activity" title="No sysadmin activity recorded" %}</td></tr>{% endfor %}</tbody>
-  </table></div></div>
+  <div class="page-head"><div><h1>Sysadmin activity</h1><p class="subtitle">Everything done by anyone holding the sysadmin role, every change to who holds it, and every break-glass command run on the server. Most recent first.</p></div>
+    <div class="actions"><a class="btn secondary" href="{{ export_url }}">{% icon "download" %} Export CSV</a></div></div>
+  <form method="get" class="inline-form filters-form" aria-label="Filter sysadmin activity">
+    <div><label for="sa-who">Person</label><select id="sa-who" name="who"><option value="">Everyone</option>{% for pk, email in people %}<option value="{{ pk }}"{% if who == pk|stringformat:"s" %} selected{% endif %}>{{ email }}</option>{% endfor %}</select></div>
+    <div><label for="sa-action">Action</label><select id="sa-action" name="action"><option value="">Every action</option>{% for a in actions %}<option value="{{ a }}"{% if a == action %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+    <div><label for="sa-from">From</label><input id="sa-from" type="date" name="from" value="{{ start|date:'Y-m-d' }}"></div>
+    <div><label for="sa-to">To</label><input id="sa-to" type="date" name="to" value="{{ end|date:'Y-m-d' }}"></div>
+    <button type="submit" class="secondary">Show</button>{% if who or action %}<a class="small" href="?from={{ start|date:'Y-m-d' }}&amp;to={{ end|date:'Y-m-d' }}">Clear filters</a>{% endif %}
+  </form>
+  <p class="small muted" data-testid="activity-window">Showing {{ start|date:"M j, Y" }} to {{ end|date:"M j, Y" }}{% if who or action %}, filtered{% endif %}: {{ count }} event{{ count|pluralize }}. Older activity is kept and shown with Older.</p>
+  {% for day, events in days.items %}
+    <section class="card">
+      <h2>{{ day|date:"l, F j, Y" }}</h2>
+      <div class="table-wrap"><table class="stack-sm">
+        <thead><tr><th>Time</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
+        <tbody>{% for e in events %}<tr><td class="nowrap muted-sm">{{ e.occurred_at|date:"H:i" }}</td><td class="cell-title">{% if e.actor %}{{ e.actor.email }}{% else %}{{ e.get_actor_type_display }}{% endif %}{% if e.channel != "web" %} <span class="status tone-warning">{{ e.get_channel_display }}</span>{% endif %}</td>
+          <td><code>{{ e.action }}</code></td><td class="small muted">{% for k, v in e.metadata.items %}{{ k }}={{ v }} {% endfor %}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+  {% empty %}<section class="card">{% include "partials/empty.html" with icon="activity" title="No sysadmin activity in these days" %}</section>{% endfor %}
+  <nav class="pager" aria-label="More activity">
+    {% if newer_url %}<a class="btn secondary" href="{{ newer_url }}">Newer</a>{% endif %}
+    {% if older_exists %}<a class="btn secondary" href="{{ older_url }}">Older</a>{% endif %}
+  </nav>
 {% endblock %}

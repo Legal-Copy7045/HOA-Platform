@@ -50,11 +50,45 @@ def system_panel() -> dict:
     }
 
 
+# Roles that are never assigned anything (no My items): their dashboard
+# shows the pages they use most instead of an always-empty to-do card (WT-016).
+ROLE_SHORTCUTS = {
+    policy.AUDITOR: ["reports", "accounting", "sysadmin_activity", "community_settings"],
+    policy.SYSADMIN: ["system_status", "server_tasks", "sysadmin_activity"],
+}
+
+
+def role_shortcuts(user, roles, request=None) -> list[dict]:
+    """Shortcuts for a login whose roles never receive to-dos (auditor,
+    sysadmin), or [] for anyone who can (staff with a queue, residents,
+    former owners)."""
+    from core import navigation
+    from core.my_items import MY_ITEMS_PERMISSIONS
+
+    if any(policy.can(user, p) for p in MY_ITEMS_PERMISSIONS):
+        return []
+    if roles.groups & (policy.RESIDENTS | {policy.FORMER_OWNER, policy.BOARD}):
+        return []
+    names: list[str] = []
+    for group, pages in ROLE_SHORTCUTS.items():
+        if group in roles.groups:
+            names += [n for n in pages if n not in names]
+    return navigation.shortcuts(request, names, roles.groups) if names else []
+
+
 def quick_actions(user, roles) -> list[dict]:
     out = []
     # "Record checks" is also offered on My items ({% quick_actions %}).
     if _can(roles.groups, "ledger.manage"):
         out.append({"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"})
+    if _can(roles.groups, "request.submit"):
+        out.append(
+            {
+                "label": "Ask the board a question",
+                "url": reverse("requests") + "?mine=1&new=1#new-request",
+                "icon": "mail",
+            }
+        )
     if roles.groups & policy.ACCOUNT_VIEWERS:
         if _can(roles.groups, "arc.submit"):
             out.append(
@@ -157,8 +191,10 @@ def build(user, request=None) -> dict:
     if roles.groups == {policy.SYSADMIN}:  # sysadmin-only login: operations first
         data["system"] = system_panel()
     data["quick"] = quick_actions(user, roles)
+    if not items:
+        data["shortcuts"] = role_shortcuts(user, roles, request)
     from comms.models import Announcement, AnnouncementRead
-    from comms.services import upcoming
+    from comms.services import upcoming, with_page_urls
 
     data["news"], data["events"] = [], []
     if policy.can(user, "announcement.view"):
@@ -170,7 +206,7 @@ def build(user, request=None) -> dict:
             AnnouncementRead.objects.filter(user=user).values_list("announcement_id", flat=True)
         )
         data["news"] = [(a, a.pk in read) for a in Announcement.objects.for_user(user)[:4]]
-        data["events"] = list(upcoming(user)[:4])
+        data["events"] = with_page_urls(upcoming(user)[:4], user)
     if policy.can(user, "calendar.view"):
         from comms.rsvp import my_upcoming
 

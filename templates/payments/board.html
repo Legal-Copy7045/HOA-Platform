@@ -31,10 +31,20 @@
     {% for c in failed %}<p class="small">#{{ c.pk }} &middot; {{ c.lot.label }} &middot; {{ c.total_cents|cents }} &middot; {{ c.get_state_display }}</p>{% empty %}<p class="small muted">None.</p>{% endfor %}
   </section>
   {% if autopay %}<section class="card" data-testid="autopay-board"><h2>Automatic payments</h2>
-    <p class="small muted">Accounts whose monthly assessment is paid automatically. A failed payment is retried once after a soft decline; after a hard decline or a second failure the account is paused until the owner sets up a payment method again.</p>
-    <div class="table-wrap"><table><thead><tr><th>Lot</th><th>Account</th><th>Status</th><th>Pays by</th><th>Since</th><th class="num">Failures (90 days)</th></tr></thead>
-    <tbody>{% for r in autopay.enrolments %}<tr><td>{{ r.lot.number }}</td><td>{{ r.account.number }}</td><td>{% if r.status == "paused" %}<span class="status tone-warning">Paused</span>{% else %}<span class="status tone-success">On</span>{% endif %}</td><td>{{ r.method_type }}</td><td class="nowrap">{{ r.since|short_date }}</td><td class="num">{{ r.failures }}</td></tr>
-    {% empty %}<tr><td colspan="6" class="muted">No account pays automatically yet.</td></tr>{% endfor %}</tbody></table></div>
+    <p class="small muted">Accounts whose {% term "terms" %} are paid automatically, monthly or once a year. A failed payment is retried once after a soft decline; after a hard decline or a second failure the account is paused until the owner sets up a payment method again.</p>
+    <h3 id="autopay-reviews">Waiting for review</h3>
+    <p class="small muted">Automatic payments above {{ autopay.review_cents|cents }} (surcharge included) are charged only once a board member approves them; not decided within 14 days, nothing is charged. You cannot decide a payment for a home you pay for.</p>
+    <div data-testid="autopay-reviews">{% for r in autopay.reviews.waiting %}<div class="card-row">
+      <p><strong>{{ r.title }}</strong> &middot; {{ r.what }} &middot; {{ r.review.get_method_display }} &middot; decide by {{ r.review.expires_at|date:"M j, Y" }}</p>
+      {% if r.own %}<p class="small muted">You pay for this home, so another board member decides.</p>
+      {% else %}<form method="post" action="{% url 'autopay_review' r.review.pk %}" data-confirm="Approve this automatic payment? It is charged on the next automatic run.">{% csrf_token %}<input type="hidden" name="decision" value="approve"><button type="submit">Approve</button></form>
+      <form method="post" action="{% url 'autopay_review' r.review.pk %}" data-confirm="Decline it? Nothing is charged, and the owners are emailed with your reason.">{% csrf_token %}<input type="hidden" name="decision" value="decline"><label>Reason (emailed to the owners) <input type="text" name="reason" maxlength="300" required></label><button type="submit" class="secondary">Decline</button></form>{% endif %}
+    </div>{% empty %}<p class="small muted">Nothing waiting.</p>{% endfor %}</div>
+    {% if autopay.reviews.decided %}<details><summary class="small">Recent decisions</summary>{% for d in autopay.reviews.decided %}<p class="small">{{ d.created_at|date:"M j, Y" }} &middot; {{ d.review.lot.label }} &middot; {{ d.review.total_cents|cents }} &middot; {{ d.get_outcome_display }}{% if d.decided_by %} by {{ d.decided_by }}{% endif %}{% if d.reason %} &middot; {{ d.reason }}{% endif %}</p>{% endfor %}</details>{% endif %}
+    <h3>Accounts</h3>
+    <div class="table-wrap"><table><thead><tr><th>Home</th><th>Account</th><th>Status</th><th>Schedule</th><th>Pays by</th><th>Since</th><th class="num">Failures (90 days)</th></tr></thead>
+    <tbody>{% for r in autopay.enrolments %}<tr><td>{{ r.lot.label }}</td><td>{{ r.account.number }}</td><td>{% if r.status == "paused" %}<span class="status tone-warning">Paused</span>{% else %}<span class="status tone-success">On</span>{% endif %}</td><td>{{ r.schedule|capfirst }}</td><td>{{ r.method_type }}</td><td class="nowrap">{{ r.since|short_date }}</td><td class="num">{{ r.failures }}</td></tr>
+    {% empty %}<tr><td colspan="7" class="muted">No account pays automatically yet.</td></tr>{% endfor %}</tbody></table></div>
     <h3>Recent failures</h3>
     {% for f in autopay.failures %}<p class="small">{{ f.created_at|date:"M j, Y" }} &middot; {{ f.lot.label }} &middot; {{ f.attempt.period }} try {{ f.attempt.try_number }} &middot; {{ f.code }}</p>{% empty %}<p class="small muted">None.</p>{% endfor %}
   </section>{% endif %}

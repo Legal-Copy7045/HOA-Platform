@@ -74,6 +74,8 @@ GL_LABELS = {
     "stripe_clearing": "Stripe clearing (balance at Stripe)",
     "card_surcharge": "Credit card surcharge income",
     "processing_fees": "Payment processing fees",
+    # Disbursements (D52)
+    "surplus_fund": "Surplus distributions paid from (reserve or surplus fund)",
 }
 
 
@@ -83,6 +85,98 @@ def gl_rows(setup: AccountingSetup) -> list[dict]:
         {"key": key, "label": term_text(label), "value": accounts.get(key, "")}
         for key, label in GL_LABELS.items()
     ]
+
+
+# The setup page groups the accounts under plain headings, each with a line
+# on what lands there (owner request 2026-11-26). Labels stay GL_LABELS.
+GL_GROUPS = [
+    (
+        "Money coming in",
+        [
+            ("assessment", "Monthly {terms} owners are charged."),
+            ("late_fee", "Late fees posted on overdue accounts."),
+            ("resale_fee", "Fees for resale certificates when a home is sold."),
+            ("other_charge", "Any other charge posted to an owner's account."),
+            ("card_surcharge", "The surcharge owners pay when they pay by credit card."),
+        ],
+    ),
+    (
+        "Money owed to the association",
+        [
+            ("receivable", "What owners owe: every charge until it is paid."),
+            ("credit", "Credits and adjustments given to owners."),
+        ],
+    ),
+    (
+        "Bank and card payments",
+        [
+            ("cash", "The bank account owners' checks and transfers are deposited into."),
+            ("stripe_clearing", "Online payments while they sit at Stripe before the payout."),
+            ("processing_fees", "What Stripe keeps for each online payment."),
+        ],
+    ),
+    (
+        "Money paid back to owners",
+        [
+            (
+                "surplus_fund",
+                "The fund a surplus distribution to every home is paid from (D52).",
+            ),
+        ],
+    ),
+]
+
+
+def standard_accounts() -> dict[str, str]:
+    """The account each key uses when its box is left empty."""
+    from ledger.models import DEFAULT_GL, DISBURSEMENT_GL, ONLINE_GL
+
+    defaults = {
+        k.strip(): v.strip()
+        for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
+    }
+    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL}
+
+
+def setup_groups(setup: AccountingSetup, values: dict[str, str] | None = None) -> list[dict]:
+    """The setup form's rows by heading. A row's value is the account only
+    when it differs from the standard one (shown as the placeholder), so
+    saving without changes keeps every account as it was. ``values`` are
+    what was typed, for a form shown again with errors."""
+    accounts = setup.accounts()
+    standard = standard_accounts()
+    out = []
+    for heading, rows in GL_GROUPS:
+        items = []
+        for key, help_text in rows:
+            current = accounts.get(key, "")
+            items.append(
+                {
+                    "key": key,
+                    "label": term_text(GL_LABELS[key]),
+                    "help": term_text(help_text),
+                    "standard": standard.get(key, ""),
+                    "value": values.get(key, "")
+                    if values is not None
+                    else ("" if current == standard.get(key) else current),
+                }
+            )
+        out.append({"heading": heading, "rows": items})
+    return out
+
+
+def setup_summary(setup: AccountingSetup) -> dict:
+    """One line for the Accounting page: how many accounts are mapped (and
+    changed from the standard), and the opening balance and its date."""
+    accounts = setup.accounts()
+    standard = standard_accounts()
+    return {
+        "mapped": sum(1 for key in GL_LABELS if accounts.get(key)),
+        "changed": sum(1 for key in GL_LABELS if accounts.get(key) != standard.get(key)),
+        "opening_cents": setup.opening_cash_cents,
+        "opening_on": setup.opening_cash_on,
+        "is_set_up": setup.opening_cash_on is not None,
+    }
 
 
 def gl_text(setup: AccountingSetup, values: dict[str, str]) -> str:
@@ -159,11 +253,40 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
     from payments.services import journal_items, online_entry_ids
 
     online = online_entry_ids()
+    from ledger import disbursements
+
+    paid_out = disbursements.journal_roles()
     for e in entries:
         kind = e.reverses.kind if e.kind == EntryKind.REVERSAL and e.reverses else e.kind
         memo = f"{e.lot.label}: {e.get_kind_display()}"
         ref = f"L{e.pk}"
-        if kind == EntryKind.PAYMENT:
+        role = paid_out.get(e.pk) or paid_out.get(e.reverses_id)
+        if role == disbursements.SURPLUS_CREDIT:
+            # Surplus returned as a statement credit (D52): out of the fund,
+            # owners owe that much less.
+            pair(
+                e.posted_on,
+                "Disbursements",
+                ref,
+                gl["surplus_fund"],
+                gl["receivable"],
+                -e.amount_cents,
+                f"{e.lot.label}: surplus distribution credit",
+                e.lot,
+            )
+        elif role == disbursements.REFUND_CHECK:
+            # An owner's credit refunded by check (D52); a void reverses it.
+            pair(
+                e.posted_on,
+                "Disbursements",
+                ref,
+                gl["receivable"],
+                gl["cash"],
+                e.amount_cents,
+                f"{e.lot.label}: credit refunded by check",
+                e.lot,
+            )
+        elif kind == EntryKind.PAYMENT:
             # A payment is a negative entry: debit cash, credit receivables.
             # Online payments sit at Stripe until the payout reaches the bank.
             is_online = e.pk in online or e.reverses_id in online
@@ -244,6 +367,9 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
     for day, ref, cents, payout_id in stripe["payouts"]:
         memo = f"Stripe payout {payout_id}"[:120]
         pair(day, "Online payments", ref, gl["cash"], gl["stripe_clearing"], cents, memo)
+    # Surplus distribution checks post no owner entry: fund to bank (D52).
+    for day, ref, cents, lot, memo in disbursements.surplus_check_journal(start, end):
+        pair(day, "Disbursements", ref, gl["surplus_fund"], gl["cash"], cents, memo, lot)
     for p in payments:
         inv = p.invoice
         expense = f"{inv.category.code} {inv.category.name}".strip()
@@ -451,7 +577,10 @@ def book_balance(as_of: datetime.date) -> int:
     )
     returned = sum(e.amount_cents for e in _returned_items(since, as_of))
     payouts = sum(p.amount_cents for p in _payouts(since, as_of))
-    return setup.opening_cash_cents + deposits + payouts - paid - returned
+    from ledger import disbursements
+
+    checks = disbursements.book_cents(since, as_of)  # owner checks (D52)
+    return setup.opening_cash_cents + deposits + payouts - paid - returned - checks
 
 
 def uncleared(as_of: datetime.date) -> dict:
@@ -476,7 +605,16 @@ def uncleared(as_of: datetime.date) -> dict:
     returned = [e for e in _returned_items(since, as_of) if e.pk not in _cleared_ids("returned")]
     cleared_payouts = _cleared_ids("payout")
     payouts = [p for p in _payouts(since, as_of) if p.pk not in cleared_payouts]
-    return {"deposits": deposits, "payments": payments, "returned": returned, "payouts": payouts}
+    from ledger import disbursements
+
+    return {
+        "deposits": deposits,
+        "payments": payments,
+        "returned": returned,
+        "payouts": payouts,
+        # Checks to owners (D52), outstanding until they clear.
+        "checks": disbursements.outstanding_checks(since, as_of),
+    }
 
 
 def reconcile(
@@ -487,6 +625,7 @@ def reconcile(
     cleared_payment_ids,
     cleared_returned_ids=(),
     cleared_payout_ids=None,
+    cleared_check_ids=None,
     note: str = "",
     actor,
     request=None,
@@ -497,7 +636,10 @@ def reconcile(
     ``cleared_payout_ids``: the Stripe payouts ticked. Left out (None), the
     payouts Stripe reports as paid (arrived at the bank) clear and any
     others stay outstanding; the reconciliation page always sends the
-    board's ticks."""
+    board's ticks.
+
+    ``cleared_check_ids``: the owner checks ticked (D52). Left out (None),
+    checks recorded as cleared on or before the statement date clear."""
     require(actor, "accounting.manage")
     with transaction.atomic():
         AccountingSetup.objects.select_for_update().get(pk=AccountingSetup.get().pk)
@@ -506,6 +648,13 @@ def reconcile(
         payments = {p.pk: p for p in open_items["payments"]}
         returned = {e.pk: e for e in open_items["returned"]}
         payouts = {p.pk: p for p in open_items["payouts"]}
+        checks = {c.pk: c for c in open_items["checks"]}
+        if cleared_check_ids is None:
+            ck_ids = {
+                k for k, c in checks.items() if c.cleared_on and c.cleared_on <= statement_date
+            }
+        else:
+            ck_ids = {int(i) for i in cleared_check_ids}
         dep_ids = {int(i) for i in cleared_deposit_ids}
         pay_ids = {int(i) for i in cleared_payment_ids}
         ret_ids = {int(i) for i in cleared_returned_ids}
@@ -518,12 +667,14 @@ def reconcile(
             and pay_ids <= set(payments)
             and ret_ids <= set(returned)
             and po_ids <= set(payouts)
+            and ck_ids <= set(checks)
         ):
             raise AccountingError("Some ticked items are not open on this date.")
         outstanding_dep = sum(d.total_cents for k, d in deposits.items() if k not in dep_ids)
         outstanding_dep += sum(p.amount_cents for k, p in payouts.items() if k not in po_ids)
         outstanding_pay = sum(p.amount_cents for k, p in payments.items() if k not in pay_ids)
         outstanding_pay += sum(e.amount_cents for k, e in returned.items() if k not in ret_ids)
+        outstanding_pay += sum(c.amount_cents for k, c in checks.items() if k not in ck_ids)
         book = book_balance(statement_date)
         adjusted_bank = statement_balance_cents + outstanding_dep - outstanding_pay
         rec = BankReconciliation.objects.create(
@@ -563,6 +714,10 @@ def reconcile(
                 kind="payout",
                 object_id=k,
                 amount_cents=payouts[k].amount_cents,
+            )
+        for k in ck_ids:
+            ReconciledItem.objects.create(
+                reconciliation=rec, kind="check", object_id=k, amount_cents=checks[k].amount_cents
             )
     record_event(
         "accounting.reconciled",

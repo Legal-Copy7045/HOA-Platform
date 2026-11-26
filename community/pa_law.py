@@ -95,6 +95,14 @@ GROUP_NOTES: dict[str, str] = {
         "(15 Pa.C.S.); have counsel confirm the consent wording and which notices it covers. "
         "Owners who have not agreed get paper notices."
     ),
+    "Disbursements": (
+        f"Unless the Declaration says otherwise, any surplus the association has after paying "
+        f"common expenses and funding reserves is paid to the owners in proportion to their "
+        f"common expense liability or credited to them to reduce their future assessments "
+        f'({ACT} § 5313, "Surplus funds"). Counsel should confirm what the Declaration says '
+        f"and whether reserve funds count as surplus at all. Refunding an owner's own credit "
+        f"(for example after a sale) is not a surplus distribution."
+    ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
@@ -194,9 +202,9 @@ GUIDES: dict[str, Guide] = {
     ),
     "arc.signoff_auto_confirm": Guide(
         BOARD,
-        "Not covered by the Act. Neighbor sign-offs are information for the reviewers; the "
+        "Not covered by the Act. Neighbor acknowledgements are information for the reviewers; the "
         "decision stays with the committee under the Declaration.",
-        "Off: a person confirms each signature read from a scanned form (Board resolution).",
+        "Off: a person checks each acknowledgement read from a scanned form (Board resolution).",
     ),
     "arc.signoff_respond_days": Guide(
         BOARD,
@@ -275,7 +283,7 @@ GUIDES["payments.credit_card_surcharge_bp"] = Guide(
     "debit or prepaid), no more than the cost of acceptance and at most 3%, disclosed before "
     "payment, after registering with Visa and Mastercard 30 days ahead. Counsel should confirm "
     "the disclosure wording.",
-    "300 (3%, not more than the processor's credit card cost): Board resolution 2027-09, "
+    "3% (not more than the processor's credit card cost): Board resolution 2027-09, "
     "after counsel review.",
 )
 
@@ -288,13 +296,14 @@ GUIDES["notices.electronic_consent_required"] = Guide(
     "On: owners choose email or post at sign-up; Bylaws notice article, as confirmed by counsel.",
 )
 
-GUIDES["payments.autopay_ceiling_percent"] = Guide(
+GUIDES["payments.autopay_review_cents"] = Guide(
     BOARD,
-    "Not covered by the Act. A safety limit of the portal, not a fee: an owner authorizes "
-    "automatic payment of the monthly assessment, and anything larger is held for the board "
-    "to check. NACHA rules (bank debits) and card-network rules expect a recurring charge to "
-    "stay within what the payer authorized.",
-    "300 (three months of dues): Board resolution adopting automatic payments.",
+    "Not covered by the Act. A safeguard of the portal, not a fee: an owner authorizes "
+    "automatic payment of the assessment (monthly, or twelve months at once), and a charge "
+    "above this amount waits until a board member who does not pay for that home approves "
+    "it. NACHA rules (bank debits) and card-network rules expect a recurring charge to stay "
+    "within what the payer authorized.",
+    "$500.00: Board resolution adopting automatic payments.",
 )
 
 GUIDES["retention.former_owner_contact_days"] = Guide(
@@ -302,6 +311,24 @@ GUIDES["retention.former_owner_contact_days"] = Guide(
     "Not covered by the Act. Only contact details are cleared: ledger, ARC, violation, vote "
     f"and audit records stay, as the association must keep its records ({ACT} § 5316).",
     "730 days (two years after leaving): Board privacy policy, resolution 2027-11.",
+)
+
+GUIDES["disbursement.surplus_equal_shares"] = Guide(
+    DECLARATION,
+    f"Unless the Declaration provides otherwise, surplus funds are paid to the owners in "
+    f"proportion to their common expense liability, or credited to them to reduce future "
+    f"assessments ({ACT} § 5313). Common expense liability is allocated by the Declaration "
+    f"(§ 5207); with an equal assessment per home, the shares are equal. Counsel should "
+    f"confirm the Declaration's allocation and whether reserve funds may be treated as surplus "
+    f"(many declarations and the reserve study say reserves are kept for their purpose).",
+    "On (equal shares, each home's assessment is the same): Declaration §6.2 and § 5313; a "
+    "Board resolution approves each distribution.",
+)
+
+GUIDES["disbursement.second_approval_cents"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal financial control like the invoice approval rule.",
+    "Two approvals at $500 and over: Board resolution 2026-07 (spending controls).",
 )
 
 for _key in ("general", "billing", "maintenance", "common_area"):

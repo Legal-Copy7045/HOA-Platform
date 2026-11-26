@@ -9,17 +9,20 @@
         <div class="muted small">{% if p.lot %}<span class="lot-ref">{{ p.lot.lot_ref }}</span> · {% endif %}{{ p.start|date:"M j, Y" }} – {{ p.end|date:"M j, Y" }}</div></div>
         <div class="balance"><div class="small muted">Balance when you sold</div><div class="amount-big">{{ p.sold_balance|cents }}</div>
           {% if p.credit_owed %}<div class="small" data-testid="credit-owed">Credit owed to you: <strong>{{ p.credit_owed|cents }}</strong>. The board refunds it; ask them if you have not heard.</div>{% endif %}</div></div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr></thead>
+      <div class="table-wrap"><table class="stack-sm">
+        <thead><tr><th>Date</th><th>Description</th><th class="num">Charges</th><th class="num">Payments</th><th class="num">Balance</th></tr></thead>
         <tbody>
-        {% if p.statement.brought_forward %}<tr><td></td><td>Balance brought forward</td><td class="num">{{ p.statement.brought_forward|cents }}</td></tr>{% endif %}
-        {% for e in p.statement.entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}</td><td class="num">{{ e.amount_cents|cents }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No activity in this period.</td></tr>{% endfor %}
+        {% for r in p.rows %}<tr><td class="nowrap muted-sm">{% if r.posted_on %}{{ r.posted_on|date:"M j, Y" }}{% endif %}</td><td class="cell-title">{{ r.description }}</td><td class="num" data-label="Charge">{% if r.charge_cents %}{{ r.charge_cents|cents }}{% endif %}</td><td class="num" data-label="Payment">{% if r.payment_cents %}{{ r.payment_cents|cents }}{% endif %}</td><td class="num" data-label="Balance">{{ r.balance_cents|cents }}</td></tr>{% empty %}<tr><td colspan="5" class="muted">No activity in this period.</td></tr>{% endfor %}
         </tbody>
       </table></div>
+      {% if p.account %}<div class="form-actions"><a class="btn secondary" href="{% url 'my_history_statement_pdf' p.index %}">{% icon "download" %} Download statement (PDF)</a></div>{% endif %}
+      {% if p.sold_balance or p.credit_owed %}<div class="small" data-testid="balance-questions"><p><strong>Questions about this balance?</strong> {% if questions.contact %}Contact the association: {{ questions.contact }}.{% else %}Write to the board at the address below.{% endif %}</p>
+        {% if questions.remit_lines %}<p>Checks payable to <strong>{{ questions.payable_to }}</strong>, mailed to:</p><address>{% for line in questions.remit_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% endif %}</div>{% endif %}
+      {% include "ledger/_checks_to_you.html" with checks=p.checks show_address=True %}
     </section>
   {% empty %}{% include "partials/empty.html" with icon="clock" title="No past ownership" text="There are no earlier ownership periods on your record." %}{% endfor %}
   <div class="grid grid-2">
-    <section class="card"><h3>Home improvement approvals (ARC)</h3>
+    <section class="card"><h3>Home improvement requests (ARC)</h3>
       {% if arc %}<ul class="list">{% for r in arc %}<li><span class="grow">{{ r.title|default:r }}</span><span class="small muted">{{ r.get_state_display }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}</section>
     <section class="card"><h3>Notices</h3>
       {% if violations %}<ul class="list">{% for v in violations %}<li><span class="grow">{{ v }}</span><span class="small muted">{{ v.get_state_display }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}</section>

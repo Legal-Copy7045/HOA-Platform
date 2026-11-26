@@ -37,15 +37,18 @@ def calendar(user, q):
 
     if not policy.can(user, "calendar.view"):
         return []
-    rows = (
+    # Each hit opens its own page; a meeting's event opens the meeting page
+    # when this person may open that meeting (D49).
+    rows = services.with_page_urls(
         services.upcoming(user)
         .filter(matching(q, "title", "description", "location"))
-        .order_by("starts_at")[:LIMIT]
+        .order_by("starts_at")[:LIMIT],
+        user,
     )
     return [
         Result(
             title=e.title,
-            url=reverse("calendar"),
+            url=e.page_url,
             snippet=snippet(q, e.description, e.location),
             date=e.starts_at,
             detail="Cancelled" if e.cancelled else "",

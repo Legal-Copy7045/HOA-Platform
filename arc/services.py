@@ -12,7 +12,7 @@ from community.rules import rule, rule_with_citation
 from core import pdf
 from core.policy import SYSTEM, can, require, roles_for
 from core.scoping import system_access
-from core.workflow import Transition, Workflow, WorkflowError
+from core.workflow import NotForYou, Transition, Workflow, WorkflowError
 
 
 class ArcError(ValueError):
@@ -51,7 +51,7 @@ def _not_recused(obj, actor):
 
 
 def _lot_owner(obj, actor):
-    return None if owns_lot(actor, obj) else "Only an owner of this home can do this."
+    return None if owns_lot(actor, obj) else NotForYou("Only an owner of this home can do this.")
 
 
 def _may_complete(obj, actor):
@@ -514,6 +514,9 @@ def record_position(
         raise ArcError("Positions are recorded while a request is in review.")
     if is_recused(actor, req):
         raise ArcError("You are recused from this request.")
+    if not position:
+        # The form starts on "Choose..." so nothing is recorded by accident (WT-015).
+        raise ArcError("Choose your position before recording it.")
     if position not in Position.values:
         raise ArcError("Unknown position.")
     vote = ReviewerVote.objects.create(

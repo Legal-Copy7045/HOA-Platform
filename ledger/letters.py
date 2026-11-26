@@ -589,6 +589,83 @@ def statement_pdf(lot: Lot, *, since=None) -> bytes:
     return pdf.render(paras, title=f"Account statement {lot.legal_label}", margin=STATEMENT_MARGIN)
 
 
+def balance_questions(profile=None) -> dict:
+    """Whom a former owner asks about their old balance, and where checks go
+    (Letters and certificates). Contact details only: no form (WT-010)."""
+    profile = profile or CommunityProfile.get()
+    return {
+        "contact": (profile.letter_contact or profile.signin_help_contact or "").strip(),
+        "payable_to": profile.legal_name,
+        "remit_lines": [line for line in (profile.remit_to or "").splitlines() if line.strip()],
+    }
+
+
+def former_statement_pdf(*, name: str, lot: Lot, account_number: str, start, end, statement):
+    """A former owner's statement for their own ownership period (WT-010):
+    the period's entries with a running balance, the balance when they sold,
+    and whom to ask. Built from ``ledger.services.period_statement``, the
+    same figures My history shows; nothing from after the sale."""
+    profile = CommunityProfile.get()
+    paras: list = [*_statement_letterhead(profile), ("gap", "")]
+    paras += [
+        ("title", f"Account statement for {_short(start)} to {_short(end)}"),
+        ("normal", f"**{pdf.plain(name)}**"),
+        (
+            "normal",
+            f"Account number **{pdf.plain(account_number)}**     "
+            f"Home **{pdf.plain(_one_line(lot.legal_label))}**",
+        ),
+        ("gap", ""),
+        ("subheading", "Account activity"),
+        (
+            "note",
+            "Charges add to what you owe; payments and credits take it down. Balance is the "
+            "total after each line (a minus sign is a credit).",
+        ),
+        ("rowhead", _ACTIVITY.format("Date", "What happened", "Charges", "Payments", "Balance")),
+        (
+            "row",
+            _ACTIVITY.format(
+                "",
+                f"Balance brought forward on {_short(start)}",
+                "",
+                "",
+                format_cents(statement.brought_forward),
+            ),
+        ),
+    ]
+    running = statement.brought_forward
+    for e in statement.entries:
+        running += e.amount_cents
+        paras.append(
+            (
+                "row",
+                _ACTIVITY.format(
+                    _short(e.posted_on),
+                    _activity_text(e)[:40],
+                    format_cents(e.amount_cents) if e.amount_cents > 0 else "",
+                    format_cents(-e.amount_cents) if e.amount_cents < 0 else "",
+                    format_cents(running),
+                ),
+            )
+        )
+    if not statement.entries:
+        paras.append(("row", f"{'':<13}No activity in this period."))
+    paras += [("gap", ""), ("normal", f"**Balance: {format_cents(statement.balance)}**")]
+    ask = balance_questions(profile)
+    if ask["contact"]:
+        paras.append(("normal", f"Questions about this balance? {pdf.plain(ask['contact'])}"))
+    if ask["remit_lines"]:
+        paras.append(
+            (
+                "normal",
+                f"Checks payable to {pdf.plain(ask['payable_to'])}, mailed to "
+                + pdf.plain(", ".join(line.strip() for line in ask["remit_lines"])),
+            )
+        )
+    return pdf.render(paras, title=f"Account statement {lot.legal_label}", margin=STATEMENT_MARGIN)
+
+
 def notice_pdf(lot: Lot, kind: str) -> bytes:
     """A delinquency notice with the account statement attached (page 2)."""
     if kind not in (LetterKind.FIRST, LetterKind.SECOND, LetterKind.FINAL):

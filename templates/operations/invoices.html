@@ -6,18 +6,20 @@
   <div class="page-head">
     <div><h1>Invoices</h1><p class="subtitle">Under the threshold one board member who didn't enter the invoice approves; at or above it, two different board members.</p></div>
   </div>
-  <div class="filters">
-    <a href="?"{% if not state %} aria-current="true"{% endif %}>All</a>
-    {% for s in states %}<a href="?state={{ s }}"{% if state == s %} aria-current="true"{% endif %}>{{ s|state_label }}</a>{% endfor %}
-  </div>
+  <div data-swap-region id="results" class="swap-anchor">
+  <nav class="filters" aria-label="Invoice status" data-swap>
+    <a href="?#results"{% if not state %} aria-current="true"{% endif %}>All</a>
+    {% for s in states %}<a href="?state={{ s }}#results"{% if state == s %} aria-current="true"{% endif %}>{{ s|state_label }}</a>{% endfor %}
+  </nav>
   {% include "partials/list_tools.html" %}
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Vendor</th><th>Invoice</th><th>Date</th><th>Category</th><th class="num">Amount</th><th>Status</th></tr></thead>
     <tbody>
-    {% for i in rows %}<tr><td>{{ i.vendor }}</td><td><a href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td class="nowrap">{{ i.invoice_date|date:"M j, Y" }}</td><td>{{ i.category.name }}</td><td class="num">{{ i.amount_cents|cents }}</td><td>{% status i.state i.get_state_display %}</td></tr>
+    {% for i in rows %}<tr class="row-link"><td class="cell-title">{{ i.vendor }}</td><td data-label="Invoice"><a class="row-main" href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td class="nowrap muted-sm">{{ i.invoice_date|date:"M j, Y" }}</td><td class="muted-sm">{{ i.category.name }}</td><td class="num">{{ i.amount_cents|cents }}</td><td>{% status i.state i.get_state_display %}</td></tr>
     {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="receipt" title="No invoices here" %}</td></tr>{% endfor %}
     </tbody></table></div></div>
   {% include "partials/pager.html" %}
+  </div>
   {% if can_enter %}
     {% if has_categories %}
       <details class="panel"{% if not rows or form.errors %} open{% endif %}><summary>Enter an invoice</summary><div class="panel-body">

@@ -5,6 +5,8 @@
   var shell = document.querySelector(".shell");
   var sidebar = document.getElementById("sidebar");
   var button = document.querySelector("[data-nav-toggle]");
+  // The topbar's Menu and the phone tab bar's Menu (D48) work the same way.
+  var toggles = document.querySelectorAll("[data-nav-toggle]");
   var scrim = document.querySelector(".scrim");
   var phone = window.matchMedia ? window.matchMedia("(max-width: 820px)") : null;
 
@@ -21,7 +23,7 @@
   function setOpen(open, returnFocus) {
     if (!shell || !button) return;
     shell.classList.toggle("nav-open", open);
-    button.setAttribute("aria-expanded", open ? "true" : "false");
+    Array.prototype.forEach.call(toggles, function (t) { t.setAttribute("aria-expanded", open ? "true" : "false"); });
     setInert(!open);
     if (open) {
       var target = sidebar && (sidebar.querySelector("[aria-current=page]") || sidebar.querySelector("a, summary"));
@@ -37,8 +39,11 @@
       setInert(!(shell && shell.classList.contains("nav-open")));
     });
   }
-  if (button) button.addEventListener("click", function () {
-    setOpen(!shell.classList.contains("nav-open"), true);
+  Array.prototype.forEach.call(toggles, function (t) {
+    t.addEventListener("click", function () {
+      button = t;
+      setOpen(!shell.classList.contains("nav-open"), true);
+    });
   });
   if (scrim) scrim.addEventListener("click", function () { setOpen(false, true); });
   document.addEventListener("keydown", function (e) {
@@ -214,4 +219,160 @@ portalButtonConfirm();
         " MB in all). Please choose fewer, or add them in smaller groups.");
     }
   }, true);
+})();
+
+// <details data-collapse-narrow open> starts closed on a phone (board
+// controls that would push the page's own content down, WT-044). Without
+// JavaScript it stays open.
+(function () {
+  "use strict";
+  if (!window.matchMedia || !window.matchMedia("(max-width: 820px)").matches) return;
+  Array.prototype.forEach.call(document.querySelectorAll("details[data-collapse-narrow]"), function (d) {
+    d.open = false;
+  });
+})();
+
+// --- Phone layout and in-page navigation (walkthrough fixes, D48) ----------------
+
+// Filter and tab links (<nav data-swap>) swap only the list region
+// ([data-swap-region]) in place: no reload, no jump to the top. The address
+// bar follows (back and forward work). Without JavaScript the plain link
+// loads the page at #results, which is the list, so it stays in view.
+(function () {
+  "use strict";
+  if (!window.fetch || !window.DOMParser || !window.history || !history.pushState) return;
+  function region() { return document.querySelector("[data-swap-region]"); }
+  if (!region()) return;
+  function plain(url) { var u = new URL(url, window.location.href); u.hash = ""; return u.href; }
+  function markCurrent(url) {
+    var here = plain(url);
+    Array.prototype.forEach.call(document.querySelectorAll("nav[data-swap]"), function (nav) {
+      var links = nav.querySelectorAll("a[href]");
+      var match = null;
+      Array.prototype.forEach.call(links, function (a) { if (plain(a.href) === here) match = a; });
+      if (!match) return;
+      var attr = nav.classList.contains("filters") ? "true" : "page";
+      Array.prototype.forEach.call(links, function (a) { a.removeAttribute("aria-current"); });
+      match.setAttribute("aria-current", attr);
+    });
+  }
+  function swap(url, push, focusHref) {
+    var current = region();
+    if (!current) { window.location.href = url; return; }
+    current.setAttribute("aria-busy", "true");
+    fetch(plain(url), { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (r) {
+        if (!r.ok || r.redirected) throw new Error("reload");
+        return r.text();
+      })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var fresh = doc.querySelector("[data-swap-region]");
+        if (!fresh) throw new Error("reload");
+        // Navs outside the region come from the new page too (counts, links).
+        var oldNavs = document.querySelectorAll("nav[data-swap]");
+        var newNavs = doc.querySelectorAll("nav[data-swap]");
+        current.replaceWith(document.importNode(fresh, true));
+        if (oldNavs.length === newNavs.length) {
+          Array.prototype.forEach.call(oldNavs, function (nav, i) {
+            if (document.contains(nav)) nav.replaceWith(document.importNode(newNavs[i], true));
+          });
+        }
+        if (doc.title) document.title = doc.title;
+        if (push) history.pushState({ swap: true }, "", plain(url));
+        markCurrent(url);
+        var target = null;
+        if (focusHref) {
+          Array.prototype.forEach.call(document.querySelectorAll("nav[data-swap] a[href]"), function (a) {
+            if (!target && plain(a.href) === plain(focusHref)) target = a;
+          });
+        }
+        if (target) target.focus({ preventScroll: true });
+      })
+      .catch(function () { window.location.href = url; });
+  }
+  history.replaceState({ swap: true }, "", window.location.href);
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest("nav[data-swap] a[href]");
+    if (!a || a.target || a.hasAttribute("download")) return;
+    if (new URL(a.href, window.location.href).origin !== window.location.origin) return;
+    e.preventDefault();
+    swap(a.href, true, a.href);
+  });
+  window.addEventListener("popstate", function (e) {
+    if (e.state && e.state.swap) swap(window.location.href, false, null);
+  });
+})();
+
+// One control per form: a header button (<a data-opens="panel-id">) opens its
+// <details> panel in place, and is hidden while that panel is open.
+(function () {
+  "use strict";
+  var openers = document.querySelectorAll("[data-opens]");
+  Array.prototype.forEach.call(openers, function (button) {
+    var panel = document.getElementById(button.getAttribute("data-opens"));
+    if (!panel || panel.tagName !== "DETAILS") return;
+    function sync() {
+      button.hidden = panel.open;
+      // A panel marked data-hide-closed is shown only while open.
+      if (panel.hasAttribute("data-hide-closed")) panel.hidden = !panel.open;
+    }
+    button.addEventListener("click", function (e) {
+      e.preventDefault();
+      panel.hidden = false;
+      panel.open = true;
+      sync();
+      panel.scrollIntoView({ block: "start" });
+      var field = panel.querySelector("input:not([type=hidden]), select, textarea");
+      if (field) field.focus({ preventScroll: true });
+    });
+    panel.addEventListener("toggle", sync);
+    sync();
+  });
+})();
+
+// Phones: a sideways-scrolling tab bar shows its current tab (WT-046); list
+// filters (details.list-filter) start open on wider screens (WT-047).
+(function () {
+  "use strict";
+  Array.prototype.forEach.call(document.querySelectorAll(".subnav [aria-current=page]"), function (a) {
+    var bar = a.parentElement;
+    if (bar && bar.scrollWidth > bar.clientWidth) {
+      bar.scrollLeft = a.offsetLeft - bar.offsetLeft - (bar.clientWidth - a.offsetWidth) / 2;
+    }
+  });
+  // A link that stands alone in its paragraph or cell (no sentence around
+  // it) gets the 44px tap height on phones (WT-036), like p.link-row.
+  var main = document.getElementById("main");
+  if (main) {
+    Array.prototype.forEach.call(main.querySelectorAll("p > a, dd > a, li > a, div > a, span > a"), function (a) {
+      var parent = a.parentElement;
+      if (a.classList.contains("btn") || parent.children.length !== 1) return;
+      var around = parent.textContent.replace(/\s+/g, " ").trim().length - a.textContent.replace(/\s+/g, " ").trim().length;
+      if (around <= 3) a.classList.add("tap");
+    });
+  }
+  // A link to #something inside a closed panel or folded section (<details>,
+  // e.g. the Community settings index, WT-014) opens it first, on load and on
+  // in-page links.
+  function openTo(hash) {
+    if (!hash || hash.length < 2) return;
+    var target = null;
+    try { target = document.getElementById(decodeURIComponent(hash.slice(1))); } catch (err) { return; }
+    for (var d = target && target.closest("details"); d; d = d.parentElement && d.parentElement.closest("details")) {
+      d.hidden = false;
+      d.open = true;
+    }
+    if (target) target.scrollIntoView({ block: "start" });
+  }
+  if (window.location.hash) openTo(window.location.hash);
+  window.addEventListener("hashchange", function () { openTo(window.location.hash); });
+  var wide = window.matchMedia && window.matchMedia("(min-width: 821px)").matches;
+  if (wide) {
+    Array.prototype.forEach.call(document.querySelectorAll("details.list-filter"), function (d) {
+      d.open = true;
+      d.classList.add("js-open");
+    });
+  }
 })();

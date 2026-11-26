@@ -45,7 +45,7 @@ def test_surcharge_rounds_up_and_options_show_each_total():
 
 
 def test_the_cap_holds_in_the_rule_and_in_code():
-    with pytest.raises(ValueError, match="at most 300"):
+    with pytest.raises(ValueError, match="at most 3%"):
         validate_value("payments.credit_card_surcharge_bp", "301")
     GoverningRule.objects.update_or_create(
         key="payments.credit_card_surcharge_bp", defaults={"value": "900", "citation": "x"}

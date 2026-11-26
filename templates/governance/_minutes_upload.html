@@ -1,0 +1,4 @@
+{% load portal %}<form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}" enctype="multipart/form-data" class="stack" data-testid="step-minutes">{% csrf_token %}<input type="hidden" name="how" value="upload">
+  <h4>Upload the minutes</h4>{% include "partials/form_errors.html" with form=minutes_form %}{{ minutes_form }}
+  <p class="help">Saved in Documents under Meeting minutes{% if m.kind == "executive" %}, board only{% else %}, for all owners{% endif %}, and attached here. They stay a draft until the board approves them.</p>
+  <button type="submit" class="secondary small">Upload and attach</button></form>

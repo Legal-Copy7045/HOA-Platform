@@ -62,6 +62,17 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
 
 5. Invite a second board member as soon as possible: the board page warns
    until at least two people with MFA can perform every action.
+6. Walk through **Admin → Settings → Community setup** (`/board/community-setup/`,
+   D51) as a board member. It takes every decision in order: the community's
+   details and letterhead, the monthly charge, late fees, online and automatic
+   payments, notices, architectural review, violations, common areas, owner
+   requests, meetings and resale, privacy, features, then status-only steps
+   for people and access and for the server (email, backups, off-site copy,
+   Stripe and Teller keys, which a sysadmin sets on the server, never in the
+   portal), and a review that flags anything still at its default or without
+   a citation. Each step shows what Pennsylvania and federal law say about
+   it. "Finish community setup" stays on the board's My items until the
+   review is finished; run it again at any time with "Run setup again".
 
 ## Deploying an update
 
@@ -165,7 +176,8 @@ board is emailed.
 
 ## Filling in the governing rules
 
-Board → Community settings. Every value needs a citation (Declaration,
+The easiest way is Settings → Community setup (step by step, D51); the same
+values are on Board → Community settings. Every value needs a citation (Declaration,
 bylaws, or the board resolution that set it). Demo data cites "DEMO -
 replace": replace every one before real use.
 
@@ -662,9 +674,11 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    stays on the Customer at Stripe (the audit log shows
    `payments.autopay_detach_failed`; detach it in the dashboard).
 2. Admin -> Features: switch on **Automatic payments** (Online payments must
-   be on too). Community settings: **Automatic payment ceiling** (default 300
-   = three months of dues) with its citation; the due day (`dues.due_day`) is
-   when the charge is made.
+   be on too). Community settings: **Automatic payments above this wait for
+   the board's review** (`payments.autopay_review_cents`, default $500.00, D47)
+   with its citation; the due day (`dues.due_day`) is when the charge is made.
+   The old percent ceiling (`payments.autopay_ceiling_percent`) is retired: a
+   value recorded for it stays in the history and is ignored.
 3. As a demo owner: My account -> Pay assessments automatically (asks for
    the password again) -> bank account or card -> Stripe's setup page. Test
    card `4242 4242 4242 4242` (credit, surcharge), `4000 0566 5566 5556`
@@ -679,8 +693,19 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    Stripe says the charge succeeded (cards at once, bank debits after a few
    business days).
 5. The board sees every account's status and recent failures on Finance ->
-   Online payments ("Automatic payments"). An amount over the ceiling is not
-   charged: a My item "Automatic payment held back".
+   Online payments ("Automatic payments"). A charge above the review limit
+   (surcharge included) is not charged: a My item "Approve automatic payment
+   of $X for <address>"; Approve (charged on the next hourly run) or Decline
+   with a reason (the owners are emailed) under "Waiting for review". Not
+   decided within 14 days, nothing is charged and the owners are told. A
+   board member never decides a payment for a home they pay for.
+6. Once a year (D47): the payer picks "Once a year" and a month; on that
+   month's due day the next 12 months' assessments are charged at once, less
+   any credit, and the money is drawn down month by month as credit. Months
+   before the first yearly payment (or in a gap after changing the month)
+   are charged monthly as usual; no month is charged twice. At the
+   default limit ($500) every yearly payment waits for the board's approval.
+   No Stripe key rights change.
 
 ### 2. Securing the HOA's Stripe account
 
@@ -729,6 +754,21 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    prompt, and `DEPLOYMENT_STAGE=production` plus `PAYMENTS_LIVE_ALLOWED=true`
    in the production `.env`. The portal refuses live keys without both, and
    refuses test keys in production.
+
+## Disbursements and checks (D52)
+
+Finance → Disbursements pays money back to owners: a **surplus distribution** to every home, or an **owner refund** of one account's credit (usually a former owner's, after a sale: My items shows "Refund $X to the former owner of <address>").
+
+1. **Propose** (board or manager). Surplus: the total, the year, the board resolution (choose it, or type its reference), and any homes to pay by check instead of a statement credit; "Show the split" first. Refund: open it from My items or the "Credit owed to former owners" list; check the payee and type the former owner's forwarding address.
+2. **Approve** (a board member other than the proposer; two at or over the rule's amount; a surplus approved by a recipient needs two). Statement credits post on the final approval.
+3. **Write the checks.** Either download the **check register** (CSV or PDF) and write the checks in the bank's bill pay or the accounting package, or print them on the association's **pre-printed check stock** ("Print on check stock"). Then "Mark as issued" with the first check number and the date on the checks: the numbers go to the homes in the order listed. A refund is posted on the owner's account at this point.
+4. **Clear or void.** "Mark cleared" when the bank statement shows the check (the page suggests the bank feed line with the same amount and check number); the bank reconciliation lists issued checks as outstanding until then. "Void" (board) reverses a refund so the credit is back on the account and a new check can be written.
+
+**Check stock alignment** (Disbursements → Check printing): print the alignment test page on plain paper at 100% (turn off "fit to page"), hold it over a blank check against the light, and adjust each field's position (hundredths of an inch from the top-left corner of the page; "Move everything" shifts all fields for a printer that feeds a little off). Print one real check on a voided blank before a batch. The portal never needs, and never stores, the bank's account or routing numbers: they are already on the stock.
+
+**Uncashed checks.** After 90 days an uncashed check is a My item. Pennsylvania's unclaimed property law applies to checks that stay uncashed: after the dormancy period the money must be reported and paid to the PA Treasury instead of being kept or re-credited. The treasurer should confirm the dormancy period and the reporting steps (and counsel the wording of any letter) before voiding or reissuing. Voiding restores the owner's credit on the account; the board then follows the Treasury's reporting process for it.
+
+**For counsel before the first surplus distribution:** 68 Pa.C.S. § 5313 (surplus funds) applies unless the Declaration provides otherwise; confirm what the Declaration says, whether reserve funds may be treated as surplus, and record the citation on the rule in Community settings.
 
 ## Server tasks (D36)
 

@@ -1,0 +1,5 @@
+# Community setup wizard (D51). `match` runs over "<stage>:<check>".
+- feature: "Community setup wizard: board only (manager, sysadmin, owners, tenants and contacts refused); one page per step with progress, Back, Skip and sticky Save; rule steps driven by RuleSpec groups (a new rule appears in its group's step); saves through set_rule, update_profile, update_letter_settings, save_common_area and set_feature with their audit events and confirmations; append-only progress with run numbers and reruns prefilled and marked changed; review flags defaults, missing values and citations; My items until finished; no field for keys; What the law says panel (PA and federal) on every step"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:community/tests/test_setup_wizard\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[setup_", "^manual:community setup wizard on a phone"]

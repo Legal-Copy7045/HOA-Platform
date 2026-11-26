@@ -3,8 +3,9 @@
 {% block title %}{{ e.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>{% if e.cancelled %}<s>{{ e.title }}</s>{% else %}{{ e.title }}{% endif %}</h1>
-    <p class="subtitle">{{ e.starts_at|date:"l, F j, Y g:i A" }}{% if e.ends_at %}–{{ e.ends_at|date:"g:i A" }}{% endif %}{% if e.location %} · {{ e.location }}{% endif %}</p></div>
-    <div class="actions">{% if meeting %}<a class="btn" href="{% url 'meeting_detail' meeting.pk %}">{% icon "file" %} Meeting page</a>{% endif %}<a class="btn secondary" href="{% url 'calendar' %}">Calendar</a></div></div>
+    <p class="subtitle">{{ e.starts_at|date:"l, F j, Y g:i A" }}{% if e.ends_at %}–{{ e.ends_at|date:"g:i A" }}{% endif %}{% if e.location %} · {{ e.location }}{% endif %}{% if e.join_url %} · Online{% endif %}</p></div>
+    <div class="actions">{% if e.join_url and not e.cancelled %}<a class="btn" href="{{ e.join_url }}" target="_blank" rel="noopener noreferrer" data-testid="join-link">Join online</a>{% endif %}{% if meeting %}<a class="btn{% if e.join_url and not e.cancelled %} secondary{% endif %}" href="{% url 'meeting_detail' meeting.pk %}">{% icon "file" %} Meeting page</a>{% endif %}{% include "partials/add_to_calendar.html" %}<a class="btn secondary" href="{% url 'calendar' %}">Calendar</a></div></div>
+  {% if e.join_url and not e.cancelled %}<p class="small muted join-note">Join link: <a href="{{ e.join_url }}" target="_blank" rel="noopener noreferrer">{{ e.join_url }}</a>. Please don't forward it: it is shown only to people who can open this page.</p>{% endif %}
 
   {% if e.cancelled %}<div class="alert danger" role="alert">{% icon "alert" %}<span>This event was cancelled.</span></div>{% endif %}
 

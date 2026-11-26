@@ -2,12 +2,13 @@
 {% load portal %}
 {% block title %}{{ m.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'meetings' %}">Meetings</a> / {{ m.starts_at|date:"M j, Y" }}</div>
+  <div class="crumbs">{% if calendar_on %}<a href="{% url 'calendar' %}?type=meetings">Calendar</a>{% else %}<a href="{% url 'meetings' %}">Meetings</a>{% endif %} / {{ m.starts_at|date:"M j, Y" }}</div>
   <div class="page-head"><div><h1>{{ m.title }}</h1>
-    <div class="meta">{% status m.status %}<span>{{ m.get_kind_display }}</span><span>{% icon "calendar" %}{{ m.starts_at|date:"l F j, Y g:i A" }}</span>{% if m.location %}<span>{% icon "pin" %}{{ m.location }}</span>{% endif %}</div></div>
-    {% if m.minutes_document %}<div class="actions">{% if minutes_approval %}<span class="badge tone-success">Minutes approved {{ minutes_approval.approved_on|short_date }}</span>{% else %}<span class="badge tone-warning">Draft minutes, not yet approved</span>{% endif %}<a class="btn secondary" href="{% url 'document_detail' m.minutes_document_id %}">{% icon "file" %} Minutes</a></div>{% endif %}
+    <div class="meta">{% status m.status %}<span>{{ m.get_kind_display }}</span><span>{% icon "calendar" %}{{ m.starts_at|date:"l F j, Y g:i A" }}{% if m.ends_at %}–{{ m.ends_at|date:"g:i A" }}{% endif %}</span>{% if m.location %}<span>{% icon "pin" %}{{ m.location }}</span>{% endif %}{% if m.join_url %}<span>{% icon "arrow-right" %}Online{% if m.location %} too{% endif %}</span>{% endif %}</div></div>
+    <div class="actions">{% if m.join_url and m.status == "scheduled" %}<a class="btn" href="{{ m.join_url }}" target="_blank" rel="noopener noreferrer" data-testid="join-link">Join online</a>{% endif %}{% if m.minutes_document %}{% if minutes_approval %}<span class="badge tone-success">Minutes approved {{ minutes_approval.approved_on|short_date }}</span>{% else %}<span class="badge tone-warning">Draft minutes, not yet approved</span>{% endif %}<a class="btn secondary" href="{% url 'document_detail' m.minutes_document_id %}">{% icon "file" %} Minutes</a>{% endif %}{% include "partials/add_to_calendar.html" %}</div>
   </div>
-  {% if short_days %}<div class="alert warning">{% icon "alert" %}<span>Notice sent now would be {{ short_days }} day{{ short_days|pluralize }} short of the governing rule.</span></div>{% endif %}
+  {% if m.join_url and m.status == "scheduled" %}<p class="small muted join-note">Join link: <a href="{{ m.join_url }}" target="_blank" rel="noopener noreferrer">{{ m.join_url }}</a>. Please don't forward it: it is shown only to people who can open this page.</p>{% endif %}
+  {% if short_days and m.status == "scheduled" and not m.notice_sent_at %}<div class="alert warning">{% icon "alert" %}<span>Notice sent now would be {{ short_days }} day{{ short_days|pluralize }} short of the governing rule.</span></div>{% endif %}
   <div class="split">
     <section class="card prose"><h2>Agenda</h2>{{ m.agenda|default:"No agenda yet."|linebreaks }}</section>
     <aside>
@@ -22,26 +23,33 @@
       <section class="card"><h3>Notice</h3>{% if m.notice_sent_at %}<p>{% icon "check" %} Sent {{ m.notice_sent_at|date:"M j, Y" }}</p>{% elif m.kind == "executive" %}<p class="muted small">Executive sessions are not noticed to owners and are not on the community calendar.</p>{% else %}<p class="muted small">Not sent yet.</p>{% endif %}
         {% if m.calendar_event_id and m.kind != "executive" %}<p class="small"><a href="{% url 'event_detail' m.calendar_event_id %}">{% icon "calendar" %} On the community calendar</a></p>{% endif %}</section>
       {% if can_manage %}
-        <section class="card"><h3>Board actions</h3>
-          {% if m.status == "scheduled" %}<div class="stack">
-            {% if m.kind != "executive" %}<form method="post" action="{% url 'meeting_action' m.pk 'notice' %}" data-confirm="Email the notice to every owner who has consented? Owners who have not consented to email need a paper notice; the page lists how many.">{% csrf_token %}
-              {% if deadlines %}<p><label for="notice-deadline">Also mark this deadline done</label><select id="notice-deadline" name="deadline"><option value="">(none)</option>{% for d in deadlines %}<option value="{{ d.pk }}"{% if d.pk == deadline_default %} selected{% endif %}>{{ d.title }} (due {{ d.due_on|short_date }})</option>{% endfor %}</select></p>
-              <p class="help">From the recurring deadlines on Board tasks.</p>{% endif %}
-              <button type="submit">{% icon "mail" %} Send notice to owners</button></form>{% endif %}
-            <form method="post" action="{% url 'meeting_action' m.pk 'held' %}">{% csrf_token %}<button type="submit" class="secondary">Mark held</button></form>
-            <form method="post" action="{% url 'meeting_action' m.pk 'cancelled' %}" data-confirm="Cancel this meeting?{% if m.calendar_event_id %} It is taken off the community calendar.{% endif %} Owners already sent a notice are not told automatically: post an announcement.">{% csrf_token %}<button type="submit" class="danger">Cancel meeting</button></form>
-          </div>{% endif %}
-          {% if minutes_form %}<form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}" enctype="multipart/form-data" class="stack">{% csrf_token %}<input type="hidden" name="how" value="upload">
-            <h4>Upload the minutes</h4>{% include "partials/form_errors.html" with form=minutes_form %}{{ minutes_form }}
-            <p class="help">Saved in Documents under Meeting minutes{% if m.kind == "executive" %}, board only{% else %}, for all owners{% endif %}, and attached here.</p>
-            <button type="submit" class="secondary small">Upload and attach</button></form>{% endif %}
-          {% if approve_form %}<form method="post" action="{% url 'meeting_action' m.pk 'approve_minutes' %}" class="stack" id="approve-minutes" data-confirm="Mark {% if minutes_version %}version {{ minutes_version.number }} of {% endif %}these minutes approved by the board? This is recorded permanently, and owner packets then list them as approved minutes. A corrected version later needs its own approval.">{% csrf_token %}
-            <h4>Mark minutes approved</h4>{% include "partials/form_errors.html" with form=approve_form %}{{ approve_form }}
-            {% if minutes_version %}<p class="small" data-testid="minutes-version">You are approving version {{ minutes_version.number }} ({{ minutes_version.original_filename }}, added {{ minutes_version.uploaded_at|short_date }}).</p>{% endif %}
-            <p class="help">Attached minutes are a draft until the board approves them.</p>
-            <button type="submit" class="secondary small">Mark minutes approved</button></form>{% elif minutes_approval and can_manage %}<p class="small muted">{% icon "check" %} Minutes approved {{ minutes_approval.approved_on|short_date }}{% if minutes_approval.note %}: {{ minutes_approval.note }}{% endif %}.</p>{% endif %}
-          {% if minutes_choices and not m.minutes_document_id %}<details><summary class="small">Or attach minutes already in Documents</summary><form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}">{% csrf_token %}<label for="doc">Minutes document</label><select id="doc" name="document">{% for d in minutes_choices %}<option value="{{ d.pk }}">{{ d.title }}</option>{% endfor %}</select><p class="help">From Documents, category Minutes.</p><button type="submit" class="secondary small">Attach</button></form></details>{% endif %}
-        </section>
+        {# Board steps in the order they happen, only those that apply now (WT-008); collapsed on phones (WT-044, static/js/app.js). #}
+        <details class="panel board-actions" id="board-actions" open{% if not minutes_form.errors and not approve_form.errors %} data-collapse-narrow{% endif %}><summary>Board actions</summary><div class="panel-body stack">
+          {% if m.status == "scheduled" %}
+            {% if m.kind != "executive" and not m.notice_sent_at %}<form method="post" action="{% url 'meeting_action' m.pk 'notice' %}" class="stack" data-testid="step-notice" data-confirm="Email the notice to every owner who has consented? Owners who have not consented to email need a paper notice; the page lists how many.">{% csrf_token %}
+              <h4>1. Send the notice</h4>
+              {% if deadlines %}<p><label for="notice-deadline">Also mark this recurring deadline done</label><select id="notice-deadline" name="deadline" aria-describedby="notice-deadline-help"><option value="">(none)</option>{% for d in deadlines %}<option value="{{ d.pk }}"{% if d.pk == deadline_default %} selected{% endif %}>{{ d.title }} (due {{ d.due_on|short_date }})</option>{% endfor %}</select></p>
+              <p class="help" id="notice-deadline-help">From the recurring deadlines on Board tasks; marked done when the notice goes out.</p>{% endif %}
+              <div><button type="submit">{% icon "mail" %} Send notice to owners</button></div></form>{% endif %}
+            <h4>{% if m.kind != "executive" and not m.notice_sent_at %}2. {% endif %}After the meeting</h4>
+            <div class="wf-actions" data-testid="step-held">
+              <form method="post" action="{% url 'meeting_action' m.pk 'held' %}" class="wf-action" data-confirm="Mark this meeting held? You can then upload and approve its minutes.">{% csrf_token %}<button type="submit" class="secondary">Mark held</button></form>
+              {% if not minutes_form.is_bound %}<div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="blocked-minutes">Upload the minutes</button><p class="help" id="blocked-minutes">After the meeting is marked held.</p></div>{% endif %}
+              <form method="post" action="{% url 'meeting_action' m.pk 'cancelled' %}" class="wf-action" data-confirm="Cancel this meeting?{% if m.calendar_event_id %} It is taken off the community calendar.{% endif %} Owners already sent a notice are not told automatically: post an announcement.">{% csrf_token %}<button type="submit" class="danger">Cancel meeting</button></form>
+            </div>
+            {% if minutes_form.is_bound %}{% include "governance/_minutes_upload.html" %}{% endif %}
+          {% elif m.status == "held" %}
+            {% if minutes_form %}{% include "governance/_minutes_upload.html" %}{% endif %}
+            {% if minutes_choices and not m.minutes_document_id %}<details><summary class="small">Or attach minutes already in Documents</summary><form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}">{% csrf_token %}<label for="doc">Minutes document</label><select id="doc" name="document">{% for d in minutes_choices %}<option value="{{ d.pk }}">{{ d.title }}</option>{% endfor %}</select><p class="help">From Documents, category Minutes.</p><button type="submit" class="secondary small">Attach</button></form></details>{% endif %}
+            {% if approve_form %}<form method="post" action="{% url 'meeting_action' m.pk 'approve_minutes' %}" class="stack" id="approve-minutes" data-testid="step-approve" data-confirm="Mark {% if minutes_version %}version {{ minutes_version.number }} of {% endif %}these minutes approved by the board? This is recorded permanently, and owner packets then list them as approved minutes. A corrected version later needs its own approval.">{% csrf_token %}
+              <h4>Mark minutes approved</h4>{% include "partials/form_errors.html" with form=approve_form %}{{ approve_form }}
+              {% if minutes_version %}<p class="small" data-testid="minutes-version">You are approving version {{ minutes_version.number }} ({{ minutes_version.original_filename }}, added {{ minutes_version.uploaded_at|short_date }}).</p>{% endif %}
+              <p class="help">Attached minutes are a draft until the board approves them.</p>
+              <button type="submit" class="secondary small">Mark minutes approved</button></form>
+            {% elif minutes_approval %}<p class="small muted">{% icon "check" %} Minutes approved {{ minutes_approval.approved_on|short_date }}{% if minutes_approval.note %}: {{ minutes_approval.note }}{% endif %}.</p>
+            {% elif m.minutes_document_id %}<p class="small muted">Minutes attached. A board member marks them approved, usually at the next meeting.</p>{% endif %}
+          {% else %}<p class="small muted">This meeting was cancelled.</p>{% endif %}
+        </div></details>
       {% endif %}
     </aside>
   </div>
@@ -56,7 +64,7 @@
   {% if quorum %}<section class="card"><h2>Quorum</h2>
     <p><strong>{{ quorum.represented }}</strong> of {{ quorum.eligible }} homes represented ({{ quorum.in_person }} in person, {{ quorum.by_proxy }} by proxy). Needed: {{ quorum.needed }} ({{ quorum.percent }}%).
       {% if quorum.met %}<span class="badge tone-success">Quorum met</span>{% else %}<span class="badge tone-warning">No quorum yet</span>{% endif %}</p>
-    <p class="small muted">Counts owners marked present above, and proxies whose holder is present.</p></section>{% endif %}
+    <p class="small muted">Counts owners the board recorded as present at the meeting, and proxies whose holder is present. Attendance is recorded by the board, not on this page.</p></section>{% endif %}
   {% if proxy_lots and m.status == "scheduled" %}<section class="card" id="proxy"><h2>Give a proxy</h2>
     <p>Can't attend? A proxy lets someone you trust vote for your home at this meeting.</p>
     {% if proxies_mine %}<ul class="list">{% for p in proxies_mine %}<li><span class="grow">{{ p.lot.label }}: your proxy is held by {{ p.holder.display_name }}.</span><form method="post" action="{% url 'proxy_revoke' p.pk %}" class="inline" data-confirm="Revoke the proxy for {{ p.lot.label }}? {{ p.holder.display_name }} can no longer vote for it.">{% csrf_token %}<button type="submit" class="secondary small">Revoke</button></form></li>{% endfor %}</ul>{% endif %}

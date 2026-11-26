@@ -194,6 +194,8 @@ PROTECTED = {
     "contact_method_remove": ("POST", "contact_method_b"),
     "contact_method_notices": ("POST", "contact_method_b"),
     "my_history": ("GET", None),
+    # A former owner's own period by its index in their roles (WT-010).
+    "my_history_statement_pdf": ("GET", None),
     "board_home": ("GET", None),
     "owner_preview_start": ("POST", None),
     "branding_settings": ("GET", None),
@@ -220,6 +222,10 @@ PROTECTED = {
     "system_status": ("GET", None),
     "server_tasks": ("GET", None),
     "community_settings": ("GET", None),
+    # Community setup wizard (D51): board only.
+    "setup_home": ("GET", None),
+    "setup_start": ("POST", None),
+    "setup_step": ("GET", None),
     "community_rule_save": ("POST", None),
     "community_profile_save": ("POST", None),
     "common_area_save": ("POST", None),
@@ -315,6 +321,9 @@ PROTECTED = {
     "event_slot_add": ("POST", "event"),
     "event_slot_action": ("POST", "event_slot"),
     "event_rsvp_export": ("GET", "event"),
+    # Add to calendar (D49): the .ics file is scoped like its page.
+    "event_ics": ("GET", "event"),
+    "meeting_ics": ("GET", "executive_meeting"),
     # Reserve plan (reserves)
     "reserve_plan": ("GET", None),
     "reserve_component": ("GET", "reserve_component"),
@@ -340,6 +349,18 @@ PROTECTED = {
     "autopay_start": ("POST", "lot_id_b"),
     "autopay_cancel": ("POST", "lot_id_b"),
     "autopay_return": ("GET", "autopay_setup_b"),
+    # D47: the payer's schedule change and the board's review decision.
+    "autopay_schedule": ("POST", "lot_id_b"),
+    "autopay_review": ("POST", "autopay_review_b"),
+    # Disbursements (D52): board, manager and auditor pages only.
+    "disbursements": ("GET", None),
+    "disbursement_new": ("GET", None),
+    "disbursement_detail": ("GET", "disbursement"),
+    "disbursement_action": ("POST", "disbursement"),
+    "disbursement_register": ("GET", "disbursement"),
+    "disbursement_checks_pdf": ("GET", "disbursement"),
+    "check_print_settings": ("GET", None),
+    "check_alignment_pdf": ("GET", None),
 }
 
 
@@ -434,6 +455,7 @@ def world():
         executive_meeting = governance.create_meeting(
             title="Executive session: litigation",
             kind="executive",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=5),
             actor=board,
         )
@@ -442,6 +464,7 @@ def world():
         packet_meeting = governance.create_meeting(
             title="Open board meeting",
             kind="board",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=6),
             actor=board,
         )
@@ -564,6 +587,7 @@ def world():
         annual = governance.create_meeting(
             title="Annual meeting",
             kind="annual",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=30),
             actor=board,
         )
@@ -682,11 +706,32 @@ def world():
                 session_id="cs_test_matrixautopayb",
                 expires_at=timezone.now() + timedelta(hours=24),
             )
+            from payments.models import AutopayReview
+
+            autopay_review_b = AutopayReview.objects.create(
+                lot=lot_b,
+                account=account_b,
+                schedule="annual",
+                period="2027",
+                covers_from="2027-01",
+                method="bank",
+                base_cents=240_000,
+                total_cents=240_000,
+                limit_cents=50_000,
+                expires_at=timezone.now() + timedelta(days=14),
+            )
+    from ledger import disbursements
+
+    disbursement = disbursements.propose_surplus(
+        total_cents=4400, year=2026, resolution_ref="Resolution 2026-14", actor=board
+    )
     targets = {
+        "disbursement": disbursement.pk,
         "checkout_b": checkout_b.pk,
         "payment_b": payment_b.pk,
         "alert_b": alert_b.pk,
         "autopay_setup_b": autopay_setup_b.pk,
+        "autopay_review_b": autopay_review_b.pk,
         "bank_connection": bank_connection.pk,
         "reservation_b": reservation_b.pk,
         "area": area.pk,
@@ -826,6 +871,7 @@ def _url(name, key, targets):
         "autopay",
         "autopay_start",
         "autopay_cancel",
+        "autopay_schedule",
     ):
         kwargs = {"lot_id": targets["lot_id_b"]}
     elif name == "lot_ledger_action":
@@ -836,6 +882,8 @@ def _url(name, key, targets):
         kwargs["kind"] = "first"
     elif name == "accounting_1099":
         kwargs = {"year": 2026}
+    elif name == "my_history_statement_pdf":
+        kwargs = {"index": 0}
     elif name == "collection_action":
         kwargs["action"] = "send_reminder"
     elif name == "resale_action":
@@ -848,6 +896,10 @@ def _url(name, key, targets):
         kwargs = {"pk": targets["packet_meeting"], "packet_id": targets["board_packet"]}
     elif name == "event_slot_action":
         kwargs["action"] = "join"
+    elif name == "setup_step":
+        kwargs["step"] = "charge"
+    elif name == "disbursement_action":
+        kwargs["action"] = "approve"
     return reverse(name, kwargs=kwargs)
 
 
@@ -930,10 +982,13 @@ def test_board_pages_load(client, world):
     client.force_login(world["board"])
     # The old Board overview sends bookmarks to My items (streamlining).
     assert client.get(reverse("board_home"))["Location"] == reverse("my_items")
+    # Sign-ups are a view of Homes and owners for the board (WT-002).
+    signups = reverse("lot_list") + "?view=signups"
+    assert client.get(reverse("invitations"))["Location"] == signups
+    assert client.get(signups).status_code == 200
     for name in (
         "people",
         "approvals",
-        "invitations",
         "lot_list",
         "sysadmin_activity",
         "server_tasks",

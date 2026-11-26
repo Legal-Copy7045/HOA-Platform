@@ -129,8 +129,16 @@ def test_hub_entry_is_current_on_its_pages_and_its_group_opens(client, w):
     admin = section(response, "Admin")
     assert admin["open"] and [i["label"] for i in admin["items"] if i["current"]] == ["Settings"]
     response = client.get(reverse("home"))
-    assert not section(response, "Admin")["open"]  # collapsed unless the page is inside
-    assert section(response, "My home")["open"] and section(response, "Community")["open"]
+    admin = section(response, "Admin")
+    # Collapsed unless the page is inside or (staff, WT-040) something waits there.
+    assert admin["open"] == bool(admin["count"])
+    # Staff start with My home and Community closed (WT-040); owners keep them open.
+    assert not section(response, "My home")["open"]
+    assert not section(response, "Community")["open"]
+    client.force_login(w["owner"])
+    owner = client.get(reverse("home"))
+    assert section(owner, "My home")["open"] and section(owner, "Community")["open"]
+    client.force_login(w["board"])
     html = response.content.decode()
     assert '<details class="nav-section nav-group" data-nav-group="association"' in html
     assert 'data-nav-group="my-home"' in html
@@ -154,10 +162,10 @@ def test_feature_switches_still_gate_hubs_and_voting(client, w):
     client.force_login(w["owner"])
     features.set_feature("votes", False, actor=w["board"])
     page = client.get(reverse("voting")).content.decode()
-    assert 'href="?type=elections"' in page and 'href="?type=votes"' not in page
+    assert 'href="?type=elections#results"' in page and 'href="?type=votes' not in page
     features.set_feature("elections", False, actor=w["board"])
     page = client.get(reverse("voting")).content.decode()
-    assert "surveys (to hear your views" in page and 'href="?type=elections"' not in page
+    assert "surveys (to hear your views" in page and 'href="?type=elections' not in page
     features.set_feature("surveys", False, actor=w["board"])
     assert client.get(reverse("voting")).status_code == 404
     assert "Voting" not in labels(client.get(reverse("home")))
@@ -297,7 +305,7 @@ def test_dashboard_and_board_overview_share_one_list(client, w):
     client.force_login(w["board2"])
     assert "Sign-in reset" in client.get(reverse("home")).content.decode()
     counts = client.get(reverse("my_items")).context["counts"]
-    assert any(c["area"] == "Approvals" for c in counts)
+    assert any(c["area"] == "Second approvals" for c in counts)
 
 
 def test_my_items_uses_area_icons(client, w):
@@ -307,7 +315,7 @@ def test_my_items_uses_area_icons(client, w):
     compliance.VIOLATION.apply(v, "respond", actor=w["owner_b"], note="Done")
     html = client.get(reverse("my_items")).content.decode()
     assert "#flag" in html
-    assert my_items.Item("Approvals", "t", "d", "/").icon == "check-circle"
+    assert my_items.Item("Second approvals", "t", "d", "/").icon == "check-circle"
 
 
 def test_proxy_offered_on_dashboard_when_a_meeting_has_a_vote(client, w):
@@ -317,6 +325,7 @@ def test_proxy_offered_on_dashboard_when_a_meeting_has_a_vote(client, w):
     meeting = gov.create_meeting(
         title="Annual meeting",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=10),
         actor=w["board"],
     )
@@ -370,6 +379,7 @@ def election(w):
     meeting = gov.create_meeting(
         title="Annual meeting",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=20),
         actor=w["board"],
     )

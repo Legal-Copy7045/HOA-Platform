@@ -313,6 +313,16 @@ def render(paragraphs: list, *, title: str = "Letter", margin: float = MARGIN) -
     "bottom" (what follows ends at the foot of the page) and "qr" with a
     ``QrBlock`` instead of text."""
     pages = _layout(_lines(paragraphs, PAGE_W - 2 * margin), margin)
+    streams = []
+    open_box = None
+    for page_lines in pages:
+        ops, open_box = _page_ops(page_lines, margin, open_box)
+        streams.append(ops)
+    return _assemble(streams, title)
+
+
+def _assemble(streams: list[list[str]], title: str) -> bytes:
+    """The PDF file: one page per list of content-stream operators."""
     objects: list[bytes] = []
 
     def add(obj: bytes) -> int:
@@ -327,11 +337,9 @@ def render(paragraphs: list, *, title: str = "Letter", margin: float = MARGIN) -
     mono_bold = add(
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>"
     )
-    pages_id = len(objects) + 1 + 2 * len(pages)  # placeholder index after content+page objs
+    pages_id = len(objects) + 1 + 2 * len(streams)  # placeholder index after content+page objs
     page_ids = []
-    open_box = None
-    for page_lines in pages:
-        ops, open_box = _page_ops(page_lines, margin, open_box)
+    for ops in streams:
         stream = "\n".join(ops).encode("latin-1")
         content = add(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
         page_ids.append(
@@ -363,3 +371,83 @@ def render(paragraphs: list, *, title: str = "Letter", margin: float = MARGIN) -
         f"startxref\n{xref}\n%%EOF\n"
     ).encode()
     return bytes(out)
+
+
+# --- Text at fixed positions (D52: printing on pre-printed check stock) ---------------------
+# Each piece of text sits at an exact place on the page. Positions and sizes
+# are validated numbers; the text is escaped like every other text here and
+# kept to one line, so nothing a person typed can reach the PDF operators.
+
+_FONTS = {(False, False): "/F1", (True, False): "/F2", (False, True): "/F3", (True, True): "/F4"}
+
+
+def _number(value, low: float, high: float, what: str) -> float:
+    if type(value) not in (int, float) or value != value or not low <= value <= high:
+        raise ValueError(f"{what} must be a number from {low} to {high}.")
+    return float(value)
+
+
+@dataclass(frozen=True)
+class Placed:
+    """One line of text with its baseline at (``x``, ``y``) points from the
+    page's top-left corner."""
+
+    x: float
+    y: float
+    text: str
+    size: float = 10
+    bold: bool = False
+    mono: bool = False
+
+    def __post_init__(self):
+        _number(self.x, 0, PAGE_W, "x")
+        _number(self.y, 0, PAGE_H, "y")
+        _number(self.size, 4, 36, "Text size")
+        if not isinstance(self.text, str):
+            raise TypeError("Placed text must be a string.")
+        if type(self.bold) is not bool or type(self.mono) is not bool:
+            raise TypeError("bold and mono are booleans.")
+
+
+@dataclass(frozen=True)
+class Stroke:
+    """A thin straight line from (x1, y1) to (x2, y2), points from the top-left."""
+
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    width: float = 0.25
+    gray: float = 0.6
+
+    def __post_init__(self):
+        for name in ("x1", "x2"):
+            _number(getattr(self, name), 0, PAGE_W, name)
+        for name in ("y1", "y2"):
+            _number(getattr(self, name), 0, PAGE_H, name)
+        _number(self.width, 0.1, 3, "Line width")
+        _number(self.gray, 0, 1, "Gray")
+
+
+def render_positioned(pages: list, *, title: str = "Document") -> bytes:
+    """PDF bytes from pages of ``Placed`` text and ``Stroke`` lines. Text is
+    one line each: line breaks and tabs become spaces."""
+    if not pages:
+        raise ValueError("A document needs at least one page.")
+    streams = []
+    for page in pages:
+        ops: list[str] = []
+        for item in page:
+            if isinstance(item, Stroke):
+                ops += ["q", f"{_num(item.gray)} G", f"{_num(item.width)} w"]
+                ops += [f"{_num(item.x1)} {_num(PAGE_H - item.y1)} m"]
+                ops += [f"{_num(item.x2)} {_num(PAGE_H - item.y2)} l", "S", "Q"]
+            elif isinstance(item, Placed):
+                text = " ".join(item.text.replace("\t", " ").splitlines())
+                font = _FONTS[(item.bold, item.mono)]
+                ops += ["BT", f"{font} {_num(item.size)} Tf"]
+                ops += [f"{_num(item.x)} {_num(PAGE_H - item.y)} Td", f"({_escape(text)}) Tj", "ET"]
+            else:
+                raise TypeError("A page holds Placed text and Stroke lines only.")
+        streams.append(ops)
+    return _assemble(streams, title)

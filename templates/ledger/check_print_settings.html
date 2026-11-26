@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Check printing · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'disbursements' %}">Disbursements</a> / Check printing</div>
+  <div class="page-head"><div><h1>Check printing</h1>
+    <p class="subtitle">Where the date, payee, amounts, address and memo print on the association's pre-printed check stock (one check per page, check at the top). The stock already carries the bank's name, account and routing numbers and the check number; the portal never knows them.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'check_alignment_pdf' %}">{% icon "download" %} Alignment test (PDF)</a></div></div>
+  <div class="alert info">{% icon "info" %}<span>Print the alignment test on plain paper at 100% (no "fit to page"), hold it over a blank check against the light, and move each field until it sits on its line. Positions are in hundredths of an inch from the top-left corner of the page: 250 across is 2.5 inches from the left edge.</span></div>
+  <section class="card">
+    {% include "partials/form_errors.html" %}
+    <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save positions</button></div></form>
+    {% if settings.updated_by %}<p class="small muted">Last saved {{ settings.updated_at|short_date }}.</p>{% endif %}
+  </section>
+{% endblock %}

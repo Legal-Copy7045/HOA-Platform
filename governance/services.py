@@ -41,16 +41,49 @@ class GovernanceError(ValueError):
 # --- Meetings ----------------------------------------------------------------------
 
 
-def create_meeting(*, title, kind, starts_at, location="", agenda="", actor, request=None):
+def _clean_where(location, join_url, starts_at, ends_at) -> tuple[str, str]:
+    """A new meeting's place and/or join link (at least one; both for a
+    hybrid meeting) and a sensible end (D49)."""
+    from django.core.exceptions import ValidationError
+
+    from comms.calendar_links import clean_join_url
+
+    try:
+        join_url = clean_join_url(join_url)
+    except ValidationError as exc:
+        raise GovernanceError(" ".join(exc.messages)) from exc
+    location = single_line(location or "")[:200]
+    if not location and not join_url:
+        raise GovernanceError("Say where the meeting is: a place, a link to join online, or both.")
+    if ends_at is not None and ends_at < starts_at:
+        raise GovernanceError("A meeting cannot end before it starts.")
+    return location, join_url
+
+
+def create_meeting(
+    *,
+    title,
+    kind,
+    starts_at,
+    location="",
+    join_url="",
+    ends_at=None,
+    agenda="",
+    actor,
+    request=None,
+):
     require(actor, "meeting.manage")
     if kind not in MeetingKind.values or not single_line(title):
         raise GovernanceError("A meeting needs a title and a type.")
+    location, join_url = _clean_where(location, join_url, starts_at, ends_at)
     with transaction.atomic():
         meeting = Meeting.objects.create(
             title=single_line(title)[:200],
             kind=kind,
             starts_at=starts_at,
-            location=location[:200],
+            ends_at=ends_at,
+            location=location,
+            join_url=join_url,
             agenda=agenda,
             created_by=actor,
         )
@@ -63,7 +96,8 @@ def create_meeting(*, title, kind, starts_at, location="", agenda="", actor, req
 
 def _add_to_calendar(meeting: Meeting, *, actor, request=None) -> None:
     """Put the meeting on the community calendar. Executive sessions never go
-    on it: owners must not learn of them from the calendar."""
+    on it: owners must not learn of them from the calendar. The place, join
+    link and end are mirrored onto the event (D49)."""
     if meeting.kind == MeetingKind.EXECUTIVE:
         return
     from comms import services as comms_services
@@ -71,7 +105,9 @@ def _add_to_calendar(meeting: Meeting, *, actor, request=None) -> None:
     event = comms_services.create_event(
         title=meeting.title,
         starts_at=meeting.starts_at,
+        ends_at=meeting.ends_at,
         location=meeting.location,
+        join_url=meeting.join_url,
         description=(
             f"{meeting.get_kind_display()}. The agenda and minutes are on the meeting page."
         ),
@@ -97,6 +133,32 @@ def meeting_for_event(event, user) -> Meeting | None:
     return Meeting.objects.for_user(user).filter(calendar_event=event).first()
 
 
+# --- Meetings on the calendar (D49: Meetings merged into Calendar) ---------------------
+
+
+def meetings_for_events(event_ids, user) -> dict[int, Meeting]:
+    """The meetings behind these calendar events that this person may open,
+    by event id."""
+    rows = Meeting.objects.for_user(user).filter(calendar_event_id__in=list(event_ids))
+    return {m.calendar_event_id: m for m in rows}
+
+
+def upcoming_meetings_off_calendar(user, since):
+    """Coming meetings this person may open that have no calendar event:
+    executive sessions (only in the board's view, by Meeting.objects.for_user)
+    and meetings from before meetings made their own events."""
+    return Meeting.objects.for_user(user).filter(calendar_event__isnull=True, starts_at__gte=since)
+
+
+def past_meetings(user, before, limit: int = 200) -> list[dict]:
+    """Past meetings this person may open, newest first, each with its
+    minutes approval (None while the minutes are a draft, D34-fixgov)."""
+    rows = list(
+        Meeting.objects.for_user(user).filter(starts_at__lt=before).order_by("-starts_at")[:limit]
+    )
+    return [{"meeting": m, "approval": minutes_approval(m)} for m in rows]
+
+
 def notice_shortfall_days(meeting: Meeting, sent_at=None) -> int | None:
     """Days short of the required owner notice, or None if fine/unknown."""
     required = rule("meeting.owner_notice_days")
@@ -105,6 +167,17 @@ def notice_shortfall_days(meeting: Meeting, sent_at=None) -> int | None:
     sent_at = sent_at or timezone.now()
     given = (timezone.localdate(meeting.starts_at) - timezone.localdate(sent_at)).days
     return max(0, required - given) or None
+
+
+def _notice_where(meeting: Meeting) -> str:
+    """Where, for the notice email. The join link is written out in the
+    email (owner decision 2026-11-26, D49 amended): a meeting link is not a
+    portal page, and whoever joins is visible in the meeting."""
+    if meeting.location and meeting.join_url:
+        return f"{meeting.location}, or online: {meeting.join_url}"
+    if meeting.join_url:
+        return f"Online: {meeting.join_url}"
+    return meeting.location or "see the portal"
 
 
 def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
@@ -118,7 +191,7 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
     when = timezone.localtime(meeting.starts_at).strftime("%A %B %-d, %Y at %-I:%M %p")
     body = (
         f"Notice of {meeting.get_kind_display().lower()}: {meeting.title}\n\n"
-        f"When: {when}\nWhere: {meeting.location or 'see the portal'}\n\n"
+        f"When: {when}\nWhere: {_notice_where(meeting)}\n\n"
         f"Agenda and details (sign-in required):\n{link}\n\n-- \n{settings.SITE_NAME}"
     )
     emailed, paper = 0, []

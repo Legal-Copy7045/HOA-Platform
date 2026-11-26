@@ -461,6 +461,7 @@ _SPECS = [
         "account_id",
         "setup_id",
         "method",
+        "schedule",
     ),
     _spec(
         "payments.autopay_enrolled",
@@ -470,6 +471,7 @@ _SPECS = [
         "setup_id",
         "method",
         "replaced",
+        "schedule",
     ),
     _spec(
         "payments.autopay_setup_mismatch",
@@ -500,6 +502,7 @@ _SPECS = [
         "try",
         "method",
         "amount_cents",
+        "schedule",
     ),
     _spec(
         "payments.autopay_failed",
@@ -520,13 +523,57 @@ _SPECS = [
     ),
     _spec(
         "payments.autopay_held",
-        "Automatic payment held back: above the ceiling",
+        "Automatic payment held back: more than the board approved",
         "lot_id",
         "account_id",
         "amount_cents",
         "period",
     ),
     _spec("payments.autopay_detach_failed", "Stripe could not detach a payment method", "code"),
+    # D47: schedule (monthly / once a year) and board review above the limit.
+    _spec(
+        "payments.autopay_schedule_changed",
+        "Automatic payments: schedule changed by the payer",
+        "lot_id",
+        "account_id",
+        "schedule",
+        "month",
+    ),
+    _spec(
+        "payments.autopay_review_requested",
+        "Automatic payment above the review limit: waiting for the board",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "schedule",
+        "period",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.autopay_review_approved",
+        "Automatic payment approved by the board",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.autopay_review_declined",
+        "Automatic payment declined by the board",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.autopay_review_expired",
+        "Automatic payment not reviewed in time (or schedule changed): not charged",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "amount_cents",
+        "code",
+    ),
     # Accounting fixes (D33-acctfix)
     _spec(
         "ledger.refund_recorded", "Online refund recorded on an account", "lot_id", "amount_cents"
@@ -571,6 +618,72 @@ _SPECS = [
     _spec(
         "ledger.moves_checked", "Board checked entries moved between accounts", "lot_id", "count"
     ),
+    # Disbursements (D52): ids, kinds, counts and amounts; never names or addresses.
+    _spec(
+        "disbursement.proposed",
+        "Disbursement proposed",
+        "batch_id",
+        "kind",
+        "lines",
+        "amount_cents",
+        "need",
+    ),
+    _spec(
+        "disbursement.approval_given",
+        "Disbursement approval given",
+        "batch_id",
+        "have",
+        "need",
+        "recipient",
+    ),
+    _spec(
+        "disbursement.approved",
+        "Disbursement approved",
+        "batch_id",
+        "kind",
+        "lines",
+        "credits",
+        "amount_cents",
+    ),
+    _spec("disbursement.declined", "Disbursement declined", "batch_id"),
+    _spec(
+        "disbursement.credit_posted",
+        "Disbursement statement credit posted",
+        "batch_id",
+        "line_id",
+        "lot_id",
+        "amount_cents",
+    ),
+    _spec(
+        "disbursement.check_issued",
+        "Disbursement check recorded as issued",
+        "batch_id",
+        "line_id",
+        "check_id",
+        "lot_id",
+        "amount_cents",
+    ),
+    _spec(
+        "disbursement.check_cleared",
+        "Disbursement check cleared",
+        "check_id",
+        "lot_id",
+        "amount_cents",
+        "bank_line",
+    ),
+    _spec(
+        "disbursement.check_voided",
+        "Disbursement check voided",
+        "check_id",
+        "lot_id",
+        "amount_cents",
+        "reversal_id",
+    ),
+    _spec(
+        "disbursement.register_exported", "Check register downloaded", "batch_id", "rows", "format"
+    ),
+    _spec("disbursement.checks_printed", "Checks printed for check stock", "batch_id", "count"),
+    _spec("disbursement.print_settings_saved", "Check printing positions saved"),
     _spec(
         "payments.unreachable",
         "Online payment Stripe cannot find: no longer checked",
@@ -580,6 +693,11 @@ _SPECS = [
     # Server tasks (hosttasks, D35)
     _spec("system.task_requested", "Server task requested", "kind"),
     _spec("system.task_finished", "Server task finished on the VM", "kind", "state"),
+    # Community setup wizard (D51): step key and run number only.
+    _spec("setup.run_started", "Community setup started", "run"),
+    _spec("setup.step_completed", "Community setup step completed", "step", "run"),
+    _spec("setup.step_skipped", "Community setup step skipped", "step", "run"),
+    _spec("setup.run_finished", "Community setup finished", "run"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

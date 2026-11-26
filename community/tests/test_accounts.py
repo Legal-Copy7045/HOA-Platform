@@ -176,9 +176,13 @@ def test_my_account_lists_people_and_upcoming_charges(client, w):
     _contact_user(w["account"], "view_only")
     client.force_login(w["owner"])
     page = client.get(reverse("my_account")).content
-    assert b"On this account" in page
-    assert b"view_only person" in page
+    # WT-011: the people are listed on My home only; My account links there.
+    assert b"On this account" not in page
+    assert b"view_only person" not in page
+    assert b"People on this account" in page
+    assert reverse("my_lot").encode() + b"#people-" in page
     assert b"Upcoming charges" in page and b"$45.00" in page
+    assert b"view_only person" in client.get(reverse("my_lot")).content
 
 
 # --- Former owners -------------------------------------------------------------------------------
@@ -301,6 +305,7 @@ def test_meeting_notice_goes_to_consented_extra_emails(w):
     meeting = gov.create_meeting(
         title="Annual meeting",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=30),
         actor=w["board"],
     )
@@ -318,3 +323,41 @@ def test_co_owner_with_an_earlier_deed_date_joins_the_open_account(w):
     with system_access("test"):
         accounts = list(Account.objects.filter(lot=w["lot"]))
     assert len(accounts) == 1 and accounts[0].opened_on == days_ago(900)
+
+
+# --- WT-010: My history's balance has a next step ---------------------------------------------
+
+
+def test_my_history_has_running_balance_statement_and_whom_to_ask(client, sold):
+    from community.models import CommunityProfile
+
+    profile = CommunityProfile.get()
+    profile.letter_contact = "treasurer@example.org, 555-0100"
+    profile.remit_to = "PO Box 12\nSomewhere, PA 17000"
+    profile.save()
+    client.force_login(sold["owner"])
+    html = client.get(reverse("my_history")).content.decode()
+    assert '<th class="num">Balance</th>' in html and "$12.00" in html
+    assert reverse("my_history_statement_pdf", args=[0]) in html
+    assert "Questions about this balance?" in html and "treasurer@example.org" in html
+    assert "PO Box 12" in html
+    # Read-only: contact details only, no form and no links into current pages.
+    section = html[html.index('data-testid="balance-questions"') :]
+    assert "<form" not in section.split("</div>")[0]
+
+
+def test_former_owner_statement_pdf_is_their_own_and_audited(client, sold):
+    from audit.models import AuditEvent
+
+    client.force_login(sold["owner"])
+    response = client.get(reverse("my_history_statement_pdf", args=[0]))
+    assert response.status_code == 200 and response["Content-Type"] == "application/pdf"
+    assert AuditEvent.objects.filter(action="ledger.statement_downloaded").exists()
+    # Only their own periods exist: any other index is not found.
+    assert client.get(reverse("my_history_statement_pdf", args=[1])).status_code == 404
+
+
+@pytest.mark.parametrize("who", ["buyer", "other_owner", "board"])
+def test_others_cannot_download_a_former_owners_statement(client, sold, who):
+    client.force_login(sold[who])
+    assert client.get(reverse("my_history_statement_pdf", args=[0])).status_code == 403

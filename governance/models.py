@@ -1,5 +1,6 @@
 """Meetings, the resolution/policy register, records requests and votes."""
 
+import datetime
 import uuid
 
 from django.conf import settings
@@ -26,6 +27,10 @@ class MeetingStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
 
 
+# How long a meeting without an end time is assumed to last (D49).
+DEFAULT_MEETING_LENGTH = datetime.timedelta(hours=1)
+
+
 class MeetingQuerySet(models.QuerySet):
     def for_user(self, user):
         from core import policy
@@ -41,7 +46,14 @@ class Meeting(models.Model):
     title = models.CharField(max_length=200)
     kind = models.CharField(max_length=16, choices=MeetingKind.choices)
     starts_at = models.DateTimeField()
+    # Optional end; pages and calendar files assume one hour when empty (D49).
+    ends_at = models.DateTimeField(null=True, blank=True)
+    # Where: a place, a virtual join link (https only), or both. New meetings
+    # need at least one (governance.services.create_meeting); older meetings
+    # with neither stay valid. The join link is shown only to people who may
+    # open the meeting and never goes into emails (D24, D49).
     location = models.CharField(max_length=200, blank=True)
+    join_url = models.URLField(max_length=500, blank=True)
     agenda = models.TextField(blank=True)
     status = models.CharField(
         max_length=16, choices=MeetingStatus.choices, default=MeetingStatus.SCHEDULED
@@ -64,12 +76,24 @@ class Meeting(models.Model):
 
     class Meta:
         ordering = ["-starts_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(ends_at__isnull=True)
+                | models.Q(ends_at__gte=models.F("starts_at")),
+                name="meeting_ends_after_start",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.title
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Meetings are cancelled, not deleted.")
+
+    @property
+    def ends_at_or_default(self):
+        """The end, or one hour after the start when none was given."""
+        return self.ends_at or self.starts_at + DEFAULT_MEETING_LENGTH
 
 
 class Attendance(models.Model):

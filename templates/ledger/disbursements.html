@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Disbursements · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="page-head">
+    <div><h1>Disbursements</h1>
+      <p class="subtitle">Money the association pays back to owners: a surplus distribution to every home, or a refund of an account's credit (usually a former owner's, after a sale). Paid by statement credit or by check, after a board member other than the one who proposed it approves.</p></div>
+    <div class="actions">
+      {% if can_propose %}<a class="btn" href="{% url 'disbursement_new' %}?kind=surplus">{% icon "plus" %} Propose a surplus distribution</a>{% endif %}
+      {% if can_issue %}<a class="btn secondary" href="{% url 'check_print_settings' %}">{% icon "sliders" %} Check printing</a>{% endif %}
+    </div>
+  </div>
+
+  {% if surplus %}<div class="alert info" data-testid="reserve-surplus">{% icon "info" %}<span><strong>Reserves are {{ surplus.above_cents|cents }} above target.</strong> The reserve balance of {{ surplus.balance_cents|cents }}{% if surplus.balance_as_of %} (as of {{ surplus.balance_as_of|short_date }}){% endif %} is above the fully funded balance of {{ surplus.target_cents|cents }} in the reserve plan adopted {{ surplus.adopted_on|short_date }}. The board may consider a surplus distribution; counsel should confirm the Declaration lets reserve funds be treated as surplus.</span></div>{% endif %}
+
+  {% if credits %}<section class="card"><h2>Credit owed to former owners</h2>
+    <p class="small muted">Accounts closed by a sale that still hold a credit. A refund is paid by check to the former owner's forwarding address.</p>
+    <ul class="list">{% for r in credits %}<li><span class="grow">{{ r.lot.label }} · account {{ r.account.number }}</span><span>{{ r.credit_cents|cents }}</span>{% if can_propose %}<a class="btn secondary small" href="{% url 'disbursement_new' %}?kind=refund&amp;account={{ r.account.pk }}">Propose refund</a>{% endif %}</li>{% endfor %}</ul>
+  </section>{% endif %}
+
+  {% if stale %}<section class="card"><h2>Uncashed checks</h2>
+    <p class="small muted">Issued more than 90 days ago and not cleared. {{ unclaimed_note }}</p>
+    <ul class="list">{% for c in stale %}<li><a class="grow" href="{% url 'disbursement_detail' c.line.batch_id %}">Check #{{ c.number }} · {{ c.line.lot.label }} · sent {{ c.issued_on|short_date }}</a><span>{{ c.amount_cents|cents }}</span></li>{% endfor %}</ul>
+  </section>{% endif %}
+
+  <h2>Disbursements</h2>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th scope="col">Proposed</th><th scope="col">Disbursement</th><th scope="col" class="num">Total</th><th scope="col">Homes</th><th scope="col">Status</th></tr></thead>
+    <tbody>{% for b in batches %}
+      <tr><td class="nowrap">{{ b.batch.created_at|short_date }}</td><td><a href="{% url 'disbursement_detail' b.batch.pk %}">{{ b.batch.title }}</a><div class="small muted">{{ b.batch.get_kind_display }}</div></td><td class="num">{{ b.batch.total_cents|cents }}</td><td>{{ b.lines }}</td>
+        <td><span class="status{% if b.state.status == 'declined' %} tone-danger{% elif b.state.status == 'awaiting' %} tone-warning{% else %} tone-success{% endif %}">{{ b.state.label }}</span>{% if b.state.status == "awaiting" %} <span class="small muted">{{ b.state.have }} of {{ b.state.needed }}</span>{% endif %}{% if b.to_issue %} <span class="small">{{ b.to_issue }} check{{ b.to_issue|pluralize }} to write</span>{% endif %}{% if b.issued %} <span class="small muted">{{ b.issued }} outstanding</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="dollar" title="No disbursements yet" text="Surplus distributions and refunds of owners' credit appear here." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

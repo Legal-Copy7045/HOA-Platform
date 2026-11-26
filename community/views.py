@@ -116,21 +116,53 @@ def lot_list(request):
     adds each account's other people, contact details and balance (and the
     CSV export). The old Roster page redirects here."""
     policy.require(request.user, "lot.view_all")
-    roster_view = request.GET.get("view") == "roster" and policy.can(request.user, "roster.view")
+    view = request.GET.get("view")
+    roster_view = view == "roster" and policy.can(request.user, "roster.view")
     if roster_view:
         return _roster(request)
+    can_signups = policy.can(request.user, "invite.send")
+    if view == "signups" and can_signups:
+        # Invitations and sign-ups, as a tab (WT-002); the board only.
+        from accounts.board_views import signups_context
+
+        return render(
+            request,
+            "community/lot_list.html",
+            {
+                **signups_context(request),
+                "signups_view": True,
+                "can_roster": policy.can(request.user, "roster.view"),
+                "can_signups": True,
+            },
+        )
     lots = sorted(Lot.objects.for_user(request.user), key=lambda lot: lot.sort_key)
     current = Ownership.objects.for_user(request.user).active().select_related("person")
     owners: dict[int, list] = {}
     for ownership in current:
         owners.setdefault(ownership.lot_id, []).append(ownership.person)
+    rows = [(lot, owners.get(lot.pk, [])) for lot in lots]
+    # Find one home without scrolling every row (WT-029): number, address or
+    # an owner's name. Never logged or audited, like portal search.
+    q = request.GET.get("q", "").strip()[:100]
+    if q:
+        needle = q.casefold().removeprefix("lot ").strip()
+        rows = [
+            (lot, people)
+            for lot, people in rows
+            if needle == str(lot.number)
+            or needle in lot.label.casefold()
+            or any(needle in p.display_name.casefold() for p in people)
+        ]
     return render(
         request,
         "community/lot_list.html",
         {
-            "rows": [(lot, owners.get(lot.pk, [])) for lot in lots],
+            "rows": rows,
+            "q": q,
+            "total": len(lots),
             "roster_view": False,
             "can_roster": policy.can(request.user, "roster.view"),
+            "can_signups": can_signups,
         },
     )
 
@@ -480,7 +512,14 @@ def community_settings(request):
     policy.require(request.user, "lot.view_all")
     from community import pa_law
     from community.models import CommonArea, CommunityProfile, GoverningRule
-    from community.rules import REGISTRY, cents_display, group_title, rule_origin
+    from community.rules import (
+        BASIS_POINTS,
+        REGISTRY,
+        bp_display,
+        cents_display,
+        group_title,
+        rule_origin,
+    )
     from community.terms import charge_term, term_text
 
     rows = {r.key: r for r in GoverningRule.objects.all()}
@@ -495,6 +534,8 @@ def community_settings(request):
         raw = row.value if row and row.value != "" else (spec.default or "")
         effective = raw or (guide.fallback if guide and origin == "pa_law" else "")
         shown = cents_display(int(effective)) if spec.kind == "cents" and effective else effective
+        if spec.kind == BASIS_POINTS and effective:
+            shown = f"{bp_display(effective)}%"
         # The "Dues" group is headed with the board's word (D42).
         title = group_title(spec.group, term)
         if spec.group in pa_law.GROUP_NOTES:
@@ -506,7 +547,7 @@ def community_settings(request):
                 "help": term_text(spec.help, term),
                 "row": row,
                 # Money is typed in dollars, like every other money field.
-                "raw": _dollars(raw) if spec.kind == "cents" and raw.lstrip("-").isdigit() else raw,
+                "raw": _typed(spec, raw),
                 "shown": shown,
                 "guide": guide,
                 "origin": origin,
@@ -522,6 +563,10 @@ def community_settings(request):
         sorted(groups.items(), key=lambda item: not any(r["needs_attention"] for r in item[1]))
     )
     attention = [r for rules in groups.values() for r in rules if r["needs_attention"]]
+    # Each group is a closed panel unless it holds a setting needing attention (WT-030).
+    group_attention = {
+        title: sum(1 for r in rules if r["needs_attention"]) for title, rules in groups.items()
+    }
     profile = CommunityProfile.get()
     return render(
         request,
@@ -529,6 +574,7 @@ def community_settings(request):
         {
             "groups": groups,
             "attention": attention,
+            "group_attention": group_attention,
             "group_notes": group_notes,
             "pa_disclaimer": pa_law.DISCLAIMER,
             "profile_form": forms.ProfileForm(
@@ -558,6 +604,18 @@ def _booking_rules_on(request) -> bool:
     )
 
 
+def _typed(spec, raw: str) -> str:
+    """The stored value as people type it: dollars for money, a percent for
+    basis points (WT-007)."""
+    from community.rules import BASIS_POINTS, bp_display
+
+    if spec.kind == "cents" and raw.lstrip("-").isdigit():
+        return _dollars(raw)
+    if spec.kind == BASIS_POINTS and raw.isdigit():
+        return bp_display(raw)
+    return raw
+
+
 def _dollars(cents_text: str) -> str:
     cents = int(cents_text)
     sign = "-" if cents < 0 else ""
@@ -568,20 +626,17 @@ def _dollars(cents_text: str) -> str:
 @require_POST
 def community_rule_save(request):
     policy.require(request.user, "community.manage_rules")
+    from community.rule_input import to_stored
     from community.rules import REGISTRY
-    from core.money import parse_cents
 
     data = request.POST.copy()
     spec = REGISTRY.get(data.get("key", ""))
-    if spec is not None and spec.kind == "cents" and (data.get("value") or "").strip():
+    if spec is not None:
+        # Shared with the community setup wizard (D51).
         try:
-            data["value"] = str(parse_cents(data["value"]))
-        except ValueError:
-            return _failed(
-                request,
-                CommunityError("Enter the amount in dollars, e.g. 75.00."),
-                reverse("community_settings"),
-            )
+            data["value"] = to_stored(spec, data.get("value", ""))
+        except ValueError as exc:
+            return _failed(request, CommunityError(str(exc)), reverse("community_settings"))
     form = forms.RuleForm(data)
     back = reverse("community_settings")
     if not form.is_valid():
@@ -728,6 +783,7 @@ def _roster(request):
             "include_dormant": include_dormant,
             "roster_view": True,
             "can_roster": True,
+            "can_signups": policy.can(request.user, "invite.send"),
         },
     )
 

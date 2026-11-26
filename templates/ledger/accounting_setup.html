@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Accounting · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="page-head"><div><h1>Accounting</h1><p class="subtitle">Which account in your accounting package each kind of entry goes to in the journal export, and the bank balance the books start from.</p></div></div>
+  <nav class="subnav" aria-label="Accounting"><a href="{% url 'accounting' %}">Overview</a><a href="{% url 'accounting' %}?tab=setup" aria-current="page">Setup</a></nav>
+  <form method="post" action="{% url 'accounting' %}" class="accounting-setup" data-testid="accounting-setup">{% csrf_token %}<input type="hidden" name="section" value="setup">
+    {% include "partials/form_errors.html" %}
+    <p class="small muted">Type the account number and name as they appear in your accounting package, e.g. "1000 Operating cash". Leave a box empty to use the standard account shown in it. Expenses use each invoice's category code.</p>
+    {% for g in groups %}
+    <section class="card">
+      <h2>{{ g.heading }}</h2>
+      {% for r in g.rows %}
+      <div class="field setup-row">
+        <label for="id_gl_{{ r.key }}">{{ r.label }}</label>
+        <p class="help" id="gl_{{ r.key }}-help">{{ r.help }} Leave empty to use the standard account ({{ r.standard }}).</p>
+        <input id="id_gl_{{ r.key }}" name="gl_{{ r.key }}" value="{{ r.value }}" placeholder="{{ r.standard }}" maxlength="80" aria-describedby="gl_{{ r.key }}-help" class="full-width">
+      </div>
+      {% endfor %}
+    </section>
+    {% endfor %}
+    <section class="card" id="opening-balance">
+      <h2>Opening balance</h2>
+      <p class="small muted">The bank balance on the day you started using the portal for the books, so reconciliation starts from the right number. Enter both the amount and its date.</p>
+      <div class="inline-form">
+        <div><label for="id_opening_cash">Opening bank balance<span class="required-mark" aria-hidden="true">*</span></label><div class="money-input"><span aria-hidden="true">$</span><input id="id_opening_cash" name="opening_cash" value="{{ form.opening_cash.value|default_if_none:'' }}" inputmode="decimal" aria-describedby="oc-err"{% if form.opening_cash.errors %} aria-invalid="true"{% endif %}></div>{% for e in form.opening_cash.errors %}<p class="help error" id="oc-err">{{ e }}</p>{% endfor %}</div>
+        <div><label for="id_opening_cash_on">As of<span class="required-mark" aria-hidden="true">*</span></label><input id="id_opening_cash_on" type="date" name="opening_cash_on" value="{{ form.opening_cash_on.value|date:'Y-m-d'|default:form.opening_cash_on.value|default_if_none:'' }}" aria-describedby="od-err"{% if form.opening_cash_on.errors %} aria-invalid="true"{% endif %}>{% for e in form.opening_cash_on.errors %}<p class="help error" id="od-err">{{ e }}</p>{% endfor %}</div>
+      </div>
+    </section>
+    <div class="form-actions"><button type="submit">Save accounting setup</button><a class="btn secondary" href="{% url 'accounting' %}">Cancel</a></div>
+  </form>
+{% endblock %}

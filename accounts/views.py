@@ -146,9 +146,13 @@ def signin_help(request):
 
 @login_required
 def onboarding(request):
-    """The old Onboarding page: now part of Invitations and sign-ups."""
+    """The old Onboarding page: now the sign-ups tab of Homes and owners
+    (WT-002); the letters download still lives on the invitations URL."""
     from django.urls import reverse
 
+    from accounts.board_views import signups_url
+
     policy.require(request.user, "invite.send")
-    query = request.GET.urlencode()
-    return redirect(reverse("invitations") + (f"?{query}" if query else ""))
+    if request.GET.get("letters") == "1":
+        return redirect(reverse("invitations") + "?letters=1")
+    return redirect(signups_url())

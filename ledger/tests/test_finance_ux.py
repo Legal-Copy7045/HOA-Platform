@@ -468,9 +468,10 @@ def test_recorded_list_is_scoped_to_payments(client, w):
 def test_dues_form_uses_a_month_picker_and_previews_the_charge(client, w):
     client.force_login(w["manager"])
     page = client.get(reverse("ledger_home")).content.decode()
-    assert 'type="month"' in page
+    # Months in words, not the browser's month grid (D48).
+    assert 'type="month"' not in page and '<select id="dperiod" name="period"' in page
     nxt = (TODAY.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
-    assert f'value="{nxt:%Y-%m}"' in page
+    assert f'value="{nxt:%Y-%m}" selected>{nxt:%B %Y}</option>' in page
     assert "Will charge <strong>2 homes $75.00 each</strong>" in page
 
 
@@ -521,11 +522,12 @@ def test_accounting_setup_has_one_labeled_input_per_account(client, w):
     from ledger import accounting as acc
 
     client.force_login(w["board"])
-    page = client.get(reverse("accounting")).content.decode()
+    # The setup is its own tab of Accounting (owner request 2026-11-26).
+    page = client.get(reverse("accounting"), {"tab": "setup"}).content.decode()
     assert 'name="gl_accounts"' not in page
     for key in acc.GL_LABELS:
-        assert f'<label for="gl_{key}">' in page and f'name="gl_{key}"' in page
-    assert 'value="1000 Operating cash"' in page
+        assert f'<label for="id_gl_{key}">' in page and f'name="gl_{key}"' in page
+    assert 'placeholder="1000 Operating cash"' in page
 
 
 def test_accounting_setup_saves_each_account_into_the_stored_text(client, w):
@@ -539,6 +541,7 @@ def test_accounting_setup_saves_each_account_into_the_stored_text(client, w):
             "gl_cash": "1010 Main checking",
             "gl_assessment": "",
             "opening_cash": "0",
+            "opening_cash_on": "2026-01-01",
         },
     )
     accounts = AccountingSetup.get().accounts()
@@ -565,7 +568,7 @@ def test_1099_table_scrolls_on_phones(client, w):
     client.force_login(w["board"])
     page = client.get(reverse("accounting") + f"?year={TODAY.year}").content.decode()
     section = page.split("<h2>1099 worksheet</h2>")[1]
-    assert '<div class="table-wrap"><table>' in section and "Mow Co" in section
+    assert '<div class="table-wrap"><table class="stack-sm">' in section and "Mow Co" in section
     assert 'class="table small"' not in page
 
 

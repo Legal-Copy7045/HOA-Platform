@@ -36,6 +36,7 @@ def w(settings):
     meeting = gov.create_meeting(
         title="Annual meeting",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=20),
         actor=board,
     )

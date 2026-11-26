@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Review · Community setup · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'setup_home' %}">Community setup</a></div>
+  <div class="setup-progress">
+    <p class="small muted" id="setup-progress-label">Step {{ number }} of {{ total }}{% if run %} · setup run {{ run }}{% endif %}</p>
+    <progress max="{{ total }}" value="{{ number }}" aria-labelledby="setup-progress-label">Step {{ number }} of {{ total }}</progress>
+  </div>
+  <div class="page-head"><div><h1>{{ title }}</h1><p class="subtitle">{{ intro }}</p></div></div>
+
+  {% include "community/setup/_law.html" %}
+  {% if flagged %}<div class="alert warning" role="status" data-testid="review-flagged">{% icon "alert" %}<span>{{ flagged }} item{{ flagged|pluralize }} still at {{ flagged|pluralize:"its,their" }} default, missing, or without a citation. That can be fine; the flags say what to check.</span></div>{% endif %}
+  {% if not_done and run and not finished %}<div class="alert info" role="status">{% icon "info" %}<span>Not completed in this run: {% for sec in not_done %}<a href="{{ sec.url }}">{{ sec.title }}</a>{% if sec.state == "skipped" %} (skipped){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}.</span></div>{% endif %}
+
+  {% for sec in sections %}
+    <section class="card setup-review" id="review-{{ sec.step.key }}">
+      <div class="setup-review-head"><h2>{{ sec.title }}</h2>{% if sec.state == "completed" %}<span class="status tone-success">Done</span>{% elif sec.state == "skipped" %}<span class="status tone-warning">Skipped</span>{% endif %}<a class="btn secondary small" href="{{ sec.url }}" aria-label="Change {{ sec.title }}">Change</a></div>
+      {% if sec.lines %}<dl class="kv setup-kv">{% for line in sec.lines %}<dt>{{ line.label }}</dt><dd>{{ line.value|default:"-" }}{% if line.citation %} <span class="small muted">({{ line.citation }})</span>{% endif %}{% if line.flag %} <span class="status tone-warning" data-flag>{{ line.flag }}</span>{% endif %}</dd>{% endfor %}</dl>
+      {% else %}<p class="small muted">Status only: see the step.</p>{% endif %}
+    </section>
+  {% endfor %}
+
+  <form method="post" class="setup-form">{% csrf_token %}
+    <div class="setup-actions">
+      {% if finished %}<a class="btn setup-save" href="{% url 'setup_home' %}">Done</a>{% else %}<button type="submit" class="setup-save">Finish setup</button>{% endif %}
+      <a class="btn secondary" href="{{ prev_url }}">Back</a>
+    </div>
+  </form>
+  <p class="small muted setup-footer">{{ law.footer }}</p>
+{% endblock %}

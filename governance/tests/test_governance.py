@@ -35,7 +35,7 @@ def test_notice_emails_consenting_owners_and_lists_the_rest(board):
     community.update_my_profile(user=consenting, electronic_notice_consent=True)
     make_member(lots=[LotFactory()], email="no@example.com")
     meeting = services.create_meeting(
-        title="Annual meeting", kind="annual", starts_at=soon(), actor=board
+        title="Annual meeting", kind="annual", location="Clubhouse", starts_at=soon(), actor=board
     )
     mail.outbox = []
     result = services.send_notice(meeting, actor=board)
@@ -48,13 +48,15 @@ def test_notice_shortfall_against_the_rule(board):
         key="meeting.owner_notice_days", value="10", citation="Bylaws §3.4", actor=board
     )
     meeting = services.create_meeting(
-        title="Special", kind="special", starts_at=soon(3), actor=board
+        title="Special", kind="special", location="Clubhouse", starts_at=soon(3), actor=board
     )
     assert services.notice_shortfall_days(meeting) == 7
 
 
 def test_executive_sessions_are_hidden_from_owners_and_never_noticed(board):
-    meeting = services.create_meeting(title="Exec", kind="executive", starts_at=soon(), actor=board)
+    meeting = services.create_meeting(
+        title="Exec", kind="executive", location="Clubhouse", starts_at=soon(), actor=board
+    )
     owner = make_member(lots=[LotFactory()])
     assert not Meeting.objects.for_user(owner).filter(pk=meeting.pk).exists()
     with pytest.raises(services.GovernanceError):

@@ -6,6 +6,145 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.21.0 — 2026-11-26
+
+- Disbursements (Finance, optional feature, on by default): the board can pay
+  money back to owners. A surplus distribution splits a total equally across
+  every home (the odd cents in address order) as statement credits or checks,
+  under a board resolution; an owner refund pays a former owner's credit by
+  check after a sale (My items says "Refund $X to the former owner of
+  <address>"). A board member other than the one who proposed it approves
+  (two at $500 and over); statement credits post on approval and refunds when
+  the check is recorded. Checks come from a check register (CSV or PDF) for
+  the bank's bill pay, or print on the association's pre-printed check stock
+  with an alignment test; then the board records the check numbers, marks
+  them cleared (suggested from the bank feed) or voids them (the credit comes
+  back). Uncashed checks show up after 90 days. The accounting export,
+  reconciliation and bank feed include them. When reserves are above the
+  adopted plan's target, Disbursements and My items say so.
+- Owners see a surplus credit on My account; former owners see their refund
+  check in My history.
+
+## 0.20.0 — 2026-11-26
+
+- Community setup (Settings → Community setup): a step-by-step walk through
+  every set-up decision for the board: the community's details and
+  letterhead, what the monthly assessment is called and how much it is, late
+  fees, online and automatic payments, notices, architectural review,
+  violations, common areas, owner requests, meetings and resale, privacy,
+  features, then where people and access and the server stand, and a review
+  that flags anything still at its default or without a citation. Each step
+  shows what Pennsylvania and federal law say about the choice. It saves
+  through the same settings and confirmations as the existing pages, and can
+  be run again at any time; "Finish community setup" is on My items until
+  done (D51).
+
+## 0.19.0 — 2026-11-26
+
+- Automatic payments can now be once a year: the payer chooses "Once a
+  year" and a month, and on that month's due day the next 12 months'
+  assessments are paid in one payment, less any credit on the account. The
+  money becomes prepaid credit that pays each month's assessment as it is
+  charged. Months before the first yearly payment, or between the end of
+  the prepaid months and the next yearly payment after a change of month,
+  are paid automatically month by month; no month is ever charged twice. The set-up page and Stripe's page
+  say which schedule and roughly what amount; the schedule can be changed on
+  the automatic payments page and takes effect from the next charge.
+- Automatic payments above $500 (a new Community setting, surcharge
+  included; it replaces the old percent ceiling) are no longer charged
+  straight away: they wait for the board's review. The board approves or
+  declines from My items or Online payments (never for a home they pay for,
+  and never the manager); a declined or expired (14 days) payment is not
+  charged and the owners are emailed (D47).
+- Online payments lists homes by address in the automatic payments table.
+
+## 0.18.0 — 2026-11-26
+
+- Phones: every button and link is at least a thumb's size, buttons wrap
+  instead of running off their card, and money tables (My account, home
+  accounts, Owner accounts, Invoices, Collections, Invitations and more)
+  become one card per row. A bar at the bottom of the screen opens the
+  Dashboard, My account or My items, Voting or Search, and the Menu.
+- Filters and tabs (My requests, Voting, Homes and owners, Owner accounts,
+  Invoices, Invitations, Resolutions) change the list in place, without
+  reloading or jumping to the top; Back and Forward work.
+- One button per form: "Ask the board a question", "Ask for approval of a
+  project" and the Voting and Resolutions "New ..." buttons open their form
+  where they are and hide while it is open.
+- Main actions first: Pay online and the statement under the balance on My
+  account; Record a payment, Post a charge and Post a credit at the top of a
+  home account; the deposit total and Record deposit at the top of
+  Accounting.
+- Find a home by number, address or owner on Homes and owners; Owner
+  accounts can show only homes with a balance; Invitations filter by status.
+- The month to charge is a list of months in words with already-posted
+  months marked. With automatic posting on, the card shows when the month
+  was posted and the next run; if a month is missed, the board is emailed
+  once, it appears in My items and on System status, and the card offers
+  the button for that month.
+- File inputs look like the portal's buttons; date fields match the other
+  inputs; committee forms have visible labels; Community settings and ARC
+  request types fold into sections.
+- Contacts no longer see a resale certificate link they cannot use, and a
+  refused or missing page keeps the portal's layout with a way home (D48).
+
+## 0.17.0 — 2026-11-26
+
+- Homes and owners has a Sign-ups view for the board (who has signed up,
+  how homes get official notices, invite everyone, reminders and every
+  invitation); the separate "Invitations and sign-ups" menu entry is gone and
+  its old address leads there. The sysadmin's page is now called Invitations.
+- One name per thing: "My home improvement requests (ARC)" on My home and
+  My history, "Work order #3", "Invoice PP-102 · vendor", My items groups named
+  after the page they open (Voting, Invoices, Second approvals, People...),
+  plainer report names, and a tenant's Voting is called Surveys.
+- Community settings: a section index at the top, sections that fold away,
+  the card surcharge typed as a percent (3 or 2.5; still at most 3%), and
+  plain wording for reading neighbor acknowledgements from scanned forms.
+  ARC request types fold to one line each with their citation.
+- Former owners: My history shows a running balance, a statement PDF for
+  their period, and whom to ask about the balance.
+- My account links to the people on the account on My home instead of
+  listing them twice.
+- Ways back: breadcrumbs on every Settings page, Access review and Neighbor
+  acknowledgements.
+- Sysadmin activity shows 30 days at a time with Older and Newer, by day,
+  with filters and a CSV export (recorded in the audit log).
+- ARC reviewers choose their position from an empty list (nothing is
+  recorded by accident), and steps they can never take are no longer shown.
+- Auditors and sysadmins see their usual pages on the dashboard instead of
+  an always-empty to-do list; Quick actions moved up under the to-dos.
+- Documents: "Ask to inspect it" opens the request form; meeting packets are
+  listed under "Meeting packets".
+- Phone menu: staff see their work sections open when something waits there,
+  and Sign out is at the top of the drawer.
+- Accounting setup has its own tab, grouped under plain headings with a line
+  on what each account is for, the whole account visible, and the opening
+  balance and its date required together; Accounting shows a one-line
+  summary.
+
+## 0.16.0 — 2026-11-26
+
+- Meeting notices now include the join link itself (owner decision), and the
+  board can mark a meeting held at any time.
+- Meetings are now part of the Calendar: one menu entry, with All /
+  Meetings / Events and Past meetings (approved minutes are linked there).
+  Board members and the manager schedule meetings with "New meeting" next
+  to "New event". The old Meetings address leads to the calendar's
+  Meetings list. Executive sessions show only in the board's view (D49).
+- Meetings say where they are: a place, a link to join online, or both,
+  with an optional end time. The join link is shown only on the portal to
+  people who can open the meeting, never in emails. Events can have a join
+  link too.
+- "Add to calendar" on every event and meeting: Google Calendar, Outlook.com,
+  Microsoft 365, or a calendar file for Apple Calendar and Outlook desktop.
+- Clicking an event anywhere (calendar, dashboard, search) opens its page;
+  a meeting opens its meeting page.
+- The meeting page shows the board's steps in order and only those that
+  apply now, in one panel that starts closed on phones.
+- Marking a violation cured is now a board decision; the manager can no
+  longer do it.
+
 ## 0.15.1 — 2026-11-26
 
 - Bank feed: a guided one-time script sets up Teller on the server

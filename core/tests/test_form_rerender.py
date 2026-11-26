@@ -73,7 +73,7 @@ def test_service_refusal_is_shown_on_the_form(client, board, monkeypatch):
     monkeypatch.setattr(services, "create_meeting", refuse)
     response = client.post(
         reverse("meetings"),
-        {"title": TYPED, "kind": "board", "starts_at": "2027-01-05T19:00"},
+        {"title": TYPED, "kind": "board", "starts_at": "2027-01-05T19:00", "location": "Hall"},
     )
     assert response.status_code == 200
     page = response.content.decode()
