@@ -83,8 +83,9 @@ STEPS: list[Step] = [
         "late_fees",
         "Late fees and collections",
         "When a payment is late, what the late fee is, whether fees post by themselves, "
-        "and the notice periods of the collection letters. Also the invoice approval limit.",
-        groups=("Dues", "Invoices"),
+        "and the notice periods of the collection letters. Also the invoice approval limit "
+        "and how money is paid back to owners (surplus distributions and refunds).",
+        groups=("Dues", "Invoices", "Disbursements"),
         links=(("Letters and certificates", "letters_settings", "letters.manage"),),
     ),
     Step(
@@ -141,10 +142,14 @@ STEPS: list[Step] = [
     Step(
         "governance",
         "Meetings, voting, records and resale",
-        "Meeting notice, quorum and passing share for formal votes, records requests and "
-        "resale certificates.",
+        "Meeting notice; for formal votes and elections the quorum, the passing share, the "
+        "shortest voting period, whether the board may close voting early and whether owners "
+        "see the turnout while voting is open; records requests and resale certificates.",
         groups=("Meetings", "Voting", "Records", "Resale"),
+        # Catch-all only as a safety net: every group in community/rules.py
+        # must be named by a step (a guard test fails otherwise).
         catch_all=True,
+        features=("votes", "elections", "surveys"),
     ),
     Step(
         "privacy",
@@ -222,6 +227,16 @@ def assign_rules(registry=None) -> dict[str, list]:
         order = {g: i for i, g in enumerate(step.groups)}
         out[step.key].sort(key=lambda s: order.get(s.group, len(order)))
     return out
+
+
+def unmapped_groups(registry=None) -> set[str]:
+    """Rule groups no step names: they would fall into the catch-all step
+    silently. Always empty in a correct build (guard test, D61)."""
+    from community import rules
+
+    registry = rules.REGISTRY if registry is None else registry
+    named = {g for s in STEPS for g in s.groups}
+    return {spec.group for spec in registry.values()} - named
 
 
 def rules_for(step_key: str) -> list:
