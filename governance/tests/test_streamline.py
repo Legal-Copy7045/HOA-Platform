@@ -146,7 +146,7 @@ def test_board_gets_new_buttons_owners_do_not(client, w):
     html = _page(client, reverse("voting"))
     for label in ("New vote", "New election", "New survey"):
         assert label in html
-    assert 'id="new-vote" open' in _page(client, reverse("voting") + "?new=vote")
+    assert 'open id="new-vote"' in _page(client, reverse("voting") + "?new=vote")
     for user in (w["owner"], w["manager"]):
         client.force_login(user)
         html = _page(client, reverse("voting"))
@@ -176,7 +176,7 @@ def test_refused_vote_form_comes_back_with_what_was_typed(client, w):
     response = client.post(reverse("votes"), {"title": "Keep this title", "options": "Only one"})
     html = response.content.decode()
     assert response.status_code == 200
-    assert "Keep this title" in html and 'id="new-vote" open' in html
+    assert "Keep this title" in html and 'open id="new-vote"' in html
     assert "Give at least two different options" in html
     assert not Vote.objects.exists()
 
@@ -200,7 +200,7 @@ def test_board_creates_an_election_from_voting(client, w):
     election = Election.objects.get(title="2027 election")
     assert response.status_code == 302 and election.meeting_id == meeting.pk
     bad = client.post(reverse("elections"), {"title": "Too many", "seats": 99, "term_years": 2})
-    assert bad.status_code == 200 and 'id="new-election" open' in bad.content.decode()
+    assert bad.status_code == 200 and 'open id="new-election"' in bad.content.decode()
     assert b'role="alert"' in bad.content and b"Too many" in bad.content
 
 
@@ -262,7 +262,7 @@ def test_board_adopts_by_written_consent_from_resolutions(client, w):
     assert not Resolution.objects.exists()
     bad = client.post(reverse("consents"), {"title": "Keep me", "text": ""})
     assert bad.status_code == 200 and b"Keep me" in bad.content
-    assert b'id="adopt-consent" open' in bad.content
+    assert b'open id="adopt-consent"' in bad.content
 
 
 def test_owners_never_see_consents_on_resolutions(client, w):
@@ -375,7 +375,7 @@ def test_record_resolution_prefills_the_meeting(client, w):
     form = response.context["form"]
     assert form.initial["meeting"] == meeting.pk
     assert form.initial["adopted_on"] == timezone.localdate(meeting.starts_at)
-    assert b'id="record" open' in response.content
+    assert b'open id="record"' in response.content
     response = client.post(
         reverse("resolutions"),
         {
