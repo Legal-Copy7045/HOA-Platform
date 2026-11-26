@@ -47,6 +47,12 @@ SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
 # member's approval. On in production; the POC turns it off (see production.py).
 BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=True)
 
+# Secret ballots, elections and anonymous surveys (D56): choices wait in a
+# mixing pool with no identity and are written to the permanent tables in
+# shuffled batches, in a separate transaction, keeping at least this many
+# behind while voting is open; closing writes everything. Never below 2.
+SECRET_BALLOT_MIX_MIN = max(2, env.int("SECRET_BALLOT_MIX_MIN", default=5))
+
 # ARC neighbor sign-off (Milestone 3): single-use links expire after this
 # many days. Gemini reads scanned signed forms when a key is set; a person
 # confirms what it reads unless the board switches on automatic confirming.

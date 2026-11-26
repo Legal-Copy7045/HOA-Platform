@@ -74,6 +74,15 @@ OWNER_USER="$(env_value HOA_OWNER_DB_USER)"
 OWNER_PW="$(env_value HOA_OWNER_DB_PASSWORD)"
 
 echo "==> Database"
+# The secret-choice mixing pool (governance_pendingsecretchoice, D56) stays
+# in the dump on purpose. Excluding it (--exclude-table-data) would make a
+# restore taken during an open vote lose the choices still waiting there
+# while keeping the "this home voted" rows, and those homes could not vote
+# again: a binding vote would silently miss ballots. The cost: a backup taken
+# while a secret vote, election or anonymous survey is open holds up to about
+# 2 x SECRET_BALLOT_MIX_MIN pooled choices per open item whose order in the
+# dump can still be matched to the casting order. Backups are encrypted and
+# held under the two-person rules; after the vote closes the pool is empty.
 # The password goes through the environment, not the command line, so it
 # never shows in the host's process list (SEC-008).
 PGPASSWORD="$OWNER_PW" "${COMPOSE[@]}" exec -T -e PGPASSWORD postgres \

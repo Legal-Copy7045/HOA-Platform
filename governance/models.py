@@ -1,6 +1,7 @@
 """Meetings, the resolution/policy register, records requests and votes."""
 
 import datetime
+import secrets
 import uuid
 
 from django.conf import settings
@@ -892,3 +893,54 @@ class SurveyAnswer(AppendOnlyModel):
 
     def __str__(self) -> str:
         return "survey answer"
+
+
+# --- Mixing pool for secret choices (D56) ---------------------------------------------
+
+
+def _mix_key() -> int:
+    return secrets.randbits(62)
+
+
+class PendingSecretChoice(models.Model):
+    """A secret choice waiting to be written to its permanent table (D56).
+
+    Casting records who voted (append-only, as before) and puts the choice
+    here, with nothing that names the voter: no person, lot, ballot or
+    participation id and no timestamp; a random id and a random sort key.
+    ``governance.mixing`` later moves pooled choices to ``SecretChoice``,
+    ``ElectionChoice`` or ``SurveyResponse``/``SurveyAnswer`` in a separate
+    transaction and in shuffled order, so the permanent rows share no
+    transaction id, sequence, time or physical order with the participation
+    rows. A staging area, not a record: rows are deleted when moved (the
+    runtime role may INSERT, SELECT and DELETE here, never UPDATE)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vote = models.ForeignKey(
+        Vote, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    election = models.ForeignKey(
+        Election, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    survey = models.ForeignKey(
+        Survey, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    # vote: {"option": id}; election: {"candidates": [ids]}; survey:
+    # {"answers": [{"question": id, "choice": id|None, "rating": n|None, "text": ""}]}
+    payload = models.JSONField()
+    sort_key = models.BigIntegerField(default=_mix_key)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(vote__isnull=False, election__isnull=True, survey__isnull=True)
+                    | models.Q(vote__isnull=True, election__isnull=False, survey__isnull=True)
+                    | models.Q(vote__isnull=True, election__isnull=True, survey__isnull=False)
+                ),
+                name="pending_secret_choice_one_target",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return "pending secret choice"

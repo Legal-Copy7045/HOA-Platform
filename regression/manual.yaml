@@ -277,4 +277,7 @@
 - key: check stock alignment
   check: "Disbursements > Check printing > Alignment test prints on plain paper at 100% with the quarter-inch grid and a sample check; held over a blank check of the association's stock, the date, payee, amount, amount in words, memo and window-envelope address sit on their lines after adjusting the positions; a real refund check printed on a voided blank lines up, its address shows through a #10 window envelope, and the amount in words matches the figures."
   steps: "Sign in as a demo board member; open Finance > Disbursements > Check printing; download the alignment test and print at 100% (no fit to page); compare against a blank check; adjust and save; propose and approve a demo refund; Print on check stock; print on a voided blank; fold into a window envelope."
+- key: secret choices mixed on the server
+  check: "On the POC, a secret test vote's ballots show as \"waiting to be mixed\" on the vote page while fewer than ten are pooled, the worker writes them once ten wait (five stay behind), and closing the vote counts every ballot with nothing left waiting (D56)."
+  steps: "Open a secret demo vote, cast ballots from demo owners, check the vote page as the board after each; cast ten or more and wait a minute for the worker; close the vote and check the counts equal the ballots cast."
   last: ""
