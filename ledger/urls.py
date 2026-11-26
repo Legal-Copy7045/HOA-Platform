@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from ledger import views
+from ledger import reserve_views, views
 
 urlpatterns = [
     path("budget/", views.owner_budget, name="owner_budget"),
@@ -39,6 +39,16 @@ urlpatterns = [
     ),
     path("finance/budgets/", views.budgets, name="budgets"),
     path("finance/budgets/<int:pk>/", views.budget_detail, name="budget_detail"),
+    # Reserve plan (reserves)
+    path("finance/reserves/", reserve_views.reserve_plan_page, name="reserve_plan"),
+    path(
+        "finance/reserves/component/<int:pk>/",
+        reserve_views.reserve_component,
+        name="reserve_component",
+    ),
+    path("finance/reserves/adopt/", reserve_views.reserve_adopt, name="reserve_adopt"),
+    path("finance/reserves/projection.csv", reserve_views.reserve_export, name="reserve_export"),
+    path("reserves/", reserve_views.reserve_summary, name="reserve_summary"),
     path("resale/", views.resales, name="resales"),
     path("resale/<int:pk>/", views.resale_detail, name="resale_detail"),
     re_path(

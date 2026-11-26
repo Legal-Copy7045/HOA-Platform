@@ -161,6 +161,20 @@ FEATURES: list[Feature] = [
         {"sms_start", "sms_verify", "urgent_notice"},
         default=False,
     ),
+    # --- Reserve plan (reserves) ---
+    _f(
+        "reserves",
+        "Reserve plan",
+        "An in-house reserve study: what will need replacing, when, and the reserve "
+        "contribution that keeps the fund above zero.",
+        {
+            "reserve_plan",
+            "reserve_component",
+            "reserve_adopt",
+            "reserve_export",
+            "reserve_summary",
+        },
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"

@@ -138,6 +138,7 @@ def test_feature_switches_still_gate_hubs_and_voting(client, w):
     assert "Voting" not in labels(client.get(reverse("home")))
     features.set_feature("faq", False, actor=w["board"])
     features.set_feature("directory", False, actor=w["board"])
+    features.set_feature("reserves", False, actor=w["board"])
     assert "Community info" not in labels(client.get(reverse("home")))
     assert client.get(reverse("community_info")).status_code == 404
 

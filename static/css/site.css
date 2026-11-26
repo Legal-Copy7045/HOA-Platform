@@ -482,3 +482,6 @@ details.menu-details > .panel-body br { display: none; }
 .group-pinned { border-color: var(--green-700); }
 fieldset.choices { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; }
 fieldset.choices legend { padding: 0; margin-bottom: .4rem; }
+
+/* Reserve plan: years whose ending balance is below zero (also labeled in text). */
+tr.below-zero th, tr.below-zero td { background: var(--danger-bg); }

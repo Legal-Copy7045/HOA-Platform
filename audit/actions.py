@@ -310,6 +310,32 @@ _SPECS = [
     _spec("arc.edited", "ARC draft edited by the owner", "fields"),
     # --- Regression fixes: operations, ledger, notifications (fix_ops) ---
     _spec("contract.approval_given", "Contract approval given", "have", "need"),
+    # --- Reserve plan (reserves) ---
+    _spec(
+        "reserves.component_saved",
+        "Reserve component saved",
+        "created",
+        "category",
+        "cost_cents",
+        "active",
+    ),
+    _spec(
+        "reserves.settings_saved",
+        "Reserve plan settings saved",
+        "annual_contribution_cents",
+        "inflation_bp",
+        "interest_bp",
+        "horizon_years",
+    ),
+    _spec(
+        "reserves.adopted",
+        "Reserve plan recorded as adopted",
+        "components",
+        "percent_funded",
+        "needed_contribution_cents",
+        "horizon_years",
+    ),
+    _spec("reserves.exported", "Reserve plan projection exported (CSV)", "rows", "start_year"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

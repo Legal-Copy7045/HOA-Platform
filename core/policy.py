@@ -169,6 +169,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "access_review.record": frozenset({BOARD}),
     # Clearing former owners' contact details under the retention rule.
     "retention.manage": frozenset({BOARD}),
+    # --- Reserve plan (reserves) ---
+    # The board, manager and auditor see the plan; changing or adopting it
+    # is a board decision. Owners see the adopted plan's summary only.
+    "reserves.view": frozenset({BOARD, AUDITOR, MANAGER}),
+    "reserves.manage": frozenset({BOARD}),
+    "reserves.view_summary": ACCOUNT_VIEWERS | {BOARD, MANAGER, AUDITOR},
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

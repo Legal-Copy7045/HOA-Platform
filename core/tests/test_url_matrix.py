@@ -84,6 +84,8 @@ BOARD_ONLY_MARKERS = (
     b"Lot B pond",
     b"Lot B nephew",
     b"Lot B pavilion party",
+    # Reserve plan (reserves): component notes are board only.
+    b"Board note on reserve pond liner",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -108,6 +110,8 @@ MEMBER_PAGES = {
     # Navigation and UX review (ux_nav): hub pages.
     "voting",
     "community_info",
+    # Reserve plan (reserves): the adopted plan's summary.
+    "reserve_summary",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -269,6 +273,11 @@ PROTECTED = {
     "access_review_record": ("POST", None),
     "retention": ("GET", None),
     "retention_run": ("POST", None),
+    # Reserve plan (reserves)
+    "reserve_plan": ("GET", None),
+    "reserve_component": ("GET", "reserve_component"),
+    "reserve_adopt": ("POST", None),
+    "reserve_export": ("GET", None),
 }
 
 
@@ -410,6 +419,18 @@ def world():
         )
         collection = ledger.open_case(lot=lot_b, actor=board)
         budget = ledger.create_budget(fiscal_year=2027, actor=board)
+        from ledger import reserve_plan
+
+        reserve_component = reserve_plan.save_component(
+            name="Pond liner",
+            category="stormwater",
+            replacement_cost_cents=4500000,
+            useful_life_years=20,
+            remaining_life_years=3,
+            notes="Board note on reserve pond liner",
+            actor=board,
+        )
+        reserve_plan.adopt(actor=board)
         resale_b = ledger.request_resale(
             lot=lot_b, requester_name="Lot B Buyer Agent", actor=owner_b
         )
@@ -541,6 +562,7 @@ def world():
         "lot_id_b": lot_b.pk,
         "collection": collection.pk,
         "budget": budget.pk,
+        "reserve_component": reserve_component.pk,
         "resale_b": resale_b.pk,
         "report": "ar_aging",
     }
