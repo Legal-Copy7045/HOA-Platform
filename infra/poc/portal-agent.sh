@@ -7,7 +7,9 @@
 # Every 15 minutes, or when "Check now" is pressed on System status, it asks
 # GitHub whether the branch has newer commits and records the answer in the
 # portal's database. When "Install update" is pressed, it runs
-# update-portal.sh and records the outcome. The web app itself never gets
+# update-portal.sh and records the outcome. Then it runs the oldest server
+# task requested on Admin -> Server tasks (a backup, a restore drill...; D35)
+# from the fixed list in host-tasks.sh. The web app itself never gets
 # any access to this machine: it can only write the request row, and this
 # script decides what to do with it. Nothing typed on the website reaches
 # a shell: values written back go through psql variables, never the command.
@@ -18,6 +20,8 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 APP_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 # shellcheck source=infra/poc/lib.sh
 source "$APP_DIR/infra/poc/lib.sh"
+# shellcheck source=infra/poc/host-tasks.sh
+source "$APP_DIR/infra/poc/host-tasks.sh"
 cd "$APP_DIR"
 LOG=/var/log/hoa-portal-update.log
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
@@ -79,6 +83,7 @@ UPDATE core_updatestatus
 SQL
 }
 
+UPDATED=0
 read -r STATE DUE <<<"$(psql_run <<'SQL' | tr '|' ' '
 SELECT state,
        (checked_at IS NULL
@@ -97,6 +102,7 @@ UPDATE core_updatestatus SET state = 'failed', state_changed_at = now(), message
  WHERE id = 1;
 SQL
 elif [ "$STATE" = "requested" ]; then
+  UPDATED=1
   psql_run >/dev/null <<'SQL'
 UPDATE core_updatestatus SET state = 'running', state_changed_at = now(), message = '' WHERE id = 1;
 SQL
@@ -117,4 +123,11 @@ UPDATE core_updatestatus SET state = :'result', state_changed_at = now(), messag
 SQL
 elif [ "$DUE" = "t" ]; then
   check
+fi
+
+# Server tasks (D35). Not in the same run as an update (which restarts the
+# portal and can use most of the service's time limit): next minute instead.
+# Before the migration that adds them, process_host_task does nothing.
+if [ "$UPDATED" -eq 0 ]; then
+  process_host_task
 fi
