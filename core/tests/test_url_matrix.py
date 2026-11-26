@@ -262,6 +262,7 @@ PROTECTED = {
     "collection_detail": ("GET", "collection"),
     "collection_action": ("POST", "collection"),
     "collection_letter": ("POST", "collection"),
+    "collection_notice_pdf": ("GET", "collection"),
     "accounting": ("GET", None),
     "accounting_export": ("GET", None),
     "accounting_1099": ("GET", None),
@@ -763,7 +764,7 @@ def _url(name, key, targets):
         kwargs["action"] = "credit"
     elif name == "lot_statement_pdf":
         kwargs["kind"] = "statement"
-    elif name == "lot_notice_pdf":
+    elif name == "lot_notice_pdf" or name == "collection_notice_pdf":
         kwargs["kind"] = "first"
     elif name == "accounting_1099":
         kwargs = {"year": 2026}

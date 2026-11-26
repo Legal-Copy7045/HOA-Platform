@@ -92,12 +92,92 @@ def test_lot_page_and_collections_show_the_same_buckets(client, w):
     assert "1\u201330 days" in report and "Over 90 days" in report
 
 
-def test_lot_page_uses_plain_notice_buttons_not_a_menu(client, w):
+def _owing(w):
+    services.post_charge(
+        lot=w["lot"],
+        kind="other_charge",
+        amount_cents=9000,
+        description="Gate share",
+        posted_on=TODAY - datetime.timedelta(days=45),
+        actor=w["board"],
+    )
+
+
+def _cases(lot):
+    from ledger.models import CollectionCase
+
+    with system_access("test"):
+        return list(CollectionCase.objects.filter(lot=lot))
+
+
+def test_lot_page_has_no_letter_buttons_only_open_collection_case(client, w):
+    """Delinquency letters come only from the collection case (streamlining)."""
+    _owing(w)
     client.force_login(w["board"])
     page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
-    assert "menu-details" not in page
+    assert "menu-details" not in page and "notice-buttons" not in page
     for kind in ("first", "second", "final"):
-        assert reverse("lot_notice_pdf", args=[w["lot"].pk, kind]) in page
+        assert reverse("lot_notice_pdf", args=[w["lot"].pk, kind]) not in page
+    assert page.count("Open collection case") == 1
+    assert reverse("lot_ledger_action", args=[w["lot"].pk, "collection"]) in page
+
+
+def test_open_collection_case_creates_it_once_then_goes_to_it(client, w):
+    _owing(w)
+    client.force_login(w["manager"])
+    url = reverse("lot_ledger_action", args=[w["lot"].pk, "collection"])
+    first = client.post(url)
+    [case] = _cases(w["lot"])
+    assert first.status_code == 302 and first.url == reverse("collection_detail", args=[case.pk])
+    second = client.post(url)
+    assert second.url == reverse("collection_detail", args=[case.pk])
+    assert len(_cases(w["lot"])) == 1
+    assert AuditEvent.objects.filter(action="collection.opened").count() == 1
+    # With a case open, the lot page links straight to it.
+    page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
+    assert reverse("collection_detail", args=[case.pk]) in page
+    assert url not in page
+
+
+def test_only_collections_staff_open_a_case(client, w):
+    _owing(w)
+    url = reverse("lot_ledger_action", args=[w["lot"].pk, "collection"])
+    client.force_login(w["auditor"])
+    page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
+    assert "Open collection case" not in page
+    assert client.post(url).status_code == 403
+    client.force_login(w["owner"])
+    assert client.post(url).status_code in (403, 404)
+    assert _cases(w["lot"]) == []
+
+
+def test_old_lot_notice_address_redirects_to_the_case(client, w):
+    _owing(w)
+    client.force_login(w["board"])
+    old = reverse("lot_notice_pdf", args=[w["lot"].pk, "first"])
+    # No case yet: back to the lot's account with a pointer; nothing generated.
+    response = client.get(old)
+    assert response.status_code == 302
+    assert response.url == reverse("lot_ledger", args=[w["lot"].pk])
+    case = services.open_case(lot=w["lot"], actor=w["board"])
+    response = client.get(old)
+    assert response.status_code == 302
+    assert response.url == reverse("collection_detail", args=[case.pk])
+    assert not AuditEvent.objects.filter(action="ledger.notice_generated").exists()
+
+
+def test_case_page_reprints_from_the_case(client, w):
+    _owing(w)
+    case = services.open_case(lot=w["lot"], actor=w["board"])
+    client.force_login(w["board"])
+    page = client.get(reverse("collection_detail", args=[case.pk])).content.decode()
+    for kind in ("statement", "first", "second", "final"):
+        assert reverse("collection_notice_pdf", args=[case.pk, kind]) in page
+    assert "/notice-" not in page
+    response = client.get(reverse("collection_notice_pdf", args=[case.pk, "final"]))
+    assert response.status_code == 200 and response["Content-Type"] == "application/pdf"
+    event = AuditEvent.objects.get(action="ledger.notice_generated")
+    assert event.metadata == {"kind": "final", "lot_id": w["lot"].pk}
 
 
 # --- My account --------------------------------------------------------------------------------

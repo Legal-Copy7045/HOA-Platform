@@ -31,6 +31,11 @@ urlpatterns = [
     path("finance/accounting/1099-<int:year>.csv", views.accounting_1099, name="accounting_1099"),
     path("finance/accounting/reconcile/", views.reconcile, name="reconcile"),
     path("finance/collections/<int:pk>/letter/", views.collection_letter, name="collection_letter"),
+    re_path(
+        r"^finance/collections/(?P<pk>[0-9]+)/reprint-(?P<kind>statement|first|second|final)\.pdf$",
+        views.collection_notice_pdf,
+        name="collection_notice_pdf",
+    ),
     path("finance/collections/", views.collections, name="collections"),
     path("finance/collections/<int:pk>/", views.collection_detail, name="collection_detail"),
     re_path(

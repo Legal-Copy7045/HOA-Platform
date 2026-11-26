@@ -5,18 +5,13 @@
   {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'ledger_home' %}">Owner accounts</a> / Lot {{ lot.number }}</div>
   <div class="page-head">
-    <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<a href="{% url 'collection_detail' open_case.pk %}">{% icon "alert" %}Open collection case</a>{% endif %}</div></div>
+    <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<span>{% icon "alert" %}Collection case #{{ open_case.pk }} open</span>{% endif %}</div></div>
     <div class="actions">
       <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">{% icon "download" %} Statement</a>
       {% if can_manage %}<a class="btn secondary" href="{% url 'record_payments' %}">{% icon "receipt" %} Record payments</a>{% endif %}
+      {% if user|can:"collections.manage" %}{% if open_case %}<a class="btn secondary" href="{% url 'collection_detail' open_case.pk %}" data-testid="open-collection-case">{% icon "alert" %} Open collection case</a>{% elif balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" class="inline-form" data-confirm="Open a collection case for this lot? Delinquency letters are sent from the case, step by step.">{% csrf_token %}<button type="submit" class="secondary" data-testid="open-collection-case">{% icon "alert" %} Open collection case</button></form>{% endif %}{% endif %}
     </div>
   </div>
-  {% if user|can:"collections.manage" %}<div class="actions-row notice-buttons" role="group" aria-label="Delinquency notices">
-    <span class="small muted">Delinquency notice with statement (PDF):</span>
-    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'first' %}">{% icon "mail" %} First notice</a>
-    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'second' %}">{% icon "mail" %} Second notice</a>
-    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'final' %}">{% icon "mail" %} Final notice</a>
-  </div>{% endif %}
   <div class="grid grid-3">
     <div class="stat {% if balance > 0 %}tone-warning{% elif balance < 0 %}tone-success{% endif %}"><div class="label">Balance</div><div class="value">{{ balance|cents }}</div>{% if aging.credit %}<div class="hint">unapplied credit {{ aging.credit|cents }}</div>{% endif %}</div>
     {% for label, amount in aging_columns %}<div class="stat{% if amount and forloop.counter > 3 %} tone-danger{% endif %}"><div class="label">{{ label }}</div><div class="value">{{ amount|cents }}</div></div>{% endfor %}
@@ -33,6 +28,5 @@
     <details class="panel"><summary>Record a payment</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'payment' %}" class="form-grid">{% csrf_token %}{{ payment_form }}<div class="form-actions"><button type="submit">Record payment</button></div></form></div></details>
     <details class="panel"><summary>Post a charge</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'charge' %}" class="form-grid">{% csrf_token %}{{ charge_form }}<div class="form-actions"><button type="submit">Post charge</button></div></form></div></details>
     <details class="panel"><summary>Post a credit</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'credit' %}" class="form-grid">{% csrf_token %}{{ credit_form }}<div class="form-actions"><button type="submit">Post credit</button></div></form></div></details>
-    {% if not open_case and balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" data-confirm="Open a collection case for this lot?">{% csrf_token %}<button type="submit" class="secondary">Open a collection case</button></form>{% endif %}
   {% endif %}
 {% endblock %}

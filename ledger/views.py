@@ -327,6 +327,14 @@ def lot_ledger_action(request, pk, action):
             "Reversal posted.",
         )
     elif action == "collection":
+        # "Open collection case": go to the lot's open case, creating it if
+        # there is none yet.
+        policy.require(actor, "collections.manage")
+        existing = (
+            CollectionCase.objects.for_user(actor).filter(lot=lot).exclude(state="closed").first()
+        )
+        if existing is not None:
+            return redirect("collection_detail", pk=existing.pk)
         case = _flash(
             request,
             lambda: services.open_case(lot=lot, actor=actor, request=request),
@@ -852,12 +860,34 @@ def _adopted_reserves(request):
 
 @login_required
 def lot_notice_pdf(request, pk, kind):
+    """Old address of the lot-page notice buttons. Delinquency letters now
+    come only from the collection case (streamlining 2026-11-26): send people
+    to the lot's case, or back to the lot's account to open one."""
     _finance(request)
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
     if kind not in ("statement", "first", "second", "final"):
         raise Http404
-    data = services.generate_notice(lot, kind, actor=request.user, request=request)
-    return pdf_response(data, f"{kind}-lot-{lot.number}.pdf")
+    cases = CollectionCase.objects.for_user(request.user).filter(lot=lot)
+    case = cases.exclude(state="closed").first() or cases.order_by("-pk").first()
+    if case is not None:
+        return redirect("collection_detail", pk=case.pk)
+    messages.info(
+        request,
+        "Delinquency letters are sent from the collection case. "
+        "Use \"Open collection case\" on this page first.",
+    )
+    return redirect("lot_ledger", pk=lot.pk)
+
+
+@login_required
+def collection_notice_pdf(request, pk, kind):
+    """Reprint a notice (or the statement) from the collection case."""
+    _finance(request)
+    case = get_object_or_404(CollectionCase.objects.for_user(request.user), pk=pk)
+    if kind not in ("statement", "first", "second", "final"):
+        raise Http404
+    data = services.generate_notice(case.lot, kind, actor=request.user, request=request)
+    return pdf_response(data, f"{kind}-lot-{case.lot.number}.pdf")
 
 
 # --- Money tools (Milestone 4 part 3) ------------------------------------------------------

@@ -25,11 +25,11 @@
     <aside>{% follow_up_form "collection" obj %}<section class="card"><h3>Letters</h3>
       {% if next_letter and user|can:"collections.manage" %}<form method="post" action="{% url 'collection_letter' obj.pk %}">{% csrf_token %}<p class="small">Next: <strong>{{ next_letter.label }}</strong>{% if next_letter.due_on %}, due {{ next_letter.due_on|date:"M j, Y" }}{% endif %}.</p><button type="submit">{% icon "download" %} Generate {{ next_letter.label|lower }}</button></form><p class="small muted">Downloads the letter with the statement to print and mail, logs it, and moves the case on.</p>{% endif %}
       {% if letters %}<ul class="list">{% for l in letters %}<li><span class="grow">{{ l.get_kind_display }}</span><span class="small muted">{{ l.generated_on|date:"M j, Y" }} · {{ l.amount_cents|cents }}</span></li>{% endfor %}</ul>{% endif %}
-      <h3>Reprint</h3><ul class="list">
-      <li><a class="grow" href="{% url 'lot_notice_pdf' obj.lot_id 'statement' %}">{% icon "download" %} Statement of account</a></li>
-      <li><a class="grow" href="{% url 'lot_notice_pdf' obj.lot_id 'first' %}">{% icon "download" %} First notice + statement</a></li>
-      <li><a class="grow" href="{% url 'lot_notice_pdf' obj.lot_id 'second' %}">{% icon "download" %} Second notice + statement (certified)</a></li>
-      <li><a class="grow" href="{% url 'lot_notice_pdf' obj.lot_id 'final' %}">{% icon "download" %} Final notice + statement (certified)</a></li></ul>
+      {% if user|can:"collections.manage" %}<h3>Reprint</h3><ul class="list">
+      <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'statement' %}">{% icon "download" %} Statement of account</a></li>
+      <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'first' %}">{% icon "download" %} First notice + statement</a></li>
+      <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'second' %}">{% icon "download" %} Second notice + statement (certified)</a></li>
+      <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'final' %}">{% icon "download" %} Final notice + statement (certified)</a></li></ul>{% endif %}
       <p class="small muted">Printed and mailed by the board. Wording: Finance, Letters.</p></section></aside>
   </div>
 {% endblock %}

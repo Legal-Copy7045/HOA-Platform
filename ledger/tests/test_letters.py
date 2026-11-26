@@ -96,15 +96,27 @@ def test_only_the_board_edits_wording_and_settings(w):
 
 
 def test_notice_download_is_audited_and_scoped(client, w):
+    case = services.open_case(lot=w["lot"], actor=w["board"])
     client.force_login(w["manager"])
-    response = client.get(reverse("lot_notice_pdf", args=[w["lot"].pk, "second"]))
+    response = client.get(reverse("collection_notice_pdf", args=[case.pk, "second"]))
     assert response.status_code == 200 and response["Content-Type"] == "application/pdf"
     assert AuditEvent.objects.filter(action="ledger.notice_generated").exists()
     client.force_login(w["owner"])
-    assert client.get(reverse("lot_notice_pdf", args=[w["lot"].pk, "first"])).status_code in (
-        403,
-        404,
-    )
+    for url in (
+        reverse("collection_notice_pdf", args=[case.pk, "first"]),
+        reverse("lot_notice_pdf", args=[w["lot"].pk, "first"]),
+    ):
+        assert client.get(url).status_code in (403, 404)
+
+
+def test_auditor_sees_the_case_but_cannot_print_notices(client, w):
+    case = services.open_case(lot=w["lot"], actor=w["board"])
+    client.force_login(make_member(roles=[Role.AUDITOR]))
+    page = client.get(reverse("collection_detail", args=[case.pk])).content.decode()
+    assert reverse("collection_notice_pdf", args=[case.pk, "first"]) not in page
+    response = client.get(reverse("collection_notice_pdf", args=[case.pk, "first"]))
+    assert response.status_code == 403
+    assert not AuditEvent.objects.filter(action="ledger.notice_generated").exists()
 
 
 def test_letters_page_saves_settings_and_wording(client, w):
