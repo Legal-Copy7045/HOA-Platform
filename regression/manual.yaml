@@ -165,3 +165,11 @@
   check: "Finance > Reserve plan reads on a phone: the four figures stack, the year-by-year table scrolls sideways inside its card (not the page), below-zero years are tinted and say 'Below zero', and the Add a component and Plan settings panels open and save."
   steps: "Sign in as a demo board member on a phone; Finance > Reserve plan; scroll the table; open Plan settings, type 3.5 for inflation and save; add a component; then open Community info > Reserve plan summary as a demo owner."
   last: ""
+- key: bank feed teller connect
+  check: "With Teller set up (sandbox first, then development), Connect a bank asks for the password or passkey, opens Teller's window without CSP errors in the browser console, and after choosing a bank shows the account with its last four digits and recent lines; Sync now adds nothing twice; Disconnect asks first and keeps the lines; no other page's Content-Security-Policy mentions teller.io."
+  steps: "Follow docs/runbook.md 'Bank feed (Teller, free tier)' with TELLER_ENVIRONMENT=sandbox; open the browser console on Connect a bank; connect a sandbox bank; press Sync now twice; check another page's response headers; Disconnect. If the console reports a blocked Teller host, add it to teller.CONNECT_CSP."
+  last: ""
+- key: bank feed statement file
+  check: "A real OFX or QFX download and a CSV download from the HOA's bank import into Bank feed (CSV after Match the columns), amounts and dates look right, importing the same file again adds nothing, a matching deposit is offered and once confirmed is ticked on Reconcile a statement with the ending balance filled in; the pages work at phone width."
+  steps: "Download last month's activity as OFX/QFX and as CSV from the bank's website; Finance > Accounting > Bank feed; add an account for statement files; import each; confirm a suggested match; open Reconcile a statement for the month end; repeat on a phone."
+  last: ""

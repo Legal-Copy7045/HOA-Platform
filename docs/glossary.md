@@ -43,6 +43,9 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | RSVP | Your answer to a calendar event: Going, Maybe or Not going, with guests if the event allows. Other owners see counts only. | `comms.EventRsvp`, `comms/rsvp.py` |
 | Volunteers | Jobs to sign up for at an event ("Bring a dessert"), each with a number of places. | `VolunteerSlot`, `VolunteerSignup` |
 | Events I'm going to | Dashboard list of coming events you said Going to or volunteer at. | `comms.rsvp.my_upcoming` |
+| Bank feed | Lines from the association's bank (through Teller, or imported statement files), matched to deposits and vendor payments for the monthly reconciliation. Board, manager and auditor only. | `ledger/bankfeeds`, `BankTransaction` |
+| Connect a bank | Linking the association's bank account through Teller (board only, after a fresh password or passkey check). | `bank_connect`, Teller Connect |
+| Match the columns | The step after uploading a CSV statement: which column is the date, description and amount. | `bank_import` (CSV mapping) |
 
 Dates: "Nov 3" for a date in the current month, "Nov 3, 2027" for any other
 (`{{ d|short_date }}`, `core.dates.short_date`).

@@ -314,6 +314,7 @@ MEMBER_READS = {
                 "budget.view_owner",
                 "reserves.view",
                 "reserves.view_summary",
+                "bank_feed.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

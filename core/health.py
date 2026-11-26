@@ -153,6 +153,21 @@ def _backups():
     return True, f"Last backup {local} h ago; off-site {remote} h ago, {locked}"
 
 
+def _bank_feed():
+    """Only shown once a Teller account is connected (bank_feeds feature)."""
+    from ledger.bankfeeds.services import connections, feature_on, needs_attention
+    from ledger.models import BankConnectionStatus, BankProvider
+
+    teller = list(connections().filter(provider=BankProvider.TELLER))
+    if not teller or not feature_on():
+        return None
+    if any(c.status == BankConnectionStatus.NEEDS_REAUTH for c in teller):
+        return False, "A bank account needs reconnecting"
+    if any(needs_attention(c) for c in teller):
+        return False, "Not synced for more than 3 days"
+    return True, "Synced in the last 3 days"
+
+
 CHECKS = [
     ("database", "Database", _database),
     ("worker", "Background worker", _worker),
@@ -162,6 +177,7 @@ CHECKS = [
     ("errors", "Server errors", _errors),
     ("email", "Outgoing email", _email),
     ("backups", "Backups", _backups),
+    ("bank_feed", "Bank feed", _bank_feed),
 ]
 
 
@@ -190,7 +206,10 @@ def run_checks() -> list[Result]:
     out = []
     for key, label, fn in CHECKS:
         try:
-            ok, detail = fn()
+            result = fn()
+            if result is None:  # not applicable here (e.g. nothing connected)
+                continue
+            ok, detail = result
         except Exception as exc:  # a broken check is itself a failure
             ok, detail = False, f"Check failed ({type(exc).__name__})"
         out.append(Result(key, label, ok, detail))

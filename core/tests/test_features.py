@@ -21,7 +21,7 @@ def w():
     }
 
 
-OFF_BY_DEFAULT = {"reservations", "push", "sms"}
+OFF_BY_DEFAULT = {"reservations", "push", "sms", "bank_feeds"}
 
 
 def test_defaults_reservations_alerts_off_everything_else_on():

@@ -4,7 +4,7 @@
 {% block content %}
   {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Accounting</h1><p class="subtitle">Journal export for the accounting package, bank deposits, monthly bank reconciliation, and the 1099 worksheet. Book cash balance today: <strong>{{ book_balance|cents }}</strong>.</p></div>
-    {% if can_manage %}<div class="actions"><a class="btn" href="{% url 'reconcile' %}?date={{ last_month_start|date:'Y-m' }}-{{ month_start|date:'d'|default:'01' }}">{% icon "check-circle" %} Reconcile a statement</a></div>{% endif %}</div>
+    {% if can_manage %}<div class="actions">{% if bank_feed_on %}<a class="btn secondary" href="{% url 'bank_feed' %}">{% icon "inbox" %} Bank feed</a>{% endif %}<a class="btn" href="{% url 'reconcile' %}?date={{ last_month_start|date:'Y-m' }}-{{ month_start|date:'d'|default:'01' }}">{% icon "check-circle" %} Reconcile a statement</a></div>{% endif %}</div>
   <div class="split">
     <div>
       <section class="card"><h2>Journal export</h2>

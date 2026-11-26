@@ -12,7 +12,7 @@ from audit.services import record_event
 from community.account_views import my_account_people
 from community.models import Lot
 from community.rules import rule, rule_with_citation
-from core import policy
+from core import features, policy
 from core.money import MoneyField
 from core.workflow import WorkflowError
 from documents import attachments
@@ -893,6 +893,8 @@ def accounting(request):
         "ledger/accounting.html",
         {
             "can_manage": can_manage,
+            "bank_feed_on": features.enabled("bank_feeds", request)
+            and policy.can(request.user, "bank_feed.view"),
             "undeposited": acc.undeposited_payments() if can_manage else [],
             "batches": DepositBatch.objects.all()[:20],
             "reconciliations": BankReconciliation.objects.all()[:12],
@@ -978,6 +980,7 @@ def reconcile(request):
                 messages.success(request, "Reconciled: the statement balances.")
             return redirect("accounting")
         return redirect(f"{request.path}?date={statement_date.isoformat()}")
+    feed = _bank_feed_for_statement(request, statement_date)
     return render(
         request,
         "ledger/reconcile.html",
@@ -985,8 +988,31 @@ def reconcile(request):
             "statement_date": statement_date,
             "open": acc.uncleared(statement_date) if statement_date else None,
             "book": acc.book_balance(statement_date) if statement_date else None,
+            **feed,
         },
     )
+
+
+def _bank_feed_for_statement(request, statement_date) -> dict:
+    """Bank feed help on the reconcile page (feature "bank_feeds"): items
+    matched to bank lines are ticked in advance, and the statement balance
+    can be filled in from a connected account."""
+    from ledger.bankfeeds import matching
+    from ledger.bankfeeds import services as bank
+
+    empty = {"ticked": {"deposit": set(), "payment": set(), "returned": set()}}
+    if not statement_date or not bank.feature_on(request):
+        return empty
+    accounts = list(bank.connections())
+    chosen = next((a for a in accounts if str(a.pk) == request.GET.get("feed", "")), None)
+    if chosen is None and len(accounts) == 1:
+        chosen = accounts[0]
+    return {
+        "ticked": matching.matched_for_statement(statement_date),
+        "feed_accounts": accounts,
+        "feed_account": chosen,
+        "feed_balance": bank.feed_balance(chosen, statement_date) if chosen else None,
+    }
 
 
 @login_required

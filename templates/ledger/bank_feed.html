@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Bank feed · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'accounting' %}">Accounting</a> / Bank feed</div>
+  <div class="page-head"><div><h1>Bank feed</h1><p class="subtitle">Lines from the association's bank, matched to the deposits and vendor payments in the books. Confirmed matches are ticked for you when you reconcile a statement. Nothing here posts to owner accounts.</p></div>
+    {% if can_connect %}<div class="actions">{% if teller_ready %}<a class="btn" href="{% url 'bank_connect' %}">{% icon "key" %} Connect a bank</a>{% else %}<span class="small muted">Connecting a bank needs Teller set up on the server (docs/runbook.md, "Bank feed").</span>{% endif %}</div>{% endif %}</div>
+
+  <div class="split">
+    <div>
+      <section class="card"><h2>Bank accounts</h2>
+        {% if accounts %}<ul class="list">{% for a in accounts %}<li><span class="grow"><strong>{{ a.label }}</strong>{% if a.institution_name %} · {{ a.institution_name }}{% endif %}<br><span class="small muted">{% if a.provider == "teller" %}Teller · {% if a.last_synced_at %}last synced {{ a.last_synced_at|short_date }}{% else %}not synced yet{% endif %}{% else %}Statement files{% endif %}</span></span>
+          {% if a.status == "needs_reauth" %}<span class="status tone-warning">Needs reconnecting</span>{% elif a.provider == "teller" and a.last_error_status %}<span class="status tone-danger">Last sync failed ({{ a.last_error_status }})</span>{% endif %}
+          {% if a.provider == "teller" and can_sync %}<form method="post" action="{% url 'bank_sync' a.pk %}">{% csrf_token %}<button type="submit" class="secondary small">Sync now</button></form>{% endif %}
+          {% if can_connect %}<form method="post" action="{% url 'bank_disconnect' a.pk %}" data-confirm="Disconnect {{ a.label }}? The portal stops reading this account and deletes its access. Lines already imported and their matches are kept.">{% csrf_token %}<button type="submit" class="secondary small">Disconnect</button></form>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="muted small">No bank account yet. Connect one through Teller, or add one below and import the statement files your bank's website offers (OFX, QFX or CSV).</p>{% endif %}
+      </section>
+
+      {% if can_import %}<section class="card"><h2>Import a statement file</h2>
+        {% if file_accounts %}<form method="post" action="{% url 'bank_import' %}" enctype="multipart/form-data">{% csrf_token %}
+          <div class="field"><label for="ia">Account <span class="required-mark" aria-hidden="true">*</span><span class="sr-only"> (required)</span></label><select id="ia" name="account" required>{% for a in file_accounts %}<option value="{{ a.pk }}">{{ a.label }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="if">Statement file (OFX, QFX or CSV) <span class="required-mark" aria-hidden="true">*</span><span class="sr-only"> (required)</span></label><input id="if" type="file" name="file" accept=".ofx,.qfx,.csv" required></div>
+          <p class="small muted">Lines already imported are skipped, so an overlapping file is fine. A CSV file asks which column is which next.</p>
+          <div class="form-actions"><button type="submit">Import</button></div></form>
+        {% else %}<p class="small muted">Add an account for statement files first.</p>{% endif %}
+        <details class="panel"{% if not file_accounts %} open{% endif %}><summary>Add an account for statement files</summary><div class="panel-body">
+          <form method="post" action="{% url 'bank_account_add' %}">{% csrf_token %}
+            <div class="field"><label for="an">Name <span class="required-mark" aria-hidden="true">*</span><span class="sr-only"> (required)</span></label><input id="an" name="display_name" maxlength="80" required placeholder="Operating checking"></div>
+            <div class="field"><label for="ai">Bank</label><input id="ai" name="institution_name" maxlength="80"></div>
+            <div class="field"><label for="al">Last four digits of the account number</label><input id="al" name="last_four" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" size="5"><p class="small muted">Only the last four: the portal never keeps full account or routing numbers.</p></div>
+            <div class="form-actions"><button type="submit" class="secondary">Add account</button></div></form></div></details>
+      </section>{% endif %}
+    </div>
+
+    <div>
+      <section class="card"><h2>Suggested matches</h2>
+        {% if suggested %}<ul class="list">{% for row in suggested %}<li><span class="grow"><strong>{{ row.line.posted_on|short_date }}</strong> · {{ row.line.description|default:"(no description)" }}<br><span class="small muted">{{ row.line.connection.label }}</span></span><span>{{ row.line.amount_cents|cents }}</span>
+          {% if can_match %}<div class="actions">{% for c in row.candidates %}<form method="post" action="{% url 'bank_match' %}">{% csrf_token %}<input type="hidden" name="action" value="confirm"><input type="hidden" name="line" value="{{ row.line.pk }}"><input type="hidden" name="kind" value="{{ c.kind }}"><input type="hidden" name="object_id" value="{{ c.object_id }}"><button type="submit" class="secondary small">Match: {{ c.label }}, {{ c.on|short_date }}{% if c.days_apart %} ({{ c.days_apart }} day{{ c.days_apart|pluralize }} apart){% endif %}</button></form>{% endfor %}</div>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="muted small">No suggestions: every bank line is matched, or nothing in the books has the same amount and a nearby date.</p>{% endif %}
+      </section>
+
+      <section class="card"><h2>Not matched</h2>
+        {% if unmatched %}<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>{% for t in unmatched %}<tr><td>{{ t.posted_on|short_date }}</td><td>{{ t.description|default:"(no description)" }}<br><span class="small muted">{{ t.connection.label }}</span></td><td class="num">{{ t.amount_cents|cents }}</td></tr>{% endfor %}</tbody></table></div>
+          <p class="small muted">Bank fees, interest and anything not yet in the books. Record a missing deposit or vendor payment first and its match appears above.</p>
+        {% else %}<p class="muted small">Nothing waiting.</p>{% endif %}
+      </section>
+
+      <section class="card"><h2>Matched</h2>
+        {% if matches %}<ul class="list">{% for m in matches %}<li><span class="grow">{{ m.transaction.posted_on|short_date }} · {{ m.transaction.description|default:"(no description)" }} · {{ m.get_kind_display }} #{{ m.object_id }}</span><span>{{ m.transaction.amount_cents|cents }}</span>
+          {% if can_match %}<form method="post" action="{% url 'bank_match' %}" data-confirm="Undo this match? The bank line goes back to the lists above.">{% csrf_token %}<input type="hidden" name="action" value="undo"><input type="hidden" name="match" value="{{ m.pk }}"><button type="submit" class="secondary small">Undo</button></form>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="muted small">None yet.</p>{% endif %}
+      </section>
+    </div>
+  </div>
+{% endblock %}

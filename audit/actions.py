@@ -375,6 +375,28 @@ _SPECS = [
         "horizon_years",
     ),
     _spec("reserves.exported", "Reserve plan projection exported (CSV)", "rows", "start_year"),
+    # --- Bank feed (bankfeeds): ids and counts only, never descriptions ---
+    _spec("bank_feed.connected", "Bank account connected", "connection_id", "provider"),
+    _spec("bank_feed.disconnected", "Bank account disconnected", "connection_id"),
+    _spec("bank_feed.synced", "Bank feed synced", "connection_id", "new", "seen"),
+    _spec("bank_feed.sync_failed", "Bank feed sync failed", "connection_id", "status"),
+    _spec(
+        "bank_feed.imported",
+        "Bank statement file imported",
+        "connection_id",
+        "source",
+        "new",
+        "seen",
+        "skipped",
+    ),
+    _spec(
+        "bank_feed.match_confirmed",
+        "Bank line matched to the cash book",
+        "connection_id",
+        "kind",
+        "object_id",
+    ),
+    _spec("bank_feed.match_undone", "Bank line match undone", "kind", "object_id"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

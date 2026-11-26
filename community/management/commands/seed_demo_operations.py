@@ -563,3 +563,25 @@ class Command(BaseCommand):
         )
         packets.build_packet(november, variant="board", minutes_id=minutes.pk, actor=b1)
         packets.build_packet(november, variant="owner", actor=b1)
+        # Bank feed (optional feature "bank_feeds", off until the board turns
+        # it on): a statement-file account with fictional lines. The check
+        # line matches invoice PP-101's payment and is offered as a match.
+        from ledger.bankfeeds import services as bank_feed
+        from ledger.bankfeeds.base import TransactionInfo
+
+        bank = bank_feed.add_file_account(
+            display_name="Operating checking (demo)",
+            institution_name="Demo Community Bank",
+            last_four_digits="0000",
+            actor=b1,
+        )
+        bank_feed.store_lines(
+            bank,
+            [
+                TransactionInfo("demo:1", t, -32000, "CHECK 1001 (demo)", "check"),
+                TransactionInfo("demo:2", t, -1200, "MONTHLY SERVICE FEE (demo)", "fee"),
+                TransactionInfo("demo:3", t, 37, "INTEREST PAID (demo)", "int"),
+            ],
+            source="csv",
+            actor=b1,
+        )
