@@ -298,10 +298,10 @@ def test_owner_sees_summary_only(client, w):
     ):
         assert client.get(reverse(name, args=args)).status_code == 403, name
     assert client.post(reverse("reserve_adopt")).status_code == 403
-    page = client.get(reverse("reserve_summary")).content.decode()
+    page = client.get(reverse("owner_budget")).content.decode()
     assert "No reserve plan adopted yet" in page and "Main road paving" not in page
     reserve_plan.adopt(actor=w["board"])
-    page = client.get(reverse("reserve_summary")).content.decode()
+    page = client.get(reverse("owner_budget")).content.decode()
     assert "reserve plan adopted" in page and "Main road paving" in page
     assert "three paving bids" not in page  # no board notes
 
@@ -312,14 +312,30 @@ def test_owner_summary_shows_only_adopted_figures(client, w):
     reserve_plan.adopt(actor=w["board"])
     _settings(w["board"], starting_balance_cents=9900000)  # draft change after adoption
     client.force_login(w["owner"])
-    page = client.get(reverse("reserve_summary")).content.decode()
+    page = client.get(reverse("owner_budget")).content.decode()
     assert "$25,000.00" in page and "$99,000.00" not in page
 
 
-def test_summary_is_in_community_info(client, w):
+def test_summary_is_on_budget_and_reserves(client, w):
+    """Streamlining: the summary is a section of Budget and reserves; the old
+    page redirects there."""
     client.force_login(w["owner"])
-    page = client.get(reverse("community_info")).content.decode()
-    assert reverse("reserve_summary") in page and "Reserve plan summary" in page
+    response = client.get(reverse("reserve_summary"))
+    assert response.status_code == 302 and response["Location"] == reverse("owner_budget")
+    page = client.get(reverse("owner_budget")).content.decode()
+    assert "<h1>Budget and reserves</h1>" in page and 'id="reserves"' in page
+
+
+def test_budget_and_reserves_shows_only_the_parts_switched_on(client, w):
+    client.force_login(w["owner"])
+    features.set_feature("reserves", False, actor=w["board"])
+    page = client.get(reverse("owner_budget")).content.decode()
+    assert 'id="budget"' in page and 'id="reserves"' not in page
+    features.set_feature("owner_budget", False, actor=w["board"])
+    assert client.get(reverse("owner_budget")).status_code == 404  # both off
+    features.set_feature("reserves", True, actor=w["board"])
+    page = client.get(reverse("owner_budget")).content.decode()
+    assert 'id="budget"' not in page and 'id="reserves"' in page
 
 
 # --- Board page forms ---------------------------------------------------------------------------
