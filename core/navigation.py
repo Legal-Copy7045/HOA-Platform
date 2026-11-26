@@ -55,7 +55,7 @@ HUBS = {
             "board_and_committees",
             "users",
             # Every resident (owner decision 2026-11-26): the COMMUNITY audience.
-            "announcement.view",
+            "board_committees.view",
             "Who is on the board, their offices, and the committees.",
         ),
         (

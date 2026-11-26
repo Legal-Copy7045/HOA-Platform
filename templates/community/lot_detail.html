@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}{{ lot }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'lot_list' %}">Lots</a> / {{ lot }}</div>
+  <div class="crumbs"><a href="{% url 'lot_list' %}">Lots and owners</a> / {{ lot }}</div>
   <div class="page-head"><div><h1>{{ lot }}</h1><div class="meta"><span>{% icon "pin" %}{{ lot.street_address }}</span></div></div>
     {% if user|can:"portal.preview_as_owner" %}<div class="actions"><form method="post" action="{% url 'owner_preview_start' %}">{% csrf_token %}<input type="hidden" name="lot" value="{{ lot.pk }}"><button type="submit" class="secondary">{% icon "home" %} Preview as owner</button></form></div>{% endif %}</div>
   <section class="card"><h2>Current owners</h2>

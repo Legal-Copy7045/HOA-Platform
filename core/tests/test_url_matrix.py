@@ -111,7 +111,8 @@ MEMBER_PAGES = {
     "community_info",
     # Portal search (core.search): see also test_search_never_shows_board_only_content.
     "search",
-    # Reserve plan (reserves): the adopted plan's summary.
+    # Reserve plan (reserves): the adopted plan's summary (now a redirect to
+    # Budget and reserves, streamlining).
     "reserve_summary",
 }
 
@@ -129,6 +130,11 @@ COMMUNITY_DETAIL = {
     "election_detail": ("GET", "election"),
     "election_action": ("POST", "election"),
 }
+
+# Board and committees (streamlining, owner decision 2026-11-26): every
+# resident sees board members' names and offices and each committee's name
+# and members by design; topics, tasks, files and contact details never.
+NAMES_AND_OFFICES = {"board_and_committees"}
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
 # pointed at owner B's data, and send anonymous visitors to sign in.
@@ -340,6 +346,7 @@ def test_every_named_url_is_classified():
         | set(VOTING_REDIRECTS)
         | set(PROTECTED)
         | set(COMMUNITY_DETAIL)
+        | NAMES_AND_OFFICES
         and not name.startswith(OWN_ACCOUNT_PREFIXES)
     }
     assert unclassified == set(), f"Classify these URLs in {__name__}: {sorted(unclassified)}"
@@ -937,7 +944,8 @@ def test_member_pages_require_sign_in(client, world, name):
 @pytest.mark.parametrize("name", sorted(MEMBER_PAGES))
 def test_member_pages_hide_board_only_content_from_owners(client, world, name):
     client.force_login(world["owner_a"])
-    response = client.get(reverse(name))
+    # follow: old pages that now redirect to their merged page (streamlining).
+    response = client.get(reverse(name), follow=True)
     assert response.status_code == 200
     for secret in BOARD_ONLY_MARKERS:
         assert secret not in response.content
@@ -974,6 +982,24 @@ def test_export_contains_only_my_own_records(client, world):
     data = json.loads(client.get(reverse("export_my_data")).content)
     assert [o["lot"] for o in data["community"]["ownerships"]] == [world["lot_a"].number]
     assert "Bravo" not in json.dumps(data)
+
+
+@pytest.mark.parametrize("name", sorted(NAMES_AND_OFFICES))
+def test_board_and_committees_shows_names_and_offices_only(client, world, name):
+    response = client.get(reverse(name))
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("account_login"))
+    client.force_login(world["owner_a"])
+    page = client.get(reverse(name)).content
+    # By design: committee names and members' names (owner B chairs nothing
+    # secret here), the board with offices.
+    assert b"Lot B pond committee" in page
+    # Never: committee topics, tasks, notes, other lots' records or contact details.
+    for secret in (*BOARD_ONLY_MARKERS, b"Lot B pond plans", b"Lot B pond task"):
+        if secret != b"Lot B pond":
+            assert secret not in page
+    for detail in (b"2 Bravo Way", b"1 Alpha Way", b"@"):
+        assert detail not in page.split(b"<main", 1)[-1]
 
 
 @pytest.mark.parametrize("name", sorted(COMMUNITY_DETAIL))

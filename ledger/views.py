@@ -781,16 +781,32 @@ def resale_pdf(request, pk):
 
 @login_required
 def owner_budget(request):
-    """The association's budget as owners see it (summary lines only)."""
+    """Budget and reserves: the association's budget as owners see it
+    (summary lines only) and the adopted reserve plan's summary (no board
+    notes). Each part shows while its feature is on (core.features.ANY_OF)."""
+    from core import features
+
     policy.require(request.user, "budget.view_owner")
-    budget = services.owner_visible_budget()
+    show_budget = features.enabled("owner_budget", request)
+    show_reserves = features.enabled("reserves", request) and policy.can(
+        request.user, "reserves.view_summary"
+    )
+    budget = services.owner_visible_budget() if show_budget else None
+    snapshot = None
+    if show_reserves:
+        from ledger import reserve_plan
+
+        snapshot = reserve_plan.latest_snapshot()
     return render(
         request,
         "ledger/owner_budget.html",
         {
+            "show_budget": show_budget,
+            "show_reserves": show_reserves,
             "budget": budget,
             "summary": services.budget_summary(budget) if budget else None,
             "dues": rule_with_citation("dues.monthly_cents"),
+            "snapshot": snapshot,
         },
     )
 

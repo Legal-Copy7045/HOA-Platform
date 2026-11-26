@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -22,21 +23,36 @@ class TaskForm(forms.Form):
         self.fields["assignee"].queryset = Person.objects.for_user(user).filter(user__isnull=False)
 
 
+def _deadlines_on(request) -> bool:
+    """The Recurring deadlines tab: the "compliance" feature and permission."""
+    from core import features
+
+    return features.enabled("compliance", request) and policy.can(request.user, "compliance.manage")
+
+
 @login_required
 def tasks(request):
+    """Board tasks, with the compliance calendar as its Recurring deadlines
+    tab (``?tab=deadlines``, streamlining)."""
     policy.require(request.user, "task.manage")
+    deadlines_on = _deadlines_on(request)
+    if request.GET.get("tab") == "deadlines":
+        if deadlines_on:
+            return _deadlines(request)
+        if request.method == "POST":
+            raise Http404  # never turn a deadline form into a task
     form = TaskForm(request.POST or None, user=request.user)
-    if request.method == "POST":
-        if form.is_valid():
-            services.create_task(actor=request.user, request=request, **form.cleaned_data)
-            messages.success(request, "Task added.")
-        else:
-            messages.error(request, "A task needs a title.")
+    if request.method == "POST" and form.is_valid():
+        services.create_task(actor=request.user, request=request, **form.cleaned_data)
+        messages.success(request, "Task added.")
         return redirect("tasks")
+    # Invalid: shown again below with what was typed and the errors.
     return render(
         request,
         "operations/tasks.html",
         {
+            "tab": "tasks",
+            "deadlines_on": deadlines_on,
             "open": BoardTask.objects.filter(status=TaskStatus.OPEN).select_related("assignee"),
             "closed": BoardTask.objects.exclude(status=TaskStatus.OPEN)[:50],
             "form": form,
@@ -59,8 +75,20 @@ def task_close(request, pk, status):
 # --- Compliance calendar (Milestone 4) ------------------------------------------------
 
 
+def _deadlines_url() -> str:
+    from django.urls import reverse
+
+    return reverse("tasks") + "?tab=deadlines"
+
+
 @login_required
 def compliance(request):
+    """The old Compliance calendar: now Board tasks → Recurring deadlines."""
+    policy.require(request.user, "compliance.manage")
+    return redirect(_deadlines_url())
+
+
+def _deadlines(request):
     import datetime
 
     from django.contrib import messages
@@ -115,14 +143,16 @@ def compliance(request):
                 if isinstance(exc, services.OperationsError)
                 else "Check the date and the reminder days.",
             )
-        return redirect("compliance")
+        return redirect(_deadlines_url())
     today = timezone.localdate()
     from community.services import staff_people
 
     return render(
         request,
-        "operations/compliance.html",
+        "operations/tasks.html",
         {
+            "tab": "deadlines",
+            "deadlines_on": True,
             "items": ComplianceItem.objects.filter(active=True).select_related("responsible"),
             "done": ComplianceItem.objects.filter(active=False).order_by("-last_done_on")[:20],
             "soon": {i.pk for i in services.due_soon(today)},

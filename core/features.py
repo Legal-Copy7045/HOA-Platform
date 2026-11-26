@@ -110,9 +110,9 @@ FEATURES: list[Feature] = [
         "Owners' requests to inspect association records.",
         {"records_requests", "records_request_detail", "records_request_action"},
     ),
-    _f(
-        "owner_budget", "Budget for owners", "The adopted budget shown to owners.", {"owner_budget"}
-    ),
+    # The Budget and reserves page ("owner_budget") is in ANY_OF below: it is
+    # on while this or the reserve plan is on, and shows only the parts on.
+    _f("owner_budget", "Budget for owners", "The adopted budget shown to owners.", set()),
     _f(
         "violations",
         "Violations",
@@ -251,7 +251,11 @@ SHARED_BY_KIND = {
 BY_URL = {name: f.key for f in FEATURES for name in f.url_names}
 # Pages that show several features' records: on while any of them is on
 # (the page itself leaves out the parts that are off).
-ANY_OF = {"voting": frozenset({"votes", "elections", "surveys"})}
+ANY_OF = {
+    "voting": frozenset({"votes", "elections", "surveys"}),
+    # Budget and reserves (streamlining): the budget and the reserve summary.
+    "owner_budget": frozenset({"owner_budget", "reserves"}),
+}
 
 
 def _load() -> dict[str, bool]:

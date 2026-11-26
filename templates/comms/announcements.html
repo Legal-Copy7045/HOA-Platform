@@ -13,8 +13,9 @@
     {% else %}{% include "partials/empty.html" with icon="megaphone" title="No announcements yet" %}{% endif %}
   </section>
   {% if can_publish %}
-    <details class="panel"><summary>Publish an announcement</summary><div class="panel-body">
+    <details class="panel" id="publish"{% if open_form %} open{% endif %}><summary>Publish an announcement</summary><div class="panel-body">
       <p class="muted small">Published announcements can't be edited; publish a correction if needed. Members get an email with the title and a link.</p>
-      <form method="post">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Publish</button></div></form></div></details>
+      <form method="post">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Publish</button></div></form>
+      {% if form.can_text %}<p class="small muted"><a href="{% url 'urgent_notice' %}">Urgent texts sent so far</a></p>{% endif %}</div></details>
   {% endif %}
 {% endblock %}

@@ -67,6 +67,9 @@ def requests_list(request):
     user = request.user
     staff = policy.can(user, "request.manage")
     if not staff and not policy.can(user, "request.view_own"):
+        if policy.can(user, "history.view_own"):
+            # Former owners read their old requests inside My history.
+            return redirect("my_history")
         policy.require(user, "request.view_own")
     qs = OwnerRequest.objects.for_user(user).select_related("lot", "assignee")
     show = request.GET.get("show", "open")
@@ -152,6 +155,8 @@ def requests_list(request):
             "types": RequestType.choices,
             "type": kind,
             "open_form": bool(form and (form.errors or request.GET.get("new"))),
+            # View-only contacts: the account's requests, read-only.
+            "read_only": mine and not policy.can(user, "request.submit"),
         },
     )
 

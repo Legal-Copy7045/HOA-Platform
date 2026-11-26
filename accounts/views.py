@@ -140,39 +140,9 @@ def signin_help(request):
 
 @login_required
 def onboarding(request):
-    from django.contrib import messages
-    from django.shortcuts import redirect
-
-    from documents.attachments import pdf_response
+    """The old Onboarding page: now part of Invitations and sign-ups."""
+    from django.urls import reverse
 
     policy.require(request.user, "invite.send")
-    if request.method == "POST":
-        action = request.POST.get("action")
-        if action == "invite_all":
-            n = services.invite_everyone(actor=request.user, request=request)
-            messages.success(request, f"{n} invitation(s) sent.")
-        elif action == "remind":
-            n = services.remind_pending(actor=request.user, request=request)
-            messages.success(request, f"{n} reminder(s) sent.")
-        return redirect("onboarding")
-    rows = services.onboarding_rows()
-    if request.GET.get("letters") == "1":
-        return pdf_response(
-            services.email_request_letters_pdf([r for r in rows if r["status"] == "no_email"]),
-            "portal-letters.pdf",
-        )
-    counts = dict.fromkeys(services.ONBOARDING_LABELS, 0)
-    for r in rows:
-        counts[r["status"]] += 1
-        r["label"] = services.ONBOARDING_LABELS[r["status"]]
-    return render(
-        request,
-        "accounts/onboarding.html",
-        {
-            "rows": rows,
-            "counts": counts,
-            "labels": services.ONBOARDING_LABELS,
-            "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
-            "remind_count": len(services.reminder_due(rows=rows)),
-        },
-    )
+    query = request.GET.urlencode()
+    return redirect(reverse("invitations") + (f"?{query}" if query else ""))

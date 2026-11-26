@@ -383,7 +383,10 @@ def items_for(user) -> list[Item]:
                     vendor.insurance_expires_on,
                 )
             )
-    if can(user, "compliance.manage"):
+    # Recurring deadlines (Board tasks tab): hidden with the "compliance" feature.
+    from core.features import enabled as feature_on
+
+    if can(user, "compliance.manage") and feature_on("compliance"):
         from operations.services import due_soon
 
         for c in due_soon(today):
@@ -392,10 +395,10 @@ def items_for(user) -> list[Item]:
                     "Compliance",
                     c.title,
                     f"{'Overdue since' if c.due_on < today else 'Due'} {short_date(c.due_on)}",
-                    reverse("compliance"),
+                    reverse("tasks") + "?tab=deadlines",
                     _due_tone(c.due_on, today),
                     c.due_on,
-                    nav="compliance",
+                    nav="tasks",
                 )
             )
     if can(user, "records_request.manage"):

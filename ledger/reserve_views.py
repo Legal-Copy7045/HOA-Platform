@@ -275,10 +275,6 @@ def reserve_export(request):
 
 @login_required
 def reserve_summary(request):
-    """What owners see: the adopted plan only, no board notes."""
+    """The old Reserve plan summary page: now part of Budget and reserves."""
     policy.require(request.user, "reserves.view_summary")
-    return render(
-        request,
-        "ledger/reserve_summary.html",
-        {"snapshot": reserve_plan.latest_snapshot()},
-    )
+    return redirect("owner_budget")

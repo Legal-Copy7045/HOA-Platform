@@ -1,19 +1,45 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Budget · {{ SITE_NAME }}{% endblock %}
+{% block title %}Budget and reserves · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{% if budget %}{{ budget }}{% else %}Budget{% endif %}</h1>
-    <p class="subtitle">{% if budget.status == "adopted" %}Adopted by the board on {{ budget.adopted_on|date:"F j, Y" }}.{% elif budget %}Proposed by the board: owners may comment before it is adopted.{% endif %}</p></div></div>
-  {% if budget %}
-    <div class="grid grid-3">
-      <div class="stat"><div class="label">Income</div><div class="value">{{ summary.income|cents }}</div></div>
-      <div class="stat"><div class="label">Expenses</div><div class="value">{{ summary.expense|cents }}</div></div>
-      <div class="stat"><div class="label">Monthly dues per lot</div><div class="value">{% if dues.0 %}{{ dues.0|cents }}{% else %}-{% endif %}</div>{% if dues.1 %}<div class="hint">{{ dues.1 }}</div>{% endif %}</div>
-    </div>
-    <div class="table-card"><div class="table-wrap"><table>
-      <thead><tr><th>Line</th><th>Kind</th><th class="num">For the year</th></tr></thead>
-      <tbody>{% for l in summary.lines %}<tr><td>{{ l.name }}</td><td>{{ l.get_kind_display }}</td><td class="num">{{ l.annual_cents|cents }}</td></tr>{% endfor %}</tbody>
-    </table></div></div>
-    {% if budget.status != "adopted" and user|can:"request.submit" %}<p><a href="{% url 'requests' %}?mine=1">Comment or ask a question about the budget</a></p>{% endif %}
-  {% else %}<section class="card">{% include "partials/empty.html" with icon="chart" title="No budget published yet" %}</section>{% endif %}
+  <div class="page-head"><div><h1>Budget and reserves</h1>
+    <p class="subtitle">{% if budget %}{{ budget }} · {% if budget.status == "adopted" %}Adopted by the board on {{ budget.adopted_on|date:"F j, Y" }}.{% else %}Proposed by the board: owners may comment before it is adopted.{% endif %}{% else %}What the association plans to spend this year, and what it saves for big replacements.{% endif %}</p></div></div>
+  {% if show_budget %}
+  <section id="budget" aria-labelledby="budget-h">
+    <h2 id="budget-h">Budget</h2>
+    {% if budget %}
+      <div class="grid grid-3">
+        <div class="stat"><div class="label">Income</div><div class="value">{{ summary.income|cents }}</div></div>
+        <div class="stat"><div class="label">Expenses</div><div class="value">{{ summary.expense|cents }}</div></div>
+        <div class="stat"><div class="label">Monthly dues per lot</div><div class="value">{% if dues.0 %}{{ dues.0|cents }}{% else %}-{% endif %}</div>{% if dues.1 %}<div class="hint">{{ dues.1 }}</div>{% endif %}</div>
+      </div>
+      <div class="table-card"><div class="table-wrap"><table>
+        <thead><tr><th>Line</th><th>Kind</th><th class="num">For the year</th></tr></thead>
+        <tbody>{% for l in summary.lines %}<tr><td>{{ l.name }}</td><td>{{ l.get_kind_display }}</td><td class="num">{{ l.annual_cents|cents }}</td></tr>{% endfor %}</tbody>
+      </table></div></div>
+      {% if budget.status != "adopted" and user|can:"request.submit" %}<p><a href="{% url 'requests' %}?mine=1">Comment or ask a question about the budget</a></p>{% endif %}
+    {% else %}<section class="card">{% include "partials/empty.html" with icon="chart" title="No budget published yet" %}</section>{% endif %}
+  </section>
+  {% endif %}
+  {% if show_reserves %}
+  <section id="reserves" aria-labelledby="reserves-h">
+    <h2 id="reserves-h">Reserves</h2>
+    <p class="muted">The association saves in a reserve fund for big replacements such as roads, ponds and signs, so they can be paid for when they come due.</p>
+    {% if snapshot %}
+      <p>From the <strong>reserve plan adopted {{ snapshot.adopted_on|date:"F j, Y" }}</strong> by the board.</p>
+      <div class="grid grid-3">
+        <div class="stat"><div class="label">Percent funded</div><div class="value">{% if snapshot.percent_funded is None %}-{% else %}{{ snapshot.percent_funded }}%{% endif %}</div><div class="hint">The reserve balance compared with the share of future replacements already worn out</div></div>
+        <div class="stat"><div class="label">Reserve balance</div><div class="value">{{ snapshot.starting_balance_cents|cents }}</div>{% if snapshot.balance_as_of %}<div class="hint">As of {{ snapshot.balance_as_of|date:"F j, Y" }}</div>{% endif %}</div>
+        <div class="stat"><div class="label">Saved per year</div><div class="value">{{ snapshot.annual_contribution_cents|cents }}</div><div class="hint">The plan's yearly contribution to reserves</div></div>
+      </div>
+      <section class="card">
+        <h3>Next major items</h3>
+        {% if snapshot.next_items %}<ul class="list">{% for item in snapshot.next_items %}<li><span class="muted nowrap">{{ item.year }}</span><span class="grow">{{ item.name }}</span><span class="num">{{ item.cents|cents }}</span></li>{% endfor %}</ul>
+        <p class="muted small">Estimated costs, raised for inflation to the year each is expected.</p>
+        {% else %}<p class="muted">Nothing is due within the plan's {{ snapshot.horizon_years }} years.</p>{% endif %}
+      </section>
+      {% if user|can:"request.submit" %}<p><a href="{% url 'requests' %}?mine=1">Ask the board a question about the reserves</a></p>{% endif %}
+    {% else %}<section class="card">{% include "partials/empty.html" with icon="chart" title="No reserve plan adopted yet" text="The board will publish a summary here once it adopts one." %}</section>{% endif %}
+  </section>
+  {% endif %}
 {% endblock %}

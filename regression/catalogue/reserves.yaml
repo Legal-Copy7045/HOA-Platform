@@ -8,9 +8,9 @@
 - feature: "Record as adopted: append-only reserve plan snapshot (model, database trigger, runtime role), audited"
   since: M5
   match: ["^unit:ledger/tests/test_reserve_plan.py::test_(adopt|snapshot_is_append_only|runtime_role|board_adopts)"]
-- feature: "Reserve plan permissions: board changes and adopts; manager and auditor view; owners see only the adopted summary in Community info, without board notes; feature switch"
+- feature: "Reserve plan permissions: board changes and adopts; manager and auditor view; owners see only the adopted summary on Budget and reserves, without board notes; feature switch"
   since: M5
-  match: ["^unit:ledger/tests/test_reserve_plan.py::test_(only_the_board|owner_cannot|board_manager_and_auditor|manager_posts|owner_sees|owner_summary|summary_is_in|feature_switch|reserve_plan_is_in)", "^unit:core/tests/test_url_matrix.py::test_"]
+  match: ["^unit:ledger/tests/test_reserve_plan.py::test_(only_the_board|owner_cannot|board_manager_and_auditor|manager_posts|owner_sees|owner_summary|summary_is_on|feature_switch|reserve_plan_is_in)", "^unit:core/tests/test_url_matrix.py::test_"]
 - feature: "Reserve plan CSV export (audited, formula-safe); adopted plan's suggested contribution on the budget page and its balance offered on Letters and certificates"
   since: M5
   match: ["^unit:ledger/tests/test_reserve_plan.py::test_(csv_export|budget_page|letters_page)"]

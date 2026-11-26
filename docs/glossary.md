@@ -31,7 +31,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Checked for completeness | The board checks a submitted request has everything it needs, then the review clock starts. | `submitted` state |
 | Request #12, Notice #7, Work order #3 | Record numbers. No letter prefixes (ARC-12, V-7, WO-3, R-2). | primary key |
 | Version 2 | A document's second upload. | `DocumentVersion.number` |
-| My requests | Questions and requests to the board. The board's list is **Owner requests**. | `operations.OwnerRequest` |
+| My requests | Questions and requests to the board. The board's list is **Owner requests**. View-only contacts see the requests on the account they follow, read-only; former owners find theirs in **My history**. | `operations.OwnerRequest` |
 | Records requests | An owner's request to inspect association records (Pennsylvania law). The owner's own list is **My records requests**. | `governance.RecordsRequest` |
 | Voting | One list of **Votes**, **Elections** and **Surveys**, filtered by open or past and by type. Board members start new ones here (New vote, New election, New survey). Owners also find **Give a proxy** for coming owners' meetings. The old addresses of the three lists lead here. | `voting` |
 | Votes | Formal votes of the owners: binding, one ballot per lot, with the quorum and pass rules (and citations) fixed when the vote opens. Informal polls made before November 26, 2026 stay readable under Past; a new poll is a survey with one question. | `Vote` |
@@ -46,11 +46,16 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Community info | One page for **Frequently asked questions**, **Board and committees**, the **Owner directory** and (for committee members) **Committees**. With only one of these open to you, the menu goes straight to it. | `community_info` |
 | Reserve plan | The board's in-house reserve study: the things the association will one day replace (component, cost today, useful life, years left), a year-by-year projection of the reserve fund, percent funded and the contribution needed. Finance menu. | `reserve_plan`, `ledger/reserves.py` |
 | Record as adopted | The board fixes the current reserve plan's figures as adopted on a date ("reserve plan adopted Nov 26, 2026"); kept unchanged. | `ReserveStudySnapshot` |
-| Reserve plan summary | What owners see of the adopted reserve plan: percent funded, the adopted date and the next major items (no board notes). | `reserve_summary` |
+| Budget and reserves | What owners see of the money plan: the budget (income, expenses, dues per lot) and the adopted reserve plan's summary (percent funded, adopted date, next major items; no board notes). The year is in the subtitle. The old Reserve plan summary page redirects here. | `owner_budget` (`reserve_summary` redirects) |
 | Percent funded | The reserve balance compared with the fully funded balance (each component's cost times the share of its life already used). | `percent_funded` |
 | Settings | One page for rarely used set-up pages: Community settings, ARC request types, Lot neighbors, Letters and certificates, Common area booking rules, Branding, Features, Contact retention. With only one open to you, the menu goes straight to it. | `settings_hub` |
 | Contact retention | Former owners' contact details cleared after the retention period. | `retention` |
 | Access review | The board's quarterly check of every login's access, on the People page. | `access_review` |
+| Lots and owners | Every lot with its current owners; the "Accounts, contacts and balances" view adds each account's other people, contact details and balance, with the CSV export (was Roster). | `lot_list` (`roster` redirects) |
+| Invitations and sign-ups | Who has signed up, lot by lot, with "Invite everyone not yet invited" and reminders (board), and every invitation with re-send and revoke (board or sysadmin). Was Onboarding and Invitations. | `invitations` (`onboarding` redirects) |
+| Board and committees | Who serves: board members with their offices, and each committee with its members. Names and offices only, for every resident. | `board_and_committees` |
+| Common area booking rules | Each common area (name, kind, in use) and its booking rules, edited together, with where the rules come from. | `reservation_settings` |
+| Recurring deadlines | The Board tasks tab for filings and renewals the association must not miss (insurance, taxes, annual report), each with a reminder window (was Compliance calendar). | `tasks?tab=deadlines`, `ComplianceItem` (`compliance` redirects) |
 | Passkeys and security | Your sign-in methods (passkey, authenticator app, recovery codes). | allauth MFA |
 | Download my data | A file with everything the portal holds about you, for your records. | JSON export |
 | RSVP | Your answer to a calendar event: Going, Maybe or Not going, with guests if the event allows. Other owners see counts only. | `comms.EventRsvp`, `comms/rsvp.py` |

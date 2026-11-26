@@ -39,6 +39,7 @@
   <section class="card"><h2>Common areas</h2>
     {% if areas %}<ul class="list">{% for a in areas %}<li><div class="todo-icon">{% icon "map" %}</div><div class="grow"><div class="title">{{ a.name }}</div><div class="small muted">{{ a.get_kind_display }}{% if not a.active %} · inactive{% endif %}</div></div></li>{% endfor %}</ul>
     {% else %}<p class="muted">None recorded.</p>{% endif %}
+    {% if booking_rules_on %}<p><a href="{% url 'reservation_settings' %}">{% icon "map" %} Edit the areas and their booking rules</a></p>{% endif %}
     {% if can_edit %}<details class="panel"><summary>Add a common area</summary><div class="panel-body"><form method="post" action="{% url 'common_area_save' %}" class="form-grid">{% csrf_token %}{{ area_form }}<div class="form-actions"><button type="submit">Add</button></div></form></div></details>{% endif %}
   </section>
 {% endblock %}

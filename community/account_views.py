@@ -275,11 +275,22 @@ def my_history(request):
                 "statement": period_statement(lot_id, start, end),
             }
         )
+    from django.db.models import Q
+
+    from operations.models import OwnerRequest
+
+    # Requests from their time only (not a home they own or follow now).
+    era = Q(pk__in=[])
+    for lot_id, start, end in roles.former_periods:
+        era |= Q(lot_id=lot_id, created_at__date__gte=start, created_at__date__lt=end)
     return render(
         request,
         "community/my_history.html",
         {
             "periods": periods,
+            "requests": OwnerRequest.objects.for_user(request.user)
+            .filter(era)
+            .select_related("lot"),
             "arc": ArcRequest.objects.for_user(request.user).select_related("lot"),
             "violations": Violation.objects.for_user(request.user).select_related("lot"),
             "resales": ResaleRequest.objects.for_user(request.user).select_related("lot"),

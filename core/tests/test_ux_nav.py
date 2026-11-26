@@ -182,17 +182,10 @@ def _h1(client, url) -> str | None:
 
 # Pages other streamlining builders rename in parallel (2026-11-26); their
 # <h1> is aligned when the branches merge. Empty this once merged.
-H1_PENDING = {
-    "My records requests",  # records requests, owner side (governance builder)
-    "Budget and reserves",  # owner_budget (community builder)
-    "Lots and owners",  # lot_list (community builder)
-    "Invitations and sign-ups",  # invitations (community builder)
-    "Owner directory",  # directory (community builder)
-    "Common area booking rules",  # reservation_settings (community builder)
-}
+H1_PENDING: set[str] = set()
 # A tenant's Voting goes straight to Surveys (its one page), which the
 # governance builder turns into a redirect to the Voting list.
-H1_PENDING_PAIRS = {("Voting", "Surveys")}
+H1_PENDING_PAIRS: set[tuple[str, str | None]] = set()
 
 
 def test_nav_labels_match_page_headings(client, w):

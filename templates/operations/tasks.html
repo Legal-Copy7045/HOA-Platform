@@ -1,14 +1,22 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Board tasks · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if tab == "deadlines" %}Recurring deadlines · {% endif %}Board tasks · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Board tasks</h1><p class="subtitle">Follow-ups for the board and manager. Owners don't see these.</p></div></div>
+  <div class="page-head"><div><h1>Board tasks</h1><p class="subtitle">Follow-ups for the board and manager{% if deadlines_on %}, and the filings and renewals the association must not miss{% endif %}. Owners don't see these.</p></div></div>
+  {% if deadlines_on %}<nav class="subnav" aria-label="Board tasks">
+    <a href="{% url 'tasks' %}"{% if tab == "tasks" %} aria-current="page"{% endif %}>Tasks</a>
+    <a href="{% url 'tasks' %}?tab=deadlines"{% if tab == "deadlines" %} aria-current="page"{% endif %}>Recurring deadlines</a>
+  </nav>{% endif %}
+  {% if tab == "deadlines" %}
+    {% include "operations/_deadlines.html" %}
+  {% else %}
   <section class="card">
-    {% if open %}<ul class="list">{% for t in open %}<li><div class="todo-icon">{% icon "list" %}</div><div class="grow"><div class="title">{{ t.title }}</div><div class="small muted">{% if t.assignee %}{{ t.assignee.display_name }}{% else %}Unassigned{% endif %}{% if t.due_date %} · due {{ t.due_date|date:"M j" }}{% endif %}{% if t.description %} · {{ t.description }}{% endif %}</div></div>
+    {% if open %}<ul class="list">{% for t in open %}<li><div class="todo-icon">{% icon "list" %}</div><div class="grow"><div class="title">{{ t.title }}</div><div class="small muted">{% if t.assignee %}{{ t.assignee.display_name }}{% else %}Unassigned{% endif %}{% if t.due_date %} · due {{ t.due_date|short_date }}{% endif %}{% if t.description %} · {{ t.description }}{% endif %}</div></div>
       <form method="post" action="{% url 'task_close' t.pk 'done' %}" class="inline">{% csrf_token %}<button type="submit" class="small">{% icon "check" %} Done</button></form>
-      <form method="post" action="{% url 'task_close' t.pk 'dropped' %}" class="inline" data-confirm="Drop this task?">{% csrf_token %}<button type="submit" class="secondary small">Drop</button></form></li>{% endfor %}</ul>
+      <form method="post" action="{% url 'task_close' t.pk 'dropped' %}" class="inline" data-confirm="Drop this task? It moves to Recently closed and nobody is reminded of it again.">{% csrf_token %}<button type="submit" class="secondary small">Drop</button></form></li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="check-circle" title="No open tasks" %}{% endif %}
   </section>
-  <details class="panel"><summary>Add a task</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Add task</button></div></form></div></details>
+  <details class="panel"{% if form.errors %} open{% endif %}><summary>Add a task</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Add task</button></div></form></div></details>
   {% if closed %}<h2>Recently closed</h2><section class="card"><ul class="list">{% for t in closed %}<li><span class="grow">{{ t.title }}</span>{% status t.status %}</li>{% endfor %}</ul></section>{% endif %}
+  {% endif %}
 {% endblock %}

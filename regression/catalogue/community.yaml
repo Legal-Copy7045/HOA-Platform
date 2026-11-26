@@ -48,7 +48,7 @@
 - feature: "Lot and owner register import (check, then commit; links the first officer by email); board members are homeowners first and keep it after leaving the board"
   since: M3
   match: ["^unit:community/tests/test_register_and_board_owners"]
-- feature: "Board roster (current and previous accounts) with audited, formula-safe CSV export; list tools (status, dates, paging, export) on board lists; FAQ; dashboard welcome message"
+- feature: "Lots and owners roster view, was Board roster (current and previous accounts) with audited, formula-safe CSV export; list tools (status, dates, paging, export) on board lists; FAQ; dashboard welcome message"
   since: M3
   match: ["^unit:community/tests/test_roster_lists_faq"]
 - feature: "Board seats need a second board member in production (proposal, approval, withdraw; first seats exempt; off on the POC)"
