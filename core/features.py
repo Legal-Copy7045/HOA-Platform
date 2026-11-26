@@ -35,7 +35,22 @@ FEATURES: list[Feature] = [
         "Board news posted to owners.",
         {"announcements", "announcement_detail"},
     ),
-    _f("calendar", "Calendar", "Community events and meeting dates.", {"calendar", "event_cancel"}),
+    _f(
+        "calendar",
+        "Calendar",
+        "Community events and meeting dates, with RSVPs and volunteer sign-ups.",
+        {
+            "calendar",
+            "event_cancel",
+            # Event RSVPs and volunteer sign-ups (rsvp)
+            "event_detail",
+            "event_rsvp",
+            "event_rsvp_settings",
+            "event_slot_add",
+            "event_slot_action",
+            "event_rsvp_export",
+        },
+    ),
     _f("faq", "FAQ", "Frequently asked questions page.", {"faq"}),
     _f(
         "directory",

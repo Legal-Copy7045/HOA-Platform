@@ -157,3 +157,7 @@
   check: "On a phone the search icon in the top bar opens Search; results are grouped by area with counts, matches are highlighted, nothing runs off the screen, and a one-letter search shows the 'at least 2 characters' message."
   steps: "Sign in as a demo owner on a phone; tap the search icon; search a street name, then 'a'; then on a computer use the box at the top of the menu."
   last: ""
+- key: event rsvp on a phone
+  check: "On a phone, an owner answers an event's RSVP (Going with guests), signs up for a volunteer slot and leaves it; another owner sees only counts; a board member sees names and downloads the CSV; with the reminder on, people going get one email the day before with a link only."
+  steps: "As a board member open an event from the Calendar, open RSVP settings, turn RSVPs on with a cap, guests and the reminder, add a slot; as an owner on a phone answer and sign up; as a second owner check no names show; as the board download the CSV; check the inbox the day before the event."
+  last: ""

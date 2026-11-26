@@ -243,6 +243,22 @@ class Command(BaseCommand):
             location="Community room (fictional)",
             actor=b1,
         )
+        # Event RSVPs and volunteer sign-ups (comms.rsvp).
+        from comms import rsvp
+
+        picnic = comms.create_event(
+            title="Community picnic (demo)",
+            starts_at=timezone.now() + datetime.timedelta(days=10),
+            location="Pavilion (fictional)",
+            description="Burgers and lemonade provided. Bring a chair.",
+            actor=b1,
+        )
+        rsvp.save_settings(picnic, enabled=True, cap=80, max_guests=4, remind=True, actor=b1)
+        dessert = rsvp.add_slot(picnic, title="Bring a dessert", capacity=6, actor=b1)
+        rsvp.add_slot(picnic, title="Set up tables 9-10am", capacity=3, actor=b1)
+        rsvp.answer(picnic, answer="going", guests=2, actor=owner3)
+        rsvp.answer(picnic, answer="maybe", actor=owner12)
+        rsvp.sign_up(dessert, actor=owner3)
         governance.create_meeting(
             title="Annual owners' meeting (demo)",
             kind="annual",

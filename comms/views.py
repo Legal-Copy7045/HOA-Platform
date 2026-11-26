@@ -84,11 +84,18 @@ def calendar(request):
         "comms/calendar.html",
         {
             "events": services.upcoming(request.user)[:200],
+            "going": _going(request.user),
             "bookings": _bookings(request),
             "form": form,
             "can_manage": policy.can(request.user, "calendar.manage"),
         },
     )
+
+
+def _going(user) -> set[int]:
+    from comms.rsvp import going_event_ids
+
+    return going_event_ids(user)
 
 
 def _bookings(request) -> list[dict]:

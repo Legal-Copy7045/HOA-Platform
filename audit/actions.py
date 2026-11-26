@@ -337,6 +337,18 @@ _SPECS = [
     _spec("survey.sharing_changed", "Survey results sharing changed", "share_results"),
     _spec("survey.responded", "Survey answered", "anonymous"),
     _spec("survey.exported", "Survey results exported (CSV)", "rows", "anonymous"),
+    # --- Event RSVPs and volunteer sign-ups (rsvp) ---
+    _spec(
+        "event.rsvp_settings_saved",
+        "RSVPs set up for a calendar event",
+        "enabled",
+        "cap",
+        "max_guests",
+        "remind",
+    ),
+    _spec("event.slot_added", "Volunteer slot added to a calendar event", "event_id", "capacity"),
+    _spec("event.slot_removed", "Volunteer slot removed from a calendar event", "event_id"),
+    _spec("event.reminders_sent", "Event reminder emails sent", "recipients"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

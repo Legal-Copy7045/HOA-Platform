@@ -293,6 +293,7 @@ MEMBER_READS = {
                 "sms.opt_in",
                 "reservation.request",
                 "survey.respond",
+                "event.rsvp",
             },
         ),
         (

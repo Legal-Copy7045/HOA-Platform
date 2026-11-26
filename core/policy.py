@@ -179,6 +179,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "survey.view": COMMUNITY,
     "survey.respond": RESIDENTS,
     "survey.manage": frozenset({BOARD}),
+    # --- Event RSVPs and volunteer sign-ups (rsvp) ---
+    # Residents who can see an event answer it (view-only contacts and former
+    # owners cannot); board or manager set it up; only the board sees names.
+    "event.rsvp": frozenset({OWNER, AUTHORIZED, TENANT}),
+    "event.rsvp_manage": frozenset({BOARD, MANAGER}),
+    "event.rsvp_names": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

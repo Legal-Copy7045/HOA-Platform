@@ -153,4 +153,8 @@ def build(user, request=None) -> dict:
         )
         data["news"] = [(a, a.pk in read) for a in Announcement.objects.for_user(user)[:4]]
         data["events"] = list(upcoming(user)[:4])
+    if policy.can(user, "calendar.view"):
+        from comms.rsvp import my_upcoming
+
+        data["going"] = my_upcoming(user)
     return data

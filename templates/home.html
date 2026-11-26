@@ -83,11 +83,17 @@
         {% if events %}
           <ul class="list">
             {% for e in events %}
-              <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><div class="title">{{ e.title }}</div><div class="small muted">{{ e.starts_at|date:"D M j, Y, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
+              <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><a class="title" href="{% url 'event_detail' e.pk %}">{{ e.title }}</a>{% if e.rsvp_enabled and not e.cancelled %} <span class="badge tone-info">RSVP</span>{% endif %}<div class="small muted">{{ e.starts_at|date:"D M j, Y, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
             {% endfor %}
           </ul>
         {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
         {% endwith %}
+      </section>{% endif %}
+      {% if dash.going %}<section class="card" id="going">
+        <h2>Events I'm going to</h2>
+        <ul class="list">{% for e in dash.going %}
+          <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><a class="title" href="{% url 'event_detail' e.pk %}">{{ e.title }}</a><div class="small muted">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
+        {% endfor %}</ul>
       </section>{% endif %}
       {% if o %}
         <section class="card">
