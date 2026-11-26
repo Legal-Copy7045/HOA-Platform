@@ -26,6 +26,9 @@
     <div class="stat"><div class="label">Background jobs</div><div class="value small-value">{% for status, n in jobs %}{{ status }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}None{% endfor %}</div></div>
     <div class="stat {% if email_redirect %}tone-warning{% endif %}"><div class="label">Email redirect (POC)</div><div class="value small-value">{% if email_redirect %}On{% else %}Off{% endif %}</div>{% if email_redirect %}<div class="hint">All mail goes to one inbox</div>{% endif %}
       <form method="post" class="hint">{% csrf_token %}<input type="hidden" name="action" value="test_email"><button type="submit" class="secondary small">Send me a test email</button></form></div>
+    <div class="stat {% if update.host %}{% for label, state, ok in update.host %}{% if not ok %}tone-warning{% endif %}{% endfor %}{% else %}tone-warning{% endif %}"><div class="label">Host security</div>
+      {% if update.host %}<ul class="hint">{% for label, state, ok in update.host %}<li>{{ label }}: {% if ok %}on{% else %}<strong>{{ state }}</strong>{% endif %}</li>{% endfor %}</ul>
+      {% else %}<div class="value small-value">Not set up</div><div class="hint">Run infra/poc/harden-host.sh once on the VM (see the runbook, Host security).</div>{% endif %}</div>
     <div class="stat {% if scanner == 'none' %}tone-warning{% endif %}"><div class="label">Malware scanning</div><div class="value small-value">{% if scanner == 'none' %}Off{% else %}{{ scanner }}{% endif %}</div><div class="hint">{% if scanner == 'none' %}Uploads are not scanned{% elif require_clean_scan %}Only clean files download{% else %}Unscanned files still download{% endif %}</div></div>
   </div>
 {% endblock %}

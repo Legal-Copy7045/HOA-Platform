@@ -113,6 +113,7 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 - File store write/read/delete probe: `python manage.py check_storage`
 - What the database holds (counts only, no personal data): `python manage.py data_status`
 - Backups (POC VM): `sudo bash infra/poc/backup.sh [--install]`; restore drill: `sudo bash infra/poc/restore-drill.sh [--allow-unsigned] [dir]` (own scratch file store; refuses backups without the stamped keyed checksum from `infra/poc/backup_mac.py`, whose key never goes on a command line); shared shell helpers: `infra/poc/lib.sh`; file store export/import: `export_files` / `import_files`
+- Host security (POC VM, once, idempotent): `sudo bash infra/poc/harden-host.sh` (automatic security updates, Livepatch when Ubuntu Pro is attached, auditd, nightly AIDE, Falco); alerts reach sysadmins via `python manage.py host_alert --kind ...`; System status shows the services
 - Health: `python manage.py health_check [--alert]` (VM timer: `infra/poc/health-timer.sh`); routine update emails go through `comms.notify.send_update` (honours the weekly digest), legal notices never do
 - Load the lot and owner register (go-live; check, then `--commit`): `python manage.py import_register register.csv` (template `docs/examples/register-template.csv`; real file never in the repo)
 - On a fictional-data POC, attach yourself to a demo lot: `python manage.py demo_make_me_owner --email you@... --lot N`

@@ -334,6 +334,29 @@ sudo bash /opt/hoa-portal/infra/poc/health-timer.sh
 
 The same checks are on Admin > System status.
 
+## Host security
+
+Run once on the VM (safe to re-run after updates):
+
+    sudo bash /opt/hoa-portal/infra/poc/harden-host.sh
+
+It sets up:
+
+- **Automatic security updates** (unattended-upgrades; never reboots by itself). With Ubuntu Pro attached, ESM updates come the same way and Livepatch applies kernel fixes without a reboot.
+- **auditd** watching `.env`, the backup key, SSH keys and config, sudoers, users and groups, and systemd units.
+- **AIDE**, a nightly (03:30) file-integrity check of /etc, /root, /usr/local, /boot and the hoa user's SSH keys. Changes are emailed, then accepted as the new baseline.
+- **Falco** (modern eBPF), watching the containers at runtime: shells, unexpected programs, writes and secret reads. Alerts at warning and above go to `/var/log/falco/alerts.jsonl`, and a summary is emailed at most every 10 minutes.
+
+Emails go to every active sysadmin through the portal's mail settings, and each one is audited (`system.host_alert`). System status → Host security shows whether each service is running.
+
+If an alert is unexpected:
+
+1. Check who was signed in to the VM: `last -n 20`.
+2. Look at the detail: `sudo ausearch -k hoa_env -i` (or another key), or `sudo tail /var/log/falco/alerts.jsonl`.
+3. If it may be an intrusion, stop the tunnel (`docker compose stop cloudflared`), keep the VM running for evidence, and rotate the `.env` secrets from a clean machine.
+
+To quiet a known-good Falco alert, add an exception in `/etc/falco/rules.d/hoa-portal.yaml`, then run `sudo systemctl restart falco-modern-bpf`. Falco uses about 100–150 MB of memory.
+
 ## Email deliverability (SPF, DKIM, DMARC)
 
 Notices are only useful if they arrive. For the domain the portal sends from

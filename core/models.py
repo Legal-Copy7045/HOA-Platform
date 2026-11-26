@@ -101,6 +101,9 @@ class UpdateStatus(models.Model):
     )
     message = models.CharField(max_length=300, blank=True)
     agent_seen_at = models.DateTimeField(null=True, blank=True)
+    # Host security services as the agent last saw them, e.g.
+    # {"falco": "active", "auditd": "active", ...} (infra/poc/harden-host.sh).
+    host_security = models.JSONField(default=dict, blank=True)
 
     def __str__(self) -> str:
         return f"update status ({self.state})"

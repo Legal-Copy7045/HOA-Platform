@@ -44,7 +44,36 @@ def _update_status():
         status.agent_seen_at
         and status.agent_seen_at > timezone.now() - __import__("datetime").timedelta(minutes=5)
     )
-    return {"s": status, "agent_ok": agent_ok, "changes": status.changes.splitlines()[:10]}
+    return {
+        "s": status,
+        "agent_ok": agent_ok,
+        "changes": status.changes.splitlines()[:10],
+        "host": _host_security(status.host_security),
+    }
+
+
+# Host security services the VM agent reports (infra/poc/harden-host.sh).
+HOST_SECURITY_SERVICES = [
+    ("updates", "Automatic security updates"),
+    ("livepatch", "Kernel fixes without reboot (Livepatch)"),
+    ("auditd", "Audit log of sensitive files"),
+    ("integrity", "Nightly file-integrity check"),
+    ("falco", "Container monitoring (Falco)"),
+    ("alerts", "Alert emails"),
+]
+
+
+def _host_security(states):
+    """[(label, state, ok)] for the System status card; None before the
+    hardening script has run (nothing reported active)."""
+    states = states if isinstance(states, dict) else {}
+    rows = [
+        (label, str(states.get(key) or "not installed")[:20], states.get(key) == "active")
+        for key, label in HOST_SECURITY_SERVICES
+    ]
+    if not any(ok for _, _, ok in rows):
+        return None
+    return rows
 
 
 def _update_action(request, action):
