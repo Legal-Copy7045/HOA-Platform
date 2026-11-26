@@ -268,6 +268,13 @@ DEFAULT_GL = (
     "other_charge = 4900 Other owner charges\n"
     "credit = 4950 Owner credits and adjustments"
 )
+# Online payments (D32-payments): added to every setup without changing the
+# stored default above.
+ONLINE_GL = {
+    "stripe_clearing": "1050 Stripe clearing",
+    "card_surcharge": "4300 Credit card surcharge income",
+    "processing_fees": "6150 Payment processing fees",
+}
 
 
 class AccountingSetup(models.Model):
@@ -300,7 +307,7 @@ class AccountingSetup(models.Model):
             k.strip(): v.strip()
             for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
         }
-        return {**defaults, **out}
+        return {**defaults, **ONLINE_GL, **out}
 
 
 class DepositBatch(AppendOnlyModel):
@@ -418,3 +425,71 @@ class CollectionLetter(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"{self.kind} letter"
+
+
+# --- Open-item accounting (decision D32-payments) ----------------------------------------
+# Every payment or credit is applied to specific charges, so each charge has
+# its own open balance. Applications are append-only: undoing one is a new,
+# negative application. ledger/allocation.py is the only writer.
+
+
+class ChargeNumber(ScopedAppendOnlyModel):
+    """The human number of a charge ("Invoice 2026-0142"): year and a
+    sequence within the year, given once when the charge posts."""
+
+    scope_lot_path = "entry__lot"
+
+    entry = models.OneToOneField(
+        LedgerEntry, on_delete=models.PROTECT, primary_key=True, related_name="charge_number"
+    )
+    year = models.PositiveSmallIntegerField()
+    seq = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["year", "seq"], name="charge_number_unique")]
+
+    def __str__(self) -> str:
+        return self.label
+
+    @property
+    def label(self) -> str:
+        return f"{self.year}-{self.seq:04d}"
+
+
+class ApplicationKind(models.TextChoices):
+    AUTO = "auto", "By the application rule"
+    DIRECTED = "directed", "To the charges chosen"
+    REVERSAL = "reversal", "Reversal matched to its entry"
+    UNWIND = "unwind", "Undone by a reversal"
+    MIGRATION = "migration", "Rebuilt from history"
+
+
+class PaymentApplication(ScopedAppendOnlyModel):
+    """``amount_cents`` of a payment or credit (``source``, a negative entry)
+    applied to a charge (``charge``, a positive entry). Negative rows undo
+    earlier ones."""
+
+    scope_lot_path = "lot"
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    source = models.ForeignKey(
+        LedgerEntry, on_delete=models.PROTECT, related_name="applications_out"
+    )
+    charge = models.ForeignKey(
+        LedgerEntry, on_delete=models.PROTECT, related_name="applications_in"
+    )
+    amount_cents = models.BigIntegerField()
+    kind = models.CharField(max_length=10, choices=ApplicationKind.choices)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["id"]
+        indexes = [models.Index(fields=["lot", "id"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(amount_cents=0), name="payment_application_nonzero"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"application #{self.pk}"

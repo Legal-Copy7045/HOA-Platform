@@ -12,6 +12,7 @@
           {% if a.statement.balance > 0 and a.due.due_on %}<div class="small" data-testid="due-by">{% if a.due.past_due %}<span class="status tone-danger">Past due since {{ a.due.due_on|date:"M j, Y" }}</span>{% else %}Due by {{ a.due.due_on|date:"M j, Y" }}{% endif %}</div>{% endif %}
         </div>
       </div>
+      {% include "ledger/_open_charges.html" with open_charges=a.open_charges open_before=a.open_before unapplied=a.unapplied %}
       <h3>Statement</h3>
       <div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>Description</th><th class="num">Charges</th><th class="num">Payments</th><th class="num">Balance</th></tr></thead>

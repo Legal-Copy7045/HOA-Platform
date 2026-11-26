@@ -13,11 +13,11 @@ from community.account_views import my_account_people
 from community.models import Lot
 from community.rules import rule, rule_with_citation
 from core import policy
-from core.money import MoneyField
+from core.money import MoneyField, format_cents
 from core.workflow import WorkflowError
 from documents import attachments
 from documents.attachments import pdf_response
-from ledger import services
+from ledger import allocation, services
 from ledger.models import (
     Budget,
     CollectionCase,
@@ -51,6 +51,22 @@ class PaymentForm(forms.Form):
     reference = forms.CharField(
         max_length=40, required=False, help_text="Check number - never account numbers."
     )
+    apply_to = forms.TypedMultipleChoiceField(
+        coerce=int,
+        required=False,
+        label="Apply payment to\u2026",
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Leave all unticked to pay the oldest charges first (the application rule).",
+    )
+
+    def __init__(self, *args, open_charges=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["apply_to"].choices = [
+            (c.entry.pk, f"{c.label}: {c.title} ({format_cents(c.open_cents)} open)")
+            for c in open_charges
+        ]
+        if not open_charges:
+            del self.fields["apply_to"]
 
 
 class ChargeForm(forms.Form):
@@ -103,6 +119,9 @@ def my_account(request):
         accounts.append(
             {
                 "lot": lot,
+                "open_charges": allocation.open_charges(lot.pk, since=since),
+                "open_before": allocation.open_before(lot.pk, since) if since else 0,
+                "unapplied": allocation.unapplied_credit(lot.pk),
                 "statement": statement,
                 "rows": services.statement_rows(statement),
                 "due": services.amount_due(lot.pk),
@@ -220,6 +239,7 @@ def lot_ledger(request, pk):
     entries = (
         LedgerEntry.objects.for_user(request.user).filter(lot=lot).select_related("reversed_by")
     )
+    open_charges = allocation.open_charges(lot.pk)
     return render(
         request,
         "ledger/lot.html",
@@ -230,7 +250,8 @@ def lot_ledger(request, pk):
             "aging": (aging := services.aging(lot.pk)),
             "aging_columns": services.aging_columns(aging),
             "can_manage": policy.can(request.user, "ledger.manage"),
-            "payment_form": PaymentForm(),
+            "open_charges": open_charges,
+            "payment_form": PaymentForm(open_charges=open_charges),
             "charge_form": ChargeForm(),
             "credit_form": CreditForm(),
             "open_case": CollectionCase.objects.for_user(request.user)
@@ -248,7 +269,7 @@ def lot_ledger_action(request, pk, action):
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
     actor = request.user
     if action == "payment":
-        form = PaymentForm(request.POST)
+        form = PaymentForm(request.POST, open_charges=allocation.open_charges(lot.pk))
         if form.is_valid():
             _flash(
                 request,

@@ -169,6 +169,15 @@ REGISTRY: dict[str, RuleSpec] = {
             "vote.pass_percent", "Share of votes cast needed to pass", PERCENT, None, "Voting"
         ),
         RuleSpec(
+            "ledger.assessments_before_fees",
+            "Apply payments to dues before late fees and other charges",
+            BOOL,
+            "false",
+            "Dues",
+            "Off: each payment pays the oldest charge first. On: dues first (oldest first), then "
+            "late fees and other charges. An owner may still direct a payment to chosen charges.",
+        ),
+        RuleSpec(
             "payments.card_fee_bp",
             "Card convenience fee (hundredths of a percent: 295 = 2.95%)",
             INT,

@@ -244,6 +244,15 @@ GUIDES: dict[str, Guide] = {
     ),
 }
 
+GUIDES["ledger.assessments_before_fees"] = Guide(
+    DECLARATION,
+    "The Act does not say in what order an owner's payments pay their charges. Assessments, "
+    f"late charges, fines and interest are all part of the association's lien ({ACT} § 5302(a)(11) "
+    "and § 5315), so the Declaration or a board collection policy usually sets the order. "
+    "Oldest first is the common default; some policies pay dues before fees.",
+    "Off (oldest first): Board collection policy, resolution 2027-03. On if the Declaration "
+    "says payments apply to assessments first (e.g. Declaration §7.6).",
+)
 GUIDES["payments.card_fee_bp"] = Guide(
     BOARD,
     "Not covered by the Act. Card-network rules cap surcharges (commonly at the actual cost, "

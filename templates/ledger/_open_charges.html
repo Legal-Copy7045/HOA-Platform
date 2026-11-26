@@ -1,0 +1,20 @@
+{% load portal %}{# Open charges with the payments applied to each (D32-payments). #}
+<h3>Open charges</h3>
+{% if open_charges or open_before %}
+<div class="table-wrap"><table class="open-charges">
+  <thead><tr><th>Charge</th><th>Due</th><th class="num">Original</th><th class="num">Open</th><th>Status</th></tr></thead>
+  <tbody>
+  {% if open_before %}<tr><td>From before your ownership</td><td></td><td class="num"></td><td class="num">{{ open_before|cents }}</td><td><span class="status tone-warning">Open</span></td></tr>{% endif %}
+  {% for c in open_charges %}<tr>
+    <td><div><strong>{{ c.title }}</strong></div><div class="small muted">{{ c.label }}</div>
+      {% if c.payments %}<details class="applied"><summary class="small">Payments applied ({{ c.payments|length }})</summary>
+        <ul class="small">{% for p in c.payments %}<li>{{ p.posted_on|short_date }} · {{ p.description }}{% if p.reference %} ({{ p.reference }}){% endif %}: {{ p.amount_cents|cents }}</li>{% endfor %}</ul>
+      </details>{% endif %}</td>
+    <td class="nowrap">{{ c.due_on|short_date }}</td>
+    <td class="num">{{ c.original_cents|cents }}</td>
+    <td class="num">{{ c.open_cents|cents }}</td>
+    <td><span class="status {% if c.status == 'partial' %}tone-warning{% else %}tone-danger{% endif %}">{{ c.status_label }}</span></td>
+  </tr>{% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="small muted">No open charges.{% if unapplied %} Credit on the account: {{ unapplied|cents }}, used for the next charges as they post.{% endif %}</p>{% endif %}
