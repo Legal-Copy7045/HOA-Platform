@@ -43,13 +43,7 @@
         {% if remit_lines %}<address>{% for line in remit_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% else %}<p class="small muted">Ask the board where to send checks.</p>{% endif %}
         <p class="small muted">Write your address on the check so the payment reaches the right account.</p>
       </div>
-      {% if a.account %}<h3>On this account</h3>
-      <p class="small muted">Account number {{ a.account.number }}</p>
-      <ul class="list">
-        {% for p in a.owners %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow">{{ p.display_name }} <span class="small muted">Owner</span></div></li>{% endfor %}
-        {% for c in a.contacts %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow">{{ c.person.display_name }} <span class="small muted">{{ c.get_kind_display }}</span></div></li>{% endfor %}
-      </ul>
-      <p class="small muted">To add or remove someone, ask the board.</p>{% endif %}
+      {% if a.account %}<p class="small muted" data-testid="account-people-link">Account number {{ a.account.number }} · <a href="{% url 'my_lot' %}#people-{{ a.lot.pk }}">People on this account</a></p>{% endif %}
       <div class="form-actions">
         <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
         {% if online and a.statement.balance > 0 and a.can_pay_online %}<a class="btn" href="{% url 'pay_online' a.lot.pk %}">{% icon "wallet" %} Pay online</a>{% endif %}

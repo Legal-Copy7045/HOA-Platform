@@ -59,7 +59,7 @@ def test_due_items_show_in_my_items(board):
     import django.utils.timezone as tz
 
     _item(board, tz.localdate() + datetime.timedelta(days=3))
-    assert any(i.area == "Compliance" for i in my_items.items_for(board))
+    assert any(i.area == "Recurring deadlines" for i in my_items.items_for(board))
 
 
 def test_starter_items_and_permissions(client, board):
@@ -129,7 +129,7 @@ def test_due_deadlines_link_to_the_tab_in_my_items(board):
     from django.utils import timezone
 
     _item(board, timezone.localdate() + datetime.timedelta(days=3))
-    found = [i for i in my_items.items_for(board) if i.area == "Compliance"]
+    found = [i for i in my_items.items_for(board) if i.area == "Recurring deadlines"]
     assert found and found[0].url == _deadlines_url()
 
 

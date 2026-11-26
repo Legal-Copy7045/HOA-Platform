@@ -138,12 +138,17 @@ HUBS = {
 # and links to the hub's own page filtered by this query parameter (the
 # child's old URL is only a redirect there).
 HUB_KEEPS_LABEL = {"voting": "type"}
+# The label for a hub entry kept above when its one page has its own name
+# (governance.voting_views: the heading is "Surveys" when only surveys show).
+HUB_SINGLE_LABELS = {("voting", "surveys"): "Surveys"}
 
 # Pages reached from a sidebar entry's page rather than from the sidebar: the
-# entry is marked current on them and counts their waiting items.
+# entry is marked current on them and counts their waiting items. A page
+# listed here is not shown again as its own entry further down the menu.
 SUBPAGES = {
     "arc_list?mine=1": ["signoffs_mine"],
     "people": ["access_review"],
+    "lot_list": ["invitations"],
     "tasks": ["compliance"],
 }
 
@@ -197,8 +202,8 @@ SECTIONS = [
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
             ("Board tasks", "tasks", "list", "task.manage"),
             ("People", "people", "users", "person.manage"),
+            # Sign-ups are a tab of it for the board (WT-002).
             ("Homes and owners", "lot_list", "map", "lot.view_all"),
-            ("Invitations and sign-ups", "invitations", "mail", "invite.send"),
         ],
     ),
     (
@@ -229,8 +234,9 @@ SECTIONS = [
             ("System status", "system_status", "activity", "system.view_status"),
             # Backups, restore drills and other host tasks (D36); the board sees the history.
             ("Server tasks", "server_tasks", "clock", "system.view_tasks"),
-            # Sysadmins re-send and revoke; the board has it under Association.
-            ("Invitations and sign-ups", "invitations", "mail", "invite.resend"),
+            # Sysadmins re-send and revoke (D9); the board has them on the
+            # Sign-ups tab of Homes and owners, its SUBPAGE (WT-002, WT-018).
+            ("Invitations", "invitations", "mail", "invite.resend"),
             ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
             ("Settings", "settings_hub", "sliders", HUB),
         ],
@@ -239,6 +245,19 @@ SECTIONS = [
 # Sections open by default; the others open when the current page is inside
 # (and the browser remembers what the person last chose, static/js/app.js).
 OPEN_BY_DEFAULT = {"My home", "Community"}
+# Staff open their work instead: the work sections with something waiting,
+# and My home and Community start closed (WT-040).
+STAFF_GROUPS = frozenset(
+    {policy.BOARD, policy.MANAGER, policy.ARC_REVIEWER, policy.AUDITOR, policy.SYSADMIN}
+)
+PERSONAL_SECTIONS = {"My home", "Community"}
+
+
+def _open_by_default(title: str, count: int, staff: bool) -> bool:
+    if not staff:
+        return title in OPEN_BY_DEFAULT
+    return title not in PERSONAL_SECTIONS and count > 0
+
 
 ROLE_LABELS = {
     policy.OWNER: "Owner",
@@ -263,6 +282,28 @@ def _url(name: str) -> str | None:
         return reverse(url_name) + (f"?{query}" if query else "")
     except NoReverseMatch:
         return None
+
+
+def shortcuts(request, names: list[str], groups: frozenset[str]) -> list[dict]:
+    """Links to these pages (URL names) with their menu label and icon, for
+    the ones this person may open and whose feature is on (the dashboard's
+    role shortcuts, WT-016)."""
+    known = {
+        name: (label, icon, perm) for _t, items in SECTIONS for label, name, icon, perm in items
+    }
+    for hub in HUBS.values():
+        known.update({name: (label, icon, perm) for label, name, icon, perm, _d in hub})
+    out = []
+    for name in names:
+        label, icon, permission = known[name]
+        if permission == HUB or not allowed(groups, permission):
+            continue
+        if not features.url_name_enabled(name.partition("?")[0], request):
+            continue
+        url = _url(name)
+        if url:
+            out.append({"label": label, "url": url, "icon": icon})
+    return out
 
 
 def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[dict]:
@@ -317,6 +358,9 @@ def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict,
         # Surveys; a sysadmin's Settings is Branding).
         if name in HUB_KEEPS_LABEL:
             url = f"{url}?{HUB_KEEPS_LABEL[name]}={children[0]['name']}"
+            # ...except where the one page is named differently, so the menu
+            # says what the page's heading says (a tenant's "Surveys", WT-018).
+            label = HUB_SINGLE_LABELS.get((name, children[0]["name"]), label)
         else:
             url = children[0]["url"]
             label, icon = children[0]["label"], children[0]["icon"]
@@ -338,6 +382,7 @@ def build(request) -> dict:
         counts = nav_counts(user, request) if user.is_authenticated else {}
     except Exception:  # a count must never break the page
         counts = {}
+    staff = bool(roles.groups & STAFF_GROUPS)
     best = ("", None, None)  # longest matching URL wins the "current page" mark
     for title, items in SECTIONS:
         visible = []
@@ -349,21 +394,28 @@ def build(request) -> dict:
                 continue
             seen.add(name)
             item, children = found
+            seen.update(c["name"] for c in children)
             for candidate in [item["url"]] + [c["url"] for c in children]:
                 base = candidate.partition("?")[0]
                 if _matches(candidate, path, here_mine) and len(base) > len(best[0]):
                     best = (base, item, len(sections))
             visible.append(item)
         if visible:
+            count = sum(i["count"] for i in visible)
             sections.append(
                 {
                     "title": title,
                     "key": title.lower().replace(" ", "-"),
                     "items": visible,
-                    "open": title in OPEN_BY_DEFAULT,
-                    "count": sum(i["count"] for i in visible),
+                    "open": _open_by_default(title, count, staff),
+                    "count": count,
                 }
             )
+    if staff and not any(s["open"] for s in sections if s["title"]):
+        # Nothing waiting: open the first work section rather than none.
+        work = [s for s in sections if s["title"] and s["title"] not in PERSONAL_SECTIONS]
+        if work:
+            work[0]["open"] = True
     if best[1]:
         best[1]["current"] = True
         sections[best[2]]["open"] = True

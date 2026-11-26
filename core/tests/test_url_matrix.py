@@ -194,6 +194,8 @@ PROTECTED = {
     "contact_method_remove": ("POST", "contact_method_b"),
     "contact_method_notices": ("POST", "contact_method_b"),
     "my_history": ("GET", None),
+    # A former owner's own period by its index in their roles (WT-010).
+    "my_history_statement_pdf": ("GET", None),
     "board_home": ("GET", None),
     "owner_preview_start": ("POST", None),
     "branding_settings": ("GET", None),
@@ -836,6 +838,8 @@ def _url(name, key, targets):
         kwargs["kind"] = "first"
     elif name == "accounting_1099":
         kwargs = {"year": 2026}
+    elif name == "my_history_statement_pdf":
+        kwargs = {"index": 0}
     elif name == "collection_action":
         kwargs["action"] = "send_reminder"
     elif name == "resale_action":
@@ -930,10 +934,13 @@ def test_board_pages_load(client, world):
     client.force_login(world["board"])
     # The old Board overview sends bookmarks to My items (streamlining).
     assert client.get(reverse("board_home"))["Location"] == reverse("my_items")
+    # Sign-ups are a view of Homes and owners for the board (WT-002).
+    signups = reverse("lot_list") + "?view=signups"
+    assert client.get(reverse("invitations"))["Location"] == signups
+    assert client.get(signups).status_code == 200
     for name in (
         "people",
         "approvals",
-        "invitations",
         "lot_list",
         "sysadmin_activity",
         "server_tasks",

@@ -194,9 +194,9 @@ GUIDES: dict[str, Guide] = {
     ),
     "arc.signoff_auto_confirm": Guide(
         BOARD,
-        "Not covered by the Act. Neighbor sign-offs are information for the reviewers; the "
+        "Not covered by the Act. Neighbor acknowledgements are information for the reviewers; the "
         "decision stays with the committee under the Declaration.",
-        "Off: a person confirms each signature read from a scanned form (Board resolution).",
+        "Off: a person checks each acknowledgement read from a scanned form (Board resolution).",
     ),
     "arc.signoff_respond_days": Guide(
         BOARD,
@@ -275,7 +275,7 @@ GUIDES["payments.credit_card_surcharge_bp"] = Guide(
     "debit or prepaid), no more than the cost of acceptance and at most 3%, disclosed before "
     "payment, after registering with Visa and Mastercard 30 days ahead. Counsel should confirm "
     "the disclosure wording.",
-    "300 (3%, not more than the processor's credit card cost): Board resolution 2027-09, "
+    "3% (not more than the processor's credit card cost): Board resolution 2027-09, "
     "after counsel review.",
 )
 

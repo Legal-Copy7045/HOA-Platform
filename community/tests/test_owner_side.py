@@ -112,7 +112,7 @@ def test_owner_asks_another_board_member_approves(client, w, django_capture_on_c
     assert any(
         "on the account" in i.title
         for i in my_items.items_for(w["board2"])
-        if i.area == "Approvals"
+        if i.area == "Homes and owners"
     )
     client.force_login(w["board2"])
     client.post(reverse("account_change_decide", args=[change.pk, "approve"]))

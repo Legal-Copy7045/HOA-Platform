@@ -445,7 +445,7 @@ class Command(BaseCommand):
             (
                 "Architectural review",
                 "Do I need approval for a fence? (demo)",
-                "Yes. Apply under Home improvement approvals (ARC) before work starts.",
+                "Yes. Apply under My home improvement requests (ARC) before work starts.",
             ),
             (
                 "Assessments",

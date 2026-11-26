@@ -72,36 +72,67 @@ def test_owners_cannot_open_onboarding(client, w):
     assert client.get(reverse("onboarding")).status_code == 403
 
 
+def _signups(client):
+    return client.get(reverse("lot_list"), {"view": "signups"})
+
+
 def test_page_shows_counts(client, w):
     client.force_login(w["board"])
-    page = client.get(reverse("invitations")).content
+    page = _signups(client).content
     assert b"No email on record" in page and b"With Email" in page
 
 
 # --- Invitations and sign-ups (streamlining: Onboarding merged into Invitations) ---------
 
 
-def test_onboarding_redirects_to_invitations_and_keeps_the_query(client, w):
+def test_onboarding_redirects_to_the_sign_ups_tab_and_keeps_the_letters(client, w):
     client.force_login(w["board"])
     response = client.get(reverse("onboarding"))
-    assert response.status_code == 302 and response["Location"] == reverse("invitations")
+    assert response.status_code == 302
+    assert response["Location"] == reverse("lot_list") + "?view=signups"
     response = client.get(reverse("onboarding"), {"letters": "1"})
     assert response["Location"] == reverse("invitations") + "?letters=1"
 
 
-def test_invitations_page_has_sign_ups_and_bulk_buttons_for_the_board(client, w):
+def test_invitations_redirects_the_board_to_the_sign_ups_tab(client, w):
+    """WT-002: sign-ups are a tab of Homes and owners; bookmarks and emails
+    to the old address still land there."""
     client.force_login(w["board"])
-    page = client.get(reverse("invitations")).content.decode()
-    assert "<h1>Invitations and sign-ups</h1>" in page
+    response = client.get(reverse("invitations"))
+    assert response.status_code == 302
+    assert response["Location"] == reverse("lot_list") + "?view=signups"
+
+
+def test_sign_ups_tab_has_counts_and_bulk_buttons_for_the_board(client, w):
+    client.force_login(w["board"])
+    page = _signups(client).content.decode()
+    assert "<h1>Homes and owners</h1>" in page
+    assert 'href="/lots/?view=signups" aria-current="page"' in page
     assert "With Email" in page and "Invite everyone not yet invited" in page
-    assert "Every invitation" in page
+    assert "Every invitation" in page and "Official notices" in page
+    # The bulk buttons and the letters download still go to the invitations URL.
+    assert f'action="{reverse("invitations")}"' in page
+    assert f'href="{reverse("invitations")}?letters=1"' in page
+
+
+@pytest.mark.parametrize("role", ["MANAGER", "AUDITOR"])
+def test_sign_ups_tab_is_board_only(client, role):
+    """Managers and auditors see Homes and owners but never the sign-ups or
+    the bulk buttons (invite.send is board only)."""
+    from community.models import Role
+
+    client.force_login(make_member(roles=[getattr(Role, role)]))
+    page = client.get(reverse("lot_list"), {"view": "signups"}).content.decode()
+    assert "Invite everyone" not in page and "Every invitation" not in page
+    assert "?view=signups" not in page
 
 
 @mock.patch("accounts.tasks.send_invitation.defer")
 def test_board_bulk_invites_from_the_merged_page(_defer, client, w):
     client.force_login(w["board"])
     response = client.post(reverse("invitations"), {"action": "invite_all"})
-    assert response.status_code == 302 and response["Location"] == reverse("invitations")
+    assert response.status_code == 302
+    assert response["Location"] == reverse("lot_list") + "?view=signups"
     assert _status("With Email") == "invited"
 
 
@@ -115,6 +146,7 @@ def test_sysadmin_sees_invitation_status_only_and_no_bulk_buttons(_defer, client
     response = client.get(reverse("invitations"))
     assert response.status_code == 200
     page = response.content.decode()
+    assert "<h1>Invitations</h1>" in page  # WT-018: no sign-ups shown, so not named so
     # Not the register (D9): no names, no sign-up table.
     assert "With Email" not in page and "No Email" not in page
     assert "Invite everyone" not in page and "Sign-ups by lot" not in page

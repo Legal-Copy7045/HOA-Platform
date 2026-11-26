@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -1027,6 +1028,35 @@ def _money(value) -> int:
     return parse_cents(value)
 
 
+class AccountingSetupForm(forms.Form):
+    """Accounting setup: one optional account per kind of entry (empty keeps
+    the standard account) and the opening bank balance with its date, which
+    go together (owner request 2026-11-26)."""
+
+    opening_cash = MoneyField(label="Opening bank balance", required=False, allow_negative=True)
+    opening_cash_on = forms.DateField(
+        label="As of", required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+    def __init__(self, *args, **kwargs):
+        from ledger import accounting as acc
+
+        super().__init__(*args, **kwargs)
+        for key in acc.GL_LABELS:
+            self.fields[f"gl_{key}"] = forms.CharField(required=False, max_length=80)
+
+    def clean(self):
+        data = super().clean()
+        amount, on = data.get("opening_cash"), data.get("opening_cash_on")
+        if "opening_cash" in self.errors or "opening_cash_on" in self.errors:
+            return data
+        if amount is not None and on is None:
+            self.add_error("opening_cash_on", "Enter the date of the opening balance.")
+        if on is not None and amount is None:
+            self.add_error("opening_cash", "Enter the opening balance for that date.")
+        return data
+
+
 @login_required
 def accounting(request):
     """Export, deposits, reconciliation, 1099 worksheet and setup."""
@@ -1055,17 +1085,7 @@ def accounting(request):
                 acc.void_deposit(batch, actor=request.user, request=request)
                 messages.success(request, "Deposit voided; its payments are undeposited again.")
             elif section == "setup":
-                acc.save_setup(
-                    gl_accounts=acc.gl_text(
-                        AccountingSetup.get(),
-                        {key: request.POST.get(f"gl_{key}", "") for key in acc.GL_LABELS},
-                    ),
-                    opening_cash_cents=_money(request.POST.get("opening_cash") or "0"),
-                    opening_cash_on=_date(request.POST.get("opening_cash_on")),
-                    actor=request.user,
-                    request=request,
-                )
-                messages.success(request, "Saved.")
+                return _accounting_setup_save(request)
             else:
                 raise Http404
         except acc.AccountingError as exc:
@@ -1073,6 +1093,9 @@ def accounting(request):
         except ValueError:
             messages.error(request, "Check the amount (dollars, e.g. 1250.00).")
         return redirect("accounting")
+    if request.GET.get("tab") == "setup":
+        policy.require(request.user, "accounting.manage")
+        return _accounting_setup_page(request, AccountingSetupForm(initial=_setup_initial()))
     today = timezone.localdate()
     year = int(request.GET.get("year") or today.year - (1 if today.month < 4 else 0))
     return render(
@@ -1085,8 +1108,7 @@ def accounting(request):
             "undeposited": acc.undeposited_payments() if can_manage else [],
             "batches": DepositBatch.objects.all()[:20],
             "reconciliations": BankReconciliation.objects.all()[:12],
-            "setup": (setup := AccountingSetup.get()),
-            "gl_rows": acc.gl_rows(setup),
+            "setup_summary": acc.setup_summary(AccountingSetup.get()),
             "book_balance": acc.book_balance(today),
             "year": year,
             "vendors_1099": acc.vendor_1099_totals(year),
@@ -1095,6 +1117,65 @@ def accounting(request):
             "today": today,
         },
     )
+
+
+def _setup_initial() -> dict:
+    from core.templatetags.portal import cents_plain
+    from ledger.models import AccountingSetup
+
+    setup = AccountingSetup.get()
+    if setup.opening_cash_on is None and not setup.opening_cash_cents:
+        return {}
+    return {
+        "opening_cash": cents_plain(setup.opening_cash_cents),
+        "opening_cash_on": setup.opening_cash_on,
+    }
+
+
+def _accounting_setup_page(request, form, status=200):
+    """Accounting's Setup tab: accounts grouped under plain headings, then
+    the opening balance (owner request 2026-11-26)."""
+    from ledger import accounting as acc
+    from ledger.models import AccountingSetup
+
+    typed = None
+    if form.is_bound:
+        typed = {key: form.data.get(f"gl_{key}", "") for key in acc.GL_LABELS}
+    return render(
+        request,
+        "ledger/accounting_setup.html",
+        {
+            "form": form,
+            "groups": acc.setup_groups(AccountingSetup.get(), typed),
+            "summary": acc.setup_summary(AccountingSetup.get()),
+        },
+        status=status,
+    )
+
+
+def _accounting_setup_save(request):
+    from ledger import accounting as acc
+    from ledger.models import AccountingSetup
+
+    form = AccountingSetupForm(request.POST)
+    if not form.is_valid():
+        return _accounting_setup_page(request, form)
+    data = form.cleaned_data
+    try:
+        acc.save_setup(
+            gl_accounts=acc.gl_text(
+                AccountingSetup.get(), {key: data[f"gl_{key}"] for key in acc.GL_LABELS}
+            ),
+            opening_cash_cents=data["opening_cash"] or 0,
+            opening_cash_on=data["opening_cash_on"],
+            actor=request.user,
+            request=request,
+        )
+    except acc.AccountingError as exc:
+        form.add_error(None, str(exc))
+        return _accounting_setup_page(request, form)
+    messages.success(request, "Accounting setup saved.")
+    return redirect(reverse("accounting") + "?tab=setup")
 
 
 @login_required

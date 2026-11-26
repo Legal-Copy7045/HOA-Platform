@@ -65,6 +65,19 @@
     group.addEventListener("toggle", function () { store(key, group.open ? "1" : "0"); });
   });
 
+  // A link to something inside a folded section (<details>) opens the
+  // section, on load and on in-page links (Community settings, WT-014).
+  function openTarget() {
+    var id = window.location.hash.slice(1);
+    if (!id) return;
+    var el = document.getElementById(id);
+    for (var node = el; node; node = node.parentElement) {
+      if (node.tagName === "DETAILS") node.open = true;
+    }
+  }
+  openTarget();
+  window.addEventListener("hashchange", openTarget);
+
   // <form data-confirm="Are you sure?"> asks before submitting. A form with
   // data-confirm-ballot builds the question from the boxes ticked.
   document.addEventListener("submit", function (e) {

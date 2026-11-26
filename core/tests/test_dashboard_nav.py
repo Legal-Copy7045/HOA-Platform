@@ -56,7 +56,7 @@ def test_board_dashboard_lists_invoice_waiting_for_me(client):
     [
         (
             [Role.SYSADMIN],
-            ["System status", "Invitations and sign-ups", "Branding"],
+            ["System status", "Invitations", "Branding"],
             ["Owner accounts", "People", "My home", "Settings"],
         ),
         ([Role.AUDITOR], ["Owner accounts", "Reports"], ["Approvals", "People"]),

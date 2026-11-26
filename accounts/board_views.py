@@ -13,13 +13,61 @@ from accounts.models import Invitation, MfaReset
 from community.models import Person
 from core import policy
 
+SIGNUPS_TAB = "view=signups"
+
+
+def signups_url() -> str:
+    """The board's sign-ups: a tab of Homes and owners (WT-002)."""
+    return f"{reverse('lot_list')}?{SIGNUPS_TAB}"
+
+
+def _back_to_list(user) -> str:
+    """Where a button on the invitations list returns to: the board's
+    sign-ups tab, or the sysadmin's Invitations page."""
+    return signups_url() if policy.can(user, "invite.send") else reverse("invitations")
+
+
+def invitation_rows(user):
+    return Invitation.objects.for_user(user).select_related("person")[:200]
+
+
+def signups_context(request) -> dict:
+    """The sign-ups tab of Homes and owners (board, ``invite.send``): the
+    per-home sign-up status, the official-notice counts and the bulk
+    buttons, above every invitation with re-send and revoke. Each button
+    keeps its own permission check."""
+    policy.require(request.user, "invite.send")
+    rows = services.onboarding_rows()
+    counts = dict.fromkeys(services.ONBOARDING_LABELS, 0)
+    for r in rows:
+        counts[r["status"]] += 1
+        r["label"] = services.ONBOARDING_LABELS[r["status"]]
+    # D44: how homes get official notices (counts only) and the wording.
+    from community import notices
+    from community.services import notice_choice_counts
+
+    return {
+        "invitations": invitation_rows(request.user),
+        "can_send": True,
+        "can_resend": policy.can(request.user, "invite.resend"),
+        "can_revoke": policy.can(request.user, "invite.revoke"),
+        "rows": rows,
+        "counts": counts,
+        "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
+        "remind_count": len(services.reminder_due(rows=rows)),
+        "notice_counts": notice_choice_counts(),
+        "notice_version": notices.CONSENT_VERSION,
+        "notice_wording": notices.consent_text(),
+    }
+
 
 @login_required
 def invitations(request):
-    """Invitations and sign-ups: the per-lot sign-up status and the bulk
-    buttons (board, ``invite.send``) above every invitation with re-send and
-    revoke (board or sysadmin). Each button keeps its own permission check;
-    sysadmins see invitation status only, not the register (decision D9)."""
+    """Invitations. The board's sign-ups live on Homes and owners
+    (``lot_list?view=signups``, WT-002), so a board member is sent there;
+    the bulk buttons and the letters download still post and link here.
+    A sysadmin sees only the invitations with re-send and revoke, never the
+    register of owners (decision D9)."""
     from documents.attachments import pdf_response
 
     policy.require(request.user, "invite.resend")
@@ -33,45 +81,21 @@ def invitations(request):
         elif action == "remind":
             n = services.remind_pending(actor=request.user, request=request)
             messages.success(request, f"{n} reminder(s) sent.")
-        return redirect("invitations")
+        return redirect(signups_url())
+    if request.GET.get("letters") == "1":
+        policy.require(request.user, "invite.send")
+        rows = services.onboarding_rows()
+        return pdf_response(
+            services.email_request_letters_pdf([r for r in rows if r["status"] == "no_email"]),
+            "portal-letters.pdf",
+        )
+    if can_send:
+        return redirect(signups_url())
     context = {
-        "invitations": Invitation.objects.for_user(request.user).select_related("person")[:200],
-        "can_send": can_send,
-        "can_resend": policy.can(request.user, "invite.resend"),
+        "invitations": invitation_rows(request.user),
+        "can_resend": True,
         "can_revoke": policy.can(request.user, "invite.revoke"),
     }
-    if can_send:
-        rows = services.onboarding_rows()
-        if request.GET.get("letters") == "1":
-            return pdf_response(
-                services.email_request_letters_pdf([r for r in rows if r["status"] == "no_email"]),
-                "portal-letters.pdf",
-            )
-        counts = dict.fromkeys(services.ONBOARDING_LABELS, 0)
-        for r in rows:
-            counts[r["status"]] += 1
-            r["label"] = services.ONBOARDING_LABELS[r["status"]]
-        context.update(
-            {
-                "rows": rows,
-                "counts": counts,
-                "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
-                "remind_count": len(services.reminder_due(rows=rows)),
-            }
-        )
-        # D44: how homes get official notices (counts only) and the wording.
-        from community import notices
-        from community.services import notice_choice_counts
-
-        context.update(
-            {
-                "notice_counts": notice_choice_counts(),
-                "notice_version": notices.CONSENT_VERSION,
-                "notice_wording": notices.consent_text(),
-            }
-        )
-    elif request.GET.get("letters") == "1":
-        policy.require(request.user, "invite.send")
     return render(request, "accounts/board/invitations.html", context)
 
 
@@ -109,7 +133,7 @@ def invitation_action(request, pk, action):
             messages.success(request, "Invitation revoked.")
     except services.InvitationError as exc:
         messages.error(request, str(exc))
-    return redirect("invitations")
+    return redirect(_back_to_list(request.user) + "#every-invitation")
 
 
 @login_required

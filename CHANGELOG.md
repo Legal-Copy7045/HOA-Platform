@@ -6,6 +6,41 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.19.0 — 2026-11-26
+
+- Homes and owners has a Sign-ups view for the board (who has signed up,
+  how homes get official notices, invite everyone, reminders and every
+  invitation); the separate "Invitations and sign-ups" menu entry is gone and
+  its old address leads there. The sysadmin's page is now called Invitations.
+- One name per thing: "My home improvement requests (ARC)" on My home and
+  My history, "Work order #3", "Invoice PP-102 · vendor", My items groups named
+  after the page they open (Voting, Invoices, Second approvals, People...),
+  plainer report names, and a tenant's Voting is called Surveys.
+- Community settings: a section index at the top, sections that fold away,
+  the card surcharge typed as a percent (3 or 2.5; still at most 3%), and
+  plain wording for reading neighbor acknowledgements from scanned forms.
+  ARC request types fold to one line each with their citation.
+- Former owners: My history shows a running balance, a statement PDF for
+  their period, and whom to ask about the balance.
+- My account links to the people on the account on My home instead of
+  listing them twice.
+- Ways back: breadcrumbs on every Settings page, Access review and Neighbor
+  acknowledgements.
+- Sysadmin activity shows 30 days at a time with Older and Newer, by day,
+  with filters and a CSV export (recorded in the audit log).
+- ARC reviewers choose their position from an empty list (nothing is
+  recorded by accident), and steps they can never take are no longer shown.
+- Auditors and sysadmins see their usual pages on the dashboard instead of
+  an always-empty to-do list; Quick actions moved up under the to-dos.
+- Documents: "Ask to inspect it" opens the request form; meeting packets are
+  listed under "Meeting packets".
+- Phone menu: staff see their work sections open when something waits there,
+  and Sign out is at the top of the drawer.
+- Accounting setup has its own tab, grouped under plain headings with a line
+  on what each account is for, the whole account visible, and the opening
+  balance and its date required together; Accounting shows a one-line
+  summary.
+
 ## 0.15.0 — 2026-11-26
 
 - Automatic payments (optional feature, off by default; needs Online

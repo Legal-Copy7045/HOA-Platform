@@ -233,3 +233,15 @@
   check: "On a phone, My profile's How we reach you sections stack with full-width buttons; ticking 'Receive text alerts' shows the number field; choosing 'A different address' shows the address fields."
   steps: "Open My profile on a phone as a demo owner; add an email and a phone; tick and untick text alerts; switch the mailing address choice."
   last: ""
+- key: community settings index and folding
+  check: "On Community settings the section index stays in view while scrolling, a section folds and unfolds, and a link in the 'needs attention' summary opens its section at the rule."
+  steps: "Sign in as a board member; open Settings, Community settings; scroll; click a section link and an attention link."
+  last: "not done yet"
+- key: phone menu sign out at the top
+  check: "On a phone, the menu drawer shows the name, Profile, Sign-in and security and Sign out at the top; for board, manager and ARC the sections with waiting items are open and My home and Community closed (new browser)."
+  steps: "Private window on a phone; sign in as board; open Menu."
+  last: "not done yet"
+- key: accounting setup on a phone
+  check: "Finance, Accounting, Setup on a phone: one column, each account input full width showing the whole value, the $ beside the opening balance, Save at the bottom."
+  steps: "Sign in as board on a phone; open Accounting; tap Setup."
+  last: "not done yet"
