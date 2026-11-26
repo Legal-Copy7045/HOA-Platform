@@ -26,6 +26,7 @@ WORKER_STALE_MINUTES = 20
 SIGNATURES_STALE_DAYS = 3
 ERRORS_PER_HOUR = 20
 DISK_FULL_PERCENT = 90
+BACKUP_STALE_HOURS = 36
 
 
 @dataclass
@@ -124,6 +125,34 @@ def _email():
     )
 
 
+def _backups():
+    from core import offsite
+    from core.models import Heartbeat
+
+    beats = dict(Heartbeat.objects.filter(name__startswith="backup_").values_list("name", "at"))
+    beats.update(Heartbeat.objects.filter(name="offsite_lock").values_list("name", "at"))
+    now = timezone.now()
+
+    def age(name):
+        at = beats.get(name)
+        return None if at is None else int((now - at).total_seconds() // 3600)
+
+    local = age("backup_local")
+    if local is None:
+        return False, "No backup has run yet (infra/poc/backup.sh --install)"
+    if local > BACKUP_STALE_HOURS:
+        return False, f"Last backup {local} hours ago"
+    if not offsite.configured():
+        return True, f"Last backup {local} h ago; no off-site copy"
+    remote = age("backup_offsite")
+    if remote is None or remote > BACKUP_STALE_HOURS:
+        when = "never" if remote is None else f"{remote} hours ago"
+        return False, f"Last backup {local} h ago, but off-site copy {when}"
+    lock = beats.get("offsite_lock")
+    locked = f"lock verified {timezone.localdate(lock):%b %-d}" if lock else "lock not verified"
+    return True, f"Last backup {local} h ago; off-site {remote} h ago, {locked}"
+
+
 CHECKS = [
     ("database", "Database", _database),
     ("worker", "Background worker", _worker),
@@ -132,6 +161,7 @@ CHECKS = [
     ("signatures", "Malware scanner", _signatures),
     ("errors", "Server errors", _errors),
     ("email", "Outgoing email", _email),
+    ("backups", "Backups", _backups),
 ]
 
 

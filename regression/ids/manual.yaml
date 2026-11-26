@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-036
+# highest issued: MAN-037
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -36,3 +36,4 @@ MAN-033: "install update refuses a non-main branch"
 MAN-034: "move files to R2 compares counts"
 MAN-035: "push and SMS settings reach the containers"
 MAN-036: "host hardening on the VM"
+MAN-037: "off-site backups locked"
