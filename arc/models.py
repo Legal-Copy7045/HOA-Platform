@@ -283,14 +283,15 @@ class SignoffRequest(ScopedModel):
     def scope_for_owner(cls, queryset, roles):
         """Owners see the acknowledgements asked of their own lot (their
         neighbors' projects) once they were actually asked: never a draft, and
-        a waiting one only while the request is still open (BUG-002, BUG-008);
-        and those on their own ARC requests."""
-        asked = models.Q(lot_id__in=roles.owned_lot_ids, sent_at__isnull=False) & ~models.Q(
-            arc_request__state=ArcState.DRAFT
-        )
-        still_open = ~models.Q(state=SignoffState.PENDING) | models.Q(
-            arc_request__state__in=NEIGHBOR_VISIBLE_STATES
-        )
+        only while the request is still open (BUG-002, BUG-008, SEC-001), and
+        only those sent since they own the lot: a buyer never sees what the
+        seller was asked or answered (SEC-001); and those on their own ARC
+        requests."""
+        asked = models.Q(pk__in=[])
+        for lot_id, since in roles.owned_since:
+            if lot_id in roles.owned_lot_ids:
+                asked |= models.Q(lot_id=lot_id, sent_at__date__gte=since)
+        still_open = models.Q(arc_request__state__in=NEIGHBOR_VISIBLE_STATES)
         return queryset.filter(
             (asked & still_open)
             | models.Q(
