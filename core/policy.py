@@ -116,7 +116,8 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Owner requests: owners, authorized contacts and tenants raise them
     # (view-only contacts and former owners cannot).
     "request.submit": frozenset({OWNER, AUTHORIZED, TENANT}),
-    "request.view_own": RESIDENTS | {FORMER_OWNER},
+    # Former owners read their old requests inside My history (streamlining).
+    "request.view_own": RESIDENTS,
     "request.manage": frozenset({BOARD, MANAGER}),
     "followup.view": frozenset({BOARD, MANAGER}),
     "workorder.manage": frozenset({BOARD, MANAGER}),
@@ -206,6 +207,10 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "payments.pay": frozenset({OWNER, AUTHORIZED}),
     # Closing online-payment problems (mismatches, refunds, disputes): board.
     "payments.manage": frozenset({BOARD}),
+    # --- Community streamlining (community builder) ---
+    # Board and committees: names, offices and committee members only (no
+    # contact details), for everyone who sees the community pages.
+    "board_committees.view": COMMUNITY,
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

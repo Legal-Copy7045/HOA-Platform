@@ -151,6 +151,9 @@ def test_permissions_unchanged_owner_still_refused_board_pages(client, w):
         assert client.get(reverse(name)).status_code in (403, 404), name
 
 
+MERGED_INTO = {"Roster": "Lots and owners", "Onboarding": "Invitations and sign-ups"}
+
+
 def test_nav_labels_match_page_headings(client, w):
     """Each menu label is the page's <h1> (docs/glossary.md)."""
     wrong = []
@@ -160,9 +163,12 @@ def test_nav_labels_match_page_headings(client, w):
             for item in s["items"]:
                 if item["label"] in ("Dashboard", "Budget"):  # greeting; budget's own title
                     continue
-                page = client.get(item["url"]).content.decode()
+                page = client.get(item["url"], follow=True).content.decode()
                 h1 = re.search(r"<h1[^>]*>(.*?)</h1>", page, re.S)
-                if not h1 or item["label"] not in h1.group(1):
+                # Old pages merged into another (streamlining) redirect there
+                # until the menu drops them.
+                label = MERGED_INTO.get(item["label"], item["label"])
+                if not h1 or label not in h1.group(1):
                     wrong.append((item["label"], h1.group(1) if h1 else None))
     assert not wrong, wrong
 

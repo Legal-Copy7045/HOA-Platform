@@ -53,6 +53,11 @@ urlpatterns = [
         account_views.account_contact_end,
         name="lot_account_contact_end",
     ),
+    path(
+        "community/board-and-committees/",
+        views.board_and_committees,
+        name="board_and_committees",
+    ),
     path("lots/", views.lot_list, name="lot_list"),
     path("lots/<int:pk>/", views.lot_detail, name="lot_detail"),
     path("lots/<int:pk>/transfer/", views.lot_transfer, name="lot_transfer"),

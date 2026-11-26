@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Board and committees · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Board and committees</h1>
+    <p class="subtitle">Who serves the community.{% if user|can:"request.submit" %} To reach the board, <a href="{% url 'requests' %}?mine=1">send a request</a>.{% endif %}</p></div></div>
+  <section class="card" aria-labelledby="board-h">
+    <h2 id="board-h">Board of directors</h2>
+    {% if board %}<ul class="list">{% for m in board %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow"><div class="title">{{ m.name }}</div><div class="small muted">{% if m.offices %}{{ m.offices|join:", " }}{% else %}Director{% endif %}</div></div></li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="users" title="No board members recorded yet" %}{% endif %}
+  </section>
+  {% if show_committees %}
+  <h2>Committees</h2>
+  {% for c in committees %}
+    <section class="card" aria-labelledby="committee-{{ c.committee.pk }}">
+      <h3 id="committee-{{ c.committee.pk }}">{% if c.can_open %}<a href="{% url 'committee_detail' c.committee.pk %}">{{ c.committee.name }}</a>{% else %}{{ c.committee.name }}{% endif %}</h3>
+      {% if c.committee.purpose %}<p class="muted">{{ c.committee.purpose }}</p>{% endif %}
+      {% if c.members %}<ul class="list">{% for m in c.members %}<li><span class="grow">{{ m.name }}</span><span class="small muted">{{ m.role }}</span></li>{% endfor %}</ul>
+      {% else %}<p class="muted small">No members appointed yet.</p>{% endif %}
+    </section>
+  {% empty %}<section class="card">{% include "partials/empty.html" with icon="users" title="No committees yet" %}</section>{% endfor %}
+  {% endif %}
+{% endblock %}

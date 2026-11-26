@@ -580,6 +580,27 @@ def committees_for(user):
     return Committee.objects.filter(pk__in=_policy.roles_for(user).committee_ids)
 
 
+def committees_public(*, actor) -> list[dict]:
+    """Board and committees page: each active committee's name and purpose
+    and its current members' names and roles (chair or member), nothing else,
+    for everyone who sees the community pages."""
+    require(actor, "board_committees.view")
+    rows = []
+    for committee in Committee.objects.filter(active=True):
+        members = [
+            {"name": m.person.display_name, "role": m.get_role_display()}
+            for m in committee_members(committee)
+        ]
+        rows.append(
+            {
+                "committee": committee,
+                "members": members,
+                "can_open": can_view_committee(actor, committee),
+            }
+        )
+    return rows
+
+
 def create_committee(*, name: str, purpose: str = "", citation: str = "", actor, request=None):
     require(actor, "committee.manage")
     name = single_line(name)[:120]

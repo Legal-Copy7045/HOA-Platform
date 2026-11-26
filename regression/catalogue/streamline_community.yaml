@@ -1,0 +1,35 @@
+# Community streamlining (owner-approved 2026-11-26): merged pages, the Board and committees page,
+# view-only and former owners' requests, areas with their booking rules, urgent texts from the
+# announcement form and Recurring deadlines on Board tasks. `match` runs over "<stage>:<check>".
+- feature: "Lots and owners with the roster view (accounts, contacts, balances, audited CSV export); the old Roster URL redirects with its query"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:community/tests/test_roster_lists_faq\\.py::test_(roster|old_roster|lots_and_owners|previous_accounts)"]
+- feature: "Invitations and sign-ups: per-lot sign-up status, bulk invite and reminders (board only, invite.send), letters for owners without email; sysadmin sees no register and no bulk buttons; the old Onboarding URL redirects"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:accounts/tests/test_onboarding\\.py::test_"]
+- feature: "Budget and reserves: the owner budget and the adopted reserve summary on one page, each part with its feature; the old Reserve plan summary URL redirects"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:ledger/tests/test_reserve_plan\\.py::test_(owner_sees_summary_only|owner_summary_shows|summary_is_on_budget|budget_and_reserves)"]
+- feature: "Board and committees for every resident (board_committees.view): names, offices and committee members only, never contact details, lots, topics or directory-private fields; not a coverage-checked action; no audit change"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:community/tests/test_board_and_committees\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_board_and_committees_shows_names_and_offices_only"]
+- feature: "View-only contacts read the account's requests and can never post, withdraw, add photos or raise; former owners read their requests in My history and have no separate My requests"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:operations/tests/test_requests\\.py::test_(view_only_contact_sees|owner_who_is_view_only_elsewhere_cannot_post|former_owner_reads|a_former_owner_who_owns)"]
+- feature: "Common areas and their booking rules edited together (board only), invalid forms re-shown with what was typed, areas no longer in use listed"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:community/tests/test_reservations\\.py::test_(area_and_its_rules|invalid_area_form|retired_areas|only_the_board_edits|board_saves_rules)"]
+- feature: "Urgent text from the announcement form (sms feature and sms.send_urgent only), checked before publishing, linked to the new announcement; the sent log stays at its URL"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:comms/tests/test_sms\\.py::test_(announcement_form_offers|board_publishes_and_texts|manager_cannot_text|a_text_that_cannot_go_out|no_one_opted_in)"]
+- feature: "Recurring deadlines tab of Board tasks (compliance.manage and the compliance feature); the old Compliance calendar URL redirects; My items links to the tab"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:operations/tests/test_compliance\\.py::test_(compliance_redirects|deadline_forms|deadlines_tab|due_deadlines|starter_items)"]

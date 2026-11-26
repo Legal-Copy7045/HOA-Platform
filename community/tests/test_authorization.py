@@ -269,6 +269,7 @@ MEMBER_READS = {
     "vote.view",
     "reservation.view",
     "survey.view",  # Surveys (M5); each survey's audience narrows it further
+    "board_committees.view",  # Board and committees: names and offices only
 }
 
 
@@ -320,7 +321,8 @@ MEMBER_READS = {
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
         ("sysadmin", {"system.view_status", "invite.resend", "invite.revoke", "branding.manage"}),
-        ("former", {"history.view_own", "request.view_own"}),
+        # Former owners read their old requests inside My history.
+        ("former", {"history.view_own"}),
     ],
 )
 def test_permission_matrix(world, who, allowed):

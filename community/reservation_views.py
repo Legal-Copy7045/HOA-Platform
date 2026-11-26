@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from community import reservations
-from community.models import CommonArea, Lot, Reservation, ReservationSettings
+from community.models import CommonArea, CommonAreaKind, Lot, Reservation, ReservationSettings
 from core import policy
 from core.money import MoneyField, format_cents
 
@@ -68,6 +68,29 @@ class AreaRulesForm(forms.Form):
         max_length=200,
         required=False,
     )
+
+
+class AreaForm(AreaRulesForm):
+    """One common area and its booking rules, edited together (streamlining):
+    the area itself (name, kind, notes, in use) above its rules."""
+
+    name = forms.CharField(label="Name", max_length=120)
+    kind = forms.ChoiceField(label="Kind", choices=CommonAreaKind.choices)
+    notes = forms.CharField(
+        label="Notes (board only)", required=False, widget=forms.Textarea(attrs={"rows": 2})
+    )
+    active = forms.BooleanField(
+        label="In use (uncheck for an area the community no longer has)", required=False
+    )
+    field_order = ["name", "kind", "notes", "active"]
+
+    AREA_FIELDS = ("name", "kind", "notes", "active")
+
+    def area_data(self) -> dict:
+        return {f: self.cleaned_data[f] for f in self.AREA_FIELDS}
+
+    def rules_data(self) -> dict:
+        return {k: v for k, v in self.cleaned_data.items() if k not in self.AREA_FIELDS}
 
 
 def _form_errors(request, form):
@@ -191,13 +214,20 @@ def reservation_action(request, pk, action):
 
 
 @login_required
-def reservation_settings(request):
+def reservation_settings(request, bound=None):
+    """Common area booking rules: each area and its rules on one form. Areas
+    no longer in use are listed last so they can be brought back."""
     policy.require(request.user, "reservation.configure")
-    areas = CommonArea.objects.filter(active=True).order_by("name")
+    from community import forms as community_forms
+
+    areas = CommonArea.objects.order_by("-active", "name")
     saved = {r.area_id: r for r in ReservationSettings.objects.filter(area__in=areas)}
     rows = []
     for area in areas:
         rules = saved.get(area.pk) or ReservationSettings(area=area)
+        if bound is not None and bound.prefix == f"a{area.pk}":
+            rows.append((area, rules, bound))
+            continue
         initial = {
             f: getattr(rules, f)
             for f in AreaRulesForm.base_fields
@@ -206,26 +236,45 @@ def reservation_settings(request):
         for f in ("fee_cents", "deposit_cents"):
             value = getattr(rules, f)
             initial[f] = format_cents(value).lstrip("$") if value is not None else ""
-        rows.append((area, rules, AreaRulesForm(initial=initial, prefix=f"a{area.pk}")))
-    return render(request, "community/reservation_settings.html", {"rows": rows})
+        initial.update({f: getattr(area, f) for f in AreaForm.AREA_FIELDS})
+        rows.append((area, rules, AreaForm(initial=initial, prefix=f"a{area.pk}")))
+    return render(
+        request,
+        "community/reservation_settings.html",
+        {
+            "rows": rows,
+            "area_form": community_forms.CommonAreaForm(),
+            "can_add_area": policy.can(request.user, "community.manage_rules"),
+        },
+        status=400 if bound is not None else 200,
+    )
 
 
 @login_required
 @require_POST
 def reservation_area_save(request, pk):
+    """Save one area and its booking rules together (both board only)."""
+    from django.db import transaction
+
+    from community import services as community
+
     policy.require(request.user, "reservation.configure")
+    policy.require(request.user, "community.manage_rules")
     area = get_object_or_404(CommonArea, pk=pk)
-    form = AreaRulesForm(request.POST, prefix=f"a{area.pk}")
-    back = reverse("reservation_settings")
-    if not form.is_valid():
-        _form_errors(request, form)
-        return redirect(back)
-    try:
-        reservations.save_area_settings(
-            area, actor=request.user, request=request, **form.cleaned_data
-        )
-    except reservations.ReservationError as exc:
-        messages.error(request, str(exc))
-    else:
-        messages.success(request, f"Booking rules saved for {area.name}.")
-    return redirect(back)
+    form = AreaForm(request.POST, prefix=f"a{area.pk}")
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                community.save_common_area(
+                    area=area, actor=request.user, request=request, **form.area_data()
+                )
+                reservations.save_area_settings(
+                    area, actor=request.user, request=request, **form.rules_data()
+                )
+        except (reservations.ReservationError, community.CommunityError) as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(request, f"Saved {area.name} and its booking rules.")
+            return redirect(reverse("reservation_settings") + f"#area-{area.pk}")
+    # Invalid: the page again with what was typed and the errors.
+    return reservation_settings(request, bound=form)

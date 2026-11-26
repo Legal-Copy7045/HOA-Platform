@@ -163,7 +163,7 @@
   last: ""
 - key: reserve plan on a phone
   check: "Finance > Reserve plan reads on a phone: the four figures stack, the year-by-year table scrolls sideways inside its card (not the page), below-zero years are tinted and say 'Below zero', and the Add a component and Plan settings panels open and save."
-  steps: "Sign in as a demo board member on a phone; Finance > Reserve plan; scroll the table; open Plan settings, type 3.5 for inflation and save; add a component; then open Community info > Reserve plan summary as a demo owner."
+  steps: "Sign in as a demo board member on a phone; Finance > Reserve plan; scroll the table; open Plan settings, type 3.5 for inflation and save; add a component; then open Budget and reserves (Reserves section) as a demo owner."
   last: ""
 - key: bank feed teller connect
   check: "With Teller set up (sandbox first, then development), Connect a bank asks for the password or passkey, opens Teller's window without CSP errors in the browser console, and after choosing a bank shows the account with its last four digits and recent lines; Sync now adds nothing twice; Disconnect asks first and keeps the lines; no other page's Content-Security-Policy mentions teller.io."
@@ -176,4 +176,12 @@
 - key: stripe test payment
   check: "With test keys on the POC and Online payments switched on: an owner pays one charge by credit card 4242 4242 4242 4242 (surcharge shown first, TEST MODE banner), by debit card 4000 0566 5566 5556 (no fee) and by a test bank account (processing, then paid next day); each shows on My account against the chosen charge, a receipt email and PDF arrive, and Finance -> Online payments shows the payment, the payout and 'matches'."
   steps: "Follow docs/runbook.md 'Online payments (Stripe)' test-mode setup; sign in as a demo owner; Pay online three times; next day open Finance -> Online payments; on a phone check the pay page fits the screen."
+  last: ""
+- key: streamlined community pages at phone width
+  check: "Lots and owners (both views), Invitations and sign-ups, Budget and reserves, Board and committees, Common area booking rules and Board tasks > Recurring deadlines read well on a phone: no sideways scrolling outside the tables, tabs reachable, forms usable; Board and committees shows names and offices only."
+  steps: "On the POC with demo data, open each page as a demo board member on a phone (Board and committees also as a demo owner and a tenant); switch the Lots and owners view; open an area on Common area booking rules and save; open Recurring deadlines and edit an item."
+  last: ""
+- key: urgent text from an announcement
+  check: "With the sms feature on and a test provider, the announcement form shows 'Also send as an urgent text (N opted in)' to a board member only; ticking it publishes the announcement and the phone that opted in gets one text linking to it; a text with an amount or email is refused before anything is published."
+  steps: "Board > Admin > Features: switch on Urgent text messages; opt a demo owner's test phone in on My profile; as a board member publish an announcement with the box ticked; check the phone; try again with '$100' in the text."
   last: ""

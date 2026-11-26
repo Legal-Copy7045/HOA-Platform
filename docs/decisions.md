@@ -361,3 +361,14 @@ How it was built (choices the board should know):
 - **Accounting**: the owner's payment is the base amount, applied to the chosen charges; the surcharge is not an owner charge but card surcharge income in the journal export, Stripe's fee an expense, payouts move Stripe clearing to the bank. Payouts are copied daily (append-only) and offered for bank matching through `payments.sync.payouts_for_matching(start, end)`.
 - **Three-way reconciliation** daily: ledger online payments against Stripe's balance lines and payouts (and, once wired, the bank deposits: hook `payments.sync.check_payouts_against_bank`). Any difference fails the "Online payments" health check, emails the board and sysadmins, and gives the treasurer a My item.
 - Still needed before live payments: the HOA-owned Stripe account (EIN, bank account), Visa/Mastercard surcharge registration 30 days ahead, counsel-approved disclosure wording, and the go-live checklist in the runbook.
+
+## D32-commstream. Community pages streamlined (2026-11-26)
+
+Owner-approved streamlining. Choices the board should know:
+
+- **Board and committees** is a new page for everyone who sees the community pages (new permission `board_committees.view`; former owners and sysadmin-only logins do not). It shows board members' names and offices and each active committee's name, purpose and members' names and roles. Committee names and members were board-and-member only before; they are now community-wide by this decision. Topics, tasks, files and every contact detail stay private, whatever the directory settings are.
+- **View-only contacts** see the account's requests read-only and can never post, withdraw, add photos or raise one, even when they own another home (the thread rule now checks the request's own lot).
+- **Former owners** no longer have "My requests" (`request.view_own` is residents only); their requests from their time are listed in My history and open read-only.
+- **Budget and reserves** is on while either the "Budget for owners" or the "Reserve plan" feature is on and shows only the parts switched on.
+- **Common areas** are edited together with their booking rules (both board only, saved together or not at all); Community settings keeps the "Add a common area" form so areas exist even with bookings off.
+- **Urgent texts** can go out from the announcement form (board, with the "sms" feature on); the text is checked before anything is published, and it links to the new announcement.

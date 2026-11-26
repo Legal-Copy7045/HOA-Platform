@@ -35,12 +35,42 @@ def w():
 # --- Roster ------------------------------------------------------------------------------
 
 
+ROSTER = {"view": "roster"}
+
+
 def test_roster_lists_accounts_for_the_board_and_auditor(client, w):
     client.force_login(w["auditor"])
-    page = client.get(reverse("roster")).content
+    page = client.get(reverse("lot_list"), ROSTER).content
     assert f"Lot {w['lot_a'].number}".encode() in page
+    assert b"<h1>Lots and owners</h1>" in page and b"Export CSV" in page
     client.force_login(w["owner"])
+    assert client.get(reverse("lot_list"), ROSTER).status_code == 403
     assert client.get(reverse("roster")).status_code == 403
+
+
+def test_old_roster_url_redirects_to_lots_and_owners(client, w):
+    client.force_login(w["board"])
+    response = client.get(reverse("roster"))
+    assert response.status_code == 302
+    assert response["Location"] == reverse("lot_list") + "?view=roster"
+    response = client.get(reverse("roster"), {"export": "csv", "previous": "1"})
+    assert response["Location"].startswith(reverse("lot_list") + "?")
+    for part in ("view=roster", "export=csv", "previous=1"):
+        assert part in response["Location"]
+
+
+def test_lots_and_owners_default_view_has_no_contact_details(client, w):
+    from community.models import Person
+    from core.scoping import system_access
+
+    with system_access("t"):
+        Person.objects.filter(user=w["owner"]).update(email="owner-a@example.com")
+    client.force_login(w["board"])
+    page = client.get(reverse("lot_list")).content
+    assert b"<h1>Lots and owners</h1>" in page and b"owner-a@example.com" not in page
+    assert b"Accounts, contacts and balances" in page
+    roster = client.get(reverse("lot_list"), ROSTER).content
+    assert b"owner-a@example.com" in roster
 
 
 def test_roster_export_is_audited_and_formula_safe(client, w):
@@ -50,7 +80,7 @@ def test_roster_export_is_audited_and_formula_safe(client, w):
     with system_access("t"):
         Person.objects.filter(user=w["owner"]).update(display_name="=HYPERLINK(1)")
     client.force_login(w["board"])
-    response = client.get(reverse("roster"), {"export": "csv"})
+    response = client.get(reverse("lot_list"), {**ROSTER, "export": "csv"})
     body = response.content.decode()
     assert response["Content-Type"].startswith("text/csv")
     assert "'=HYPERLINK(1)" in body
@@ -61,9 +91,9 @@ def test_previous_accounts_only_on_request(client, w):
     buyer = services.record_person(display_name="Buyer", actor=SYSTEM)
     services.transfer_lot(w["lot_a"], new_owners=[buyer], transfer_date=days_ago(1), actor=SYSTEM)
     client.force_login(w["board"])
-    current = client.get(reverse("roster")).content
+    current = client.get(reverse("lot_list"), ROSTER).content
     assert b"Dormant" not in current
-    previous = client.get(reverse("roster"), {"previous": "1"}).content
+    previous = client.get(reverse("lot_list"), {**ROSTER, "previous": "1"}).content
     assert b"Dormant" in previous
 
 

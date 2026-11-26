@@ -449,6 +449,36 @@ def staff_people(action: str) -> list[Person]:
     return [p for p in people if can(p.user, action)]
 
 
+def board_members_public(*, actor, on=None) -> list[dict]:
+    """Board and committees page: each current board member's name and
+    offices, nothing else (no contact details, lots or seat history), for
+    everyone who sees the community pages."""
+    from community.models import BoardSeat, Office, OfficeHolding
+
+    require(actor, "board_committees.view")
+    with system_access("board and committees page"):
+        seated = dict(
+            BoardSeat.objects.active(on)
+            .order_by("person__display_name")
+            .values_list("person_id", "person__display_name")
+        )
+        offices: dict[int, list[str]] = {}
+        for person_id, office in OfficeHolding.objects.active(on).values_list(
+            "person_id", "office"
+        ):
+            offices.setdefault(person_id, []).append(office)
+    order = {value: i for i, value in enumerate(Office.values)}
+    labels = dict(Office.choices)
+    rows = []
+    for person_id, name in seated.items():
+        held = sorted((o for o in offices.get(person_id, []) if o in labels), key=order.get)
+        rank = order[held[0]] if held else len(order)
+        rows.append({"name": name, "offices": [labels[o] for o in held], "rank": rank})
+    # Officers first, in the usual order; then the other directors by name.
+    rows.sort(key=lambda r: (r["rank"], r["name"]))
+    return rows
+
+
 def notice_emails_for_users(users) -> list[str]:
     """Consented extra notice emails of the people behind these logins."""
     with system_access("notice emails for users"):
