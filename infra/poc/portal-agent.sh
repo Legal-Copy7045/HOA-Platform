@@ -87,6 +87,15 @@ SQL
 }
 
 UPDATED=0
+# "Install tonight" (D38): at the scheduled time a scheduled update becomes a
+# request, installed below. Tolerant of a database not yet migrated (the
+# column arrives with the release that brings this line).
+psql_run >/dev/null 2>&1 <<'SQL' || true
+UPDATE core_updatestatus
+   SET state = 'requested', state_changed_at = now(), scheduled_for = NULL
+ WHERE id = 1 AND state = 'scheduled' AND scheduled_for <= now();
+SQL
+
 read -r STATE DUE <<<"$(psql_run <<'SQL' | tr '|' ' '
 SELECT state,
        (checked_at IS NULL
@@ -110,7 +119,7 @@ elif [ "$STATE" = "requested" ]; then
 UPDATE core_updatestatus SET state = 'running', state_changed_at = now(), message = '' WHERE id = 1;
 SQL
   {
-    echo "=== $(date -u +%FT%TZ) update requested from System status"
+    echo "=== $(date -u +%FT%TZ) update requested from System status (now or scheduled)"
   } >>"$LOG"
   if bash "$APP_DIR/infra/poc/update-portal.sh" >>"$LOG" 2>&1; then
     RESULT=succeeded; MESSAGE="Running $(g rev-parse --short HEAD)"

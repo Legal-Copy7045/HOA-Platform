@@ -106,7 +106,7 @@ def test_update_controls_only_record_a_request(client):
         checked_at=timezone.now(),
     )
     page = client.get(reverse("system_status")).content.decode()
-    assert "Update available: 2 changes" in page and "Install update" in page
+    assert "Update available: 2 changes" in page and "Install now" in page
     client.post(reverse("system_status"), {"action": "install_update"})
     status = UpdateStatus.objects.get(pk=1)
     assert status.state == "requested" and status.requested_by == admin
@@ -306,3 +306,83 @@ def test_status_page_stacks_on_phones(client):
     css = Path("static/css/site.css").read_text()
     assert ".grid.stack-sm { grid-template-columns: 1fr; }" in css
     assert ".health-list > li { flex-wrap: wrap; }" in css
+
+
+def test_next_update_window_is_the_coming_4am_eastern(settings):
+    import datetime
+    import zoneinfo
+
+    from core.views import next_update_window
+
+    settings.UPDATE_NIGHTLY_HOUR = 4
+    ny = zoneinfo.ZoneInfo("America/New_York")
+    evening = datetime.datetime(2026, 11, 26, 21, 30, tzinfo=ny)
+    assert next_update_window(evening) == datetime.datetime(2026, 11, 27, 4, 0, tzinfo=ny)
+    early = datetime.datetime(2026, 11, 27, 2, 0, tzinfo=ny)
+    assert next_update_window(early) == datetime.datetime(2026, 11, 27, 4, 0, tzinfo=ny)
+    # Across the March clock change, still 4:00 local time.
+    spring = datetime.datetime(2027, 3, 13, 22, 0, tzinfo=ny)
+    assert next_update_window(spring).hour == 4 and next_update_window(spring).day == 14
+
+
+def test_install_tonight_schedules_and_can_be_cancelled(client):
+    from audit.models import AuditEvent
+    from core.models import UpdateStatus
+
+    admin = make_member(roles=[Role.SYSADMIN])
+    client.force_login(admin)
+    UpdateStatus.objects.create(
+        pk=1,
+        behind=1,
+        latest_commit="bbb2222",
+        agent_seen_at=timezone.now(),
+        checked_at=timezone.now(),
+    )
+    page = client.get(reverse("system_status")).content.decode()
+    assert "Install now" in page and "Install tonight at 4:00 am" in page
+    client.post(reverse("system_status"), {"action": "schedule_update"})
+    status = UpdateStatus.objects.get(pk=1)
+    assert status.state == "scheduled" and status.scheduled_for > timezone.now()
+    assert timezone.localtime(status.scheduled_for).hour == 4
+    page = client.get(reverse("system_status")).content.decode()
+    assert "Update scheduled for 4:00 AM" in page and "Cancel tonight's update" in page
+    assert AuditEvent.objects.filter(action="system.schedule_update").exists()
+    client.post(reverse("system_status"), {"action": "cancel_schedule"})
+    status.refresh_from_db()
+    assert status.state == "idle" and status.scheduled_for is None
+    # Install now still works while one is scheduled, and clears the schedule.
+    client.post(reverse("system_status"), {"action": "schedule_update"})
+    client.post(reverse("system_status"), {"action": "install_update"})
+    status.refresh_from_db()
+    assert status.state == "requested" and status.scheduled_for is None
+    client.force_login(make_member(board=True))
+    assert client.post(reverse("system_status"), {"action": "schedule_update"}).status_code == 403
+
+
+@pytest.mark.django_db
+def test_agent_turns_a_due_schedule_into_a_request():
+    from pathlib import Path
+
+    from django.db import connection
+
+    from core.models import UpdateStatus
+
+    text = Path("infra/poc/portal-agent.sh").read_text()
+    sql = re.search(r"(UPDATE core_updatestatus\s+SET state = 'requested'.*?;)", text, re.S).group(
+        1
+    )
+    past, future = (
+        timezone.now() - datetime.timedelta(minutes=1),
+        timezone.now() + datetime.timedelta(hours=1),
+    )
+    UpdateStatus.objects.create(pk=1, state="scheduled", scheduled_for=future)
+    with connection.cursor() as cur:
+        cur.execute(sql)
+    assert UpdateStatus.objects.get(pk=1).state == "scheduled"  # not yet
+    UpdateStatus.objects.filter(pk=1).update(scheduled_for=past)
+    with connection.cursor() as cur:
+        cur.execute(sql)
+    status = UpdateStatus.objects.get(pk=1)
+    assert status.state == "requested" and status.scheduled_for is None
+    # Tolerant of a database without the column yet (it ships with this release).
+    assert "<<'SQL' || true" in text.split("Install tonight")[1][:400]

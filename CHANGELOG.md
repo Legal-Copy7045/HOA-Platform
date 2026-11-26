@@ -6,6 +6,12 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.7.0 — 2026-11-26
+
+- Updates can wait for the night: System status offers "Install now" or
+  "Install tonight at 4:00 am" (Eastern), with "Cancel tonight's update" until
+  then. At that time the update agent installs the newest version (D38).
+
 ## 0.6.2 — 2026-11-26
 
 - System status on a phone: cards stack in one column and their buttons fit;

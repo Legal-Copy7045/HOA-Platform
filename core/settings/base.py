@@ -38,6 +38,9 @@ def _release() -> str:
 
 
 APP_RELEASE = _release()
+# "Install tonight" on System status runs the update at this hour, site time
+# (America/New_York), when nobody is likely to be using the portal (D38).
+UPDATE_NIGHTLY_HOUR = env.int("UPDATE_NIGHTLY_HOUR", default=4)
 # seed_demo refuses to run unless this is true (never set it in production).
 SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
 # Decision D21 (security review A3): a new board seat needs a second board

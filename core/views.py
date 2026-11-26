@@ -79,6 +79,22 @@ def _host_security(states):
     return rows
 
 
+def next_update_window(now=None):
+    """The next UPDATE_NIGHTLY_HOUR:00 in the site's time zone (D38)."""
+    import datetime
+
+    now = timezone.localtime(now or timezone.now())
+    at = now.replace(hour=settings.UPDATE_NIGHTLY_HOUR, minute=0, second=0, microsecond=0)
+    if at <= now:
+        at = timezone.make_aware(
+            datetime.datetime.combine(
+                now.date() + datetime.timedelta(days=1),
+                datetime.time(settings.UPDATE_NIGHTLY_HOUR),
+            )
+        )
+    return at
+
+
 def _update_action(request, action):
     """Ask the VM's update agent to check GitHub, or to install the update.
     The web app never touches the server itself: it records the request and
@@ -90,6 +106,7 @@ def _update_action(request, action):
     from audit.services import record_event
     from core.models import UpdateStatus
 
+    metadata: dict = {}
     with transaction.atomic():
         UpdateStatus.get()
         status = UpdateStatus.objects.select_for_update().get(pk=1)
@@ -97,22 +114,62 @@ def _update_action(request, action):
             status.check_requested_at = timezone.now()
             status.save(update_fields=["check_requested_at"])
             messages.success(request, "Checking for updates: refresh in a minute.")
+        elif action == "cancel_schedule":
+            if status.state == "scheduled":
+                status.state = "idle"
+                status.scheduled_for = None
+                status.state_changed_at = timezone.now()
+                status.save(update_fields=["state", "scheduled_for", "state_changed_at"])
+                messages.success(request, "Tonight's update is cancelled.")
+            else:
+                messages.info(request, "No update is scheduled.")
         elif status.state in ("requested", "running"):
             messages.info(request, "An update is already on its way.")
         elif not status.behind:
             messages.info(request, "The portal is already up to date.")
-        else:
-            status.state = "requested"
+        elif action == "schedule_update":
+            status.state = "scheduled"
+            status.scheduled_for = next_update_window()
             status.state_changed_at = timezone.now()
             status.requested_by = request.user
             status.message = ""
-            status.save(update_fields=["state", "state_changed_at", "requested_by", "message"])
+            status.save(
+                update_fields=[
+                    "state",
+                    "scheduled_for",
+                    "state_changed_at",
+                    "requested_by",
+                    "message",
+                ]
+            )
+            when = timezone.localtime(status.scheduled_for)
+            messages.success(
+                request,
+                f"The update will install at {when:%-I:%M %p} on {when:%b %-d} "
+                "(the newest version at that time). You can cancel it until then.",
+            )
+            metadata = {"at": when.isoformat(timespec="minutes")}
+        else:
+            status.state = "requested"
+            status.scheduled_for = None
+            status.state_changed_at = timezone.now()
+            status.requested_by = request.user
+            status.message = ""
+            status.save(
+                update_fields=[
+                    "state",
+                    "scheduled_for",
+                    "state_changed_at",
+                    "requested_by",
+                    "message",
+                ]
+            )
             messages.success(
                 request,
                 "Update requested. It starts within a minute and takes a few minutes; "
                 "the site may be unavailable for a few seconds at the end.",
             )
-    record_event(f"system.{action}", actor=request.user, request=request, metadata={})
+    record_event(f"system.{action}", actor=request.user, request=request, metadata=metadata)
     return redirect("system_status")
 
 
@@ -187,6 +244,8 @@ def system_status(request):
     if request.method == "POST" and request.POST.get("action") in (
         "check_updates",
         "install_update",
+        "schedule_update",
+        "cancel_schedule",
     ):
         return _update_action(request, request.POST["action"])
     executor = MigrationExecutor(connection)
@@ -208,6 +267,8 @@ def system_status(request):
         "core/system_status.html",
         {
             "version": settings.APP_RELEASE,
+            "nightly_hour_label": f"{settings.UPDATE_NIGHTLY_HOUR % 12 or 12}:00 "
+            f"{'am' if settings.UPDATE_NIGHTLY_HOUR < 12 else 'pm'}",
             "build": settings.APP_VERSION,
             "pending_migrations": len(pending),
             "jobs": jobs,
