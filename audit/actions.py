@@ -40,6 +40,9 @@ _SPECS = [
     ),
     _spec("ownership.ended", "Ownership ended", "lot_id", "person_id", "end_date"),
     _spec(
+        "ownership.type_changed", "Ownership type changed", "lot_id", "person_id", "ownership_type"
+    ),
+    _spec(
         "ownership.transferred",
         "Lot transferred to new owners",
         "lot_id",

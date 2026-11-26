@@ -1,0 +1,10 @@
+{# The deed and the sign-in outcome of an account change request (D40). Expects: ch (with deed_files); board #}
+{% if ch.is_owner_change %}<div class="small">Deed dated {{ ch.deed_date|date:"M j, Y" }}{% for f in ch.deed_files %} · <a href="{% url 'account_change_deed' ch.pk f.pk %}">{{ f.original_filename }}</a>{% empty %} · no deed file{% endfor %}</div>{% endif %}
+{% if ch.adds_person %}{% if ch.state == "pending" %}
+  {% if ch.will_invite %}<div class="small muted">Approving sends {% if board %}{{ ch.email }}{% else %}them{% endif %} an email invitation to sign in.</div>
+  {% else %}<div class="small muted">No sign-in: they don't use email. Approving keeps them on the account as a record only; they cannot sign in until the board adds an email to their record and invites them.</div>{% endif %}
+{% elif ch.state == "approved" %}
+  {% if ch.invitation_sent is True %}<div class="small muted">Invitation to sign in emailed.</div>
+  {% elif ch.invitation_sent is False %}<div class="small muted">The invitation could not be sent yet: the board sends it from Invitations and sign-ups.</div>
+  {% else %}<div class="small muted">On the account as a record only: no sign-in until the board adds an email and invites them.</div>{% endif %}
+{% endif %}{% endif %}

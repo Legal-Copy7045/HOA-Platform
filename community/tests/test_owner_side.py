@@ -105,7 +105,7 @@ def test_owner_asks_another_board_member_approves(client, w, django_capture_on_c
     account = _account(w["other"])
     client.post(
         reverse("account_change_request", args=[account.pk]),
-        {"action": "add", "name": "Teen Driver", "kind": "view_only"},
+        {"action": "add", "name": "Teen Driver", "kind": "view_only", "no_login": "on"},
     )
     change = AccountChangeRequest.objects.for_user(w["owner"]).get()
     assert change.state == "pending"
@@ -138,7 +138,12 @@ def test_owner_asks_to_remove_and_board_declines(w):
 
 def test_requester_on_the_board_cannot_approve_their_own_change(w):
     change = services.request_account_change(
-        _account(w["lot"]), action="add", name="Spouse", kind="authorized", actor=w["board_owner"]
+        _account(w["lot"]),
+        action="add",
+        name="Spouse",
+        kind="authorized",
+        no_login=True,
+        actor=w["board_owner"],
     )
     with pytest.raises(services.CommunityError):
         services.decide_account_change(change, approve=True, actor=w["board_owner"])
@@ -148,7 +153,12 @@ def test_requester_on_the_board_cannot_approve_their_own_change(w):
 def test_only_owners_of_that_lot_may_ask(w):
     with pytest.raises(PermissionDenied):
         services.request_account_change(
-            _account(w["lot"]), action="add", name="X", kind="tenant", actor=w["owner"]
+            _account(w["lot"]),
+            action="add",
+            name="X",
+            kind="tenant",
+            no_login=True,
+            actor=w["owner"],
         )
     contact_user = UserFactory()
     person = services.record_person(display_name="Contact", actor=SYSTEM)
@@ -164,7 +174,12 @@ def test_only_owners_of_that_lot_may_ask(w):
 
 def test_other_owners_cannot_see_or_decide_changes(client, w):
     change = services.request_account_change(
-        _account(w["other"]), action="add", name="Guest", kind="tenant", actor=w["owner"]
+        _account(w["other"]),
+        action="add",
+        name="Guest",
+        kind="tenant",
+        no_login=True,
+        actor=w["owner"],
     )
     intruder = make_member(lots=[LotFactory()])
     client.force_login(intruder)
@@ -178,7 +193,12 @@ def test_other_owners_cannot_see_or_decide_changes(client, w):
 
 def test_owner_withdraws_a_waiting_change(w):
     change = services.request_account_change(
-        _account(w["other"]), action="add", name="Guest", kind="tenant", actor=w["owner"]
+        _account(w["other"]),
+        action="add",
+        name="Guest",
+        kind="tenant",
+        no_login=True,
+        actor=w["owner"],
     )
     services.withdraw_account_change(change, actor=w["owner"])
     change.refresh_from_db()

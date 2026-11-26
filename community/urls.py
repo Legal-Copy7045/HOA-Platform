@@ -25,6 +25,11 @@ urlpatterns = [
         name="account_change_request",
     ),
     path(
+        "my-home/changes/<int:pk>/deed/<int:file_id>/",
+        account_views.account_change_deed,
+        name="account_change_deed",
+    ),
+    path(
         "my-home/changes/<int:pk>/withdraw/",
         account_views.account_change_withdraw,
         name="account_change_withdraw",

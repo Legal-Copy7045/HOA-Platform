@@ -54,6 +54,12 @@ def _invalid(request, form, to: str) -> object:
 
 @login_required
 def my_lot(request):
+    return render_my_lot(request)
+
+
+def render_my_lot(request, bound=None):
+    """My home. ``bound``: (account pk, form key, form) of a request form that
+    came back with errors, shown again open with what was typed."""
     policy.require(request.user, "lot.view_own")
     roles = policy.roles_for(request.user)
     from community.account_views import owner_account_panel
@@ -69,7 +75,7 @@ def my_lot(request):
                 (
                     lot,
                     [o for o in owners if o.lot_id == lot.pk],
-                    owner_account_panel(request.user, lot.pk),
+                    owner_account_panel(request.user, lot.pk, bound),
                 )
                 for lot in lots
             ],

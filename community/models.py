@@ -696,6 +696,15 @@ class ContactMethod(ScopedModel):
 class AccountChangeAction(models.TextChoices):
     ADD = "add", "Add someone"
     REMOVE = "remove", "Remove someone"
+    # Owners on the deed (D40): only with the recorded deed attached.
+    ADD_OWNER = "add_owner", "Add an owner on the deed"
+    REMOVE_OWNER = "remove_owner", "Remove an owner from the deed"
+
+
+OWNER_CHANGE_ACTIONS = frozenset({AccountChangeAction.ADD_OWNER, AccountChangeAction.REMOVE_OWNER})
+# A deed adds a co-owner as joint owner, a trust or an entity; "sole" is a sale.
+ADDED_OWNER_TYPES = (OwnershipType.JOINT, OwnershipType.TRUST, OwnershipType.ENTITY)
+DEED_FILE_LABEL = "Recorded deed"
 
 
 class AccountChangeState(models.TextChoices):
@@ -706,20 +715,38 @@ class AccountChangeState(models.TextChoices):
 
 
 class AccountChangeRequest(NeverDeleteMixin, ScopedModel):
-    """An owner asks to add or remove a contact on their account; a board
-    member (not the requester) approves or declines. Approval makes the
-    change through the normal services, so it is audited the same way."""
+    """An owner asks to add or remove a contact on their account, or (with
+    the recorded deed attached) an owner on the deed; a board member (not
+    the requester, nor the person added or removed) approves or declines.
+    Approval makes the change through the normal services, so it is audited
+    the same way, and invites an added person who has an email (D40)."""
 
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="change_requests")
-    action = models.CharField(max_length=8, choices=AccountChangeAction.choices)
+    action = models.CharField(max_length=12, choices=AccountChangeAction.choices)
     kind = models.CharField(max_length=12, choices=ContactKind.choices, blank=True)
-    # For "add": who to add (a new person record is created on approval).
+    # For "add" / "add_owner": who to add (a new person record is created on approval).
     name = models.CharField(max_length=200, blank=True)
     email = models.EmailField(blank=True)
+    # They don't use email: kept on the account as a record, without a sign-in.
+    no_login = models.BooleanField(default=False)
     # For "remove": which contact.
     contact = models.ForeignKey(
         AccountContact, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
+    # For "add_owner": joint / trust / entity. For both owner actions: the
+    # date on the recorded deed (the deed itself is an attachment).
+    ownership_type = models.CharField(max_length=16, choices=OwnershipType.choices, blank=True)
+    deed_date = models.DateField(null=True, blank=True)
+    # For "remove_owner": which ownership ends.
+    ownership = models.ForeignKey(
+        Ownership, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    # Set on approval: the person added, and whether their invitation went out
+    # (None: no invitation was due).
+    person = models.ForeignKey(
+        Person, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    invitation_sent = models.BooleanField(null=True, blank=True)
     reason = models.TextField(blank=True)
     state = models.CharField(
         max_length=10, choices=AccountChangeState.choices, default=AccountChangeState.PENDING
@@ -749,6 +776,20 @@ class AccountChangeRequest(NeverDeleteMixin, ScopedModel):
 
     def __str__(self) -> str:
         return f"Account change #{self.pk}"
+
+    @property
+    def is_owner_change(self) -> bool:
+        return self.action in OWNER_CHANGE_ACTIONS
+
+    @property
+    def adds_person(self) -> bool:
+        return self.action in (AccountChangeAction.ADD, AccountChangeAction.ADD_OWNER)
+
+    @property
+    def will_invite(self) -> bool:
+        """Approval sends a sign-in invitation (an added person with an email
+        who uses it)."""
+        return self.adds_person and bool(self.email) and not self.no_login
 
 
 class BoardSeatNomination(NeverDeleteMixin, ScopedModel):
