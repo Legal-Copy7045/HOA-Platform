@@ -23,6 +23,15 @@ def health_alerts(timestamp: int) -> int:
     return alert(run_checks())
 
 
+@app.periodic(cron="23 3 * * *")  # daily
+@app.task(queue="maintenance", queueing_lock="purge_server_errors")
+def purge_server_errors(timestamp: int) -> int:
+    """Server error counts and signatures are kept RETENTION_DAYS (D45)."""
+    from core.errors import purge
+
+    return purge()
+
+
 @app.periodic(cron="37 3 * * *")  # daily
 @app.task(queue="maintenance", queueing_lock="remove_old_jobs", pass_context=True)
 async def remove_old_jobs(context, timestamp: int) -> None:

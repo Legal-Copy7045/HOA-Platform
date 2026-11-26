@@ -117,6 +117,8 @@ a.stat:hover { border-color: #b9d3c4; }
 .list > li { display: flex; align-items: center; gap: .75rem; padding: .7rem 0; border-top: 1px solid var(--line-2); }
 .list > li:first-child { border-top: 0; }
 .list .grow { flex: 1; min-width: 0; }
+.error-list .todo-icon { width: auto; min-width: 2.25rem; padding: 0 .35rem; font-weight: 700; font-size: .85rem; }
+.error-list code { overflow-wrap: anywhere; }
 .list .title { font-weight: 600; color: var(--ink); text-decoration: none; }
 a.title:hover { color: var(--green-700); text-decoration: underline; }
 .todo-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--green-50); color: var(--green-700); flex: none; }
