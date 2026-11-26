@@ -42,6 +42,19 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
    dc exec web python manage.py import_register /tmp/register.csv --commit
    ```
 
+   Or, without a terminal, in the portal (D54): **Homes and owners ->
+   Import homes and owners** (also linked from Community setup -> People and
+   access). Download the Excel or CSV template, fill one row per owner,
+   delete the two EXAMPLE rows, upload it (CSV UTF-8 or .xlsx, up to 2 MB;
+   it is type-checked and scanned for malware), read the check (new homes,
+   new and matched people, rows with problems, homes left alone), then press
+   Import. The upload is kept privately for the board: delete it on the
+   import's page once done (it is removed automatically after
+   `REGISTER_IMPORT_FILE_DAYS`, 30 by default). The importing board member's
+   own home is created but their ownership is left for another board member
+   (no self-grants): that member uploads the same file again, which is safe.
+   Then invite everyone from Sign-ups.
+
    Delete the file from the server afterwards. Later changes of owner go
    through a transfer on the home's page (Homes and owners); a board member's own ownership is
    recorded by another board member (no self-grants).

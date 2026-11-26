@@ -306,6 +306,9 @@ DOCUMENT_REQUIRE_CLEAN_SCAN = env.bool("DOCUMENT_REQUIRE_CLEAN_SCAN", default=Fa
 # passkey or authenticator app, in that same browser session (finding B2).
 MFA_ENROLLMENT_WINDOW_SECONDS = env.int("MFA_ENROLLMENT_WINDOW_SECONDS", default=3600)
 ATTACHMENTS_PER_OBJECT_MAX = env.int("ATTACHMENTS_PER_OBJECT_MAX", default=40)
+# Register import (D54): days an uploaded register file is kept (it holds
+# owners' names and emails); the record of the import stays.
+REGISTER_IMPORT_FILE_DAYS = env.int("REGISTER_IMPORT_FILE_DAYS", default=30)
 FILE_UPLOAD_HANDLERS = [
     "core.uploads.LimitedUploadHandler",
     "django.core.files.uploadhandler.MemoryFileUploadHandler",

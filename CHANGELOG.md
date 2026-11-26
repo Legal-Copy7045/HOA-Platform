@@ -6,6 +6,17 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.23.0 — 2026-11-26
+
+- Import homes and owners (Homes and owners → Import homes and owners, also
+  from Community setup): download an Excel or CSV template, fill in the
+  homes, addresses and owners, upload it, see what would change and any rows
+  to fix, then import. The file is checked for malware, kept privately for
+  the board and deleted after the import or after 30 days. Homes that
+  already have owners are left alone and importing the same file twice adds
+  nothing. The server command `import_register` now reads Excel files too
+  (D54).
+
 ## 0.22.0 — 2026-11-26
 
 - A second demo dataset, "Fresh start": a community the declarant has just

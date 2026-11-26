@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Check the register · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Check the register</h1>
+    <p class="subtitle">{{ record.get_kind_display }} uploaded {{ record.uploaded_at|short_date }}. Nothing has been written yet.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'register_import' %}">Upload another file</a></div></div>
+  <ol class="steps" aria-label="Importing the register"><li class="done">Upload<span class="sr-only"> (done)</span></li><li class="current" aria-current="step">Check</li><li>Import</li></ol>
+
+  {% if not record.has_file %}
+    <div class="alert warning" role="status">{% icon "alert" %}<span>The file has been deleted, so it can no longer be imported. Upload it again.</span></div>
+  {% elif not scan_ok %}
+    <section class="card">
+      <h2>{% icon "shield" %} Checking the file for malware…</h2>
+      {% if scan == "error" %}<p>The malware scanner could not check the file just now. Nothing can be imported until it has been checked. Try again in a few minutes; if it keeps failing, ask a sysadmin to look at System status.</p>
+      {% else %}<p>The file has not been confirmed clean by the malware scanner yet, so it cannot be imported. Check again, or ask a sysadmin whether the scanner is running.</p>{% endif %}
+      <form method="post" action="{% url 'register_import_rescan' record.pk %}">{% csrf_token %}<button type="submit">Check again</button></form>
+    </section>
+  {% elif read_error %}
+    <div class="alert danger" role="alert">{% icon "alert" %}<span>{{ read_error }} Fix the file and upload it again.</span></div>
+  {% else %}
+    {% if scan == "unscanned" %}<p class="small muted">{% icon "info" %} No malware scanner is set up on this server, so the file was not scanned.</p>
+    {% else %}<p class="small"><span class="status tone-success">No malware found</span></p>{% endif %}
+    {% if result.unknown_columns %}<div class="alert info" role="status">{% icon "info" %}<span>These columns are not part of the register and were ignored: {{ result.unknown_columns|join:", " }}.</span></div>{% endif %}
+
+    {% if result.problems %}
+      <section class="card">
+        <h2>{% icon "alert" %} {{ result.problems|length }} problem{{ result.problems|length|pluralize }} to fix</h2>
+        <p>Nothing will be imported until every row is right. Fix these in your spreadsheet and upload it again.</p>
+        <div class="table-wrap"><table><thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
+          <tbody>{% for p in result.problems %}<tr><td class="nowrap">{% if p.row %}{{ p.row }}{% else %}Lot {{ p.lot }}{% endif %}</td><td>{% if p.column %}<code>{{ p.column }}</code>{% endif %}</td><td>{{ p.message|capfirst }}</td></tr>{% endfor %}</tbody></table></div>
+      </section>
+    {% else %}
+      <section class="card">
+        <h2>What the import would do</h2>
+        <dl class="kv">
+          <dt>Rows read</dt><dd>{{ counts.rows }}</dd>
+          <dt>New homes</dt><dd>{{ counts.lots_created }}</dd>
+          <dt>Homes getting owners</dt><dd>{{ counts.lots_filled }}</dd>
+          <dt>Owners to record</dt><dd>{{ counts.owners }}</dd>
+          <dt>New people</dt><dd>{{ counts.people_created }}</dd>
+          <dt>Matched to people already in the portal (by email)</dt><dd>{{ counts.people_matched }}</dd>
+          <dt>Homes left alone</dt><dd>{{ counts.lots_left_alone }}{% if result.skip %} ({{ result.skip|length }} already have owners){% endif %}{% if result.own_lots %} ({{ result.own_lots|length }} list you: another board member imports those owners){% endif %}</dd>
+        </dl>
+        {% if result.notes %}<ul class="small">{% for n in result.notes %}<li>Lot {{ n.lot }}: {{ n.message }}.</li>{% endfor %}</ul>{% endif %}
+        {% if nothing_to_do %}
+          <p><span class="status tone-neutral">Nothing to import</span> Every home in the file is already on the register with its owners.</p>
+        {% else %}
+          <form method="post" action="{% url 'register_import_run' record.pk %}" data-confirm="Import {{ counts.lots_created }} new home{{ counts.lots_created|pluralize }} and {{ counts.owners }} owner{{ counts.owners|pluralize }}? Each owner can then be invited to sign in. Ownerships are permanent records: a mistake is corrected by ending the ownership.">{% csrf_token %}
+            <input type="hidden" name="expect" value="{{ fingerprint }}">
+            <div class="form-actions"><button type="submit">Import {{ counts.lots_created }} home{{ counts.lots_created|pluralize }} and {{ counts.owners }} owner{{ counts.owners|pluralize }}</button></div>
+          </form>
+        {% endif %}
+      </section>
+      <div class="table-card"><div class="table-wrap"><table>
+        <thead><tr><th>Home</th><th>Owners in the file</th><th>What happens</th></tr></thead>
+        <tbody>{% for r in rows %}<tr>
+          <td>{{ r.address }}<div class="small muted">Lot {{ r.number }}</div></td>
+          <td>{% for o in r.owners %}<div>{{ o.name }}{% if o.email %} <span class="small muted">{{ o.email }}</span>{% endif %}{% if o.matched %} <span class="status tone-info">Already in the portal</span>{% endif %}<div class="small muted">Since {{ o.since|short_date }}{% if o.kind %} · {{ o.kind }}{% endif %}{% if o.extra %} · phone or mailing address{% endif %}</div></div>{% endfor %}
+            {% if r.current %}<div class="small muted">Current owners: {{ r.current|join:"; " }}</div>{% endif %}</td>
+          <td><span class="status tone-{{ r.tone }}">{{ r.status }}</span></td></tr>{% endfor %}</tbody>
+      </table></div></div>
+    {% endif %}
+  {% endif %}
+
+  {% if record.has_file %}<section class="card"><h2>The uploaded file</h2>
+    <p class="small">Kept privately for the board; deleted automatically {{ keep_days }} days after upload. It holds owners' names and emails, so delete it once you are done.</p>
+    <div class="actions">{% if scan_ok %}<a class="btn secondary small" href="{% url 'register_import_file' record.pk %}">{% icon "download" %} Download</a>{% endif %}
+      <form method="post" action="{% url 'register_import_remove' record.pk %}" data-confirm="Delete this file? The record of the upload is kept.">{% csrf_token %}<button type="submit" class="secondary small">Delete file</button></form></div>
+  </section>{% endif %}
+{% endblock %}

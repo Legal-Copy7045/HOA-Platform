@@ -163,6 +163,7 @@ def lot_list(request):
             "roster_view": False,
             "can_roster": policy.can(request.user, "roster.view"),
             "can_signups": can_signups,
+            "can_import": policy.can(request.user, "ownership.manage"),
         },
     )
 
