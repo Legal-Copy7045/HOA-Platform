@@ -1,6 +1,6 @@
 # Stable check IDs for the page stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: PAGE-944
+# highest issued: PAGE-945
 PAGE-001: "board: / loads"
 PAGE-002: "board: / has no console or CSP errors"
 PAGE-003: "board: / fits a phone screen"
@@ -879,3 +879,4 @@ PAGE-941: "owner is refused board page /board/setup/"
 PAGE-942: "owner is refused board page /board/access-review/"
 PAGE-943: "owner is refused board page /finance/ledger/record-payments/"
 PAGE-944: "owner is refused board page /board/retention/"
+PAGE-945: "setup: fresh database"
