@@ -72,3 +72,20 @@ branch_allowed() {
   [ -n "$allow" ] && [ "$branch" = "$allow" ] && return 0
   return 1
 }
+
+# offsite_stamp_ok <stamp in the object names> <stamp inside the signed checksum> <now stamp>
+# The off-site drill picks a backup by its object names; the keyed checksum
+# says when it was really made. They must be the same, and not in the future,
+# or an older signed backup copied under a newer name would pass (R2-002).
+offsite_stamp_ok() {
+  local remote="$1" signed="$2" now="$3"
+  if [ -z "$signed" ] || [ "$signed" != "$remote" ]; then
+    echo "The off-site backup is named $remote but its keyed checksum says ${signed:-nothing}." >&2
+    return 1
+  fi
+  if [[ "$remote" > "$now" ]]; then
+    echo "The off-site backup $remote is dated in the future." >&2
+    return 1
+  fi
+  return 0
+}

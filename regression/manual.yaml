@@ -138,8 +138,8 @@
   steps: "As the neighbor, open the emailed link on a phone; pick 'I object' and try to send with no comment; then pick 'no objection' and send."
   last: ""
 - key: host hardening on the VM
-  check: "After harden-host.sh, System status shows Host security with every line on; touching the .env sends an audit email the next morning; a shell opened inside the web container produces a Falco email within 10 minutes."
-  steps: "sudo bash infra/poc/harden-host.sh; open System status after a minute; sudo touch /opt/hoa-portal/.env; docker compose exec web sh -c 'echo hi' and wait 10 minutes; check the sysadmin inbox; next morning check for the audit email."
+  check: "After harden-host.sh (which prints 'Falco signing key 478B2FBB... verified'), System status shows Host security with every line on; touching the .env sends an audit email the next morning; a shell opened inside the web container produces a Falco email within 10 minutes."
+  steps: "sudo bash infra/poc/harden-host.sh and look for the 'verified' line; open System status after a minute; sudo touch /opt/hoa-portal/.env; docker compose exec web sh -c 'echo hi' and wait 10 minutes; check the sysadmin inbox; next morning check for the audit email."
   last: ""
 - key: off-site backups locked
   check: "setup-offsite-backups.sh reports 'Locked'; the bucket shows the backup files under backups/; deleting one in the Cloudflare dashboard is refused; System status Backups shows the off-site age and 'lock verified'; restore-drill.sh --from-offsite passes."

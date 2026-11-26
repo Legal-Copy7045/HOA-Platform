@@ -69,6 +69,11 @@ echo "==> Checking $SRC was made with this key, at the time it says, and not alt
 STAMP="$(python3 -I "$APP_DIR/infra/poc/backup_mac.py" verify "$SRC" "$KEY_FILE" "${VERIFY_ARGS[@]}")" \
   || { echo "Not restoring $SRC." >&2; exit 1; }
 echo "    Backup made at: ${STAMP:-unknown (no stamped keyed checksum)}"
+if [ "$FROM_OFFSITE" -eq 1 ]; then
+  # The signed stamp must be the backup the object names pointed at (R2-002).
+  offsite_stamp_ok "$REMOTE" "$STAMP" "$(date -u +%Y-%m-%dT%H%MZ)" \
+    || { echo "Not restoring the off-site backup $REMOTE." >&2; exit 1; }
+fi
 
 env_value() { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
 DB_NAME="$(env_value HOA_DB_NAME)"; DB_NAME="${DB_NAME:-hoa}"

@@ -355,7 +355,7 @@ Afterwards:
   sudo docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web python manage.py check_offsite_lock
   ```
 
-- Prove the off-site copy restores (downloads the newest complete backup, checks its keyed checksum, restores it into the scratch copy):
+- Prove the off-site copy restores (downloads the newest complete backup, checks its keyed checksum, refuses it unless the time signed inside the checksum is the time in its name and not in the future, so an old backup copied under a newer name cannot pass, then restores it into the scratch copy):
 
   ```bash
   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh --from-offsite
@@ -385,10 +385,12 @@ It sets up:
 
 - **Automatic security updates** (unattended-upgrades; never reboots by itself). With Ubuntu Pro attached, ESM updates come the same way and Livepatch applies kernel fixes without a reboot.
 - **auditd** watching `.env`, the backup key, SSH keys and config, sudoers, users and groups, and systemd units.
-- **AIDE**, a nightly (03:30) file-integrity check of /etc, /root, /usr/local, /boot and the hoa user's SSH keys. Changes are emailed, then accepted as the new baseline.
-- **Falco** (modern eBPF), watching the containers at runtime: shells, unexpected programs, writes and secret reads. Alerts at warning and above go to `/var/log/falco/alerts.jsonl`, and a summary is emailed at most every 10 minutes.
+- **AIDE**, a nightly (03:30) file-integrity check of /etc, /root, /usr/local, /boot and the hoa user's SSH keys. Changes are emailed, and accepted as the new baseline only once the email reached at least one sysadmin; if it did not (mail down, or no sysadmin email set), the old baseline stays, the same changes are reported again the next night, and the timer shows as failed.
+- **Falco** (modern eBPF), watching the containers at runtime: shells, unexpected programs, writes and secret reads. Alerts at warning and above go to `/var/log/falco/alerts.jsonl`, and a summary is emailed at most every 10 minutes; alerts that could not be emailed are sent again on the next run.
 
-Emails go to every active sysadmin through the portal's mail settings, and each one is audited (`system.host_alert`). System status → Host security shows whether each service is running.
+Emails go to every active sysadmin through the portal's mail settings, and each one is audited (`system.host_alert`, with how many were sent). `host_alert` exits with an error when it reached nobody, so make sure at least one sysadmin has an email address.
+
+Falco's packages are trusted only through Falco's signing key with the fingerprint Falco publishes (the "Trusted" row of the key table at https://falco.org/docs/setup/packages/; pinned in `harden-host.sh` as `478B2FBBC75F4237B731DA4365106822B35B1B1F`, checked 2026-11-26). If the downloaded key does not match, the script prints the fingerprints it found and stops before installing Falco. When Falco rotates its key (announced on falco.org/blog), compare the new fingerprint with that page and re-run with it: `sudo HOA_FALCO_KEY_FPR=<fingerprint> bash /opt/hoa-portal/infra/poc/harden-host.sh`, then update the pinned value in the script. System status → Host security shows whether each service is running.
 
 If an alert is unexpected:
 

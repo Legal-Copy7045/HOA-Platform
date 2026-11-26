@@ -104,27 +104,49 @@ if [ ! -f "$STATE_DIR/aide.db" ]; then
 fi
 install -m 0755 /dev/stdin /usr/local/sbin/hoa-integrity-check <<'SCRIPT'
 #!/usr/bin/env bash
-# Nightly: report changed system files and sensitive-file audit events, then
-# accept today's state as the new baseline.
+# Nightly: report changed system files and sensitive-file audit events. Only
+# once the report reached a sysadmin (host_alert exits 0 only when it sent to
+# at least one) is today's state accepted as the new baseline; otherwise the
+# old baseline stays and the change is reported again next night (R2-006).
 set -uo pipefail
 STATE_DIR=/var/lib/hoa-host-security
 APP_DIR="$(cat "$STATE_DIR/app_dir")"
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
-alert() { "${COMPOSE[@]}" exec -T web python manage.py host_alert --kind "$1" >/dev/null 2>&1 || true; }
+alert() { "${COMPOSE[@]}" exec -T web python manage.py host_alert --kind "$1" >/dev/null 2>&1; }
+status=0
 report="$(aide --config "$STATE_DIR/aide.conf" --check 2>&1)"; rc=$?
 # AIDE exits 1-7 when files were added, removed or changed; 0 when none.
 if [ "$rc" -ge 1 ] && [ "$rc" -le 7 ]; then
-  printf '%s\n' "$report" | head -150 | alert integrity
-  aide --config "$STATE_DIR/aide.conf" --update >/dev/null 2>&1 || true
-  [ -f "$STATE_DIR/aide.db.new" ] && mv -f "$STATE_DIR/aide.db.new" "$STATE_DIR/aide.db"
+  # Cut to 150 lines first: under pipefail a head inside the pipe could fail
+  # it (SIGPIPE) even after a successful send.
+  report="$(printf '%s\n' "$report" | head -150)"
+  if printf '%s\n' "$report" | alert integrity; then
+    aide --config "$STATE_DIR/aide.conf" --update >/dev/null 2>&1 || true
+    [ -f "$STATE_DIR/aide.db.new" ] && mv -f "$STATE_DIR/aide.db.new" "$STATE_DIR/aide.db"
+  else
+    echo "Integrity report not delivered; keeping the old baseline to report it again." >&2
+    rm -f "$STATE_DIR/aide.db.new"
+    status=1
+  fi
 fi
 # Audit events on the watched files since the last run (ausearch remembers
-# where it stopped in the checkpoint file).
+# where it stopped in the checkpoint file; the previous checkpoint is put back
+# when the report could not be delivered, so the events are sent next time).
+[ -f "$STATE_DIR/audit.checkpoint" ] && cp -p "$STATE_DIR/audit.checkpoint" "$STATE_DIR/audit.checkpoint.prev"
 events="$(ausearch --checkpoint "$STATE_DIR/audit.checkpoint" -m SYSCALL -i 2>/dev/null \
   | grep -E ' key=hoa_' | sed -E 's/.* comm=([^ ]+).* exe=([^ ]+).* key=([^ ]+).*/\3 by \1 (\2)/' \
   | sort | uniq -c | sort -rn | head -40)"
-[ -n "$events" ] && printf 'Changes to watched files since the last report (count, watch, program):\n%s\n' "$events" | alert audit
-exit 0
+if [ -n "$events" ] && ! printf 'Changes to watched files since the last report (count, watch, program):\n%s\n' "$events" | alert audit; then
+  echo "Audit report not delivered; it will be sent again next time." >&2
+  if [ -f "$STATE_DIR/audit.checkpoint.prev" ]; then
+    mv -f "$STATE_DIR/audit.checkpoint.prev" "$STATE_DIR/audit.checkpoint"
+  else
+    rm -f "$STATE_DIR/audit.checkpoint"
+  fi
+  status=1
+fi
+rm -f "$STATE_DIR/audit.checkpoint.prev"
+exit "$status"
 SCRIPT
 echo "$APP_DIR" > "$STATE_DIR/app_dir"
 cat > /etc/systemd/system/hoa-integrity-check.service <<'UNIT'
@@ -152,11 +174,37 @@ WantedBy=timers.target
 UNIT
 
 echo "==> 4. Falco (runtime monitoring of the containers)"
-if ! [ -f /usr/share/keyrings/falco-archive-keyring.gpg ]; then
-  apt-get install -y -qq --no-install-recommends curl gnupg >/dev/null
-  curl -fsSL https://falco.org/repo/falcosecurity-packages.asc \
-    | gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
+# Falco's package-signing key is trusted only with the fingerprint Falco
+# publishes (R2-009): the "Trusted" key in the table at
+# https://falco.org/docs/setup/packages/ (source: github.com/falcosecurity/
+# falco-website, content/en/docs/setup/packages.md), checked 2026-11-26.
+# When Falco rotates its key, check that page and re-run with
+# HOA_FALCO_KEY_FPR=<the new fingerprint>. The downloaded bundle also holds
+# revoked keys; only the pinned key goes into the keyring apt uses.
+FALCO_KEY_FPR_PUBLISHED="478B2FBBC75F4237B731DA4365106822B35B1B1F"
+FALCO_KEY_FPR="$(printf '%s' "${HOA_FALCO_KEY_FPR:-$FALCO_KEY_FPR_PUBLISHED}" | tr -d ' ' | tr 'a-f' 'A-F')"
+FALCO_KEYRING=/usr/share/keyrings/falco-archive-keyring.gpg
+apt-get install -y -qq --no-install-recommends curl gnupg >/dev/null
+FALCO_TMP="$(mktemp -d)"; chmod 700 "$FALCO_TMP"
+curl -fsSL https://falco.org/repo/falcosecurity-packages.asc -o "$FALCO_TMP/falco.asc"
+FALCO_FOUND="$(gpg --show-keys --with-colons "$FALCO_TMP/falco.asc" 2>/dev/null | awk -F: '$1 == "fpr" {print $10}' || true)"
+if ! printf '%s\n' "$FALCO_FOUND" | grep -qxF "$FALCO_KEY_FPR"; then
+  echo "Falco's signing key does not have the expected fingerprint." >&2
+  echo "  expected: $FALCO_KEY_FPR" >&2
+  echo "  found:    $(printf '%s' "$FALCO_FOUND" | tr '\n' ' ')" >&2
+  echo "Not installing Falco. If Falco has rotated its key, compare with the table at" >&2
+  echo "https://falco.org/docs/setup/packages/ and re-run with HOA_FALCO_KEY_FPR=<fingerprint>." >&2
+  rm -rf "$FALCO_TMP"
+  exit 1
 fi
+mkdir -p -m 700 "$FALCO_TMP/gnupg"
+GNUPGHOME="$FALCO_TMP/gnupg" gpg --batch --quiet --import "$FALCO_TMP/falco.asc"
+GNUPGHOME="$FALCO_TMP/gnupg" gpg --batch --export "$FALCO_KEY_FPR" > "$FALCO_TMP/falco.gpg"
+[ -s "$FALCO_TMP/falco.gpg" ] || { echo "Could not export Falco's key $FALCO_KEY_FPR." >&2; rm -rf "$FALCO_TMP"; exit 1; }
+install -m 0644 "$FALCO_TMP/falco.gpg" "$FALCO_KEYRING"
+GNUPGHOME="$FALCO_TMP/gnupg" gpgconf --kill all >/dev/null 2>&1 || true
+rm -rf "$FALCO_TMP"
+echo "    Falco signing key $FALCO_KEY_FPR verified"
 echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" \
   > /etc/apt/sources.list.d/falcosecurity.list
 apt-get update -qq
@@ -236,11 +284,17 @@ for line in sys.stdin:
 for (prio, rule), n in counts.most_common(20):
     print(f"{n} x {prio}: {rule}\n    e.g. {examples[(prio, rule)]}")
 ')"
+# The offset moves past these alerts only once they reached a sysadmin
+# (host_alert exits 0 only then); otherwise they are sent again next run (R2-006).
+if [ -n "$summary" ]; then
+  COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
+  if ! printf 'New Falco alerts (count x priority: rule):\n\n%s\n' "$summary" \
+    | "${COMPOSE[@]}" exec -T web python manage.py host_alert --kind falco >/dev/null 2>&1; then
+    echo "Falco alerts not delivered; they will be sent again next run." >&2
+    exit 1
+  fi
+fi
 echo "$size" > "$STATE_DIR/falco_offset"
-[ -z "$summary" ] && exit 0
-COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
-printf 'New Falco alerts (count x priority: rule):\n\n%s\n' "$summary" \
-  | "${COMPOSE[@]}" exec -T web python manage.py host_alert --kind falco >/dev/null 2>&1 || true
 exit 0
 SCRIPT
 cat > /etc/systemd/system/hoa-host-alerts.service <<'UNIT'
