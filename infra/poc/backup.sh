@@ -98,7 +98,9 @@ du -sh "$DEST" | awk '{print "    size: "$1}'
 
 if [ -n "$(env_value BACKUP_S3_BUCKET)" ]; then
   echo "==> Copying off-site"
-  for f in db.dump.enc files.tar.enc SHA256SUMS HMAC-SHA256; do
+  # APP_VERSION is a label only (which code made the backup), not covered
+  # by the keyed checksum; the restore drill shows it sanitised.
+  for f in db.dump.enc files.tar.enc SHA256SUMS HMAC-SHA256 APP_VERSION; do
     "${COMPOSE[@]}" exec -T web python manage.py push_backup --name "$STAMP-$f" < "$DEST/$f"
   done
   "${COMPOSE[@]}" exec -T web python manage.py backup_heartbeat --kind offsite
