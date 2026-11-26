@@ -269,6 +269,14 @@ PROTECTED = {
     "access_review_record": ("POST", None),
     "retention": ("GET", None),
     "retention_run": ("POST", None),
+    # Event RSVPs and volunteer sign-ups (rsvp): a board-only event's pages
+    # are 404 for owners; the board side is 403.
+    "event_detail": ("GET", "event"),
+    "event_rsvp": ("POST", "event"),
+    "event_rsvp_settings": ("POST", "event"),
+    "event_slot_add": ("POST", "event"),
+    "event_slot_action": ("POST", "event_slot"),
+    "event_rsvp_export": ("GET", "event"),
 }
 
 
@@ -333,6 +341,10 @@ def world():
             audience="board",
             actor=board,
         )
+        from comms import rsvp
+
+        rsvp.save_settings(board_event, enabled=True, actor=board)
+        event_slot = rsvp.add_slot(board_event, title="Board snacks", capacity=2, actor=board)
         task = create_task(title="Chase the pond contractor", actor=board)
         from documents import services as documents
         from documents.tests.helpers import pdf
@@ -524,6 +536,7 @@ def world():
         "reset": MfaReset.objects.unscoped("t").get(pk=reset.pk).pk,
         "board_announcement": board_note.pk,
         "event": board_event.pk,
+        "event_slot": event_slot.pk,
         "task": task.pk,
         "board_document": board_document.pk,
         "lot_b_document": lot_b_document.pk,
@@ -633,6 +646,8 @@ def _url(name, key, targets):
         kwargs = {"key": "ar_aging"}
     elif name == "reservation_action":
         kwargs["action"] = "cancel"
+    elif name == "event_slot_action":
+        kwargs["action"] = "join"
     return reverse(name, kwargs=kwargs)
 
 
