@@ -16,7 +16,6 @@ from governance.models import (
     Candidate,
     ConsentRequest,
     Election,
-    ElectionParticipation,
     ElectionState,
     Meeting,
     Proxy,
@@ -93,14 +92,9 @@ def election_detail(request, pk):
     show_results = election.state == ElectionState.CERTIFIED or (
         can_manage and election.state == ElectionState.CLOSED
     )
-    roles = policy.roles_for(user)
-    with system_access("my lots' election participation"):
-        # That a ballot was cast for my lot (never what it chose: D21).
-        recorded = list(
-            ElectionParticipation.objects.filter(election=election, lot_id__in=roles.owned_lot_ids)
-            .select_related("lot")
-            .order_by("lot__number")
-        )
+    # That a ballot was cast for my lot (never what it chose: D21), and only
+    # mine if cast since I own the lot (BUG-004).
+    recorded, cast_before_me = elections.my_lots_participation(election, user)
     meeting_ahead = (
         election.meeting
         if election.meeting_id
@@ -122,6 +116,7 @@ def election_detail(request, pk):
             "owners": _owner_choices() if election.state == ElectionState.NOMINATIONS else [],
             "my_lots": elections.lots_actor_may_vote_for(election, user),
             "recorded": recorded,
+            "cast_before_me": cast_before_me,
             "proxy_meeting": meeting_ahead,
             "ballot": elections.ballot_candidates(election),
             "tally": elections.tally(election) if show_results else None,

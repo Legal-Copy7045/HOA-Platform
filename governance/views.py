@@ -268,7 +268,7 @@ def voting(request):
     elections. Each half follows its own feature switch."""
     from core import features
     from governance import elections as election_services
-    from governance.models import Election, ElectionParticipation
+    from governance.models import Election
 
     policy.require(request.user, "vote.view")
     show_votes = features.enabled("votes", request)
@@ -277,7 +277,6 @@ def voting(request):
         raise Http404
     user = request.user
     can_manage = policy.can(user, "vote.manage")
-    roles = policy.roles_for(user)
     vote_rows, election_rows = [], []
     if show_votes:
         rows = Vote.objects.all()
@@ -291,11 +290,8 @@ def voting(request):
                 {
                     "election": e,
                     "can_vote": bool(election_services.lots_actor_may_vote_for(e, user)),
-                    "voted": ElectionParticipation.objects.filter(
-                        election=e, lot_id__in=roles.owned_lot_ids
-                    ).exists()
-                    if roles.owned_lot_ids
-                    else False,
+                    # Only ballots cast since this person owns the lot (R2-010).
+                    "voted": bool(election_services.my_lots_participation(e, user)[0]),
                 }
             )
     return render(

@@ -240,6 +240,28 @@ def lots_actor_may_vote_for(election: Election, actor) -> list[dict]:
     ]
 
 
+def my_lots_participation(election: Election, user) -> tuple[list, list]:
+    """Ballots cast for the lots this person owns, as (mine, earlier): mine
+    were cast since they own the lot; earlier ones before they owned it (the
+    seller's). Only that a ballot was cast, never its choices (D21). A buyer
+    is never told the seller's ballot was theirs (reviews BUG-004, R2-010)."""
+    roles = policy.roles_for(user)
+    if not roles.owned_lot_ids:
+        return [], []
+    since = dict(roles.owned_since)
+    mine, earlier = [], []
+    with system_access("my lots' election participation"):
+        rows = (
+            ElectionParticipation.objects.filter(election=election, lot_id__in=roles.owned_lot_ids)
+            .select_related("lot")
+            .order_by("lot__number")
+        )
+        for row in rows:
+            ours = row.lot_id in since and timezone.localdate(row.cast_at) >= since[row.lot_id]
+            (mine if ours else earlier).append(row)
+    return mine, earlier
+
+
 def cast_election_ballot(
     election: Election, *, lot_id: int, candidate_ids: list[int], actor, request=None
 ) -> None:
