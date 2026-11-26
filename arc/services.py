@@ -406,15 +406,7 @@ def edit_request(req: ArcRequest, *, actor, request=None, **changes) -> ArcReque
         req.save(update_fields=changed)
         # Neighbors acknowledged the earlier wording: after a change they are
         # asked again (review R2-002). Their earlier answers stay on record.
-        from arc.models import SignoffRequest, SignoffState
-
-        SignoffRequest.objects.filter(arc_request=req).exclude(state=SignoffState.WITHDRAWN).filter(
-            models.Q(sent_at__isnull=False) | ~models.Q(state=SignoffState.PENDING)
-        ).update(
-            state=SignoffState.PENDING,
-            sent_at=None,
-            token_hash="",  # nosec B106 - clearing an old link's hash, not a password
-        )
+        _ask_neighbors_again(req)
     record_event(
         "arc.edited",
         actor=actor,
@@ -423,6 +415,52 @@ def edit_request(req: ArcRequest, *, actor, request=None, **changes) -> ArcReque
         metadata={"fields": " ".join(changed)},
     )
     return req
+
+
+def _ask_neighbors_again(req: ArcRequest) -> int:
+    """Acknowledgements that were sent or answered go back to waiting, so the
+    owner must request them again before the draft can be submitted. Earlier
+    answers stay on record as SignoffResponse rows. Call inside
+    system_access. Returns the number of rows reset."""
+    from arc.models import SignoffRequest, SignoffState
+
+    return (
+        SignoffRequest.objects.filter(arc_request=req)
+        .exclude(state=SignoffState.WITHDRAWN)
+        .filter(models.Q(sent_at__isnull=False) | ~models.Q(state=SignoffState.PENDING))
+        .update(
+            state=SignoffState.PENDING,
+            sent_at=None,
+            token_hash="",  # nosec B106 - clearing an old link's hash, not a password
+        )
+    )
+
+
+def add_owner_files(req: ArcRequest, uploads, *, actor, request, label: str = "") -> int:
+    """The lot owner adds plans or photos to their draft. Every owner path that
+    adds files to a draft goes through here: new files change what the
+    neighbors were shown, so acknowledgements already sent or answered are
+    asked again, as for a text edit (reviews BUG-001, SEC-003, R2-001).
+    Returns the number of files added."""
+    from django.contrib import messages
+
+    from documents import attachments
+
+    require(actor, "arc.submit")
+    with transaction.atomic(), system_access("add files to arc draft"):
+        req = ArcRequest.objects.select_for_update().get(pk=req.pk)
+        if req.state != ArcState.DRAFT:
+            raise ArcError("The owner can add files only while the request is a draft.")
+        if not owns_lot(actor, req):
+            raise ArcError("Only an owner of this lot can add files to the request.")
+        added = attachments.attach_many(request, req, uploads, actor=actor, label=label)
+        if added and _ask_neighbors_again(req):
+            messages.info(
+                request,
+                "The neighbors acknowledged the earlier plans. "
+                "Request their acknowledgements again before you submit.",
+            )
+    return added
 
 
 AFFECTED_LOTS_STATES = {ArcState.SUBMITTED, ArcState.IN_REVIEW, ArcState.APPEAL}
