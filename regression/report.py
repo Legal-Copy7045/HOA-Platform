@@ -34,6 +34,29 @@ STAGE_NAMES = {
 }
 SEVERITY = ["critical", "high", "medium", "low", "info"]
 
+# Shared with walkthrough_report.py: theme-aware (light/dark), phone-friendly.
+CSS = """:root{--bg:#f6f5f1;--card:#fff;--ink:#1d2320;--muted:#66706b;--line:#e3e1d9;--pass:#1f6b46;--pass-bg:#e3f1e8;
+--fail:#a3302a;--fail-bg:#fbe7e5;--warn:#8a5a00;--warn-bg:#fdf1d8;--neutral-bg:#eceae4}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#151917;--card:#1e2421;--ink:#e8ece9;
+--muted:#9aa49f;--line:#2f3632;--pass:#7fd1a4;--pass-bg:#1d3327;--fail:#f19a93;--fail-bg:#3a1f1d;--warn:#f0c36a;
+--warn-bg:#3a2f17;--neutral-bg:#2a302c;color-scheme:dark}}
+:root[data-theme=dark]{--bg:#151917;--card:#1e2421;--ink:#e8ece9;--muted:#9aa49f;--line:#2f3632;--pass:#7fd1a4;
+--pass-bg:#1d3327;--fail:#f19a93;--fail-bg:#3a1f1d;--warn:#f0c36a;--warn-bg:#3a2f17;--neutral-bg:#2a302c;color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1100px;margin:0 auto;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));
+padding-right:max(16px,env(safe-area-inset-right,0px))}.grid>*{min-width:0}h1{font-size:1.6rem;margin:0 0 4px}
+h2{font-size:1.15rem;margin:28px 0 10px}h3{font-size:1rem;margin:6px 0 2px}.m{color:var(--muted);font-size:.85rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.big{font-size:1.9rem;font-weight:700}table{width:100%;border-collapse:collapse;background:var(--card);
+border:1px solid var(--line);border-radius:10px;overflow:hidden}td,th{padding:8px 10px;border-top:1px solid var(--line);
+vertical-align:top;text-align:left}th{font-size:.78rem;text-transform:uppercase;color:var(--muted);border-top:0}
+.n{text-align:right;font-variant-numeric:tabular-nums}.b{display:inline-block;padding:1px 8px;border-radius:99px;
+font-size:.75rem;font-weight:600;background:var(--neutral-bg);white-space:nowrap}.b.pass{background:var(--pass-bg);color:var(--pass)}
+.b.fail,.b.critical,.b.high{background:var(--fail-bg);color:var(--fail)}.b.manual,.b.medium,.b.not-run,.b.uncovered{background:var(--warn-bg);color:var(--warn)}
+code{font-size:.85em}.wrap{overflow-x:auto}
+"""
+
 
 def load(name: str, default):
     path = OUT / name
@@ -178,27 +201,7 @@ def main() -> None:
     page = f"""<title>Portal regression report</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-:root{{--bg:#f6f5f1;--card:#fff;--ink:#1d2320;--muted:#66706b;--line:#e3e1d9;--pass:#1f6b46;--pass-bg:#e3f1e8;
---fail:#a3302a;--fail-bg:#fbe7e5;--warn:#8a5a00;--warn-bg:#fdf1d8;--neutral-bg:#eceae4}}
-@media (prefers-color-scheme:dark){{:root:not([data-theme=light]){{--bg:#151917;--card:#1e2421;--ink:#e8ece9;
---muted:#9aa49f;--line:#2f3632;--pass:#7fd1a4;--pass-bg:#1d3327;--fail:#f19a93;--fail-bg:#3a1f1d;--warn:#f0c36a;
---warn-bg:#3a2f17;--neutral-bg:#2a302c;color-scheme:dark}}}}
-:root[data-theme=dark]{{--bg:#151917;--card:#1e2421;--ink:#e8ece9;--muted:#9aa49f;--line:#2f3632;--pass:#7fd1a4;
---pass-bg:#1d3327;--fail:#f19a93;--fail-bg:#3a1f1d;--warn:#f0c36a;--warn-bg:#3a2f17;--neutral-bg:#2a302c;color-scheme:dark}}
-body{{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}}
-main{{max-width:1100px;margin:0 auto;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));
-padding-right:max(16px,env(safe-area-inset-right,0px))}}.grid>*{{min-width:0}}h1{{font-size:1.6rem;margin:0 0 4px}}
-h2{{font-size:1.15rem;margin:28px 0 10px}}h3{{font-size:1rem;margin:6px 0 2px}}.m{{color:var(--muted);font-size:.85rem}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}}
-.card{{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}}
-.big{{font-size:1.9rem;font-weight:700}}table{{width:100%;border-collapse:collapse;background:var(--card);
-border:1px solid var(--line);border-radius:10px;overflow:hidden}}td,th{{padding:8px 10px;border-top:1px solid var(--line);
-vertical-align:top;text-align:left}}th{{font-size:.78rem;text-transform:uppercase;color:var(--muted);border-top:0}}
-.n{{text-align:right;font-variant-numeric:tabular-nums}}.b{{display:inline-block;padding:1px 8px;border-radius:99px;
-font-size:.75rem;font-weight:600;background:var(--neutral-bg);white-space:nowrap}}.b.pass{{background:var(--pass-bg);color:var(--pass)}}
-.b.fail,.b.critical,.b.high{{background:var(--fail-bg);color:var(--fail)}}.b.manual,.b.medium,.b.not-run,.b.uncovered{{background:var(--warn-bg);color:var(--warn)}}
-code{{font-size:.85em}}.wrap{{overflow-x:auto}}
-</style><main>
+{CSS}</style><main>
 <h1>Portal regression report</h1><div class=m>{e(when)} · commit {e(commit)}</div>
 {f"<p>{e(notes['summary'])}</p>" if notes.get("summary") else ""}
 <div class=grid style="margin-top:14px">
