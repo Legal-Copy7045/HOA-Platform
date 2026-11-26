@@ -41,3 +41,6 @@
 - feature: "Contract pre-approval follows the invoice two-approver rule: a cap at or above invoice.dual_approval_cents needs two different board approvals (never the entrant, never a manager), recorded append-only and fixed when entered; a one-approval contract pre-approves only invoices below the threshold (SEC-002)"
   since: M4
   match: ["^unit:operations/tests/test_contracts.py::test_(contract_at_or_above_threshold|entrant_approval_never|required_approvals_fixed|contract_approvals_are_append_only|one_approval_contract|board_approves_contract)"]
+- feature: "My account upcoming charges skip months whose dues are already posted (no double counting); prepaid owners see future months listed unpaid and the credit drawn down only as each month posts (owner ruling 2026-11-26); a charge posted ahead shows 'due by' in My items (BUG-005)"
+  since: M4
+  match: ["^unit:ledger/tests/test_ledger.py::test_(dues_posted_early|reversed_early_assessment|owner_ruling_prepaid|my_items_says_due_by)"]

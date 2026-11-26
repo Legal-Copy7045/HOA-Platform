@@ -283,3 +283,62 @@ def test_issued_resale_certificate_is_stored_and_served_unchanged(w, client):
     response = client.get(reverse("resale_pdf", args=[req.pk]))
     assert response.status_code == 200
     assert b"".join(response.streaming_content) == stored.file.open("rb").read()
+
+
+# --- BUG-005: dues posted ahead of time are not listed again as upcoming ---------
+
+
+def test_dues_posted_early_are_not_listed_again_as_upcoming(w):
+    on = D(2026, 11, 26)
+    before = services.upcoming_charges(0, lot_id=w["lot"].pk, on=on)
+    assert [c.due_on for c in before] == [D(2026, 12, 1), D(2027, 1, 1), D(2027, 2, 1)]
+    services.post_monthly_assessments(year=2026, month=12, actor=w["manager"])
+    balance = services.balance(w["lot"].pk)
+    assert balance == 4500  # December is in the balance ...
+    after = services.upcoming_charges(balance, lot_id=w["lot"].pk, on=on)
+    # ... and not listed a second time.
+    assert [c.due_on for c in after] == [D(2027, 1, 1), D(2027, 2, 1), D(2027, 3, 1)]
+
+
+def test_reversed_early_assessment_is_listed_as_upcoming_again(w):
+    on = D(2026, 11, 26)
+    services.post_monthly_assessments(year=2026, month=12, actor=w["manager"])
+    with system_access("test"):
+        entry = LedgerEntry.objects.get(lot=w["lot"], period="2026-12")
+    services.reverse_entry(entry, reason="Posted by mistake", actor=w["board"])
+    upcoming = services.upcoming_charges(0, lot_id=w["lot"].pk, on=on)
+    assert upcoming[0].due_on == D(2026, 12, 1)
+
+
+def test_owner_ruling_prepaid_months_listed_unpaid_and_drawn_down_as_posted(client, w):
+    """Owner ruling 2026-11-26: a prepaid owner's future months are listed as
+    not yet paid; the prepayment is drawn down only as each month posts."""
+    services.record_payment(
+        lot=w["lot"], amount_cents=4500 * 3, received_on=D(2026, 11, 2), actor=w["manager"]
+    )
+    on = D(2026, 11, 26)
+    balance = services.balance(w["lot"].pk)
+    assert balance == -4500 * 3
+    upcoming = services.upcoming_charges(balance, lot_id=w["lot"].pk, on=on)
+    # Every future month is still listed as a charge; nothing is marked paid.
+    assert [(c.due_on, c.amount_cents) for c in upcoming] == [
+        (D(2026, 12, 1), 4500),
+        (D(2027, 1, 1), 4500),
+        (D(2027, 2, 1), 4500),
+    ]
+    services.post_monthly_assessments(year=2026, month=12, actor=w["manager"])
+    balance = services.balance(w["lot"].pk)
+    assert balance == -4500 * 2  # the credit drops by one month's dues
+    upcoming = services.upcoming_charges(balance, lot_id=w["lot"].pk, on=on)
+    assert [c.due_on for c in upcoming] == [D(2027, 1, 1), D(2027, 2, 1), D(2027, 3, 1)]
+    assert [c.covered_by_credit for c in upcoming] == [True, True, False]
+
+
+def test_my_items_says_due_by_for_dues_posted_ahead(w):
+    from core.my_items import items_for
+
+    services.post_monthly_assessments(year=2099, month=1, actor=w["manager"])
+    items = [i for i in items_for(w["owner"]) if i.nav == "my_account"]
+    assert len(items) == 1
+    assert "due by" in items[0].detail and "due since" not in items[0].detail
+    assert items[0].tone == "info"
