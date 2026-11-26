@@ -2,6 +2,8 @@
 
 * Only ``https://api.stripe.com``, with Python's default certificate
   verification (no custom CA, no verify=False, no proxy settings of ours).
+* Redirects are refused (urllib would otherwise copy the Authorization
+  header to whatever host a 30x names).
 * 10 second timeouts. POSTs carry an Idempotency-Key and are retried (with
   the same key) on network errors and 5xx/429; GETs are not retried (the
   poller simply asks again later).
@@ -43,12 +45,34 @@ class StripeError(RuntimeError):
         self.code = code
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect: the key must never reach another URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect refused", headers, fp)
+
+
+def build_opener():
+    return urllib.request.build_opener(_NoRedirect())
+
+
+# Replaced in tests with a fake opener.
+_opener = None
+
+
+def _get_opener():
+    global _opener
+    if _opener is None:
+        _opener = build_opener()
+    return _opener
+
+
 def _transport(method: str, url: str, data: bytes | None, headers: dict) -> tuple[int, bytes]:
     if not url.startswith(API_BASE + "/"):
         raise StripeError(0, "bad_host")
     request = urllib.request.Request(url, data=data, method=method, headers=headers)  # noqa: S310
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310  # nosec B310
+        with _get_opener().open(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
             return response.status, response.read(2_000_000)
     except urllib.error.HTTPError as exc:
         body = b""
