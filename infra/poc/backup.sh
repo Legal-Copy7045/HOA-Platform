@@ -91,7 +91,8 @@ echo "==> Uploaded files"
 # (SEC-008, R2-003). The key is read from its file inside python, never put
 # on a command line (R2-004). Checked before every restore.
 python3 -I "$APP_DIR/infra/poc/backup_mac.py" sign "$DEST" "$KEY_FILE" "$STAMP"
-echo "$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" > "$DEST/APP_VERSION"
+# Release number and commit, e.g. 0.6.0-be6a62d (D37).
+echo "$(tr -cd '0-9.' < "$APP_DIR/VERSION" 2>/dev/null | cut -c1-20)-$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" > "$DEST/APP_VERSION"
 du -sh "$DEST" | awk '{print "    size: "$1}'
 # System status and the health alerts read these (core/health.py "Backups").
 "${COMPOSE[@]}" exec -T web python manage.py backup_heartbeat --kind local

@@ -207,7 +207,8 @@ def system_status(request):
         request,
         "core/system_status.html",
         {
-            "version": settings.APP_VERSION,
+            "version": settings.APP_RELEASE,
+            "build": settings.APP_VERSION,
             "pending_migrations": len(pending),
             "jobs": jobs,
             "failed_jobs": failed_jobs,

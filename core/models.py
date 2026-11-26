@@ -88,6 +88,10 @@ class UpdateStatus(models.Model):
     branch = models.CharField(max_length=100, blank=True)
     running_commit = models.CharField(max_length=40, blank=True)
     latest_commit = models.CharField(max_length=40, blank=True)
+    # The release number (VERSION) on GitHub's copy of the branch (D37).
+    # A database default, so the agent's INSERT works before and after this
+    # column exists (an update pulls the agent before migrating).
+    latest_version = models.CharField(max_length=20, blank=True, default="", db_default="")
     behind = models.PositiveIntegerField(default=0)
     changes = models.TextField(blank=True)  # commit subjects, newest first
     checked_at = models.DateTimeField(null=True, blank=True)

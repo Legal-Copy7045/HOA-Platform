@@ -69,15 +69,18 @@ BRANCH="$(g rev-parse --abbrev-ref HEAD)"
 
 check() {
   g fetch --quiet origin "$BRANCH" || return 0
-  local running latest behind changes
+  local running latest behind changes version
   running="$(g rev-parse --short HEAD)"
   latest="$(g rev-parse --short "origin/$BRANCH")"
+  # The release number of the newer code (D37): digits and dots only.
+  version="$(g show "origin/$BRANCH:VERSION" 2>/dev/null | head -1 | tr -cd '0-9.' | cut -c1-20)"
   behind="$(g rev-list --count "HEAD..origin/$BRANCH")"
   changes="$(g log --format='%s' "HEAD..origin/$BRANCH" | head -20 | cut -c1-150)"
   psql_run -v branch="$BRANCH" -v running="$running" -v latest="$latest" \
-    -v behind="$behind" -v changes="$changes" >/dev/null <<'SQL'
+    -v behind="$behind" -v changes="$changes" -v version="$version" >/dev/null <<'SQL'
 UPDATE core_updatestatus
    SET branch = :'branch', running_commit = :'running', latest_commit = :'latest',
+       latest_version = :'version',
        behind = :'behind'::int, changes = :'changes', checked_at = now()
  WHERE id = 1;
 SQL

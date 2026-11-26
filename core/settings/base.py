@@ -24,6 +24,20 @@ USE_X_FORWARDED_HOST = False  # never trust a client-supplied Host override
 SITE_NAME = env("SITE_NAME", default="Oak Creek Farms HOA")
 # Shown on the sysadmin status page; start-portal.sh sets it to the git commit.
 APP_VERSION = env("APP_VERSION", default="dev")
+
+
+def _release() -> str:
+    """The release number from VERSION (decision D37), e.g. "0.6.0"."""
+    import re as _re
+
+    try:
+        text = (BASE_DIR / "VERSION").read_text().strip()
+    except OSError:
+        return "unknown"
+    return text if _re.fullmatch(r"\d+\.\d+\.\d+", text) else "unknown"
+
+
+APP_RELEASE = _release()
 # seed_demo refuses to run unless this is true (never set it in production).
 SEED_DEMO_ALLOWED = env.bool("SEED_DEMO_ALLOWED", default=False)
 # Decision D21 (security review A3): a new board seat needs a second board

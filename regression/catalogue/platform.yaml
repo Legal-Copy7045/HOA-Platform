@@ -77,3 +77,6 @@
 - feature: "Server tasks (D36): sysadmins start backups, restore drills and other host tasks from a fixed allowlist; one at a time; the board sees the history; audited; the VM agent maps the kind in one case statement and writes back through psql variables"
   since: M5
   match: ["^unit:core/tests/test_host_tasks", "^manual:server tasks on the VM"]
+- feature: "Release numbers (D37): VERSION is MAJOR.MINOR.PATCH with a CHANGELOG entry; System status shows the release, the build and an update's number; the agent reads it safely"
+  since: M5
+  match: ["^unit:core/tests/test_versioning\\.py::test_"]
