@@ -243,3 +243,55 @@ def test_status_page_names_failed_job_kinds_but_not_their_arguments(client):
     assert "Failed: send_digest (1)" in page
     assert "owner-b@example.com" not in page
     assert 'tone-success"><div class="label">Host security' in page and "All on" in page
+
+
+def test_a_successful_send_clears_the_remembered_email_failure(settings):
+    import smtplib
+    from unittest import mock
+
+    from django.core.cache import cache
+    from django.core.mail import send_mail
+
+    from core.email import FAILURE_CACHE_KEY
+
+    settings.EMAIL_BACKEND = "core.email.RedirectingBackend"
+    settings.EMAIL_TRANSPORT_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    with mock.patch(
+        "django.core.mail.backends.locmem.EmailBackend.send_messages",
+        side_effect=smtplib.SMTPServerDisconnected(),
+    ):
+        send_mail("s", "b", None, ["a@example.com"], fail_silently=True)
+    assert cache.get(FAILURE_CACHE_KEY)
+    assert health._email()[0] is False
+    send_mail("s", "b", None, ["a@example.com"])
+    assert cache.get(FAILURE_CACHE_KEY) is None
+    assert health._email()[0] is True
+
+
+def test_sysadmin_can_clear_sticky_checks_only_and_it_is_audited(client):
+    from django.core.cache import cache
+
+    from audit.models import AuditEvent
+    from core.email import FAILURE_CACHE_KEY
+
+    cache.set(FAILURE_CACHE_KEY, ("2026-11-26T00:00:00", "SMTPSenderRefused"), 600)
+    ErrorTally.objects.create(
+        hour=timezone.now().replace(minute=0, second=0, microsecond=0), count=50
+    )
+    admin = make_member(roles=[Role.SYSADMIN])
+    client.force_login(admin)
+    page = client.get(reverse("system_status")).content.decode()
+    assert page.count('value="clear_check"') == 2
+    client.post(reverse("system_status"), {"action": "clear_check", "check": "email"})
+    client.post(reverse("system_status"), {"action": "clear_check", "check": "errors"})
+    assert health._email()[0] and health._errors()[0]
+    assert set(
+        AuditEvent.objects.filter(action="system.health_check_cleared").values_list(
+            "metadata__check", flat=True
+        )
+    ) == {"email", "errors"}
+    client.post(reverse("system_status"), {"action": "clear_check", "check": "database"})
+    assert AuditEvent.objects.filter(action="system.health_check_cleared").count() == 2
+    client.force_login(make_member(board=True))
+    response = client.post(reverse("system_status"), {"action": "clear_check", "check": "email"})
+    assert response.status_code == 403

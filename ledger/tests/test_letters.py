@@ -5,6 +5,7 @@ import datetime
 import pytest
 from django.core.exceptions import PermissionDenied
 from django.urls import reverse
+from django.utils import timezone
 
 from audit.models import AuditEvent
 from community import services as community
@@ -30,7 +31,7 @@ def w():
         kind=EntryKind.OTHER_CHARGE,
         amount_cents=12345,
         description="Gate repair share",
-        posted_on=datetime.date.today() - datetime.timedelta(days=40),
+        posted_on=timezone.localdate() - datetime.timedelta(days=40),
         actor=board,
     )
     return {

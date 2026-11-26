@@ -165,6 +165,27 @@ CHECKS = [
 ]
 
 
+# Checks that remember past failures; a sysadmin can clear them once fixed.
+CLEARABLE = {"email", "errors"}
+
+
+def clear(key: str) -> None:
+    """Forget a sticky failure (System status "Clear"); the next run decides
+    again from fresh data. The caller audits it."""
+    if key not in CLEARABLE:
+        raise ValueError("That check cannot be cleared.")
+    if key == "email":
+        from core.email import clear_failure
+
+        clear_failure()
+    else:
+        from core.models import ErrorTally
+
+        # Counts only (no URLs, messages or users): forget the last hour's.
+        since = timezone.now() - datetime.timedelta(hours=2)
+        ErrorTally.objects.filter(hour__gte=since).delete()
+
+
 def run_checks() -> list[Result]:
     out = []
     for key, label, fn in CHECKS:

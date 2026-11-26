@@ -37,6 +37,21 @@ def _note_failure(exc: Exception) -> None:
         logger.warning("email.failure_not_recorded")
 
 
+def _note_recovery() -> None:
+    """A message went out, so mail works again: clear any remembered failure
+    (System status "Outgoing email" recovers at once, not a day later)."""
+    from django.core.cache import cache
+
+    try:
+        cache.delete(FAILURE_CACHE_KEY)
+    except Exception:  # clearing must not fail the send
+        logger.warning("email.recovery_not_recorded")
+
+
+def clear_failure() -> None:
+    _note_recovery()
+
+
 class RedirectingBackend(BaseEmailBackend):
     def __init__(self, fail_silently: bool = False, **kwargs):
         super().__init__(fail_silently=fail_silently)
@@ -52,12 +67,15 @@ class RedirectingBackend(BaseEmailBackend):
 
     def send_messages(self, email_messages):
         try:
-            return self._send(email_messages)
+            sent = self._send(email_messages)
         except (OSError, smtplib.SMTPException) as exc:
             _note_failure(exc)
             if self.fail_silently:
                 return 0
             raise EmailUnavailable from exc
+        if sent:
+            _note_recovery()
+        return sent
 
     def _send(self, email_messages):
         target = settings.EMAIL_REDIRECT_ALL_TO

@@ -16,6 +16,20 @@ def test_site_time_zone_is_eastern():
     assert settings.TIME_ZONE == "America/New_York" and settings.USE_TZ
 
 
+def test_tests_use_eastern_dates_too():
+    # A test's "today" from the server clock (UTC) disagrees with the portal's
+    # Eastern date for five hours each evening, so the test fails only then.
+    offenders = []
+    for path in Path(".").rglob("test*.py"):
+        text = str(path)
+        if any(s in "/" + text for s in (".venv", ".claude")) or path.name == "test_local_dates.py":
+            continue
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            if re.search(r"\bdate\.today\(\)", line):
+                offenders.append(f"{text}:{n}: {line.strip()}")
+    assert not offenders, "Use timezone.localdate() in tests:\n" + "\n".join(offenders)
+
+
 def test_no_utc_or_server_dates_in_product_code():
     offenders = []
     for path in Path(".").rglob("*.py"):

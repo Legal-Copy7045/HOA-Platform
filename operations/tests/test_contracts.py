@@ -6,6 +6,7 @@ import pytest
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.urls import reverse
+from django.utils import timezone
 
 from audit.models import AuditEvent
 from community.models import Role
@@ -263,7 +264,7 @@ def test_owners_cannot_see_contracts(client, w):
 
 def test_contract_pages_for_the_board(client, w):
     _approve(w)
-    _invoice(w, 70000, datetime.date.today().replace(day=1), "NOW")
+    _invoice(w, 70000, timezone.localdate().replace(day=1), "NOW")
     client.force_login(w["b2"])
     page = client.get(reverse("contracts")).content
     assert b"Mowing" in page and b"received" in page

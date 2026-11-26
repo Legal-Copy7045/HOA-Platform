@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from core import policy
+from core.health import CLEARABLE as health_clearable
 from core.health import run_checks
 
 
@@ -148,12 +149,35 @@ def _send_test_email(request):
     return redirect("system_status")
 
 
+def _clear_check(request):
+    """Clear a health check that remembers past failures (email, server
+    errors) once the cause is fixed. Audited."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from audit.services import record_event
+    from core import health
+
+    key = request.POST.get("check", "")
+    if key not in health.CLEARABLE:
+        messages.error(request, "That check cannot be cleared.")
+        return redirect("system_status")
+    health.clear(key)
+    record_event(
+        "system.health_check_cleared", actor=request.user, request=request, metadata={"check": key}
+    )
+    messages.success(request, "Cleared. The check now reflects only what happens from here on.")
+    return redirect("system_status")
+
+
 @login_required
 def system_status(request):
     """Operations view for sysadmins: health only, no owner data (decision D9)."""
     policy.require(request.user, "system.view_status")
     if request.method == "POST" and request.POST.get("action") == "test_email":
         return _send_test_email(request)
+    if request.method == "POST" and request.POST.get("action") == "clear_check":
+        return _clear_check(request)
     if request.method == "POST" and request.POST.get("action") in (
         "check_updates",
         "install_update",
@@ -184,6 +208,7 @@ def system_status(request):
             "thin": policy.thinly_covered_actions(),
             "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),
             "health": run_checks(),
+            "clearable": health_clearable,
             "update": _update_status(),
             "scanner": settings.DOCUMENT_SCANNER,
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
