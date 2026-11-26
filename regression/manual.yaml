@@ -265,3 +265,7 @@
   check: "On a phone every signed-in page has a bottom bar (owners: Dashboard, My account, Voting, Menu; board, manager and ARC: Dashboard, My items, Search, Menu) that never covers a page's last button, shows waiting counts, and whose Menu opens the drawer; it is absent on a desktop and in print."
   steps: "Sign in as a demo owner and a board member on an iPhone and an Android phone; scroll to the bottom of a long page (My account, Owner accounts); open Menu from the bar; print a page."
   last: ""
+- key: secret choices mixed on the server
+  check: "On the POC, a secret test vote's ballots show as \"waiting to be mixed\" on the vote page while fewer than ten are pooled, the worker writes them once ten wait (five stay behind), and closing the vote counts every ballot with nothing left waiting (D56)."
+  steps: "Open a secret demo vote, cast ballots from demo owners, check the vote page as the board after each; cast ten or more and wait a minute for the worker; close the vote and check the counts equal the ballots cast."
+  last: ""

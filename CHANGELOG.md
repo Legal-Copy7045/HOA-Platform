@@ -6,6 +6,17 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.25.0 — 2026-11-26
+
+- Secret ballots, election ballots and anonymous survey answers can no
+  longer be matched to who cast them, even by someone reading the database
+  afterwards (D56). The choice waits in a mixing pool with no name on it and
+  is written later, shuffled with others, in a separate step. While a vote is
+  open the board's results say how many ballots are still "waiting to be
+  mixed"; closing the vote, election or survey counts every one of them.
+- Votes cast before this release keep the old layout (demo data only): run
+  real secret votes only on this release or later.
+
 ## 0.18.0 — 2026-11-26
 
 - Phones: every button and link is at least a thumb's size, buttons wrap
