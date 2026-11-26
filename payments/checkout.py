@@ -30,6 +30,7 @@ from core import policy
 from core.money import format_cents
 from core.policy import SYSTEM
 from core.scoping import internal, system_access
+from ledger.accounts import CURRENT
 from payments import services as fees
 from payments import stripe_api
 from payments.models import (
@@ -87,13 +88,15 @@ def _own_open_charges(user, lot):
     from ledger import allocation
 
     since = policy.roles_for(user).lot_since.get(lot.pk)
-    return allocation.open_charges(lot.pk, since=since)
+    return allocation.open_charges(lot.pk, since=since, account=CURRENT)
 
 
 def payable_cents(lot_id: int) -> int:
+    """What today's owners owe on their own account (a former owner's
+    balance on the lot is never theirs to pay, D33-acctfix-1)."""
     from ledger.services import balance
 
-    return max(balance(lot_id), 0)
+    return max(balance(lot_id, account=CURRENT), 0)
 
 
 def quote(user, lot, *, charge_ids=None, amount_cents=None) -> Quote:

@@ -17,6 +17,9 @@ How money is applied (governing rule ``ledger.assessments_before_fees``):
 * Reversing an entry undoes its applications (negative rows) and matches
   the reversal to the entry, so a bounced payment reopens the charges it
   paid, and a reversed charge frees whatever paid it.
+* Money is applied only to charges of the same ownership account
+  (D33-acctfix-1, ledger/accounts.py): a seller's credit never pays the
+  buyer's dues. Readers take ``account=`` (the whole lot by default).
 
 The engine (``LotBook``) works on plain values so the data migration that
 rebuilt applications for existing entries uses exactly the same steps as
@@ -33,12 +36,14 @@ from dataclasses import dataclass, field
 
 from django.db import connection, transaction
 from django.db.models import Max
+from django.utils import timezone
 
 from core.scoping import internal, system_access
+from ledger.accounts import ALL, account_q, resolve
 
 ORDER_RULE = "ledger.assessments_before_fees"
 AUTO, DIRECTED, REVERSAL, UNWIND, MIGRATION = "auto", "directed", "reversal", "unwind", "migration"
-CHARGE_KIND_VALUES = ("assessment", "late_fee", "other_charge", "resale_fee")
+CHARGE_KIND_VALUES = ("assessment", "late_fee", "other_charge", "resale_fee", "refund")
 _LOCK_NAMESPACE = 5_320_001  # pg advisory lock namespace for lot allocation
 _NUMBER_LOCK = 5_320_002
 
@@ -68,10 +73,13 @@ class _Entry:
     amount: int
     posted_on: datetime.date
     reverses_id: int | None = None
+    account: int | None = None
 
     @classmethod
     def of(cls, e) -> _Entry:
-        return cls(e.id, e.kind, e.amount_cents, e.posted_on, e.reverses_id)
+        # Historical models before migration 0015 have no account.
+        account = getattr(e, "account_id", None)
+        return cls(e.id, e.kind, e.amount_cents, e.posted_on, e.reverses_id, account)
 
 
 @dataclass
@@ -118,6 +126,8 @@ class LotBook:
         )
         for credit in credits:
             for charge in charges:
+                if charge.account != credit.account:
+                    continue  # money stays with its own ownership account
                 cents = min(self.remaining(credit.id), self.remaining(charge.id))
                 self._apply(credit.id, charge.id, cents, kind, out)
                 if not self.remaining(credit.id):
@@ -143,12 +153,32 @@ class LotBook:
         elif directed and entry.amount < 0:
             for charge_id in directed:
                 charge = self.entries.get(charge_id)
-                if charge is None or charge.amount <= 0 or charge.reverses_id:
+                if not self.can_direct(entry, charge):
                     continue
                 cents = min(self.remaining(entry.id), self.remaining(charge_id))
                 if cents > 0:
                     self._apply(entry.id, charge_id, cents, kind or DIRECTED, out)
         self.settle(kind or AUTO, out)
+        return out
+
+    @staticmethod
+    def can_direct(source: _Entry, charge: _Entry | None) -> bool:
+        return (
+            charge is not None
+            and charge.amount > 0
+            and not charge.reverses_id
+            and charge.account == source.account
+        )
+
+    def separate_accounts(self, kind: str = MIGRATION) -> list:
+        """Undo money applied across ownership accounts (history from before
+        D33-acctfix-1), then apply it again within each account."""
+        out: list = []
+        for (s, c), net in list(self.pairs.items()):
+            if net > 0 and self.entries[s].account != self.entries[c].account:
+                self._apply(s, c, -net, kind, out)
+        if out:
+            self.settle(kind, out)
         return out
 
     def open_cents(self) -> int:
@@ -217,7 +247,12 @@ def after_post(entry, directed: list[int] | None = None) -> list:
         PaymentApplication.objects.bulk_create(
             [
                 PaymentApplication(
-                    lot_id=entry.lot_id, source_id=s, charge_id=c, amount_cents=cents, kind=kind
+                    lot_id=entry.lot_id,
+                    source_id=s,
+                    charge_id=c,
+                    amount_cents=cents,
+                    kind=kind,
+                    effective_on=entry.posted_on,
                 )
                 for s, c, cents, kind in rows
             ]
@@ -241,16 +276,22 @@ def apply(entry, charge_ids: list[int]) -> list:
         out: list = []
         for charge_id in charge_ids:
             charge = book.entries.get(charge_id)
-            if charge is None or charge.amount <= 0 or charge.reverses_id:
+            if not book.can_direct(book.entries[entry.pk], charge):
                 continue
             cents = min(book.remaining(entry.pk), book.remaining(charge_id))
             if cents > 0:
                 book._apply(entry.pk, charge_id, cents, DIRECTED, out)
         book.settle(AUTO, out)
+        today = timezone.localdate()
         PaymentApplication.objects.bulk_create(
             [
                 PaymentApplication(
-                    lot_id=entry.lot_id, source_id=s, charge_id=c, amount_cents=cents, kind=k
+                    lot_id=entry.lot_id,
+                    source_id=s,
+                    charge_id=c,
+                    amount_cents=cents,
+                    kind=k,
+                    effective_on=today,
                 )
                 for s, c, cents, k in out
             ]
@@ -269,6 +310,9 @@ def backfill(entry_model, application_model, number_model, *, qs=None) -> dict[s
     qs = qs or (lambda model: model.objects.all())
     done_lots = set(qs(application_model).values_list("lot_id", flat=True).distinct())
     lot_ids = sorted(set(qs(entry_model).values_list("lot_id", flat=True).distinct()))
+    # The historical model of migration 0009 has no ``effective_on`` yet
+    # (migration 0012 fills it in for those rows).
+    dated = "effective_on" in {f.name for f in application_model._meta.get_fields()}
     created = 0
     for lot_id in lot_ids:
         if lot_id in done_lots:
@@ -276,13 +320,18 @@ def backfill(entry_model, application_model, number_model, *, qs=None) -> dict[s
         book = LotBook()
         rows = []
         for e in qs(entry_model).filter(lot_id=lot_id).order_by("id"):
-            rows += book.post(_Entry.of(e), kind=MIGRATION)
+            rows += [(*row, e.posted_on) for row in book.post(_Entry.of(e), kind=MIGRATION)]
         application_model.objects.bulk_create(
             [
                 application_model(
-                    lot_id=lot_id, source_id=s, charge_id=c, amount_cents=cents, kind=MIGRATION
+                    lot_id=lot_id,
+                    source_id=s,
+                    charge_id=c,
+                    amount_cents=cents,
+                    kind=MIGRATION,
+                    **({"effective_on": on} if dated else {}),
                 )
-                for s, c, cents, _k in rows
+                for s, c, cents, _k, on in rows
             ]
         )
         created += len(rows)
@@ -378,14 +427,18 @@ def charge_status(entry) -> str:
 
 
 @internal("allocation")
-def charges(lot_id: int, *, open_only: bool = True, since=None) -> list[ChargeView]:
+def charges(lot_id: int, *, open_only: bool = True, since=None, account=ALL) -> list[ChargeView]:
     """The lot's charges with their open amounts and the payments applied to
     each, oldest first. ``since``: leave out charges posted before (an
-    owner's era); their open total is in ``open_before``."""
+    owner's era); their open total is in ``open_before``. ``account``: one
+    ownership account's charges only (ledger/accounts.py)."""
     from ledger.models import ChargeNumber, LedgerEntry, PaymentApplication
 
     book = load_book(lot_id)
-    entries = {e.pk: e for e in LedgerEntry.objects.filter(lot_id=lot_id)}
+    entries = {
+        e.pk: e
+        for e in LedgerEntry.objects.filter(lot_id=lot_id).filter(account_q(lot_id, account))
+    }
     numbers = {n.entry_id: n.label for n in ChargeNumber.objects.filter(entry__lot_id=lot_id)}
     applied: dict[int, dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for s, c, cents in PaymentApplication.objects.filter(lot_id=lot_id).values_list(
@@ -425,12 +478,12 @@ def charges(lot_id: int, *, open_only: bool = True, since=None) -> list[ChargeVi
     return out
 
 
-def open_charges(lot_id: int, *, since=None) -> list[ChargeView]:
-    return charges(lot_id, open_only=True, since=since)
+def open_charges(lot_id: int, *, since=None, account=ALL) -> list[ChargeView]:
+    return charges(lot_id, open_only=True, since=since, account=account)
 
 
 @internal("allocation")
-def open_before(lot_id: int, since) -> int:
+def open_before(lot_id: int, since, *, account=ALL) -> int:
     """Open amount of charges posted before ``since`` (an owner sees it as
     one "from before your ownership" line, not the detail)."""
     from ledger.models import LedgerEntry
@@ -440,37 +493,73 @@ def open_before(lot_id: int, since) -> int:
         book.remaining(e.pk)
         for e in LedgerEntry.objects.filter(
             lot_id=lot_id, posted_on__lt=since, amount_cents__gt=0, kind__in=CHARGE_KIND_VALUES
-        )
+        ).filter(account_q(lot_id, account))
     )
 
 
 @internal("allocation")
-def unapplied_credit(lot_id: int) -> int:
+def unapplied_credit(lot_id: int, *, account=ALL) -> int:
     book = load_book(lot_id)
-    return sum(book.remaining(e.id) for e in book.entries.values() if e.amount < 0)
+    account = resolve(lot_id, account)
+    return sum(
+        book.remaining(e.id)
+        for e in book.entries.values()
+        if e.amount < 0 and (account == ALL or e.account == account)
+    )
+
+
+@dataclass
+class AsOf:
+    """A lot's open items as they stood on a date."""
+
+    entries: dict  # id -> LedgerEntry posted by then
+    open: dict[int, int]  # charge id -> open cents
+    credit: int  # money not applied to any charge
+    balance: int
 
 
 @internal("allocation")
-def open_items_as_of(lot_id: int, as_of: datetime.date) -> tuple[list[list], int]:
-    """[(due_on, open_cents)] of charges open on ``as_of`` and the unapplied
-    credit, counting only entries posted by then (for aging)."""
+def state_as_of(lot_id: int, as_of: datetime.date, *, account=ALL) -> AsOf:
+    """Open amounts on ``as_of``: only entries posted by then, and only the
+    applications made by entries posted by then (``effective_on``), so a
+    reversal posted later does not reach back (D33-acctfix-3).
+
+    Backdated entries can make a past state slightly inconsistent (an
+    application dated before an earlier one it followed); open amounts are
+    kept between zero and the charge, and the credit is what keeps open
+    charges - credit equal to the balance on that date."""
     from ledger.models import LedgerEntry, PaymentApplication
 
-    entries = {e.pk: e for e in LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of)}
+    entries = {
+        e.pk: e
+        for e in LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of).filter(
+            account_q(lot_id, account)
+        )
+    }
     applied: dict[int, int] = defaultdict(int)
-    for s, c, cents in PaymentApplication.objects.filter(lot_id=lot_id).values_list(
-        "source_id", "charge_id", "amount_cents"
-    ):
+    for s, c, cents in PaymentApplication.objects.filter(
+        lot_id=lot_id, effective_on__lte=as_of
+    ).values_list("source_id", "charge_id", "amount_cents"):
         if s in entries and c in entries:
-            applied[s] += cents
             applied[c] += cents
-    charges_ = sorted(
-        [e.posted_on, e.amount_cents - applied[e.pk]]
+    open_ = {
+        e.pk: min(max(e.amount_cents - applied[e.pk], 0), e.amount_cents)
         for e in entries.values()
-        if e.amount_cents > 0 and e.amount_cents - applied[e.pk] > 0
+        if e.amount_cents > 0
+    }
+    balance = sum(e.amount_cents for e in entries.values())
+    credit = max(sum(open_.values()) - balance, 0)
+    return AsOf(entries, open_, credit, balance)
+
+
+def open_items_as_of(lot_id: int, as_of: datetime.date, *, account=ALL) -> tuple[list[list], int]:
+    """[(due_on, open_cents)] of charges open on ``as_of`` and the unapplied
+    credit, counting only entries and applications posted by then (aging)."""
+    state = state_as_of(lot_id, as_of, account=account)
+    charges_ = sorted(
+        [state.entries[pk].posted_on, cents] for pk, cents in state.open.items() if cents > 0
     )
-    credit = sum(-e.amount_cents - applied[e.pk] for e in entries.values() if e.amount_cents < 0)
-    return charges_, credit
+    return charges_, state.credit
 
 
 @internal("allocation")

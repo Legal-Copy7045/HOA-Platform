@@ -235,11 +235,6 @@ def test_former_owner_sees_their_credit_read_only_in_my_history(client, w, books
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: a seller's unapplied credit stays on the lot and pays the buyer's dues "
-    "(ledger is per lot, transfer_lot never settles the old account)",
-)
 def test_sellers_credit_never_pays_the_buyers_dues(client, w, books):
     _charge(w, 4500, "Dues", ago(60))
     _pay(w, 13_500, ago(50), reference="502")
@@ -295,11 +290,6 @@ def test_reversing_a_paid_late_fee_frees_the_money_and_is_not_charged_again(w, b
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: late fee charged although the month's dues were paid on time "
-    "(late_fee_candidates tests the lot balance, not whether the assessment is open)",
-)
 def test_no_late_fee_when_the_months_dues_were_paid_on_time(w, books):
     _dues(2026, 10)
     _pay(w, 4500, D(2026, 10, 1))
@@ -351,11 +341,6 @@ def test_partial_payments_move_the_aging_buckets(w, books):
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: aging as of a past date counts the unwind rows of a reversal posted later "
-    "(open_items_as_of uses every application, whatever entry created it)",
-)
 def test_aging_as_of_a_date_before_a_bounce_shows_the_charge_paid(w, books):
     charge = _charge(w, 3000, "Fine", D(2026, 1, 5))
     payment = _pay(w, 3000, D(2026, 1, 10), reference="77")
@@ -412,11 +397,6 @@ def test_statement_and_resale_certificate_list_the_open_charges_and_total(w, boo
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: delinquency notices state the whole balance as the 'delinquency', "
-    "including charges not yet past due (notice_pdf uses balance, the case letter past_due)",
-)
 def test_delinquency_notice_states_only_the_past_due_amount(w, books):
     _dues(2026, 9)
     _charge(w, 1000, "Posted today", TODAY)

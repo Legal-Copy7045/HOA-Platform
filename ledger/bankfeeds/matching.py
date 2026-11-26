@@ -1,7 +1,9 @@
 """Matching bank lines to the cash book, for the monthly reconciliation.
 
 Suggestions need the exact amount and a nearby date:
-- money in: a deposit batch dated within 5 days of the bank line;
+- money in: a deposit batch dated within 5 days of the bank line, or a
+  Stripe payout arriving within 3 days of it (payments.sync.PAYOUT_BANK_DAYS;
+  online payments reach the bank only in payouts, D33-acctfix-6);
 - money out: a vendor payment dated up to 5 days after or 45 days before
   the bank line (a mailed check clears weeks later), or a deposited owner
   payment that bounced (returned item), within 5 days.
@@ -34,7 +36,7 @@ SUGGESTIONS_PER_LINE = 3
 
 @dataclass(frozen=True)
 class Candidate:
-    kind: str  # deposit | payment | returned
+    kind: str  # deposit | payment | returned | payout
     object_id: int
     on: datetime.date
     amount_cents: int
@@ -72,6 +74,14 @@ def _open_items(today):
         ref = f" · {p.reference}" if p.reference else ""
         label = f"Payment to {p.invoice.vendor.name}{ref}"
         out.append(Candidate("payment", p.pk, p.paid_on, -p.amount_cents, label, 0))
+    for p in items["payouts"]:
+        if ("payout", p.pk) in taken_items:
+            continue
+        out.append(
+            Candidate(
+                "payout", p.pk, p.arrival_date, p.amount_cents, f"Stripe payout {p.payout_id}", 0
+            )
+        )
     for e in items["returned"]:
         if ("returned", e.pk) in taken_items:
             continue
@@ -97,6 +107,10 @@ def _fits(line: BankTransaction, item: Candidate) -> int | None:
         ok = abs(gap) <= DEPOSIT_DAYS
     elif item.kind == "payment":
         ok = -PAYMENT_DAYS_AFTER <= gap <= PAYMENT_DAYS_BEFORE
+    elif item.kind == "payout":
+        from payments.sync import PAYOUT_BANK_DAYS
+
+        ok = abs(gap) <= PAYOUT_BANK_DAYS
     else:
         ok = abs(gap) <= RETURNED_DAYS
     return abs(gap) if ok else None
@@ -132,7 +146,7 @@ def suggestions(lines=None) -> list[dict]:
 
 def confirm(line: BankTransaction, *, kind: str, object_id: int, actor, request=None) -> BankMatch:
     require(actor, "bank_feed.match")
-    if kind not in ("deposit", "payment", "returned"):
+    if kind not in ("deposit", "payment", "returned", "payout"):
         raise BankFeedError("Choose what this bank line is.")
     with transaction.atomic():
         # One lock for matching and reconciling (the same row reconcile() takes).
@@ -195,7 +209,7 @@ def undo(match: BankMatch, *, actor, request=None) -> BankMatch:
 def matched_for_statement(statement_date: datetime.date) -> dict[str, set[int]]:
     """Cash-book items whose bank line posted by the statement date: ticked
     in advance on the reconciliation page."""
-    out: dict[str, set[int]] = {"deposit": set(), "payment": set(), "returned": set()}
+    out: dict[str, set[int]] = {k: set() for k in ("deposit", "payment", "returned", "payout")}
     for kind, object_id in (
         active_matches()
         .filter(transaction__posted_on__lte=statement_date)

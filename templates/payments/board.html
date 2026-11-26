@@ -16,6 +16,7 @@
   </section>
   <section class="card"><h2>Needs the board</h2>
     {% for a in open_alerts %}<div class="notice"><div><strong>{{ a.get_kind_display }}</strong>{% if a.lot %} &middot; lot {{ a.lot.number }}{% endif %}{% if a.amount_cents %} &middot; {{ a.amount_cents|cents }}{% endif %}</div><div class="small">{{ a.detail }}{% if a.stripe_ref %} <span class="muted">({{ a.stripe_ref }})</span>{% endif %}</div>
+      {% if can_manage and a.kind == "refund" %}<form method="post" action="{% url 'payment_alert_resolve' a.pk %}" class="inline-form" data-confirm="Record this refund on the lot's account? The owner's balance goes up by the payment's share; the surcharge share is booked by itself. For a full refund you can instead reverse the payment on the lot's account, which also reopens the charges it paid.">{% csrf_token %}<input type="hidden" name="record_refund" value="1"><button type="submit" class="small secondary">Record on the account</button></form>{% endif %}
       {% if can_manage %}<form method="post" action="{% url 'payment_alert_resolve' a.pk %}" class="inline-form" data-confirm="Mark this as done? It leaves the board's list; the record stays.">{% csrf_token %}<label class="sr-only" for="note-{{ a.pk }}">What was done</label><input id="note-{{ a.pk }}" name="note" required placeholder="What was done"><button type="submit" class="small">Mark done</button></form>{% endif %}</div>
     {% empty %}<p class="small muted">Nothing waiting.</p>{% endfor %}
   </section>

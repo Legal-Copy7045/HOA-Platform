@@ -434,6 +434,16 @@ _SPECS = [
     _spec("payments.alert_resolved", "Online payment item closed", "alert_id", "kind"),
     _spec("payments.reconciled", "Ledger compared with Stripe", "ok", "problems"),
     _spec("payments.receipt_downloaded", "Payment receipt downloaded", "checkout_id"),
+    # Accounting fixes (D33-acctfix)
+    _spec(
+        "ledger.refund_recorded", "Online refund recorded on an account", "lot_id", "amount_cents"
+    ),
+    _spec(
+        "payments.refund_recorded",
+        "Board recorded a Stripe refund on the account",
+        "alert_id",
+        "amount_cents",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

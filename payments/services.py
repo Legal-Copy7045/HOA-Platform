@@ -95,19 +95,13 @@ def online_entry_ids() -> set[int]:
 
 def journal_items(start, end) -> dict[str, list[tuple]]:
     """Stripe-side journal lines for the period, so the books balance:
-    surcharges (income), surcharge refunds, Stripe's processing fees
-    (expense) and payouts (Stripe clearing to the bank)."""
+    surcharges (income), the surcharge part of every refund (refund_portions),
+    Stripe's processing fees (expense) and payouts (Stripe clearing to the
+    bank). The payment part of a refund is booked from the owner's account,
+    when the board records the refund or reverses the payment."""
     from django.utils import timezone
 
-    from payments.models import (
-        AlertKind,
-        EventKind,
-        PaymentAlert,
-        StripeBalanceTransaction,
-        StripeEvent,
-        StripePayment,
-        StripePayout,
-    )
+    from payments.models import StripeBalanceTransaction, StripePayment, StripePayout
 
     out: dict[str, list[tuple]] = {
         "surcharges": [],
@@ -119,21 +113,12 @@ def journal_items(start, end) -> dict[str, list[tuple]]:
         day = timezone.localdate(p.recorded_at)
         if p.surcharge_cents and start <= day <= end:
             out["surcharges"].append((day, f"S{p.pk}", p.surcharge_cents, p.lot.number))
-    surcharge_due = set(
-        PaymentAlert.objects.unscoped("accounting")
-        .filter(kind=AlertKind.SURCHARGE_REFUND)
-        .values_list("key", flat=True)
-    )
-    events = StripeEvent.objects.unscoped("accounting").filter(kind=EventKind.REFUND_SEEN)
-    for ev in events.select_related("payment__lot"):
+    for ev, surcharge_part, _base in refund_portions():
         day = timezone.localdate(ev.seen_at)
-        payment = ev.payment
-        if (
-            start <= day <= end
-            and payment.payment_intent_id in surcharge_due
-            and ev.amount_cents == payment.surcharge_cents
-        ):
-            out["surcharge_refunds"].append((day, f"E{ev.pk}", ev.amount_cents, payment.lot.number))
+        if surcharge_part and start <= day <= end:
+            out["surcharge_refunds"].append(
+                (day, f"E{ev.pk}", surcharge_part, ev.payment.lot.number)
+            )
     for bt in StripeBalanceTransaction.objects.exclude(fee_cents=0):
         day = timezone.localdate(bt.created)
         if start <= day <= end:
@@ -141,3 +126,120 @@ def journal_items(start, end) -> dict[str, list[tuple]]:
     for po in StripePayout.objects.filter(arrival_date__range=(start, end)):
         out["payouts"].append((po.arrival_date, f"O{po.pk}", po.amount_cents, po.payout_id))
     return out
+
+
+# --- Refunds (D33-acctfix-5) -----------------------------------------------------------------
+
+
+def _round_half_up(numerator: int, denominator: int) -> int:
+    return (2 * numerator + denominator) // (2 * denominator)
+
+
+def refund_portions(payment=None) -> list[tuple]:
+    """Every refund Stripe reported, split into (event, surcharge part,
+    payment part), oldest first per payment.
+
+    The surcharge is refunded in proportion (card-network rules require a
+    partial refund to return the surcharge pro rata): after refunds totalling
+    R of a payment of T (base B + surcharge S), round(R x S / T) of the
+    surcharge has been refunded, and all of it once R reaches T. Each refund
+    takes the difference, so the parts always add up and never exceed S. The
+    one exception is the debit-card safety net: a refund of exactly the
+    surcharge, owed because a non-credit card paid one, is all surcharge."""
+    from payments.models import AlertKind, EventKind, PaymentAlert, StripeEvent
+
+    surcharge_due = set(
+        PaymentAlert.objects.unscoped("refunds")
+        .filter(kind=AlertKind.SURCHARGE_REFUND)
+        .values_list("key", flat=True)
+    )
+    events = (
+        StripeEvent.objects.unscoped("refunds")
+        .filter(kind=EventKind.REFUND_SEEN)
+        .select_related("payment__lot")
+        .order_by("payment_id", "seen_at", "id")
+    )
+    if payment is not None:
+        events = events.filter(payment=payment)
+    out = []
+    totals: dict[int, list[int]] = {}
+    for ev in events:
+        p = ev.payment
+        refunded, surcharge_refunded = totals.setdefault(p.pk, [0, 0])
+        total = p.base_cents + p.surcharge_cents
+        amount = ev.amount_cents
+        if (
+            p.payment_intent_id in surcharge_due
+            and amount == p.surcharge_cents
+            and not surcharge_refunded
+        ):
+            part = amount
+        elif not total or not p.surcharge_cents:
+            part = 0
+        elif refunded + amount >= total:
+            part = p.surcharge_cents - surcharge_refunded
+        else:
+            cumulative = _round_half_up((refunded + amount) * p.surcharge_cents, total)
+            part = max(0, min(cumulative, p.surcharge_cents) - surcharge_refunded)
+        part = min(part, amount)
+        totals[p.pk] = [refunded + amount, surcharge_refunded + part]
+        out.append((ev, part, amount - part))
+    return out
+
+
+def record_refund(alert, *, actor, request=None):
+    """The board records a refund Stripe reported (a "Refund to record" item)
+    on the owner's account: the payment's share of it becomes a refund entry
+    (the surcharge share is booked in the journal by itself), and the item
+    closes. Returns the ledger entry, or None when the refund was all
+    surcharge."""
+    from django.db import transaction
+    from django.utils import timezone
+
+    from audit.services import record_event
+    from core.money import format_cents
+    from core.policy import require
+    from ledger import services as ledger
+    from payments.models import AlertKind, EventKind, PaymentAlert, StripeEvent
+
+    require(actor, "payments.manage")
+    with transaction.atomic():
+        alert = PaymentAlert.objects.unscoped("record refund").select_for_update().get(pk=alert.pk)
+        if alert.kind != AlertKind.REFUND or alert.resolved_at is not None:
+            raise ledger.LedgerError("This item is not a refund waiting to be recorded.")
+        event = (
+            StripeEvent.objects.unscoped("record refund")
+            .filter(kind=EventKind.REFUND_SEEN, stripe_id=alert.key)
+            .select_related("payment__entry")
+            .first()
+        )
+        if event is None:
+            raise ledger.LedgerError("Stripe's record of this refund was not found.")
+        base = next(b for ev, _s, b in refund_portions(event.payment) if ev.pk == event.pk)
+        entry = None
+        if base:
+            entry = ledger.record_online_refund(
+                payment=event.payment.entry,
+                amount_cents=base,
+                refund_id=event.stripe_id,
+                actor=actor,
+                request=request,
+            )
+        PaymentAlert.objects.unscoped("record refund").filter(pk=alert.pk).update(
+            resolved_at=timezone.now(),
+            resolved_by=actor,
+            resolution=(
+                f"Recorded on the account: {format_cents(base)} of the payment refunded"
+                f" ({format_cents(event.amount_cents - base)} surcharge)."
+                if base
+                else "The refund was all surcharge; nothing to record on the account."
+            ),
+        )
+    record_event(
+        "payments.refund_recorded",
+        actor=actor,
+        request=request,
+        target=alert,
+        metadata={"alert_id": alert.pk, "amount_cents": base},
+    )
+    return entry

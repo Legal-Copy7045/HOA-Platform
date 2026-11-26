@@ -310,9 +310,13 @@ def payouts_for_matching(start: datetime.date, end: datetime.date) -> list[dict]
     """Stripe payouts arriving in the bank between ``start`` and ``end``
     (inclusive), for bank reconciliation: match each ``amount_cents`` (the
     net deposit) to a bank line on ``arrival_date``. Gross payments, refunds
-    and fees explain the difference from the online payments recorded."""
+    and fees explain the difference from the online payments recorded. The
+    cash book counts each as a deposit on its arrival date (bank
+    reconciliation, D33-acctfix-6)."""
     return [
         {
+            "id": p.pk,
+            "status": p.status,
             "payout_id": p.payout_id,
             "arrival_date": p.arrival_date,
             "amount_cents": p.amount_cents,

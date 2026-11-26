@@ -18,8 +18,9 @@ from core.money import format_cents
 from core.policy import SYSTEM, require
 from core.scoping import internal, system_access
 from core.workflow import Transition, Workflow
+from ledger import accounts
+from ledger.accounts import ALL, CURRENT, account_q
 from ledger.models import (
-    CHARGE_KINDS,
     Budget,
     BudgetLine,
     BudgetStatus,
@@ -55,26 +56,39 @@ def _authorize(actor, action):
 
 
 @internal("ledger service")
-def balance(lot_id: int, as_of: datetime.date | None = None) -> int:
-    qs = LedgerEntry.objects.filter(lot_id=lot_id)
+def balance(lot_id: int, as_of: datetime.date | None = None, *, account=ALL) -> int:
+    """The lot's balance: the sum over its ownership accounts, or one
+    account's (``account``: an id, or CURRENT for today's owners)."""
+    qs = LedgerEntry.objects.filter(lot_id=lot_id).filter(account_q(lot_id, account))
     if as_of:
         qs = qs.filter(posted_on__lte=as_of)
     return qs.aggregate(s=Sum("amount_cents"))["s"] or 0
 
 
-def past_due(lot_id: int, today: datetime.date | None = None) -> int:
-    """What is actually overdue: charges dated before today, less every
-    payment and credit so far. Assessments auto-posted for a due date later
-    this month do not count yet (BUG-006)."""
-    from django.db.models import Q
-
-    today = today or timezone.localdate()
-    qs = (
-        LedgerEntry.objects.unscoped("past due")
-        .filter(lot_id=lot_id, posted_on__lte=today)
-        .filter(~Q(kind__in=CHARGE_KINDS) | Q(posted_on__lt=today))
+@internal("ledger service")
+def account_balances() -> dict[int, int]:
+    """Balance of every ownership account that has entries."""
+    return dict(
+        LedgerEntry.objects.filter(account__isnull=False)
+        .values_list("account_id")
+        .annotate(s=Sum("amount_cents"))
+        .values_list("account_id", "s")
     )
-    return max(qs.aggregate(s=Sum("amount_cents"))["s"] or 0, 0)
+
+
+def past_due(lot_id: int, today: datetime.date | None = None, *, account=ALL) -> int:
+    """What is actually overdue on ``today``: the open amounts of charges
+    due before that day (open-item accounting, as the charges stood then).
+    A charge due today or later, such as dues posted ahead for a later due
+    date, does not count yet (BUG-006). Every delinquency notice and letter
+    states this amount, never the whole balance (D33-acctfix-4)."""
+    today = today or timezone.localdate()
+    state = _allocation().state_as_of(lot_id, today, account=account)
+    return sum(
+        cents
+        for pk, cents in state.open.items()
+        if cents > 0 and state.entries[pk].posted_on < today
+    )
 
 
 @internal("ledger service")
@@ -94,34 +108,37 @@ class OwnerStatement:
 
 
 @internal("ledger service")
-def owner_statement(lot_id: int, since: datetime.date) -> OwnerStatement:
-    """What a current owner sees: entries from their ownership start, with any
-    earlier balance shown as one 'brought forward' line (not the detail)."""
-    forward = (
-        LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lt=since).aggregate(
-            s=Sum("amount_cents")
-        )["s"]
-        or 0
-    )
-    entries = list(LedgerEntry.objects.filter(lot_id=lot_id, posted_on__gte=since))
+def owner_statement(lot_id: int, since: datetime.date | None, *, account=CURRENT) -> OwnerStatement:
+    """What a current owner sees: their ownership account (today's, by
+    default; D33-acctfix-1), entries from their ownership start, with any
+    earlier balance on that account shown as one 'brought forward' line (not
+    the detail). Another account's money (a former owner's) is never in it."""
+    qs = LedgerEntry.objects.filter(lot_id=lot_id).filter(account_q(lot_id, account))
+    since = since or datetime.date(1900, 1, 1)
+    forward = qs.filter(posted_on__lt=since).aggregate(s=Sum("amount_cents"))["s"] or 0
+    entries = list(qs.filter(posted_on__gte=since))
     return OwnerStatement(forward, entries, forward + sum(e.amount_cents for e in entries))
 
 
 @internal("ledger service")
 def period_statement(
-    lot_id: int, start: datetime.date, end: datetime.date | None
+    lot_id: int,
+    start: datetime.date,
+    end: datetime.date | None,
+    *,
+    account=ALL,
+    include_after_end: bool = False,
 ) -> OwnerStatement:
-    """What a former owner sees: only the entries posted while they owned the
-    lot, with the balance brought forward from before their time and the
-    balance on the day they sold. Nothing from after the sale."""
-    forward = (
-        LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lt=start).aggregate(
-            s=Sum("amount_cents")
-        )["s"]
-        or 0
-    )
-    entries = LedgerEntry.objects.filter(lot_id=lot_id, posted_on__gte=start)
-    if end is not None:
+    """What a former owner sees: the entries of their ownership account
+    posted while they owned the lot, with the balance brought forward from
+    before their time and the balance on the day they sold. Nothing from
+    after the sale, except, with ``include_after_end`` (their account went
+    dormant with them, so nobody else is on it), later entries on that
+    account, such as the board refunding a credit."""
+    qs = LedgerEntry.objects.filter(lot_id=lot_id).filter(account_q(lot_id, account))
+    forward = qs.filter(posted_on__lt=start).aggregate(s=Sum("amount_cents"))["s"] or 0
+    entries = qs.filter(posted_on__gte=start)
+    if end is not None and not include_after_end:
         entries = entries.filter(posted_on__lt=end)
     entries = list(entries)
     return OwnerStatement(forward, entries, forward + sum(e.amount_cents for e in entries))
@@ -256,13 +273,15 @@ def _duplicate_reference(lot, reference: str) -> bool:
 ONLINE_METHODS = frozenset({"online", "stripe"})
 
 
-def _check_apply_to(lot, apply_to) -> list[int]:
-    """Charge ids chosen for a payment: this lot's open charges only."""
+def _check_apply_to(lot, apply_to, account_id=None) -> list[int]:
+    """Charge ids chosen for a payment: open charges of this lot and of the
+    account the payment goes to only (D33-acctfix-1)."""
     if not apply_to:
         return []
     from ledger import allocation
 
-    open_ids = {c.entry.pk for c in allocation.open_charges(lot.pk)}
+    account = account_id if account_id is not None else accounts.CURRENT
+    open_ids = {c.entry.pk for c in allocation.open_charges(lot.pk, account=account)}
     ids = []
     for value in apply_to:
         try:
@@ -276,9 +295,12 @@ def _check_apply_to(lot, apply_to) -> list[int]:
     return ids
 
 
-def _post_payment(lot, *, amount_cents, received_on, method, reference, apply_to, actor):
+def _post_payment(
+    lot, *, amount_cents, received_on, method, reference, apply_to, actor, account_id=None
+):
     entry = LedgerEntry(
         lot=lot,
+        account_id=account_id,
         posted_on=received_on,
         kind=EntryKind.PAYMENT,
         amount_cents=-amount_cents,
@@ -301,11 +323,14 @@ def record_payment(
     method: str = "check",
     reference: str = "",
     apply_to: list[int] | None = None,
+    account_id: int | None = None,
     actor,
     request=None,
 ) -> LedgerEntry:
     """A payment received by check, cash, ACH... ``apply_to``: charges the
     payer chose, in order; the rest follows the application rule.
+    ``account_id``: the ownership account it pays (by default the one its
+    date falls in), e.g. a former owner's arrears paid at settlement.
 
     Online (Stripe) payments are never entered here: only the Stripe sync
     records them, from what Stripe itself reports (D32-payments)."""
@@ -318,14 +343,18 @@ def record_payment(
         raise LedgerError("Enter a check number or short reference, never an account number.")
     if _duplicate_reference(lot, reference):
         raise LedgerError(f"Payment {reference[:40]} for this home is already recorded.")
+    account_id = accounts.check_account(lot.pk, account_id)
+    if account_id is None:
+        account_id = accounts.account_on(lot.pk, received_on)
     entry = _post_payment(
         lot,
         amount_cents=amount_cents,
         received_on=received_on,
         method=method,
         reference=reference,
-        apply_to=_check_apply_to(lot, apply_to),
+        apply_to=_check_apply_to(lot, apply_to, account_id),
         actor=actor,
+        account_id=account_id,
     )
     record_event(
         "ledger.payment_recorded",
@@ -347,9 +376,11 @@ def record_online_payment(
         raise PermissionError("Online payments are recorded only by the Stripe sync.")
     if amount_cents <= 0 or not payment_intent_id:
         raise LedgerError("An online payment needs an amount and its Stripe reference.")
-    open_ids = {c.entry.pk for c in _allocation().open_charges(lot.pk)}
+    account_id = accounts.account_on(lot.pk, received_on)
+    open_ids = {c.entry.pk for c in _allocation().open_charges(lot.pk, account=account_id)}
     entry = _post_payment(
         lot,
+        account_id=account_id,
         amount_cents=amount_cents,
         received_on=received_on,
         method="online",
@@ -430,7 +461,15 @@ def record_payments(payments: list[BatchPayment], *, actor, request=None) -> lis
 
 @internal("ledger service")
 def post_charge(
-    *, lot: Lot, kind: str, amount_cents: int, description: str, posted_on=None, actor, request=None
+    *,
+    lot: Lot,
+    kind: str,
+    amount_cents: int,
+    description: str,
+    posted_on=None,
+    account_id: int | None = None,
+    actor,
+    request=None,
 ) -> LedgerEntry:
     _authorize(actor, "ledger.manage")
     if kind not in (EntryKind.OTHER_CHARGE, EntryKind.LATE_FEE, EntryKind.RESALE_FEE):
@@ -445,6 +484,7 @@ def post_charge(
         raise LedgerError("A charge needs a positive amount and a description.")
     entry = LedgerEntry.objects.create(
         lot=lot,
+        account_id=accounts.check_account(lot.pk, account_id),
         posted_on=posted_on or timezone.localdate(),
         kind=kind,
         amount_cents=amount_cents,
@@ -463,13 +503,20 @@ def post_charge(
 
 @internal("ledger service")
 def post_credit(
-    *, lot: Lot, amount_cents: int, description: str, actor, request=None
+    *,
+    lot: Lot,
+    amount_cents: int,
+    description: str,
+    account_id: int | None = None,
+    actor,
+    request=None,
 ) -> LedgerEntry:
     _authorize(actor, "ledger.manage")
     if amount_cents <= 0 or not description.strip():
         raise LedgerError("A credit needs a positive amount and a reason.")
     entry = LedgerEntry.objects.create(
         lot=lot,
+        account_id=accounts.check_account(lot.pk, account_id),
         posted_on=timezone.localdate(),
         kind=EntryKind.CREDIT,
         amount_cents=-amount_cents,
@@ -486,6 +533,61 @@ def post_credit(
     return entry
 
 
+def _recorded_refunds(payment: LedgerEntry):
+    """Refunds recorded against an online payment that still stand (a
+    recorded refund carries the payment's Stripe reference)."""
+    return LedgerEntry.objects.unscoped("recorded refunds").filter(
+        lot_id=payment.lot_id,
+        kind=EntryKind.REFUND,
+        reference=payment.reference,
+        reversed_by__isnull=True,
+    )
+
+
+@internal("ledger service")
+def record_online_refund(
+    *, payment: LedgerEntry, amount_cents: int, refund_id: str, actor, request=None
+) -> LedgerEntry:
+    """Record on the account the part of an online payment refunded at Stripe
+    (the payment's share, without the surcharge: D33-acctfix-5). Only for
+    payments.services.record_refund, from a refund Stripe reported. The owner
+    has the money back, so the account goes up by it; the journal books it
+    against Stripe clearing. A full refund may instead reverse the payment,
+    which also reopens the charges it paid."""
+    _authorize(actor, "ledger.manage")
+    if payment.kind != EntryKind.PAYMENT or not payment.reference or amount_cents <= 0:
+        raise LedgerError("Only part of an online payment can be recorded as refunded.")
+    description = f"Refund at Stripe {refund_id}"[:200]
+    with transaction.atomic():
+        LedgerEntry.objects.unscoped("refund").select_for_update().get(pk=payment.pk)
+        if LedgerEntry.objects.unscoped("refund").filter(reverses=payment).exists():
+            raise LedgerError("This payment was reversed; that already records the refund.")
+        refunds = _recorded_refunds(payment)
+        if refunds.filter(description=description).exists():
+            raise LedgerError("This refund is already recorded on the account.")
+        already = refunds.aggregate(s=Sum("amount_cents"))["s"] or 0
+        if already + amount_cents > -payment.amount_cents:
+            raise LedgerError("The refunds would be more than the payment.")
+        entry = LedgerEntry.objects.create(
+            lot_id=payment.lot_id,
+            account_id=payment.account_id,
+            posted_on=timezone.localdate(),
+            kind=EntryKind.REFUND,
+            amount_cents=amount_cents,
+            description=description,
+            reference=payment.reference,
+            posted_by=_user(actor),
+        )
+    record_event(
+        "ledger.refund_recorded",
+        actor=_user(actor),
+        request=request,
+        target=entry,
+        metadata={"lot_id": payment.lot_id, "amount_cents": amount_cents},
+    )
+    return entry
+
+
 @internal("ledger service")
 def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> LedgerEntry:
     """Corrections are new, opposite entries (CLAUDE.md rule 5)."""
@@ -494,6 +596,11 @@ def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> Le
         raise LedgerError("Give the reason for the reversal.")
     if entry.kind == EntryKind.REVERSAL:
         raise LedgerError("A reversal cannot itself be reversed; post a new entry instead.")
+    if entry.kind == EntryKind.PAYMENT and entry.reference and _recorded_refunds(entry).exists():
+        raise LedgerError(
+            "Part of this payment is recorded as refunded; reverse that refund entry first, "
+            "or the refund would count twice."
+        )
     try:
         with transaction.atomic():
             reversal = LedgerEntry.objects.create(
@@ -543,17 +650,9 @@ def _bucket(age_days: int) -> str:
     return "over_90"
 
 
-def _open_charges(lot_id: int, as_of: datetime.date) -> tuple[list[list], int]:
-    """Charges still open on ``as_of`` as [posted_on, open_cents], oldest
-    first, and the credit not applied to any charge. Open amounts come from
-    the payment applications (open-item accounting, D32-payments): a payment
-    pays the charges it was applied to, a reversal reopens them."""
-    return _allocation().open_items_as_of(lot_id, as_of)
-
-
-def aging(lot_id: int, as_of: datetime.date | None = None) -> dict[str, int]:
+def aging(lot_id: int, as_of: datetime.date | None = None, *, account=ALL) -> dict[str, int]:
     as_of = as_of or timezone.localdate()
-    charges, credit = _open_charges(lot_id, as_of)
+    charges, credit = _allocation().open_items_as_of(lot_id, as_of, account=account)
     result = dict.fromkeys(BUCKETS, 0)
     for posted_on, open_cents in charges:
         result[_bucket((as_of - posted_on).days)] += open_cents
@@ -573,14 +672,16 @@ class AmountDue:
     past_due: bool
 
 
-def amount_due(lot_id: int, today: datetime.date | None = None) -> AmountDue:
-    """What is owed on a lot and by when ("Due by <date>": the oldest unpaid
-    charge's date). Shared by My account and the dashboard's balance to-do."""
+def amount_due(lot_id: int, today: datetime.date | None = None, *, account=CURRENT) -> AmountDue:
+    """What is owed on an account (today's owners' by default) and by when
+    ("Due by <date>": the oldest unpaid charge's date). Shared by My account
+    and the dashboard's balance to-do."""
     today = today or timezone.localdate()
-    owed = balance(lot_id)
+    account = accounts.resolve(lot_id, account)
+    owed = balance(lot_id, account=account)
     if owed <= 0:
         return AmountDue(0, None, False)
-    open_ = _allocation().open_charges(lot_id)
+    open_ = _allocation().open_charges(lot_id, account=account)
     due_on = min((c.due_on for c in open_), default=today)
     return AmountDue(owed, due_on, due_on < today)
 
@@ -617,16 +718,20 @@ def statement_rows(statement: OwnerStatement) -> list[StatementRow]:
 
 @internal("ledger service")
 def delinquent_lots(min_age_days: int = 30, as_of=None) -> list[tuple[Lot, int, dict]]:
+    """Lots with charges open past ``min_age_days``, with what is open on
+    them. Open charges, not the netted balance: a former owner's credit on
+    the old account never hides the current owner's arrears (D33-acctfix-1)."""
     out = []
     with system_access("delinquency list"):
         lots = {lot.pk: lot for lot in Lot.objects.all()}
-    for lot_id, bal in balances().items():
-        if bal <= 0:
-            continue
+    for lot_id in balances():
         a = aging(lot_id, as_of)
-        overdue = a["31_60"] + a["61_90"] + a["over_90"] if min_age_days >= 30 else bal
+        owed = sum(a[b] for b in BUCKETS)
+        if owed <= 0:
+            continue
+        overdue = a["31_60"] + a["61_90"] + a["over_90"] if min_age_days >= 30 else owed
         if overdue > 0:
-            out.append((lots[lot_id], bal, a))
+            out.append((lots[lot_id], owed, a))
     return sorted(out, key=lambda r: -r[1])
 
 
@@ -967,7 +1072,8 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
         )
     dues, dues_cite = rule_with_citation("dues.monthly_cents")
     due_day = min(rule("dues.due_day") or 1, 28)
-    bal = balance(lot.pk, as_of=timezone.localdate())
+    # The selling owners' account only (D33-acctfix-1): what a buyer takes on.
+    bal = balance(lot.pk, as_of=timezone.localdate(), account=CURRENT)
     today = timezone.localdate()
 
     def b(text) -> str:
@@ -1167,8 +1273,12 @@ def set_case_follow_up(case: CollectionCase, on, *, actor, request=None) -> Coll
 
 
 def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
-    """Lots past the grace period for this month's dues that still owe
-    money and have no late fee for the month yet."""
+    """Lots whose dues for this month are still open (unpaid, in whole or in
+    part) on ``on``, past the grace period of the late-fee rule, and have no
+    late fee for the month yet (D33-acctfix-2). Other open charges, such as a
+    charge not yet due, never make the month's dues late; a credit that paid
+    the dues (a prepayment) means they are not late. ``balance_cents`` is
+    what is still open of that month's dues."""
     on = on or timezone.localdate()
     fee = rule("late_fee.cents")
     grace = rule("late_fee.grace_days")
@@ -1183,16 +1293,14 @@ def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
                 "lot_id", flat=True
             )
         )
-        owed = balances()
         for entry in assessments.select_related("lot"):
             late_from = entry.posted_on + datetime.timedelta(days=int(grace) + 1)
             if on < late_from or entry.lot_id in already:
                 continue
-            if owed.get(entry.lot_id, 0) <= 0:
-                continue  # paid up, or in credit (prepayment covers it)
-            out.append(
-                {"lot": entry.lot, "balance_cents": owed[entry.lot_id], "late_from": late_from}
-            )
+            open_cents = _allocation().state_as_of(entry.lot_id, on).open.get(entry.pk, 0)
+            if open_cents <= 0:
+                continue  # this month's dues are paid (or reversed)
+            out.append({"lot": entry.lot, "balance_cents": open_cents, "late_from": late_from})
     return out
 
 

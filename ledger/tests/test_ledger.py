@@ -134,7 +134,9 @@ def test_owners_cannot_post_and_ledger_is_scoped(w):
     assert not LedgerEntry.objects.for_user(other).filter(lot=w["lot"]).exists()
 
 
-def test_new_owner_sees_brought_forward_not_previous_owners_history(client, w):
+def test_new_owner_starts_clean_and_the_sellers_arrears_stay_on_the_old_account(client, w):
+    """D33-acctfix-1 (replaces the earlier "brought forward" behaviour): the
+    seller's unpaid dues stay on the seller's, now dormant, account."""
     services.post_monthly_assessments(year=2026, month=1, actor=w["manager"])
     buyer = make_member()
     with system_access("t"):
@@ -143,10 +145,15 @@ def test_new_owner_sees_brought_forward_not_previous_owners_history(client, w):
         w["lot"], new_owners=[buyer_person], transfer_date=D(2026, 2, 15), actor=SYSTEM
     )
     st = services.owner_statement(w["lot"].pk, D(2026, 2, 15))
-    assert st.brought_forward == 4500 and st.entries == []
+    assert st.brought_forward == 0 and st.entries == [] and st.balance == 0
+    assert services.balance(w["lot"].pk) == 4500  # still on the lot, on the seller's account
     client.force_login(buyer)
     page = client.get(reverse("my_account")).content.decode()
-    assert "Balance brought forward" in page and "Assessment January 2026" not in page
+    assert "Balance brought forward" not in page and "Assessment January 2026" not in page
+    assert "Paid up" in page
+    client.force_login(w["board"])
+    page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
+    assert "Still owed by former owner: <strong>$45.00</strong>" in page
     with system_access("t"):
         assert not Ownership.objects.filter(person__user=w["owner"]).active().exists()
 

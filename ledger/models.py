@@ -1,4 +1,5 @@
-"""Owner accounts (one per lot), budgets, collections and resale certificates.
+"""Owner accounts (one per ownership period of a lot), budgets, collections
+and resale certificates.
 
 Ledger entries are append-only integer cents (CLAUDE.md rules 5 and 7):
 positive amounts are charges (the lot owes more), negative amounts are
@@ -26,6 +27,9 @@ class EntryKind(models.TextChoices):
     PAYMENT = "payment", "Payment received"
     CREDIT = "credit", "Credit / adjustment"
     REVERSAL = "reversal", "Reversal"
+    # Part of an online payment the board refunded at Stripe, recorded on the
+    # account (positive: the owner has that money back). D33-acctfix-5.
+    REFUND = "refund", "Payment refunded"
 
 
 CHARGE_KINDS = {
@@ -33,6 +37,7 @@ CHARGE_KINDS = {
     EntryKind.LATE_FEE,
     EntryKind.OTHER_CHARGE,
     EntryKind.RESALE_FEE,
+    EntryKind.REFUND,
 }
 
 
@@ -40,6 +45,12 @@ class LedgerEntry(ScopedAppendOnlyModel):
     scope_lot_path = "lot"
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    # The ownership account this entry belongs to (D33-acctfix-1): set when
+    # the entry is first saved, from its posting date (ledger/accounts.py).
+    # Money is applied only within one account; a sale starts a new one.
+    account = models.ForeignKey(
+        "community.Account", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     posted_on = models.DateField()
     kind = models.CharField(max_length=16, choices=EntryKind.choices)
     amount_cents = models.BigIntegerField()
@@ -56,7 +67,10 @@ class LedgerEntry(ScopedAppendOnlyModel):
 
     class Meta:
         ordering = ["posted_on", "id"]
-        indexes = [models.Index(fields=["lot", "posted_on"])]
+        indexes = [
+            models.Index(fields=["lot", "posted_on"]),
+            models.Index(fields=["account", "posted_on"]),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["lot", "period"],
@@ -75,6 +89,13 @@ class LedgerEntry(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"entry #{self.pk}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self._state.adding and self.account_id is None and not kwargs.get("raw"):
+            from ledger.accounts import for_new_entry
+
+            self.account_id = for_new_entry(self)
+        super().save(*args, **kwargs)
 
 
 # --- Budgets ---------------------------------------------------------------------------
@@ -344,6 +365,17 @@ class DepositItem(ScopedAppendOnlyModel):
         return f"deposit item #{self.pk}"
 
 
+# Cash-book items a bank statement clears. A "payout" is a Stripe payout
+# (payments.StripePayout) reaching the bank: online payments reach the bank
+# only that way, never in deposit batches (D33-acctfix-6).
+CASH_ITEM_KINDS = [
+    ("deposit", "Deposit"),
+    ("payment", "Payment"),
+    ("returned", "Returned item"),
+    ("payout", "Stripe payout"),
+]
+
+
 class BankReconciliation(AppendOnlyModel):
     """A month's bank statement matched to the cash book. Kept as recorded;
     a redo is a new reconciliation for the same date."""
@@ -373,10 +405,7 @@ class ReconciledItem(AppendOnlyModel):
     reconciliation = models.ForeignKey(
         BankReconciliation, on_delete=models.PROTECT, related_name="items"
     )
-    kind = models.CharField(
-        max_length=8,
-        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
-    )
+    kind = models.CharField(max_length=8, choices=CASH_ITEM_KINDS)
     object_id = models.PositiveBigIntegerField()
     amount_cents = models.BigIntegerField()
 
@@ -673,10 +702,7 @@ class BankMatch(AppendOnlyModel):
     returned payment). Undoing is a new row pointing at the match it undoes."""
 
     transaction = models.ForeignKey(BankTransaction, on_delete=models.PROTECT, related_name="+")
-    kind = models.CharField(
-        max_length=8,
-        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
-    )
+    kind = models.CharField(max_length=8, choices=CASH_ITEM_KINDS)
     object_id = models.PositiveBigIntegerField()
     undoes = models.OneToOneField(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="undone_by"
@@ -743,6 +769,11 @@ class PaymentApplication(ScopedAppendOnlyModel):
     )
     amount_cents = models.BigIntegerField()
     kind = models.CharField(max_length=10, choices=ApplicationKind.choices)
+    # The posting date of the entry whose posting made this row (the date the
+    # application took effect), so views "as of" a past date leave out rows a
+    # later entry made, such as the undo rows of a later reversal
+    # (D33-acctfix-3). Applying existing credit by hand takes the local date.
+    effective_on = models.DateField()
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:

@@ -307,12 +307,6 @@ def test_credit_card_on_a_no_fee_session_is_absorbed(client, w, books):
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: a full refund of a credit card payment leaves the surcharge as income; "
-    "Stripe clearing in the journal no longer matches Stripe (journal_items only books "
-    "surcharge refunds for the debit-card safety net)",
-)
 def test_full_refund_of_a_surcharged_payment_keeps_stripe_clearing_true(client, w, books):
     checkout = _start(client, w, "credit")
     _pi, ch_id = w["fake"].pay(checkout.session_id, funding="credit")
@@ -505,11 +499,6 @@ def test_payout_missing_from_the_bank_or_not_adding_up_fails_reconciliation(clie
     _check(books, synced=True)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: bank reconciliation ignores Stripe payouts (book_balance and the matching "
-    "candidates know deposits, vendor payments and returns only)",
-)
 def test_bank_reconciliation_counts_stripe_payouts(client, w, books):
     acc.save_setup(
         gl_accounts="",
