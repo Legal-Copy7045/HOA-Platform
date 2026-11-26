@@ -153,3 +153,11 @@ echo
 # the terminal.
 VERSION="$(head -c 40 "$SRC/APP_VERSION" 2>/dev/null | tr -cd 'a-z0-9.-' | cut -c1-32)"
 echo "Restore drill passed for $SRC (made at ${STAMP:-unknown}, version ${VERSION:-unknown})."
+# The live portal's Backups health check needs a passed drill at least every
+# 90 days in production (D57). A legacy backup without the stamped keyed
+# checksum does not count: it proves the restore, not the key.
+if [ ${#VERIFY_ARGS[@]} -eq 0 ]; then
+  LIVE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
+  "${LIVE[@]}" exec -T web python manage.py backup_heartbeat --kind restore_drill \
+    || echo "Warning: the drill passed but could not be recorded on the live portal." >&2
+fi

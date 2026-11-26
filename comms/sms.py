@@ -177,6 +177,14 @@ def _require_owner(user) -> None:
 
     _refuse_read_only(user)
     policy.require(user, "sms.opt_in")
+    _refuse_if_locked(user)
+
+
+def _refuse_if_locked(user) -> None:
+    """D58: text alerts stay as they were for a while after a recovery."""
+    from accounts.recovery import refuse_if_locked
+
+    refuse_if_locked(user, "text alerts", SmsError)
 
 
 def start_verification(*, user, number: str, request=None) -> SmsVerification:
@@ -264,6 +272,7 @@ def confirm(*, user, code: str, request=None) -> str:
 def stop(*, user, request=None) -> None:
     from community import services as community
 
+    _refuse_if_locked(user)
     if community.stop_sms(user=user):
         _audit("sms.opted_out", actor=user, request=request, metadata={"by": "owner"})
 

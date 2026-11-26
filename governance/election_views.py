@@ -251,8 +251,11 @@ def proxy_grant(request, pk):
 @require_POST
 def proxy_revoke(request, pk):
     proxy = get_object_or_404(Proxy.objects.for_user(request.user), pk=pk)
-    elections.revoke_proxy(proxy, actor=request.user, request=request)
-    messages.success(request, "Proxy revoked.")
+    _flash(
+        request,
+        lambda: elections.revoke_proxy(proxy, actor=request.user, request=request),
+        "Proxy revoked.",
+    )
     return redirect("meeting_detail", pk=proxy.meeting_id)
 
 

@@ -117,7 +117,7 @@
           <li><a href="{% url 'register_import' %}">Import homes and owners</a></li>
           <li><a href="{% url 'people' %}">People</a></li>
           <li><a href="{% url 'lot_list' %}">Homes and owners</a></li>
-          <li><a href="{% url 'invitations' %}">Invitations and sign-ups</a></li>
+          <li><a href="{% url 'lot_list' %}?view=signups">Invitations and sign-ups</a></li>
         </ul>
       </section>
     {% endif %}
@@ -131,6 +131,7 @@
           <li><div class="grow"><div class="title">Health checks</div><div class="small muted">{% if server.last_health %}Last run from Server tasks {{ server.last_health.requested_at|short_date }}: {{ server.last_health.get_state_display }}.{% else %}Run every few minutes by the server; none started from Server tasks yet.{% endif %}</div></div></li>
           <li><div class="grow"><div class="title">Stripe</div><div class="small muted">{% if server.stripe.available %}Set up ({{ server.stripe.mode_label }}).{% else %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-stripe-key.sh</code> on the server (5 minutes).{% endif %}</div></div><span class="status tone-{% if server.stripe.available %}success{% else %}neutral{% endif %}">{% if server.stripe.available %}Ready{% else %}Not set up{% endif %}</span></li>
           <li><div class="grow"><div class="title">Bank feed (Teller)</div><div class="small muted">{% if server.teller %}Set up.{% else %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-teller.sh</code>.{% endif %}</div></div></li>
+          <li><div class="grow"><div class="title">USPS tracking</div><div class="small muted">{% if server.usps.state == "not_set_up" %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-usps.sh</code> on the server to enter the association's USPS Business Customer Gateway login. Paper mail and its barcode work without it.{% else %}{{ server.usps.text }}{% endif %}</div></div><span class="status tone-{% if server.usps.state == "failing" %}warning{% elif server.usps.state == "not_set_up" %}neutral{% else %}success{% endif %}">{% if server.usps.state == "failing" %}Check{% elif server.usps.state == "not_set_up" %}Not set up{% else %}Set up{% endif %}</span></li>
           <li><div class="grow"><div class="title">Push notifications and text alerts</div><div class="small muted">Push keys: {% if server.push %}set{% else %}not set (a sysadmin runs <code>python manage.py generate_vapid_keys</code>){% endif %}. SMS provider: {% if server.sms %}set{% else %}not set{% endif %}.</div></div></li>
         </ul>
         <p class="small muted">Keys and passwords never pass through the portal: a sysadmin types them on the server. Sysadmins see the details on System status.</p>

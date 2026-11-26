@@ -11,7 +11,7 @@ a break-glass command (shown on the board's sysadmin activity page).
 from core.breakglass import BreakGlassCommand
 from core.scoping import system_access
 from documents.models import Attachment, AttachmentScan, DocumentVersion, ScanResult, VersionScan
-from documents.scanning import scan
+from documents.scanning import detail_of, scan
 
 
 class Command(BreakGlassCommand):
@@ -26,13 +26,19 @@ class Command(BreakGlassCommand):
             attachments = list(Attachment.objects.all())
         for version in versions:
             with version.file.open("rb") as fh:
-                result, scanner = scan(fh)
-            VersionScan.objects.create(version=version, result=result, scanner=scanner)
+                outcome = scan(fh)
+            result, scanner = outcome
+            VersionScan.objects.create(
+                version=version, result=result, scanner=scanner, detail=detail_of(outcome)
+            )
             counts[result] += 1
         for attachment in attachments:
             with attachment.file.open("rb") as fh:
-                result, scanner = scan(fh)
-            AttachmentScan.objects.create(attachment=attachment, result=result, scanner=scanner)
+                outcome = scan(fh)
+            result, scanner = outcome
+            AttachmentScan.objects.create(
+                attachment=attachment, result=result, scanner=scanner, detail=detail_of(outcome)
+            )
             counts[result] += 1
         # Register files still kept from an import (D54).
         from community.models import RegisterImport, RegisterImportScan

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Account recovery · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Account recovery</h1><p class="subtitle">Requests to recover the sign-in to your account when the phone and recovery codes are lost.</p></div></div>
+  {% if current %}
+    <section class="card">
+      <h2>{% icon "alert" %} A recovery is waiting</h2>
+      <p>Someone asked to recover your sign-in. It can be finished from <strong>{{ ready }}</strong>. If this wasn't you, cancel it now.</p>
+      <form method="post" data-confirm="Cancel this recovery? Nothing on your account changes.">{% csrf_token %}<div class="form-actions"><button type="submit" class="danger">Cancel the recovery</button></div></form>
+    </section>
+  {% else %}
+    <p>No recovery is waiting for your account.</p>
+  {% endif %}
+  {% if locked_until %}<p class="small muted">Your sign-in was recently recovered, so voting, proxies, contact details, notice and text choices, automatic payments and account change requests are locked until {{ locked_until|date:"l, F j \a\t g:i A" }}.</p>{% endif %}
+  {% if past %}
+    <h2>Recent requests</h2>
+    <ul class="small">{% for r in past %}<li>{{ r.started_at|date:"M j, Y g:i A" }}: {% if r.status == "cancelled" %}cancelled{% elif r.status == "completed" %}completed{% elif r.status == "expired" %}expired{% else %}waiting{% endif %}</li>{% endfor %}</ul>
+  {% endif %}
+  <p class="small muted">If you didn't ask for a recovery, also tell the board. <a href="{% url 'mfa_index' %}">Sign-in and security</a></p>
+{% endblock %}

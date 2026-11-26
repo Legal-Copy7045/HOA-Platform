@@ -7,15 +7,17 @@
   {% if signin_setup %}{% include "accounts/_setup_steps.html" with steps=signin_setup.steps %}{% endif %}
   <h1>{% if signin_setup %}Save your recovery codes{% else %}Your recovery codes{% endif %}</h1>
   <p>If you lose your phone or passkey, each code lets you sign in once in its place. Keep them somewhere safe, such as printed with your important papers.</p>
+  {% if can_view_codes %}<div class="alert warning">{% icon "alert" %}<span>These codes are shown <strong>only now</strong>, in this browser. Print or download them before you leave this page.</span></div>{% endif %}
   {% if can_view_codes %}
     <ul class="recovery-codes" aria-label="Recovery codes">{% for code in unused_codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
     <p class="small muted">{{ unused_codes|length }} of {{ total_count }} unused. Each code works only once.</p>
     <div class="form-actions no-print">
+      {% if can_download_codes %}<a class="btn secondary" href="{% url 'mfa_print_recovery_codes' %}">Printable page</a>
+      <a class="btn secondary" href="{% url 'mfa_download_recovery_codes' %}">{% icon "download" %} Download as a text file</a>{% endif %}
       <button type="button" class="secondary" data-print>Print</button>
-      {% if can_download_codes %}<a class="btn secondary" href="{% url 'mfa_download_recovery_codes' %}">{% icon "download" %} Download</a>{% endif %}
     </div>
   {% else %}
-    <div class="alert info">{% icon "lock" %}<span>For your security the codes are hidden. Make new codes to see them (the old ones stop working).</span></div>
+    <div class="alert info">{% icon "lock" %}<span>For your security the codes are shown only once. Make new codes to see them (the old ones stop working).</span></div>
     {% if signin_setup %}<div class="form-actions"><a class="btn block" href="{% url 'mfa_generate_recovery_codes' %}">Make new codes</a></div>{% endif %}
   {% endif %}
   {% if signin_setup %}

@@ -117,9 +117,9 @@ dc logs --tail 50 web
 dc exec web python manage.py check_coverage
 ```
 
-```bash
-systemctl list-timers hoa-cloudflared-update.timer
-```
+cloudflared and the other infrastructure images are pinned in the compose
+files and updated by Dependabot pull requests (see "Container image updates"
+below); there is no daily cloudflared timer any more.
 
 File store (writes, reads and deletes a small probe file; prints the store's
 error code if it fails):
@@ -157,10 +157,51 @@ SPF, DKIM and DMARC (`p=reject`) are already published for the domain.
 Revoking: any one board member ends the role on the person's page; the
 board is emailed.
 
+## Lost sign-in (D58)
+
+### For an owner, account contact or tenant
+
+1. **Forgot the password only:** "Forgot your password?" on the sign-in page.
+   Open the emailed link within an hour, enter the code from the authenticator
+   app (or use the passkey, or one recovery code), then choose a new password.
+   The reset never signs you in; sign in with the new password as usual.
+2. **Lost the phone or passkey:** sign in with the password and type one of
+   the recovery codes instead of the 6-digit code, or use a passkey on another
+   device. Then add a new passkey or app on Sign-in and security.
+3. **Lost the phone and the recovery codes:** Sign-in help, "I've lost my
+   phone and recovery codes", enter your email, open the link (within an
+   hour) and confirm. The recovery waits 48 hours (Community settings, "Sign-in
+   and security"). You get an email at every address on file and a text if you
+   get our texts. After the wait, ask again on the same page; open the new
+   link on the phone or computer you will use, press "Remove the old ones and
+   continue", add a passkey or app right away and save the new recovery codes.
+   For 48 hours afterwards you cannot vote, give a proxy, change contact
+   details, notice or text choices, or set up automatic payments.
+4. **Didn't ask for it?** Sign in normally with your passkey or app: that
+   cancels it. Or open the link in the email ("Account recovery" page) and
+   press Cancel, or call the board.
+
+### For the board
+
+1. Every recovery request shows on My items ("Account recovery requested for
+   ..."), and each board member gets an email. If the person says they did not
+   ask, or anything looks wrong, open it and press **Cancel the recovery**.
+2. After a recovery completes, My items shows "... recovered their sign-in;
+   review if unexpected" for seven days. If it was not them, start an assisted
+   reset (below) with a second board member and talk to the person.
+3. Board members, officers, the manager, sysadmins, auditors and ARC reviewers
+   (and anyone who was one in the last 30 days) cannot use self-service
+   recovery: they always get the assisted reset below. The form never says so
+   to the person asking (it answers every address the same way).
+4. The waiting period and the lock are Community settings ("Sign-in and
+   security"): at least 48 hours to wait and 24 hours of lock, at most 14
+   days each, with a citation (board security policy). A change applies to
+   requests started afterwards.
+
 ## Lost authenticator (assisted reset, two board members)
 
-1. The person contacts the board by phone or in person. There is no
-   self-service path, by design.
+1. The person contacts the board by phone or in person. This is the only
+   path for staff roles and is open to everyone (D58).
 2. Board member A confirms identity (in person, or by calling the number on
    file), then Board -> People -> person -> "Start a sign-in reset", choosing
    how identity was confirmed.
@@ -183,8 +224,12 @@ board is emailed.
 3. **Invoices**: enter with the PDF attached, submit; board members other
    than the entrant approve (two at $500 and over); record payment.
 4. **Collections**: Finance → Collections lists balances over 30 days.
-   Reminders, payment plans and referrals are recorded by hand. Late fees
-   are switched off until the PA law review.
+   Reminders, payment plans and referrals are recorded by hand. Late fees:
+   the board posts them from the late list with a button (allowed while
+   `LEDGER_LATE_FEES_ENABLED` is true, the default; set it to false in
+   `.env` as an emergency off switch). They are posted automatically only
+   if the board switches on "Post late fees automatically after the grace
+   period" (`late_fee.auto_apply`, off by default) in Community settings.
 5. **Reports**: Reports page; every report downloads as CSV.
 
 ## Filling in the governing rules
@@ -196,17 +241,67 @@ replace": replace every one before real use.
 
 ## Malware scanning
 
-Off on the POC (`DOCUMENT_SCANNER=none`; System status shows it). To enable:
-add a ClamAV container, set `DOCUMENT_SCANNER=clamd`,
-`DOCUMENT_CLAMD_ADDRESS=clamav:3310` and `DOCUMENT_REQUIRE_CLEAN_SCAN=true`,
-restart, then scan what is already stored:
+On wherever real files are held: the POC/production overlay
+(`docker-compose.tunnel.yml`) runs the `clamav` container and sets
+`DOCUMENT_SCANNER=clamd`, `DOCUMENT_CLAMD_ADDRESS=clamav:3310` and
+`DOCUMENT_REQUIRE_CLEAN_SCAN=true` itself, and production settings refuse to
+start on the POC or in production without them (D57). Local development
+(`docker compose up`) has no scanner.
+
+Every upload is scanned while it is stored. If ClamAV does not answer (it
+needs a few minutes after a restart to load its signatures, or the container
+is down), the file is kept but cannot be downloaded: it is **waiting for a
+scan**. The worker tries it again two minutes after the upload and then every
+10 minutes while ClamAV answers, so waiting files clear by themselves once
+the scanner is back.
+
+System status → **Waiting for a scan** lists each waiting file: where it
+belongs (Document library, ARC request attachment, Owner request photo, ...),
+when it was uploaded, how long it has waited, its size, how many scans were
+tried and what the last one said (scanner unreachable, timed out, never
+attempted). No names, titles or owners: sysadmins see operations data only.
+A file is **stuck** after 15 minutes; the health check "Files waiting for a
+malware scan" fails after 30.
+
+When files are stuck:
+
+1. Look at the **Malware scanner** health line. "Not answering": check the
+   container (`dc ps clamav`, `dc logs --tail 30 clamav`) and give it a few
+   minutes after a restart.
+2. Once it answers, press **Scan waiting files now** (sysadmin; audited with
+   counts only). The worker scans each file within a minute or two.
+3. A file that keeps timing out is probably very large; the scan is retried
+   every 10 minutes.
+
+Everything already stored can be scanned again (after a signature update, for
+example); a file found infected later is blocked from download immediately:
 
 ```bash
-dc exec web python manage.py rescan_files --actor you@example.org --reason "scanner enabled"
+dc exec web python manage.py rescan_files --actor you@example.org --reason "signatures updated"
 ```
 
-Run it again whenever the scanner's signatures update; a file found infected
-later is blocked from download immediately.
+## Container image updates (D57)
+
+The infrastructure images (cloudflared, ClamAV, Postgres, SeaweedFS, Mailpit)
+are pinned in `docker-compose.yml` and `docker-compose.tunnel.yml` to a
+version tag and a digest, so the server runs exactly what was tested.
+Dependabot (`docker-compose` in `.github/dependabot.yml`) checks weekly and
+opens a pull request for each new release; CI validates both compose files,
+builds the portal image and scans the images with Trivy. After the pull
+request is merged, the update reaches the VM like any other: System status →
+Install now (or Install tonight). A new Postgres major version is not
+proposed: it needs a dump and restore, planned separately.
+
+cloudflared used to follow `latest` with a daily pull on the VM
+(`hoa-cloudflared-update.timer`); `start-portal.sh` removes that timer. Keep
+merging the cloudflared pull requests: Cloudflare stops supporting releases
+older than about a year.
+
+The portal image's base (`python:3.13-slim-bookworm` in the `Dockerfile`)
+stays on its tag: `start-portal.sh` refreshes it weekly for security fixes,
+and Dependabot's `docker` entry proposes new tags. The Postgres image of the
+CI test jobs (`.github/workflows/ci.yml`) also stays on its tag: Dependabot
+does not update service images in workflows.
 
 ## Break-glass (sysadmin, on the server)
 
@@ -263,26 +358,67 @@ password manager and the POC VM's `.env`.
 - A restore-and-migrate drill to a scratch environment is required before
   any real data or live payments (CLAUDE.md).
 
-## Production checklist (before real data)
+## Go-live checklist (before real owners, real data or live payments)
 
-- [ ] Restore-and-migrate drill completed and written up.
-- [ ] HOA owns every account: Cloudflare (zone, tunnel, Access), Hostinger,
-      domain registrar, GitHub, hosting.
-- [ ] `SEED_DEMO_ALLOWED=false`; `EMAIL_REDIRECT_ALL_TO` empty;
-      `ADMIN_ENABLED=false` (enforced); `SECURE_HSTS_SECONDS=31536000`.
+Work through it with the board; tick each item in the go-live notes.
+
+**Accounts the HOA owns** (never a volunteer's personal account; at least two
+board members can sign in to each, with MFA):
+
+- [ ] Cloudflare: the domain (registrar and DNS zone), the tunnel, and Zero
+      Trust / Access (remove or replace the POC hostname's Access rule).
+- [ ] Stripe: the HOA's own account, verified, with the restricted key made
+      as in "Online payments (Stripe)" (live keys need
+      `DEPLOYMENT_STAGE=production` and `PAYMENTS_LIVE_ALLOWED=true`).
+- [ ] Teller (bank feed, if used): the HOA's own application, certificate and
+      enrollment.
+- [ ] Twilio (urgent texts, if used): the HOA's account and number, with its
+      A2P registration.
+- [ ] Gemini (scanned acknowledgement forms, if used): an API key on terms
+      that do not use submitted data for training (a paid tier or an
+      agreement that says so). Until then, do not send real signed documents
+      to it: leave `GEMINI_API_KEY` empty and read the forms by hand.
+- [ ] Email (Hostinger or another provider), the GitHub repository and the
+      hosting account.
+
+**Production settings** (the portal refuses to start without most of them):
+
+- [ ] `DEPLOYMENT_STAGE=production`.
+- [ ] Malware scanning: `DOCUMENT_SCANNER=clamd`,
+      `DOCUMENT_CLAMD_ADDRESS=clamav:3310`, `DOCUMENT_REQUIRE_CLEAN_SCAN=true`
+      (set by the tunnel overlay; enforced), and no file left under System
+      status → Waiting for a scan.
+- [ ] `EMAIL_REDIRECT_ALL_TO` empty (enforced in production).
+- [ ] `SECURE_HSTS_SECONDS` unset or at least `31536000` (enforced);
+      `SECURE_HSTS_INCLUDE_SUBDOMAINS=true` once every subdomain serves HTTPS.
+- [ ] `SEED_DEMO_ALLOWED=false` (ignored outside the POC anyway),
+      `ADMIN_ENABLED=false` (enforced).
 - [ ] Fresh secrets generated for production (never reuse POC secrets).
-- [ ] Cloudflare Access for the POC hostname removed or replaced.
-- [ ] Container images pinned by digest; Dependabot PRs reviewed.
+- [ ] Container images pinned by digest (they are) and the open Dependabot
+      pull requests reviewed and merged.
+
+**Backups**:
+
+- [ ] Off-site backups to a locked bucket (`setup-offsite-backups.sh`, lock
+      proved with `check_offsite_lock`). In production the Backups health
+      check fails without an off-site copy less than 36 hours old.
+- [ ] A restore drill passed (Admin → Server tasks → Restore drill, and once
+      from the off-site copy) and written up. In production the health check
+      fails when the last passed drill is more than 90 days old.
+- [ ] Proxmox/VPS backups that contain `.env` are encrypted.
+
+**Before the first real vote and first real owners**:
+
+- [ ] The deployed version (System status → Version) includes the
+      secret-ballot fix (secret ballots stored unlinkable, D21 and the
+      security review). Do not open a real secret ballot on an older version.
 - [ ] Audit IP retention confirmed with the association's counsel.
 - [ ] At least two board members with MFA for every action
       (`check_coverage` clean).
 - [ ] Owner sign-in help page and spare hardware security keys ready.
-- [ ] Malware scanning on (`DOCUMENT_SCANNER=clamd`,
-      `DOCUMENT_REQUIRE_CLEAN_SCAN=true`) and `rescan_files` run.
-- [ ] HSTS one year with subdomains (`SECURE_HSTS_SECONDS=31536000`,
-      `SECURE_HSTS_INCLUDE_SUBDOMAINS=true`) once every subdomain serves HTTPS.
-- [ ] Board decisions in `docs/security-review-2026-11.md` section 3 made.
-
+- [ ] Board decisions in `docs/security-review-2026-11.md` section 3 made,
+      and the findings of the latest full regression run (`/regression`,
+      which includes a full security audit) closed or accepted.
 
 ## ARC neighbor sign-off and Gemini
 
@@ -855,4 +991,33 @@ Association → Paper mail shows who gets paper (owners on the deed who have not
 3. **A mailing:** from a meeting page (Prepare paper notices), the budget page after its notice, or Paper mail → New mailing (blank, meeting, budget, or a Letters and certificates wording). Preview, then Prepare mailing. On the mailing page print the letters (tick "start every letter on a front side" when printing both sides), and envelopes or labels unless you use window envelopes.
 4. **After posting:** "Mark as mailed" with the date (or "Not sending this"). Until then the mailing stays on My items; for a meeting, the meeting page then shows "Paper notices mailed <date> to N homes".
 
-**Tracking barcode (optional, free).** Create a USPS Business Customer Gateway account to get a Mailer ID, and sign up for Informed Visibility (IV). Enter the Mailer ID on Paper mail settings, keep Barcode ID 00, choose the Service Type ID (310 is suggested for First-Class with IV tracking: confirm with USPS), and tick "Print the tracking barcode". Window letters and envelopes then carry the barcode above the name (labels are too small for it). To follow a mailing, sign in to IV and search by Mailer ID and serial range (the mailing's pieces are numbered consecutively; the portal keeps each letter's serial and home). USPS returns scans in IV (and its API) only for barcodes carrying the HOA's own Mailer ID, and keeps scan data for 30 days, so look within a month. Importing IV scans into the portal is a possible later step; it would need IV credentials entered on the server with a script, never through the web app.
+**Tracking barcode (optional, free).** Create a USPS Business Customer Gateway account to get a Mailer ID, and sign up for Informed Visibility (IV). Enter the Mailer ID on Paper mail settings, keep Barcode ID 00, choose the Service Type ID (310 is suggested for First-Class with IV tracking: confirm with USPS), and tick "Print the tracking barcode". Window letters and envelopes then carry the barcode above the name (labels are too small for it). To follow a mailing, sign in to IV and search by Mailer ID and serial range (the mailing's pieces are numbered consecutively; the portal keeps each letter's serial and home). USPS returns scans in IV (and its API) only for barcodes carrying the HOA's own Mailer ID, and keeps scan data for 30 days, so look within a month. The portal can also read the scans itself: see "USPS tracking (Informed Visibility)" below.
+
+## USPS tracking (Informed Visibility)
+
+With USPS tracking on, the portal reads USPS scans of barcoded paper mail itself (decision D60): a few times a day, for 30 days after a mailing is marked as mailed. Nothing is sent to USPS but the barcode numbers; USPS never calls the portal.
+
+1. **USPS accounts.** The association needs a USPS Business Customer Gateway (BCG) account (it also gives the Mailer ID for the barcode, see "Printing paper notices"). The account's Business Service Administrator (BSA), or a BSA Delegate, gives the user the portal will sign in as access to the **Informed Visibility Mail Tracking & Reporting (IV-MTR)** service. Use a dedicated user for the portal, with a long password kept in the HOA's password manager.
+2. **Test first (CAT).** USPS has a test environment, CAT. Ask InformedVisibility@usps.gov for a CAT test account for IV-MTR. USPS is changing its sign-in in 2026 and it is not confirmed whether the API's sign-in changes with it, so always prove the connection in CAT before production.
+3. **Enter the login on the server** (never on the portal's pages, by email or in a chat):
+
+   ```
+   sudo bash /opt/hoa-portal/infra/poc/set-usps.sh
+   ```
+
+   Choose `cat` (the default) or `production`, type the BCG user name and the password (hidden). The script saves them in `.env` (a copy of the old file is kept as `.env.before-usps`), restarts the portal and signs in once with `manage.py check_usps_iv` (no mail is looked up). It prints `OK: signed in to ...` or what failed. To undo: `cp .env.before-usps .env && sudo bash infra/poc/start-portal.sh`. When CAT works, run it again with `production`.
+4. **Switch it on:** Admin → Features → USPS tracking. Settings → Paper mail settings then shows "Connected to the USPS test environment (CAT)" (or "Connected to USPS Informed Visibility") and when it last checked. The tracking barcode must be on for the mailing: only letters printed with it can be followed.
+
+**What the statuses mean** (mailing page, USPS tracking card):
+
+| Status | Meaning |
+|---|---|
+| Mailed | Marked as mailed; USPS has not scanned it yet. |
+| Processed | USPS has scanned it on its way. |
+| Sorted for delivery on <date> | Sorted into the carrier's delivery order (operations 918/919). Usually delivered that day or the next. USPS gives actual delivery scans only to bulk mailers who file an electronic mailing statement (eDoc), so this is normally the last scan. |
+| Delivered on <date> | A delivery scan (rare without an eDoc). |
+| No scans after 5 days | Never scanned 5 days after mailing: the address or the barcode may be wrong, or it was not mailed. It goes on My items; check the address, then press "Address checked". |
+| Gave up after 30 days | USPS keeps scans for 30 days; the portal stops asking. |
+| USPS would not show it | USPS answered "not yours": the barcode's Mailer ID is not on this BCG account. |
+
+**Problems.** System status → "USPS tracking" fails when USPS refuses the sign-in (the sysadmins also get one email a day: re-run `set-usps.sh`, check the password has not expired and the user still has IV-MTR access), when USPS refuses every letter (check that the Mailer ID on Paper mail settings belongs to this account), or when no check has worked for a day (the worker, or USPS, is down). The portal keeps under 400 requests a minute (USPS allows 500).

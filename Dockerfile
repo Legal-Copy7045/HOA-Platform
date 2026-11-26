@@ -8,6 +8,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# The base image is rebuilt only every few weeks; take the Debian security
+# updates published since, so the image scan (CI image-scan) finds nothing
+# fixable. No new packages are installed.
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid app --home-dir /app --shell /usr/sbin/nologin app
 
@@ -19,7 +26,13 @@ WORKDIR /app
 COPY requirements/base.txt requirements/base.txt
 RUN --mount=type=secret,id=extra_ca,required=false \
     if [ -f /run/secrets/extra_ca ]; then export PIP_CERT=/run/secrets/extra_ca; fi; \
-    pip install --require-hashes -r requirements/base.txt
+    pip install --require-hashes -r requirements/base.txt \
+ && python -m pip uninstall -y pip \
+ && rm -rf /usr/local/lib/python3*/ensurepip/_bundled
+# pip is needed only to build the image. It is removed with its vendored
+# libraries (urllib3, msgpack, setuptools' pkg_resources, listed in its SBOM),
+# which the image scan flags and the portal never runs; nothing in the
+# container installs packages (the filesystem is read-only anyway).
 
 # Copied as root: the runtime user can read the code but never change it.
 COPY . .

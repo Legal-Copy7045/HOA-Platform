@@ -42,10 +42,16 @@ def signups_context(request) -> dict:
     for r in rows:
         counts[r["status"]] += 1
         r["label"] = services.ONBOARDING_LABELS[r["status"]]
+        if r["status"] == "no_authenticator":
+            # D59: a new setup link where allowed, otherwise the reset.
+            inv = r["invitation"]
+            r["setup_link_open"] = bool(inv and inv.status in ("pending", "queued"))
+            r["setup_refusal"] = services.setup_again_refusal(r["person"])
     # Status pills (WT-050): see only the people who still need something.
     show = request.GET.get("status", "")
     groups = {
         "needs": {"not_invited", "expired", "no_email"},
+        "no_authenticator": {"no_authenticator"},
         "invited": {"invited"},
         "signed_up": {"signed_up"},
     }
@@ -118,13 +124,22 @@ def invite_person(request, pk):
     policy.require(request.user, "invite.send")
     person = get_object_or_404(Person.objects.for_user(request.user), pk=pk)
     back = reverse("person_detail", args=[person.pk])
+    if request.POST.get("back") == "signups":
+        back = signups_url() + "#signups-by-home"
+    setup_again = person.user_id is not None
     try:
         services.create_invitation(person=person, actor=request.user, request=request)
     except services.InvitationError as exc:
         messages.error(request, str(exc))
     else:
         messages.success(
-            request, "Invitation queued to the address on file. It goes out within a minute."
+            request,
+            (
+                "A new setup link is on its way to the address on file. It goes out "
+                "within a minute; any earlier link no longer works."
+            )
+            if setup_again
+            else "Invitation queued to the address on file. It goes out within a minute.",
         )
     return redirect(back)
 

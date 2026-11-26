@@ -103,6 +103,11 @@ GROUP_NOTES: dict[str, str] = {
         f"and whether reserve funds count as surplus at all. Refunding an owner's own credit "
         f"(for example after a sale) is not a surplus distribution."
     ),
+    "Sign-in and security": (
+        "Not set by the Act; a board security policy. The Act does not regulate how owners "
+        "sign in. The waiting period and the lock afterwards protect votes, notices and "
+        "payments if someone else gets into an owner's email."
+    ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
@@ -329,6 +334,23 @@ GUIDES["disbursement.second_approval_cents"] = Guide(
     BOARD,
     "Not covered by the Act; an internal financial control like the invoice approval rule.",
     "Two approvals at $500 and over: Board resolution 2026-07 (spending controls).",
+)
+
+GUIDES["recovery.wait_hours"] = Guide(
+    BOARD,
+    "Not set by the Act; a board security policy. While the request waits, the person, every "
+    "email address on file, their verified text number and the board are told, and any of "
+    "them can cancel it. The portal never allows less than 48 hours.",
+    "48 hours: Board security policy (sign-in recovery), resolution 2026-12.",
+)
+
+GUIDES["recovery.lock_hours"] = Guide(
+    BOARD,
+    "Not set by the Act; a board security policy. Votes and ballots stay the owner's own "
+    f"(the association keeps ballots and records, {ACT} § 5316), so a recently recovered "
+    "sign-in cannot cast or change them, give a proxy, or change where notices go until the "
+    "lock ends. The portal never allows less than 24 hours.",
+    "48 hours: Board security policy (sign-in recovery), resolution 2026-12.",
 )
 
 for _key in ("general", "billing", "maintenance", "common_area"):

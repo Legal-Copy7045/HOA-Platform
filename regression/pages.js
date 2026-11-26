@@ -11,7 +11,9 @@ const fs = require('fs');
 
 const [base, sessionsFile, outFile] = process.argv.slice(2);
 const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf8'));
-const SKIP = [/logout/, /\.pdf$/, /\.csv(\?|$)/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
+// Downloads (PDF, CSV, spreadsheets, calendar files, packet zips) are not pages,
+// with or without a query string (test.pdf?kind=letter).
+const SKIP = [/logout/, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 const MAX_PAGES = 120;
 

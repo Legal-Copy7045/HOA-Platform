@@ -1,5 +1,16 @@
 # Security review, November 2026
 
+> **Scope of this document.** Sections 1 to 6 are the review of the portal
+> after Milestone 2 and the UI sprint (commit `c850171`); they do not cover
+> Milestones 3 and 4 or the later streamlining, payments, bank feed and
+> walkthrough work. A fresh full review of the current codebase is
+> scheduled: every run of the project's full regression (`/regression`,
+> `regression/README.md`) includes a full security audit (the claims below,
+> the whole codebase, the new code and the deployment surface), and its
+> findings go to that run's report. Section 7 is a later finding (D56);
+> section 8 lists the findings of the external review of 2026-11-26 and
+> their status; section 9 is the invitation and enrollment review (D59).
+
 Scope: the whole portal after Milestone 2 and the UI sprint (commit `c850171`).
 Five independent reviews ran in parallel, each proving findings with scripts
 where possible:
@@ -153,3 +164,53 @@ It confirmed end to end that these still work: first-officer bootstrap, assisted
 - **Fix:** casting now records the participation and puts the choice in a mixing pool (`governance_pendingsecretchoice`) that carries no person, lot, ballot, participation or time. A separate transaction (a worker task after the cast commits, an hourly sweep, and the close itself) writes pooled choices to the permanent append-only tables in shuffled order with fresh random ids. While voting is open it writes only once twice `SECRET_BALLOT_MIX_MIN` (default 5) are waiting and keeps that many behind, so every batch, including the last one at close, mixes at least five ballots whenever five or more were cast. Closing writes everything before results are computed. The runtime role may insert into, read and delete from the pool, never update or truncate it; the permanent tables stay append-only (model, trigger, grants).
 - **Tests:** `governance/tests/test_secret_mixing_transactions.py` casts in real committed transactions and checks that no permanent choice row shares `xmin` with any participation row (votes, elections, surveys); `governance/tests/test_secret_mixing.py` covers shuffled order, flush thresholds, close and results, double voting, eligibility, grants and that nothing logged or audited carries the choice.
 - **Residual risk (accepted):** while a choice waits in the pool, someone with live database access, a backup taken in that window, or the write-ahead log could still link it. After the flush and VACUUM the permanent tables cannot be linked. Backups keep the pool so a restore never loses a ballot (see D56). Votes cast before this release keep the old linkable layout (demo data only); the board should not run real secret votes on an older version.
+
+## 8. External review 2026-11-26
+
+An external review of the current code and deployment. Decision D57 records
+the reasoning; each item has tests.
+
+| # | Finding | Status |
+|---|---|---|
+| X1 | Production could start with malware scanning off, downloads of unscanned files allowed, all mail redirected to one inbox, or a one-hour HSTS. | **Fixed.** `core/settings/production.py` refuses, on the POC and in production, any scanner other than ClamAV and downloads without a clean scan; in production also a mail redirect and HSTS under a year (default now a year there). The tunnel overlay sets the scanner itself. |
+| X2 | The Backups health check passed with no off-site copy and never asked for a restore drill. | **Fixed.** In production: no off-site copy, one older than 36 h, or no passed restore drill in 90 days fails it. The drill now records itself. POC/local say "Not production-ready". |
+| X3 | Files waiting for a malware scan were a bare count; nobody could tell what they were or whether they were stuck. Root cause: a scan that failed at upload (ClamAV not answering yet) was never retried. | **Fixed.** Retry after upload, a 10-minute sweep while ClamAV answers, a list on System status in operations terms only (no names or owners), "Scan waiting files now" (audited, counts only) and a health check after 30 minutes. |
+| X4 | django-allauth 65.22.1: rate limits could be bypassed with IPv4-mapped IPv6 addresses (the app relies on allauth's limits for sign-in, codes and resets). | **Fixed.** 65.23.0 (`requirements/base.in` floor, hashes recompiled). The OIDC CIMD SSRF in the same release does not apply (no OIDC provider). |
+| X5 | No secret scanning, container image scanning or static analysis in CI. | **Fixed.** Gitleaks (whole history weekly and on demand, new commits on every PR), Trivy on the built image (fails on fixable HIGH/CRITICAL), CodeQL for Python and JavaScript. Separate checks; the `test` check is unchanged. |
+| X6 | The regression page crawl ran only by hand. | **Fixed.** `pages` job in CI (about 3 minutes locally, 15-minute limit). |
+| X7 | Infrastructure images floated (`cloudflared:latest` pulled daily on the VM, `postgres:16-alpine`, `clamav:1.4`). | **Fixed, with the owner's condition**: pinned to version and digest only together with Dependabot's docker-compose updates, so every bump is a tested pull request; the daily cloudflared pull is removed. Left on tags: the Dockerfile base (weekly refresh) and the CI Postgres service image (Dependabot cannot update it). |
+| X8 | Documentation drift: README described Milestone 1, late-fee text said fees were off, this document's scope was unclear, and there was no go-live checklist for the HOA's own third-party accounts. | **Fixed.** README, late-fee text (plan, summary, runbook, settings comment), this header, and the runbook's go-live checklist (Stripe, Teller, Twilio, Cloudflare, Gemini data-use terms, production settings, off-site backups and a restore drill, secret-ballot fix deployed before real secret votes). |
+| X9 | A fresh full review of the current codebase. | **Scheduled**: the next full regression run (`/regression`) includes it. |
+
+## 9. Invitation and enrollment review (2026-11-26)
+
+Goal: every login ends up with a strong second factor (passkey or authenticator app), and no path lets a login reach portal data without one. Traced end to end from invitation creation to the first dashboard, at commit `9918ea9`. Decision D59 records the fixes. Line numbers are those at `9918ea9` unless marked "now".
+
+### Findings
+
+| ID | Severity | Where | Scenario | Status |
+|----|----------|-------|----------|--------|
+| IE-1 | Medium | `accounts/services.py:59` (`create_invitation`), `templates/accounts/setup_expired.html:8` | An owner accepts the invitation and closes the browser (or the hour runs out) before adding a passkey or app. From then on every sign-in is signed out. The page told them to "ask the board to send you a new invitation", but `create_invitation` refused anyone with a login ("This person already has a login"), so the board could not. The only way back was the two-board-member reset, which nothing pointed the board to. The owner was stuck, with wrong instructions. | Fixed: the board can send a **new setup link** to a login that has never had a passkey or app (`setup_again_refusal`, now `accounts/services.py:38`). Anyone who ever had one, went through a reset, has a switched-off login, or whose login email differs from the record still needs the two-person reset. The link goes only to the Person's email and is created only by the board (`invite.send`). It is single use, and it is checked again at acceptance (now `accounts/services.py:274`). Accepting sets a new password and ends every other session of the login (`session_generation`). The expired page is now "Your setup link expired" and gives both next steps. |
+| IE-2 | Medium | `accounts/services.py:262` (`onboarding_rows`) | Sign-ups showed such a login as "Signed up", so the board could not see who was stuck, and nothing reminded anyone. | Fixed: new status "Signed in, no passkey or app yet" with its own filter, a note on the Signed up tile, and a "Send a new setup link" button (or the reason a reset is needed) on the row and on the person's page. A board My items entry appears for a login with no passkey or app 7 days after it last accepted a link, unless a setup link or reset is open (`stuck_logins`). |
+| IE-3 | Low | `accounts/middleware.py:82` | A login with no authenticator and no setup window is signed out with no audit record of why. Only `auth.login` and then `auth.logout` were recorded. | Fixed: `auth.setup_window_closed` (reason `expired` or `none`) is recorded before the sign-out. |
+| IE-4 | Low | `accounts/views.py:29`, `:43` | After the Person's email was changed, an older link still opened the password page. It was refused only when the password was saved. | Fixed: the landing page and the password page both check the address on record (`services.matches_record`). |
+| IE-5 | Low (hardening) | `accounts/middleware.py:17-50` | The pages open to a login without an authenticator are a name list plus every URL name starting with `mfa_`. Nothing stopped a later page from joining that list by name, or from being added to it without review. | Fixed with tests (`accounts/tests/test_enrollment_review.py`): (1) the open list must equal the reviewed list; (2) every `mfa_` page must be allauth's or our subclass of it; (3) every named URL in the project (paths built from each pattern) redirects a password-only login inside its window to setup; (4) every named URL signs out a login with no window. |
+| IE-6 | Info | `accounts/views.py:24` | The invitation link and the password page have no rate limit of their own. | Accepted. The token is 256 bits (`secrets.token_urlsafe(32)`), only its SHA-256 is stored, and the password page needs the token's hash in the session. There is nothing to guess. |
+| IE-7 | Info | `accounts/setup.py` | The setup pages don't say how much of the hour is left. | Not fixed (UX only). The expired page explains what happened and what to do. |
+
+### Confirmed, no change needed
+
+- **Creation:** only the board (`invite.send`) creates invitations, always to the email on the Person record. Bulk invite, reminders and approval-sent invitations (D41) all go through `create_invitation`. A sysadmin can re-send or revoke but cannot create one. An invitation grants nothing: it only links a login to the existing Person.
+- **The link:** single use. The hash is cleared on accept, re-send and revoke. It expires after `INVITE_TTL_HOURS`. Opening it swaps the token for a session marker and cycles the session key, so it leaves the URL bar. A second browser, a revoked link, a re-sent link and an accepted link all get "not valid". A signed-in visitor is refused. An already-linked Person cannot be invited again, except for the IE-1 setup link.
+- **Acceptance:** the password validators apply (12+ characters, common and breached checks). `login()` cycles the session key again. The setup window is granted only in that session.
+- **The setup window (`RequireMFAMiddleware`):** checked on every request, before every other app middleware. With no passkey or app, only logout, re-authentication (password or authenticator, never an emailed code), login, change password, health, the reset-code page and allauth's own MFA pages open. Static files are served by WhiteNoise. The manifest, `sw.js`, search, My items, the dashboard, the notice step, `account_setup_done`, every JSON and HTMX endpoint, every download, and unknown paths (404) all redirect to setup, or sign out once the window has passed. Healthz returns only up/down.
+- **Emailed codes:** an emailed sign-in code is only a first factor. A login with no authenticator that signs in by code (or by password) is signed out at its next request (tested). Re-authentication by code is refused (`ACCOUNT_REAUTHENTICATION_METHODS`; allauth raises PermissionDenied on the code views).
+- **Setup steps:** passkey first, with the authenticator app offered on the step page and on the passkey page. The recovery codes are shown, with Print and "I've saved them". The notice step (D44) comes only after a passkey or app exists. Neither the last passkey nor the last app can be removed (MFA adapter plus `accounts/mfa_views.py`), and adding or removing one needs a recent password or authenticator.
+- **Accounts made by commands:** the first officer (`bootstrap_first_officer`) gets an invitation link and the same window. If they miss it, `breakglass_enrollment_code` covers them while fewer than two other board members can sign in. Seeded demo logins have no password, and if they sign in by code they are signed out like anyone else. There is no keep-logins flow at this commit. Django admin is refused in production (`core/settings/production.py:48`).
+- **Rate limits:** axes (5 failures per email and IP), allauth's login-by-code limits (3 tries per code, plus its request limits), and 5 tries per reset code, after which the board is told.
+- **Audit:** invitation created, sent, re-sent, revoked and accepted (now with `setup_again`); authenticator added and removed; recovery codes; reset steps; sign-out without a window (new).
+- **Logging:** paths are masked in Django's request loggers, gunicorn access logs are off, error signatures never hold the path, the referrer policy is same-origin, and the landing page redirects without rendering anything.
+
+### Note for the concurrent recovery work
+
+A forgotten-password or self-service recovery flow must not open the setup window, and must not count an emailed code or link as a factor. A login with no passkey or app that resets its password and signs in is still signed out (IE-3 records it). The board's setup link (IE-1) is only for logins that never enrolled.

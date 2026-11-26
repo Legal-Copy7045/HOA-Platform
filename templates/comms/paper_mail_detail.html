@@ -29,4 +29,14 @@
         <p>{% for line in first.recipient %}{{ line }}<br>{% endfor %}</p><p>{{ first.date }}</p><p><strong>RE: {{ first.subject }}</strong></p><p>Dear {{ first.salutation }}:</p>{{ first.body|linebreaks }}<p>Sincerely,<br>{% for line in first.signature %}{{ line }}<br>{% endfor %}</p></div></section>{% endif %}
     </aside>
   </div>
+  {% if tracking %}<section class="card" id="tracking" data-testid="usps-tracking"><h2>USPS tracking</h2>
+    {% if tracking.rows %}
+      {% if tracking.summary %}<p data-testid="tracking-summary">{{ tracking.summary|capfirst }}.</p>{% else %}<p class="muted">Tracking starts once the mailing is marked as mailed.</p>{% endif %}
+      <p class="small muted">{{ sorted_meaning }} Scans are read from USPS Informed Visibility every 4 hours for 30 days after mailing (USPS keeps them that long). A letter with no scan after 5 days may have a wrong address or barcode.</p>
+      <table class="stack-sm"><thead><tr><th>Mailing address</th><th>Status</th><th>Last scan</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
+      {% for row in tracking.rows %}<tr><td class="cell-title" data-label="Mailing address">{{ row.address }}</td><td data-label="Status">{% if row.status.tone %}<span class="badge {{ row.status.tone }}">{{ row.status.label }}</span>{% else %}{{ row.status.label }}{% endif %}</td><td data-label="Last scan">{% if row.status.last_scan %}{{ row.status.last_scan|date:"M j, Y g:i A" }}{% else %}<span class="muted">None</span>{% endif %}</td>
+        <td data-label="Action">{% if row.status.key == "missing" or row.status.key == "gave_up" and not row.scans %}{% if row.checked %}<span class="small muted">Address checked</span>{% else %}<form method="post" action="{% url 'paper_mail_piece_checked' m.pk %}" data-confirm="Record that you checked this letter's address? Its My items reminder ends.">{% csrf_token %}<input type="hidden" name="piece" value="{{ row.piece.pk }}"><button type="submit" class="secondary small">Address checked</button></form>{% endif %}{% endif %}</td></tr>{% endfor %}
+      </tbody></table>
+    {% else %}<p class="muted">These letters were printed without the tracking barcode, so USPS cannot report on them.</p>{% endif %}
+  </section>{% endif %}
 {% endblock %}

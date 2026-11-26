@@ -556,3 +556,95 @@ class MailPiece(ScopedAppendOnlyModel):
     @classmethod
     def scope_for_owner(cls, queryset, roles):
         return queryset.none()
+
+
+# --- USPS tracking: Informed Visibility scans (D60) -----------------------------------
+
+
+class MailPieceScan(ScopedAppendOnlyModel):
+    """One USPS scan of a barcoded mailpiece, as Informed Visibility reported
+    it. Append-only; the same scan (piece, time, operation code) is stored
+    once however often it is read. Facility place and the mail phase only:
+    nothing about the recipient."""
+
+    piece = models.ForeignKey(MailPiece, on_delete=models.PROTECT, related_name="+")
+    scanned_at = models.DateTimeField()
+    opcode = models.CharField(max_length=4)
+    facility_city = models.CharField(max_length=60, blank=True)
+    facility_state = models.CharField(max_length=2, blank=True)
+    facility_zip = models.CharField(max_length=10, blank=True)
+    handling_event_type = models.CharField(max_length=4, blank=True)
+    mail_phase = models.CharField(max_length=80, blank=True)
+    imported_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["piece", "scanned_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["piece", "scanned_at", "opcode"], name="mailpiece_scan_once"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Mailpiece scan #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.none()
+
+
+class MailPieceOutcomeKind(models.TextChoices):
+    NOT_OURS = "not_ours", "USPS would not show it (not our Mailer ID)"
+    CHECKED = "checked", "Board checked the address"
+
+
+class MailPieceOutcome(ScopedAppendOnlyModel):
+    """Something settled about one mailpiece, once each: USPS refused to
+    show it (HTTP 403, so it is not asked again), or the board checked the
+    address after no scan came (the My items reminder ends)."""
+
+    piece = models.ForeignKey(MailPiece, on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(max_length=10, choices=MailPieceOutcomeKind.choices)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["recorded_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["piece", "kind"], name="mailpiece_outcome_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"Mailpiece outcome #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.none()
+
+
+class UspsPollState(models.Model):
+    """How the last reading of USPS scans went (one row; operational status
+    for the health check and Paper mail settings, no personal data)."""
+
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_failure_at = models.DateTimeField(null=True, blank=True)
+    # auth, network, rate_limited, server, refused (every piece refused)
+    last_failure = models.CharField(max_length=20, blank=True)
+    last_queried = models.PositiveIntegerField(default=0)
+    last_new_scans = models.PositiveIntegerField(default=0)
+    # The day the sysadmins were last emailed about a refused sign-in.
+    auth_alerted_on = models.DateField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return "USPS tracking status"
+
+    @classmethod
+    def get(cls) -> "UspsPollState":
+        found, _ = cls.objects.get_or_create(pk=1)
+        return found
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("The USPS tracking status is kept.")

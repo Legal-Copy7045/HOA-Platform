@@ -17,7 +17,7 @@ from documents.models import (
     VersionScan,
     Visibility,
 )
-from documents.scanning import scan
+from documents.scanning import detail_of, scan
 from documents.validation import UploadRejected, check_upload, safe_filename
 
 
@@ -46,7 +46,8 @@ def _store_version(
     for chunk in uploaded.chunks():
         digest.update(chunk)
     uploaded.seek(0)
-    result, scanner = scan(uploaded)
+    outcome = scan(uploaded)
+    result, scanner = outcome
     if result == ScanResult.INFECTED:
         record_event(
             "document.upload_blocked",
@@ -72,7 +73,15 @@ def _store_version(
         )
         version.file.save("upload", uploaded, save=False)
         version.save()
-        VersionScan.objects.create(version=version, result=result, scanner=scanner)
+        VersionScan.objects.create(
+            version=version, result=result, scanner=scanner, detail=detail_of(outcome)
+        )
+        if result == ScanResult.ERROR:
+            # The scanner did not answer (e.g. still loading after a restart):
+            # try again shortly instead of waiting for someone to notice (D57).
+            from documents import scan_queue
+
+            scan_queue.queue_soon(scan_queue.VERSION, version.pk)
         Document.objects.unscoped("set current version").filter(pk=document.pk).update(
             current_version=version
         )

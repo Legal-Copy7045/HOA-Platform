@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Recovery started · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Your recovery has started</h1>
+  <p>You can finish it from <strong>{{ ready }}</strong>. Then go to Sign-in help, choose "I've lost my phone and recovery codes" and enter your email again: we'll email you a link to finish.</p>
+  <p class="small muted">We've told you at every address we have for you, and the board. If you didn't ask for this, sign in with your passkey or app (that cancels it) or call the board.</p>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+{% endblock %}

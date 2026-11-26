@@ -65,6 +65,14 @@ def test_board_may_open_every_step(client, board):
         assert f"Step {setup.number(key)} of {len(setup.STEPS)}" in response.content.decode()
 
 
+def test_people_step_links_straight_to_the_boards_signups(client, board):
+    """The board's sign-ups are a tab of Homes and owners; linking the old
+    invitations URL only bounced through a redirect (CI page crawl)."""
+    page = client.get(step_url("people")).content.decode()
+    assert f'href="{reverse("lot_list")}?view=signups"' in page
+    assert f'href="{reverse("invitations")}"' not in page
+
+
 def test_everyone_else_is_refused(client):
     from core.tests.test_nav_streamline import role_users
 
@@ -216,7 +224,7 @@ def test_rule_notes_are_kept(client, board):
 def test_each_rule_shows_its_pa_guidance_and_citation_field(client, board):
     from community.pa_law import guide
 
-    for key in ("charge", "late_fees", "arc", "violations", "privacy", "notices"):
+    for key in ("charge", "late_fees", "arc", "violations", "privacy", "signin", "notices"):
         html = client.get(step_url(key)).content.decode()
         for spec in setup.rules_for(key):
             slug = spec.key.replace(".", "-")
@@ -354,6 +362,7 @@ def test_every_rule_lands_in_exactly_one_step():
     assert "late_fee.cents" in {s.key for s in assigned["late_fees"]}
     assert "payments.credit_card_surcharge_bp" in {s.key for s in assigned["payments"]}
     assert "notices.electronic_consent_required" in {s.key for s in assigned["notices"]}
+    assert {s.key for s in assigned["signin"]} == {"recovery.wait_hours", "recovery.lock_hours"}
 
 
 def test_a_new_rule_shows_up_in_its_groups_step(client, board):
@@ -462,6 +471,14 @@ def test_no_field_accepts_keys_or_secrets(client, board):
             )
     html = client.get(step_url("payments")).content.decode()
     assert "sudo bash infra/poc/set-stripe-key.sh" in html
+
+
+def test_server_step_shows_usps_setup_and_features_lists_usps_tracking(client, board):
+    html = client.get(step_url("server")).content.decode()
+    assert "USPS tracking" in html
+    assert "sudo bash infra/poc/set-usps.sh" in html  # not set up in tests
+    html = client.get(step_url("features")).content.decode()
+    assert 'name="feature__usps_tracking"' in html
 
 
 def test_posted_secrets_are_ignored(client, board, settings):

@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from core import policy
+from core import features, policy
 from documents.models import Document
 from governance import packets
 from governance.models import Meeting, MeetingKind, MeetingPacket, PacketVariant
@@ -98,6 +98,9 @@ def meeting_packet(request, pk):
             "open_variant": posted,
             "history": history,
             "latest": packets.visible_packets(request.user, meeting),
+            # The crumb goes straight to the meetings list (on the Calendar
+            # when that feature is on, D49), never through a redirect.
+            "calendar_on": features.enabled("calendar", request),
         },
     )
 

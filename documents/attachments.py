@@ -11,7 +11,7 @@ from django.http import FileResponse, Http404
 
 from audit.services import record_event
 from documents.models import Attachment, ScanResult
-from documents.scanning import scan
+from documents.scanning import detail_of, scan
 from documents.services import DocumentError, scan_allows_download
 from documents.validation import UploadRejected, check_upload, download_filename, safe_filename
 
@@ -43,7 +43,8 @@ def attach(
     for chunk in uploaded.chunks():
         digest.update(chunk)
     uploaded.seek(0)
-    result, _ = scan(uploaded)
+    outcome = scan(uploaded)
+    result = outcome[0]
     if result == ScanResult.INFECTED:
         raise DocumentError("The file was flagged by the malware scanner and was not stored.")
     owner_type, owner_id = _owner_key(obj)
@@ -55,6 +56,7 @@ def attach(
         size=uploaded.size,
         sha256=digest.hexdigest(),
         scan_result=result,
+        scan_detail=detail_of(outcome),
         label=label[:200],
         uploaded_by=actor,
     )
@@ -74,6 +76,11 @@ def attach(
             )
         attachment.file.save("upload", uploaded, save=False)
         attachment.save()
+        if result == ScanResult.ERROR:
+            # Scanner unavailable at upload: try again shortly (D57).
+            from documents import scan_queue
+
+            scan_queue.queue_soon(scan_queue.ATTACHMENT, attachment.pk)
     record_event(
         "attachment.added",
         actor=actor,

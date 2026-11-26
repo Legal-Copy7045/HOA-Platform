@@ -14,7 +14,7 @@
   steps: "Invite a test person; check the message headers for dkim=pass; accept; add a passkey within the hour."
   last: "not done yet (POC redirects mail to one inbox)"
 - key: enrollment window expiry
-  check: "An invited person who closes the browser before adding a passkey or app is shown 'Your account isn't set up yet' next time and needs a new invitation."
+  check: "An invited person who closes the browser before adding a passkey or app is shown 'Your setup link expired' next time and needs a new setup link from the board (D59)."
   steps: "Accept an invitation, close the browser without enrolling; sign in again with the password."
   last: "not done yet"
 - key: assisted reset end to end
@@ -82,8 +82,8 @@
   steps: "Invite a test person; open the link on an iPhone and an Android phone; finish all three steps; confirm the home page then shows the menu."
   last: ""
 - key: recovery codes print
-  check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer)."
-  steps: "During setup or from Sign-in and security > Show codes, press Print and look at the print preview."
+  check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer); the Printable page prints the same; Download saves recovery-codes.txt; opening the codes again in another browser shows them hidden (shown once, D58)."
+  steps: "During setup (or after Make new codes), press Print, then Printable page and Download; then open Sign-in and security in a private window."
   last: ""
 - key: install the app
   check: "The portal installs to a phone home screen and a desktop, opens standalone with the leaf icon, still asks for sign-in, and shows no cached page after signing out."
@@ -270,7 +270,7 @@
   steps: "Sign in as a demo owner and a board member on an iPhone and an Android phone; scroll to the bottom of a long page (My account, Owner accounts); open Menu from the bar; print a page."
   last: ""
 - key: community setup wizard on a phone
-  check: "On a phone, Settings > Community setup > Start setup walks every step: one column, 'Step N of 16' with a progress bar, the What the law says panel and the legal footer readable, Save and continue stays at the bottom of the screen while scrolling and is the full-width button, Back and Skip for now fit beside each other; a wrong amount (e.g. 'forty') comes back with the error beside the field and the typed text kept; a big change to the monthly assessment asks first; switching a feature off asks first; the review lists every decision with Change links and flags; Finish setup removes 'Finish community setup' from My items; Run setup again starts run 2 with today's values and 'Changed since the last setup' on a rule changed in between; a screen reader announces each field's label, help and error."
+  check: "On a phone, Settings > Community setup > Start setup walks every step: one column, 'Step N of 17' with a progress bar, the What the law says panel and the legal footer readable, Save and continue stays at the bottom of the screen while scrolling and is the full-width button, Back and Skip for now fit beside each other; a wrong amount (e.g. 'forty') comes back with the error beside the field and the typed text kept; a big change to the monthly assessment asks first; switching a feature off asks first; the review lists every decision with Change links and flags; Finish setup removes 'Finish community setup' from My items; Run setup again starts run 2 with today's values and 'Changed since the last setup' on a rule changed in between; a screen reader announces each field's label, help and error."
   steps: "Sign in as a demo board member on a phone; open Settings > Community setup; walk each step (skip one, go Back once); type 'forty' as the amount; save; switch Violations off and cancel; finish on the review; change one rule on Community settings; Run setup again and open its step; try VoiceOver or TalkBack on one rule step."
   last: ""
 
@@ -293,4 +293,28 @@
 - key: secret choices mixed on the server
   check: "On the POC, a secret test vote's ballots show as \"waiting to be mixed\" on the vote page while fewer than ten are pooled, the worker writes them once ten wait (five stay behind), and closing the vote counts every ballot with nothing left waiting (D56)."
   steps: "Open a secret demo vote, cast ballots from demo owners, check the vote page as the board after each; cast ten or more and wait a minute for the worker; close the vote and check the counts equal the ballots cast."
+  last: ""
+- key: waiting files clear after a scanner restart
+  check: "On the POC, upload a document while the clamav container is stopped: System status shows it under Waiting for a scan (Document library, Scanner unreachable, no file name), Stuck after 15 minutes and the Files waiting for a malware scan check failing after 30; start clamav and within 10 minutes (or after Scan waiting files now) the list is empty and the file downloads."
+  steps: "dc stop clamav; upload a test PDF as the board; open System status as a sysadmin; dc start clamav; wait for the scanner line to say On; press Scan waiting files now."
+  last: ""
+- key: restore drill heartbeat
+  check: "After Admin, Server tasks, Restore drill passes, Server tasks shows Last restore drill passed with today's time and the Backups health line says restore drill 0 days ago."
+  steps: "As a sysadmin start a restore drill from Server tasks; refresh when it has finished."
+  last: ""
+- key: dependabot compose pull request
+  check: "Dependabot opens a pull request for a newer cloudflared, ClamAV, SeaweedFS, Mailpit or Postgres 16 image that changes the tag and digest in the compose file, and CI (docker, image-scan, pages) runs on it; after the merge, System status Install updates the VM and no hoa-cloudflared-update timer remains."
+  steps: "GitHub, Pull requests, filter author dependabot; check the checks; after installing, systemctl list-timers on the VM."
+  last: ""
+- key: accept an invitation on a phone and a laptop
+  check: "An invitation accepted on a phone with a passkey, and another on a laptop with an authenticator app, both end with recovery codes and then the dashboard. Closing the browser midway (before the passkey or app) shows 'Your setup link expired' at the next sign-in; the board sees 'Signed in, no passkey or app yet' on Sign-ups, sends a new setup link, and the person finishes setting up from it."
+  steps: "Board: invite two demo people. Person 1 on a phone: open the link, choose a password, Use this phone's fingerprint or face, save recovery codes. Person 2 on a laptop: open the link, choose a password, Use an authenticator app instead, scan the QR code, save codes. Person 3: open the link, choose a password, close the browser; sign in again; board: Homes and owners, Sign-ups, Send a new setup link; person 3 opens the new link and finishes."
+  last: ""
+- key: recover an owner account on a phone end to end
+  check: "As a demo owner on a phone: Sign-in help, 'I've lost my phone and recovery codes', the email arrives (and at the other addresses on file, and a text if opted in), the link opens the confirm page, the board gets the email and the My items entry with Cancel; signing in with the old passkey cancels it; a second request left to wait lets the owner finish from a new link on the phone, add a passkey, save the new codes and see the lock banner; voting and My profile changes are refused with the date; after the lock they work. A board member's address gets no email and the same page."
+  steps: "POC with fictional data and a demo owner with a test mailbox. To skip the 48 hours, move the request's ready_at back in a scratch database only, never on real data."
+  last: ""
+- key: usps tracking in the test environment
+  check: "With a USPS CAT (test environment) IV-MTR account, sudo bash infra/poc/set-usps.sh with environment cat signs in and prints OK without showing the password; Paper mail settings shows 'Connected to the USPS test environment (CAT)'; after a barcoded test piece is mailed and scanned in CAT, the mailing page's USPS tracking card shows its scan (Processed or Sorted for delivery on <date>) and the last scan time within 4 hours, and System status shows the USPS tracking check passing."
+  steps: "Ask InformedVisibility@usps.gov for a CAT account with IV-MTR; run set-usps.sh (cat); switch on Admin > Features > USPS tracking; print and mark mailed a demo mailing with the test Mailer ID; wait for the next 4-hourly check (or run the usps_tracking task) and open the mailing page; then run set-usps.sh with a wrong password and confirm the check fails and says so."
   last: ""

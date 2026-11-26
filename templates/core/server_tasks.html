@@ -13,6 +13,7 @@
         <li><span>Last backup on the server</span><span>{% if backups.local %}{{ backups.local|date:"M j, g:i A" }}{% else %}None yet{% endif %}</span></li>
         <li><span>Last off-site copy</span><span>{% if not backups.offsite_configured %}Not set up{% elif backups.offsite %}{{ backups.offsite|date:"M j, g:i A" }}{% else %}None yet{% endif %}</span></li>
         {% if backups.offsite_configured %}<li><span>Off-site lock verified</span><span>{% if backups.lock %}{{ backups.lock|date:"M j, g:i A" }}{% else %}Not verified{% endif %}</span></li>{% endif %}
+        <li><span>Last restore drill passed</span><span>{% if backups.drill %}{{ backups.drill|date:"M j, g:i A" }}{% else %}None yet{% endif %}</span></li>
       </ul>
       <p class="small"><span class="status tone-{% if backups.ok %}success{% else %}danger{% endif %}">{% if backups.ok %}OK{% else %}Needs attention{% endif %}</span> {{ backups.detail }}</p>
       {% if can_run %}<form method="post" data-confirm="Take a backup now? It takes about a minute; the site stays up.">{% csrf_token %}<input type="hidden" name="kind" value="backup"><button type="submit" class="small"{% if current %} disabled{% endif %}>Take a backup now</button></form>{% endif %}

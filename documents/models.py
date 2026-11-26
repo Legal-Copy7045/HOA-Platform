@@ -185,6 +185,9 @@ class VersionScan(AppendOnlyModel):
     result = models.CharField(max_length=16, choices=ScanResult.choices)
     scanner = models.CharField(max_length=50)
     scanned_at = models.DateTimeField(default=timezone.now)
+    # Why the scan gave no answer (documents.scanning: unreachable, timeout,
+    # bad_reply, not_configured); empty for a clean or infected result (D57).
+    detail = models.CharField(max_length=20, blank=True, default="", db_default="")
 
     class Meta:
         ordering = ["-scanned_at", "-id"]
@@ -210,6 +213,8 @@ class Attachment(AppendOnlyModel):
     size = models.PositiveBigIntegerField()
     sha256 = models.CharField(max_length=64)
     scan_result = models.CharField(max_length=16, choices=ScanResult.choices)
+    # Why the first scan gave no answer (see VersionScan.detail).
+    scan_detail = models.CharField(max_length=20, blank=True, default="", db_default="")
     label = models.CharField(max_length=200, blank=True)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
@@ -232,6 +237,7 @@ class AttachmentScan(AppendOnlyModel):
     result = models.CharField(max_length=16, choices=ScanResult.choices)
     scanner = models.CharField(max_length=50)
     scanned_at = models.DateTimeField(default=timezone.now)
+    detail = models.CharField(max_length=20, blank=True, default="", db_default="")
 
     class Meta:
         ordering = ["-scanned_at", "-id"]

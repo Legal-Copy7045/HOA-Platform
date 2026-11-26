@@ -1,5 +1,5 @@
 # Runtime dependencies. Each entry is justified in docs/decisions.md.
-# Compile with: pip-compile --generate-hashes --allow-unsafe -o requirements/base.txt requirements/base.in
+# Compile with: pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements/base.txt requirements/base.in
 Django>=5.2,<5.3
 psycopg[binary]>=3.2
 django-environ
@@ -9,7 +9,8 @@ django-storages[s3]
 procrastinate[django]
 django-csp>=4
 django-simple-history
-django-allauth[mfa]
+# 65.23.0: security release (rate limits keyed on IPv4-mapped IPv6 addresses).
+django-allauth[mfa]>=65.23.0
 django-axes
 Pillow
 segno

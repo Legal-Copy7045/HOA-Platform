@@ -472,6 +472,15 @@ def _may_edit_methods(actor, person_id: int) -> None:
     if actor is not SYSTEM and not (_person_of(actor) == person_id or can(actor, "person.manage")):
         raise PermissionDenied("contact_method")
     _refuse_read_only(actor)
+    _refuse_if_locked(actor, "contact details")
+
+
+def _refuse_if_locked(actor, what: str) -> None:
+    """D58: contact details, notices and account changes stay as they were
+    for a while after a self-service recovery."""
+    from accounts.recovery import refuse_if_locked
+
+    refuse_if_locked(actor, what, CommunityError)
 
 
 def _valid_phone(value: str) -> str:
@@ -711,6 +720,7 @@ def record_notice_choice(
     from community.notices import CONSENT_VERSION
 
     _refuse_read_only(user)
+    _refuse_if_locked(user, "notice choice")
     with transaction.atomic():
         _person, profile = _own_profile(user, "record notice choice")
         changed = profile.electronic_notice_consent != bool(consent)
@@ -749,6 +759,7 @@ def set_mailing_address(
     import re
 
     _refuse_read_only(user)
+    _refuse_if_locked(user, "mailing address")
     street, unit, city = (" ".join((v or "").split()) for v in (street, unit, city))
     state = (state or "").strip().upper()
     zip_code = (zip_code or "").strip()
@@ -1513,6 +1524,8 @@ def update_my_profile(
     ``record_notice_choice``; ``phone``, ``mailing_address`` and
     ``electronic_notice_consent`` remain for older callers."""
     _refuse_read_only(user)
+    if phone is not None or mailing_address is not None or electronic_notice_consent is not None:
+        _refuse_if_locked(user, "contact details")
     from community.models import ContactProfile
     from community.notices import CONSENT_VERSION
 
@@ -1569,6 +1582,7 @@ def sms_settings(user) -> tuple[str, bool]:
 def set_sms_number(*, user, number: str) -> None:
     """Save a number the owner just proved (comms.sms checks the code)."""
     _refuse_read_only(user)
+    _refuse_if_locked(user, "text alerts")
     from community.models import ContactProfile
 
     with transaction.atomic(), system_access("set sms number"):
@@ -1747,6 +1761,7 @@ def request_account_change(
 
     require(actor, "account.request_change")
     _refuse_read_only(actor)
+    _refuse_if_locked(actor, "account change request")
     if actor is not SYSTEM and account.lot_id not in roles_for(actor).owned_lot_ids:
         raise PermissionDenied("account_change")
     if not account.is_active:
@@ -2328,3 +2343,45 @@ def update_letter_settings(*, actor, request=None, **values):
             "community.letters_changed", actor=actor, request=request, target=profile, metadata={}
         )
     return profile
+
+
+# --- Account recovery notices (D58) ------------------------------------------------------
+
+
+def recovery_contacts(user) -> tuple[list[str], str]:
+    """Every email address on file for this login's person (the sign-in
+    address, the register's address and every extra email, whatever its
+    notices choice) and the verified text number if they opted in to texts.
+    Security notices go to all of them, so one taken-over mailbox cannot hide
+    a recovery from the person."""
+    from community.models import ContactProfile
+
+    emails = {user.email} if user.email else set()
+    number = ""
+    with system_access("account recovery contacts"):
+        person = Person.objects.filter(user=user).first()
+        if person is not None:
+            if person.email:
+                emails.add(person.email.strip().lower())
+            emails.update(
+                v.strip().lower()
+                for v in ContactMethod.objects.filter(
+                    person=person, kind=ContactMethodKind.EMAIL
+                ).values_list("value", flat=True)
+            )
+            profile = ContactProfile.objects.filter(person=person).first()
+            if profile and profile.sms_opt_in and profile.sms_verified_at and profile.sms_number:
+                number = profile.sms_number
+    return sorted(e for e in emails if e), number
+
+
+def person_and_homes(user) -> tuple[str, list[str]]:
+    """(display name, home addresses) for a board notice about this login."""
+    from core.policy import roles_for
+
+    with system_access("person and homes"):
+        person = Person.objects.filter(user=user).first()
+        roles = roles_for(user)
+        ids = set(roles.account_lot_ids) | {lot for lot, *_ in roles.former_periods}
+        lots = list(Lot.objects.filter(pk__in=ids).order_by("number")) if ids else []
+    return (person.display_name if person else "A login"), [lot.label for lot in lots]

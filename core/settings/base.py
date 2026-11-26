@@ -216,7 +216,12 @@ ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
 ACCOUNT_RATE_LIMITS = {
     # D6: per-email ceiling regardless of IP; axes handles email+IP below.
     "login_failed": "10/m/ip,20/h/key",
+    # D58: "lost my phone and recovery codes" form, per client and per address.
+    "account_recovery": "10/h/ip,3/h/key",
 }
+# D58: emailed password reset links work once (the token changes with the
+# password) and only for an hour. The link still needs the passkey or app.
+PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT_SECONDS", default=3600)
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
@@ -321,10 +326,11 @@ FILE_UPLOAD_HANDLERS = [
     "django.core.files.uploadhandler.TemporaryFileUploadHandler",
 ]
 
-# Ledger: late fees cannot be posted until the board has reviewed PA law and
-# turned this on (decision recorded 2026-11-25).
-# Decision D21: late fees may be posted (by the board, or automatically when
-# the late_fee.auto_apply rule is on). This stays as an emergency off switch.
+# Ledger, decision D21: the board posts late fees from the late list with a
+# button (on by default); the daily task posts them automatically only when
+# the board switches on the late_fee.auto_apply rule (off by default) in
+# Community settings. This setting is the server's emergency off switch for
+# both.
 LEDGER_LATE_FEES_ENABLED = env.bool("LEDGER_LATE_FEES_ENABLED", default=True)
 # Online payments (D32-payments): "none" or "stripe" (hosted Checkout; the app
 # never sees card or bank numbers). The key lives only in the server's .env:
@@ -379,6 +385,17 @@ TELLER_APPLICATION_ID = env("TELLER_APPLICATION_ID", default="")
 TELLER_ENVIRONMENT = env("TELLER_ENVIRONMENT", default="sandbox")
 TELLER_CERTIFICATE_B64 = env("TELLER_CERTIFICATE_B64", default="")
 TELLER_PRIVATE_KEY_B64 = env("TELLER_PRIVATE_KEY_B64", default="")
+
+# --- USPS tracking: Informed Visibility scans (optional feature "usps_tracking", D60) ----
+# The HOA's Business Customer Gateway login, put into the server's .env by
+# infra/poc/set-usps.sh (never through the web app). "cat" is USPS's test
+# environment, "production" the real one. The hosts default to USPS's own for
+# that environment; overrides must be *.usps.com names (comms/usps_iv.py).
+USPS_IV_ENVIRONMENT = env("USPS_IV_ENVIRONMENT", default="cat")
+USPS_IV_USERNAME = env("USPS_IV_USERNAME", default="")
+USPS_IV_PASSWORD = env("USPS_IV_PASSWORD", default="")
+USPS_IV_API_HOST = env("USPS_IV_API_HOST", default="")
+USPS_IV_AUTH_HOST = env("USPS_IV_AUTH_HOST", default="")
 
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).
