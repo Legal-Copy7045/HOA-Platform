@@ -23,9 +23,11 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Version 2 | A document's second upload. | `DocumentVersion.number` |
 | My requests | Questions and requests to the board. The board's list is **Owner requests**. | `operations.OwnerRequest` |
 | Records requests | An owner's request to inspect association records (Pennsylvania law). | `governance.RecordsRequest` |
-| Voting | One page for **Votes and polls** and **Elections**. | `voting` |
+| Voting | One page for **Votes and polls**, **Elections** and **Surveys**. | `voting` |
 | Votes and polls | Formal votes (binding, one ballot per lot) and informal polls (one per owner). | `Vote` |
 | Elections | Board elections: nominations, ballots, results. | `Election` |
+| Surveys | Informal multi-question surveys from the board (not a vote). Anonymous ones keep answers apart from who responded. | `Survey` |
+| Survey results | Totals for each question; written answers are seen by the board only. Owners see totals after it closes, if the board shares them. | `survey_results` |
 | Proxy | Someone you choose to vote for your lot at a meeting. Holders are picked by name (board members) or by address (owners). | `Proxy` |
 | Resolutions and policies | Board resolutions and the policies in force. | `Resolution` |
 | Community info | One page for **Frequently asked questions**, the **Owner directory** and **Committees**. | `community_info` |
