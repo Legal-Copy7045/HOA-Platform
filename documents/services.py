@@ -307,3 +307,66 @@ def search_documents(queryset, q: str):
         | Q(folder__name__icontains=q)
         | Q(category__in=categories)
     )
+
+
+def scan_summary(days: int = 7) -> dict:
+    """Malware scanning at a glance for System status (counts only, no file
+    names or owners): scans in the last ``days`` by result, and files whose
+    latest result does not allow a download yet (waiting for a rescan)."""
+    import datetime
+
+    from django.db.models import Count, OuterRef, Subquery
+    from django.utils import timezone
+
+    from documents.models import Attachment, AttachmentScan, DocumentVersion
+
+    since = timezone.now() - datetime.timedelta(days=days)
+    counts = dict.fromkeys(ScanResult.values, 0)
+    with system_access("scan summary counts"):
+        for model, field in ((VersionScan, "scanned_at"), (AttachmentScan, "scanned_at")):
+            rows = (
+                model.objects.filter(**{f"{field}__gte": since})
+                .values("result")
+                .annotate(n=Count("id"))
+            )
+            for row in rows:
+                counts[row["result"]] = counts.get(row["result"], 0) + row["n"]
+        # A new attachment's first scan is on the attachment itself.
+        for row in (
+            Attachment.objects.filter(uploaded_at__gte=since)
+            .values("scan_result")
+            .annotate(n=Count("id"))
+        ):
+            counts[row["scan_result"]] = counts.get(row["scan_result"], 0) + row["n"]
+
+        blocked = [ScanResult.ERROR, ScanResult.UNSCANNED]
+        latest_version = VersionScan.objects.filter(version=OuterRef("pk")).values("result")[:1]
+        waiting_versions = (
+            DocumentVersion.objects.annotate(latest=Subquery(latest_version))
+            .filter(latest__in=blocked)
+            .count()
+        )
+        latest_attachment = AttachmentScan.objects.filter(attachment=OuterRef("pk")).values(
+            "result"
+        )[:1]
+        waiting_attachments = (
+            Attachment.objects.annotate(latest=Subquery(latest_attachment))
+            .filter(_waiting_q(blocked))
+            .count()
+        )
+    return {
+        "days": days,
+        "scanned": sum(counts.values()),
+        "clean": counts.get(ScanResult.CLEAN, 0),
+        "infected": counts.get(ScanResult.INFECTED, 0),
+        "errors": counts.get(ScanResult.ERROR, 0),
+        "waiting": waiting_versions + waiting_attachments,
+    }
+
+
+def _waiting_q(blocked):
+    """An attachment is waiting when its newest rescan, or (with none) its
+    first scan, does not allow a download."""
+    from django.db.models import Q
+
+    return Q(latest__in=blocked) | Q(latest__isnull=True, scan_result__in=blocked)

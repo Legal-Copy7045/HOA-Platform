@@ -6,6 +6,18 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.8.0 — 2026-11-26
+
+- System status shows malware scanning at a glance: answering or not, ClamAV
+  version, signature age, files scanned, infected and errored in the last 7
+  days, and files waiting to be scanned.
+- A "Server resources" card: memory really in use (without the disk cache),
+  swap and processor load, read by the VM agent once a minute from /proc.
+  A "Server memory" health check emails the sysadmins when less than 10% of
+  memory stays free for 10 minutes (D39).
+- For the team: `/walkthrough` (independent walkthrough of every role on
+  desktop and phone) and `/full-check` (regression and walkthrough together).
+
 ## 0.7.0 — 2026-11-26
 
 - Updates can wait for the night: System status offers "Install now" or

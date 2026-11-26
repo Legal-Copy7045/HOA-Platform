@@ -435,3 +435,8 @@ The owner asked to move from commit codes to version numbers. `VERSION` at the t
 ## D38. Install updates tonight (2026-11-26)
 
 An update makes the site unavailable for roughly 5 to 15 seconds while the web container is replaced (the build and the database changes run while the old version still serves). The owner preferred scheduling updates for the middle of the night to building a maintenance page, which is not critical. System status therefore offers "Install now" and "Install tonight at 4:00 am" (site time, `UPDATE_NIGHTLY_HOUR`), cancellable until then; at that time the VM agent turns the scheduled update into a request and installs whatever is newest on `main`. Requests stay audited (`system.schedule_update`, `system.cancel_schedule`). A maintenance page in front of the portal (an nginx gatekeeper, or the app's own maintenance mode on a managed platform) remains an option for production if updates ever need to happen in the day. Production will use Cloudflare DNS and WAF, not a tunnel.
+
+
+## D39. Scanner figures and server resources, the cheap way (2026-11-26)
+
+System status shows the malware scanner's state (answering, version, signature age, scans in the last 7 days by result, files waiting to be scanned) and the server's memory in use without the disk cache, swap and load. The owner chose the cheap parts only: the VM agent already runs every minute and reads /proc (milliseconds); per-service memory (`docker stats`) costs a second or two of processor time each run and was left out, to be looked at by hand if memory ever gets tight. One health check, "Server memory", alerts when less than 10% of memory stays free for 10 minutes, so ClamAV's brief signature reload does not trigger it. No history graphs: Proxmox keeps those.

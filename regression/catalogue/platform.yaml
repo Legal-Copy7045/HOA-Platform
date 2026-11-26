@@ -89,3 +89,6 @@
 - feature: "Walkthrough tooling: the walkthrough stage runs only with --stage walkthrough or --with-walkthrough (own database, port and lane; WALK- IDs); its report shows menus per role, failing checks with thumbnails under a size budget, and reviewer findings by group"
   since: M5
   match: ["^unit:regression/tests/test_walkthrough_tooling"]
+- feature: "Scanner figures and server resources (D39): signature age, 7-day scan counts, files waiting; memory without cache, swap, load from /proc; Server memory alert only after 10 minutes low"
+  since: M5
+  match: ["^unit:core/tests/test_resources_and_scanner\\.py::test_"]
