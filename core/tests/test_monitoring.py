@@ -198,3 +198,21 @@ def test_harden_script_is_idempotent_and_keeps_secrets_off_argv():
     for unit in ("falco-modern-bpf.service", "hoa-integrity-check.timer", "hoa-host-alerts.timer"):
         assert unit in text and unit in agent
     assert "PASSWORD" not in text and "SECRET" not in text
+
+
+@pytest.mark.django_db
+def test_agent_insert_fills_every_required_column():
+    # Postgres checks NOT NULL before ON CONFLICT, so a new required column
+    # missing from the agent's INSERT breaks every run (host_security did).
+    from pathlib import Path
+
+    from django.db import connection
+
+    from core.models import UpdateStatus
+
+    text = Path("infra/poc/portal-agent.sh").read_text()
+    sql = re.search(r"(INSERT INTO core_updatestatus .*?;)", text, re.S).group(1)
+    with connection.cursor() as cur:
+        cur.execute(sql)  # creates the row
+        cur.execute(sql)  # and is harmless once it exists
+    assert UpdateStatus.objects.get(pk=1).host_security == {}

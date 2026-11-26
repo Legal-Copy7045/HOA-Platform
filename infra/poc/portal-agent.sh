@@ -43,8 +43,8 @@ SELECT 1 FROM core_updatestatus LIMIT 1;
 SQL
 
 psql_run <<'SQL' >/dev/null
-INSERT INTO core_updatestatus (id, branch, running_commit, latest_commit, behind, changes, state, message)
-VALUES (1, '', '', '', 0, '', 'idle', '') ON CONFLICT (id) DO NOTHING;
+INSERT INTO core_updatestatus (id, branch, running_commit, latest_commit, behind, changes, state, message, host_security)
+VALUES (1, '', '', '', 0, '', 'idle', '', '{}') ON CONFLICT (id) DO NOTHING;
 UPDATE core_updatestatus SET agent_seen_at = now() WHERE id = 1;
 SQL
 
