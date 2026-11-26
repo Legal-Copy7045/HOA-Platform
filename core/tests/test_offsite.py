@@ -155,3 +155,13 @@ def test_scripts_record_backups_and_drill_from_offsite():
     assert 'read -r -s -p "R2 Secret Access Key' in setup
     assert "set_env .env BACKUP_S3_SECRET_ACCESS_KEY" in setup
     assert "check_offsite_lock" in setup and "Use a separate bucket" in setup
+
+
+def test_the_version_label_goes_off_site_and_is_shown_sanitised():
+    backup = (POC / "backup.sh").read_text()
+    assert "HMAC-SHA256 APP_VERSION; do" in backup
+    drill = (POC / "restore-drill.sh").read_text()
+    assert '--name "$REMOTE-APP_VERSION"' in drill and "|| rm -f" in drill
+    assert "tr -cd 'a-z0-9'" in drill and "${VERSION:-unknown}" in drill
+    # A backup without the label is still complete.
+    assert "APP_VERSION" not in offsite.BACKUP_FILES

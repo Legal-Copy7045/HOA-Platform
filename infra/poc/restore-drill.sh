@@ -53,6 +53,9 @@ if [ "$FROM_OFFSITE" -eq 1 ]; then
   for f in db.dump.enc files.tar.enc SHA256SUMS HMAC-SHA256; do
     "${LIVE[@]}" exec -T web python manage.py pull_backup --name "$REMOTE-$f" > "$SRC/$f"
   done
+  # The version label (older off-site backups don't have one).
+  "${LIVE[@]}" exec -T web python manage.py pull_backup --name "$REMOTE-APP_VERSION" \
+    > "$SRC/APP_VERSION" 2>/dev/null || rm -f "$SRC/APP_VERSION"
 fi
 if [ -z "$SRC" ]; then
   SRC="$(ls -1d "$BACKUP_ROOT"/*/ 2>/dev/null | sort | tail -1)"
@@ -138,4 +141,7 @@ echo "==> Checking the restored copy"
 "${SCRATCH[@]}" run --rm -T --no-deps web python manage.py check_storage
 "${SCRATCH[@]}" run --rm -T --no-deps web python manage.py data_status
 echo
-echo "Restore drill passed for $SRC (made at ${STAMP:-unknown}, version $(cat "$SRC/APP_VERSION" 2>/dev/null || echo unknown))."
+# The version label is not covered by the keyed checksum: show letters and
+# digits only, so a tampered label cannot send anything to the terminal.
+VERSION="$(head -c 40 "$SRC/APP_VERSION" 2>/dev/null | tr -cd 'a-z0-9' | cut -c1-12)"
+echo "Restore drill passed for $SRC (made at ${STAMP:-unknown}, version ${VERSION:-unknown})."
