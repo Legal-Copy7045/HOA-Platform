@@ -6,6 +6,19 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.29.0 — 2026-11-26
+
+- USPS tracking for paper mail (optional, Admin → Features → USPS tracking):
+  once a sysadmin enters the association's USPS Business Customer Gateway
+  login on the server (`sudo bash infra/poc/set-usps.sh`), the portal reads
+  USPS Informed Visibility scans of barcoded letters every 4 hours for 30
+  days after mailing. The mailing page shows each letter's status (Mailed,
+  Processed, Sorted for delivery on a date, No scans after 5 days) and the
+  last scan; the meeting page says how many paper notices were sorted for
+  delivery. Letters with no scan after 5 days go on My items to check the
+  address. Paper mail settings shows whether tracking is connected; System
+  status has a "USPS tracking" check.
+
 ## 0.24.0 — 2026-11-26
 
 - Paper mail (Association → Paper mail, board and manager): letters for

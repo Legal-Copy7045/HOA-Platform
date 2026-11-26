@@ -766,4 +766,33 @@ Association → Paper mail shows who gets paper (owners on the deed who have not
 3. **A mailing:** from a meeting page (Prepare paper notices), the budget page after its notice, or Paper mail → New mailing (blank, meeting, budget, or a Letters and certificates wording). Preview, then Prepare mailing. On the mailing page print the letters (tick "start every letter on a front side" when printing both sides), and envelopes or labels unless you use window envelopes.
 4. **After posting:** "Mark as mailed" with the date (or "Not sending this"). Until then the mailing stays on My items; for a meeting, the meeting page then shows "Paper notices mailed <date> to N homes".
 
-**Tracking barcode (optional, free).** Create a USPS Business Customer Gateway account to get a Mailer ID, and sign up for Informed Visibility (IV). Enter the Mailer ID on Paper mail settings, keep Barcode ID 00, choose the Service Type ID (310 is suggested for First-Class with IV tracking: confirm with USPS), and tick "Print the tracking barcode". Window letters and envelopes then carry the barcode above the name (labels are too small for it). To follow a mailing, sign in to IV and search by Mailer ID and serial range (the mailing's pieces are numbered consecutively; the portal keeps each letter's serial and home). USPS returns scans in IV (and its API) only for barcodes carrying the HOA's own Mailer ID, and keeps scan data for 30 days, so look within a month. Importing IV scans into the portal is a possible later step; it would need IV credentials entered on the server with a script, never through the web app.
+**Tracking barcode (optional, free).** Create a USPS Business Customer Gateway account to get a Mailer ID, and sign up for Informed Visibility (IV). Enter the Mailer ID on Paper mail settings, keep Barcode ID 00, choose the Service Type ID (310 is suggested for First-Class with IV tracking: confirm with USPS), and tick "Print the tracking barcode". Window letters and envelopes then carry the barcode above the name (labels are too small for it). To follow a mailing, sign in to IV and search by Mailer ID and serial range (the mailing's pieces are numbered consecutively; the portal keeps each letter's serial and home). USPS returns scans in IV (and its API) only for barcodes carrying the HOA's own Mailer ID, and keeps scan data for 30 days, so look within a month. The portal can also read the scans itself: see "USPS tracking (Informed Visibility)" below.
+
+## USPS tracking (Informed Visibility)
+
+With USPS tracking on, the portal reads USPS scans of barcoded paper mail itself (decision D60): a few times a day, for 30 days after a mailing is marked as mailed. Nothing is sent to USPS but the barcode numbers; USPS never calls the portal.
+
+1. **USPS accounts.** The association needs a USPS Business Customer Gateway (BCG) account (it also gives the Mailer ID for the barcode, see "Printing paper notices"). The account's Business Service Administrator (BSA), or a BSA Delegate, gives the user the portal will sign in as access to the **Informed Visibility Mail Tracking & Reporting (IV-MTR)** service. Use a dedicated user for the portal, with a long password kept in the HOA's password manager.
+2. **Test first (CAT).** USPS has a test environment, CAT. Ask InformedVisibility@usps.gov for a CAT test account for IV-MTR. USPS is changing its sign-in in 2026 and it is not confirmed whether the API's sign-in changes with it, so always prove the connection in CAT before production.
+3. **Enter the login on the server** (never on the portal's pages, by email or in a chat):
+
+   ```
+   sudo bash /opt/hoa-portal/infra/poc/set-usps.sh
+   ```
+
+   Choose `cat` (the default) or `production`, type the BCG user name and the password (hidden). The script saves them in `.env` (a copy of the old file is kept as `.env.before-usps`), restarts the portal and signs in once with `manage.py check_usps_iv` (no mail is looked up). It prints `OK: signed in to ...` or what failed. To undo: `cp .env.before-usps .env && sudo bash infra/poc/start-portal.sh`. When CAT works, run it again with `production`.
+4. **Switch it on:** Admin → Features → USPS tracking. Settings → Paper mail settings then shows "Connected to the USPS test environment (CAT)" (or "Connected to USPS Informed Visibility") and when it last checked. The tracking barcode must be on for the mailing: only letters printed with it can be followed.
+
+**What the statuses mean** (mailing page, USPS tracking card):
+
+| Status | Meaning |
+|---|---|
+| Mailed | Marked as mailed; USPS has not scanned it yet. |
+| Processed | USPS has scanned it on its way. |
+| Sorted for delivery on <date> | Sorted into the carrier's delivery order (operations 918/919). Usually delivered that day or the next. USPS gives actual delivery scans only to bulk mailers who file an electronic mailing statement (eDoc), so this is normally the last scan. |
+| Delivered on <date> | A delivery scan (rare without an eDoc). |
+| No scans after 5 days | Never scanned 5 days after mailing: the address or the barcode may be wrong, or it was not mailed. It goes on My items; check the address, then press "Address checked". |
+| Gave up after 30 days | USPS keeps scans for 30 days; the portal stops asking. |
+| USPS would not show it | USPS answered "not yours": the barcode's Mailer ID is not on this BCG account. |
+
+**Problems.** System status → "USPS tracking" fails when USPS refuses the sign-in (the sysadmins also get one email a day: re-run `set-usps.sh`, check the password has not expired and the user still has IV-MTR access), when USPS refuses every letter (check that the Mailer ID on Paper mail settings belongs to this account), or when no check has worked for a day (the worker, or USPS, is down). The portal keeps under 400 requests a minute (USPS allows 500).
