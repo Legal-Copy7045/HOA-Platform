@@ -134,6 +134,8 @@ def test_feature_switches_still_gate_hubs_and_voting(client, w):
     page = client.get(reverse("voting")).content.decode()
     assert "Board elections" in page and "All votes and polls" not in page
     features.set_feature("elections", False, actor=w["board"])
+    assert "All surveys" in client.get(reverse("voting")).content.decode()
+    features.set_feature("surveys", False, actor=w["board"])
     assert client.get(reverse("voting")).status_code == 404
     assert "Voting" not in labels(client.get(reverse("home")))
     features.set_feature("faq", False, actor=w["board"])
