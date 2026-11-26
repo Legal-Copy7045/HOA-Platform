@@ -313,6 +313,16 @@ def render(paragraphs: list, *, title: str = "Letter", margin: float = MARGIN) -
     "bottom" (what follows ends at the foot of the page) and "qr" with a
     ``QrBlock`` instead of text."""
     pages = _layout(_lines(paragraphs, PAGE_W - 2 * margin), margin)
+    streams = []
+    open_box = None
+    for page_lines in pages:
+        ops, open_box = _page_ops(page_lines, margin, open_box)
+        streams.append(ops)
+    return _document(streams, PAGE_W, PAGE_H, title)
+
+
+def _document(streams: list[list[str]], width: float, height: float, title: str) -> bytes:
+    """Assemble pages (each a list of content-stream operators) into a PDF."""
     objects: list[bytes] = []
 
     def add(obj: bytes) -> int:
@@ -327,17 +337,16 @@ def render(paragraphs: list, *, title: str = "Letter", margin: float = MARGIN) -
     mono_bold = add(
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>"
     )
-    pages_id = len(objects) + 1 + 2 * len(pages)  # placeholder index after content+page objs
+    pages_id = len(objects) + 1 + 2 * len(streams)  # placeholder index after content+page objs
     page_ids = []
-    open_box = None
-    for page_lines in pages:
-        ops, open_box = _page_ops(page_lines, margin, open_box)
+    box = f"[0 0 {_num(width)} {_num(height)}]"
+    for ops in streams:
         stream = "\n".join(ops).encode("latin-1")
         content = add(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
         page_ids.append(
             add(
                 (
-                    f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {PAGE_W} {PAGE_H}] "
+                    f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox {box} "
                     f"/Resources << /Font << /F1 {font} 0 R /F2 {bold} 0 R /F3 {mono} 0 R "
                     f"/F4 {mono_bold} 0 R >> >> /Contents {content} 0 R >>"
                 ).encode()
@@ -363,3 +372,228 @@ def render(paragraphs: list, *, title: str = "Letter", margin: float = MARGIN) -
         f"startxref\n{xref}\n%%EOF\n"
     ).encode()
     return bytes(out)
+
+
+# --- Absolute positions (paper mail, D55) -----------------------------------------------
+#
+# Letters for window envelopes, #10 envelopes and address labels need text at
+# exact places on the sheet. ``render_placed`` takes pages of ``Text`` and
+# ``Line``/``Rect`` items with coordinates in points from the bottom-left
+# corner. Text goes through the same Latin-1 escaping as everything else;
+# coordinates and sizes must be real, finite numbers inside the page, so
+# nothing a person typed can reach the drawing operators.
+
+INCH = 72
+
+# Advance widths (thousandths of the font size) of Helvetica and
+# Helvetica-Bold for printable ASCII, from the standard Adobe metrics, so
+# lines can be wrapped, centred and cut to fit a window, envelope or label.
+_HELVETICA = (
+    "278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 "
+    "556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 "
+    "1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 "
+    "667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 "
+    "333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 "
+    "556 556 333 500 278 556 500 722 500 500 500 334 260 334 584"
+)
+_HELVETICA_BOLD = (
+    "278 333 474 556 556 889 722 238 333 333 389 584 278 333 278 278 "
+    "556 556 556 556 556 556 556 556 556 556 333 333 584 584 584 611 "
+    "975 722 722 722 722 667 611 778 722 278 556 722 611 833 722 778 "
+    "667 778 722 667 611 722 667 944 667 667 611 333 278 333 584 556 "
+    "333 556 611 556 611 556 333 611 611 278 278 556 278 889 611 611 "
+    "611 611 389 556 333 611 556 778 556 556 500 389 280 389 584"
+)
+_WIDTHS = {
+    False: dict(zip(map(chr, range(32, 127)), map(int, _HELVETICA.split()), strict=True)),
+    True: dict(zip(map(chr, range(32, 127)), map(int, _HELVETICA_BOLD.split()), strict=True)),
+}
+
+
+def safe_text(text: str) -> str:
+    """``text`` as it will print: one line, typographic characters kept where
+    the PDF fonts have them, anything else outside Latin-1 replaced by "?"."""
+    text = " ".join(str(text or "").split())
+    text = "".join(_WINANSI.get(c, c) for c in text)
+    return "".join(
+        c if (32 <= ord(c) < 127 or 160 <= ord(c) < 256 or c in _WINANSI.values()) else "?"
+        for c in text
+    )
+
+
+def text_width(text: str, size: float, bold: bool = False) -> float:
+    """Printed width of one line of ``text`` in points."""
+    widths = _WIDTHS[bool(bold)]
+    return sum(widths.get(c, 556) for c in safe_text(text)) * size / 1000
+
+
+def fit_text(text: str, size: float, width: float, bold: bool = False) -> str:
+    """One line cut to ``width`` points, ending in "..." when cut."""
+    text = safe_text(text)
+    if text_width(text, size, bold) <= width:
+        return text
+    while text and text_width(text + "...", size, bold) > width:
+        text = text[:-1]
+    return text.rstrip() + "..."
+
+
+def wrap_text(text: str, size: float, width: float, bold: bool = False) -> list[str]:
+    """Wrap one paragraph to lines of at most ``width`` points (a word longer
+    than the line is cut)."""
+    lines: list[str] = []
+    current = ""
+    for word in safe_text(text).split(" "):
+        candidate = f"{current} {word}" if current else word
+        if text_width(candidate, size, bold) <= width:
+            current = candidate
+            continue
+        if current:
+            lines.append(current)
+        current = word if text_width(word, size, bold) <= width else fit_text(word, size, width)
+    if current or not lines:
+        lines.append(current)
+    return lines
+
+
+def _real(value, name: str) -> float:
+    import math
+
+    if type(value) not in (int, float) or not math.isfinite(value):
+        raise ValueError(f"{name} must be a number.")
+    return float(value)
+
+
+@dataclass(frozen=True)
+class Text:
+    """One line of text at (x, y): the baseline's left end, or its centre
+    with ``align="center"``, or its right end with ``align="right"``."""
+
+    x: float
+    y: float
+    text: str
+    size: float = 11
+    bold: bool = False
+    align: str = "left"
+
+    def __post_init__(self):
+        _real(self.x, "x")
+        _real(self.y, "y")
+        if not 4 <= _real(self.size, "size") <= 36:
+            raise ValueError("Text size must be 4 to 36 points.")
+        if not isinstance(self.text, str):
+            raise TypeError("Text must be a string.")
+        if self.align not in ("left", "center", "right"):
+            raise ValueError("Unknown alignment.")
+
+
+@dataclass(frozen=True)
+class Line:
+    """A thin line from (x1, y1) to (x2, y2); dashed for guides and fold marks."""
+
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    dashed: bool = False
+
+    def __post_init__(self):
+        for name in ("x1", "y1", "x2", "y2"):
+            _real(getattr(self, name), name)
+
+
+@dataclass(frozen=True)
+class Rect:
+    """An outline (for the alignment test page: where a window will be)."""
+
+    x: float
+    y: float
+    w: float
+    h: float
+    dashed: bool = True
+
+    def __post_init__(self):
+        for name in ("x", "y", "w", "h"):
+            _real(getattr(self, name), name)
+
+
+# Intelligent Mail barcode dimensions (USPS-B-3200): bar width 0.020 in,
+# 22 bars per inch, full bar 0.145 in, tracker 0.048 in.
+IMB_BAR_W = 0.020 * INCH
+IMB_PITCH = INCH / 22
+IMB_FULL = 0.145 * INCH
+IMB_TRACKER = 0.048 * INCH
+IMB_LENGTH = 64 * IMB_PITCH + IMB_BAR_W  # about 2.93 in
+
+
+@dataclass(frozen=True)
+class Bars:
+    """An Intelligent Mail barcode: 65 bars ("F", "A", "D", "T") drawn as
+    filled rectangles from (x, y), the bottom-left of the full-bar height."""
+
+    x: float
+    y: float
+    bars: str
+
+    def __post_init__(self):
+        _real(self.x, "x")
+        _real(self.y, "y")
+        if not isinstance(self.bars, str) or len(self.bars) != 65 or set(self.bars) - set("FADT"):
+            raise ValueError("An Intelligent Mail barcode is 65 bars of F, A, D or T.")
+
+
+def _bars_ops(item: Bars) -> list[str]:
+    mid = item.y + IMB_FULL / 2
+    t_low, t_high = mid - IMB_TRACKER / 2, mid + IMB_TRACKER / 2
+    top, bottom = item.y + IMB_FULL, item.y
+    ops = ["q", "0 0 0 rg"]
+    for i, bar in enumerate(item.bars):
+        low = bottom if bar in "FD" else t_low
+        high = top if bar in "FA" else t_high
+        x = item.x + i * IMB_PITCH
+        ops.append(f"{_num(x)} {_num(low)} {_num(IMB_BAR_W)} {_num(high - low)} re")
+    return [*ops, "f", "Q"]
+
+
+def _placed_ops(items, width: float, height: float) -> list[str]:
+    ops: list[str] = []
+    for item in items:
+        if isinstance(item, Text):
+            text = safe_text(item.text)
+            if not text:
+                continue
+            x = item.x
+            if item.align != "left":
+                w = text_width(text, item.size, item.bold)
+                x -= w / 2 if item.align == "center" else w
+            if not (-1 <= x <= width + 1 and -1 <= item.y <= height + 1):
+                raise ValueError("Text is outside the page.")
+            font = "/F2" if item.bold else "/F1"
+            ops += ["BT", f"{_num(x)} {_num(item.y)} Td", f"{font} {_num(item.size)} Tf"]
+            ops += [f"({_escape(text)}) Tj", "ET"]
+        elif isinstance(item, Line):
+            dash = ["[3 3] 0 d"] if item.dashed else []
+            ops += ["q", "0.5 G", "0.5 w", *dash, f"{_num(item.x1)} {_num(item.y1)} m"]
+            ops += [f"{_num(item.x2)} {_num(item.y2)} l", "S", "Q"]
+        elif isinstance(item, Rect):
+            dash = ["[3 3] 0 d"] if item.dashed else []
+            ops += ["q", "0.5 G", "0.5 w", *dash]
+            ops += [f"{_num(item.x)} {_num(item.y)} {_num(item.w)} {_num(item.h)} re", "S", "Q"]
+        elif isinstance(item, Bars):
+            ops += _bars_ops(item)
+        else:
+            raise TypeError("A placed page holds Text, Line, Rect and Bars items only.")
+    return ops
+
+
+def render_placed(
+    pages: list, *, width: float = PAGE_W, height: float = PAGE_H, title: str = "Letter"
+) -> bytes:
+    """Pages of placed items -> PDF bytes. ``width`` x ``height`` in points
+    (US Letter by default; a #10 envelope is 684 x 297). An empty page list
+    gives one blank page; an empty page is a blank page (duplex padding)."""
+    _real(width, "width")
+    _real(height, "height")
+    if not (72 <= width <= 1224 and 72 <= height <= 1224):
+        raise ValueError("Unsupported page size.")
+    streams = [_placed_ops(items, width, height) for items in (pages or [[]])]
+    return _document(streams, width, height, title)
