@@ -6,6 +6,25 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.21.0 — 2026-11-26
+
+- Disbursements (Finance, optional feature, on by default): the board can pay
+  money back to owners. A surplus distribution splits a total equally across
+  every home (the odd cents in address order) as statement credits or checks,
+  under a board resolution; an owner refund pays a former owner's credit by
+  check after a sale (My items says "Refund $X to the former owner of
+  <address>"). A board member other than the one who proposed it approves
+  (two at $500 and over); statement credits post on approval and refunds when
+  the check is recorded. Checks come from a check register (CSV or PDF) for
+  the bank's bill pay, or print on the association's pre-printed check stock
+  with an alignment test; then the board records the check numbers, marks
+  them cleared (suggested from the bank feed) or voids them (the credit comes
+  back). Uncashed checks show up after 90 days. The accounting export,
+  reconciliation and bank feed include them. When reserves are above the
+  adopted plan's target, Disbursements and My items say so.
+- Owners see a surplus credit on My account; former owners see their refund
+  check in My history.
+
 ## 0.15.1 — 2026-11-26
 
 - Bank feed: a guided one-time script sets up Teller on the server
