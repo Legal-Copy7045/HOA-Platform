@@ -15,7 +15,8 @@ adds an entry here.
   extend a deadline once, with a reason, before it passes (owners are told),
   never shorten it, and close early only if Community settings allow it.
   Owners who have not voted get a reminder with their personal link 48 hours
-  before the close. The deadline shows on the Voting list, the page, the
+  before the close, and everyone is told of an extension, straight away even
+  if they chose the weekly summary. The deadline shows on the Voting list, the page, the
   email and My items ("Vote by ...").
 - Turnout while voting is open: the board and the manager see "N of M homes
   have voted", the quorum needed and whether it is reached so far, a

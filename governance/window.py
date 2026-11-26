@@ -173,7 +173,8 @@ def require_early_close(target, reason, *, now=None) -> str:
 
 def extend(target, *, closes_at, reason: str, actor, request=None):
     """Move the deadline later, once, before it passes, with a reason; the
-    people who can vote are told by the update path. Never shorter."""
+    people who can vote are emailed at once (never held for a digest). Never
+    shorter."""
     require(actor, "vote.manage")
     reason = clean_reason(reason)
     if not reason:
@@ -241,11 +242,13 @@ def _voter_emails() -> dict[int, str]:
 
 
 def _notify_extension(target, *, old, reason) -> None:
-    from comms.notify import send_update
+    """Deadline-bound: sent at once to everyone, never held for a weekly
+    digest. The email carries only the signed-in page's link."""
+    from comms.notify import send_now
 
     link = _detail_url(target)
     new = window(target)[1]
-    send_update(
+    send_now(
         set(_voter_emails().values()),
         subject=f"[{settings.SITE_NAME}] Voting extended: {target.title}"[:200],
         body=(
@@ -254,7 +257,6 @@ def _notify_extension(target, *, old, reason) -> None:
             "Ballots already cast stay as they are. If your home has not voted yet, you can "
             f"vote until the new deadline (sign-in required):\n{link}\n\n-- \n{settings.SITE_NAME}"
         ),
-        link=link,
     )
 
 
@@ -315,7 +317,7 @@ def _not_voted_people(target) -> dict[int, str]:
 def send_reminders(now=None) -> int:
     """Once per vote or election, about 48 hours before it closes: remind
     the owners of homes that have not voted, each with a personal link
-    (D24), through the update path."""
+    (D24), sent at once whatever their digest choice."""
     now = now or timezone.now()
     soon = now + datetime.timedelta(hours=REMINDER_HOURS)
     sent = 0
@@ -357,17 +359,19 @@ def send_reminders(now=None) -> int:
 
 
 def _remind(target) -> int:
-    from comms.notify import send_update
+    """Deadline-bound: sent at once whatever the person's digest choice, so
+    the personal single-use link (D24) only ever travels in this email and
+    is created only for an email that is sent; nothing goes to a digest."""
+    from comms.notify import send_now
     from governance import ballot_links
 
     people = _not_voted_people(target)
     if not people:
         return 0
-    detail = _detail_url(target)
     deadline = when(window(target)[1])
     for person_id, email in people.items():
         link = ballot_links.new_link(target, person_id)
-        send_update(
+        send_now(
             {email},
             subject=f"[{settings.SITE_NAME}] Vote by {deadline}: {target.title}"[:200],
             body=(
@@ -378,8 +382,6 @@ def _remind(target) -> int:
                 f"You can also vote from the portal menu until the deadline.\n\n-- \n"
                 f"{settings.SITE_NAME}"
             ),
-            # A weekly digest lists the page, never the personal link.
-            link=detail,
         )
     return len(people)
 

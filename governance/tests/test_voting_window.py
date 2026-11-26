@@ -405,6 +405,41 @@ def test_reminder_48_hours_before_goes_to_homes_that_have_not_voted(
     assert event.metadata["kind"] == "vote" and event.metadata["count"] == sent
 
 
+def test_deadline_messages_skip_the_weekly_digest_and_no_link_lands_in_one(
+    w, django_capture_on_commit_callbacks
+):
+    from comms.models import DigestItem
+    from community.models import ContactProfile
+    from governance.models import BallotLink
+
+    vote = _vote(w)
+    digest_owner = w["owners"][0]
+    with system_access("test"):
+        ContactProfile.objects.update_or_create(
+            person=digest_owner.person, defaults={"weekly_digest": True}
+        )
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        sent = window.send_reminders(now=vote.closes_at - 24 * HOUR)
+    mine = [m for m in mail.outbox if m.to == [digest_owner.email]]
+    assert len(mine) == 1 and re.search(r"/ballot/[A-Za-z0-9_-]{20,100}/", mine[0].body)
+    # One personal link per email actually sent, and none waiting unsent.
+    with system_access("test"):
+        reminder_links = BallotLink.objects.filter(vote=vote).count()
+    issued_at_open = len(window._voter_emails())
+    assert reminder_links == issued_at_open + sent
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        window.extend(
+            vote, closes_at=vote.closes_at + DAY, reason="Clubhouse closed", actor=w["board"]
+        )
+    assert [m for m in mail.outbox if m.to == [digest_owner.email]]
+    with system_access("test"):
+        links = list(DigestItem.objects.values_list("link", flat=True))
+    assert not [link for link in links if "/ballot/" in link]
+    assert not DigestItem.objects.filter(user=digest_owner).exists()
+
+
 def test_election_reminders_skip_homes_that_voted(w, django_capture_on_commit_callbacks):
     e = _election(w)
     a = w["owners"][0]

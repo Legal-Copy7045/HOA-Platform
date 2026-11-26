@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-3014
+# highest issued: UNIT-3015
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -3000,3 +3000,4 @@ UNIT-3011: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_dat
 UNIT-3012: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[vote_who_voted_csv]"
 UNIT-3013: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[election_who_voted_csv]"
 UNIT-3014: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[vote_who_voted_csv]"
+UNIT-3015: "governance/tests/test_voting_window.py::test_deadline_messages_skip_the_weekly_digest_and_no_link_lands_in_one"
