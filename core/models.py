@@ -111,6 +111,9 @@ class UpdateStatus(models.Model):
     # Host security services as the agent last saw them, e.g.
     # {"falco": "active", "auditd": "active", ...} (infra/poc/harden-host.sh).
     host_security = models.JSONField(default=dict, blank=True)
+    # Server memory, swap and load, from the agent every minute (D39).
+    # Nullable, so the agent's INSERT never has to name it.
+    host_resources = models.JSONField(null=True, blank=True)
 
     def __str__(self) -> str:
         return f"update status ({self.state})"

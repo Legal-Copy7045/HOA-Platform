@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-2441
+# highest issued: UNIT-2457
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -1685,7 +1685,23 @@ UNIT-2439: "core/tests/test_ci_shards.py::test_every_item_lands_in_exactly_one_s
 UNIT-244: "community/tests/test_authorization.py::test_non_board_members_cannot_change_the_register[end_board_seat-sysadmin]"
 UNIT-2440: "core/tests/test_ci_shards.py::test_shard_option_is_checked"
 UNIT-2441: "core/tests/test_ci_shards.py::test_ci_runs_every_shard"
+UNIT-2442: "regression/tests/test_walkthrough_tooling.py::test_default_run_is_the_regression_stages_only"
+UNIT-2443: "regression/tests/test_walkthrough_tooling.py::test_with_walkthrough_adds_the_walkthrough_to_the_regression_stages"
+UNIT-2444: "regression/tests/test_walkthrough_tooling.py::test_walkthrough_stage_alone"
+UNIT-2445: "regression/tests/test_walkthrough_tooling.py::test_walkthrough_runs_in_its_own_lane_database_and_port"
+UNIT-2446: "regression/tests/test_walkthrough_tooling.py::test_walkthrough_ids_are_stable"
+UNIT-2447: "regression/tests/test_walkthrough_tooling.py::test_walkthrough_script_parses"
+UNIT-2448: "regression/tests/test_walkthrough_tooling.py::test_report_renders_roles_checks_findings_and_menus"
+UNIT-2449: "regression/tests/test_walkthrough_tooling.py::test_report_without_thumbnails_or_findings"
 UNIT-245: "community/tests/test_authorization.py::test_non_board_members_cannot_change_the_register[end_board_seat-former]"
+UNIT-2450: "regression/tests/test_walkthrough_tooling.py::test_report_thumbnails_stay_within_the_budget"
+UNIT-2451: "regression/tests/test_walkthrough_tooling.py::test_report_respects_report_tz"
+UNIT-2452: "core/tests/test_resources_and_scanner.py::test_no_agent_report_means_no_memory_row"
+UNIT-2453: "core/tests/test_resources_and_scanner.py::test_memory_row_reads_in_use_without_the_cache"
+UNIT-2454: "core/tests/test_resources_and_scanner.py::test_low_memory_alerts_only_when_it_stays_low"
+UNIT-2455: "core/tests/test_resources_and_scanner.py::test_status_page_shows_resources_and_scanner"
+UNIT-2456: "core/tests/test_resources_and_scanner.py::test_scan_summary_counts_and_waiting"
+UNIT-2457: "core/tests/test_resources_and_scanner.py::test_agent_reads_proc_numbers_only"
 UNIT-246: "community/tests/test_authorization.py::test_non_board_members_cannot_change_the_register[record_office-owner_a]"
 UNIT-247: "community/tests/test_authorization.py::test_non_board_members_cannot_change_the_register[record_office-auditor]"
 UNIT-248: "community/tests/test_authorization.py::test_non_board_members_cannot_change_the_register[record_office-arc]"

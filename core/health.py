@@ -8,6 +8,7 @@ and once when it recovers.
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import shutil
 import socket
@@ -74,23 +75,40 @@ def _storage():
     return True, "Write and delete work"
 
 
-def _signatures():
+def scanner_version() -> dict:
+    """What the ClamAV daemon says about itself: {"answering", "version",
+    "signatures_at" (naive, the daemon's clock)}. Empty values when off or
+    silent. Used by the health check and the System status card."""
+    out = {"answering": False, "version": "", "signatures_at": None}
     if settings.DOCUMENT_SCANNER != "clamd":
-        return False, "Malware scanning is off"
+        return out
     host, _, port = settings.DOCUMENT_CLAMD_ADDRESS.partition(":")
     try:
         with socket.create_connection((host, int(port or 3310)), timeout=10) as sock:
             sock.sendall(b"zVERSION\0")
             reply = sock.recv(512).decode(errors="replace").strip("\0\n ")
     except (OSError, ValueError):
-        return False, "The scanner is not answering"
+        return out
+    out["answering"] = True
     # "ClamAV 1.4.2/27850/Tue Nov 25 08:42:01 2026"
     parts = reply.split("/")
-    if len(parts) < 3:
-        return True, "Answering (signature date unknown)"
-    try:
-        stamp = datetime.datetime.strptime(parts[2].strip(), "%a %b %d %H:%M:%S %Y")
-    except ValueError:
+    out["version"] = parts[0].replace("ClamAV", "").strip()[:20]
+    if len(parts) >= 3:
+        with contextlib.suppress(ValueError):
+            out["signatures_at"] = datetime.datetime.strptime(
+                parts[2].strip(), "%a %b %d %H:%M:%S %Y"
+            )
+    return out
+
+
+def _signatures():
+    if settings.DOCUMENT_SCANNER != "clamd":
+        return False, "Malware scanning is off"
+    info = scanner_version()
+    if not info["answering"]:
+        return False, "The scanner is not answering"
+    stamp = info["signatures_at"]
+    if stamp is None:
         return True, "Answering (signature date unknown)"
     age = (timezone.now().replace(tzinfo=None) - stamp).days
     if age > SIGNATURES_STALE_DAYS:
@@ -174,6 +192,57 @@ def _payments():
     return health()
 
 
+LOW_MEMORY_MINUTES = 10
+
+
+def resources() -> dict | None:
+    """The server's memory, swap and load as the VM agent last reported them
+    (D39), with figures ready to show; None when there is no recent report."""
+    from core.models import UpdateStatus
+
+    status = UpdateStatus.objects.filter(pk=1).first()
+    data = (status.host_resources if status else None) or {}
+    if not data.get("mem_total_kb") or not status.agent_seen_at:
+        return None
+    if status.agent_seen_at < timezone.now() - datetime.timedelta(minutes=5):
+        return None
+    gib = 1024 * 1024
+    total, avail = data["mem_total_kb"], data.get("mem_available_kb", 0)
+    swap_used = max(0, data.get("swap_total_kb", 0) - data.get("swap_free_kb", 0))
+    low_since = None
+    if data.get("low_since"):
+        try:
+            low_since = datetime.datetime.fromisoformat(str(data["low_since"]))
+        except ValueError:
+            low_since = None
+    return {
+        "used_gb": round((total - avail) / gib, 1),
+        "total_gb": round(total / gib, 1),
+        "available_percent": int(avail * 100 / total),
+        "swap_used_mb": swap_used // 1024,
+        "swap_total_mb": data.get("swap_total_kb", 0) // 1024,
+        "load": [data.get("load1", 0), data.get("load5", 0), data.get("load15", 0)],
+        "cpus": data.get("cpus") or 1,
+        "low_since": low_since,
+    }
+
+
+def _memory():
+    res = resources()
+    if res is None:
+        return None  # no agent report (not on the VM, or the agent is down)
+    detail = (
+        f"{res['used_gb']} of {res['total_gb']} GB in use, swap {res['swap_used_mb']} MB, "
+        f"load {res['load'][0]} ({res['cpus']} cores)"
+    )
+    low_since = res["low_since"]
+    if low_since is not None:
+        minutes = int((timezone.now() - low_since).total_seconds() // 60)
+        if minutes >= LOW_MEMORY_MINUTES:
+            return False, f"Less than 10% of memory free for {minutes} minutes: {detail}"
+    return True, detail
+
+
 CHECKS = [
     ("database", "Database", _database),
     ("worker", "Background worker", _worker),
@@ -183,6 +252,7 @@ CHECKS = [
     ("errors", "Server errors", _errors),
     ("email", "Outgoing email", _email),
     ("backups", "Backups", _backups),
+    ("memory", "Server memory", _memory),
     ("bank_feed", "Bank feed", _bank_feed),
     ("payments", "Online payments", _payments),
 ]

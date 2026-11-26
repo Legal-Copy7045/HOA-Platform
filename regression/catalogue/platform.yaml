@@ -86,3 +86,9 @@
 - feature: "Install tonight (D38): System status schedules the update for the next 4:00 am Eastern (cancellable, audited); the agent turns a due schedule into a request, tolerant of an unmigrated database"
   since: M5
   match: ["^unit:core/tests/test_monitoring\\.py::test_(next_update_window|install_tonight|agent_turns_a_due_schedule)"]
+- feature: "Walkthrough tooling: the walkthrough stage runs only with --stage walkthrough or --with-walkthrough (own database, port and lane; WALK- IDs); its report shows menus per role, failing checks with thumbnails under a size budget, and reviewer findings by group"
+  since: M5
+  match: ["^unit:regression/tests/test_walkthrough_tooling"]
+- feature: "Scanner figures and server resources (D39): signature age, 7-day scan counts, files waiting; memory without cache, swap, load from /proc; Server memory alert only after 10 minutes low"
+  since: M5
+  match: ["^unit:core/tests/test_resources_and_scanner\\.py::test_"]

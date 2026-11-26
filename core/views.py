@@ -9,6 +9,7 @@ from django.views.decorators.http import require_GET
 
 from core import policy
 from core.health import CLEARABLE as health_clearable
+from core.health import resources as health_resources
 from core.health import run_checks
 
 
@@ -206,6 +207,25 @@ def _send_test_email(request):
     return redirect("system_status")
 
 
+def _scanner_context() -> dict:
+    """Malware scanning figures for System status (D39): counts only."""
+    import datetime
+
+    from django.utils.timesince import timesince
+
+    from core.health import scanner_version
+    from documents.services import scan_summary
+
+    if settings.DOCUMENT_SCANNER == "none":
+        return {"scanner_info": None, "scan": None, "signatures_ago": ""}
+    info = scanner_version()
+    ago = ""
+    if info["signatures_at"]:
+        # The daemon reports the database time in UTC (as the health check reads it).
+        ago = timesince(info["signatures_at"].replace(tzinfo=datetime.UTC))
+    return {"scanner_info": info, "scan": scan_summary(), "signatures_ago": ago}
+
+
 def _clear_check(request):
     """Clear a health check that remembers past failures (email, server
     errors) once the cause is fixed. Audited."""
@@ -281,6 +301,8 @@ def system_status(request):
             "can_run_task": policy.can(request.user, "system.run_task"),
             "task_busy": _task_busy(),
             "scanner": settings.DOCUMENT_SCANNER,
+            **_scanner_context(),
+            "resources": health_resources(),
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
         },
     )

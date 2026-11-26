@@ -2,6 +2,13 @@
 
 python regression/page_setup.py reset-db <name>     # drop and create the database
 python regression/page_setup.py sessions <out.json> # one signed-in session per role
+python regression/page_setup.py walk-sessions <out.json>  # every role, for the walkthrough
+
+The page stage uses six roles (board, owner, manager, auditor, tenant, former
+owner) and a signed-out passkey tester. The walkthrough stage adds the
+authorized and view-only contacts, an officer, an ARC reviewer and a sysadmin,
+and makes no passkey tester (the two stages run side by side, each on its own
+database).
 """
 
 from __future__ import annotations
@@ -26,7 +33,7 @@ def reset_db(name: str) -> None:
         conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
 
 
-def sessions(out: str) -> None:
+def sessions(out: str, *, every_role: bool = False) -> None:
     import django
 
     django.setup()
@@ -87,7 +94,11 @@ def sessions(out: str) -> None:
             staff("Regression Auditor", "reg-aud@example.com", Role.AUDITOR), "reg-aud@example.com"
         ),
     }
+    if every_role:
+        result.update(_more_roles(login, staff))
     Path(out).write_text(json.dumps(result), encoding="utf-8")
+    if every_role:
+        return
 
     # A signed-out tester for the passkey stage: password + authenticator app.
     from accounts.tests.helpers import PASSWORD
@@ -109,6 +120,57 @@ def sessions(out: str) -> None:
     )
 
 
+def _more_roles(login, staff) -> dict[str, str]:
+    """The walkthrough's extra personas, from the seeded demo community."""
+    from community import services
+    from community.models import AccountContact, OfficeHolding, Person, Role, RoleAssignment
+    from core.policy import SYSTEM
+    from core.scoping import system_access
+
+    with system_access("regression walkthrough personas"):
+        officer = OfficeHolding.objects.active().order_by("office").first().person
+        # A board member who holds no office: board rights from the seat only.
+        plain = (
+            Person.objects.filter(board_seats__isnull=False)
+            .exclude(pk__in=OfficeHolding.objects.active().values("person"))
+            .first()
+        )
+        contacts = AccountContact.objects.active().select_related("person")
+        authorized = contacts.filter(kind="authorized").first().person
+        view_only = contacts.filter(kind="view_only").first().person
+        reviewer = (
+            RoleAssignment.objects.active()
+            .filter(role=Role.ARC_REVIEWER)
+            .exclude(person__board_seats__isnull=False)
+            .first()
+            .person
+        )
+        sysadmin = services.record_person(
+            display_name="Regression Sysadmin", email="reg-sys@example.com", actor=SYSTEM
+        )
+        # Sysadmin normally needs a nomination and a second board member's
+        # approval; this throwaway demo database records it directly.
+        services._record_role(
+            person=sysadmin,
+            role=Role.SYSADMIN,
+            start_date=services.today(),
+            appointed_by="",
+            citation="",
+            actor=SYSTEM,
+            request=None,
+        )
+    out = {
+        "officer": login(officer, "reg-officer@example.com"),
+        "authorized": login(authorized, "reg-authorized@example.com"),
+        "view_only": login(view_only, "reg-viewonly@example.com"),
+        "arc_reviewer": login(reviewer, "reg-arc@example.com"),
+        "sysadmin": login(sysadmin, "reg-sys@example.com"),
+    }
+    if plain is not None:
+        out["board"] = login(plain, "reg-board2@example.com")
+    return out
+
+
 def totp(secret: str) -> None:
     import django
 
@@ -120,4 +182,7 @@ def totp(secret: str) -> None:
 
 if __name__ == "__main__":
     command, arg = sys.argv[1], sys.argv[2]
-    {"reset-db": reset_db, "sessions": sessions, "totp": totp}[command](arg)
+    if command == "walk-sessions":
+        sessions(arg, every_role=True)
+    else:
+        {"reset-db": reset_db, "sessions": sessions, "totp": totp}[command](arg)

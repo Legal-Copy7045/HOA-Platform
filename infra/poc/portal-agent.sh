@@ -63,6 +63,30 @@ psql_run -v hs="$HOST_SECURITY" >/dev/null <<'SQL'
 UPDATE core_updatestatus SET host_security = :'hs'::jsonb WHERE id = 1;
 SQL
 
+# Server memory, swap and load for System status (D39): read from /proc,
+# numbers only, a few milliseconds a minute. low_since records when available
+# memory first dropped under 10%, so the health check alerts only when it
+# stays low. Tolerant of a database not yet migrated.
+meminfo() { awk -v k="$1:" '$1 == k { print $2 + 0 }' /proc/meminfo; }
+MEM_TOTAL="$(meminfo MemTotal)"; MEM_AVAIL="$(meminfo MemAvailable)"
+SWAP_TOTAL="$(meminfo SwapTotal)"; SWAP_FREE="$(meminfo SwapFree)"
+read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
+CPUS="$(nproc 2>/dev/null || echo 1)"
+LOW=0
+[ "${MEM_TOTAL:-0}" -gt 0 ] && [ $(( ${MEM_AVAIL:-0} * 100 / MEM_TOTAL )) -lt 10 ] && LOW=1
+HOST_RESOURCES="$(printf '{"mem_total_kb":%d,"mem_available_kb":%d,"swap_total_kb":%d,"swap_free_kb":%d,"load1":%s,"load5":%s,"load15":%s,"cpus":%d}' \
+  "${MEM_TOTAL:-0}" "${MEM_AVAIL:-0}" "${SWAP_TOTAL:-0}" "${SWAP_FREE:-0}" \
+  "$(printf '%s' "$LOAD1" | tr -cd '0-9.')" "$(printf '%s' "$LOAD5" | tr -cd '0-9.')" \
+  "$(printf '%s' "$LOAD15" | tr -cd '0-9.')" "${CPUS//[^0-9]/}")"
+psql_run -v hr="$HOST_RESOURCES" -v low="$LOW" >/dev/null 2>&1 <<'SQL' || true
+UPDATE core_updatestatus
+   SET host_resources = :'hr'::jsonb || jsonb_build_object(
+         'at', now(),
+         'low_since', CASE WHEN :'low' = '1'
+                           THEN coalesce(host_resources->>'low_since', now()::text) END)
+ WHERE id = 1;
+SQL
+
 REPO_OWNER="$(stat -c %U "$APP_DIR")"
 g() { if [ "$REPO_OWNER" = "root" ]; then git -C "$APP_DIR" "$@"; else sudo -u "$REPO_OWNER" -H git -C "$APP_DIR" "$@"; fi; }
 BRANCH="$(g rev-parse --abbrev-ref HEAD)"

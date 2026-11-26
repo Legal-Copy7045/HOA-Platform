@@ -6,7 +6,14 @@ description: Run the HOA portal's full regression suite (every stage in regressi
 # Full regression run
 
 The suite lives in `regression/` (read `regression/README.md` first). Five
-steps, in order. The owner usually reads the report later, so finish every step
+steps, in order.
+
+The independent walkthrough (every role's menus and pages on a desktop and a
+phone, with a streamlining review) is a separate stage that a plain `run.py`
+does not run: `/walkthrough` runs it alone (`.claude/skills/walkthrough/SKILL.md`),
+and `/full-check` runs this skill and the walkthrough together as one command
+(`python3 regression/run.py --with-walkthrough`,
+`.claude/skills/full-check/SKILL.md`). The owner usually reads the report later, so finish every step
 and leave nothing waiting on him.
 
 ## 1. Bring the suite up to date
@@ -33,6 +40,8 @@ Live is read-only (HTTPS reachability, Access in front, Cloudflare API GETs).
 If the host or API isn't reachable from the session its checks skip; say so.
 A `<PREFIX>-RUN` failure means a stage broke (Postgres down, port 8011 in use,
 Node missing): fix the environment and re-run that stage with `--stage`.
+(Plain `run.py` runs ci, unit, page and manual; `--stage walkthrough` and
+`--with-walkthrough` add the walkthrough, port 8012, database `hoa_reg_walk`.)
 Commit new IDs in `regression/ids/*.yaml`.
 
 ## 3. Review and security audit (three fresh agents, in parallel, while the stages run)

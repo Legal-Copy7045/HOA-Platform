@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Full regression run: every check in the repo, one result per check, stable IDs.
 
-    python3 regression/run.py                 # every stage except live
+    python3 regression/run.py                 # every regression stage except live
     python3 regression/run.py --stage unit    # some stages only (repeatable)
+    python3 regression/run.py --stage walkthrough      # the walkthrough only
+    python3 regression/run.py --with-walkthrough       # regression + walkthrough together
     LIVE_HOST=portal-dev.example.org python3 regression/run.py --stage live
     python3 regression/report.py              # out/*.json -> out/report.html + report.md
 
 Stages run side by side in three lanes (ci | unit | page); live runs last, and only
-when asked. Each stage writes out/<stage>.json; logs go to out/logs/. See
+when asked. The walkthrough stage (every role and page on a desktop and a phone,
+regression/walkthrough.js) is not a default stage: it runs alone with --stage
+walkthrough, or in a fourth lane with --with-walkthrough, on its own database
+and port so it never collides with the page stage. Each stage writes out/<stage>.json
+(the walkthrough: out/walkthrough-checks.json); logs go to out/logs/. See
 regression/README.md.
 """
 
@@ -39,10 +45,25 @@ LOGS = OUT / "logs"
 IDS = HERE / "ids"
 PY = str(ROOT / ".venv" / "bin" / "python") if (ROOT / ".venv").exists() else sys.executable
 
-PREFIX = {"ci": "CI", "unit": "UNIT", "page": "PAGE", "live": "LIVE", "manual": "MAN"}
-ORDER = ["ci", "unit", "page", "live", "manual"]
+PREFIX = {
+    "ci": "CI",
+    "unit": "UNIT",
+    "page": "PAGE",
+    "live": "LIVE",
+    "manual": "MAN",
+    "walkthrough": "WALK",
+}
+ORDER = ["ci", "unit", "page", "live", "manual", "walkthrough"]
+# Plain `run.py`: the regression stages (live only when asked, walkthrough only
+# with --stage walkthrough or --with-walkthrough).
+DEFAULT_STAGES = ["ci", "unit", "page", "manual"]
+PARALLEL = ("ci", "unit", "page", "walkthrough")
 UNIT_LANES = 3
 PAGE_PORT = 8011
+WALK_PORT = 8012
+# Stage results go to out/<stage>.json, except where that name is taken:
+# out/walkthrough.json is the walkthrough's inventory (role -> width -> pages).
+RESULT_FILE = {"walkthrough": "walkthrough-checks.json"}
 
 
 def now() -> str:
@@ -130,7 +151,8 @@ class Stage:
             "environment": environment or {},
             "results": sorted(self.results, key=lambda r: r["id"]),
         }
-        (OUT / f"{self.name}.json").write_text(json.dumps(data, indent=1), encoding="utf-8")
+        result_file = RESULT_FILE.get(self.name, f"{self.name}.json")
+        (OUT / result_file).write_text(json.dumps(data, indent=1), encoding="utf-8")
         return data
 
 
@@ -348,50 +370,67 @@ def _port_free(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) != 0
 
 
-def stage_page(st: Stage) -> None:
-    if shutil.which("node") is None:
-        st.add("browser available", "skip", "node not installed")
-        return
-    env = {"DJANGO_SETTINGS_MODULE": PAGE_SETTINGS, "PYTHONPATH": str(ROOT)}
-    db = os.environ.get("REGRESSION_PAGES_DB", "hoa_reg_pages")
-    env["DATABASE_URL"] = f"postgres://hoa_owner:hoa_owner@localhost:5432/{db}"
+def _demo_site(st: Stage, *, db: str, port: int, log: str, sessions: list[str]):
+    """Fresh demo database, one session per role, and a server on `port`.
+
+    Returns (env, server process), or None after recording the step that failed.
+    """
+    env = {
+        "DJANGO_SETTINGS_MODULE": PAGE_SETTINGS,
+        "PYTHONPATH": str(ROOT),
+        "DATABASE_URL": f"postgres://hoa_owner:hoa_owner@localhost:5432/{db}",
+    }
     steps = [
         ("fresh database", [PY, "regression/page_setup.py", "reset-db", db]),
         ("cache table", [PY, "manage.py", "createcachetable"]),
         ("migrate", [PY, "manage.py", "migrate", "--noinput"]),
         ("seed demo community", [PY, "manage.py", "seed_demo"]),
-        (
-            "sessions for each role",
-            [PY, "regression/page_setup.py", "sessions", str(OUT / "page-sessions.json")],
-        ),
+        ("sessions for each role", [PY, "regression/page_setup.py", *sessions]),
     ]
     for name, cmd in steps:
-        code, text = run(cmd, env=env, log=f"page-{name.replace(' ', '-')}.log", timeout=900)
+        code, text = run(cmd, env=env, log=f"{log}-{name.replace(' ', '-')}.log", timeout=900)
         if code != 0:
             st.add(
                 f"setup: {name}",
                 "fail",
                 tail(text),
-                f"regression/out/logs/page-{name.replace(' ', '-')}.log",
+                f"regression/out/logs/{log}-{name.replace(' ', '-')}.log",
             )
-            return
-    if not _port_free(PAGE_PORT):
-        st.add("setup: server port free", "fail", f"port {PAGE_PORT} is in use")
-        return
+            return None
+    if not _port_free(port):
+        st.add("setup: server port free", "fail", f"port {port} is in use")
+        return None
     server = subprocess.Popen(  # nosec B603
-        [PY, "manage.py", "runserver", f"127.0.0.1:{PAGE_PORT}", "--noreload"],
+        [PY, "manage.py", "runserver", f"127.0.0.1:{port}", "--noreload"],
         cwd=ROOT,
         env={**os.environ, **env},
-        stdout=open(LOGS / "page-server.log", "w"),  # noqa: SIM115
+        stdout=open(LOGS / f"{log}-server.log", "w"),  # noqa: SIM115
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    for _ in range(60):
+        if not _port_free(port):
+            break
+        time.sleep(0.5)
+    return env, server
+
+
+def stage_page(st: Stage) -> None:
+    if shutil.which("node") is None:
+        st.add("browser available", "skip", "node not installed")
+        return
+    site = _demo_site(
+        st,
+        db=os.environ.get("REGRESSION_PAGES_DB", "hoa_reg_pages"),
+        port=PAGE_PORT,
+        log="page",
+        sessions=["sessions", str(OUT / "page-sessions.json")],
+    )
+    if site is None:
+        return
+    env, server = site
     try:
-        for _ in range(60):
-            if not _port_free(PAGE_PORT):
-                break
-            time.sleep(0.5)
-        code, text = run(
+        _code, text = run(
             [
                 "node",
                 str(HERE / "pages.js"),
@@ -414,7 +453,7 @@ def stage_page(st: Stage) -> None:
             )
         # Passkey sign-in end to end (WebAuthn needs a host name, not an IP).
         totp_cmd = f"{PY} {HERE / 'page_setup.py'} totp"
-        code, text = run(
+        _code, text = run(
             [
                 "node",
                 str(HERE / "passkey.js"),
@@ -441,6 +480,57 @@ def stage_page(st: Stage) -> None:
                 "fail",
                 tail(text),
                 "regression/out/logs/page-passkey.log",
+            )
+    finally:
+        os.killpg(server.pid, signal.SIGTERM)
+
+
+# --- walkthrough -------------------------------------------------------------------------
+
+
+def stage_walkthrough(st: Stage) -> None:
+    """Every role, every menu and hub page, desktop and phone: inventory + UX checks."""
+    if shutil.which("node") is None:
+        st.add("browser available", "skip", "node not installed")
+        return
+    shots = OUT / "walkthrough"
+    shutil.rmtree(shots, ignore_errors=True)
+    for name in ("walkthrough.json", "walkthrough-crawl.json"):
+        (OUT / name).unlink(missing_ok=True)
+    site = _demo_site(
+        st,
+        db=os.environ.get("REGRESSION_WALK_DB", "hoa_reg_walk"),
+        port=WALK_PORT,
+        log="walk",
+        sessions=["walk-sessions", str(OUT / "walk-sessions.json")],
+    )
+    if site is None:
+        return
+    _env, server = site
+    try:
+        _code, text = run(
+            [
+                "node",
+                str(HERE / "walkthrough.js"),
+                f"http://127.0.0.1:{WALK_PORT}",
+                str(OUT / "walk-sessions.json"),
+                str(OUT / "walkthrough.json"),
+                str(shots),
+                str(OUT / "walkthrough-crawl.json"),
+            ],
+            log="walk-crawl.log",
+            timeout=5400,
+        )
+        crawl = OUT / "walkthrough-crawl.json"
+        if not crawl.exists():
+            st.add("walkthrough ran", "fail", tail(text), "regression/out/logs/walk-crawl.log")
+            return
+        for item in json.loads(crawl.read_text(encoding="utf-8")):
+            st.add(
+                item["check"],
+                item["status"],
+                item.get("detail", ""),
+                item.get("evidence") or "regression/out/logs/walk-crawl.log",
             )
     finally:
         os.killpg(server.pid, signal.SIGTERM)
@@ -548,16 +638,34 @@ STAGES = {
     "page": stage_page,
     "live": stage_live,
     "manual": stage_manual,
+    "walkthrough": stage_walkthrough,
 }
 
 
-def main() -> int:
+def chosen_stages(argv: list[str] | None = None) -> list[str]:
+    """The stages a command line asks for, in ORDER.
+
+    The default is the regression stages: no live (needs LIVE_HOST) and no
+    walkthrough (`--stage walkthrough` alone, or `--with-walkthrough` to add it).
+    """
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--stage", action="append", choices=ORDER)
-    args = parser.parse_args()
-    chosen = args.stage or [s for s in ORDER if s != "live"]
+    parser.add_argument(
+        "--with-walkthrough",
+        action="store_true",
+        help="also run the walkthrough stage, in a lane of its own beside the others",
+    )
+    args = parser.parse_args(argv)
+    chosen = set(args.stage or DEFAULT_STAGES)
+    if args.with_walkthrough:
+        chosen.add("walkthrough")
+    return [s for s in ORDER if s in chosen]
+
+
+def main() -> int:
+    chosen = chosen_stages()
     OUT.mkdir(exist_ok=True)
     LOGS.mkdir(exist_ok=True)
     started = time.time()
@@ -572,10 +680,10 @@ def main() -> int:
         counts = {}
         for r in data["results"]:
             counts[r["status"]] = counts.get(r["status"], 0) + 1
-        print(f"{name:7} {counts}", flush=True)
+        print(f"{name:11} {counts}", flush=True)
         return data
 
-    lanes = [[s] for s in ("ci", "unit", "page") if s in chosen]
+    lanes = [[s] for s in PARALLEL if s in chosen]
     with concurrent.futures.ThreadPoolExecutor(max(1, len(lanes))) as pool:
         results = list(pool.map(lambda lane: [go(s) for s in lane], lanes))
     for name in ("live", "manual"):
