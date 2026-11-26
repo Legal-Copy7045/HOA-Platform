@@ -23,6 +23,7 @@ import datetime
 from dataclasses import dataclass, field
 
 from django.core.exceptions import PermissionDenied
+from django.utils import timezone
 
 OWNER = "owner"
 BOARD = "board"
@@ -239,7 +240,7 @@ def _preview_roles(preview, on) -> Roles:
             .active(on)
             .values_list("start_date", flat=True)
         )
-    since = min(starts) if starts else (on or datetime.date.today())
+    since = min(starts) if starts else (on or timezone.localdate())
     return Roles(
         frozenset({OWNER}),
         frozenset({preview.lot_id}),
@@ -272,7 +273,7 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
     if on is not None:
         return _compute_roles(user, on)
     cached = getattr(user, "_roles_cache", None)
-    generation = (_ROLES_GENERATION[0], datetime.date.today())
+    generation = (_ROLES_GENERATION[0], timezone.localdate())
     if cached is not None and cached[0] == generation:
         return cached[1]
     roles = _compute_roles(user, None)
@@ -373,7 +374,7 @@ def _former_ownerships(person, current_lots, on) -> dict:
     """Ended ownerships of lots this person no longer sees: read-only history."""
     from community.models import Ownership
 
-    on = on or datetime.date.today()
+    on = on or timezone.localdate()
     periods, accounts = set(), set()
     for lot_id, start, end, account_id in Ownership.objects.filter(
         person=person, end_date__isnull=False, end_date__lte=on

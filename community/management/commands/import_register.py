@@ -36,6 +36,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.core.validators import validate_email
 from django.db import transaction
+from django.utils import timezone
 
 from audit.models import Channel
 from audit.services import record_event
@@ -139,7 +140,7 @@ class Command(BaseCommand):
             except ValueError:
                 problems.append(f"{where}: owner_since must be YYYY-MM-DD")
                 continue
-            if since > datetime.date.today():
+            if since > timezone.localdate():
                 problems.append(f"{where}: owner_since is in the future")
             if kind and kind not in OwnershipType.values:
                 problems.append(f"{where}: ownership_type must be one of {OwnershipType.values}")

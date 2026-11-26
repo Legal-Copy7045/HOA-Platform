@@ -542,7 +542,7 @@ def letter_due_on(case: CollectionCase) -> datetime.date | None:
         CollectionLetter.objects.unscoped("case letters").filter(case=case).order_by("-id").first()
     )
     if last is None:
-        return case.opened_at.date()
+        return timezone.localdate(case.opened_at)
     days = int(rule("collections.notice_days") or 10)
     return last.generated_on + datetime.timedelta(days=days)
 

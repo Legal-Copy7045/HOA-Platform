@@ -65,7 +65,7 @@ def notice_shortfall_days(meeting: Meeting, sent_at=None) -> int | None:
     if required is None or meeting.kind == MeetingKind.EXECUTIVE:
         return None
     sent_at = sent_at or timezone.now()
-    given = (meeting.starts_at.date() - timezone.localtime(sent_at).date()).days
+    given = (timezone.localdate(meeting.starts_at) - timezone.localdate(sent_at)).days
     return max(0, required - given) or None
 
 

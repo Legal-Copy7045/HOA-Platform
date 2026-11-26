@@ -182,7 +182,7 @@ def work_orders(request):
                     w.get_priority_display(),
                     w.state,
                     w.due_on or "",
-                    w.created_at.date(),
+                    timezone.localdate(w.created_at),
                 ]
                 for w in rows
             ),

@@ -52,3 +52,6 @@
 - feature: "D25 updates from System status: Check now and Install update only record an audited request (sysadmin); the VM agent passes values as psql variables; agent-not-running shown"
   since: M4
   match: ["^unit:core/tests/test_monitoring.py::test_(update_controls|agent_script|send_me_a_test)"]
+- feature: "Dates are Eastern local dates (America/New_York): no UTC .date() or server date.today() in product code"
+  since: M4
+  match: ["^unit:core/tests/test_local_dates"]

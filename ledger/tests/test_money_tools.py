@@ -241,13 +241,13 @@ def test_letter_sequence_first_second_final_then_board_decides(w):
     kinds = []
     clock = [TODAY]
     for _ in range(3):
-        with mock.patch("ledger.accounting.timezone.localdate", lambda: clock[0]):
+        with mock.patch("ledger.accounting.timezone.localdate", lambda *a: clock[0]):
             data, kind = acc.generate_case_letter(case, actor=w["manager"])
         assert data.startswith(b"%PDF")
         kinds.append(kind)
         case.refresh_from_db()
         with (
-            mock.patch("ledger.accounting.timezone.localdate", lambda: clock[0]),
+            mock.patch("ledger.accounting.timezone.localdate", lambda *a: clock[0]),
             pytest.raises(acc.AccountingError),  # the notice period runs first
         ):
             acc.generate_case_letter(case, actor=w["manager"])

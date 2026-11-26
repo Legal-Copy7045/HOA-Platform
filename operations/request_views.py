@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from comms import threads
@@ -101,7 +102,7 @@ def requests_list(request):
                     r.lot.number,
                     r.assignee.display_name if r.assignee else "",
                     r.respond_by or "",
-                    r.first_response_at.date() if r.first_response_at else "",
+                    timezone.localdate(r.first_response_at) if r.first_response_at else "",
                     r.get_state_display(),
                 ]
                 for r in qs
