@@ -80,6 +80,20 @@ class Event(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
     created_at = models.DateTimeField(default=timezone.now)
+    # RSVPs and volunteer sign-ups (comms/rsvp.py). Off until the board or
+    # manager turns them on for this event.
+    rsvp_enabled = models.BooleanField(default=False)
+    rsvp_cap = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Most people (guests included) who can say Going."
+    )
+    rsvp_max_guests = models.PositiveSmallIntegerField(
+        default=0, help_text="Guests each person may bring (0: no guests)."
+    )
+    rsvp_deadline = models.DateTimeField(
+        null=True, blank=True, help_text="Answers and sign-ups close; empty: when it starts."
+    )
+    rsvp_remind = models.BooleanField(default=False)
+    rsvp_reminded_at = models.DateTimeField(null=True, blank=True)
 
     objects = AudienceQuerySet.as_manager()
 
@@ -103,6 +117,11 @@ class Event(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Events are cancelled, not deleted.")
+
+    @property
+    def answers_close_at(self):
+        """When RSVPs and volunteer sign-ups close."""
+        return self.rsvp_deadline or self.starts_at
 
 
 # --- Message threads (Milestone 3) ----------------------------------------------------
@@ -259,3 +278,96 @@ class UrgentNotice(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Urgent notices are kept as a record.")
+
+
+# --- Event RSVPs and volunteer sign-ups -------------------------------------------------
+
+from simple_history.models import HistoricalRecords  # noqa: E402
+
+from core.scoping import ScopedModel  # noqa: E402
+
+
+class RsvpAnswer(models.TextChoices):
+    GOING = "going", "Going"
+    MAYBE = "maybe", "Maybe"
+    NOT_GOING = "not_going", "Not going"
+
+
+class EventRsvp(ScopedModel):
+    """One person's answer to one event. Not a legal record: changed in place
+    (with history) until the event's answers close. Change only through
+    comms.rsvp. Other owners see counts only; the board sees names."""
+
+    event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name="+")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    answer = models.CharField(max_length=10, choices=RsvpAnswer.choices)
+    guests = models.PositiveSmallIntegerField(default=0)
+    updated_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "person"
+
+    class Meta:
+        ordering = ["event", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["event", "person"], name="event_rsvp_once"),
+            models.CheckConstraint(
+                condition=models.Q(answer="going") | models.Q(guests=0),
+                name="event_rsvp_guests_only_when_going",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"rsvp #{self.pk}"
+
+
+class VolunteerSlot(models.Model):
+    """Something people can sign up to do at an event ("Bring a dessert").
+    Removed slots stay as a record, hidden from the event page."""
+
+    event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name="volunteer_slots")
+    title = models.CharField(max_length=200)
+    capacity = models.PositiveSmallIntegerField()
+    removed = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["event", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(capacity__gte=1), name="volunteer_slot_capacity_positive"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Volunteer slots are removed, not deleted.")
+
+
+class VolunteerSignup(ScopedModel):
+    """One person signed up for one slot. Leaving deletes the row (history
+    keeps it). Change only through comms.rsvp, which locks the slot so it is
+    never overfilled."""
+
+    slot = models.ForeignKey(VolunteerSlot, on_delete=models.PROTECT, related_name="+")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "person"
+
+    class Meta:
+        ordering = ["slot", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["slot", "person"], name="volunteer_signup_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"signup #{self.pk}"
