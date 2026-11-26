@@ -6,6 +6,19 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.14.0 — 2026-11-26
+
+- The health alert email now says what the server errors were, in plain
+  words: for each of the five most common kinds in the last hour, which page
+  or background job failed, why, whether people saw an error page and what
+  to do, with a "Technical:" line underneath for the portal's maintainer
+  (error type, where in the code, route, release, times in site time), and
+  "and N more kinds" when there were more. System status has a new "Recent
+  server errors" card with every kind from the last 24 hours. The health
+  probe's and the "email unavailable" page's deliberate 503s are named as
+  such. No web addresses, messages, names or IP addresses are recorded;
+  counts and error kinds are kept 30 days (D45).
+
 ## 0.12.0 — 2026-11-26
 
 - The account statement is easier to read: a box at the top says the amount

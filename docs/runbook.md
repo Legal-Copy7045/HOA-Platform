@@ -383,6 +383,35 @@ sudo bash /opt/hoa-portal/infra/poc/health-timer.sh
 The same checks are on Admin > System status; to run them now and email any
 change, use Admin → Server tasks → Run the health checks.
 
+### Server errors: reading the list (D45)
+
+When the Server errors check fails, the email lists the five most common kinds
+of error in the last hour, and System status → Recent server errors lists every
+kind from the last 24 hours, newest first. Each kind reads in plain words
+first: which page or background job failed, why (a bug in the portal's code,
+the database or another service not answering, email sending down, the portal
+reporting itself unavailable), whether people saw an error page, and what to
+do. Underneath, "Technical:" carries what the maintainer needs: the error
+type (for example `KeyError`), where in the portal's code it happened
+(`ledger/views.py:233 in lot_ledger`), the method and route name, the status,
+the release that was running and the first and last time it happened (site
+time). Two deliberate 503s are named as such: "Health probe: database
+unavailable" (the container's `/healthz` check could not reach the database)
+and "Email sending unavailable page" (someone saw the "We couldn't send the
+email" page). Nothing in the list carries a web address, a message, a name or
+an IP address.
+
+For the full call stack of the same error, look in the web container's log:
+
+```bash
+cd /opt/hoa-portal && sudo docker compose logs web --since 2h | grep '"exc_type"'
+```
+
+Each JSON line carries `exc_type` and `exc_frames` (file:line in function for
+every frame) and the `view` name; match it to the list by error type, route
+and time. Fix the cause, ship the fix, then "Clear" the Server errors check.
+Counts and signatures are removed after 30 days.
+
 ## Host security
 
 Run once on the VM:
