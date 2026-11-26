@@ -5,6 +5,7 @@ from governance import election_views as ev
 from governance import packet_views as pv
 from governance import survey_views as sv
 from governance import views
+from governance import voting_views as vv
 
 urlpatterns = [
     path("committees/", cv.committee_list, name="committees"),
@@ -25,7 +26,7 @@ urlpatterns = [
         cv.committee_member_end,
         name="committee_member_end",
     ),
-    path("elections/", ev.election_list, name="elections"),
+    path("elections/", vv.elections, name="elections"),
     path("elections/<int:pk>/", ev.election_detail, name="election_detail"),
     re_path(
         r"^elections/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
@@ -57,8 +58,8 @@ urlpatterns = [
         views.records_request_action,
         name="records_request_action",
     ),
-    path("voting/", views.voting, name="voting"),
-    path("surveys/", sv.survey_list, name="surveys"),
+    path("voting/", vv.voting, name="voting"),
+    path("surveys/", vv.surveys_list, name="surveys"),
     path("surveys/<int:pk>/", sv.survey_detail, name="survey_detail"),
     path("surveys/<int:pk>/results/", sv.survey_results, name="survey_results"),
     path("surveys/<int:pk>/export/", sv.survey_export, name="survey_export"),
@@ -72,7 +73,7 @@ urlpatterns = [
         sv.survey_question_action,
         name="survey_question_action",
     ),
-    path("votes/", views.votes, name="votes"),
+    path("votes/", vv.votes, name="votes"),
     path("ballot/<str:token>/", views.ballot_link, name="ballot_link"),
     path("votes/<int:pk>/", views.vote_detail, name="vote_detail"),
     re_path(

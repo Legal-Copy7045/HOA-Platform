@@ -84,12 +84,20 @@ def calendar(request):
         "comms/calendar.html",
         {
             "events": services.upcoming(request.user)[:200],
+            "meeting_events": _meeting_events(),
             "going": _going(request.user),
             "bookings": _bookings(request),
             "form": form,
             "can_manage": policy.can(request.user, "calendar.manage"),
         },
     )
+
+
+def _meeting_events() -> set[int]:
+    """Events a meeting made: they are cancelled from the meeting page."""
+    from governance.services import meeting_event_ids
+
+    return meeting_event_ids()
 
 
 def _going(user) -> set[int]:
@@ -116,6 +124,9 @@ def _bookings(request) -> list[dict]:
 def event_cancel(request, pk):
     policy.require(request.user, "calendar.manage")
     event = get_object_or_404(Event.objects.for_user(request.user), pk=pk)
+    if event.pk in _meeting_events():
+        messages.error(request, "This is a meeting: cancel it from the meeting page.")
+        return redirect("calendar")
     try:
         services.cancel_event(event, actor=request.user, request=request)
     except services.CommsError as exc:

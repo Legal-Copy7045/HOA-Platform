@@ -3,14 +3,11 @@ results and the CSV export. The rules live in governance.surveys."""
 
 from __future__ import annotations
 
-import datetime
-
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core import policy
@@ -163,40 +160,6 @@ def _visible(request, pk) -> Survey:
     if not surveys.can_view(survey, request.user):
         raise Http404  # drafts and other audiences' surveys are invisible
     return survey
-
-
-@login_required
-def survey_list(request):
-    policy.require(request.user, "survey.view")
-    can_manage = surveys.can_manage(request.user)
-    form = SurveyForm(request.POST or None)
-    if request.method == "POST":
-        policy.require(request.user, "survey.manage")
-        if form.is_valid():
-            try:
-                survey = surveys.create_survey(
-                    actor=request.user, request=request, **form.cleaned_data
-                )
-            except surveys.SurveyError as exc:
-                form.add_error(None, str(exc))
-            else:
-                messages.success(request, "Survey created as a draft. Now add its questions.")
-                return redirect("survey_detail", pk=survey.pk)
-    elif can_manage:
-        today = timezone.localdate()
-        form = SurveyForm(
-            initial={"opens_on": today, "closes_on": today + datetime.timedelta(days=14)}
-        )
-    rows = [
-        {"survey": s, "responded": surveys.has_responded(s, request.user)}
-        for s in surveys.visible_surveys(request.user)
-    ]
-    rows.sort(key=lambda r: {"open": 0, "scheduled": 1, "draft": 2}.get(r["survey"].phase, 3))
-    return render(
-        request,
-        "governance/surveys.html",
-        {"rows": rows, "form": form, "can_manage": can_manage},
-    )
 
 
 def _render_detail(

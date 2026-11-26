@@ -3,42 +3,48 @@
 {% block title %}Voting · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "governance/gov_nav.html" %}
-  <div class="page-head"><div><h1>Voting</h1><p class="subtitle">Votes, polls, board elections and surveys. Open ones are listed first.</p></div></div>
-  {% if show_votes %}
+  <div class="page-head"><div><h1>Voting</h1><p class="subtitle">{% if shown.votes %}Formal votes of the owners (binding){% endif %}{% if shown.votes and shown.elections %}, {% endif %}{% if shown.elections %}board elections{% endif %}{% if shown.surveys %}{% if shown.votes or shown.elections %} and {% endif %}surveys (to hear your views, nothing is decided by them){% endif %}.</p></div>
+    {% if new.vote or new.election or new.survey %}<div class="actions">
+      {% if new.vote %}<a class="btn secondary" href="?new=vote#new-vote">{% icon "plus" %} New vote</a>{% endif %}
+      {% if new.election %}<a class="btn secondary" href="?new=election#new-election">{% icon "plus" %} New election</a>{% endif %}
+      {% if new.survey %}<a class="btn secondary" href="?new=survey#new-survey">{% icon "plus" %} New survey</a>{% endif %}
+    </div>{% endif %}
+  </div>
+
+  {% if proxy_meetings %}<section class="card" aria-labelledby="proxy-head"><h2 id="proxy-head">Give a proxy</h2>
+    <p class="small muted">Can't attend a coming owners' meeting? A proxy lets someone you trust vote for your lot there.</p>
+    <ul class="list">{% for p in proxy_meetings %}<li>
+      <div class="date-chip"><span>{{ p.meeting.starts_at|date:"M" }}</span><strong>{{ p.meeting.starts_at|date:"j" }}</strong></div>
+      <div class="grow"><a class="title" href="{% url 'meeting_detail' p.meeting.pk %}">{{ p.meeting.title }}</a><div class="small muted">{{ p.meeting.starts_at|date:"D M j, Y g:i A" }}{% if p.given %} · You gave a proxy{% endif %}</div></div>
+      <a class="btn secondary small" href="{% url 'meeting_detail' p.meeting.pk %}#proxy">{% if p.given %}Change proxy{% else %}Give a proxy{% endif %}</a>
+    </li>{% endfor %}</ul></section>{% endif %}
+
+  <nav class="filters" aria-label="Open or past">
+    <a href="?{% if kind %}type={{ kind }}{% endif %}"{% if not past %} aria-current="true"{% endif %}>Open{% if open_count %} <span class="badge">{{ open_count }}</span>{% endif %}</a>
+    <a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}"{% if past %} aria-current="true"{% endif %}>Past</a>
+  </nav>
+  {% if type_links|length > 1 %}<nav class="filters" aria-label="Type">
+    <a href="?{% if past %}status=past{% endif %}"{% if not kind %} aria-current="true"{% endif %}>All</a>
+    {% for key, label in type_links %}<a href="?type={{ key }}{% if past %}&amp;status=past{% endif %}"{% if kind == key %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+  </nav>{% endif %}
+
   <section class="card">
-    <div class="card-head"><h2>Votes and polls</h2><a class="small" href="{% url 'votes' %}">All votes and polls</a></div>
-    {% if vote_rows %}<ul class="list">{% for row in vote_rows %}{% with v=row.vote %}
-      <li><div class="todo-icon">{% icon "vote" %}</div>
-        <div class="grow"><a class="title" href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a>
-          <div class="small muted">{{ v.get_kind_display }}{% if v.closes_at %} · closes {{ v.closes_at|short_date }}{% endif %}{% if row.voted %} · {% if v.secret %}Your ballot was recorded{% else %}You voted on {{ row.voted.0.cast_at|date:"M j, Y" }}{% endif %}{% endif %}</div></div>
-        {% status v.status v.get_status_display %}</li>
-    {% endwith %}{% endfor %}</ul>
-    {% else %}{% include "partials/empty.html" with icon="vote" title="No votes yet" %}{% endif %}
+    {% if rows %}<ul class="list">{% for r in rows %}
+      <li><div class="todo-icon">{% icon r.icon %}</div>
+        <div class="grow"><a class="title" href="{{ r.url }}">{{ r.title }}</a><div class="small muted">{{ r.meta }}</div></div>
+        {% status r.state r.label %}</li>
+    {% endfor %}</ul>
+    {% elif past %}{% include "partials/empty.html" with icon="vote" title="Nothing past yet" %}
+    {% else %}{% include "partials/empty.html" with icon="vote" title="Nothing open right now" %}<p class="small"><a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}">See past ones</a></p>{% endif %}
   </section>
-  {% endif %}
-  {% if show_elections %}
-  <section class="card">
-    <div class="card-head"><h2>Board elections</h2><a class="small" href="{% url 'elections' %}">All elections</a></div>
-    {% if election_rows %}<ul class="list">{% for row in election_rows %}{% with e=row.election %}
-      <li><div class="todo-icon">{% icon "users" %}</div>
-        <div class="grow"><a class="title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a>
-          <div class="small muted">{{ e.seats }} seat{{ e.seats|pluralize }}{% if row.can_vote %} · Your ballot is open{% elif row.voted %} · Your ballot was recorded{% endif %}</div></div>
-        {% status e.state e.get_state_display %}</li>
-    {% endwith %}{% endfor %}</ul>
-    {% else %}{% include "partials/empty.html" with icon="users" title="No elections yet" %}{% endif %}
-  </section>
-  {% endif %}
-  {% if show_surveys %}
-  <section class="card">
-    <div class="card-head"><h2>Surveys</h2><a class="small" href="{% url 'surveys' %}">All surveys</a></div>
-    {% if survey_rows %}<ul class="list">{% for row in survey_rows %}{% with s=row.survey %}
-      <li><div class="todo-icon">{% icon "list" %}</div>
-        <div class="grow"><a class="title" href="{% url 'survey_detail' s.pk %}">{{ s.title }}</a>
-          <div class="small muted">Closes {{ s.closes_on|short_date }}{% if row.responded %} · You answered{% elif s.phase == "open" %} · Waiting for your answer{% endif %}</div></div>
-        {% status s.phase s.phase_label %}</li>
-    {% endwith %}{% endfor %}</ul>
-    {% else %}<p class="muted">No open surveys. <a href="{% url 'surveys' %}">Past surveys</a></p>{% endif %}
-  </section>
-  {% endif %}
-  {% if user|can:"vote.cast" %}<p class="small muted">Can't attend a meeting where owners vote? Open the meeting from <a href="{% url 'meetings' %}">Meetings</a> and give a proxy.</p>{% endif %}
+
+  {% if vote_form %}<details class="panel"{% if open_panel == "vote" %} open{% endif %} id="new-vote"><summary>New vote</summary><div class="panel-body">
+    <div class="alert info">{% icon "vote" %}<span>A vote here is a formal, binding vote of the owners, one ballot per lot, using the quorum and pass rules from Community settings (each with its citation). To ask owners' opinions, make a survey instead: one question is fine.</span></div>
+    <form method="post" action="{% url 'votes' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=vote_form %}{{ vote_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
+  {% if election_form %}<details class="panel"{% if open_panel == "election" %} open{% endif %} id="new-election"><summary>New election</summary><div class="panel-body">
+    <p class="small muted">Owners nominate owners; one ballot per lot, cast online or by proxy. Ballots are kept apart from who voted.</p>
+    <form method="post" action="{% url 'elections' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=election_form %}{{ election_form }}<div class="form-actions"><button type="submit">Open nominations</button></div></form></div></details>{% endif %}
+  {% if survey_form %}<details class="panel"{% if open_panel == "survey" %} open{% endif %} id="new-survey"><summary>New survey</summary><div class="panel-body">
+    <div class="alert info">{% icon "info" %}<span>A survey starts as a draft: add and order its questions, then open it. Once open, nothing about it can change. For a quick poll, give it one question.</span></div>
+    <form method="post" action="{% url 'surveys' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=survey_form %}{{ survey_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
 {% endblock %}

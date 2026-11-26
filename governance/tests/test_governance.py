@@ -13,6 +13,7 @@ from core.policy import SYSTEM
 from core.workflow import WorkflowError
 from governance import services
 from governance.models import Ballot, Meeting, Vote, VoteKind
+from governance.tests.helpers import legacy_poll
 
 pytestmark = pytest.mark.django_db
 
@@ -140,9 +141,12 @@ def test_only_the_requester_withdraws(board):
 
 
 def _vote(board, kind=VoteKind.INFORMAL, **kw):
-    vote = services.create_vote(
-        title="Pond fountain?", kind=kind, options=["Yes", "No"], actor=board, **kw
-    )
+    if kind == VoteKind.INFORMAL:
+        vote = legacy_poll(board, **kw)
+    else:
+        vote = services.create_vote(
+            title="Pond fountain?", kind=kind, options=["Yes", "No"], actor=board, **kw
+        )
     return vote, list(vote.options.all())
 
 

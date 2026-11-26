@@ -74,8 +74,8 @@ FEATURES: list[Feature] = [
     ),
     _f(
         "votes",
-        "Votes and polls",
-        "Informal polls and formal votes of the owners.",
+        "Votes",
+        "Formal (binding) votes of the owners. Polls are surveys.",
         {"votes", "vote_detail", "vote_action"},
     ),
     _f(
@@ -101,7 +101,7 @@ FEATURES: list[Feature] = [
     _f(
         "consents",
         "Written consents",
-        "Board resolutions adopted by unanimous written consent.",
+        "Board resolutions adopted by unanimous written consent (on Resolutions and policies).",
         {"consents", "consent_detail"},
     ),
     _f(

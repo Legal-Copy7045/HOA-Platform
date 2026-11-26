@@ -181,3 +181,7 @@
   check: "On a phone: the owner dashboard balance to-do shows \"Pay $X\" beside it without overlapping; it opens the ways to pay with the total for every open charge and \"Pay only some charges\" works; on a lot account (board) the \"Open collection case\" button fits and leads to the case, whose Letters panel prints the next notice."
   steps: "Online payments on (test mode); sign in as a demo owner with a balance on a phone; tap Pay $X; tap Pay only some charges; sign in as board; Finance > Owner accounts > a lot with a balance; Open collection case."
   last: ""
+- key: voting page at phone width
+  check: "The Voting page's Open/Past and type filters, the New vote/election/survey panels and Give a proxy read well at phone width, and an existing POC's old annual-meeting calendar entry (seeded before meetings made their own) is not shown twice."
+  steps: "On a phone, open Voting as an owner and as a board member; open each New panel; open Calendar and check the annual meeting appears once (cancel the old hand-made entry if there are two)."
+  last: ""
