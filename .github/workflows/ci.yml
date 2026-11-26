@@ -130,6 +130,9 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: oak-creek-portal:ci
+          # Explicit Trivy version (never "latest"): trivy v0.69.4-0.69.6 were
+          # malicious in the March 2026 supply-chain incident (GHSA-69fq-xp46-6x23).
+          version: v0.70.0
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
