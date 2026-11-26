@@ -14,4 +14,9 @@ urlpatterns = [
         views.payment_alert_resolve,
         name="payment_alert_resolve",
     ),
+    # Automatic payments (D46)
+    path("my-account/<int:lot_id>/autopay/", views.autopay, name="autopay"),
+    path("my-account/<int:lot_id>/autopay/start/", views.autopay_start, name="autopay_start"),
+    path("my-account/<int:lot_id>/autopay/cancel/", views.autopay_cancel, name="autopay_cancel"),
+    path("my-account/autopay/<int:pk>/return/", views.autopay_return, name="autopay_return"),
 ]

@@ -156,6 +156,8 @@ class AlertKind(models.TextChoices):
     SURCHARGE_REFUND = "surcharge", "Refund a surcharge"
     RECONCILIATION = "reconcile", "Stripe records do not match"
     FORMER_OWNER = "former", "Payment from a former owner"
+    # Autopay held back: the amount was over the ceiling (payments.autopay).
+    AUTOPAY = "autopay", "Automatic payment held back"
 
 
 class PaymentAlert(ScopedModel):
@@ -265,3 +267,167 @@ class StripeReconciliation(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"Stripe reconciliation {self.ran_at:%Y-%m-%d}"
+
+
+# --- Automatic payments (payments.autopay) ---------------------------------------------------
+
+
+class AutopayType(models.TextChoices):
+    """The kind of payment method Stripe saved (Stripe's own type names)."""
+
+    CARD = "card", "Card"
+    BANK = "us_bank_account", "Bank account"
+
+
+class StripeCustomer(ScopedAppendOnlyModel):
+    """The Stripe Customer of one ownership account (created on first use, one
+    per account and mode). Stripe holds only internal ids as its metadata:
+    no name, email or address is sent."""
+
+    scope_lot_path = "account__lot"
+
+    account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
+    customer_id = models.CharField(max_length=255, unique=True)
+    livemode = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["account", "livemode"], name="stripe_customer_one_per_account"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.customer_id
+
+
+class SetupState(models.TextChoices):
+    OPEN = "open", "Waiting for the payer on Stripe's page"
+    WAITING = "waiting", "Waiting for the bank account to be verified"
+    DONE = "done", "Set up"
+    FAILED = "failed", "Not set up"
+    EXPIRED = "expired", "Expired"
+    MISMATCH = "mismatch", "Not set up: did not match"
+
+
+class AutopaySetup(ScopedModel):
+    """A payment-method set-up started by a signed-in payer, created before the
+    redirect to Stripe's hosted page (Checkout in setup mode). Like
+    PendingCheckout, everything Stripe later reports is compared with this
+    row, and it is consumed once."""
+
+    scope_lot_path = "lot"
+    objects = ScopedQuerySet.as_manager()
+
+    nonce = models.CharField(max_length=64, unique=True)
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    method_type = models.CharField(max_length=20, choices=AutopayType.choices)
+    customer_id = models.CharField(max_length=255)
+    livemode = models.BooleanField(default=False)
+    session_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    setup_intent_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    state = models.CharField(max_length=10, choices=SetupState.choices, default=SetupState.OPEN)
+    state_changed_at = models.DateTimeField(default=timezone.now)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Automatic payment set-up #{self.pk}"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Set-ups are kept.")
+
+    @property
+    def client_reference(self) -> str:
+        return f"as{self.pk}"
+
+
+class AutopayAttempt(ScopedAppendOnlyModel):
+    """One automatic charge of one month's assessment (try 1 on the due day,
+    try 2 the one retry). Bound to a PendingCheckout so the existing
+    verification and recording path records the payment once Stripe says it
+    succeeded; the unique (account, period, try) and the idempotency key
+    make re-runs harmless."""
+
+    scope_lot_path = "lot"
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
+    charge = models.ForeignKey("ledger.LedgerEntry", on_delete=models.PROTECT, related_name="+")
+    period = models.CharField(max_length=7)
+    try_number = models.PositiveSmallIntegerField(default=1)
+    checkout = models.OneToOneField(
+        PendingCheckout, on_delete=models.PROTECT, related_name="autopay_attempt"
+    )
+    payment_method_id = models.CharField(max_length=255)
+    idempotency_key = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["account", "period", "try_number"], name="autopay_attempt_once"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Automatic payment {self.period} try {self.try_number}"
+
+
+class AutopayEventKind(models.TextChoices):
+    ENROLLED = "enrolled", "Set up"
+    REPLACED = "replaced", "Payment method replaced"
+    CANCELLED = "cancelled", "Cancelled"
+    FAILED = "failed", "Payment failed"
+    PAUSED = "paused", "Paused"
+
+
+class AutopayEvent(ScopedAppendOnlyModel):
+    """What happened to an account's automatic payments, append-only. The
+    current state (on, paused, off) is derived from these rows."""
+
+    scope_lot_path = "lot"
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(max_length=10, choices=AutopayEventKind.choices)
+    setup = models.ForeignKey(
+        AutopaySetup, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    attempt = models.ForeignKey(
+        AutopayAttempt, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    person = models.ForeignKey(
+        "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    # Stripe ids and the display details Stripe returns (brand or bank name
+    # and the last four digits): never a card or account number.
+    customer_id = models.CharField(max_length=255, blank=True)
+    payment_method_id = models.CharField(max_length=255, blank=True)
+    method_type = models.CharField(max_length=20, choices=AutopayType.choices, blank=True)
+    funding = models.CharField(max_length=16, blank=True)  # credit/debit/prepaid/unknown
+    brand = models.CharField(max_length=40, blank=True)
+    bank_name = models.CharField(max_length=80, blank=True)
+    last4 = models.CharField(max_length=4, blank=True)
+    mandate_id = models.CharField(max_length=255, blank=True)
+    # Why: a Stripe decline or error code, or "owner", "ownership_ended"...
+    code = models.CharField(max_length=60, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self) -> str:
+        return f"Automatic payments {self.kind}"

@@ -20,7 +20,7 @@ import re
 
 from django.utils import timezone
 
-from community.models import Account, CommunityProfile, ContactProfile, Lot, Ownership
+from community.models import Account, CommunityProfile, Lot, Ownership
 from community.rules import rule
 from community.terms import term_text
 from core import pdf
@@ -127,11 +127,15 @@ def _recipients(lot: Lot):
             .order_by("start_date", "pk")
         )
         people = [o.person for o in owners]
+        # D44: an owner's own postal address (structured, else one typed
+        # before D44), else the home's address.
+        from community.services import postal_address
+
         mailing = ""
         for p in people:
-            profile = ContactProfile.objects.filter(person=p).first()
-            if profile and profile.mailing_address.strip():
-                mailing = profile.mailing_address.strip()
+            address, source = postal_address(p, lot)
+            if source in ("structured", "old"):
+                mailing = address
                 break
         account = Account.objects.filter(lot=lot, closed_on__isnull=True).first()
     names = " & ".join(p.display_name for p in people) or "The Owner"

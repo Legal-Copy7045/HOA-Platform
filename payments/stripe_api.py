@@ -39,10 +39,14 @@ _ID = re.compile(r"^[a-z]{2,8}_[A-Za-z0-9_]{4,250}$")
 
 
 class StripeError(RuntimeError):
-    def __init__(self, status: int, code: str = ""):
+    def __init__(self, status: int, code: str = "", *, decline_code: str = "", object_id: str = ""):
         super().__init__(f"Stripe request failed (HTTP {status}{', ' + code if code else ''})")
         self.status = status
         self.code = code
+        # A declined off-session payment (HTTP 402): the issuer's reason and
+        # the PaymentIntent Stripe created, so the portal can read it back.
+        self.decline_code = decline_code
+        self.object_id = object_id
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -138,11 +142,16 @@ def _result(status: int, body: bytes, what: str) -> dict:
         data = json.loads(body or b"{}")
     if 200 <= status < 300 and isinstance(data, dict):
         return data
-    code = ""
+    code = decline = object_id = ""
     if isinstance(data, dict) and isinstance(data.get("error"), dict):
-        code = str(data["error"].get("code") or data["error"].get("type") or "")[:60]
+        error = data["error"]
+        code = str(error.get("code") or error.get("type") or "")[:60]
+        decline = str(error.get("decline_code") or "")[:60]
+        pi = error.get("payment_intent")
+        pi_id = pi.get("id") if isinstance(pi, dict) else ""
+        object_id = pi_id if isinstance(pi_id, str) and _ID.match(pi_id) else ""
     logger.warning("payments.stripe_error", extra={"what": what, "status": status, "code": code})
-    raise StripeError(status, code)
+    raise StripeError(status, code, decline_code=decline, object_id=object_id)
 
 
 def get(path: str, params: dict | None = None, *, what: str = "get") -> dict:
@@ -174,7 +183,10 @@ def post(path: str, params: dict, *, idempotency_key: str, what: str = "post") -
     raise StripeError(getattr(last, "status", 0), "retries")
 
 
-# --- The calls the portal makes (all reads except creating a Checkout Session) ---------
+# --- The calls the portal makes ------------------------------------------------------------
+# Writes: Checkout Sessions (payment and setup mode), Customers, off-session
+# PaymentIntents (automatic payments) and detaching a PaymentMethod. Never a
+# refund: the restricted key has no refund rights.
 
 
 def create_checkout_session(params: dict, *, idempotency_key: str) -> dict:
@@ -221,3 +233,48 @@ def list_payouts(params: dict) -> dict:
 
 def list_balance_transactions(params: dict) -> dict:
     return get("/v1/balance_transactions", params, what="balance_transactions_list")
+
+
+# --- Automatic payments (payments.autopay) -------------------------------------------------
+
+
+def create_customer(params: dict, *, idempotency_key: str) -> dict:
+    return post("/v1/customers", params, idempotency_key=idempotency_key, what="customer_create")
+
+
+def retrieve_setup_session(session_id: str) -> dict:
+    return get(
+        f"/v1/checkout/sessions/{check_id(session_id)}",
+        {"expand": ["setup_intent.payment_method"]},
+        what="setup_session_get",
+    )
+
+
+def retrieve_setup_intent(seti_id: str) -> dict:
+    return get(
+        f"/v1/setup_intents/{check_id(seti_id)}",
+        {"expand": ["payment_method"]},
+        what="setup_intent_get",
+    )
+
+
+def create_payment_intent(params: dict, *, idempotency_key: str) -> dict:
+    return post(
+        "/v1/payment_intents",
+        params,
+        idempotency_key=idempotency_key,
+        what="payment_intent_create",
+    )
+
+
+def list_payment_intents(params: dict) -> dict:
+    return get("/v1/payment_intents", params, what="payment_intents_list")
+
+
+def detach_payment_method(pm_id: str) -> dict:
+    return post(
+        f"/v1/payment_methods/{check_id(pm_id)}/detach",
+        {},
+        idempotency_key=f"detach-{pm_id}",
+        what="payment_method_detach",
+    )

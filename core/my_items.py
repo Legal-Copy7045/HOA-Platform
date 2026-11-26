@@ -703,6 +703,12 @@ def items_for(user) -> list[Item]:
             )
     if can(user, "ledger.view_own"):
         out.extend(_balance_items(user, roles))
+    out.extend(_contact_items(user, roles))
+    # An automatic payment that didn't go through (D46).
+    if can(user, "payments.pay"):
+        from payments.autopay import payer_items
+
+        out.extend(payer_items(user))
 
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
@@ -745,6 +751,49 @@ def _online_payment_items(user, roles) -> list[Item]:
                 "danger" if a.kind in (AlertKind.MISMATCH, AlertKind.RECONCILIATION) else "warning",
                 timezone.localdate(a.created_at),
                 nav="online_payments",
+            )
+        )
+    return out
+
+
+def _contact_items(user, roles) -> list[Item]:
+    """D44: "Choose how to get official notices" for an owner on the deed who
+    has never answered (skipped the sign-up step, or signed up before it),
+    and "Check your mailing address" for an address typed before the
+    structured fields. Both from the person's own scoped profile."""
+    if not roles.person_id:
+        return []
+    from community.models import ContactProfile
+    from community.services import needs_address_check, notice_choice_due
+
+    out = []
+    profile = ContactProfile.objects.for_user(user).filter(person_id=roles.person_id).first()
+    unanswered = not (profile and profile.consent_changed_at)
+    if roles.owned_lot_ids and unanswered and notice_choice_due(user):
+        out.append(
+            Item(
+                "My home",
+                "Choose how to get official notices",
+                "By email or by post: meeting, budget and other notices the association "
+                "must send you",
+                reverse("notice_choice"),
+                "info",
+                icon="mail",
+            )
+        )
+    if (
+        roles.owned_lot_ids
+        and (profile is None or profile.mail_to_home is None)
+        and needs_address_check(roles.person_id)
+    ):
+        out.append(
+            Item(
+                "My home",
+                "Check your mailing address",
+                "Re-enter it in the new address fields so letters reach you",
+                reverse("my_profile") + "#mailing",
+                "info",
+                icon="mail",
             )
         )
     return out

@@ -395,15 +395,66 @@ def end_account_contact(contact: AccountContact, *, actor, request=None) -> Acco
     return contact
 
 
-def add_contact_method(
-    person: Person, *, kind: str, value: str, label: str = "", notices: bool = False, actor
-) -> ContactMethod:
-    """The person themselves (or the board) adds a second email, phone or
-    mailing address."""
-    if actor is not SYSTEM and not (_person_of(actor) == person.pk or can(actor, "person.manage")):
+def _may_edit_methods(actor, person_id: int) -> None:
+    if actor is not SYSTEM and not (_person_of(actor) == person_id or can(actor, "person.manage")):
         raise PermissionDenied("contact_method")
     _refuse_read_only(actor)
+
+
+def _valid_phone(value: str) -> str:
+    """A phone number: 7 to 15 digits, with only the usual punctuation
+    (+ ( ) . - and spaces); returned as typed, trimmed."""
+    import re
+
+    digits = re.sub(r"\D", "", value)
+    if not 7 <= len(digits) <= 15 or re.search(r"[^0-9+().\- ]", value):
+        raise CommunityError("Enter a phone number, for example 215-555-0123.")
+    return value
+
+
+def _sync_profile_phone(person_id: int) -> None:
+    """ContactProfile.phone mirrors the first number on the Phone list, so
+    the directory and printed forms keep reading one phone (D44)."""
+    from community.models import ContactProfile
+
+    first = (
+        ContactMethod.objects.filter(person_id=person_id, kind=ContactMethodKind.PHONE)
+        .order_by("id")
+        .values_list("value", flat=True)
+        .first()
+    ) or ""
+    profile = ContactProfile.objects.filter(person_id=person_id).first()
+    if profile is None and not first:
+        return
+    if profile is None:
+        profile = ContactProfile(person_id=person_id)
+    if profile.phone != first:
+        profile.phone = first[:40]
+        profile.save()
+
+
+def add_contact_method(
+    person: Person,
+    *,
+    kind: str,
+    value: str,
+    label: str = "",
+    notices: bool = False,
+    phone_type: str = "",
+    actor,
+    request: HttpRequest | None = None,
+) -> ContactMethod:
+    """The person themselves (or the board) adds another email or a phone.
+
+    Mailing addresses are no longer list entries (D44): each person has one
+    postal address, set with ``set_mailing_address``. Adding a phone never
+    turns on text alerts (those need a texted code, comms.sms)."""
+    from community.models import ContactProfile, PhoneType
+
+    _may_edit_methods(actor, person.pk)
     value = (value or "").strip()
+    if kind == ContactMethodKind.ADDRESS:
+        raise CommunityError("Mailing addresses go in the Mailing address for post section.")
     if kind not in ContactMethodKind.values or not value or len(value) > 300:
         raise CommunityError("Choose a kind and enter the details.")
     if kind == ContactMethodKind.EMAIL:
@@ -413,33 +464,361 @@ def add_contact_method(
             validate_email(value)
         except ValidationError as exc:
             raise CommunityError("Enter a valid email address.") from exc
-    with system_access("add contact method"):
+        phone_type = ""
+    else:
+        value = _valid_phone(value)
+        if phone_type not in PhoneType.values and not (actor is SYSTEM and not phone_type):
+            raise CommunityError("Choose Mobile, Home or Work.")
+        notices = False
+    with transaction.atomic(), system_access("add contact method"):
         if ContactMethod.objects.filter(person=person).count() >= 10:
             raise CommunityError("Ten extra contact details is the most.")
+        sign_in = person.user.email.lower() if person.user_id else ""
+        if (
+            ContactMethod.objects.filter(person=person, kind=kind, value__iexact=value).exists()
+            or value.lower() == sign_in
+        ):
+            raise CommunityError("That is already on your list.")
+        if notices:
+            # Extra notice addresses only for people who chose email notices.
+            notices = ContactProfile.objects.filter(
+                person=person, electronic_notice_consent=True
+            ).exists()
         method = ContactMethod.objects.create(
-            person=person, kind=kind, value=value, label=label.strip()[:60], notices=notices
+            person=person,
+            kind=kind,
+            value=value,
+            label=label.strip()[:60],
+            notices=notices,
+            phone_type=phone_type,
         )
+        if kind == ContactMethodKind.PHONE:
+            _sync_profile_phone(person.pk)
     _audit(
-        "contact.method_added", actor=actor, request=None, target=person, metadata={"kind": kind}
+        "contact.method_added", actor=actor, request=request, target=person, metadata={"kind": kind}
     )
     return method
 
 
-def remove_contact_method(method: ContactMethod, *, actor) -> None:
-    if actor is not SYSTEM and not (
-        _person_of(actor) == method.person_id or can(actor, "person.manage")
-    ):
-        raise PermissionDenied("contact_method")
-    _refuse_read_only(actor)
-    with system_access("remove contact method"):
-        ContactMethod.objects.filter(pk=method.pk).delete()
+def set_method_notices(
+    method: ContactMethod, *, notices: bool, actor, request: HttpRequest | None = None
+) -> ContactMethod:
+    """ "Also send official notices here" on one of the person's extra emails."""
+    from community.models import ContactProfile
+
+    _may_edit_methods(actor, method.person_id)
+    if method.kind != ContactMethodKind.EMAIL:
+        raise CommunityError("Only email addresses receive notices.")
+    with transaction.atomic(), system_access("set method notices"):
+        if (
+            notices
+            and not ContactProfile.objects.filter(
+                person_id=method.person_id, electronic_notice_consent=True
+            ).exists()
+        ):
+            raise CommunityError("Choose email for official notices first.")
+        row = ContactMethod.objects.select_for_update().get(pk=method.pk)
+        row.notices = notices
+        row.save(update_fields=["notices"])
+        method.notices = notices
+    _audit(
+        "contact.method_changed",
+        actor=actor,
+        request=request,
+        target=method.person,
+        metadata={"kind": method.kind, "notices": notices},
+    )
+    return method
+
+
+def remove_contact_method(
+    method: ContactMethod, *, actor, request: HttpRequest | None = None
+) -> None:
+    _may_edit_methods(actor, method.person_id)
+    with transaction.atomic(), system_access("remove contact method"):
+        row = ContactMethod.objects.filter(pk=method.pk).first()
+        if row is not None:
+            row.delete()  # through the model, so the change history keeps a copy
+        if method.kind == ContactMethodKind.PHONE:
+            _sync_profile_phone(method.person_id)
     _audit(
         "contact.method_removed",
         actor=actor,
-        request=None,
+        request=request,
         target=method.person,
         metadata={"kind": method.kind},
     )
+
+
+# --- Official notices and the mailing address for post (D44) ---------------------------
+
+US_STATES = [
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "DC",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+    "PR",
+    "VI",
+    "GU",
+    "AS",
+    "MP",
+    "AA",
+    "AE",
+    "AP",
+]
+
+
+def _own_profile(user, reason: str):
+    """(person, profile locked for update) of this login; call inside atomic()."""
+    from community.models import ContactProfile
+
+    with system_access(reason):
+        person = Person.objects.filter(user=user).first()
+        if person is None:
+            raise CommunityError("Your login is not linked to a person yet.")
+        profile, _ = ContactProfile.objects.select_for_update().get_or_create(person=person)
+    return person, profile
+
+
+def record_notice_choice(
+    *, user, consent: bool, via: str = "profile", request: HttpRequest | None = None
+):
+    """The person's own answer: official notices by email (True) or by post.
+
+    Either answer is recorded with the time and the wording version shown
+    (community.notices), so the association can show what was agreed; the
+    sign-up step and the My items to-do stop once there is an answer."""
+    from community.notices import CONSENT_VERSION
+
+    _refuse_read_only(user)
+    with transaction.atomic():
+        _person, profile = _own_profile(user, "record notice choice")
+        changed = profile.electronic_notice_consent != bool(consent)
+        profile.electronic_notice_consent = bool(consent)
+        profile.consent_changed_at = timezone.now()
+        profile.notice_consent_version = CONSENT_VERSION
+        profile.save()
+        _audit(
+            "profile.updated",
+            actor=user,
+            request=request,
+            target=profile,
+            metadata={
+                "notice_consent": bool(consent),
+                "consent_changed": changed,
+                "notice_consent_version": CONSENT_VERSION,
+                "via": "signup" if via == "signup" else "profile",
+            },
+        )
+    return profile
+
+
+def set_mailing_address(
+    *,
+    user,
+    to_home: bool,
+    street: str = "",
+    unit: str = "",
+    city: str = "",
+    state: str = "PA",
+    zip_code: str = "",
+    request: HttpRequest | None = None,
+):
+    """The one postal address for this person's paper notices and letters:
+    their home's address, or a structured address they enter."""
+    import re
+
+    _refuse_read_only(user)
+    street, unit, city = (" ".join((v or "").split()) for v in (street, unit, city))
+    state = (state or "").strip().upper()
+    zip_code = (zip_code or "").strip()
+    if not to_home:
+        problems = []
+        if not street:
+            problems.append("Enter the street address.")
+        if not city:
+            problems.append("Enter the city or town.")
+        if state not in US_STATES:
+            problems.append("Choose a state.")
+        if not re.fullmatch(r"[0-9]{5}(-?[0-9]{4})?", zip_code):
+            problems.append("Enter a 5-digit ZIP code (or ZIP+4, like 19380-1234).")
+        if problems:
+            raise CommunityError(" ".join(problems))
+        if len(zip_code) == 9:
+            zip_code = f"{zip_code[:5]}-{zip_code[5:]}"
+    with transaction.atomic():
+        _person, profile = _own_profile(user, "set mailing address")
+        profile.mail_to_home = bool(to_home)
+        if not to_home:
+            profile.mail_street, profile.mail_unit = street[:200], unit[:60]
+            profile.mail_city, profile.mail_state, profile.mail_zip = city[:80], state, zip_code
+        profile.save()
+        _audit(
+            "profile.updated",
+            actor=user,
+            request=request,
+            target=profile,
+            metadata={"mailing": "home" if to_home else "other", "via": "profile"},
+        )
+    return profile
+
+
+def structured_address(profile) -> str:
+    """The structured mailing address as letter lines ("" if none)."""
+    if not profile or not profile.mail_street:
+        return ""
+    first = profile.mail_street + (f", {profile.mail_unit}" if profile.mail_unit else "")
+    second = f"{profile.mail_city}, {profile.mail_state} {profile.mail_zip}".strip()
+    return f"{first}\n{second}"
+
+
+def old_address(person_id: int, profile=None) -> str:
+    """Mailing address typed before D44 (free text or an old list entry)."""
+    if profile is not None and profile.mailing_address.strip():
+        return profile.mailing_address.strip()
+    with system_access("old mailing address"):
+        value = (
+            ContactMethod.objects.filter(person_id=person_id, kind=ContactMethodKind.ADDRESS)
+            .order_by("id")
+            .values_list("value", flat=True)
+            .first()
+        )
+    return (value or "").strip()
+
+
+def postal_address(person: Person, lot: Lot | None = None) -> tuple[str, str]:
+    """(address, source) for paper notices and letters to this person.
+
+    The structured address they entered first; if they chose their home's
+    address, that; otherwise an address typed before D44; otherwise the
+    home's address. ``source`` is "structured", "home", "old" or "none"."""
+    from community.models import ContactProfile
+
+    with system_access("postal address"):
+        profile = ContactProfile.objects.filter(person=person).first()
+        if lot is None:
+            own = Ownership.objects.active().filter(person=person).select_related("lot").first()
+            lot = own.lot if own else None
+    home = (lot.street_address or "").strip() if lot else ""
+    if profile and profile.mail_to_home is False and profile.mail_street:
+        return structured_address(profile), "structured"
+    if not (profile and profile.mail_to_home):
+        old = old_address(person.pk, profile)
+        if old:
+            return old, "old"
+    return home, ("home" if home else "none")
+
+
+def needs_address_check(person_id: int) -> bool:
+    """An address typed before D44 that the person has not re-entered."""
+    from community.models import ContactProfile
+
+    with system_access("address check"):
+        profile = ContactProfile.objects.filter(person_id=person_id).first()
+    if profile is not None and profile.mail_to_home is not None:
+        return False
+    return bool(old_address(person_id, profile))
+
+
+def notice_choice_due(user) -> bool:
+    """Should this login be asked how to get official notices? Only current
+    owners on the deed (official notices go to them: meeting, budget and
+    collection notices), never tenants, view-only contacts or former owners,
+    and only until they answer."""
+    from community.models import ContactProfile
+    from community.rules import rule
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    roles = roles_for(user)
+    if not roles.person_id or not roles.owned_lot_ids:
+        return False
+    if rule("notices.electronic_consent_required") is False:
+        return False
+    with system_access("notice choice due"):
+        if not Ownership.objects.active().filter(person_id=roles.person_id).exists():
+            return False
+        answered = ContactProfile.objects.filter(
+            person_id=roles.person_id, consent_changed_at__isnull=False
+        ).exists()
+    return not answered
+
+
+def notice_choice_counts() -> dict[str, int]:
+    """Homes by how they get official notices, for the board's Invitations
+    and sign-ups page (the view checks ``invite.send``): "email" (an owner on
+    the deed chose email), "paper" (every owner answered, none chose email)
+    and "unanswered" (no email yet and someone has not answered; these homes
+    get paper until then). Counts only, no names."""
+    from community.models import ContactProfile
+
+    with system_access("notice choice counts"):
+        owners: dict[int, set[int]] = {}
+        for lot_id, person_id in Ownership.objects.active().values_list("lot_id", "person_id"):
+            owners.setdefault(lot_id, set()).add(person_id)
+        profiles = {
+            p["person_id"]: p
+            for p in ContactProfile.objects.values(
+                "person_id", "electronic_notice_consent", "consent_changed_at"
+            )
+        }
+    out = {"email": 0, "paper": 0, "unanswered": 0}
+    for people in owners.values():
+        rows = [profiles.get(pid) for pid in people]
+        if any(r and r["electronic_notice_consent"] for r in rows):
+            out["email"] += 1
+        elif all(r and r["consent_changed_at"] for r in rows):
+            out["paper"] += 1
+        else:
+            out["unanswered"] += 1
+    return out
 
 
 def notice_emails(person: Person) -> list[str]:
@@ -1043,9 +1422,9 @@ def save_common_area(
 def update_my_profile(
     *,
     user,
-    phone: str = "",
-    mailing_address: str = "",
-    electronic_notice_consent: bool = False,
+    phone: str | None = None,
+    mailing_address: str | None = None,
+    electronic_notice_consent: bool | None = None,
     in_directory: bool = False,
     directory_show_email: bool = False,
     directory_show_phone: bool = False,
@@ -1053,21 +1432,34 @@ def update_my_profile(
     statement_emails: bool | None = None,
     request: HttpRequest | None = None,
 ):
-    """Anyone with a linked Person edits only their own profile."""
+    """Anyone with a linked Person edits only their own profile: the
+    directory and routine-update choices. ``None`` leaves a field as it is.
+
+    Since D44 My profile sets phones with ``add_contact_method``, the postal
+    address with ``set_mailing_address`` and the notices choice with
+    ``record_notice_choice``; ``phone``, ``mailing_address`` and
+    ``electronic_notice_consent`` remain for older callers."""
     _refuse_read_only(user)
     from community.models import ContactProfile
+    from community.notices import CONSENT_VERSION
 
     with transaction.atomic(), system_access("update_my_profile"):
         person = Person.objects.filter(user=user).first()
         if person is None:
             raise CommunityError("Your login is not linked to a person yet.")
         profile, _ = ContactProfile.objects.select_for_update().get_or_create(person=person)
-        consent_changed = profile.electronic_notice_consent != electronic_notice_consent
-        profile.phone = phone.strip()[:40]
-        profile.mailing_address = mailing_address.strip()[:1000]
-        profile.electronic_notice_consent = electronic_notice_consent
+        consent_changed = (
+            electronic_notice_consent is not None
+            and profile.electronic_notice_consent != electronic_notice_consent
+        )
+        if phone is not None:
+            profile.phone = phone.strip()[:40]
+        if mailing_address is not None:
+            profile.mailing_address = mailing_address.strip()[:1000]
         if consent_changed:
+            profile.electronic_notice_consent = electronic_notice_consent
             profile.consent_changed_at = timezone.now()
+            profile.notice_consent_version = CONSENT_VERSION
         profile.in_directory = in_directory
         profile.directory_show_email = in_directory and directory_show_email
         profile.directory_show_phone = in_directory and directory_show_phone
@@ -1082,7 +1474,7 @@ def update_my_profile(
             request=request,
             target=profile,
             metadata={
-                "notice_consent": electronic_notice_consent,
+                "notice_consent": profile.electronic_notice_consent,
                 "consent_changed": consent_changed,
                 "in_directory": in_directory,
             },

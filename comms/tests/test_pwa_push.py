@@ -362,11 +362,11 @@ def test_no_push_for_digest_readers_or_when_the_feature_is_off(
 ):
     client.force_login(w["owner"])
     _subscribe(client)
-    client.post(reverse("my_profile"), {"weekly_digest": "on"})
+    client.post(reverse("my_profile"), {"section": "prefs", "weekly_digest": "weekly"})
     with mock.patch("comms.tasks.send_push.defer") as defer:
         _thread_reply(w, django_capture_on_commit_callbacks)
     defer.assert_not_called()
-    client.post(reverse("my_profile"), {})
+    client.post(reverse("my_profile"), {"section": "prefs", "weekly_digest": "now"})
     FeatureSetting.objects.filter(key="push").update(enabled=False)
     with mock.patch("comms.tasks.send_push.defer") as defer:
         _thread_reply(w, django_capture_on_commit_callbacks)

@@ -25,12 +25,17 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Pay online | An owner or authorized contact pays chosen charges on Stripe's hosted page: bank account or debit card (no fee), or credit card (with the surcharge). | `pay_online`, `payments.checkout` |
 | Payment status | The page Stripe returns the payer to; the portal asks Stripe itself whether the payment went through. | `pay_return` |
 | Credit card surcharge | The fee on credit card payments only (never bank or debit), at most 3%. Not part of the account balance. | `payments.credit_card_surcharge_bp` |
+| Pay assessments automatically | Automatic payments: each monthly assessment (never late fees or other charges) is paid on its due day from a bank account (no fee) or card (credit cards with the surcharge) the payer saved on Stripe's page. Turned off any time on My account; ends when the home is sold. | `autopay`, `payments.autopay` |
 | Online payments | The board's page of Stripe payments, bank payments processing, problems to handle, payouts and the daily check against Stripe. | `online_payments`, `payments.sync` |
 | Account number | The number of one ownership period of a home (changes when the home is sold). Shown as plain text, not a badge. | `Account.number` |
 | My home improvement requests (ARC) | Asking the Architectural Review Committee to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |
 | Neighbor acknowledgement | A neighbor confirms they have seen a project. It never decides the request. | "signoff" (`arc/signoffs.py`) |
 | Notices about my home | Covenant or rule notices sent to an owner. The board's list is **Violations**. | `compliance`, `Violation` |
 | Fix by | The date an owner should fix a notice by. | `cure_by` |
+| Official notices | The formal notices the association must send every owner on the deed (meeting, budget and assessment notices, delinquency letters, others the Declaration or law requires), by email to those who agreed, by post to everyone else. Not the same as **Notices about my home**. | `notice_choice`, `community/notices.py` |
+| How we reach you | The card on My profile with the official notices choice, emails, phones (and opt-in text alerts) and the one mailing address for post. | `my_profile` |
+| Mailing address for post | Where paper notices and letters go: the home's address or one address the person enters. "Address on file (please check)" is one typed before the separate fields existed. | `ContactProfile.mail_*`, `postal_address` |
+| Text alerts | Optional texts about urgent community matters, only after ticking the box and entering a texted code. | `comms/sms.py` |
 | Approved automatically | No decision was made within the review period, so the Declaration treats the request as approved. | "deemed approval" |
 | Can't take part in the review | A reviewer who is the applicant or owns an affected home. | "recused" (`is_recused`) |
 | Checked for completeness | The board checks a submitted request has everything it needs, then the review clock starts. | `submitted` state |

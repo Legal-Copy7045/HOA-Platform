@@ -20,6 +20,9 @@ def healthz(request: HttpRequest) -> JsonResponse:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
     except Exception:
+        from core.errors import HEALTHZ_DB_DOWN, label_error
+
+        label_error(request, HEALTHZ_DB_DOWN)
         return JsonResponse({"status": "unavailable"}, status=503)
     return JsonResponse({"status": "ok"})
 
@@ -253,6 +256,26 @@ def _task_busy() -> bool:
     return host_tasks.current() is not None
 
 
+def _server_errors_context() -> dict:
+    """Recent server error signatures for System status (D45): class, route
+    name, code location, status, release and times; never URLs or messages."""
+    import datetime
+
+    from core import errors
+
+    since = timezone.now() - datetime.timedelta(hours=24)
+    return {
+        "server_errors": errors.with_words(
+            errors.summary(since, order="recent", limit=SERVER_ERRORS_SHOWN)
+        ),
+        "server_errors_kinds": len(errors.summary(since)),
+        "site_tz": settings.TIME_ZONE,
+    }
+
+
+SERVER_ERRORS_SHOWN = 25
+
+
 @login_required
 def system_status(request):
     """Operations view for sysadmins: health only, no owner data (decision D9)."""
@@ -304,6 +327,7 @@ def system_status(request):
             **_scanner_context(),
             "resources": health_resources(),
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
+            **_server_errors_context(),
         },
     )
 

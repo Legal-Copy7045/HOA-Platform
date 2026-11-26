@@ -267,3 +267,15 @@ def record_refund(alert, *, actor, request=None):
         metadata={"alert_id": alert.pk, "amount_cents": base},
     )
     return entry
+
+
+# --- Automatic payments (payments.autopay, D46) ----------------------------------------
+
+
+def ownership_changed(lot_id: int) -> int:
+    """For ledger.services.account_periods_change: a sale or ended ownership
+    cancels automatic payments of every account of the lot that is now
+    closed (the new owners never inherit them)."""
+    from payments.autopay import ownership_changed as cancel_closed
+
+    return cancel_closed(lot_id)

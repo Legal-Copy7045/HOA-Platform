@@ -20,7 +20,9 @@ pytestmark = pytest.mark.django_db
 def test_profile_is_grouped_with_legends(client):
     client.force_login(make_member(lots=[LotFactory()]))
     page = client.get(reverse("my_profile")).content.decode()
-    for legend in ("How to reach you", "Official notices", "Owner directory", "Email updates"):
+    # D44: contact details live in "How we reach you"; the choices below.
+    assert "<h2>How we reach you</h2>" in page
+    for legend in ("Owner directory", "Email updates"):
         assert f"<legend>{legend}</legend>" in page, legend
     # The "show my email/phone" choices sit inside the directory group.
     directory = page[page.index("<legend>Owner directory</legend>") :]
@@ -33,8 +35,7 @@ def test_profile_is_grouped_with_legends(client):
 def test_profile_explains_consent_email_and_export(client):
     client.force_login(make_member(lots=[LotFactory()]))
     page = client.get(reverse("my_profile")).content.decode()
-    assert "instead of by mail" in page and "change this at any time" in page
-    assert 'aria-describedby="id_electronic_notice_consent_help"' in page
+    assert "instead of mailing paper copies" in page and "change your choice at any time" in page
     assert "To change your sign-in email, ask the board." in page
     assert "JSON" not in page
     assert "for your records" in page
@@ -45,16 +46,20 @@ def test_profile_still_saves_every_choice(client):
     client.force_login(user)
     client.post(
         reverse("my_profile"),
+        {"section": "phone_add", "phone_type": "home", "number": "215-555-0199"},
+    )
+    client.post(reverse("my_profile"), {"section": "notices", "choice": "email"})
+    client.post(
+        reverse("my_profile"),
         {
-            "phone": "555-0199",
-            "electronic_notice_consent": "on",
+            "section": "prefs",
             "in_directory": "on",
             "directory_show_phone": "on",
-            "weekly_digest": "on",
+            "weekly_digest": "weekly",
         },
     )
     profile = ContactProfile.objects.unscoped("t").get(person__user=user)
-    assert profile.phone == "555-0199"
+    assert profile.phone == "215-555-0199"
     assert profile.electronic_notice_consent and profile.in_directory
     assert profile.directory_show_phone and not profile.directory_show_email
     assert profile.weekly_digest

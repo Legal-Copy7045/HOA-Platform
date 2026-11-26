@@ -237,6 +237,16 @@ FEATURES: list[Feature] = [
         },
         default=False,
     ),
+    # Automatic payments of the monthly assessment (D46): also needs
+    # "online_payments" on and Stripe keys on the server.
+    _f(
+        "autopay",
+        "Automatic payments",
+        "Owners can have each monthly assessment paid automatically from a saved bank "
+        "account or card (Stripe; needs Online payments on).",
+        {"autopay", "autopay_start", "autopay_return", "autopay_cancel"},
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"

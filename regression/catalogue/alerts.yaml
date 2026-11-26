@@ -15,3 +15,9 @@
 - feature: "Turning alerts off always works: 'Turn off on all my devices' and 'Stop texts and remove my number' answer and show on My profile whenever the user has a subscription or number, even with push or texts switched off; sign-ups stay off (R2-008)"
   since: M4
   match: ["^unit:comms/tests/test_sms.py::test_(number_can_be_removed_while|stop_texts_only_touches)", "^unit:comms/tests/test_pwa_push.py::test_push_can_be_turned_off_while"]
+- feature: "Text alerts opt-in under Phone (D44): off by default, never pre-ticked, texted code still required, unticking stops at once, adding a phone never opts in, hidden while the feature is off"
+  since: M5
+  match: ["^unit:comms/tests/test_text_alerts_optin"]
+- feature: "Weekly summary only when there is something new (D44): no email without held updates, updates the person can no longer open dropped silently, every update link has a visibility check"
+  since: M5
+  match: ["^unit:comms/tests/test_digest.py::test_(no_summary|one_email_per_update|held_updates|a_former_owner|only_visible|every_routine)"]

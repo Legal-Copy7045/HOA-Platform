@@ -50,7 +50,19 @@ def _community(user):
         "profile": {
             "phone": profile.phone,
             "mailing_address": profile.mailing_address,
+            "mailing_address_for_post": {
+                "same_as_home": profile.mail_to_home,
+                "street": profile.mail_street,
+                "unit": profile.mail_unit,
+                "city": profile.mail_city,
+                "state": profile.mail_state,
+                "zip": profile.mail_zip,
+            },
             "electronic_notice_consent": profile.electronic_notice_consent,
+            "notice_consent_version": profile.notice_consent_version,
+            "consent_changed_at": profile.consent_changed_at.isoformat()
+            if profile.consent_changed_at
+            else None,
             "in_directory": profile.in_directory,
         }
         if profile

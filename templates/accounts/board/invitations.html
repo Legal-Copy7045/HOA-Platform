@@ -12,6 +12,14 @@
     <div class="stat {% if counts.not_invited or counts.expired %}tone-warning{% endif %}"><div class="label">Not invited / expired</div><div class="value">{{ counts.not_invited|add:counts.expired }}</div></div>
     <div class="stat {% if counts.no_email %}tone-warning{% endif %}"><div class="label">No email on record</div><div class="value">{{ counts.no_email }}</div></div>
   </div>
+  <h3 id="notice-counts">Official notices</h3>
+  <p class="small muted">Per home: email if an owner on the deed chose email; otherwise the home gets paper. Homes not answered get paper until someone chooses.</p>
+  <div class="grid grid-3">
+    <div class="stat tone-success"><div class="label">Email notices</div><div class="value">{{ notice_counts.email }}</div><div class="hint">home{{ notice_counts.email|pluralize }}</div></div>
+    <div class="stat"><div class="label">Paper</div><div class="value">{{ notice_counts.paper }}</div><div class="hint">home{{ notice_counts.paper|pluralize }}</div></div>
+    <div class="stat {% if notice_counts.unanswered %}tone-warning{% endif %}"><div class="label">Not answered</div><div class="value">{{ notice_counts.unanswered }}</div><div class="hint">home{{ notice_counts.unanswered|pluralize }}</div></div>
+  </div>
+  <details class="panel"><summary>What owners agree to (wording version {{ notice_version }})</summary><div class="panel-body small">{{ notice_wording|linebreaks }}</div></details>
   <div class="form-actions">
     <form method="post" data-confirm="Send an invitation to every owner with an email who hasn't been invited (or whose invitation expired)?">{% csrf_token %}<input type="hidden" name="action" value="invite_all"><button type="submit">{% icon "mail" %} Invite everyone not yet invited ({{ counts.not_invited|add:counts.expired }})</button></form>
     <form method="post" data-confirm="Email a new invitation link to {{ remind_count }} {% if remind_count == 1 %}person who was{% else %}people who were{% endif %} invited more than 3 days ago and {% if remind_count == 1 %}has{% else %}have{% endif %} not signed up yet? Their old links stop working.">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary"{% if not remind_count %} disabled{% endif %}>Remind those who haven't signed up ({{ remind_count }})</button></form>{% if counts.invited and counts.invited != remind_count %}<span class="small muted">Invitations sent in the last 3 days are not reminded yet.</span>{% endif %}

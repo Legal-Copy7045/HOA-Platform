@@ -406,12 +406,19 @@ def test_credit_card_on_a_no_fee_session_is_absorbed_and_only_counted(client, w,
 
 
 def test_the_portal_has_no_way_to_write_refunds():
-    """The Stripe key is restricted (refunds read-only); the code never posts
-    anything but a new Checkout Session."""
+    """The Stripe key is restricted (refunds read-only); the code posts only
+    Checkout Sessions, and for automatic payments (D46) Customers,
+    off-session PaymentIntents and detaching a PaymentMethod. Never a refund."""
     root = pathlib.Path(__file__).resolve().parents[1]
     code = "\n".join(p.read_text() for p in root.glob("*.py"))
-    assert re.findall(r'post\(\s*"(/v1/[^"]+)"', code) == ["/v1/checkout/sessions"]
+    assert re.findall(r'post\(\s*f?"(/v1/[^"]+)"', code) == [
+        "/v1/checkout/sessions",
+        "/v1/customers",
+        "/v1/payment_intents",
+        "/v1/payment_methods/{check_id(pm_id)}/detach",
+    ]
     assert "stripe_api.post(" not in code
+    assert "/v1/refunds" not in re.findall(r'post\(\s*f?"(/v1/[^"]+)"', code)
 
 
 # --- Who may pay ---------------------------------------------------------------------------
