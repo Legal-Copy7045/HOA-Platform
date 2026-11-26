@@ -241,3 +241,8 @@
   check: "On a phone the meeting page's Board actions panel starts closed below the agenda, opens with one tap, and shows only the steps that apply (send notice first; Mark held disabled with its reason until the meeting starts; minutes after Mark held)."
   steps: "As a demo board member open a coming and a past demo meeting on a phone."
   last: ""
+- key: community setup wizard on a phone
+  check: "On a phone, Settings > Community setup > Start setup walks every step: one column, 'Step N of 16' with a progress bar, the What the law says panel and the legal footer readable, Save and continue stays at the bottom of the screen while scrolling and is the full-width button, Back and Skip for now fit beside each other; a wrong amount (e.g. 'forty') comes back with the error beside the field and the typed text kept; a big change to the monthly assessment asks first; switching a feature off asks first; the review lists every decision with Change links and flags; Finish setup removes 'Finish community setup' from My items; Run setup again starts run 2 with today's values and 'Changed since the last setup' on a rule changed in between; a screen reader announces each field's label, help and error."
+  steps: "Sign in as a demo board member on a phone; open Settings > Community setup; walk each step (skip one, go Back once); type 'forty' as the amount; save; switch Violations off and cancel; finish on the review; change one rule on Community settings; Run setup again and open its step; try VoiceOver or TalkBack on one rule step."
+  last: ""
+

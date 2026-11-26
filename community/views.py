@@ -568,20 +568,17 @@ def _dollars(cents_text: str) -> str:
 @require_POST
 def community_rule_save(request):
     policy.require(request.user, "community.manage_rules")
+    from community.rule_input import to_stored
     from community.rules import REGISTRY
-    from core.money import parse_cents
 
     data = request.POST.copy()
     spec = REGISTRY.get(data.get("key", ""))
-    if spec is not None and spec.kind == "cents" and (data.get("value") or "").strip():
+    if spec is not None:
+        # Shared with the community setup wizard (D51).
         try:
-            data["value"] = str(parse_cents(data["value"]))
-        except ValueError:
-            return _failed(
-                request,
-                CommunityError("Enter the amount in dollars, e.g. 75.00."),
-                reverse("community_settings"),
-            )
+            data["value"] = to_stored(spec, data.get("value", ""))
+        except ValueError as exc:
+            return _failed(request, CommunityError(str(exc)), reverse("community_settings"))
     form = forms.RuleForm(data)
     back = reverse("community_settings")
     if not form.is_valid():

@@ -1,0 +1,6 @@
+{# One form field: label, widget (Django adds aria-invalid and aria-describedby for the help and error ids), errors, help. Expects: f #}<div class="field{% if f.errors %} has-error{% endif %}">
+  {% if f.widget_type == "checkbox" %}<label class="choice" for="{{ f.id_for_label }}">{{ f }} {{ f.label }}</label>
+  {% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% endif %}
+  {{ f.errors }}
+  {% if f.help_text %}<div class="help" id="{{ f.auto_id }}_helptext">{{ f.help_text }}</div>{% endif %}
+</div>
