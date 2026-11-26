@@ -113,3 +113,20 @@ offsite_stamp_ok() {
   fi
   return 0
 }
+
+# demo_dataset_ok <name>: a demo dataset name is lower-case letters and _
+# only, 1-40 characters (D53); nothing else reaches a command line.
+demo_dataset_ok() {
+  [[ "$1" =~ ^[a-z_]{1,40}$ ]]
+}
+
+# reseed_allowed <DEPLOYMENT_STAGE from .env> <SEED_DEMO_ALLOWED from .env>:
+# a demo reseed runs only on the POC with demo data switched on (D53).
+reseed_allowed() {
+  local stage="$1" flag="${2,,}"
+  if [ "$stage" != "poc" ] || [ "$flag" != "true" ]; then
+    echo "Refusing: a demo reseed needs DEPLOYMENT_STAGE=poc and SEED_DEMO_ALLOWED=true in .env." >&2
+    return 1
+  fi
+  return 0
+}

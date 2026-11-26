@@ -31,7 +31,7 @@
   <section class="card" id="task-list"><h2>Tasks</h2>
     <ul class="list">{% for t in tasks %}<li>
       <div class="grow"><div class="title">{{ t.label }}</div><div class="small muted">{{ t.description }}</div></div>
-      {% if can_run %}<form method="post" data-confirm="{{ t.confirm }}">{% csrf_token %}<input type="hidden" name="kind" value="{{ t.kind }}"><button type="submit" class="secondary small"{% if current %} disabled title="Another task is waiting or running"{% endif %}>Start</button></form>{% endif %}
+      {% if can_run %}{% if t.demo_only %}<a class="btn secondary small" href="{% url 'demo_data' %}">Choose a dataset</a>{% else %}<form method="post" data-confirm="{{ t.confirm }}">{% csrf_token %}<input type="hidden" name="kind" value="{{ t.kind }}"><button type="submit" class="secondary small"{% if current %} disabled title="Another task is waiting or running"{% endif %}>Start</button></form>{% endif %}{% endif %}
     </li>{% endfor %}
     <li><div class="grow"><div class="title">Send a test email</div><div class="small muted">Sends a test email to your own address, to check outgoing email works.</div></div>
       {% if can_run %}<form method="post" action="{% url 'system_status' %}">{% csrf_token %}<input type="hidden" name="action" value="test_email"><input type="hidden" name="next" value="server_tasks"><button type="submit" class="secondary small">Start</button></form>{% endif %}</li>

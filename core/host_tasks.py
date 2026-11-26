@@ -6,7 +6,9 @@ run by the VM agent from a fixed allowlist. The web app never touches the
 host: it only inserts a ``core.HostTask`` row naming one of the kinds below.
 The agent (infra/poc/portal-agent.sh with infra/poc/host-tasks.sh) maps the
 kind to a fixed command with a bash ``case``; nothing else from the database
-reaches a command line. Results come back as a state and a short summary.
+reaches a command line, except the dataset of a demo reseed (D53), which the
+agent accepts only as a plain name ([a-z_]) the portal's own seed_demo lists.
+Results come back as a state and a short summary.
 """
 
 from __future__ import annotations
@@ -27,6 +29,14 @@ State = HostTask.State
 # How long the agent may take to notice a request (it runs every minute).
 AGENT_STALE = datetime.timedelta(minutes=5)
 
+# Reseeding (D53): the word typed to confirm, and what the person is told.
+RESEED_WORD = "RESEED"
+RESEED_CONFIRM_TEXT = (
+    "Everything in the portal is replaced by fictional data. A backup is taken first. "
+    "Real logins (yours and other non-demo logins) are kept. The portal is unavailable "
+    "for about a minute."
+)
+
 
 class HostTaskRefused(Exception):
     """A request the portal will not pass on (shown to the person as is)."""
@@ -39,6 +49,9 @@ class TaskSpec:
     description: str
     confirm: str
     offsite_only: bool = False
+    # reseed_demo (D53): offered only where demo data is allowed, takes a
+    # dataset from the registry and the typed confirmation word.
+    demo_only: bool = False
 
 
 TASKS = [
@@ -89,16 +102,31 @@ TASKS = [
         "Runs every health check now and emails the sysadmins about anything that changed.",
         "Run the health checks now? Sysadmins are emailed about any change.",
     ),
+    TaskSpec(
+        Kind.RESEED_DEMO,
+        "Reseed with demo data",
+        "Replaces everything in the portal with a fictional demo dataset, after taking a "
+        "backup. Real logins are kept. Only on a demo or test portal; started from "
+        "Settings -> Demo data.",
+        RESEED_CONFIRM_TEXT,
+        demo_only=True,
+    ),
 ]
 BY_KIND = {spec.kind: spec for spec in TASKS}
 
 
 def offered() -> list[TaskSpec]:
-    """The tasks this server offers (off-site ones only once it is set up)."""
-    from core import offsite
+    """The tasks this server offers (off-site ones only once it is set up,
+    the demo reseed only where demo data is allowed)."""
+    from core import demo_reseed, offsite
 
     has_offsite = offsite.configured()
-    return [spec for spec in TASKS if has_offsite or not spec.offsite_only]
+    demo = demo_reseed.allowed()
+    return [
+        spec
+        for spec in TASKS
+        if (has_offsite or not spec.offsite_only) and (demo or not spec.demo_only)
+    ]
 
 
 def current() -> HostTask | None:
@@ -117,14 +145,30 @@ def agent_ok(now=None) -> bool:
     return bool(seen and seen > (now or timezone.now()) - AGENT_STALE)
 
 
-def request_task(actor, kind: str, *, request=None) -> HostTask:
+def request_task(
+    actor,
+    kind: str,
+    *,
+    request=None,
+    dataset: str = "",
+    confirmation: str = "",
+    attach_requester: bool = False,
+) -> HostTask:
     """Ask the VM agent to run one allowlisted task. Sysadmins only; one at a
-    time. Audited (``system.task_requested`` with the kind)."""
+    time. Audited (``system.task_requested`` with the kind, and the dataset
+    for a reseed). A reseed needs demo data allowed here, a dataset from the
+    registry and the word RESEED typed (D53)."""
     from audit.services import record_event
+    from core import demo_reseed
 
     policy.require(actor, "system.run_task")
     if kind not in {spec.kind for spec in offered()}:
         raise HostTaskRefused("That task is not offered on this server.")
+    if kind == Kind.RESEED_DEMO:
+        demo_reseed.check_request(dataset, confirmation)
+        attach_requester = attach_requester is True
+    else:
+        dataset, attach_requester = "", False
     waiting = current()
     if waiting is not None:
         raise HostTaskRefused(
@@ -133,12 +177,21 @@ def request_task(actor, kind: str, *, request=None) -> HostTask:
         )
     try:
         with transaction.atomic():
-            task = HostTask.objects.create(kind=kind, requested_by=actor)
+            task = HostTask.objects.create(
+                kind=kind,
+                requested_by=actor,
+                dataset=dataset,
+                attach_requester=attach_requester,
+            )
     except IntegrityError as exc:  # another request got in first
         raise HostTaskRefused(
             "Another server task is already waiting or running. Try again once it has finished."
         ) from exc
-    record_event("system.task_requested", actor=actor, request=request, metadata={"kind": kind})
+    metadata = {"kind": kind}
+    if dataset:
+        metadata["dataset"] = dataset
+        metadata["attach_requester"] = attach_requester
+    record_event("system.task_requested", actor=actor, request=request, metadata=metadata)
     return task
 
 
@@ -169,12 +222,15 @@ def record_finished() -> int:
             if locked is None:
                 continue
             kind = locked.kind if locked.kind in BY_KIND else "unknown"
+            metadata = {"kind": kind, "state": locked.state}
+            if kind == Kind.RESEED_DEMO and locked.dataset:
+                metadata["dataset"] = locked.dataset
             record_event(
                 "system.task_finished",
                 actor=None,
                 channel=Channel.CLI,
                 target=locked,
-                metadata={"kind": kind, "state": locked.state},
+                metadata=metadata,
             )
             locked.audited_at = timezone.now()
             locked.save(update_fields=["audited_at"])

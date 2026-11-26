@@ -1,0 +1,22 @@
+# Demo datasets and reseeding the POC from Settings (D53). `match` runs over "<stage>:<check>".
+- feature: "Demo dataset registry: seed_demo --dataset (oak_creek default, output unchanged; fresh_start) and --list-datasets; refused unless SEED_DEMO_ALLOWED"
+  since: M5
+  match: ["^unit:community/tests/test_demo_datasets.py::test_(registry|list_datasets|unknown_dataset|every_dataset_refuses|default_is_oak_creek|naming_oak_creek)", "^unit:community/tests/test_commands.py::test_seed_demo"]
+- feature: "Fresh start dataset: 44 homes, owners with and without email, a trust, an entity, two couples, a declarant-appointed board of three with offices, a sysadmin, a placeholder Declaration, no history, default settings, no invitations, fictional only"
+  since: M5
+  match: ["^unit:community/tests/test_demo_datasets.py::test_fresh_start"]
+- feature: "Settings > Demo data: only with SEED_DEMO_ALLOWED on a poc or local stage (404 and no Settings entry otherwise), sysadmins only, RESEED typed, dataset from the registry, one task at a time, audited with the dataset; Server tasks row leads there"
+  since: M5
+  match: ["^unit:core/tests/test_demo_reseed.py::test_(url_name|allowed_only|page_|board_and_owners|anonymous|reseed_|service_|other_tasks|the_database_refuses|server_tasks_shows|finished_reseed|agent_reads)", "^unit:core/tests/test_url_matrix.py::.*\\[demo_data\\]", "^manual:reseed the POC from settings"]
+- feature: "Reseed on the VM: agent checks the dataset ([a-z_] and the portal's list) and passes it as one argument to the fixed script; script refuses unless .env says poc and demo data on, backs up first, keeps real logins, empties and migrates, seeds, cleans old files, always restarts the site"
+  since: M5
+  match: ["^unit:core/tests/test_host_tasks_agent.py::test_reseed", "^unit:core/tests/test_host_tasks_agent.py::test_the_case_statement"]
+- feature: "After reseeding, the requester becomes a board member and joint owner of a demo home (box ticked by default, boolean on the task, fixed flag and numeric task id to the script, POC only, audited with ids; flag off attaches nothing)"
+  since: M5
+  match: ["^unit:community/tests/test_demo_attach.py::", "^unit:core/tests/test_demo_reseed.py::test_(the_box|only_a_reseed_can_carry)", "^unit:core/tests/test_host_tasks_agent.py::test_(attach_requester|reseed_script_accepts_only_the_flag)"]
+- feature: "keep_logins: real logins kept across a reseed with the same ids, password hash, MFA authenticators, email addresses, person, sysadmin role, server-task history and backup heartbeats; demo logins never exported; audited"
+  since: M5
+  match: ["^unit:accounts/tests/test_keep_logins.py::"]
+- feature: "Old data's files removed after a reseed (only unreferenced, never the health probe); demo data loading in production warned by the startup and health checks; production settings force it off"
+  since: M5
+  match: ["^unit:core/tests/test_demo_reseed.py::test_(clean_demo_files|startup_check|production_settings)"]

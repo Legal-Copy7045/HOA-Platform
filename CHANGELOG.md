@@ -6,6 +6,23 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.22.0 — 2026-11-26
+
+- A second demo dataset, "Fresh start": a community the declarant has just
+  handed over (44 homes and owners, a declarant-appointed board of three, a
+  sysadmin, a placeholder Declaration, nothing else yet). `seed_demo
+  --dataset fresh_start`; the full Oak Creek demo stays the default (D53).
+- Demo and test portals only: Settings → Demo data lets a sysadmin replace
+  everything with either dataset (type RESEED to confirm). The server takes
+  a backup first, keeps real logins with their passkeys, app codes and
+  sysadmin role, and is back in about a minute. The page does not exist on
+  a real deployment, and the server refuses it there too. A box (ticked by
+  default) makes the person reseeding a board member and the owner of a
+  demo home in the new data, so one login keeps working as sysadmin, board
+  member and owner.
+- A loud warning (startup check and health check) if demo data loading were
+  ever switched on in production.
+
 ## 0.21.0 — 2026-11-26
 
 - Disbursements (Finance, optional feature, on by default): the board can pay

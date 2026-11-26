@@ -788,6 +788,7 @@ summary. One task runs at a time. The full output of each task is in
 | Check the off-site lock | `manage.py check_offsite_lock` in the web container (only once off-site backups are set up) | 5 min |
 | Re-apply host security | `infra/poc/harden-host.sh` | 25 min |
 | Run the health checks | `manage.py health_check --alert` in the web container | 5 min |
+| Reseed with demo data | `infra/poc/reseed-demo.sh <dataset>` (only on the POC with demo data on; started from Settings → Demo data) | 25 min |
 
 If the page says tasks will not run, the agent has not been seen for five
 minutes: check `systemctl status hoa-portal-agent.timer` and
@@ -796,3 +797,38 @@ typed by a person (`setup-offsite-backups.sh`, `set-stripe-key.sh`,
 `move-files-to-r2.sh`) and one-time setup (`provision-vm.sh`, the first
 `harden-host.sh`) stay in the terminal.
 
+## Reseed the POC with demo data (D53)
+
+Only on the POC (`DEPLOYMENT_STAGE=poc` and `SEED_DEMO_ALLOWED=true` in
+`.env`); on a real deployment the page does not exist and the agent refuses.
+
+1. Sign in as a sysadmin with your own login (passkey or app), open
+   **Settings → Demo data**. It shows which dataset the portal holds now.
+2. Pick a dataset: **Oak Creek Farms (full demo)** (three years of history)
+   or **Fresh start (just handed over)** (44 homes and owners, a
+   declarant-appointed board of three, a sysadmin, a placeholder Declaration,
+   nothing else: good for trying the setup and invitations). Type `RESEED`
+   and press **Reseed with this dataset**.
+3. Within a minute the agent takes a backup (the reseed stops if it fails),
+   saves the real logins, stops the portal, empties the database, migrates,
+   puts the real logins back, seeds the dataset, removes the old data's
+   files and starts the portal (about a minute without the site, more for
+   the backup). Sign in again with your own passkey or app: your login,
+   authenticators, recovery codes, person and sysadmin role are kept, and so
+   are other non-demo logins and the server-task history. With "After
+   reseeding, make me a board member and the owner of a demo home in the new
+   data" ticked (the default), you also get a declarant-appointed board seat
+   from today and become joint owner of the first demo home with a single
+   owner; untick it to come back as sysadmin only (then
+   `demo_make_me_owner` gives you a home). Other kept logins get only their
+   login, person and sysadmin role.
+4. The result is on Server tasks (and Demo data). Full output:
+   `/var/log/hoa-portal-tasks.log` on the VM.
+
+By hand on the VM: `sudo bash /opt/hoa-portal/infra/poc/reseed-demo.sh fresh_start`.
+If it fails before "Emptying the database", nothing was changed. If it fails
+while seeding or removing files, the real logins are already back: sign in
+and reseed again. If it fails in between (migrations, putting the logins
+back), the portal is empty and the saved logins are shredded: restore the
+backup it took first ("Backups and the restore drill"). The audit log of
+the replaced data is in that backup only.
