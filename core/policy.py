@@ -110,6 +110,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Compliance
     "violation.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
     "violation.manage": frozenset({BOARD, MANAGER}),
+    # Uphold, dismiss and mark cured: decisions about an owner, board only (D49).
     "violation.decide": frozenset({BOARD}),
     # Operations and money
     "vendor.manage": frozenset({BOARD, MANAGER}),

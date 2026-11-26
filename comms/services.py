@@ -78,6 +78,7 @@ def create_event(
     starts_at,
     ends_at=None,
     location: str = "",
+    join_url: str = "",
     description: str = "",
     audience: str = Audience.MEMBERS,
     committee=None,
@@ -99,11 +100,20 @@ def create_event(
         raise CommsError("An event needs a title.")
     if ends_at and ends_at < starts_at:
         raise CommsError("An event cannot end before it starts.")
+    from django.core.exceptions import ValidationError
+
+    from comms.calendar_links import clean_join_url
+
+    try:
+        join_url = clean_join_url(join_url)
+    except ValidationError as exc:
+        raise CommsError(" ".join(exc.messages)) from exc
     event = Event.objects.create(
         title=single_line(title)[:200],
         starts_at=starts_at,
         ends_at=ends_at,
         location=location.strip()[:200],
+        join_url=join_url,
         description=description,
         audience=audience,
         committee=committee,
@@ -123,6 +133,24 @@ def cancel_event(event: Event, *, actor, request=None) -> Event:
     event.save(update_fields=["cancelled"])
     record_event("event.cancelled", actor=actor, request=request, target=event)
     return event
+
+
+def with_page_urls(events, user) -> list[Event]:
+    """Give each event its page as ``page_url``: the event page, or the
+    meeting page for an event a meeting made when this person may open that
+    meeting (D49: clicking an event opens its page)."""
+    from django.urls import reverse
+
+    from governance.services import meetings_for_events
+
+    events = list(events)
+    meetings = meetings_for_events([e.pk for e in events], user)
+    for e in events:
+        m = meetings.get(e.pk)
+        e.page_url = (
+            reverse("meeting_detail", args=[m.pk]) if m else reverse("event_detail", args=[e.pk])
+        )
+    return events
 
 
 def upcoming(user):

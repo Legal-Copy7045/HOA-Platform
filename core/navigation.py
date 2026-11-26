@@ -142,10 +142,18 @@ HUB_KEEPS_LABEL = {"voting": "type"}
 # Pages reached from a sidebar entry's page rather than from the sidebar: the
 # entry is marked current on them and counts their waiting items.
 SUBPAGES = {
+    # Meetings live on the Calendar (D49): a meeting page (/meetings/<pk>/)
+    # marks Calendar current.
+    "calendar": ["meetings"],
     "arc_list?mine=1": ["signoffs_mine"],
     "people": ["access_review"],
     "tasks": ["compliance"],
 }
+
+# Entries shown only while an optional feature is off: Meetings is part of
+# the Calendar (D49), but meetings are core, so with the Calendar switched off
+# the Meetings list comes back.
+SHOWN_WHILE_OFF = {"meetings": "calendar"}
 
 # (label, url name, icon, permission or tuple of alternatives; None = everyone).
 # A hub's own entry takes its visibility from its pages (permission HUB).
@@ -308,6 +316,8 @@ def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict,
             return None
         children = [{"name": n, "url": u} for n in SUBPAGES.get(name, []) if (u := _url(n))]
     if not features.url_name_enabled(name.partition("?")[0], request):
+        return None
+    if name in SHOWN_WHILE_OFF and features.enabled(SHOWN_WHILE_OFF[name], request):
         return None
     url = _url(name)
     if url is None:

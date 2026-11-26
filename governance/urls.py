@@ -39,6 +39,7 @@ urlpatterns = [
     path("board/consents/<int:pk>/", ev.consent_detail, name="consent_detail"),
     path("meetings/", views.meetings, name="meetings"),
     path("meetings/<int:pk>/", views.meeting_detail, name="meeting_detail"),
+    path("meetings/<int:pk>/meeting.ics", views.meeting_ics, name="meeting_ics"),
     re_path(
         r"^meetings/(?P<pk>[0-9]+)/(?P<action>notice|held|cancelled|minutes|approve_minutes)/$",
         views.meeting_action,

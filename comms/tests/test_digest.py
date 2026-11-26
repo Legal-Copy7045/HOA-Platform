@@ -69,6 +69,7 @@ def test_official_notices_ignore_the_digest(w):
     meeting = gov.create_meeting(
         title="Annual",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=20),
         actor=w["board"],
     )

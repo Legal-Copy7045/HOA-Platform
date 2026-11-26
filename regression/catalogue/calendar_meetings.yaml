@@ -1,0 +1,27 @@
+# Meetings merged into Calendar, meeting places and join links, Add to
+# calendar, the meeting page's steps and board-only "Mark cured" (D49,
+# walkthrough fixes WT-008, WT-026, WT-044). `match` runs over "<stage>:<check>".
+- feature: "Calendar: one menu entry for meetings and events, filter All / Meetings / Events / Past meetings (approved minutes only for owners), meeting rows open the meeting page, old Meetings address redirects, Meetings comes back with the Calendar switched off, meeting pages mark Calendar current"
+  since: M5
+  match: ["^unit:governance/tests/test_calendar_meetings.py::test_(meetings_address|one_menu_entry|with_the_calendar_off|filters_all|past_meetings)", "^unit:core/tests/test_nav_streamline.py::test_sidebar_for_every_role"]
+- feature: "Executive sessions only in the board's calendar view, never a calendar event, never an owner .ics or packet (WT-026)"
+  since: M5
+  match: ["^unit:governance/tests/test_calendar_meetings.py::test_executive_sessions", "^unit:governance/tests/test_streamline.py::test_executive_sessions_never_reach_the_calendar", "^unit:governance/tests/test_packets.py::test_executive_session_has_board_packet_only"]
+- feature: "New meeting beside New event (board and manager), one control per form; a meeting needs a place, an https join link or both; optional end; refused forms come back with the input; older meetings stay readable; place, link and end mirrored to the calendar event; event form takes a join link"
+  since: M5
+  match: ["^unit:governance/tests/test_calendar_meetings.py::test_(new_meeting|owners_get_no_new|a_meeting_needs|join_link_must|meeting_where|an_end_before|older_meetings|event_form)", "^unit:core/tests/test_form_rerender.py::test_(invalid_form_comes_back.*meetings|service_refusal)"]
+- feature: "Join link shown only to people who may open the meeting, with noopener noreferrer, never in notice emails (D24)"
+  since: M5
+  match: ["^unit:governance/tests/test_calendar_meetings.py::test_join_link_on_the_page"]
+- feature: "Add to calendar: Google, Outlook.com, Microsoft 365 links and a signed-in .ics (RFC 5545 escaping and folding, UTC, stable UID, cancelled status, no agenda), location rule for place / online / hybrid, scoped like the page"
+  since: M5
+  match: ["^unit:comms/tests/test_calendar_links.py::", "^unit:governance/tests/test_calendar_meetings.py::test_(add_to_calendar|ics_)", "^unit:core/tests/test_url_matrix.py::test_.*(event_ics|meeting_ics)", "^manual:add to calendar"]
+- feature: "Clicking an event opens its page: whole-row links on Calendar and the dashboard, search hits to the event or meeting page"
+  since: M5
+  match: ["^unit:governance/tests/test_calendar_meetings.py::test_search_and_dashboard", "^unit:governance/tests/test_streamline.py::test_calendar_sends_meeting_events"]
+- feature: "Meeting page: board steps in order, only those that apply, disabled steps with the reason, panel collapsed on phones (WT-008, WT-044)"
+  since: M5
+  match: ["^unit:governance/tests/test_calendar_meetings.py::test_(steps_|owners_see_no_board)", "^unit:governance/tests/test_streamline.py::test_minutes_upload_without_a_file", "^manual:meeting page board actions"]
+- feature: "Violations: Mark cured is a board decision; the manager is refused by the service and the page"
+  since: M5
+  match: ["^unit:compliance/tests/test_cure_board_only.py::"]

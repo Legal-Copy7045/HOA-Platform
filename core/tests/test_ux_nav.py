@@ -317,6 +317,7 @@ def test_proxy_offered_on_dashboard_when_a_meeting_has_a_vote(client, w):
     meeting = gov.create_meeting(
         title="Annual meeting",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=10),
         actor=w["board"],
     )
@@ -370,6 +371,7 @@ def election(w):
     meeting = gov.create_meeting(
         title="Annual meeting",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=20),
         actor=w["board"],
     )

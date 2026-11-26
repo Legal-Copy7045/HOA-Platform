@@ -528,3 +528,10 @@ tr.below-zero th, tr.below-zero td { background: var(--danger-bg); }
   .reach-section .form-actions button, .reach-section .form-actions .btn,
   .notice-step .form-actions button, .notice-step .form-actions .btn { width: 100%; justify-content: center; }
 }
+/* Calendar rows (D49): the whole row opens the event or meeting; badges,
+   Add to calendar and Cancel sit beside it. */
+.list > li.cal-row { flex-wrap: wrap; }
+.list > li.cal-row .todo-link { flex: 1 1 16rem; min-width: 0; }
+.list > li.cal-row .todo-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .35rem; }
+.cal-menu .cal-note { margin: .35rem .7rem; max-width: 16rem; }
+.join-note a { overflow-wrap: anywhere; }

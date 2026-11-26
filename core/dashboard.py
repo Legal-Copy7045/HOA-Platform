@@ -158,7 +158,7 @@ def build(user, request=None) -> dict:
         data["system"] = system_panel()
     data["quick"] = quick_actions(user, roles)
     from comms.models import Announcement, AnnouncementRead
-    from comms.services import upcoming
+    from comms.services import upcoming, with_page_urls
 
     data["news"], data["events"] = [], []
     if policy.can(user, "announcement.view"):
@@ -170,7 +170,7 @@ def build(user, request=None) -> dict:
             AnnouncementRead.objects.filter(user=user).values_list("announcement_id", flat=True)
         )
         data["news"] = [(a, a.pk in read) for a in Announcement.objects.for_user(user)[:4]]
-        data["events"] = list(upcoming(user)[:4])
+        data["events"] = with_page_urls(upcoming(user)[:4], user)
     if policy.can(user, "calendar.view"):
         from comms.rsvp import my_upcoming
 

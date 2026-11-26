@@ -315,6 +315,9 @@ PROTECTED = {
     "event_slot_add": ("POST", "event"),
     "event_slot_action": ("POST", "event_slot"),
     "event_rsvp_export": ("GET", "event"),
+    # Add to calendar (D49): the .ics file is scoped like its page.
+    "event_ics": ("GET", "event"),
+    "meeting_ics": ("GET", "executive_meeting"),
     # Reserve plan (reserves)
     "reserve_plan": ("GET", None),
     "reserve_component": ("GET", "reserve_component"),
@@ -434,6 +437,7 @@ def world():
         executive_meeting = governance.create_meeting(
             title="Executive session: litigation",
             kind="executive",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=5),
             actor=board,
         )
@@ -442,6 +446,7 @@ def world():
         packet_meeting = governance.create_meeting(
             title="Open board meeting",
             kind="board",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=6),
             actor=board,
         )
@@ -564,6 +569,7 @@ def world():
         annual = governance.create_meeting(
             title="Annual meeting",
             kind="annual",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=30),
             actor=board,
         )

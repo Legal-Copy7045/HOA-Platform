@@ -128,12 +128,14 @@ def w():
         governance.create_meeting(
             title="Executive pangolin session",
             kind="executive",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=5),
             actor=board,
         )
         governance.create_meeting(
             title="Open pangolin meeting",
             kind="board",
+            location="Clubhouse",
             starts_at=timezone.now() + timedelta(days=6),
             actor=board,
         )

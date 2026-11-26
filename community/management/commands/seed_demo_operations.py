@@ -571,6 +571,7 @@ class Command(BaseCommand):
         october = governance.create_meeting(
             title="Last month's board meeting (demo)",
             kind="board",
+            location="Community room (fictional)",
             starts_at=timezone.now() - datetime.timedelta(days=30),
             agenda="1. Minutes\n2. Pond",
             actor=b1,
@@ -590,6 +591,8 @@ class Command(BaseCommand):
         november = governance.create_meeting(
             title="Board meeting (demo)",
             kind="board",
+            location="Community room (fictional)",
+            join_url="https://meet.example.com/demo-board-meeting",
             starts_at=timezone.now() + datetime.timedelta(days=10),
             agenda="1. Call to order\n2. Approve last month's minutes\n3. Treasurer's report"
             "\n4. Pond outlet (demo)",

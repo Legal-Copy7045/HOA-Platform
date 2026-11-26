@@ -298,9 +298,13 @@ def test_executive_sessions_never_reach_the_calendar(client, w):
     meeting.refresh_from_db()
     assert meeting.calendar_event_id is None
     assert not Event.objects.filter(title__contains="Executive").exists()
-    for user in (w["owner"], w["tenant"], w["board"]):
+    for user in (w["owner"], w["tenant"]):
         client.force_login(user)
-        assert b"Executive session" not in client.get(reverse("calendar")).content
+        for query in ("", "?type=meetings", "?type=past"):
+            assert b"Executive session" not in client.get(reverse("calendar") + query).content
+    # The board's own view of the Calendar lists it (D49), with no calendar event.
+    client.force_login(w["board"])
+    assert b"Executive session: litigation" in client.get(reverse("calendar")).content
     gov.set_meeting_status(meeting, "cancelled", actor=w["board"])
     assert not Event.objects.exists()
 
