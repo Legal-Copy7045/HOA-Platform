@@ -1,7 +1,11 @@
 name: CodeQL
 
 # Static analysis of the Python and JavaScript code with CodeQL's default
-# queries (D57). Results go to the repository's code scanning alerts.
+# queries (D57). Code scanning is not enabled for this private repository
+# (it needs GitHub Advanced Security), so the action refuses to upload. The
+# analysis still runs on every pull request: the findings are listed in the
+# log and the step summary and kept as a SARIF artifact. Once code scanning
+# is enabled, set upload back to "always" to get alerts in the Security tab.
 on:
   push:
     branches: [main]
@@ -22,7 +26,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      security-events: write  # upload the results
+      actions: read  # the action reads its own workflow run (required in private repositories)
+      security-events: write  # the action's status reports (and uploads, once enabled)
     strategy:
       fail-fast: false
       matrix:
@@ -37,3 +42,30 @@ jobs:
       - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934  # v4.39.5
         with:
           category: /language:${{ matrix.language }}
+          upload: never
+          output: codeql-results
+      - name: Findings (in the log and the summary)
+        if: always()
+        run: |
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          files = sorted(pathlib.Path("codeql-results").glob("*.sarif"))
+          if not files:
+              print("No SARIF results (the analysis did not finish: see the log).")
+          for f in files:
+              results = [r for run in json.loads(f.read_text())["runs"] for r in run.get("results", [])]
+              print(f"## CodeQL {f.stem}: {len(results)} finding(s)")
+              for r in results[:100]:
+                  loc = r["locations"][0]["physicalLocation"] if r.get("locations") else {}
+                  path = loc.get("artifactLocation", {}).get("uri", "?")
+                  line = loc.get("region", {}).get("startLine", "?")
+                  print(f"- {r.get('ruleId')} ({r.get('level', 'warning')}) {path}:{line}: {r['message']['text'][:150]}")
+          PY
+      - name: Keep the SARIF results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: codeql-${{ matrix.language }}
+          path: codeql-results/
+          if-no-files-found: ignore
+          retention-days: 30

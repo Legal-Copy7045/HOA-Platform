@@ -65,6 +65,14 @@ def test_board_may_open_every_step(client, board):
         assert f"Step {setup.number(key)} of {len(setup.STEPS)}" in response.content.decode()
 
 
+def test_people_step_links_straight_to_the_boards_signups(client, board):
+    """The board's sign-ups are a tab of Homes and owners; linking the old
+    invitations URL only bounced through a redirect (CI page crawl)."""
+    page = client.get(step_url("people")).content.decode()
+    assert f'href="{reverse("lot_list")}?view=signups"' in page
+    assert f'href="{reverse("invitations")}"' not in page
+
+
 def test_everyone_else_is_refused(client):
     from core.tests.test_nav_streamline import role_users
 

@@ -31,6 +31,7 @@ import subprocess  # nosec B404 - fixed command lists only
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET  # nosec B405 - parses our own pytest output
 from datetime import UTC, datetime
@@ -546,6 +547,13 @@ def stage_walkthrough(st: Stage) -> None:
 # --- live (read-only) ---------------------------------------------------------------------
 
 
+def _is_cloudflare_access(location: str) -> bool:
+    """A redirect to the Cloudflare Access sign-in: the host itself must be
+    cloudflareaccess.com or a subdomain of it (not just contain the name)."""
+    host = (urllib.parse.urlsplit(location).hostname or "").lower()
+    return host == "cloudflareaccess.com" or host.endswith(".cloudflareaccess.com")
+
+
 def _get(url: str, headers: dict | None = None):
     req = urllib.request.Request(url, headers=headers or {})
     opener = urllib.request.build_opener(_NoRedirect)
@@ -575,7 +583,7 @@ def stage_live(st: Stage) -> None:
     else:
         st.add("site reachable over HTTPS", "pass", f"HTTP {status}")
         location = headers.get("Location", "") or headers.get("location", "")
-        behind_access = status in (302, 303) and "cloudflareaccess.com" in location
+        behind_access = status in (302, 303) and _is_cloudflare_access(location)
         st.add(
             "POC is behind Cloudflare Access",
             "pass" if behind_access else "fail",

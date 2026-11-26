@@ -17,7 +17,7 @@
     <h2>Next</h2>
     <ul class="setup-links">
       <li><a href="{% url 'lot_list' %}">Homes and owners</a></li>
-      <li><a href="{% url 'invitations' %}">Invitations and sign-ups: invite everyone not yet invited</a></li>
+      <li><a href="{% url 'lot_list' %}?view=signups">Invitations and sign-ups: invite everyone not yet invited</a></li>
     </ul>
   </section>
   {% if record.has_file %}<section class="card"><h2>The uploaded file</h2>

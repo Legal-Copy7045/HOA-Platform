@@ -185,7 +185,9 @@ def test_csv_happy_path_through_the_portal(client, board):
     assert record.imported_by == board and record.counts["owners"] == 3
     done = _check_page(client, record)
     assert b"Register imported" in done.content
-    assert reverse("invitations").encode() in done.content
+    # Straight to the board's Sign-ups, not through the invitations redirect.
+    assert (reverse("lot_list") + "?view=signups").encode() in done.content
+    assert ('href="' + reverse("invitations") + '"').encode() not in done.content
     assert reverse("lot_list").encode() in done.content
 
 

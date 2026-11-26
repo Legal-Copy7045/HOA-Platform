@@ -14,7 +14,7 @@
 
   <h2>I've lost my phone and recovery codes</h2>
   <p><strong>Homeowners, account contacts and tenants</strong> can recover their sign-in themselves. For your safety it waits <strong>{{ recovery_wait }} hours</strong>: you, every email address we have for you, your phone (if you get our texts) and the board are told at once, and anyone can cancel. Afterwards you set up a new passkey or app, and for {{ recovery_lock }} hours voting, proxies, contact details and automatic payments are locked.</p>
-  <div class="form-actions"><a class="btn secondary block" href="{% url 'recovery_request' %}">{% icon "key" %} I've lost my phone and recovery codes</a></div>
+  <div class="form-actions"><a class="btn secondary block" href="{% if user.is_authenticated %}{% url 'account_recovery_status' %}{% else %}{% url 'recovery_request' %}{% endif %}">{% icon "key" %} I've lost my phone and recovery codes</a></div>
 
   <h2>Board members, officers and staff</h2>
   <p>The board resets your sign-in instead. For your safety this takes <strong>two board members</strong>: one checks it's really you and starts the reset, and a second approves it. The second one then gives you a one-time code in person or by phone (never by email). Homeowners can ask for this too.</p>
