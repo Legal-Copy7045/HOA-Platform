@@ -216,3 +216,29 @@ def test_agent_insert_fills_every_required_column():
         cur.execute(sql)  # creates the row
         cur.execute(sql)  # and is harmless once it exists
     assert UpdateStatus.objects.get(pk=1).host_security == {}
+
+
+@pytest.mark.django_db
+def test_status_page_names_failed_job_kinds_but_not_their_arguments(client):
+    from django.db import connection
+
+    from core.models import UpdateStatus
+
+    with connection.cursor() as cur:
+        cur.execute(
+            "INSERT INTO procrastinate_jobs (queue_name, task_name, args, status) "
+            "VALUES ('default', 'comms.tasks.send_digest', %s, 'failed')",
+            ['{"email": "owner-b@example.com"}'],
+        )
+    client.force_login(make_member(roles=[Role.SYSADMIN]))
+    UpdateStatus.objects.create(
+        pk=1,
+        agent_seen_at=timezone.now(),
+        host_security=dict.fromkeys(
+            ("falco", "auditd", "updates", "integrity", "alerts", "livepatch"), "active"
+        ),
+    )
+    page = client.get(reverse("system_status")).content.decode()
+    assert "Failed: send_digest (1)" in page
+    assert "owner-b@example.com" not in page
+    assert 'tone-success"><div class="label">Host security' in page

@@ -44,11 +44,13 @@ def _update_status():
         status.agent_seen_at
         and status.agent_seen_at > timezone.now() - __import__("datetime").timedelta(minutes=5)
     )
+    host = _host_security(status.host_security)
     return {
         "s": status,
         "agent_ok": agent_ok,
         "changes": status.changes.splitlines()[:10],
-        "host": _host_security(status.host_security),
+        "host": host,
+        "host_problem": bool(host) and not all(ok for _, _, ok in host),
     }
 
 
@@ -164,6 +166,13 @@ def system_status(request):
             "SELECT status, count(*) FROM procrastinate_jobs GROUP BY status ORDER BY status"
         )
         jobs = cursor.fetchall()
+        # Which kinds of job failed (task names only: never their arguments,
+        # which can name people).
+        cursor.execute(
+            "SELECT task_name, count(*) FROM procrastinate_jobs WHERE status = 'failed' "
+            "GROUP BY task_name ORDER BY count(*) DESC, task_name LIMIT 5"
+        )
+        failed_jobs = [(name.rsplit(".", 1)[-1], n) for name, n in cursor.fetchall()]
     return render(
         request,
         "core/system_status.html",
@@ -171,6 +180,7 @@ def system_status(request):
             "version": settings.APP_VERSION,
             "pending_migrations": len(pending),
             "jobs": jobs,
+            "failed_jobs": failed_jobs,
             "thin": policy.thinly_covered_actions(),
             "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),
             "health": run_checks(),
