@@ -148,14 +148,17 @@ FEATURES: list[Feature] = [
         "push",
         "Push notifications",
         "Owners can get update alerts on their phone or computer (needs VAPID keys).",
-        {"push_subscribe", "push_unsubscribe"},
+        # Turning alerts off is never gated: owners can always stop them and
+        # remove what is stored, even while the board has the feature off
+        # (review R2-008). Same for "sms_stop" below.
+        {"push_subscribe"},
         default=False,
     ),
     _f(
         "sms",
         "Urgent text messages",
         "Owners can opt in to texts; the board sends urgent notices (needs an SMS provider).",
-        {"sms_start", "sms_verify", "sms_stop", "urgent_notice"},
+        {"sms_start", "sms_verify", "urgent_notice"},
         default=False,
     ),
 ]

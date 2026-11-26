@@ -9,3 +9,6 @@
 - feature: "Urgent text messages: verified opt-in (hashed codes, 10 minutes, rate-limited), board-only urgent notices with counts-only audit, STOP handling, Twilio-compatible provider"
   since: M4
   match: ["^unit:comms/tests/test_sms.py::test_", "^manual:urgent text arrives"]
+- feature: "Turning alerts off always works: 'Turn off on all my devices' and 'Stop texts and remove my number' answer and show on My profile whenever the user has a subscription or number, even with push or texts switched off; sign-ups stay off (R2-008)"
+  since: M4
+  match: ["^unit:comms/tests/test_sms.py::test_(number_can_be_removed_while|stop_texts_only_touches)", "^unit:comms/tests/test_pwa_push.py::test_push_can_be_turned_off_while"]

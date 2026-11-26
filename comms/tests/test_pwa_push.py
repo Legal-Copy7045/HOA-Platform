@@ -416,3 +416,24 @@ def test_a_broken_server_key_never_deletes_subscriptions(client, w, push_on, set
     counts = push.deliver([w["owner"].pk], title="Hello", path="/")
     assert counts["removed"] == 0
     assert PushSubscription.objects.unscoped("t").filter(user=w["owner"]).count() == 1
+
+
+# --- R2-008: turning push off always works ----------------------------------------
+
+
+def test_push_can_be_turned_off_while_the_feature_is_off(client, w, push_on):
+    client.force_login(w["owner"])
+    _subscribe(client)
+    client.force_login(w["other"])
+    _subscribe(client, ENDPOINT + "-other")
+    FeatureSetting.objects.filter(key="push").update(enabled=False)
+    client.force_login(w["owner"])
+    page = client.get(reverse("my_profile")).content.decode()
+    assert "switched off for the community" in page
+    assert reverse("push_unsubscribe") in page and "Turn off on all my devices" in page
+    assert _subscribe(client, ENDPOINT + "-new").status_code == 404  # no new sign-ups
+    response = client.post(reverse("push_unsubscribe"))
+    assert response.status_code == 302
+    assert PushSubscription.objects.for_user(w["owner"]).count() == 0
+    assert PushSubscription.objects.for_user(w["other"]).count() == 1
+    assert reverse("push_unsubscribe") not in client.get(reverse("my_profile")).content.decode()
