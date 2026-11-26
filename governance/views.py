@@ -61,14 +61,68 @@ def _saved(request, form, fn, ok: str):
 
 class MeetingForm(forms.Form):
     title = forms.CharField(max_length=200)
-    kind = forms.ChoiceField(choices=MeetingKind.choices)
-    starts_at = forms.DateTimeField(widget=forms.DateTimeInput(attrs={"type": "datetime-local"}))
-    location = forms.CharField(max_length=200, required=False)
+    kind = forms.ChoiceField(choices=MeetingKind.choices, label="Type")
+    starts_at = forms.DateTimeField(
+        label="Starts", widget=forms.DateTimeInput(attrs={"type": "datetime-local"})
+    )
+    ends_at = forms.DateTimeField(
+        label="Ends",
+        required=False,
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        help_text="Optional. Calendars assume one hour if left empty.",
+    )
+    location = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Place",
+        help_text=(
+            "Where people meet in person, e.g. the clubhouse. "
+            "Leave empty for an online-only meeting."
+        ),
+    )
+    join_url = forms.CharField(
+        max_length=500,
+        required=False,
+        label="Link to join online",
+        widget=forms.URLInput(attrs={"placeholder": "https://"}),
+        help_text=(
+            "For an online or hybrid meeting. Shown only to people who can open the meeting "
+            "page, never in emails."
+        ),
+    )
     agenda = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("auto_id", "meeting_%s")
+        super().__init__(*args, **kwargs)
+
+    def clean_join_url(self):
+        from comms.calendar_links import clean_join_url
+
+        return clean_join_url(self.cleaned_data.get("join_url"))
+
+    def clean(self):
+        data = super().clean()
+        if "join_url" in data and not (data.get("location") or "").strip() and not data["join_url"]:
+            raise forms.ValidationError(
+                "Say where the meeting is: a place, a link to join online, or both."
+            )
+        if data.get("ends_at") and data.get("starts_at") and data["ends_at"] < data["starts_at"]:
+            self.add_error("ends_at", "A meeting cannot end before it starts.")
+        return data
+
+
+def _calendar_on(request) -> bool:
+    from core import features
+
+    return features.enabled("calendar", request)
 
 
 @login_required
 def meetings(request):
+    """Meetings live on the Calendar (D49): the old address leads to its
+    Meetings filter, and takes the "New meeting" form. With the Calendar
+    switched off, this page lists the meetings itself."""
     policy.require(request.user, "meeting.view")
     form = MeetingForm(request.POST or None)
     if request.method == "POST":
@@ -87,6 +141,15 @@ def meetings(request):
             if m:
                 return redirect("meeting_detail", pk=m.pk)
         # Invalid: show the form again with what was typed and the errors.
+        if _calendar_on(request) and policy.can(request.user, "calendar.view"):
+            from comms.views import render_calendar
+
+            return render_calendar(request, meeting_form=form)
+    elif _calendar_on(request) and policy.can(request.user, "calendar.view"):
+        from django.urls import reverse
+
+        past = request.GET.get("view") == "past"
+        return redirect(reverse("calendar") + ("?type=past" if past else "?type=meetings"))
     return render(
         request,
         "governance/meetings.html",
@@ -217,6 +280,10 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
             "short_days": services.notice_shortfall_days(meeting) if can_manage else None,
             "packets": visible_packets(user, meeting),
             "can_build_packet": policy.can(user, "meeting.packet_build"),
+            "cal": _calendar_menu(meeting),
+            "calendar_on": _calendar_on(request),
+            "started": meeting.starts_at <= timezone.now(),
+            "can_upload_minutes": can_upload,
             **_linked(request, meeting),
             **meeting_extras(user, meeting),
         },
@@ -224,10 +291,32 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
     )
 
 
+def _calendar_menu(meeting) -> dict:
+    from django.urls import reverse
+
+    from comms import calendar_links
+
+    return calendar_links.menu(
+        calendar_links.item_for_meeting(meeting), reverse("meeting_ics", args=[meeting.pk])
+    )
+
+
 @login_required
 def meeting_detail(request, pk):
     meeting = get_object_or_404(Meeting.objects.for_user(request.user), pk=pk)
     return _render_meeting(request, meeting)
+
+
+@login_required
+def meeting_ics(request, pk):
+    """The meeting as an .ics file, after sign-in and through the same
+    scoping as its page: executive sessions only for the board (404 for
+    everyone else). Never the agenda (comms.calendar_links)."""
+    from comms import calendar_links
+
+    policy.require(request.user, "meeting.view")
+    meeting = get_object_or_404(Meeting.objects.for_user(request.user), pk=pk)
+    return calendar_links.ics_response(calendar_links.item_for_meeting(meeting))
 
 
 @login_required

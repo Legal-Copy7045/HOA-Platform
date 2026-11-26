@@ -67,8 +67,10 @@ VIOLATION = Workflow(
             "mark_cured",
             {S.NOTICED, S.RESPONDED, S.HEARING},
             S.CURED,
-            "violation.manage",
-            "Mark cured",
+            # A decision about the owner, after a hearing or otherwise: the
+            # board's alone, never the manager's (owner decision 2026-11-26, D49).
+            "violation.decide",
+            "Mark cured (board)",
             confirm="Mark this as fixed? The owner is no longer asked to act.",
         ),
         Transition(

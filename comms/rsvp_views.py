@@ -88,6 +88,7 @@ def _render(request, event, *, rsvp_form=None, settings_form=None, slot_form=Non
     if rsvp_form is None:
         initial = {"answer": mine.answer, "guests": mine.guests} if mine else {}
         rsvp_form = RsvpForm(initial=initial)
+    meeting = _meeting_for(event, user)
     context = {
         "e": event,
         "mine": mine,
@@ -101,9 +102,24 @@ def _render(request, event, *, rsvp_form=None, settings_form=None, slot_form=Non
         "slot_form": slot_form or SlotForm(),
         "names": rsvp.answers_with_names(event, user) if names_ok and event.rsvp_enabled else None,
         "names_ok": names_ok,
-        "meeting": _meeting_for(event, user),
+        "meeting": meeting,
+        "cal": _calendar_menu(event, meeting),
     }
     return render(request, "comms/event_detail.html", context, status=status)
+
+
+def _calendar_menu(event, meeting) -> dict:
+    """Add to calendar: an event a meeting made is added as the meeting
+    (the same entry as from the meeting page)."""
+    from django.urls import reverse
+
+    from comms import calendar_links
+
+    if meeting is not None:
+        item = calendar_links.item_for_meeting(meeting)
+        return calendar_links.menu(item, reverse("meeting_ics", args=[meeting.pk]))
+    item = calendar_links.item_for_event(event)
+    return calendar_links.menu(item, reverse("event_ics", args=[event.pk]))
 
 
 def _meeting_for(event, user):

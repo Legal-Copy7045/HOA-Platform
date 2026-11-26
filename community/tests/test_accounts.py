@@ -301,6 +301,7 @@ def test_meeting_notice_goes_to_consented_extra_emails(w):
     meeting = gov.create_meeting(
         title="Annual meeting",
         kind="annual",
+        location="Clubhouse",
         starts_at=timezone.now() + datetime.timedelta(days=30),
         actor=w["board"],
     )

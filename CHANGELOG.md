@@ -6,6 +6,26 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.16.0 — 2026-11-26
+
+- Meetings are now part of the Calendar: one menu entry, with All /
+  Meetings / Events and Past meetings (approved minutes are linked there).
+  Board members and the manager schedule meetings with "New meeting" next
+  to "New event". The old Meetings address leads to the calendar's
+  Meetings list. Executive sessions show only in the board's view (D49).
+- Meetings say where they are: a place, a link to join online, or both,
+  with an optional end time. The join link is shown only on the portal to
+  people who can open the meeting, never in emails. Events can have a join
+  link too.
+- "Add to calendar" on every event and meeting: Google Calendar, Outlook.com,
+  Microsoft 365, or a calendar file for Apple Calendar and Outlook desktop.
+- Clicking an event anywhere (calendar, dashboard, search) opens its page;
+  a meeting opens its meeting page.
+- The meeting page shows the board's steps in order and only those that
+  apply now, in one panel that starts closed on phones.
+- Marking a violation cured is now a board decision; the manager can no
+  longer do it.
+
 ## 0.15.1 — 2026-11-26
 
 - Bank feed: a guided one-time script sets up Teller on the server

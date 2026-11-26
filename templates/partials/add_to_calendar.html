@@ -1,0 +1,6 @@
+{% load portal %}{# Expects cal = comms.calendar_links.menu(...). Online calendars open in a new tab with no referrer; the .ics file needs sign-in (D49). #}
+{% if cal %}<details class="menu-details cal-menu"><summary class="btn secondary small">{% icon "calendar" %} Add to calendar</summary><div class="panel-body">
+  {% for l in cal.online %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer">{{ l.label }}</a>{% endfor %}
+  {% for l in cal.files %}<a href="{{ l.url }}" download>{{ l.label }}</a>{% endfor %}
+  {% if cal.note %}<p class="help cal-note">{{ cal.note }}</p>{% endif %}
+</div></details>{% endif %}

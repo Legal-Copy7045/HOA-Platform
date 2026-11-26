@@ -19,6 +19,7 @@ urlpatterns = [
     path("calendar/<int:pk>/cancel/", views.event_cancel, name="event_cancel"),
     # Event RSVPs and volunteer sign-ups (comms.rsvp)
     path("calendar/<int:pk>/", rsvp_views.event_detail, name="event_detail"),
+    path("calendar/<int:pk>/event.ics", views.event_ics, name="event_ics"),
     path("calendar/<int:pk>/rsvp/", rsvp_views.event_rsvp, name="event_rsvp"),
     path(
         "calendar/<int:pk>/rsvp-settings/",

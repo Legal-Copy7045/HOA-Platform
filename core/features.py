@@ -42,6 +42,7 @@ FEATURES: list[Feature] = [
         {
             "calendar",
             "event_cancel",
+            "event_ics",
             # Event RSVPs and volunteer sign-ups (rsvp)
             "event_detail",
             "event_rsvp",

@@ -233,3 +233,11 @@
   check: "On a phone, My profile's How we reach you sections stack with full-width buttons; ticking 'Receive text alerts' shows the number field; choosing 'A different address' shows the address fields."
   steps: "Open My profile on a phone as a demo owner; add an email and a phone; tick and untick text alerts; switch the mailing address choice."
   last: ""
+- key: add to calendar on phones and desktop
+  check: "From a meeting page and an event page, Add to calendar works in each target: Google Calendar and Outlook.com / Microsoft 365 open prefilled in a new tab (title, times in the right zone, location, join link first in the details, portal link); Apple Calendar on an iPhone and a Mac and Outlook desktop import the .ics file with the same details; an online-only meeting's location is a tappable join link on the phone; a hybrid meeting shows 'place · join link'. After the meeting is cancelled, importing the file again marks it cancelled."
+  steps: "Seed demo data; as a demo owner open Calendar > Meetings > Board meeting (demo) (hybrid) and an event; try each menu entry on an iPhone, an Android phone and a desktop; cancel a test meeting as the board and import its file again."
+  last: ""
+- key: meeting page board actions on a phone
+  check: "On a phone the meeting page's Board actions panel starts closed below the agenda, opens with one tap, and shows only the steps that apply (send notice first; Mark held disabled with its reason until the meeting starts; minutes after Mark held)."
+  steps: "As a demo board member open a coming and a past demo meeting on a phone."
+  last: ""

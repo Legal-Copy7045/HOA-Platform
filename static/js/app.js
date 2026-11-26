@@ -215,3 +215,14 @@ portalButtonConfirm();
     }
   }, true);
 })();
+
+// <details data-collapse-narrow open> starts closed on a phone (board
+// controls that would push the page's own content down, WT-044). Without
+// JavaScript it stays open.
+(function () {
+  "use strict";
+  if (!window.matchMedia || !window.matchMedia("(max-width: 820px)").matches) return;
+  Array.prototype.forEach.call(document.querySelectorAll("details[data-collapse-narrow]"), function (d) {
+    d.open = false;
+  });
+})();

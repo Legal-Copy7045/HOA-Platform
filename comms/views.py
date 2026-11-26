@@ -68,9 +68,31 @@ class EventForm(forms.Form):
     ends_at = forms.DateTimeField(
         required=False, widget=forms.DateTimeInput(attrs={"type": "datetime-local"})
     )
-    location = forms.CharField(max_length=200, required=False)
+    location = forms.CharField(max_length=200, required=False, label="Place")
+    join_url = forms.CharField(
+        label="Link to join online",
+        max_length=500,
+        required=False,
+        widget=forms.URLInput(attrs={"placeholder": "https://"}),
+        help_text="Optional. Shown only to people who can see the event, never in emails.",
+    )
     description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
     audience = forms.ChoiceField(choices=Audience.choices[:2])
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("auto_id", "event_%s")
+        super().__init__(*args, **kwargs)
+
+    def clean_join_url(self):
+        from comms.calendar_links import clean_join_url
+
+        return clean_join_url(self.cleaned_data.get("join_url"))
+
+    def clean(self):
+        data = super().clean()
+        if data.get("ends_at") and data.get("starts_at") and data["ends_at"] < data["starts_at"]:
+            self.add_error("ends_at", "An event cannot end before it starts.")
+        return data
 
 
 @login_required
@@ -151,6 +173,9 @@ def announcement_detail(request, pk):
 
 @login_required
 def calendar(request):
+    """One calendar for events and meetings (D49): filter All / Meetings /
+    Events, and Past meetings with their approved minutes. Meetings open
+    their meeting page; executive sessions appear only in the board's view."""
     policy.require(request.user, "calendar.view")
     form = EventForm(request.POST or None)
     if request.method == "POST":
@@ -159,22 +184,183 @@ def calendar(request):
             try:
                 services.create_event(actor=request.user, request=request, **form.cleaned_data)
             except services.CommsError as exc:
-                messages.error(request, str(exc))
+                form.add_error(None, str(exc))
             else:
                 messages.success(request, "Event added.")
-            return redirect("calendar")
+                return redirect("calendar")
+        # Invalid: the page again with the form open and what was typed.
+    return render_calendar(request, form=form)
+
+
+CALENDAR_FILTERS = [
+    ("all", "All"),
+    ("meetings", "Meetings"),
+    ("events", "Events"),
+    ("past", "Past meetings"),
+]
+
+
+def render_calendar(request, *, form=None, meeting_form=None, status=200):
+    """The Calendar page; also used by governance.views.meetings to show a
+    refused "New meeting" form again with what was typed."""
+    from django.utils import timezone
+
+    from comms import calendar_links
+
+    user = request.user
+    shown = request.GET.get("type", "all")
+    if request.GET.get("view") == "past":
+        shown = "past"
+    if shown not in dict(CALENDAR_FILTERS):
+        shown = "all"
+    can_manage = policy.can(user, "calendar.manage")
+    can_meet = policy.can(user, "meeting.manage") and policy.can(user, "meeting.view")
+    if form is None:
+        form = EventForm()
+    if meeting_form is None and can_meet:
+        from governance.views import MeetingForm
+
+        meeting_form = MeetingForm()
+    opening = request.GET.get("new", "")
+    open_event = bool(form.errors) or (opening == "event" and can_manage)
+    open_meeting = bool(meeting_form is not None and meeting_form.errors) or (
+        opening == "meeting" and can_meet
+    )
+    rows, past = [], []
+    if shown == "past":
+        past = _past_meetings(user)
+    else:
+        rows = _calendar_rows(user, shown)
+    for row in rows:
+        row["cal"] = calendar_links.menu(row["item"], row["ics_url"])
     return render(
         request,
         "comms/calendar.html",
         {
-            "events": services.upcoming(request.user)[:200],
-            "meeting_events": _meeting_events(),
-            "going": _going(request.user),
-            "bookings": _bookings(request),
+            "rows": rows,
+            "past": past,
+            "shown": shown,
+            "filters": CALENDAR_FILTERS,
+            "going": _going(user),
+            "bookings": _bookings(request) if shown in ("all", "events") else [],
             "form": form,
-            "can_manage": policy.can(request.user, "calendar.manage"),
+            "meeting_form": meeting_form if can_meet else None,
+            "can_manage": can_manage,
+            "can_meet": can_meet,
+            "open_event": open_event,
+            "open_meeting": open_meeting,
+            "now": timezone.now(),
         },
+        status=status,
     )
+
+
+def _calendar_rows(user, shown: str) -> list[dict]:
+    """Coming events and meetings this person may see, soonest first. A
+    meeting's event is shown as the meeting (it opens the meeting page)."""
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from comms import calendar_links
+    from governance import services as governance
+
+    since = timezone.now() - timezone.timedelta(hours=6)
+    events = list(services.upcoming(user)[:200])
+    by_event = governance.meetings_for_events([e.pk for e in events], user)
+    made_by_meetings = _meeting_events()
+    rows = []
+    for e in events:
+        meeting = by_event.get(e.pk)
+        if meeting is not None:
+            rows.append(_meeting_row(meeting, event=e))
+        elif e.pk not in made_by_meetings:
+            rows.append(
+                {
+                    "kind": "event",
+                    "event": e,
+                    "title": e.title,
+                    "starts_at": e.starts_at,
+                    "ends_at": e.ends_at,
+                    "place": e.location,
+                    "online": bool(e.join_url),
+                    "cancelled": e.cancelled,
+                    "url": reverse("event_detail", args=[e.pk]),
+                    "item": calendar_links.item_for_event(e),
+                    "ics_url": reverse("event_ics", args=[e.pk]),
+                }
+            )
+    for m in governance.upcoming_meetings_off_calendar(user, since)[:200]:
+        rows.append(_meeting_row(m))
+    if shown == "meetings":
+        rows = [r for r in rows if r["kind"] == "meeting"]
+    elif shown == "events":
+        rows = [r for r in rows if r["kind"] == "event"]
+    rows.sort(key=lambda r: r["starts_at"])
+    return rows[:200]
+
+
+def _meeting_row(meeting, event=None) -> dict:
+    from django.urls import reverse
+
+    from comms import calendar_links
+
+    return {
+        "kind": "meeting",
+        "meeting": meeting,
+        "event": event,
+        "title": meeting.title,
+        "kind_label": meeting.get_kind_display(),
+        "executive": meeting.kind == "executive",
+        "starts_at": meeting.starts_at,
+        "ends_at": meeting.ends_at,
+        "place": meeting.location,
+        "online": bool(meeting.join_url),
+        "cancelled": meeting.status == "cancelled",
+        "url": reverse("meeting_detail", args=[meeting.pk]),
+        "item": calendar_links.item_for_meeting(meeting),
+        "ics_url": reverse("meeting_ics", args=[meeting.pk]),
+    }
+
+
+def _past_meetings(user) -> list[dict]:
+    """Past meetings with minutes: approved minutes for everyone who may see
+    the meeting; the board and manager also see draft minutes (D34-fixgov)."""
+    from django.utils import timezone
+
+    from governance import services as governance
+
+    staff = policy.can(user, "meeting.manage")
+    out = []
+    for row in governance.past_meetings(user, timezone.now()):
+        m = row["meeting"]
+        out.append(
+            {
+                "meeting": m,
+                "approval": row["approval"],
+                "minutes_id": m.minutes_document_id if (row["approval"] or staff) else None,
+            }
+        )
+    return out
+
+
+@login_required
+def event_ics(request, pk):
+    """The event as an .ics file for the person's own calendar, after
+    sign-in and through the event's own scoping (404 otherwise). An event a
+    meeting made is the meeting's file (same UID as on the meeting page)."""
+    from comms import calendar_links
+
+    policy.require(request.user, "calendar.view")
+    event = get_object_or_404(Event.objects.for_user(request.user), pk=pk)
+    from governance.services import meeting_for_event
+
+    meeting = meeting_for_event(event, request.user)
+    item = (
+        calendar_links.item_for_meeting(meeting)
+        if meeting is not None
+        else calendar_links.item_for_event(event)
+    )
+    return calendar_links.ics_response(item)
 
 
 def _meeting_events() -> set[int]:

@@ -2,20 +2,42 @@
 {% load portal %}
 {% block title %}Calendar · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Calendar</h1><p class="subtitle">Meetings, community events and maintenance dates.</p></div></div>
-  <section class="card">
-    {% if events %}<ul class="list">{% for e in events %}<li>
-      <div class="date-chip"><span>{{ e.starts_at|date:"M" }}</span><strong>{{ e.starts_at|date:"j" }}</strong></div>
-      <div class="grow"><a class="title" href="{% url 'event_detail' e.pk %}">{% if e.cancelled %}<s>{{ e.title }}</s>{% else %}{{ e.title }}{% endif %}</a>{% if e.rsvp_enabled and not e.cancelled %} <span class="badge tone-info">RSVP</span>{% endif %}{% if e.pk in going %} <span class="badge tone-success">You're going</span>{% endif %}
-        <div class="small muted">{{ e.starts_at|date:"D g:i A" }}{% if e.ends_at %}–{{ e.ends_at|date:"g:i A" }}{% endif %}{% if e.location %} · {{ e.location }}{% endif %}{% if e.audience == "board" %} · Board only{% endif %}</div>
-        {% if e.description %}<div class="small">{{ e.description|linebreaksbr }}</div>{% endif %}</div>
-      {% if e.cancelled %}<span class="status tone-danger">Cancelled</span>{% elif e.pk in meeting_events %}<span class="small muted">Meeting</span>{% elif can_manage %}<form method="post" action="{% url 'event_cancel' e.pk %}" class="inline" data-confirm="Cancel this event?">{% csrf_token %}<button type="submit" class="danger small">Cancel</button></form>{% endif %}
-    </li>{% endfor %}</ul>
-    {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
-  </section>
-  {% if bookings %}<section class="card"><h2>Common area bookings</h2><ul class="list">{% for b in bookings %}<li>
-    <div class="date-chip"><span>{{ b.starts_at|date:"M" }}</span><strong>{{ b.starts_at|date:"j" }}</strong></div>
-    <div class="grow"><div class="title">{{ b.area }}</div><div class="small muted">{{ b.starts_at|date:"D g:i A" }} to {{ b.ends_at|date:"D g:i A" }} · {% if b.mine %}Your booking{% else %}Booked{% endif %}</div></div>
-  </li>{% endfor %}</ul><p class="small"><a href="{% url 'reservations' %}">Book a common area</a></p></section>{% endif %}
-  {% if can_manage %}<details class="panel"><summary>Add an event</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Add event</button></div></form></div></details>{% endif %}
+  <div class="page-head"><div><h1>Calendar</h1><p class="subtitle">Meetings, community events and maintenance dates.</p></div>
+    {% if can_manage and not open_event or can_meet and not open_meeting %}<div class="actions">
+      {% if can_manage and not open_event %}<a class="btn" href="?new=event#new-event" data-testid="new-event">{% icon "plus" %} New event</a>{% endif %}
+      {% if can_meet and not open_meeting %}<a class="btn{% if can_manage %} secondary{% endif %}" href="?new=meeting#new-meeting" data-testid="new-meeting">{% icon "plus" %} New meeting</a>{% endif %}
+    </div>{% endif %}</div>
+  <nav class="subnav" aria-label="Show" data-swap>{% for key, label in filters %}<a href="?type={{ key }}#results"{% if shown == key %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+  <div id="results" data-swap-region>
+  {% if shown == "past" %}
+    <section class="card">
+      {% if past %}<ul class="list" data-testid="past-meetings">{% for p in past %}{% with m=p.meeting %}<li class="todo cal-row">
+        <a class="todo-link" href="{% url 'meeting_detail' m.pk %}"><div class="date-chip"><span>{{ m.starts_at|date:"M" }}</span><strong>{{ m.starts_at|date:"j" }}</strong></div>
+          <span class="grow"><span class="title">{{ m.title }}</span><span class="small muted todo-detail">{{ m.get_kind_display }} · {{ m.starts_at|date:"D M j, Y g:i A" }}{% if m.status == "cancelled" %} · Cancelled{% endif %}</span></span></a>
+        <div class="todo-action">{% if p.minutes_id %}{% if p.approval %}<a class="btn secondary small" href="{% url 'document_detail' p.minutes_id %}">{% icon "file" %} Minutes</a>{% else %}<a class="btn secondary small" href="{% url 'document_detail' p.minutes_id %}">{% icon "file" %} Draft minutes</a>{% endif %}{% elif m.status == "held" %}<span class="small muted">Minutes not yet approved</span>{% endif %}</div>
+      </li>{% endwith %}{% endfor %}</ul>
+      <p class="small muted">Minutes appear here once the board has approved them.</p>
+      {% else %}{% include "partials/empty.html" with icon="calendar" title="No past meetings yet" %}{% endif %}
+    </section>
+  {% else %}
+    <section class="card">
+      {% if rows %}<ul class="list" data-testid="calendar-rows">{% for r in rows %}<li class="todo cal-row">
+        <a class="todo-link" href="{{ r.url }}"><div class="date-chip"><span>{{ r.starts_at|date:"M" }}</span><strong>{{ r.starts_at|date:"j" }}</strong></div>
+          <span class="grow"><span class="title">{% if r.cancelled %}<s>{{ r.title }}</s>{% else %}{{ r.title }}{% endif %}</span>
+            <span class="small muted todo-detail">{% if r.kind == "meeting" %}{{ r.kind_label }} · {% endif %}{{ r.starts_at|date:"D M j, g:i A" }}{% if r.ends_at %}–{{ r.ends_at|date:"g:i A" }}{% endif %}{% if r.place %} · {{ r.place }}{% endif %}{% if r.online %} · Online{% endif %}{% if r.event.audience == "board" %} · Board only{% endif %}</span>
+            {% if r.kind == "event" and r.event.description %}<span class="small todo-detail">{{ r.event.description|truncatechars:160 }}</span>{% endif %}</span></a>
+        <div class="todo-action">{% if r.executive %}<span class="badge tone-warning">Board only</span> {% endif %}{% if r.kind == "event" and r.event.rsvp_enabled and not r.cancelled %}<span class="badge tone-info">RSVP</span> {% endif %}{% if r.kind == "event" and r.event.pk in going %}<span class="badge tone-success">You're going</span> {% endif %}{% if r.cancelled %}<span class="status tone-danger">Cancelled</span>{% endif %}
+          {% include "partials/add_to_calendar.html" with cal=r.cal %}
+          {% if r.kind == "event" and can_manage and not r.cancelled %}<form method="post" action="{% url 'event_cancel' r.event.pk %}" class="inline" data-confirm="Cancel this event? It stays on the calendar, crossed out.">{% csrf_token %}<button type="submit" class="danger small">Cancel</button></form>{% endif %}</div>
+      </li>{% endfor %}</ul>
+      {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
+    </section>
+    {% if bookings %}<section class="card"><h2>Common area bookings</h2><ul class="list">{% for b in bookings %}<li>
+      <div class="date-chip"><span>{{ b.starts_at|date:"M" }}</span><strong>{{ b.starts_at|date:"j" }}</strong></div>
+      <div class="grow"><div class="title">{{ b.area }}</div><div class="small muted">{{ b.starts_at|date:"D g:i A" }} to {{ b.ends_at|date:"D g:i A" }} · {% if b.mine %}Your booking{% else %}Booked{% endif %}</div></div>
+    </li>{% endfor %}</ul><p class="small"><a href="{% url 'reservations' %}">Book a common area</a></p></section>{% endif %}
+  {% endif %}
+  </div>
+  {% if can_manage %}<details class="panel"{% if open_event %} open{% endif %} id="new-event"><summary>New event</summary><div class="panel-body"><form method="post" action="{% url 'calendar' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Add event</button></div></form></div></details>{% endif %}
+  {% if meeting_form %}<details class="panel"{% if open_meeting %} open{% endif %} id="new-meeting"><summary>New meeting</summary><div class="panel-body"><p class="small muted">The meeting goes on the community calendar by itself, and comes off it if you cancel the meeting. Executive sessions never appear on the owners' calendar. Give a place, a link to join online, or both.</p><form method="post" action="{% url 'meetings' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=meeting_form %}{{ meeting_form }}<div class="form-actions"><button type="submit">Schedule meeting</button></div></form></div></details>{% endif %}
 {% endblock %}

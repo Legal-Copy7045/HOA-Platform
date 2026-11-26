@@ -93,7 +93,7 @@
         {% if events %}
           <ul class="list">
             {% for e in events %}
-              <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><a class="title" href="{% url 'event_detail' e.pk %}">{{ e.title }}</a>{% if e.rsvp_enabled and not e.cancelled %} <span class="badge tone-info">RSVP</span>{% endif %}<div class="small muted">{{ e.starts_at|date:"D M j, Y, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
+              <li class="todo"><a class="todo-link" href="{{ e.page_url }}"><span class="todo-icon">{% icon "calendar" %}</span><span class="grow"><span class="title">{% if e.cancelled %}<s>{{ e.title }}</s>{% else %}{{ e.title }}{% endif %}</span><span class="small muted todo-detail">{{ e.starts_at|date:"D M j, Y, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}{% if e.join_url %} · Online{% endif %}</span></span>{% if e.rsvp_enabled and not e.cancelled %}<span class="badge tone-info">RSVP</span>{% endif %}</a></li>
             {% endfor %}
           </ul>
         {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
@@ -102,7 +102,7 @@
       {% if dash.going %}<section class="card" id="going">
         <h2>Events I'm going to</h2>
         <ul class="list">{% for e in dash.going %}
-          <li><div class="todo-icon">{% icon "calendar" %}</div><div class="grow"><a class="title" href="{% url 'event_detail' e.pk %}">{{ e.title }}</a><div class="small muted">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>
+          <li class="todo"><a class="todo-link" href="{% url 'event_detail' e.pk %}"><span class="todo-icon">{% icon "calendar" %}</span><span class="grow"><span class="title">{{ e.title }}</span><span class="small muted todo-detail">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</span></span></a></li>
         {% endfor %}</ul>
       </section>{% endif %}
       {% if dash.quick %}

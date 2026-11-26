@@ -89,7 +89,6 @@ MY_HOME = [
 COMMUNITY = [
     "Announcements",
     "Calendar",
-    "Meetings",
     "Voting",
     "Documents",
     "Resolutions and policies",
