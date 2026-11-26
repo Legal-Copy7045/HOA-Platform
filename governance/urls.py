@@ -2,6 +2,7 @@ from django.urls import path, re_path
 
 from governance import committee_views as cv
 from governance import election_views as ev
+from governance import packet_views as pv
 from governance import views
 
 urlpatterns = [
@@ -40,6 +41,12 @@ urlpatterns = [
         r"^meetings/(?P<pk>[0-9]+)/(?P<action>notice|held|cancelled|minutes)/$",
         views.meeting_action,
         name="meeting_action",
+    ),
+    path("meetings/<int:pk>/packet/", pv.meeting_packet, name="meeting_packet"),
+    path(
+        "meetings/<int:pk>/packets/<int:packet_id>/zip/",
+        pv.meeting_packet_zip,
+        name="meeting_packet_zip",
     ),
     path("resolutions/", views.resolutions, name="resolutions"),
     path("records-requests/", views.records_requests, name="records_requests"),
