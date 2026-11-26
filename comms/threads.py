@@ -119,10 +119,10 @@ def _owner_side_may_post(kind: str, obj, user) -> bool:
     if kind == "request":
         if not policy.can(user, "request.submit"):
             return False
-        if obj.lot_id in roles.account_lot_ids:
-            return obj.requested_by_id == user.pk or bool(
-                roles.groups & {policy.OWNER, policy.AUTHORIZED}
-            )
+        # Owners and authorized contacts of that lot; never a view-only
+        # contact of it, even one who owns another home (streamlining).
+        if obj.lot_id in roles.owned_lot_ids | roles.authorized_lot_ids:
+            return True
         return obj.requested_by_id == user.pk and obj.lot_id in roles.tenant_lot_ids
     if kind == "arc":
         return (
