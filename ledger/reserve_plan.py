@@ -141,6 +141,9 @@ def _check_component(fields: dict) -> dict:
         "replacement_cost_cents": cost,
         "useful_life_years": life,
         "remaining_life_years": remaining,
+        # "Years left (0 = due this year)" is stated as of this calendar
+        # year and ages from it (BUG-007).
+        "remaining_life_as_of": this_year if remaining is not None else None,
         "last_replaced_year": last,
         "notes": (fields.get("notes") or "").strip(),
         "active": bool(fields.get("active", True)),

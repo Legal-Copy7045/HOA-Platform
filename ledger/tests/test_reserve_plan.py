@@ -114,6 +114,113 @@ def test_last_replaced_year_gives_years_left(w):
     assert c.remaining_life(year + 10) == 0  # overdue: due in the first year
 
 
+def test_years_left_ages_from_the_year_stated():
+    """BUG-007, hand-checked: 5 years left stated in 2026 is due in 2031."""
+    c = ReserveComponent(
+        name="Roads", useful_life_years=25, remaining_life_years=5, remaining_life_as_of=2026
+    )
+    assert c.due_year() == 2031
+    assert [c.remaining_life(y) for y in (2025, 2026, 2028, 2031, 2033)] == [6, 5, 3, 0, 0]
+
+
+def test_years_left_is_stated_this_year_and_the_due_year_holds(w):
+    year = timezone.localdate().year
+    c = _component(w["board"])  # 6 years left, stated this year: due year + 6
+    assert c.remaining_life_as_of == year and c.due_year() == year + 6
+    _settings(w["board"], inflation_bp=0, interest_bp=0, horizon_years=10)
+    snap = reserve_plan.adopt(actor=w["board"])
+    assert snap.components[0]["remaining_life"] == 6
+    # Next year the board updates the balance date: the plan starts a year
+    # later, so the roads have 5 years left and are still due in year + 6.
+    _settings(
+        w["board"],
+        inflation_bp=0,
+        interest_bp=0,
+        horizon_years=10,
+        balance_as_of=datetime.date(year + 1, 1, 1),
+    )
+    result, _ = reserve_plan.current_projection()
+    assert result.rows[0].year == year + 1
+    assert result.rows[5].year == year + 6 and result.rows[5].expense_cents == 18000000
+    assert result.first_negative_year == year + 6
+    assert result.next_items[0][0] == year + 6
+    # Age 20 of 25: 180,000 x 20 / 25 = 144,000; 25,000 / 144,000 = 17.4% -> 17
+    # (without aging it stayed at 18%).
+    assert result.fully_funded_cents == 14400000 and result.percent_funded == 17
+    # The adopted snapshot keeps the figures it recorded.
+    snap.refresh_from_db()
+    assert snap.components[0]["remaining_life"] == 6 and snap.start_year == year
+
+
+def test_editing_an_old_figure_shows_and_keeps_the_aged_years_left(client, w):
+    year = timezone.localdate().year
+    c = _component(w["board"], remaining_life_years=6)
+    ReserveComponent.objects.filter(pk=c.pk).update(remaining_life_as_of=year - 2)
+    c.refresh_from_db()
+    assert c.years_left_now == 4 and c.due_year() == year + 4
+    client.force_login(w["board"])
+    url = reverse("reserve_component", args=[c.pk])
+    page = client.get(url)
+    assert page.context["form"].initial["remaining_life_years"] == 4
+    plan = client.get(reverse("reserve_plan"))
+    assert plan.status_code == 200
+    data = {
+        "name": c.name,
+        "category": c.category,
+        "quantity": c.quantity,
+        "replacement_cost_cents": "185000.00",
+        "useful_life_years": "25",
+        "remaining_life_years": "4",
+        "active": "on",
+    }
+    assert client.post(url, data).status_code == 302
+    c.refresh_from_db()
+    assert c.remaining_life_years == 4 and c.remaining_life_as_of == year
+    assert c.due_year() == year + 4  # unchanged by saving
+
+
+def test_migration_backfills_the_year_years_left_was_stated(w):
+    """Before the fix the figure never aged: the year it was stated is the
+    start of the latest run of history rows carrying today's figure."""
+    import importlib
+    from unittest import mock
+
+    from django.apps import apps
+
+    migration = importlib.import_module("ledger.migrations.0016_reserve_years_left_as_of")
+    year = timezone.localdate().year
+
+    def at(y):
+        return mock.patch(
+            "django.utils.timezone.now",
+            return_value=timezone.make_aware(datetime.datetime(y, 6, 1, 12)),
+        )
+
+    fields = {"name": "Roads", "category": "roads", "useful_life_years": 25, "active": True}
+    with at(year - 3):
+        kept = reserve_plan.save_component(
+            actor=SYSTEM, replacement_cost_cents=100, remaining_life_years=6, **fields
+        )
+        changed = reserve_plan.save_component(
+            actor=SYSTEM, replacement_cost_cents=100, remaining_life_years=8, **fields
+        )
+    with at(year - 1):  # a cost change only: the figure was stated in year - 3
+        reserve_plan.save_component(
+            kept, actor=SYSTEM, replacement_cost_cents=200, remaining_life_years=6, **fields
+        )
+    with at(year - 2):  # the figure itself changed in year - 2
+        reserve_plan.save_component(
+            changed, actor=SYSTEM, replacement_cost_cents=100, remaining_life_years=6, **fields
+        )
+    by_year = _component(w["board"], remaining_life_years=None, last_replaced_year=year - 1)
+    migration.backfill_as_of(apps, None)
+    for c in (kept, changed, by_year):
+        c.refresh_from_db()
+    assert kept.remaining_life_as_of == year - 3 and kept.due_year() == year + 3
+    assert changed.remaining_life_as_of == year - 2
+    assert by_year.remaining_life_as_of is None
+
+
 def test_components_are_never_deleted(w):
     c = _component(w["board"])
     with pytest.raises(PermissionError):
