@@ -1,0 +1,32 @@
+# Gitleaks configuration (.github/workflows/secrets.yml, D57).
+#
+# The default rules, plus allowances for the repository's known synthetic
+# test values only. Each allowance names the marker the value carries or the
+# exact fixture; never a whole directory, so a real key pasted into a test
+# still fails the scan. Add a new synthetic value here with a comment, not by
+# widening a pattern.
+
+title = "Oak Creek Farms HOA portal"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Throwaway values that say what they are (tests, CI, local dev, regression)"
+regexTarget = "line"
+regexes = [
+  '''test-only[-_a-z]*''',
+  '''ci-only[-_a-z]*''',
+  '''not-a-secret''',
+  '''dev-insecure[-_a-z0-9]*''',
+  '''regression-check-only''',
+  '''ci-(superuser|owner|app|not-a-token)''',
+  '''local-dev-[-a-z]+''',  # .env.example's local Compose stack
+]
+
+[[allowlists]]
+description = "Truncated, invalid PEM header used to test the bank-feed key parser"
+condition = "AND"
+paths = ['''^ledger/tests/test_bank_feeds\.py$''']
+regexes = ['''-----BEGIN PRIVATE KEY-----\\nAA\\n''']
+regexTarget = "line"

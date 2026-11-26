@@ -247,7 +247,7 @@ def backups_overview() -> dict:
 
     beats = dict(
         Heartbeat.objects.filter(
-            name__in=["backup_local", "backup_offsite", "offsite_lock"]
+            name__in=["backup_local", "backup_offsite", "offsite_lock", health.RESTORE_DRILL_BEAT]
         ).values_list("name", "at")
     )
     try:
@@ -258,6 +258,7 @@ def backups_overview() -> dict:
         "local": beats.get("backup_local"),
         "offsite": beats.get("backup_offsite"),
         "lock": beats.get("offsite_lock"),
+        "drill": beats.get(health.RESTORE_DRILL_BEAT),
         "offsite_configured": offsite.configured(),
         "ok": ok,
         "detail": detail,

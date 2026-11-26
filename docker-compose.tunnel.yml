@@ -22,13 +22,22 @@ x-production-env: &production-env
   ADMIN_ENABLED: "false"
   TRUSTED_PROXY_CIDRS: 172.30.50.10/32
   CLIENT_IP_HEADER: CF-Connecting-IP
-  SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-3600}
+  # Empty means the stage's default: a year in production, an hour on the POC.
+  # Production settings refuse less than a year in production (D57).
+  SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-}
+  # Every upload is scanned by the clamav service below and only files it
+  # passed can be downloaded. Set here, not only in .env, so an old or edited
+  # .env cannot switch scanning off; production settings refuse anything else
+  # on the POC and in production (D57).
+  DOCUMENT_SCANNER: clamd
+  DOCUMENT_CLAMD_ADDRESS: clamav:3310
+  DOCUMENT_REQUIRE_CLEAN_SCAN: "true"
 
 services:
   # Malware scanning for every upload (decision D21). Signatures update
   # themselves; the first start downloads them (a few minutes, ~1.5 GB RAM).
   clamav:
-    image: clamav/clamav:1.4
+    image: clamav/clamav:1.4.7@sha256:ac15046e610610347c459afabea6683a52cd041c7a10adf5f050ebb05525d62d
     restart: unless-stopped
     logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
     environment:
@@ -64,11 +73,13 @@ services:
     profiles: ["local-only"]
 
   cloudflared:
-    # Follows the latest release: cloudflared cannot self-update inside a
-    # container, and Cloudflare stops supporting old versions. The VM's
-    # hoa-cloudflared-update.timer pulls a new image daily and restarts this
-    # container only when the image changed.
-    image: cloudflare/cloudflared:latest
+    # Pinned to a release and digest (D57). cloudflared cannot self-update in
+    # a container and Cloudflare stops supporting old releases, so Dependabot
+    # (docker-compose, weekly) proposes each new release as a pull request;
+    # CI validates the compose files and scans the images, and the merged
+    # update reaches the VM through the portal's normal update (System
+    # status -> Install). No daily pull of "latest" any more.
+    image: cloudflare/cloudflared:2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
     restart: unless-stopped
     logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
     command: ["tunnel", "--no-autoupdate", "run"]

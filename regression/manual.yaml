@@ -294,3 +294,15 @@
   check: "On the POC, a secret test vote's ballots show as \"waiting to be mixed\" on the vote page while fewer than ten are pooled, the worker writes them once ten wait (five stay behind), and closing the vote counts every ballot with nothing left waiting (D56)."
   steps: "Open a secret demo vote, cast ballots from demo owners, check the vote page as the board after each; cast ten or more and wait a minute for the worker; close the vote and check the counts equal the ballots cast."
   last: ""
+- key: waiting files clear after a scanner restart
+  check: "On the POC, upload a document while the clamav container is stopped: System status shows it under Waiting for a scan (Document library, Scanner unreachable, no file name), Stuck after 15 minutes and the Files waiting for a malware scan check failing after 30; start clamav and within 10 minutes (or after Scan waiting files now) the list is empty and the file downloads."
+  steps: "dc stop clamav; upload a test PDF as the board; open System status as a sysadmin; dc start clamav; wait for the scanner line to say On; press Scan waiting files now."
+  last: ""
+- key: restore drill heartbeat
+  check: "After Admin, Server tasks, Restore drill passes, Server tasks shows Last restore drill passed with today's time and the Backups health line says restore drill 0 days ago."
+  steps: "As a sysadmin start a restore drill from Server tasks; refresh when it has finished."
+  last: ""
+- key: dependabot compose pull request
+  check: "Dependabot opens a pull request for a newer cloudflared, ClamAV, SeaweedFS, Mailpit or Postgres 16 image that changes the tag and digest in the compose file, and CI (docker, image-scan, pages) runs on it; after the merge, System status Install updates the VM and no hoa-cloudflared-update timer remains."
+  steps: "GitHub, Pull requests, filter author dependabot; check the checks; after installing, systemctl list-timers on the VM."
+  last: ""

@@ -1,0 +1,16 @@
+# External review hardening (D57, 0.26.0). `match` runs over "<stage>:<check>".
+- feature: "Production refuses unsafe configuration by stage: ClamAV and clean-scan downloads on the POC and in production; no mail redirect and HSTS of at least a year in production; unknown stages refused; the tunnel overlay sets the scanner itself"
+  since: M5
+  match: ["^unit:core/tests/test_production_settings.py::test_(production_defaults|a_missing_stage|poc_and_production_need|production_refuses|production_accepts|the_poc_may|an_unknown_stage|the_tunnel_overlay)"]
+- feature: "Backups health in production: off-site copy within 36 hours and a passed restore drill within 90 days, the drill recording itself only for signed backups; POC says Not production-ready"
+  since: M5
+  match: ["^unit:core/tests/test_offsite.py::test_(backups_health_check|production_needs|production_fails|poc_shows|the_drill_records)", "^unit:core/tests/test_host_tasks.py::test_backups_card", "^manual:restore drill heartbeat"]
+- feature: "Files waiting for a malware scan: reasons kept, retried after upload and every 10 minutes while ClamAV answers, listed on System status without names or owners, Scan waiting files now (sysadmin, audited counts), health check after 30 minutes"
+  since: M5
+  match: ["^unit:documents/tests/test_scan_queue.py::test_", "^manual:waiting files clear after a scanner restart"]
+- feature: "CI security gates and pinned infrastructure images updated through Dependabot docker-compose pull requests; no daily pull of cloudflared latest"
+  since: M5
+  match: ["^unit:core/tests/test_image_pins.py::test_", "^manual:dependabot compose pull request"]
+- feature: "Meeting packet crumb goes straight to the meetings list (Calendar on or off)"
+  since: M5
+  match: ["^unit:governance/tests/test_packets.py::test_packet_crumb"]

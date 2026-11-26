@@ -6,6 +6,35 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.26.0 — 2026-11-26
+
+Hardening after an external review (D57).
+
+- Files waiting for a malware scan: System status lists each one (where it
+  belongs, when it was uploaded, how long it has waited, size, scan attempts
+  and what the last attempt said, and "Stuck" after 15 minutes), never its
+  name or whose it is. "Scan waiting files now" queues them. Files the
+  scanner could not check at upload are now retried by themselves, two
+  minutes later and every 10 minutes while the scanner answers; before, they
+  stayed blocked until someone ran a command. A health check fails when a
+  file has waited more than 30 minutes.
+- Production refuses to start without ClamAV and clean-scan-only downloads
+  (the POC too), with mail redirected to one inbox, or with HSTS under a
+  year.
+- Backups health: in production, a missing or day-and-a-half-old off-site
+  copy, or no passed restore drill in 90 days, is a failure; restore drills
+  record themselves and Server tasks shows the last one. The POC says plainly
+  when it is not production-ready.
+- django-allauth 65.23.0 (security release for rate limits).
+- CI: secret scanning (gitleaks), a vulnerability scan of the image (Trivy),
+  CodeQL, and the page crawl of every role.
+- Infrastructure images (cloudflared, ClamAV, Postgres, SeaweedFS, Mailpit)
+  are pinned and updated through tested Dependabot pull requests; the VM no
+  longer pulls the newest cloudflared every day.
+- The meeting packet page's crumb goes straight to the meetings list.
+- Documentation: README, late fees, the security review's scope, and a
+  go-live checklist in the runbook.
+
 ## 0.25.0 — 2026-11-26
 
 - Secret ballots, election ballots and anonymous survey answers can no

@@ -113,7 +113,9 @@ x-app: &app
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Pinned to a version and digest; Dependabot (docker-compose) proposes each
+    # update as a pull request that CI builds and scans (D57).
+    image: postgres:16.16-alpine@sha256:f2f98726820d0342055351c6e9d36e705f5bfffb3dd53ff556325114b08afb6d
     restart: unless-stopped
     logging: *logging
     # Sized for a small VM and a 44-household community.
@@ -150,7 +152,7 @@ services:
   # (COMPOSE_PROFILES=local-store in .env). With Cloudflare R2 it isn't needed.
   seaweedfs:
     profiles: ["local-store"]
-    image: chrislusf/seaweedfs:4.55
+    image: chrislusf/seaweedfs:4.55@sha256:7ca46aeae2f223b37e5d91593c17ab37738eec6df6ab69b48a0487f7643342b9
     restart: unless-stopped
     logging: *logging
     mem_limit: 512m
@@ -173,7 +175,7 @@ services:
     depends_on: [seaweedfs]
 
   mailpit:
-    image: axllent/mailpit:v1.34.0
+    image: axllent/mailpit:v1.34.0@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e
     restart: unless-stopped
     logging: *logging
     ports:

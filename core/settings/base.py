@@ -321,10 +321,11 @@ FILE_UPLOAD_HANDLERS = [
     "django.core.files.uploadhandler.TemporaryFileUploadHandler",
 ]
 
-# Ledger: late fees cannot be posted until the board has reviewed PA law and
-# turned this on (decision recorded 2026-11-25).
-# Decision D21: late fees may be posted (by the board, or automatically when
-# the late_fee.auto_apply rule is on). This stays as an emergency off switch.
+# Ledger, decision D21: the board posts late fees from the late list with a
+# button (on by default); the daily task posts them automatically only when
+# the board switches on the late_fee.auto_apply rule (off by default) in
+# Community settings. This setting is the server's emergency off switch for
+# both.
 LEDGER_LATE_FEES_ENABLED = env.bool("LEDGER_LATE_FEES_ENABLED", default=True)
 # Online payments (D32-payments): "none" or "stripe" (hosted Checkout; the app
 # never sees card or bank numbers). The key lives only in the server's .env:

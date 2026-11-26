@@ -194,6 +194,9 @@ _SPECS = [
     _spec("system.host_alert", "Host security alert emailed", "kind", "lines", "sent"),
     _spec("system.offsite_lock_checked", "Off-site backup lock checked", "locked"),
     _spec("system.health_check_cleared", "Health check cleared", "check"),
+    _spec(
+        "system.scan_waiting_queued", "Waiting files queued for a malware scan", "waiting", "queued"
+    ),
     _spec("system.check_updates", "Checked for portal updates"),
     _spec("system.install_update", "Portal update requested"),
     _spec("system.schedule_update", "Portal update scheduled for tonight", "at"),

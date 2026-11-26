@@ -1,12 +1,59 @@
 # Oak Creek Farms HOA portal
 
-Secure owner and board portal for a 44-lot Pennsylvania planned community.
+Secure owner and board portal for a 44-lot Pennsylvania planned community
+(PA Uniform Planned Community Act and the community's recorded Declaration).
+Invite-only: every account signs in with a passkey, or a password or emailed
+code followed by an authenticator app or passkey.
 
-- `CLAUDE.md`: architecture and rules (source of truth)
-- `docs/decisions.md`: why each decision was made
-- `docs/runbook.md`: operating the portal (bootstrap, updates, resets, break-glass)
-- `docs/milestone-1-summary.md`: what Milestone 1 delivered and what to verify
+## What it does
+
+- **Owners and their contacts** (My home): their home and account, monthly
+  statements, online payment and automatic payment through Stripe's hosted
+  pages (no card or bank numbers in the portal), requests to the board with
+  threads and photos, home improvement (ARC) requests with neighbor
+  acknowledgements, violations on their home, resale certificates, records
+  requests, notices by email or post, My items to-dos, and a read-only
+  history for former owners.
+- **Community**: documents, calendar with meetings and event RSVPs,
+  announcements, an opt-in directory, board and committees, FAQ, common-area
+  reservations, voting (formal votes with secret ballots, elections,
+  surveys), portal search, an installable app with optional push and text
+  alerts.
+- **Board, manager and committees** (Association, Maintenance, Finance,
+  Admin): homes and owners, sign-ups and invitations, governing rules with
+  citations, ARC review with recusal and decision letters, violations,
+  vendors, work orders and invoice approval, the owner ledger (open-item
+  accounting, monthly assessments, late fees, collections and letters),
+  budgets and reserves, accounting export and bank reconciliation (optional
+  bank feed), meetings, packets, minutes, resolutions and written consent,
+  reports, access reviews and retention.
+- **Sysadmins** (operations only, never owner data): System status (health
+  checks, updates, malware scanning and the files waiting for a scan, server
+  errors), Server tasks (backups, restore drills, host hardening), and the
+  board-visible sysadmin activity log.
+
+Everything financial, legal or audit-related is append-only; corrections are
+new reversing records. Rules from the Declaration are data with citations.
+
+## Documentation
+
+- `CLAUDE.md`: architecture and rules (source of truth), and the commands
+- `docs/decisions.md`: why each decision was made (D1 onwards)
+- `docs/runbook.md`: operating the portal (setup, updates, backups, malware
+  scanning, payments, bank feed, the go-live checklist)
+- `docs/glossary.md`: the names people see
+- `docs/security-review-2026-11.md`: security reviews and their findings
+- `CHANGELOG.md` and `VERSION`: releases
 - `infra/poc/README.md`: building the Proxmox POC
+- `regression/README.md`: the full regression suite and walkthrough
+- `docs/milestone-*-plan.md` and `-summary.md`: history of each milestone
+
+## Stack
+
+Python 3.13, Django 5.2 LTS, PostgreSQL 16, server-rendered templates,
+django-allauth with MFA (TOTP and passkeys), django-axes, Procrastinate
+(Postgres task queue, no Redis), S3-compatible file storage (Cloudflare R2 or
+local SeaweedFS), ClamAV, Docker Compose, Cloudflare Tunnel.
 
 ## Local development
 
@@ -23,7 +70,7 @@ docker compose up --build
 - Site: http://localhost:8000
 - Mail inbox (Mailpit): http://localhost:8025
 
-Create a first account and demo data:
+Create a first account and demo data (fictional only):
 
 ```bash
 docker compose exec web python manage.py bootstrap_first_officer --name "Local Officer" --email officer@example.com --also-sysadmin
@@ -42,12 +89,17 @@ tunnel (see the runbook).
 | Service | Purpose |
 |---|---|
 | postgres | database; creates the owner and app roles on first start |
-| seaweedfs | local S3-compatible object store (private bucket) |
+| seaweedfs | local S3-compatible object store (private bucket; profile `local-store`) |
 | create-bucket | one-shot: creates the bucket |
 | migrate | one-shot: cache table, migrations as the owner role, runtime grants |
 | web | gunicorn, as the app role |
-| worker | Procrastinate worker (emails, daily IP purge), as the app role |
-| mailpit | catches all outgoing email |
+| worker | Procrastinate worker (emails, scheduled jobs, malware-scan retries), as the app role |
+| mailpit | catches all outgoing email (local only) |
+
+The POC and production add `docker-compose.tunnel.yml`: production settings,
+the `clamav` scanner, and `cloudflared` (the only way in; web publishes no
+port). Infrastructure images are pinned by version and digest and updated by
+Dependabot pull requests (runbook, "Container image updates").
 
 ## Tests and checks outside Docker
 
@@ -69,15 +121,29 @@ pip install --require-hashes -r requirements/base.txt -r requirements/dev.txt
 scripts/check.sh
 ```
 
+CI runs ruff, bandit, pip-audit, the tests in four shards (one `test`
+check), the compose and image build, a Trivy image scan, gitleaks, CodeQL and
+the regression page crawl.
+
 ## Project layout
 
 ```
-core/          settings, policy (permissions), scoping, proxy trust, email, shared plumbing
-accounts/      logins, invitations, sign-in (allauth/MFA), assisted MFA reset
-community/     lots, people, ownership, board seats, offices, roles, sysadmin nominations
-audit/         append-only audit log, sysadmin activity page
-docker/        entrypoint, Postgres role init, SeaweedFS scripts, healthcheck
-infra/poc/     Proxmox VM scripts, .env generator, start script
-docs/          decisions, runbook, milestone summary
+core/        settings, policy (permissions), scoping, health, navigation, search, shared plumbing
+accounts/    logins, invitations, sign-in (allauth/MFA), assisted MFA reset, access reviews
+community/   homes, people, ownership and accounts, board seats, offices, roles, rules, reservations
+audit/       append-only audit log, sysadmin activity
+comms/       announcements, calendar, threads, notifications, push and texts
+documents/   document library, attachments, malware scanning and the scan queue
+governance/  meetings, packets, minutes, resolutions, voting, surveys, records requests
+arc/         architectural review, neighbor acknowledgements
+compliance/  violations, recurring deadlines
+operations/  owner requests, vendors, work orders, invoices
+ledger/      owner ledger, assessments, late fees, collections, budgets, reserves, accounting, bank feed
+payments/    Stripe hosted Checkout, automatic payments
+reports/     reports
+docker/      entrypoint, Postgres role init, SeaweedFS and ClamAV config, healthcheck
+infra/poc/   Proxmox VM scripts, update agent, backups and restore drill
+regression/  full regression and walkthrough tooling
+docs/        decisions, runbook, glossary, reviews, milestone plans and summaries
 templates/, static/
 ```

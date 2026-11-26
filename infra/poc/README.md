@@ -50,7 +50,8 @@ connections from the internet or other VLANs.
    bash infra/poc/make-env.sh
    ```
 
-   Build and start everything, and install the daily cloudflared update:
+   Build and start everything and install the update agent (images are
+   pinned in the compose files and updated by Dependabot pull requests, D57):
 
    ```bash
    sudo bash infra/poc/start-portal.sh
