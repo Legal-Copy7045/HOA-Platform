@@ -34,7 +34,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "==> 1. Automatic security updates"
 apt-get update -qq
-apt-get install -y -qq unattended-upgrades apt-listchanges python3 >/dev/null
+apt-get install -y -qq --no-install-recommends unattended-upgrades apt-listchanges python3 >/dev/null
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'CONF'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
@@ -54,7 +54,7 @@ if command -v pro >/dev/null 2>&1 && pro status --format json 2>/dev/null | grep
 fi
 
 echo "==> 2. Audit log for sensitive files (auditd)"
-apt-get install -y -qq auditd >/dev/null
+apt-get install -y -qq --no-install-recommends auditd >/dev/null
 {
   echo "# Portal VM: changes to sensitive files (infra/poc/harden-host.sh)."
   echo "-w $APP_DIR/.env -p wa -k hoa_env"
@@ -75,7 +75,10 @@ augenrules --load >/dev/null 2>&1 || true
 systemctl enable --now auditd >/dev/null
 
 echo "==> 3. Nightly file-integrity check (AIDE)"
-apt-get install -y -qq aide >/dev/null
+apt-get install -y -qq --no-install-recommends aide >/dev/null
+# Our own timer and config replace Ubuntu's daily AIDE job (which would mail
+# root through a local mail server this VM doesn't need).
+systemctl disable --now dailyaidecheck.timer >/dev/null 2>&1 || true
 cat > "$STATE_DIR/aide.conf" <<CONF
 # Portal VM file-integrity check (infra/poc/harden-host.sh).
 database_in=file:$STATE_DIR/aide.db
@@ -150,7 +153,7 @@ UNIT
 
 echo "==> 4. Falco (runtime monitoring of the containers)"
 if ! [ -f /usr/share/keyrings/falco-archive-keyring.gpg ]; then
-  apt-get install -y -qq curl gnupg >/dev/null
+  apt-get install -y -qq --no-install-recommends curl gnupg >/dev/null
   curl -fsSL https://falco.org/repo/falcosecurity-packages.asc \
     | gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
 fi
@@ -159,7 +162,7 @@ echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://down
 apt-get update -qq
 # Modern eBPF: no kernel module or headers needed; no automatic rule updates.
 FALCO_FRONTEND=noninteractive FALCO_DRIVER_CHOICE=modern_ebpf FALCOCTL_ENABLED=no \
-  apt-get install -y -qq falco >/dev/null
+  apt-get install -y -qq --no-install-recommends falco >/dev/null
 mkdir -p /etc/falco/config.d /etc/falco/rules.d /var/log/falco
 cat > /etc/falco/config.d/hoa-portal.yaml <<'CONF'
 # Portal VM (infra/poc/harden-host.sh): JSON alerts of warning and above to a

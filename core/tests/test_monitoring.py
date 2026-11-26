@@ -1,6 +1,7 @@
 """Milestone 4: health checks and alerts to sysadmins."""
 
 import datetime
+import re
 
 import pytest
 from django.core import mail
@@ -183,6 +184,9 @@ def test_harden_script_is_idempotent_and_keeps_secrets_off_argv():
     from pathlib import Path
 
     text = Path("infra/poc/harden-host.sh").read_text()
+    # No mail server or other recommended extras on the host.
+    installs = re.findall(r"apt-get install[^\n]*", text)
+    assert installs and all("--no-install-recommends" in i for i in installs)
     assert "set -euo pipefail" in text and '"$(id -u)" -eq 0' in text
     assert 'Automatic-Reboot "false"' in text
     assert "modern_ebpf" in text and "falco-modern-bpf.service" in text
