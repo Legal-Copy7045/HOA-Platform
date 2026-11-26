@@ -6,6 +6,22 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.9.0 — 2026-11-26
+
+- The account statement is easier to read: a box at the top says the amount
+  due and the date to pay by ("Past due since ..." when late), or "You have a
+  credit of $X. Nothing to pay.", or "Nothing to pay. Thank you."; then what
+  the amount is made of (each unpaid charge, partly paid ones marked), months
+  already paid ahead by a credit, how to pay, and the account activity with
+  payments in their own column and a "Balance brought forward" line. The
+  tear-off slip stays at the foot; a long history moves the activity to the
+  next page so the summary and slip fit on page 1.
+- When online payments are on, the statement (and the statement attached to
+  delinquency notices) carries a "Pay online" QR code. It holds only the
+  portal's address of the pay page: whoever scans it signs in first and
+  then sees their own home's charges, never anyone else's. The card
+  surcharge is stated from Community settings (D40).
+
 ## 0.8.0 — 2026-11-26
 
 - System status shows malware scanning at a glance: answering or not, ClamAV

@@ -311,7 +311,7 @@ def test_statement_and_resale_certificate_list_open_charges(w):
     _charge(w, 3000, "Gate remote")
     paras, _bal = letters.statement_paragraphs(w["lot"])
     text = "\n".join(t for _s, t in paras)
-    assert "OPEN CHARGES" in text and "Gate remote" in text
+    assert "What this amount is made of" in text and "Gate remote" in text
     resale = services.request_resale(lot=w["lot"], requester_name="Agent", actor=w["board"])
     pdf = services.resale_certificate(resale)
     assert b"OPEN CHARGES" in pdf

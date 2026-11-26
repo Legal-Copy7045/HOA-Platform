@@ -18,3 +18,7 @@
 - feature: "Stripe client refuses HTTP redirects so the key is never sent to another host (SEC-007)"
   since: M5
   match: ["^unit:payments/tests/test_stripe_redirects\\.py::test_"]
+- feature: "Account statement in plain words with a \"Pay online\" QR code (D40): summary box (amount due and pay-by date, past due since, credit, nothing to pay), what the amount is made of (partly paid charges), paid-ahead months, charges not due yet, how to pay, activity with brought-forward line and running balance, tear-off slip; the QR code only when online payments are usable and the site address is set, holding a plain signed-in address that opens the reader's own home; delinquency notices carry it; hostile text stays escaped"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_statement_(layout|moves)\\.py::test_", "^unit:ledger/tests/test_letters\\.py::test_", "^manual:statement pay online qr code"]

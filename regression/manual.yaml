@@ -209,3 +209,7 @@
   check: "On the POC VM, Admin > Server tasks > Take a backup now completes within a few minutes and the history row shows Done with a summary like 'Backup 2026-11-26T1830Z, 5.3M, copied off-site' whose stamp matches the newest folder in /var/backups/hoa-portal; a second request while it runs is refused; Restore drill finishes Done; a board member sees the history without Start buttons; the page fits a phone screen."
   steps: "Sign in as a sysadmin; open Admin > Server tasks; press Take a backup now; refresh after a minute or two; compare the stamp with `sudo ls /var/backups/hoa-portal`; press Start on Restore drill and wait; sign in as a demo board member and open Server tasks; repeat on a phone."
   last: ""
+- key: statement pay online qr code
+  check: "A printed account statement's \"Pay online\" QR code scans with an iPhone and an Android camera, opens the portal's sign-in, and after signing in goes straight to the ways to pay for that owner's own home with every open charge included; scanned by another owner it opens their own home instead. The statement is readable on paper (one page for a short history, the slip at the foot) and the attached statement of a delinquency notice carries the same code."
+  steps: "Online payments on (test mode); as the board print a demo owner's statement (Finance > Owner accounts > a lot > Statement) and a first notice; scan both with two phones signed out; sign in as that owner, then as another demo owner."
+  last: ""
