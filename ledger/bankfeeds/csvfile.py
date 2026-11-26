@@ -16,7 +16,13 @@ import hashlib
 import io
 from dataclasses import dataclass
 
-from ledger.bankfeeds.base import BankFeedError, TransactionInfo, clean_text, to_cents
+from ledger.bankfeeds.base import (
+    BankFeedError,
+    TransactionInfo,
+    clean_description,
+    clean_text,
+    to_cents,
+)
 
 # Under Django's 2.5 MB form-field limit: the mapping step posts the text back.
 MAX_BYTES = 2 * 1024 * 1024
@@ -88,7 +94,7 @@ def head(text: str, sample: int = 5) -> tuple[list[str], list[list[str]]]:
     """The header names (cleaned for display) and the first few lines."""
     rows = _rows(text)
     headers = [clean_text(h, 60) or f"Column {i + 1}" for i, h in enumerate(rows[0])]
-    return headers, [[clean_text(c, 60) for c in r] for r in rows[1 : 1 + sample]]
+    return headers, [[clean_description(c, 60) for c in r] for r in rows[1 : 1 + sample]]
 
 
 def guess(headers: list[str]) -> dict[str, int | None]:
@@ -150,7 +156,7 @@ def parse(text: str, mapping: Mapping) -> tuple[list[TransactionInfo], int]:
             continue
         if mapping.flip:
             amount = -amount
-        description = clean_text(cells[mapping.description])
+        description = clean_description(cells[mapping.description])
         key = f"{posted.isoformat()}|{amount}|{description.casefold()}"
         n = seen.get(key, 0)
         seen[key] = n + 1

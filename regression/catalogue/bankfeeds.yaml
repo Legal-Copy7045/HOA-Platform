@@ -20,3 +20,9 @@
 - feature: "Bank feed permissions (owners never; manager imports and matches, not connect/disconnect; auditor read-only), feature switch, health check row, audit without descriptions"
   since: M5
   match: ["^unit:ledger/tests/test_bank_feeds.py::test_(owners_never|manager_imports|auditor_sees|pages_are_gone|health_row)", "^unit:core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data\\[bank_"]
+- feature: "Bank-line descriptions never keep account or routing numbers: long digit runs masked to the last four for Teller, OFX/QFX and CSV (also the CSV preview and on storing); dates, amounts and check numbers kept; migration ledger.0016 masks stored lines (SEC-004, D34-fixinfra-1)"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feed_redaction.py::test_(redact|redaction|ofx_descriptions|csv_descriptions|teller_descriptions|storing_redacts|ofx_import_page|migration)"]
+- feature: "OFX lines without FITID: identical same-day lines both import, re-importing the file adds nothing, first occurrence keeps its earlier id (SEC-006)"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feed_redaction.py::test_(ofx_without_fitid|reimporting)"]

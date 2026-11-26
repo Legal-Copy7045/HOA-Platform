@@ -12,6 +12,7 @@ routing number (BANKID) is never read.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import datetime
 import hashlib
 import html
@@ -26,6 +27,7 @@ from ledger.bankfeeds.base import (
     TransactionInfo,
     clean_text,
     last_four,
+    redact_numbers,
     to_cents,
 )
 
@@ -91,19 +93,28 @@ def _transaction(values: dict[str, str]) -> TransactionInfo:
         description = f"{name} · {memo}" if name else memo
     if values.get("CHECKNUM") and not description:
         description = f"Check {clean_text(values['CHECKNUM'], 20)}"
+    description = redact_numbers(clean_text(description))  # never keep account numbers
     fitid = clean_text(values.get("FITID"), BANK_ID_MAX - 4)
-    if fitid:
-        bank_id = f"ofx:{fitid}"
-    else:  # FITID is required by the standard; fall back to the line itself
-        digest = hashlib.sha256(f"{posted}|{amount}|{description.casefold()}".encode())
-        bank_id = f"ofxh:{digest.hexdigest()[:48]}"
+    # FITID is required by the standard; without one, parse() keys the line by
+    # (date, amount, description) and how often it already appeared in the file.
+    bank_id = f"ofx:{fitid}" if fitid else ""
     return TransactionInfo(
         bank_id=bank_id,
         posted_on=posted,
         amount_cents=amount,
-        description=clean_text(description),
+        description=description,
         kind=clean_text(values.get("TRNTYPE"), KIND_MAX).lower(),
     )
+
+
+def _line_key(info: TransactionInfo, seen: dict[str, int]) -> str:
+    """A stable id for a line without FITID: two identical same-day lines in one
+    file both count (occurrence 0 and 1), and re-importing the file adds nothing."""
+    key = f"{info.posted_on}|{info.amount_cents}|{info.description.casefold()}"
+    n = seen.get(key, 0)
+    seen[key] = n + 1
+    suffix = f"|{n}" if n else ""  # the first occurrence keeps its earlier id
+    return f"ofxh:{hashlib.sha256((key + suffix).encode()).hexdigest()[:48]}"
 
 
 def parse(data: bytes) -> Statement:
@@ -121,6 +132,7 @@ def parse(data: bytes) -> Statement:
     txn: dict[str, str] | None = None
     balance: dict[str, str] | None = None
     seen_ids: set[str] = set()
+    occurrences: dict[str, int] = {}  # per statement account, see _line_key
     tokens = 0
     for match in _TOKEN.finditer(text, start):
         tokens += 1
@@ -138,6 +150,8 @@ def parse(data: bytes) -> Statement:
                 except BankFeedError:
                     statement.skipped += 1
                 else:
+                    if not info.bank_id:
+                        info = dataclasses.replace(info, bank_id=_line_key(info, occurrences))
                     if info.bank_id not in seen_ids:
                         seen_ids.add(info.bank_id)
                         account.transactions.append(info)
@@ -167,6 +181,7 @@ def parse(data: bytes) -> Statement:
         stack.append(name)
         if name in _STATEMENTS:
             account = StatementAccount(kind=_STATEMENTS[name])
+            occurrences = {}
         elif name == "STMTTRN":
             txn = {}
         elif name == "LEDGERBAL":

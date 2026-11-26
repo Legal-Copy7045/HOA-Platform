@@ -73,6 +73,66 @@ def clean_text(value, limit: int = DESCRIPTION_MAX) -> str:
     return _SPACES.sub(" ", text).strip()[:limit]
 
 
+# A run of six or more digits, single spaces or dashes allowed between them
+# (account and routing numbers are often written "0001 2345 6789").
+_DIGIT_RUN = re.compile(r"(?<!\d)\d(?:[ -]?\d){5,}(?!\d)")
+_AMOUNT_TAIL = re.compile(r"[.,]\d{1,2}(?!\d)")
+_DATE_SHAPES = ([6], [8], [4, 2, 2], [2, 2, 4], [2, 2, 2])
+MASK = "\u2022\u2022\u2022\u2022"  # "••••"
+
+
+def _plausible_date(digits: str) -> bool:
+    """YYYYMMDD / MMDDYYYY (8 digits) or YYMMDD / MMDDYY (6 digits)."""
+
+    def ok(y, m, d):
+        try:
+            datetime.date(y, m, d)
+        except ValueError:
+            return False
+        return True
+
+    if len(digits) == 8:
+        y1, y2 = int(digits[:4]), int(digits[4:])
+        return (1900 <= y1 <= 2100 and ok(y1, int(digits[4:6]), int(digits[6:]))) or (
+            1900 <= y2 <= 2100 and ok(y2, int(digits[:2]), int(digits[2:4]))
+        )
+    if len(digits) == 6:
+        a, b, c = int(digits[:2]), int(digits[2:4]), int(digits[4:])
+        return ok(2000 + a, b, c) or ok(2000 + c, a, b)
+    return False
+
+
+def redact_numbers(text: str, limit: int = DESCRIPTION_MAX) -> str:
+    """Mask long digit runs (account and routing numbers) down to the last four.
+
+    The portal never stores bank account numbers (SEC-004): any run of six or
+    more digits becomes "••••1234", unless it is plainly an amount (followed by
+    cents, or after a "$") or a date (6 or 8 digits that read as one, written
+    without separators or with them). Short numbers such as check numbers
+    (five digits or fewer) are kept. Over-masking is preferred to keeping a
+    number.
+    """
+
+    def replace(match: re.Match) -> str:
+        raw = match.group(0)
+        digits = "".join(c for c in raw if c.isdigit())
+        plain = raw.isdigit()
+        before = text[max(0, match.start() - 1) : match.start()]
+        if plain and (before == "$" or _AMOUNT_TAIL.match(text, match.end())):
+            return raw
+        shape = [len(group) for group in re.split(r"[ -]", raw)]
+        if shape in _DATE_SHAPES and _plausible_date(digits):
+            return raw
+        return MASK + digits[-4:]
+
+    return _DIGIT_RUN.sub(replace, text or "")[:limit]
+
+
+def clean_description(value, limit: int = DESCRIPTION_MAX) -> str:
+    """A bank line's description: clean_text, then long numbers masked."""
+    return redact_numbers(clean_text(value, limit), limit)
+
+
 def last_four(value) -> str:
     """The last four digits of an account number, and nothing more of it."""
     digits = "".join(c for c in str(value or "") if c.isdigit())

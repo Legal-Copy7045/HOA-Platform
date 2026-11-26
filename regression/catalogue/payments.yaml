@@ -15,3 +15,6 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:payments/tests/test_payout_bank_match\\.py::test_"]
+- feature: "Stripe client refuses HTTP redirects so the key is never sent to another host (SEC-007)"
+  since: M5
+  match: ["^unit:payments/tests/test_stripe_redirects\\.py::test_"]

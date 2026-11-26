@@ -36,6 +36,7 @@ from ledger.bankfeeds.base import (
     BankFeedError,
     Provider,
     TransactionInfo,
+    clean_description,
     clean_text,
     last_four,
     to_cents,
@@ -258,7 +259,7 @@ class TellerProvider(Provider):
                         bank_id=bank_id,
                         posted_on=posted,
                         amount_cents=to_cents(row.get("amount")),
-                        description=clean_text(row.get("description")),
+                        description=clean_description(row.get("description")),
                         kind=clean_text(row.get("type"), KIND_MAX),
                     )
                 )

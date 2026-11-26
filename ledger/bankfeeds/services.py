@@ -18,7 +18,14 @@ from audit.services import record_event
 from core import features
 from core.policy import SYSTEM, require
 from ledger.bankfeeds import csvfile, ofx, tokens
-from ledger.bankfeeds.base import AccountInfo, BankFeedError, Provider, clean_text, last_four
+from ledger.bankfeeds.base import (
+    AccountInfo,
+    BankFeedError,
+    Provider,
+    clean_description,
+    clean_text,
+    last_four,
+)
 from ledger.bankfeeds.providers import FileProvider, for_connection
 from ledger.bankfeeds.teller import TellerError, TellerProvider
 from ledger.models import (
@@ -177,7 +184,7 @@ def store_lines(conn, lines, *, source, actor) -> tuple[int, int]:
             bank_id=line.bank_id,
             posted_on=line.posted_on,
             amount_cents=line.amount_cents,
-            description=clean_text(line.description),
+            description=clean_description(line.description),
             kind=clean_text(line.kind, 40),
             source=source,
             imported_by=_user(actor),
