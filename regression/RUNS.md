@@ -3,6 +3,14 @@
 One entry per full run (newest first): date, commit, totals, failing check IDs,
 finding IDs, report link. No real names, hosts or addresses.
 
+## 2026-11-26 (night) — M5 features, streamlining and accounting fixes
+
+- Commit: 5b7fb4e. Totals: 3063 pass, 1 fail, 50 manual, 96 skip (78 page and 12 unit IDs retired by the streamlining merges; live not run: no LIVE_HOST in the cloud session).
+- Stages: ci 11 pass; unit 2158 pass; page 894 pass, 1 fail; live 6 skip; manual 50.
+- Failing: PAGE-946 (a tenant's Voting menu entry links to /surveys/, which now redirects to Voting).
+- Findings (26, none critical or high): BUG-001..010, R2-001..009, SEC-001..007. Medium: BUG-001/002/003, SEC-001, R2-001 (ledger entries take the account open on the posting day, not the ownership period the money belongs to: late sale recording, late fees after a sale, online payments confirmed after a sale), SEC-002/R2-003 (meeting-packet zip built in memory), SEC-003 (a manager can mark minutes as approved). bandit and pip-audit clean; 22 of 26 security claims held.
+- Report: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 4)
+
 ## 2026-11-26 — after fixing the 23 findings
 
 - Commit: 3d40fcc. Stages only (verification of the fixes): ci 11 pass; unit 1529 pass; page 878 pass; manual 34. Failing: none.
