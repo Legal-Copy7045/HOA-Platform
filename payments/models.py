@@ -152,6 +152,7 @@ class AlertKind(models.TextChoices):
     DISPUTE = "dispute", "Dispute to answer"
     SURCHARGE_REFUND = "surcharge", "Refund a surcharge"
     RECONCILIATION = "reconcile", "Stripe records do not match"
+    FORMER_OWNER = "former", "Payment from a former owner"
 
 
 class PaymentAlert(ScopedModel):
