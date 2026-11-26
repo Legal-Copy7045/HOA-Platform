@@ -112,7 +112,7 @@ class Migration(migrations.Migration):
             name="mailing_address",
             field=models.TextField(
                 blank=True,
-                help_text="Old free-text mailing address (read only since D40).",
+                help_text="Old free-text mailing address (read only since D44).",
             ),
         ),
         migrations.AlterField(
@@ -120,7 +120,7 @@ class Migration(migrations.Migration):
             name="mailing_address",
             field=models.TextField(
                 blank=True,
-                help_text="Old free-text mailing address (read only since D40).",
+                help_text="Old free-text mailing address (read only since D44).",
             ),
         ),
         migrations.CreateModel(
