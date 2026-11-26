@@ -1,7 +1,14 @@
 from django.urls import path, re_path
 from django.views.generic import RedirectView
 
-from community import account_views, branding_views, reservation_views, retention_views, views
+from community import (
+    account_views,
+    branding_views,
+    profile_views,
+    reservation_views,
+    retention_views,
+    views,
+)
 
 urlpatterns = [
     path("board/branding/", branding_views.branding_settings, name="branding_settings"),
@@ -35,6 +42,12 @@ urlpatterns = [
         name="account_change_decide",
     ),
     path("account/contacts/add/", account_views.contact_method_add, name="contact_method_add"),
+    path(
+        "account/contacts/<int:pk>/notices/",
+        account_views.contact_method_notices,
+        name="contact_method_notices",
+    ),
+    path("account/notices/", profile_views.notice_choice, name="notice_choice"),
     path(
         "account/contacts/<int:pk>/remove/",
         account_views.contact_method_remove,

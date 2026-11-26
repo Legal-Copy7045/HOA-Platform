@@ -190,6 +190,17 @@ REGISTRY: dict[str, RuleSpec] = {
             "debit card payments never carry a fee.",
             maximum=300,
         ),
+        # D40: official notices go by email only to owners who agreed.
+        RuleSpec(
+            "notices.electronic_consent_required",
+            "Ask owners to agree before official notices go to them by email",
+            BOOL,
+            "true",
+            "Notices",
+            "On: new owners choose email or post when they sign up, and owners who have not "
+            "answered see a to-do. Official notices are always emailed only to owners who "
+            "agreed; everyone else gets paper. Turning this off only stops asking.",
+        ),
         RuleSpec(
             "retention.former_owner_contact_days",
             "Days after someone leaves before their contact details are cleared",

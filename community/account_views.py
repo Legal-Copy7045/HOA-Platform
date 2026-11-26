@@ -4,6 +4,7 @@ contact details, and read-only history for former owners."""
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from community import services
@@ -101,7 +102,9 @@ def contact_method_add(request):
             value=request.POST.get("value", ""),
             label=request.POST.get("label", ""),
             notices=request.POST.get("notices") == "on",
+            phone_type=request.POST.get("phone_type", ""),
             actor=request.user,
+            request=request,
         ),
         "Contact detail added.",
     )
@@ -114,10 +117,28 @@ def contact_method_remove(request, pk):
     method = get_object_or_404(ContactMethod.objects.for_user(request.user), pk=pk)
     _flash(
         request,
-        lambda: services.remove_contact_method(method, actor=request.user),
+        lambda: services.remove_contact_method(method, actor=request.user, request=request),
         "Contact detail removed.",
     )
     return redirect("my_profile")
+
+
+@login_required
+@require_POST
+def contact_method_notices(request, pk):
+    """ "Also send official notices here" on one of my extra emails (D40)."""
+    method = get_object_or_404(
+        ContactMethod.objects.for_user(request.user).filter(person__user=request.user), pk=pk
+    )
+    on = request.POST.get("notices") == "on"
+    _flash(
+        request,
+        lambda: services.set_method_notices(
+            method, notices=on, actor=request.user, request=request
+        ),
+        "Official notices will go there too." if on else "No more official notices there.",
+    )
+    return redirect(reverse("my_profile") + "#email")
 
 
 def pending_changes_for_lot(user, lot):

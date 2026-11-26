@@ -59,6 +59,17 @@ def invitations(request):
                 "remind_count": len(services.reminder_due(rows=rows)),
             }
         )
+        # D40: how homes get official notices (counts only) and the wording.
+        from community import notices
+        from community.services import notice_choice_counts
+
+        context.update(
+            {
+                "notice_counts": notice_choice_counts(),
+                "notice_version": notices.CONSENT_VERSION,
+                "notice_wording": notices.consent_text(),
+            }
+        )
     elif request.GET.get("letters") == "1":
         policy.require(request.user, "invite.send")
     return render(request, "accounts/board/invitations.html", context)

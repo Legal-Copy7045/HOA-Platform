@@ -99,6 +99,10 @@ _SPECS = [
         "notice_consent",
         "consent_changed",
         "in_directory",
+        # D40: which consent wording, where it was answered, how post is addressed.
+        "notice_consent_version",
+        "via",
+        "mailing",
     ),
     _spec("export.own_data", "Downloaded own data"),
     _spec("preview.owner_started", "Preview as owner started", "lot_id"),
@@ -107,6 +111,7 @@ _SPECS = [
     _spec("account.contact_ended", "Account contact ended", "person_id", "kind"),
     _spec("contact.method_added", "Contact detail added", "kind"),
     _spec("contact.method_removed", "Contact detail removed", "kind"),
+    _spec("contact.method_changed", "Contact detail changed", "kind", "notices"),
     _spec("request.submitted", "Owner request submitted", "type", "lot_id"),
     _spec("request.assigned", "Owner request assigned", "person_id"),
     _spec("request.work_order_created", "Work order created from a request", "work_order_id"),

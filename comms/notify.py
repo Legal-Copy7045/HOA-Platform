@@ -79,8 +79,93 @@ def send_now(emails, *, subject: str, body: str) -> None:
         transaction.on_commit(go)
 
 
+# Detail pages a routine update links to, and how to check that the person
+# can still open one (each through that area's own scoping). A weekly digest
+# only lists updates the person can still see (D40).
+def _thread_subject(kind):
+    def check(user, pk):
+        from django.http import Http404
+
+        from comms import threads
+
+        try:
+            threads.subject_for(kind, pk, user)
+        except Http404:
+            return False
+        return True
+
+    return check
+
+
+def _scoped(model_path):
+    def check(user, pk):
+        from django.apps import apps
+
+        model = apps.get_model(model_path)
+        return model.objects.for_user(user).filter(pk=pk).exists()
+
+    return check
+
+
+def _survey(user, pk):
+    from governance import surveys
+    from governance.models import Survey
+
+    survey = Survey.objects.filter(pk=pk).first()
+    return survey is not None and surveys.can_view(survey, user)
+
+
+def _event(user, pk):
+    from comms.models import Event
+    from core import policy
+
+    return policy.can(user, "calendar.view") and Event.objects.for_user(user).filter(pk=pk).exists()
+
+
+VISIBILITY = {
+    "request_detail": _thread_subject("request"),
+    "arc_detail": _thread_subject("arc"),
+    "violation_detail": _thread_subject("violation"),
+    "work_order_detail": _thread_subject("work_order"),
+    "committee_topic_detail": _thread_subject("committee_topic"),
+    "signoff_detail": _scoped("arc.SignoffRequest"),
+    "reservation_detail": _scoped("community.Reservation"),
+    "event_detail": _event,
+    "survey_detail": _survey,
+}
+
+
+def still_visible(user, link: str) -> bool:
+    """Can ``user`` still open the page this held update links to? False
+    when their access has ended (no role left), the area is switched off,
+    the page is gone, or the record is out of their scope now."""
+    from urllib.parse import urlsplit
+
+    from django.urls import Resolver404, resolve
+
+    from core import features, policy
+
+    if not user.is_active or not policy.roles_for(user).groups:
+        return False
+    path = urlsplit(link).path or "/"
+    try:
+        match = resolve(path)
+    except Resolver404:
+        return False
+    if not features.path_enabled(path):
+        return False
+    check = VISIBILITY.get(match.url_name or "")
+    pk = match.kwargs.get("pk")
+    if check is None or pk is None:
+        return True  # a page without a record of its own: checked when opened
+    return bool(check(user, int(pk)))
+
+
 def send_digests() -> int:
-    """One email per person with everything held since their last digest."""
+    """One email per person with updates held since their last digest, sent
+    only when there is something new they can still open. Held updates they
+    can no longer see (access ended, record out of scope) are dropped
+    without an email; nobody gets an empty summary."""
     from comms.models import DigestItem
 
     sent = 0
@@ -91,14 +176,15 @@ def send_digests() -> int:
             if not items:
                 continue
             user = items[0].user
-            lines = "\n".join(f"- {i.subject}\n  {i.link}" for i in items)
-            body = (
-                f"Your weekly summary from {settings.SITE_NAME} "
-                f"({len(items)} update{'s' if len(items) != 1 else ''}):\n\n{lines}\n\n"
-                "You can switch to one email per update in My profile.\n\n"
-                f"-- \n{settings.SITE_NAME}"
-            )
-            if user.is_active:
+            visible = [i for i in items if still_visible(user, i.link)]
+            if visible:
+                lines = "\n".join(f"- {i.subject}\n  {i.link}" for i in visible)
+                count = f"{len(visible)} update{'s' if len(visible) != 1 else ''}"
+                body = (
+                    f"Your weekly summary from {settings.SITE_NAME} ({count}):\n\n{lines}\n\n"
+                    "You can switch to one email per update in My profile.\n\n"
+                    f"-- \n{settings.SITE_NAME}"
+                )
                 send_mail(f"[{settings.SITE_NAME}] Your weekly summary", body, None, [user.email])
                 sent += 1
             DigestItem.objects.filter(pk__in=[i.pk for i in items]).delete()

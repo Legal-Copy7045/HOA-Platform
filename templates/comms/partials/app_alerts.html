@@ -27,37 +27,4 @@
   <form method="post" action="{% url 'push_unsubscribe' %}">{% csrf_token %}<button type="submit" class="secondary small">Turn off on all my devices</button></form>
 </section>
 {% endif %}
-{% if sms_on %}
-<section class="card" id="texts">
-  <h3>Urgent text messages</h3>
-  <p class="small muted">Optional. The board texts only urgent community notices (a water main break, a road closure), with a link to sign in for details. Never your balance or anything personal. {{ stop_note }}</p>
-  {% if sms_number and sms_opted_in %}
-    <p class="small"><span class="badge tone-success">On</span> Texts go to your number {{ sms_number }}.</p>
-    <form method="post" action="{% url 'sms_stop' %}">{% csrf_token %}<button type="submit" class="secondary small">Stop texts and remove my number</button></form>
-  {% elif not sms_ready %}
-    <p class="small">Text messages aren't set up yet.</p>
-  {% else %}
-    {% if sms_pending %}
-      <form method="post" action="{% url 'sms_verify' %}">{% csrf_token %}
-        <p><label for="sms-code">Code we texted to your number ending in {{ sms_pending.number|slice:"-4:" }} <span class="required-mark" aria-hidden="true">*</span></label>
-          <input id="sms-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required aria-describedby="sms-code-help">
-          <span class="help" id="sms-code-help">6 digits. The code works for 10 minutes.</span></p>
-        <div class="form-actions"><button type="submit">Confirm</button></div>
-      </form>
-    {% endif %}
-    <form method="post" action="{% url 'sms_start' %}">{% csrf_token %}
-      <p><label for="sms-number">Mobile number <span class="required-mark" aria-hidden="true">*</span></label>
-        <input id="sms-number" type="tel" name="number" autocomplete="tel" maxlength="20" required aria-describedby="sms-number-help">
-        <span class="help" id="sms-number-help">We text a 6-digit code to confirm it. Message and data rates may apply.</span></p>
-      <div class="form-actions"><button type="submit" class="secondary">{% if sms_pending %}Send a new code{% else %}Text me a code{% endif %}</button></div>
-    </form>
-  {% endif %}
-</section>
-{% elif sms_number %}
-<section class="card" id="texts">
-  <h3>Urgent text messages</h3>
-  <p class="small">Texts are switched off for the community right now. Your mobile number {{ sms_number }} is still stored{% if sms_opted_in %}, and texts would go to it again if they are switched back on{% endif %}.</p>
-  <form method="post" action="{% url 'sms_stop' %}">{% csrf_token %}<button type="submit" class="secondary small">Stop texts and remove my number</button></form>
-</section>
-{% endif %}
 <script src="{% static 'js/alerts.js' %}" defer></script>

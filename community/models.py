@@ -540,13 +540,28 @@ class ContactProfile(ScopedModel):
 
     person = models.OneToOneField(Person, on_delete=models.PROTECT, related_name="contact")
     phone = models.CharField(max_length=40, blank=True)
+    # The old free-text mailing address (before D40). Kept and still read as a
+    # fallback, never written by the portal any more: people re-enter it in
+    # the structured fields below ("Address on file (please check)").
     mailing_address = models.TextField(
-        blank=True, help_text="Only if different from the lot address."
+        blank=True, help_text="Old free-text mailing address (read only since D40)."
     )
     electronic_notice_consent = models.BooleanField(
         default=False, help_text="Agree to receive official notices by email."
     )
+    # When the person last answered (on My profile or the sign-up step); null
+    # means they have never chosen, so the portal still asks (D40).
     consent_changed_at = models.DateTimeField(null=True, blank=True)
+    # Which wording they agreed to (community.notices.CONSENT_VERSION).
+    notice_consent_version = models.CharField(max_length=20, blank=True)
+    # Mailing address for post (D40): None = never chosen, True = the home's
+    # address, False = the structured address below.
+    mail_to_home = models.BooleanField(null=True, blank=True)
+    mail_street = models.CharField(max_length=200, blank=True)
+    mail_unit = models.CharField(max_length=60, blank=True)
+    mail_city = models.CharField(max_length=80, blank=True)
+    mail_state = models.CharField(max_length=2, blank=True)
+    mail_zip = models.CharField(max_length=10, blank=True)
     # Directory: hidden unless the owner opts in, field by field (decision 5).
     in_directory = models.BooleanField(default=False)
     directory_show_email = models.BooleanField(default=False)
@@ -667,7 +682,14 @@ class AccountContact(NeverDeleteMixin, ScopedModel):
 class ContactMethodKind(models.TextChoices):
     EMAIL = "email", "Email"
     PHONE = "phone", "Phone"
+    # Old entries only (D40): the one postal address now lives on ContactProfile.
     ADDRESS = "address", "Mailing address"
+
+
+class PhoneType(models.TextChoices):
+    MOBILE = "mobile", "Mobile"
+    HOME = "home", "Home"
+    WORK = "work", "Work"
 
 
 class ContactMethod(ScopedModel):
@@ -678,10 +700,12 @@ class ContactMethod(ScopedModel):
     kind = models.CharField(max_length=8, choices=ContactMethodKind.choices)
     label = models.CharField(max_length=60, blank=True, help_text='e.g. "Work", "Spouse"')
     value = models.CharField(max_length=300)
+    phone_type = models.CharField(max_length=8, choices=PhoneType.choices, blank=True)
     notices = models.BooleanField(
         default=False, help_text="Send association notices here too (email) / by post (address)."
     )
     created_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()  # D40: removed details stay in the history
 
     objects = ScopedQuerySet.as_manager()
     scope_person_path = "person"

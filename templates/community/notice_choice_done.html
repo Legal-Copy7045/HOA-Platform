@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Official notices · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Official notices</h1></div></div>
+  <section class="card notice-step">
+    <h2>We'll keep sending them by post</h2>
+    <p>Official notices will be mailed to:</p>
+    {% if address %}<p><strong>{{ address|linebreaksbr }}</strong></p>{% else %}<p class="muted">We don't have a mailing address for you yet.</p>{% endif %}
+    <p class="small muted">Is this right? You can change where post goes, or switch to email, at any time.</p>
+    <div class="form-actions">
+      <a class="btn secondary" href="{% url 'my_profile' %}#mailing">Change my mailing address on My profile</a>
+      <a class="btn" href="{% url 'home' %}">Continue</a>
+    </div>
+  </section>
+{% endblock %}

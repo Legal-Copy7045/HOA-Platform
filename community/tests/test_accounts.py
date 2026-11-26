@@ -247,6 +247,8 @@ def test_owners_cannot_open_my_history(client, w):
 
 
 def test_owner_adds_and_removes_own_contact_methods(client, w):
+    # Extra notice addresses only once the owner chose email notices (D40).
+    services.record_notice_choice(user=w["owner"], consent=True)
     client.force_login(w["owner"])
     client.post(
         reverse("contact_method_add"),

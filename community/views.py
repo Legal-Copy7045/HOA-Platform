@@ -267,8 +267,29 @@ def person_detail(request, pk):
             "role_form": forms.RoleForm(),
             "end_form": forms.EndDateForm(),
             "reset_form": StartResetForm(),
+            "contact": _person_contact(user, person),
         },
     )
+
+
+def _person_contact(user, person) -> dict:
+    """How the association reaches this person (D40): notices choice, the
+    address paper goes to, extra emails and phones. Board pages only."""
+    from community.models import ContactMethod, ContactMethodKind, ContactProfile
+
+    profile = ContactProfile.objects.for_user(user).filter(person=person).first()
+    methods = list(ContactMethod.objects.for_user(user).filter(person=person))
+    address, source = services.postal_address(person)
+    return {
+        "profile": profile,
+        "answered": bool(profile and profile.consent_changed_at),
+        "consent": bool(profile and profile.electronic_notice_consent),
+        "address": address,
+        "source": source,
+        "emails": [m for m in methods if m.kind == ContactMethodKind.EMAIL],
+        "phones": [m for m in methods if m.kind == ContactMethodKind.PHONE],
+        "needs_check": services.needs_address_check(person.pk),
+    }
 
 
 def _person_action(form_class, do, success):

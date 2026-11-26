@@ -357,6 +357,10 @@ def test_my_items_lists_unassigned_and_my_requests_with_counts(client, w):
 def test_owner_sees_requests_waiting_on_them(w):
     req = _submit(w)
     services.OWNER_REQUEST.apply(req, "ask_owner", actor=w["board"], note="Photo please")
+    # The owner already chose how to get official notices (no D40 to-do).
+    from community.services import record_notice_choice
+
+    record_notice_choice(user=w["owner"], consent=True)
     items = my_items.items_for(w["owner"])
     assert [i.area for i in items] == ["My home"]
     assert items[0].nav == "requests?mine=1"

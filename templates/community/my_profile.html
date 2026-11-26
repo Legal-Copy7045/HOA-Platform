@@ -1,24 +1,112 @@
 {% extends "base.html" %}
-{% load portal app_alerts %}
+{% load static portal app_alerts %}
 {% block title %}My profile · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>My profile</h1>{% if person %}<div class="meta"><span>{% icon "user" %}{{ person.display_name }}</span><span>{% icon "mail" %}{{ user.email }}</span></div>{% endif %}</div>
     <div class="actions"><a class="btn secondary" href="{% url 'mfa_index' %}">{% icon "lock" %} Sign-in and security</a></div></div>
   <div class="split">
-    <section class="card">
-      {% if person %}
-        <h2>Your details and choices</h2>
-        <form method="post" class="profile-form">{% csrf_token %}
-          {% if form.errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>Please check the details below.</span></div>{% endif %}
-          <fieldset><legend>How to reach you</legend>
-            <div class="field"><span class="field-label">Sign-in email</span><div>{{ user.email }}</div><div class="help">To change your sign-in email, ask the board.</div></div>
-            <div class="field{% if form.phone.errors %} has-error{% endif %}"><label for="{{ form.phone.auto_id }}">Phone</label>{{ form.phone }}{{ form.phone.errors }}</div>
-            <div class="field{% if form.mailing_address.errors %} has-error{% endif %}"><label for="{{ form.mailing_address.auto_id }}">Mailing address</label>{{ form.mailing_address }}<div class="help" id="id_mailing_address_help">{{ form.mailing_address.help_text }}</div>{{ form.mailing_address.errors }}</div>
-          </fieldset>
-          <fieldset><legend>Official notices</legend>
-            <label class="choice" for="{{ form.electronic_notice_consent.auto_id }}">{{ form.electronic_notice_consent }} {{ form.electronic_notice_consent.label }}</label>
-            <div class="help" id="id_electronic_notice_consent_help">{{ form.electronic_notice_consent.help_text }}</div>
-          </fieldset>
+    <div>
+    {% if person %}
+      <section class="card reach" id="reach">
+        <h2>How we reach you</h2>
+
+        {# 1. Official notices: email or post (D40) #}
+        <div class="reach-section" id="notices">
+          <h3>Official notices</h3>
+          {% if is_owner %}
+            {% with form=forms.notices %}
+            {% include "partials/form_errors.html" %}
+            {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
+            <p class="small">{{ notice_text.0 }} They include:</p>
+            <ul class="small">{% for k in notice_kinds %}<li>{{ k }}</li>{% endfor %}</ul>
+            <p class="small muted">{{ notice_text.1 }} {{ notice_text.2 }}</p>
+            {% if answered %}<p class="small"><span class="badge {% if consent %}tone-success{% else %}tone-neutral{% endif %}">{% if consent %}By email{% else %}By post{% endif %}</span> Chosen {{ profile.consent_changed_at|date:"M j, Y" }}.</p>{% else %}<div class="alert warning">{% icon "alert" %}<span>You haven't chosen yet. Until you do, notices come by post.</span></div>{% endif %}
+            <form method="post" action="{% url 'my_profile' %}#notices">{% csrf_token %}<input type="hidden" name="section" value="notices">
+              <fieldset class="choices"><legend class="sr-only">How to get official notices</legend>
+                <label class="choice"><input type="radio" name="choice" value="email"{% if answered and consent %} checked{% endif %} required> {{ yes_label }}</label>
+                <label class="choice"><input type="radio" name="choice" value="post"{% if answered and not consent %} checked{% endif %}> {{ no_label }}</label>
+              </fieldset>
+              <div class="form-actions"><button type="submit">Save my choice</button></div>
+            </form>
+            {% endwith %}
+          {% else %}
+            <p class="small muted">Official notices go to the owners on the deed.</p>
+          {% endif %}
+        </div>
+
+        {# 2. Email #}
+        <div class="reach-section" id="email">
+          <h3>Email</h3>
+          <div class="field"><span class="field-label">Sign-in email</span><div>{{ user.email }}</div><div class="help">You sign in with this. To change your sign-in email, ask the board.</div></div>
+          {% if emails %}<ul class="list">{% for m in emails %}<li><div class="grow"><div class="title">{{ m.value }}</div>{% if m.label %}<div class="small muted">{{ m.label }}</div>{% endif %}
+              {% if is_owner %}{% if consent %}<form method="post" action="{% url 'contact_method_notices' m.pk %}" class="inline-form">{% csrf_token %}<label class="small"><input type="checkbox" name="notices"{% if m.notices %} checked{% endif %}> Also send official notices here</label><button type="submit" class="secondary small">Save</button></form>
+              {% else %}<div class="small muted">Official notices come by post. Choose email above to send them here too.</div>{% endif %}{% endif %}</div>
+            <form method="post" action="{% url 'contact_method_remove' m.pk %}">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form></li>{% endfor %}</ul>{% endif %}
+          {% with form=forms.email_add %}
+          <details class="panel"{% if form.is_bound %} open{% endif %}><summary>Add another email</summary><div class="panel-body">
+            {% include "partials/form_errors.html" %}
+            {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
+            <form method="post" action="{% url 'my_profile' %}#email">{% csrf_token %}<input type="hidden" name="section" value="email_add">
+              <div class="field{% if form.email.errors %} has-error{% endif %}"><label for="{{ form.email.auto_id }}">{{ form.email.label }}</label>{{ form.email }}{{ form.email.errors }}</div>
+              <div class="field{% if form.label.errors %} has-error{% endif %}"><label for="{{ form.label.auto_id }}">{{ form.label.label }}</label>{{ form.label }}{{ form.label.errors }}</div>
+              {% if is_owner and consent %}<label class="choice" for="{{ form.notices.auto_id }}">{{ form.notices }} {{ form.notices.label }}</label>{% endif %}
+              <div class="form-actions"><button type="submit">Add email</button></div>
+            </form></div></details>
+          {% endwith %}
+        </div>
+
+        {# 3. Phone (and opt-in text alerts) #}
+        <div class="reach-section" id="phone">
+          <h3>Phone</h3>
+          {% if phones %}<ul class="list">{% for m in phones %}<li><div class="grow"><div class="title">{{ m.value }}</div><div class="small muted">{{ m.get_phone_type_display|default:"Phone" }}{% if m.label %} · {{ m.label }}{% endif %}</div></div>
+            <form method="post" action="{% url 'contact_method_remove' m.pk %}">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form></li>{% endfor %}</ul>
+          {% else %}<p class="small muted">No phone numbers yet.</p>{% endif %}
+          {% with form=forms.phone_add %}
+          <details class="panel"{% if form.is_bound %} open{% endif %}><summary>Add a phone</summary><div class="panel-body">
+            {% include "partials/form_errors.html" %}
+            {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
+            <form method="post" action="{% url 'my_profile' %}#phone">{% csrf_token %}<input type="hidden" name="section" value="phone_add">
+              <div class="field{% if form.phone_type.errors %} has-error{% endif %}"><label for="{{ form.phone_type.auto_id }}">{{ form.phone_type.label }}</label>{{ form.phone_type }}{{ form.phone_type.errors }}</div>
+              <div class="field{% if form.number.errors %} has-error{% endif %}"><label for="{{ form.number.auto_id }}">{{ form.number.label }}</label>{{ form.number }}{{ form.number.errors }}</div>
+              <div class="field{% if form.label.errors %} has-error{% endif %}"><label for="{{ form.label.auto_id }}">{{ form.label.label }}</label>{{ form.label }}{{ form.label.errors }}</div>
+              <p class="small muted">Adding a phone never signs you up for text messages.</p>
+              <div class="form-actions"><button type="submit">Add phone</button></div>
+            </form></div></details>
+          {% endwith %}
+          {% text_alerts_panel %}
+        </div>
+
+        {# 4. Mailing address for post #}
+        <div class="reach-section" id="mailing">
+          <h3>Mailing address for post</h3>
+          <p class="small muted">Where paper notices and letters go{% if consent %} (if any are ever sent by post){% endif %}.</p>
+          {% if post_address %}<p class="small">Post goes to: <strong>{{ post_address|linebreaksbr }}</strong></p>{% endif %}
+          {% if address_check %}<div class="alert warning">{% icon "alert" %}<div><strong>Address on file (please check)</strong><div class="small">{{ old_address|linebreaksbr }}</div><div class="small">This was typed in before addresses had separate fields. Please choose below and save, so letters reach you.</div></div></div>{% endif %}
+          {% if old_methods %}<ul class="list">{% for m in old_methods %}<li><div class="grow"><div class="title">Address on file (please check)</div><div class="small muted">{{ m.value }}</div></div><form method="post" action="{% url 'contact_method_remove' m.pk %}">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form></li>{% endfor %}</ul>{% endif %}
+          {% with form=forms.mailing %}
+          {% include "partials/form_errors.html" %}
+          {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
+          <form method="post" action="{% url 'my_profile' %}#mailing">{% csrf_token %}<input type="hidden" name="section" value="mailing">
+            <fieldset class="choices"><legend class="sr-only">Send post to</legend>
+              {% for radio in form.where %}<label class="choice" for="{{ radio.id_for_label }}">{{ radio.tag }} {{ radio.choice_label }}{% if radio.data.value == "home" and home_address %} <span class="small muted">({{ home_address }})</span>{% endif %}</label>{% endfor %}
+            </fieldset>
+            <div data-show-if="where=other">
+              <div class="field{% if form.street.errors %} has-error{% endif %}"><label for="{{ form.street.auto_id }}">{{ form.street.label }}</label>{{ form.street }}{{ form.street.errors }}</div>
+              <div class="field{% if form.unit.errors %} has-error{% endif %}"><label for="{{ form.unit.auto_id }}">{{ form.unit.label }}</label>{{ form.unit }}{{ form.unit.errors }}</div>
+              <div class="field{% if form.city.errors %} has-error{% endif %}"><label for="{{ form.city.auto_id }}">{{ form.city.label }}</label>{{ form.city }}{{ form.city.errors }}</div>
+              <div class="field{% if form.state.errors %} has-error{% endif %}"><label for="{{ form.state.auto_id }}">{{ form.state.label }}</label>{{ form.state }}{{ form.state.errors }}</div>
+              <div class="field{% if form.zip_code.errors %} has-error{% endif %}"><label for="{{ form.zip_code.auto_id }}">{{ form.zip_code.label }}</label>{{ form.zip_code }}<div class="help">5 digits, or ZIP+4.</div>{{ form.zip_code.errors }}</div>
+            </div>
+            <div class="form-actions"><button type="submit">Save mailing address</button></div>
+          </form>
+          {% endwith %}
+        </div>
+      </section>
+
+      <section class="card" id="choices">
+        <h2>Directory and email updates</h2>
+        {% include "partials/form_errors.html" %}
+        <form method="post" action="{% url 'my_profile' %}#choices" class="profile-form">{% csrf_token %}<input type="hidden" name="section" value="prefs">
           <fieldset><legend>Owner directory</legend>
             <label class="choice" for="{{ form.in_directory.auto_id }}">{{ form.in_directory }} {{ form.in_directory.label }}</label>
             <div class="help" id="id_in_directory_help">{{ form.in_directory.help_text }}</div>
@@ -28,25 +116,18 @@
             </fieldset>
           </fieldset>
           <fieldset><legend>Email updates</legend>
-            <label class="choice" for="{{ form.weekly_digest.auto_id }}">{{ form.weekly_digest }} {{ form.weekly_digest.label }}</label>
+            <p class="small">{{ form.weekly_digest.label }}:</p>
+            {% for radio in form.weekly_digest %}<label class="choice" for="{{ radio.id_for_label }}">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}
             <div class="help" id="id_weekly_digest_help">{{ form.weekly_digest.help_text }}</div>
           </fieldset>
-          <div class="form-actions"><button type="submit">Save changes</button></div>
+          <div class="form-actions"><button type="submit">Save choices</button></div>
         </form>
-      {% else %}{% include "partials/empty.html" with icon="user" title="Not linked yet" text="Your login isn't linked to a person record yet. Ask a board member." %}{% endif %}
-    </section>
-    <aside>{% if person %}<section class="card"><h3>More ways to reach you</h3>
-      <p class="small muted">Extra emails, phones or mailing addresses. Tick "send notices" on an email to get association notices there too.</p>
-      {% if methods %}<ul class="list">{% for m in methods %}<li><span class="grow">{{ m.get_kind_display }}{% if m.label %} ({{ m.label }}){% endif %}: {{ m.value }}{% if m.notices %} <span class="badge tone-success">notices</span>{% endif %}</span>
-        <form method="post" action="{% url 'contact_method_remove' m.pk %}">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form></li>{% endfor %}</ul>{% endif %}
-      <form method="post" action="{% url 'contact_method_add' %}">{% csrf_token %}
-        <p><label>Kind <select name="kind">{% for value, label in method_kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label></p>
-        <p><label>Details <input type="text" name="value" maxlength="300" required></label></p>
-        <p><label>Label (optional) <input type="text" name="label" maxlength="60" placeholder="Work, cell..."></label></p>
-        <p><label><input type="checkbox" name="notices"> Send notices here (emails only)</label></p>
-        <div class="form-actions"><button type="submit" class="secondary">Add</button></div>
-      </form></section>{% endif %}
+      </section>
+    {% else %}<section class="card">{% include "partials/empty.html" with icon="user" title="Not linked yet" text="Your login isn't linked to a person record yet. Ask a board member." %}</section>{% endif %}
+    </div>
+    <aside>
       {% app_alerts_panel %}
       <section class="card"><h3>Your data</h3><p class="small muted">A file with everything the portal holds about you (for your records).</p><a class="btn secondary" href="{% url 'export_my_data' %}">{% icon "download" %} Download my data</a></section></aside>
   </div>
 {% endblock %}
+{% block extra_body %}<script src="{% static 'js/forms.js' %}"></script>{% endblock %}

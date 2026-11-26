@@ -125,6 +125,12 @@ def account_setup_done(request):
         return redirect("mfa_index")
     enrollment.clear(request)
     messages.success(request, "You're all set. Next time, sign in with your passkey or password.")
+    # D40: owners on the deed who have not chosen yet are asked once how they
+    # want official notices (only now, with the authenticator in place).
+    from community.services import notice_choice_due
+
+    if notice_choice_due(request.user):
+        return redirect("notice_choice")
     return redirect("home")
 
 

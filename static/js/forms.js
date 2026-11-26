@@ -30,7 +30,9 @@
       var parts = rule.split("=");
       var field = form.elements[parts[0]];
       if (!field) return;
-      var on = field.value === parts[1];
+      // A checkbox counts as its value only while ticked ("opt_in=on").
+      var value = field.type === "checkbox" ? (field.checked ? field.value : "") : field.value;
+      var on = value === parts[1];
       if (el.hasAttribute("data-show-if")) {
         el.hidden = !on;
       } else {
