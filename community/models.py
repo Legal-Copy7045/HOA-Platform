@@ -61,7 +61,52 @@ class Lot(NeverDeleteMixin, ScopedModel):
         ordering = ["number"]
 
     def __str__(self) -> str:
+        return self.label
+
+    # D40: people know a home by its address, not its plat lot number.
+    # `label` is what every page, email and list shows; `legal_label` adds
+    # the lot number in brackets for formal documents a title company, court
+    # or owner keeps (resale certificate, letters, statements, decisions).
+
+    @property
+    def label(self) -> str:
+        """The address on one line, e.g. "165 Imaginary Orchard Way"."""
+        first = (self.street_address or "").strip().splitlines()
+        line = " ".join(first[0].split()) if first else ""
+        return line or f"Home {self.number} (no address recorded)"
+
+    @property
+    def lot_ref(self) -> str:
+        """The plat reference shown only as a muted subtitle or in brackets."""
         return f"Lot {self.number}"
+
+    @property
+    def legal_label(self) -> str:
+        """For formal documents: "165 Imaginary Orchard Way (Lot 30)"."""
+        return f"{self.label} ({self.lot_ref})"
+
+    @property
+    def has_address(self) -> bool:
+        return bool((self.street_address or "").strip())
+
+    @property
+    def sort_key(self) -> tuple:
+        """Lists are in address order: street name, then house number."""
+        return home_sort_key(self)
+
+
+def home_sort_key(lot) -> tuple:
+    """(street, house number, lot number) so "98 Elm" comes before "102 Elm"."""
+    label = lot.label if lot.has_address else ""
+    head, _, rest = label.partition(" ")
+    if head.isdigit():
+        return (rest.lower(), int(head), lot.number)
+    return (label.lower(), 0, lot.number)
+
+
+def sorted_homes(lots) -> list:
+    """Lots (or anything with a ``.lot``-free Lot interface) in address order."""
+    return sorted(lots, key=home_sort_key)
 
 
 class Person(NeverDeleteMixin, ScopedModel):
