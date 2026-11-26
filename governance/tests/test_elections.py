@@ -288,7 +288,7 @@ def test_a_buyer_is_not_told_the_sellers_election_ballot_was_theirs(client, w):
     )
     client.force_login(c)
     page = client.get(reverse("election_detail", args=[election.pk])).content.decode()
-    assert f"Lot {lot_c.number}: your ballot was recorded" in page
+    assert f"{lot_c.label}: your ballot was recorded" in page
     assert "Your ballot was recorded" in client.get(reverse("voting")).content.decode()
 
     with system_access("t"):

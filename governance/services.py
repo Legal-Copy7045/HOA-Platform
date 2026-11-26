@@ -672,7 +672,7 @@ def cast_ballot(
             if vote.kind == VoteKind.FORMAL:
                 lot = next((lot for lot in choices["lots"] if lot.pk == lot_id), None)
                 if lot is None:
-                    raise GovernanceError("Choose which of your lots this ballot is for.")
+                    raise GovernanceError("Choose which of your homes this ballot is for.")
             ballot = Ballot.objects.create(
                 vote=vote,
                 option=None if vote.secret else option,
@@ -684,7 +684,7 @@ def cast_ballot(
                 # Stored apart from the ballot, with nothing that links them.
                 SecretChoice.objects.create(vote=vote, option=option)
     except IntegrityError as exc:
-        raise GovernanceError("A ballot was already cast for this lot.") from exc
+        raise GovernanceError("A ballot was already cast for this home.") from exc
     # Secret ballots: the audit trail records that a ballot was cast, not the choice.
     record_event(
         "vote.ballot_cast",

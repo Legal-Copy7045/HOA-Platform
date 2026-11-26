@@ -11,13 +11,13 @@
       {% if vote.status == "open" %}<form method="post" action="{% url 'vote_action' vote.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit" class="danger">Close voting</button></form>{% endif %}
     </div>{% endif %}
   </div>
-  {% if vote.kind == "formal" %}<div class="alert info">{% icon "vote" %}<span>Formal vote: the result is binding, one ballot per lot.{% if vote.rules_citation %} Rules applied: quorum {{ vote.quorum_percent }}%, pass {{ vote.pass_percent }}% ({{ vote.rules_citation }}).{% endif %}</span></div>{% endif %}
+  {% if vote.kind == "formal" %}<div class="alert info">{% icon "vote" %}<span>Formal vote: the result is binding, one ballot per home.{% if vote.rules_citation %} Rules applied: quorum {{ vote.quorum_percent }}%, pass {{ vote.pass_percent }}% ({{ vote.rules_citation }}).{% endif %}</span></div>{% endif %}
   <div class="split">
     <div>
       {% if vote.description %}<section class="card prose">{{ vote.description|linebreaks }}</section>{% endif %}
       {% if my_ballots %}
         <section class="card" id="ballot-recorded"><h2>Your ballot</h2>
-          <ul class="list">{% for b in my_ballots %}<li class="voted">{% icon "check-circle" %}<span class="grow">{% if vote.secret %}{% if b.lot %}Lot {{ b.lot.number }}: your{% else %}Your{% endif %} ballot was recorded.{% else %}{% if b.lot %}Lot {{ b.lot.number }}: you{% else %}You{% endif %} voted on {{ b.cast_at|date:"M j, Y" }}{% if b.option %} for &ldquo;{{ b.option.label }}&rdquo;{% endif %}.{% endif %}</span></li>{% endfor %}</ul>
+          <ul class="list">{% for b in my_ballots %}<li class="voted">{% icon "check-circle" %}<span class="grow">{% if vote.secret %}{% if b.lot %}{{ b.lot.label }}: your{% else %}Your{% endif %} ballot was recorded.{% else %}{% if b.lot %}{{ b.lot.label }}: you{% else %}You{% endif %} voted on {{ b.cast_at|date:"M j, Y" }}{% if b.option %} for &ldquo;{{ b.option.label }}&rdquo;{% endif %}.{% endif %}</span></li>{% endfor %}</ul>
         </section>
       {% endif %}
       {% if choices.can_vote %}
@@ -25,10 +25,10 @@
           <form method="post" action="{% url 'vote_action' vote.pk 'cast' %}" data-confirm="Cast this ballot? It can't be changed afterwards.">{% csrf_token %}
             {% if vote.kind == "formal" %}
               {% if choices.lots|length > 1 %}
-                <div class="alert info">{% icon "info" %}<span>You have {{ choices.lots|length }} lots still to vote for. A formal vote is one ballot per lot: choose the lot, cast its ballot, then come back for the next.</span></div>
-                <p><label for="lot">Ballot for<span class="required-mark" aria-hidden="true">*</span></label><select id="lot" name="lot" required>{% for lot in choices.lots %}<option value="{{ lot.pk }}">Lot {{ lot.number }}{% if lot.street_address %}, {{ lot.street_address }}{% endif %}</option>{% endfor %}</select></p>
+                <div class="alert info">{% icon "info" %}<span>You have {{ choices.lots|length }} homes still to vote for. A formal vote is one ballot per home: choose the home, cast its ballot, then come back for the next.</span></div>
+                <p><label for="lot">Ballot for<span class="required-mark" aria-hidden="true">*</span></label><select id="lot" name="lot" required>{% for lot in choices.lots %}<option value="{{ lot.pk }}">{{ lot.label }}</option>{% endfor %}</select></p>
               {% else %}
-                <input type="hidden" name="lot" value="{{ choices.lots.0.pk }}"><p>Ballot for lot {{ choices.lots.0.number }}{% if choices.lots.0.street_address %}, {{ choices.lots.0.street_address }}{% endif %}.</p>
+                <input type="hidden" name="lot" value="{{ choices.lots.0.pk }}"><p>Ballot for {{ choices.lots.0.label }}.</p>
               {% endif %}
             {% endif %}
             <fieldset class="choices"><legend>Your choice<span class="required-mark" aria-hidden="true">*</span></legend>{% for o in vote.options.all %}<label class="choice"><input type="radio" name="option" value="{{ o.pk }}" required><span>{{ o.label }}</span></label>{% endfor %}</fieldset>
@@ -41,10 +41,10 @@
       {% if results %}
         <section class="card"><h2>Results{% if vote.status != "closed" %} so far{% endif %}</h2>
           {% for r in results.rows %}<div class="bar-row"><div class="bar-label"><span>{{ r.option.label }}</span><span class="muted">{{ r.count }} · {{ r.percent }}%</span></div><meter class="bar" min="0" max="100" value="{{ r.percent }}">{{ r.percent }}%</meter></div>{% endfor %}
-          <p class="muted small">{{ results.total }} ballot{{ results.total|pluralize }}.{% if results.outcome %} Turnout {{ results.outcome.turnout }}% of lots; quorum {{ results.outcome.quorum_met|yesno:"met,not met" }}; {% if results.outcome.leading == "tie" %}the leading options are tied, so nothing passes.{% elif results.outcome.leading %}leading option "{{ results.outcome.leading }}" {{ results.outcome.meets_threshold|yesno:"meets,does not meet" }} the pass threshold.{% endif %}{% endif %}</p>
+          <p class="muted small">{{ results.total }} ballot{{ results.total|pluralize }}.{% if results.outcome %} Turnout {{ results.outcome.turnout }}% of homes; quorum {{ results.outcome.quorum_met|yesno:"met,not met" }}; {% if results.outcome.leading == "tie" %}the leading options are tied, so nothing passes.{% elif results.outcome.leading %}leading option "{{ results.outcome.leading }}" {{ results.outcome.meets_threshold|yesno:"meets,does not meet" }} the pass threshold.{% endif %}{% endif %}</p>
         </section>
       {% endif %}
     </div>
-    <aside>{% if voters %}<section class="card"><h3>Who voted</h3><ul class="list">{% for b in voters %}<li><div class="grow">{{ b.person.display_name }}{% if b.lot %} <span class="muted small">Lot {{ b.lot.number }}</span>{% endif %}</div><span class="small">{{ b.option.label }}</span></li>{% endfor %}</ul></section>{% endif %}</aside>
+    <aside>{% if voters %}<section class="card"><h3>Who voted</h3><ul class="list">{% for b in voters %}<li><div class="grow">{{ b.person.display_name }}{% if b.lot %} <span class="muted small">{{ b.lot.label }}</span>{% endif %}</div><span class="small">{{ b.option.label }}</span></li>{% endfor %}</ul></section>{% endif %}</aside>
   </div>
 {% endblock %}

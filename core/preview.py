@@ -31,6 +31,7 @@ class Preview:
     user_id: int
     lot_id: int
     lot_number: int
+    lot_label: str = ""
 
 
 _current: contextvars.ContextVar[Preview | None] = contextvars.ContextVar(
@@ -84,7 +85,7 @@ class OwnerPreviewMiddleware:
                     "Preview as owner is read-only. Exit the preview to make changes.",
                     content_type="text/plain",
                 )
-        request.owner_preview = Preview(user.pk, lot.pk, lot.number)
+        request.owner_preview = Preview(user.pk, lot.pk, lot.number, lot.label)
         token = _current.set(request.owner_preview)
         try:
             return self.get_response(request)
@@ -108,7 +109,7 @@ def start(request):
         target=lot,
         metadata={"lot_id": lot.pk},
     )
-    messages.info(request, f"You're seeing the portal as the owner of lot {lot.number} sees it.")
+    messages.info(request, f"You're seeing the portal as the owner of {lot.label} sees it.")
     return redirect("home")
 
 

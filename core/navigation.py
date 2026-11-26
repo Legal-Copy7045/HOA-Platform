@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from django.urls import NoReverseMatch, reverse
 
+from community.terms import term_text
 from core import features, policy
 from core.my_items import MY_ITEMS_PERMISSIONS
 
@@ -79,7 +80,7 @@ HUBS = {
             "community_settings",
             "sliders",
             "lot.view_all",
-            "Dues, deadlines and voting rules from the Declaration, each with its citation.",
+            "{Terms}, deadlines and voting rules from the Declaration, each with its citation.",
         ),
         (
             "ARC request types",
@@ -89,11 +90,11 @@ HUBS = {
             "Kinds of home improvement project and what each must include.",
         ),
         (
-            "Lot neighbors",
+            "Home neighbors",
             "arc_neighbors",
             "map",
             "arc.configure",
-            "Which lots are asked to acknowledge a neighbor's project.",
+            "Which homes are asked to acknowledge a neighbor's project.",
         ),
         (
             "Letters and certificates",
@@ -196,7 +197,7 @@ SECTIONS = [
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
             ("Board tasks", "tasks", "list", "task.manage"),
             ("People", "people", "users", "person.manage"),
-            ("Lots and owners", "lot_list", "map", "lot.view_all"),
+            ("Homes and owners", "lot_list", "map", "lot.view_all"),
             ("Invitations and sign-ups", "invitations", "mail", "invite.send"),
         ],
     ),
@@ -278,7 +279,13 @@ def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[d
         url = _url(name)
         if url:
             out.append(
-                {"label": label, "name": name, "url": url, "icon": icon, "text": description}
+                {
+                    "label": label,
+                    "name": name,
+                    "url": url,
+                    "icon": icon,
+                    "text": term_text(description),
+                }
             )
     return out
 

@@ -25,22 +25,59 @@ class RuleSpec:
     help: str = ""
     maximum: int | None = None  # a hard upper limit (card-network caps)
 
+    # Labels and help may name the monthly charge with {term}/{Terms}
+    # placeholders (community/terms.py, D42); people always see these.
+    @property
+    def shown_label(self) -> str:
+        from community.terms import term_text
+
+        return term_text(self.label)
+
+    @property
+    def shown_help(self) -> str:
+        from community.terms import term_text
+
+        return term_text(self.help)
+
+
+def group_title(group: str, term=None) -> str:
+    """The heading people see for a group: the "Dues" group is named after
+    the board's word for the monthly charge ("Assessments", D42)."""
+    if group == "Dues":
+        from community.terms import charge_term
+
+        return (term or charge_term()).variants()["Terms"]
+    return group
+
 
 REGISTRY: dict[str, RuleSpec] = {
     spec.key: spec
     for spec in [
+        # D42: what the monthly charge is called on pages, emails, letters and
+        # new ledger entries. No default here: the Act's own word
+        # ("assessments") is the statutory fallback in community/pa_law.py.
+        RuleSpec(
+            "charge.term",
+            "What the regular monthly charge is called",
+            TEXT,
+            None,
+            "Dues",
+            "The word in your covenants, e.g. Assessment, Dues or Fee. For an unusual plural "
+            "type both: Levy / Levies. Used on pages, emails, letters and new charges; charges "
+            "already posted keep their wording.",
+        ),
         RuleSpec(
             "dues.monthly_cents",
-            "Monthly dues per lot",
+            "Monthly {term} per home",
             CENTS,
             None,
             "Dues",
-            "Charged on the 1st of each month to every lot's account.",
+            "Charged on the 1st of each month to every home's account.",
         ),
-        RuleSpec("dues.due_day", "Day of month dues are due", DAYS, "1", "Dues"),
+        RuleSpec("dues.due_day", "Day of the month the {term} is due", DAYS, "1", "Dues"),
         RuleSpec(
             "dues.auto_post",
-            "Post monthly dues automatically on the 1st",
+            "Post the monthly {term} automatically on the 1st",
             BOOL,
             "false",
             "Dues",
@@ -164,18 +201,19 @@ REGISTRY: dict[str, RuleSpec] = {
             "resale.deadline_days", "Days to provide a resale certificate", DAYS, None, "Resale"
         ),
         RuleSpec(
-            "vote.quorum_percent", "Quorum for formal votes (% of lots)", PERCENT, None, "Voting"
+            "vote.quorum_percent", "Quorum for formal votes (% of homes)", PERCENT, None, "Voting"
         ),
         RuleSpec(
             "vote.pass_percent", "Share of votes cast needed to pass", PERCENT, None, "Voting"
         ),
         RuleSpec(
             "ledger.assessments_before_fees",
-            "Apply payments to dues before late fees and other charges",
+            "Apply payments to {terms} before late fees and other charges",
             BOOL,
             "false",
             "Dues",
-            "Off: each payment pays the oldest charge first. On: dues first (oldest first), then "
+            "Off: each payment pays the oldest charge first. On: {terms} first (oldest first), "
+            "then "
             "late fees and other charges. An owner may still direct a payment to chosen charges.",
         ),
         # Decision D32-payments (replaces the D21 card and bank fees, whose
@@ -238,13 +276,21 @@ def validate_value(key: str, raw: str) -> str:
         # ASCII digits only and a sane size (review D9): str.isdigit() also
         # accepts characters like "²" that int() then refuses on every read.
         if not re.fullmatch(r"[0-9]{1,12}", raw):
-            raise ValueError(f"{spec.label}: enter a whole number.")
+            raise ValueError(f"{spec.shown_label}: enter a whole number.")
         if spec.kind == PERCENT and int(raw) > 100:
-            raise ValueError(f"{spec.label}: must be 0-100.")
+            raise ValueError(f"{spec.shown_label}: must be 0-100.")
         if spec.maximum is not None and int(raw) > spec.maximum:
-            raise ValueError(f"{spec.label}: at most {spec.maximum}.")
+            raise ValueError(f"{spec.shown_label}: at most {spec.maximum}.")
     if spec.kind == BOOL and raw.lower() not in ("true", "false", "yes", "no", "1", "0"):
-        raise ValueError(f"{spec.label}: enter yes or no.")
+        raise ValueError(f"{spec.shown_label}: enter yes or no.")
+    if spec.kind == TEXT:
+        from community.terms import VALID
+
+        if not VALID.fullmatch(raw):
+            raise ValueError(
+                f"{spec.shown_label}: one or two plain words (letters only), e.g. Assessment, "
+                "or Levy / Levies."
+            )
     return raw
 
 

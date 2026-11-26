@@ -210,7 +210,7 @@ def prepare_signoffs(req: ArcRequest, *, actor, request=None) -> int:
 def add_signoff_lot(req: ArcRequest, lot: Lot, *, actor, request=None) -> SignoffRequest:
     _require_arrange(actor, req)
     if lot.pk == req.lot_id:
-        raise SignoffError("That is the applicant's own lot.")
+        raise SignoffError("That is the applicant's own home.")
     try:
         with transaction.atomic(), system_access("add signoff lot"):
             existing = SignoffRequest.objects.filter(arc_request=req, lot=lot).first()
@@ -229,7 +229,7 @@ def add_signoff_lot(req: ArcRequest, lot: Lot, *, actor, request=None) -> Signof
                     created_by=_user(actor),
                 )
     except IntegrityError as exc:
-        raise SignoffError("That lot is already on the list.") from exc
+        raise SignoffError("That home is already on the list.") from exc
     record_event(
         "arc.signoff_added",
         actor=_user(actor),
@@ -614,8 +614,7 @@ def signoff_form_pdf(req: ArcRequest) -> bytes:
         ),
         (
             "normal",
-            f"2.  Address of unit where alteration will occur: "
-            f"{req.lot.street_address} (lot {req.lot.number})",
+            f"2.  Address of unit where alteration will occur: {req.lot.legal_label}",
         ),
         (
             "normal",
@@ -677,7 +676,7 @@ def signoff_form_pdf(req: ArcRequest) -> bytes:
             heading = (
                 (f"{side.title()} neighbor: " if side in ("left", "right") else "Also affected: ")
                 + (f"{who}, " if who else "")
-                + f"{row.lot.street_address} (lot {row.lot.number})"
+                + row.lot.legal_label
             )
         else:
             heading = "Also asked: " + row.label

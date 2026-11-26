@@ -54,6 +54,12 @@ def _invalid(request, form, to: str) -> object:
 
 @login_required
 def my_lot(request):
+    return render_my_lot(request)
+
+
+def render_my_lot(request, bound=None):
+    """My home. ``bound``: (account pk, form key, form) of a request form that
+    came back with errors, shown again open with what was typed."""
     policy.require(request.user, "lot.view_own")
     roles = policy.roles_for(request.user)
     from community.account_views import owner_account_panel
@@ -69,7 +75,7 @@ def my_lot(request):
                 (
                     lot,
                     [o for o in owners if o.lot_id == lot.pk],
-                    owner_account_panel(request.user, lot.pk),
+                    owner_account_panel(request.user, lot.pk, bound),
                 )
                 for lot in lots
             ],
@@ -106,14 +112,14 @@ def board_and_committees(request):
 
 @login_required
 def lot_list(request):
-    """Lots and owners: every lot with its current owners; the roster view
+    """Homes and owners: every lot with its current owners; the roster view
     adds each account's other people, contact details and balance (and the
     CSV export). The old Roster page redirects here."""
     policy.require(request.user, "lot.view_all")
     roster_view = request.GET.get("view") == "roster" and policy.can(request.user, "roster.view")
     if roster_view:
         return _roster(request)
-    lots = Lot.objects.for_user(request.user)
+    lots = sorted(Lot.objects.for_user(request.user), key=lambda lot: lot.sort_key)
     current = Ownership.objects.for_user(request.user).active().select_related("person")
     owners: dict[int, list] = {}
     for ownership in current:
@@ -173,7 +179,7 @@ def lot_transfer(request, pk):
         )
     except CommunityError as exc:
         return _failed(request, exc, back)
-    return _done(request, f"{lot} transferred.", back)
+    return _done(request, f"{lot.label}: transfer recorded.", back)
 
 
 @login_required
@@ -406,7 +412,7 @@ def _named(resets, viewer):
         .order_by("lot__number")
     )
     for o in ownerships:
-        lots.setdefault(o.person.user_id, []).append(str(o.lot.number))
+        lots.setdefault(o.person.user_id, []).append(o.lot.label)
     for r in out:
         r.subject_name = display_name(r.subject)
         r.subject_email = r.subject.email
@@ -453,11 +459,14 @@ def community_settings(request):
     policy.require(request.user, "lot.view_all")
     from community import pa_law
     from community.models import CommonArea, CommunityProfile, GoverningRule
-    from community.rules import REGISTRY, cents_display, rule_origin
+    from community.rules import REGISTRY, cents_display, group_title, rule_origin
+    from community.terms import charge_term, term_text
 
     rows = {r.key: r for r in GoverningRule.objects.all()}
     needing = {s.key for s in rules_needing_attention()}
+    term = charge_term()
     groups: dict[str, list] = {}
+    group_notes: dict[str, str] = {}
     for spec in REGISTRY.values():
         row = rows.get(spec.key)
         guide = pa_law.guide(spec.key)
@@ -465,9 +474,15 @@ def community_settings(request):
         raw = row.value if row and row.value != "" else (spec.default or "")
         effective = raw or (guide.fallback if guide and origin == "pa_law" else "")
         shown = cents_display(int(effective)) if spec.kind == "cents" and effective else effective
-        groups.setdefault(spec.group, []).append(
+        # The "Dues" group is headed with the board's word (D42).
+        title = group_title(spec.group, term)
+        if spec.group in pa_law.GROUP_NOTES:
+            group_notes[title] = pa_law.GROUP_NOTES[spec.group]
+        groups.setdefault(title, []).append(
             {
                 "spec": spec,
+                "label": term_text(spec.label, term),
+                "help": term_text(spec.help, term),
                 "row": row,
                 # Money is typed in dollars, like every other money field.
                 "raw": _dollars(raw) if spec.kind == "cents" and raw.lstrip("-").isdigit() else raw,
@@ -493,7 +508,7 @@ def community_settings(request):
         {
             "groups": groups,
             "attention": attention,
-            "group_notes": pa_law.GROUP_NOTES,
+            "group_notes": group_notes,
             "pa_disclaimer": pa_law.DISCLAIMER,
             "profile_form": forms.ProfileForm(
                 initial={
@@ -565,7 +580,7 @@ def community_rule_save(request):
     saved = "Rule saved."
     if spec is not None and spec.kind == "cents" and form.cleaned_data["value"]:
         unit = f" {MONEY_UNITS[spec.key]}" if spec.key in MONEY_UNITS else ""
-        saved = f"Saved: {spec.label} = {_money(form.cleaned_data['value'])}{unit}."
+        saved = f"Saved: {spec.shown_label} = {_money(form.cleaned_data['value'])}{unit}."
     return _done(request, saved, back + f"#rule-{spec.key}" if spec else back)
 
 
@@ -636,7 +651,7 @@ def common_area_save(request):
 
 @login_required
 def roster(request):
-    """The old Roster page: now the roster view of Lots and owners."""
+    """The old Roster page: now the roster view of Homes and owners."""
     policy.require(request.user, "roster.view")
     query = request.GET.copy()
     query["view"] = "roster"
@@ -656,21 +671,20 @@ def _roster(request):
             request,
             "roster",
             [
-                "Account",
-                "Lot",
                 "Address",
+                "Account",
                 "Status",
                 "Owners",
                 "Other people",
                 "Emails",
                 "Phones",
                 "Balance",
+                "Lot number",
             ],
             (
                 [
+                    r["lot"].label,
                     r["account"].number,
-                    r["lot"].number,
-                    r["lot"].street_address,
                     r["account"].status_label,
                     "; ".join(p.display_name for p in r["owners"]),
                     "; ".join(
@@ -679,6 +693,7 @@ def _roster(request):
                     "; ".join(r["emails"]),
                     "; ".join(r["phones"]),
                     "" if r["balance_cents"] is None else format_cents(r["balance_cents"]),
+                    r["lot"].number,
                 ]
                 for r in rows
             ),

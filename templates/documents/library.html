@@ -13,7 +13,7 @@
       <ul class="list">{% for d in docs %}<li>
         <div class="todo-icon">{% icon "file" %}</div>
         <div class="grow"><a class="title" href="{% url 'document_detail' d.pk %}">{{ d.title }}</a>
-          <div class="small muted">{% if d.current_version %}Updated {{ d.current_version.uploaded_at|date:"M j, Y" }}{% endif %}{% if d.folder and not current %} · {{ d.folder.name }}{% endif %}{% if d.visibility == "board" %} · Board only{% elif d.visibility == "lot" %} · Lot {{ d.lot.number }} only{% elif d.visibility == "committee" %} · Committee only{% endif %}{% if d.archived %} · Archived{% endif %}</div></div>
+          <div class="small muted">{% if d.current_version %}Updated {{ d.current_version.uploaded_at|date:"M j, Y" }}{% endif %}{% if d.folder and not current %} · {{ d.folder.name }}{% endif %}{% if d.visibility == "board" %} · Board only{% elif d.visibility == "lot" %} · {{ d.lot.label }} only{% elif d.visibility == "committee" %} · Committee only{% endif %}{% if d.archived %} · Archived{% endif %}</div></div>
         {% if d.current_version %}<a class="btn secondary small" href="{% url 'document_download' d.pk %}" aria-label="Download {{ d.title }}">{% icon "download" %}<span class="hide-sm">Download</span></a>{% endif %}
       </li>{% endfor %}</ul>
     </section>

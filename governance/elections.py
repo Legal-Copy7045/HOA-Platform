@@ -277,7 +277,7 @@ def cast_election_ballot(
             raise ElectionError("Voting is not open.")
         allowed = {row["lot"].pk: row["by_proxy"] for row in lots_actor_may_vote_for(locked, actor)}
         if lot_id not in allowed:
-            raise ElectionError("You cannot cast a ballot for that lot (or it has voted).")
+            raise ElectionError("You cannot cast a ballot for that home (or it has voted).")
         if not candidate_ids or len(candidate_ids) > locked.seats:
             raise ElectionError(f"Choose between 1 and {locked.seats} candidates.")
         valid = set(ballot_candidates(locked).values_list("pk", flat=True))
@@ -289,7 +289,7 @@ def cast_election_ballot(
                     election=locked, lot_id=lot_id, cast_by=actor, by_proxy=allowed[lot_id]
                 )
         except IntegrityError as exc:
-            raise ElectionError("A ballot was already cast for this lot.") from exc
+            raise ElectionError("A ballot was already cast for this home.") from exc
         for cid in candidate_ids:  # unlinked from the participation row
             ElectionChoice.objects.create(election=locked, candidate_id=cid)
     record_event(

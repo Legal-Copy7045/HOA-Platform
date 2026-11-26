@@ -64,7 +64,7 @@ def _rows(label) -> dict:
 def journal_totals(rows) -> dict[str, int]:
     """Net debit - credit per account from journal rows."""
     out: dict[str, int] = defaultdict(int)
-    for _date, _journal, _ref, account, debit, credit, _memo in rows:
+    for _date, _journal, _ref, account, debit, credit, _memo, *_lot in rows:
         out[account] += (parse_cents(debit) if debit else 0) - (
             parse_cents(credit) if credit else 0
         )

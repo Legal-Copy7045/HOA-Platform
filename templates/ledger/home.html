@@ -3,25 +3,25 @@
 {% block title %}Owner accounts · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <div class="page-head"><div><h1>Owner accounts</h1><p class="subtitle">Every lot's balance. Positive is owed to the association; negative is a prepayment credit.</p></div>
+  <div class="page-head"><div><h1>Owner accounts</h1><p class="subtitle">Every home's balance. Positive is owed to the association; negative is a prepayment credit.</p></div>
     {% if can_manage %}<div class="actions"><a class="btn" href="{% url 'record_payments' %}">{% icon "receipt" %} Record payments</a></div>{% endif %}</div>
   <div class="grid grid-3">
     <div class="stat {% if total_owed > 0 %}tone-warning{% endif %}"><div class="label">Owed by owners</div><div class="value">{{ total_owed|cents }}</div></div>
     <div class="stat tone-success"><div class="label">Prepayment credits</div><div class="value">{{ total_credit|cents|cut:"-" }}</div></div>
-    <div class="stat"><div class="label">Lots</div><div class="value">{{ rows|length }}</div></div>
+    <div class="stat"><div class="label">Homes</div><div class="value">{{ rows|length }}</div></div>
   </div>
   {% if can_manage %}
     <section class="card">
-      <h2>Post monthly dues</h2>
+      <h2>Post the monthly {% term "term" %}</h2>
       {% if dues_cents %}
-      <form method="post" class="inline-form" data-confirm="Charge {{ dues_lots }} lots {{ dues_cents|cents }} each for the month you chose? Lots already charged for that month are skipped.">{% csrf_token %}
+      <form method="post" class="inline-form" data-confirm="Charge {{ dues_lots }} homes {{ dues_cents|cents }} each for the month you chose? Homes already charged for that month are skipped.">{% csrf_token %}
         <div><label for="dperiod">Month to charge <span class="required-mark" aria-hidden="true">*</span></label><input id="dperiod" name="period" type="month" value="{{ default_period }}" required></div>
-        <button type="submit">Post to every lot</button>
+        <button type="submit">Post to every home</button>
       </form>
-      <p class="small" data-testid="dues-preview">Will charge <strong>{{ dues_lots }} lot{{ dues_lots|pluralize }} {{ dues_cents|cents }} each</strong> ({{ dues_total|cents }} in all).</p>
-      <p class="muted small">Uses the monthly dues rule. A lot already charged for that month is skipped, so posting twice is safe.</p>
+      <p class="small" data-testid="dues-preview">Will charge <strong>{{ dues_lots }} home{{ dues_lots|pluralize }} {{ dues_cents|cents }} each</strong> ({{ dues_total|cents }} in all).</p>
+      <p class="muted small">Uses the monthly {% term "term" %} amount from Community settings. A home already charged for that month is skipped, so posting twice is safe.</p>
       {% else %}
-      <p class="muted small">No monthly dues amount is set. Set it in <a href="{% url 'community_settings' %}">Community settings</a> first.</p>
+      <p class="muted small">No monthly {% term "term" %} amount is set. Set it in <a href="{% url 'community_settings' %}">Community settings</a> first.</p>
       {% endif %}
     </section>
   {% endif %}
@@ -30,14 +30,14 @@
       {% if not late_fee.0 %}<p class="muted small">No late fee is set. Set its amount, grace period and citation in <a href="{% url 'community_settings' %}">Community settings</a>.</p>
       {% else %}
         <p class="small">Late fee {{ late_fee.0|cents }}{% if late_fee.1 %} ({{ late_fee.1 }}){% endif %}. Automatic posting is <strong>{% if late_auto %}on{% else %}off{% endif %}</strong>{% if not late_auto %}: the board reviews this list and posts{% endif %}.</p>
-        {% if late %}<ul class="list">{% for r in late %}<li><a class="grow" href="{% url 'lot_ledger' r.lot.pk %}">Lot {{ r.lot.number }}</a><span class="small muted">late from {{ r.late_from|date:"M j" }}</span><span class="num">{{ r.balance_cents|cents }}</span></li>{% endfor %}</ul>
-          {% if can_post_late_fees %}<form method="post" data-confirm="Post a late fee to each of these {{ late|length }} lots? Each lot is charged at most once a month.">{% csrf_token %}<input type="hidden" name="action" value="late_fees"><button type="submit">Post late fees ({{ late|length }})</button></form>{% else %}<p class="small muted">A board member posts the fees.</p>{% endif %}
-        {% else %}<p class="muted small">Nobody is late for this month's dues.</p>{% endif %}
+        {% if late %}<ul class="list">{% for r in late %}<li><a class="grow" href="{% url 'lot_ledger' r.lot.pk %}">{{ r.lot.label }}</a><span class="small muted">late from {{ r.late_from|date:"M j" }}</span><span class="num">{{ r.balance_cents|cents }}</span></li>{% endfor %}</ul>
+          {% if can_post_late_fees %}<form method="post" data-confirm="Post a late fee to each of these {{ late|length }} homes? Each home is charged at most once a month.">{% csrf_token %}<input type="hidden" name="action" value="late_fees"><button type="submit">Post late fees ({{ late|length }})</button></form>{% else %}<p class="small muted">A board member posts the fees.</p>{% endif %}
+        {% else %}<p class="muted small">Nobody is late for this month's {% term "term" %}.</p>{% endif %}
       {% endif %}
     </section>
   {% endif %}
   <div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th>Lot</th><th>Address</th><th class="num">Balance</th></tr></thead>
-    <tbody>{% for lot, bal in rows %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">Lot {{ lot.number }}</a></td><td>{{ lot.street_address }}</td><td class="num">{% if bal > 0 %}<span class="status tone-warning">{{ bal|cents }} due</span>{% elif bal < 0 %}<span class="status tone-success">{{ bal|cents|cut:"-" }} credit</span>{% else %}<span class="muted">Paid up</span>{% endif %}</td></tr>{% endfor %}</tbody>
+    <thead><tr><th>Home</th><th class="num">Balance</th></tr></thead>
+    <tbody>{% for lot, bal in rows %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">{{ lot.label }}</a></td><td class="num">{% if bal > 0 %}<span class="status tone-warning">{{ bal|cents }} due</span>{% elif bal < 0 %}<span class="status tone-success">{{ bal|cents|cut:"-" }} credit</span>{% else %}<span class="muted">Paid up</span>{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
 {% endblock %}

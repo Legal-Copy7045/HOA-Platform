@@ -30,6 +30,8 @@
           <fieldset><legend>Email updates</legend>
             <label class="choice" for="{{ form.weekly_digest.auto_id }}">{{ form.weekly_digest }} {{ form.weekly_digest.label }}</label>
             <div class="help" id="id_weekly_digest_help">{{ form.weekly_digest.help_text }}</div>
+            <label class="choice" for="{{ form.statement_emails.auto_id }}">{{ form.statement_emails }} {{ form.statement_emails.label }}</label>
+            <div class="help" id="id_statement_emails_help">{{ form.statement_emails.help_text }}</div>
           </fieldset>
           <div class="form-actions"><button type="submit">Save changes</button></div>
         </form>

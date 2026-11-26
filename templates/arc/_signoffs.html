@@ -29,7 +29,7 @@
       <p class="small">Print the form, have the neighbor tick and sign it, then upload a scan or photo.</p>
       <form method="post" action="{% url 'arc_signoff_action' obj.pk 'upload_form' %}" enctype="multipart/form-data" class="inline-form">{% csrf_token %}<input type="file" name="file" accept="image/*,application/pdf" required aria-label="Signed form (scan or photo)"><button type="submit" class="secondary small">Upload</button></form>
       <p class="small muted">A PDF or photo of the signed form. {% if signoff_has_reader %}The board or manager can then have it read automatically.{% else %}The board or manager enters the answers from it.{% endif %}</p>
-      {% if signoff_board and signoff_neighbors %}<form method="post" action="{% url 'arc_signoff_action' obj.pk 'prepare' %}">{% csrf_token %}<button type="submit" class="secondary small">{% icon "users" %} Re-add the lot's neighbors</button></form>{% endif %}
+      {% if signoff_board and signoff_neighbors %}<form method="post" action="{% url 'arc_signoff_action' obj.pk 'prepare' %}">{% csrf_token %}<button type="submit" class="secondary small">{% icon "users" %} Re-add the home's neighbors</button></form>{% endif %}
     </div></details>
   {% endif %}
   {% if signoff_staff %}

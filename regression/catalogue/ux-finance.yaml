@@ -17,6 +17,6 @@
 - feature: "Board settings: dues shown back in dollars, confirmation for a dues change over 25%, needs-attention rules first"
   since: M4
   match: ["^unit:core/tests/test_board_settings_ux.py::test_(dues|saving_dues|big_dues|small_dues|rules_needing|owner_cannot_save_rules)", "^manual:settings dues confirmation"]
-- feature: "Board pages: counted confirmation before reminding invitees, named confirmation before switching a feature off, Save all on Lot neighbors"
+- feature: "Board pages: counted confirmation before reminding invitees, named confirmation before switching a feature off, Save all on Home neighbors"
   since: M4
   match: ["^unit:core/tests/test_board_settings_ux.py::test_(remind|switching|neighbors|owner_cannot_save_neighbors)"]

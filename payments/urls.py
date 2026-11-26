@@ -3,6 +3,7 @@ from django.urls import path
 from payments import views
 
 urlpatterns = [
+    path("my-account/pay/", views.pay_start, name="pay_start"),
     path("my-account/<int:lot_id>/pay/", views.pay_online, name="pay_online"),
     path("my-account/<int:lot_id>/pay/checkout/", views.pay_checkout, name="pay_checkout"),
     path("my-account/payments/<int:pk>/return/", views.pay_return, name="pay_return"),

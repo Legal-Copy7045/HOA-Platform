@@ -22,7 +22,7 @@ class ProfileForm(djforms.Form):
     mailing_address = djforms.CharField(
         required=False,
         widget=djforms.Textarea(attrs={"rows": 3, **_described("mailing_address")}),
-        help_text="Only if different from your lot address.",
+        help_text="Only if different from your home address.",
     )
     electronic_notice_consent = djforms.BooleanField(
         required=False,
@@ -33,7 +33,7 @@ class ProfileForm(djforms.Form):
     )
     in_directory = djforms.BooleanField(
         required=False,
-        label="List me in the owner directory (name and lot)",
+        label="List me in the owner directory (name and address)",
         widget=djforms.CheckboxInput(attrs=_described("in_directory")),
         help_text="Leave this unticked to stay out of the directory.",
     )
@@ -46,6 +46,21 @@ class ProfileForm(djforms.Form):
         help_text="Replies, discussions and acknowledgement requests. "
         "Official notices always come at once.",
     )
+    # D42: on by default (owner ruling); the label names the board's word.
+    statement_emails = djforms.BooleanField(
+        required=False,
+        label="Email me a statement when the monthly {term} is charged",
+        widget=djforms.CheckboxInput(attrs=_described("statement_emails")),
+        help_text="The amount due, a link to your account and your statement (PDF). "
+        "Untick to stop these emails.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        from community.terms import term_text
+
+        super().__init__(*args, **kwargs)
+        field = self.fields["statement_emails"]
+        field.label = term_text(field.label)
 
 
 @login_required
@@ -56,7 +71,7 @@ def my_profile(request):
         if person
         else None
     )
-    initial = {}
+    initial = {"statement_emails": True}  # the default until a profile is saved (D42)
     if profile:
         initial = {f: getattr(profile, f) for f in ProfileForm.base_fields}
     form = ProfileForm(request.POST or None, initial=initial)

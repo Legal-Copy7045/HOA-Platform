@@ -14,14 +14,16 @@ from documents import attachments
 
 
 class ReportForm(forms.Form):
-    lot = forms.ModelChoiceField(queryset=Lot.objects.none())
+    lot = forms.ModelChoiceField(queryset=Lot.objects.none(), label="Home")
     category = forms.ChoiceField(choices=ViolationCategory.choices)
     description = forms.CharField(widget=forms.Textarea(attrs={"rows": 4}))
     observed_on = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["lot"].queryset = Lot.objects.for_user(user)
+        self.fields["lot"].queryset = Lot.objects.for_user(user).order_by(
+            "street_address", "number"
+        )
 
 
 def _get(request, pk):
@@ -68,11 +70,11 @@ def violations(request):
         return csv_response(
             request,
             "violations",
-            ["Number", "Lot", "Category", "Status", "Observed", "Cure by", "Follow up"],
+            ["Address", "Number", "Category", "Status", "Observed", "Cure by", "Follow up"],
             (
                 [
+                    v.lot.label,
                     f"V-{v.pk}",
-                    v.lot.number,
                     v.get_category_display(),
                     v.get_state_display(),
                     v.observed_on,

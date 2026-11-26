@@ -6,6 +6,74 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.12.0 — 2026-11-26
+
+- Fixed: the installable-app update check (`/sw.js`) failed with a server
+  error on the live server for every signed-in visitor (it asked for the web
+  address of an empty static file name, which the production file store
+  refuses). That was the cause of the "server errors" health alerts.
+- The account statement is easier to read: a box at the top says the amount
+  due and the date to pay by ("Past due since ..." when late), or "You have a
+  credit of $X. Nothing to pay.", or "Nothing to pay. Thank you."; then what
+  the amount is made of (each unpaid charge, partly paid ones marked), months
+  already paid ahead by a credit, how to pay, and the account activity with
+  payments in their own column and a "Balance brought forward" line. The
+  tear-off slip stays at the foot; a long history moves the activity to the
+  next page so the summary and slip fit on page 1.
+- When online payments are on, the statement (and the statement attached to
+  delinquency notices) carries a "Pay online" QR code. It holds only the
+  portal's address of the pay page: whoever scans it signs in first and
+  then sees their own home's charges, never anyone else's. The card
+  surcharge is stated from Community settings (D43).
+
+## 0.11.0 — 2026-11-26
+
+- The monthly charge is called what the covenants call it: "Assessment" by
+  default, or the board's word from Community settings ("What the regular
+  monthly charge is called", with its citation). Pages, emails, letters, rule
+  labels and new charges use it; every new monthly charge reads
+  "Assessment – December 2026". Charges already posted keep their wording (D42).
+- A statement by email when the month's assessment is posted: the amount due,
+  the pay-by date (or "nothing to pay" / covered by prepaid credit), links to My
+  account and Pay online, and the statement PDF attached. On by default for
+  owners and authorized or view-only contacts; untick it on My profile to stop.
+  Sent once per account per month, never to tenants or former owners.
+
+## 0.10.0 — 2026-11-26
+
+- My home → "Ask to add someone" asks for the person's email, which they sign
+  in with. If they don't use email, a box keeps them on the account as a
+  record only, without a sign-in. When a board member approves, the portal
+  emails them an invitation to sign in. If it cannot (for example, the email
+  already has a login), the approval still stands and the board is told to
+  send the invitation from Invitations and sign-ups. Before approving, the
+  board sees whether an invitation will go out (D41).
+- Owners can ask to change the owners on the deed: add an owner (a joint
+  owner, a trust or an entity) or remove one (for example after a death or a
+  quitclaim). They attach the recorded deed and give its date. Only the board
+  and that account's owners can open the deed. A board member who is not the
+  requester, and not the person added or removed, approves. The account must
+  keep at least one owner; a sale is still recorded by the board (D41).
+
+## 0.9.0 — 2026-11-26
+
+- Homes are named by their address everywhere, not by lot number (D40): menus,
+  page titles, lists, forms, emails, My items, the dashboard, search results,
+  payments (Stripe line item and receipts) and the Preview as owner banner.
+  "Lots and owners" is now "Homes and owners", a lot's account page is the
+  "Home account", and "Lot neighbors" is "Home neighbors". Lists of homes are
+  in address order.
+- A home's title is its address, with the lot number as a small grey line
+  beneath it (My home, My account, Homes and owners, Home account, and the
+  headers of requests, violations, collection cases and resale certificates).
+- Formal documents name the home as "165 Imaginary Orchard Way (Lot 30)":
+  resale certificate, statements, delinquency letters, ARC decision letters,
+  violation notices and the printed neighbor acknowledgement form.
+- CSV exports start with an "Address" column; the roster, the accounting
+  journal, AR aging, the collections and owner transfer reports keep a
+  "Lot number" column at the end. The board can still search by lot number.
+- The board's My items warns about any home with no address recorded.
+
 ## 0.8.0 — 2026-11-26
 
 - System status shows malware scanning at a glance: answering or not, ClamAV

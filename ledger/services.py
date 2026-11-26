@@ -15,6 +15,7 @@ from django.utils import timezone
 from audit.services import record_event
 from community.models import CommunityProfile, Lot
 from community.rules import rule, rule_with_citation
+from community.terms import charge_term, term_text
 from core import pdf
 from core.money import format_cents
 from core.policy import SYSTEM, require
@@ -199,6 +200,7 @@ def upcoming_charges(
                 reversed_by__isnull=True,
             ).values_list("period", flat=True)
         )
+    term = charge_term()
     out = []
     while len(out) < months:
         if month > 12:
@@ -209,7 +211,7 @@ def upcoming_charges(
             out.append(
                 UpcomingCharge(
                     datetime.date(year, month, day),
-                    f"Monthly dues {_period(year, month)}",
+                    term.monthly_title(datetime.date(year, month, 1)),
                     amount,
                     covered,
                 )
@@ -225,14 +227,20 @@ def _period(year: int, month: int) -> str:
 @internal("ledger service")
 def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> int:
     _authorize(actor, "ledger.manage")
-    amount, citation = rule_with_citation("dues.monthly_cents")
+    amount = rule("dues.monthly_cents")
+    term = charge_term()
     if not amount:
         raise LedgerError(
-            "Set the monthly dues amount (with its citation) in Community settings first."
+            term_text(
+                "Set the monthly {term} amount (with its citation) in Community settings first.",
+                term,
+            )
         )
     day = min(rule("dues.due_day") or 1, 28)
     posted_on = datetime.date(year, month, day)
     period = _period(year, month)
+    # One name for the monthly charge (WT-003, D42): "Assessment - December 2026".
+    description = term.monthly_title(posted_on)
     created = 0
     with system_access("post assessments"):
         lots = list(Lot.objects.all())
@@ -245,8 +253,7 @@ def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> i
                     kind=EntryKind.ASSESSMENT,
                     amount_cents=amount,
                     period=period,
-                    description=f"Assessment {posted_on:%B %Y}"
-                    + (f" ({citation})" if citation else ""),
+                    description=description,
                     posted_by=_user(actor),
                 )
             created += 1
@@ -258,6 +265,12 @@ def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> i
         request=request,
         metadata={"period": period, "lots": created, "amount_cents": amount},
     )
+    # The monthly statement emails (D42): queued after commit, by the
+    # automatic posting and the board's button alike; each account at most
+    # once a month (ledger.StatementEmail), so a second posting sends nothing.
+    from ledger.tasks import send_statement_emails
+
+    transaction.on_commit(lambda: send_statement_emails.defer(year=year, month=month))
     return created
 
 
@@ -499,7 +512,7 @@ def post_charge(
 ) -> LedgerEntry:
     _authorize(actor, "ledger.manage")
     if kind not in (EntryKind.OTHER_CHARGE, EntryKind.LATE_FEE, EntryKind.RESALE_FEE):
-        raise LedgerError("Use the assessment posting for dues.")
+        raise LedgerError(term_text("Use the monthly {term} posting for the {term}."))
     if kind == EntryKind.LATE_FEE:
         _authorize(actor, "late_fee.post")  # a board decision, not the manager's
         if not settings.LEDGER_LATE_FEES_ENABLED:
@@ -802,7 +815,7 @@ def reassign_entry(
             raise LedgerError("This entry was already reversed or moved.")
         target = Account.objects.filter(pk=account_id, lot_id=entry.lot_id).first()
         if target is None:
-            raise LedgerError("Choose one of this lot's accounts.")
+            raise LedgerError("Choose one of this home's accounts.")
         if target.pk == entry.account_id:
             raise LedgerError("It is already on that account.")
         numbers = dict(Account.objects.filter(lot_id=entry.lot_id).values_list("pk", "number"))
@@ -1088,12 +1101,12 @@ COLLECTION = Workflow(
 def open_case(*, lot: Lot, notes: str = "", actor, request=None) -> CollectionCase:
     require(actor, "collections.manage")
     if CollectionCase.objects.filter(lot=lot).exclude(state="closed").exists():
-        raise LedgerError("This lot already has an open collection case.")
+        raise LedgerError("This home already has an open collection case.")
     try:
         with transaction.atomic():
             case = CollectionCase.objects.create(lot=lot, opened_by=actor, notes=notes)
     except IntegrityError as exc:
-        raise LedgerError("This lot already has an open collection case.") from exc
+        raise LedgerError("This home already has an open collection case.") from exc
     record_event(
         "collection.opened",
         actor=actor,
@@ -1321,7 +1334,7 @@ def request_resale(
     from core.policy import can, roles_for
 
     if not can(actor, "resale.manage") and lot.pk not in roles_for(actor).owned_lot_ids:
-        raise LedgerError("Owners can request a certificate only for their own lot.")
+        raise LedgerError("Owners can request a certificate only for their own home.")
     days = rule("resale.deadline_days")
     obj = ResaleRequest.objects.create(
         lot=lot,
@@ -1391,8 +1404,8 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
             "normal",
             "This certificate is provided pursuant to the provisions of Section 5407 of the "
             f"Pennsylvania Uniform Planned Community Act. {b(profile.legal_name)} (hereinafter "
-            f'"Association") represents the following with respect to {b(lot.street_address)} '
-            f'(lot {b(lot.number)}) (hereinafter "Unit"), as of {b(today.strftime("%B %-d, %Y"))}.',
+            f'"Association") represents the following with respect to {b(lot.legal_label)} '
+            f'(hereinafter "Unit"), as of {b(today.strftime("%B %-d, %Y"))}.',
         ),
         ("normal", ""),
         (
@@ -1515,7 +1528,7 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
     # so the certificate's wording above is unchanged.
     from ledger.letters import open_charges_paragraphs
 
-    body += [("pagebreak", ""), ("heading", f"Account of lot {lot.number}")]
+    body += [("pagebreak", ""), ("heading", f"Account of {lot.legal_label}")]
     body += open_charges_paragraphs(lot)
     return pdf.render(body, title=f"Resale certificate {obj.pk}")
 
@@ -1682,11 +1695,14 @@ def send_budget_notice(budget: Budget, *, stage: str, actor, request=None) -> di
             f"expenses {format_cents(summary['expense'])}.\n\nSee the details:\n{link}\n"
         )
     else:
-        subject = f"[{settings.SITE_NAME}] Adopted budget and dues for {budget}"
+        term = charge_term().variants()
+        subject = f"[{settings.SITE_NAME}] Adopted budget and {term['term']} for {budget}"
         body = (
             f"The board adopted the {budget} on {budget.adopted_on:%B %-d, %Y}.\n"
             + (
-                f"Monthly dues: {format_cents(dues)}" + (f" ({cite})" if cite else "") + "\n"
+                f"Monthly {term['term']}: {format_cents(dues)}"
+                + (f" ({cite})" if cite else "")
+                + "\n"
                 if dues
                 else ""
             )

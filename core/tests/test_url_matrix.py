@@ -65,6 +65,9 @@ OWN_ACCOUNT = {
     "sms_start",
     "sms_verify",
     "sms_stop",
+    # The statement's "Pay online" QR code (D43): opens the signed-in login's
+    # own home only; a hint for another home is ignored.
+    "pay_start",
 }
 # Text from board-only or other-lot fixtures that must never reach owner A.
 BOARD_ONLY_MARKERS = (
@@ -164,6 +167,7 @@ PROTECTED = {
     "account_change_request": ("POST", "account_b"),
     "account_change_withdraw": ("POST", "change_b"),
     "account_change_decide": ("POST", "change_b"),
+    "account_change_deed": ("GET", "owner_change_b"),
     "arc_project_types": ("GET", None),
     "committees": ("GET", None),
     "committee_detail": ("GET", "committee_b"),
@@ -564,8 +568,26 @@ def world():
         )
         account_b = Account.objects.unscoped("t").get(lot=lot_b, closed_on__isnull=True)
         change_b = services.request_account_change(
-            account_b, action="add", name="Lot B nephew", kind="view_only", actor=owner_b
+            account_b,
+            action="add",
+            name="Lot B nephew",
+            kind="view_only",
+            no_login=True,
+            actor=owner_b,
         )
+        owner_change_b = services.request_account_change(
+            account_b,
+            action="add_owner",
+            name="Lot B spouse",
+            email="lot-b-spouse@example.com",
+            ownership_type="joint",
+            deed_date=timezone.localdate(),
+            deed=pdf("lot-b-deed.pdf"),
+            actor=owner_b,
+        )
+        from documents.attachments import attachments_for
+
+        owner_change_b_file = attachments_for(owner_change_b).get()
         contact_b = services.add_account_contact(
             account_b,
             person=services.record_person(display_name="Lot B tenant", actor=SYSTEM),
@@ -653,6 +675,8 @@ def world():
         "seat_proposal": seat_proposal.pk,
         "contract": contract.pk,
         "change_b": change_b.pk,
+        "owner_change_b": owner_change_b.pk,
+        "owner_change_b_file": owner_change_b_file.pk,
         "request_b": request_b.pk,
         "request_b_file": request_b_file.pk,
         "committee_b": committee_b.pk,
@@ -743,6 +767,8 @@ def _url(name, key, targets):
         kwargs["action"] = "send_notice"
     elif name == "violation_file":
         kwargs["file_id"] = targets["violation_b_file"]
+    elif name == "account_change_deed":
+        kwargs["file_id"] = targets["owner_change_b_file"]
     elif name == "request_file":
         kwargs["file_id"] = targets["request_b_file"]
     elif name == "request_action":
@@ -837,7 +863,7 @@ def test_owner_sees_own_lot_detail(client, world):
     response = client.get(reverse("lot_detail", args=[world["lot_a"].pk]))
     assert response.status_code == 200
     assert b"1 Alpha Way" in response.content
-    assert b"Transfer this lot" not in response.content  # board-only controls
+    assert b"Transfer this home" not in response.content  # board-only controls
 
 
 @pytest.mark.parametrize(

@@ -627,3 +627,13 @@ def test_thumbnail_views_are_logged_and_marked(client, w):
         e.metadata.get("view") for e in AuditEvent.objects.filter(action="attachment.downloaded")
     )
     assert views == ["file", "thumbnail"]
+
+
+def test_printable_form_names_homes_with_the_lot_number(w):
+    from core.tests.pdftext import pdf_text
+
+    signoffs.prepare_signoffs(w["req"], actor=w["applicant"])
+    text = pdf_text(signoffs.signoff_form_pdf(w["req"]))
+    for key in ("applicant_lot", "portal_lot", "paper_lot"):
+        lot = w[key]
+        assert f"{lot.street_address} (Lot {lot.number})" in text, key

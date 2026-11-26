@@ -16,7 +16,7 @@
       <p class="small">{% for m in c.members %}{{ m.name }}{% if m.chair %} (chair){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}<span class="muted">No members yet.</span>{% endfor %}</p></section>
     {% empty %}<section class="card">{% include "partials/empty.html" with icon="users" title="No committees yet" %}</section>{% endfor %}
   {% elif entries %}
-    <div class="grid grid-3">{% for e in entries %}<section class="card person-card"><div class="small muted">{{ e.lot }}</div><div class="title">{{ e.name }}</div>
+    <div class="grid grid-3">{% for e in entries %}<section class="card person-card"><div class="small muted">{{ e.address }}</div><div class="title">{{ e.name }}</div>
       {% if e.email %}<div class="small">{% icon "mail" %} <a href="mailto:{{ e.email }}">{{ e.email }}</a></div>{% endif %}{% if e.phone %}<div class="small">{{ e.phone }}</div>{% endif %}</section>{% endfor %}</div>
   {% else %}<section class="card">{% include "partials/empty.html" with icon="users" title="Nobody has opted in yet" text="Listing is optional. You can add yourself from your profile." %}</section>{% endif %}
 {% endblock %}

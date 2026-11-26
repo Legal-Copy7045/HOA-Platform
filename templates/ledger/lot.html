@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Lot {{ lot.number }} account · {{ SITE_NAME }}{% endblock %}
+{% block title %}{{ lot.label }} · Home account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <div class="crumbs"><a href="{% url 'ledger_home' %}">Owner accounts</a> / Lot {{ lot.number }}</div>
+  <div class="crumbs"><a href="{% url 'ledger_home' %}">Owner accounts</a> / {{ lot.label }}</div>
   <div class="page-head">
-    <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<span>{% icon "alert" %}Collection case #{{ open_case.pk }} open</span>{% endif %}</div></div>
+    <div>{% home_title lot %}<div class="meta"><span>Home account</span>{% if open_case %}<span>{% icon "alert" %}Collection case #{{ open_case.pk }} open</span>{% endif %}</div></div>
     <div class="actions">
       <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">{% icon "download" %} Statement</a>
       {% if can_manage %}<a class="btn secondary" href="{% url 'record_payments' %}">{% icon "receipt" %} Record payments</a>{% endif %}
-      {% if user|can:"collections.manage" %}{% if open_case %}<a class="btn secondary" href="{% url 'collection_detail' open_case.pk %}" data-testid="open-collection-case">{% icon "alert" %} Open collection case</a>{% elif balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" class="inline-form" data-confirm="Open a collection case for this lot? Delinquency letters are sent from the case, step by step.">{% csrf_token %}<button type="submit" class="secondary" data-testid="open-collection-case">{% icon "alert" %} Open collection case</button></form>{% endif %}{% endif %}
+      {% if user|can:"collections.manage" %}{% if open_case %}<a class="btn secondary" href="{% url 'collection_detail' open_case.pk %}" data-testid="open-collection-case">{% icon "alert" %} Open collection case</a>{% elif balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" class="inline-form" data-confirm="Open a collection case for this home? Delinquency letters are sent from the case, step by step.">{% csrf_token %}<button type="submit" class="secondary" data-testid="open-collection-case">{% icon "alert" %} Open collection case</button></form>{% endif %}{% endif %}
     </div>
   </div>
   <div class="grid grid-3">
@@ -22,7 +22,7 @@
     <ul class="list">{% for a in former_accounts %}<li><span class="grow">Account {{ a.number }} <span class="small muted">{{ a.opened_on|short_date }} – {{ a.closed_on|short_date }}</span></span>{% if a.balance_cents < 0 %}<span>Credit owed to former owner: <strong>{{ a.balance_cents|cents|cut:"-" }}</strong></span>{% else %}<span>Still owed by former owner: <strong>{{ a.balance_cents|cents }}</strong></span>{% endif %}</li>{% endfor %}</ul>
   </section>{% endif %}
   {% if move_notices %}<section class="card" id="moved" data-testid="moved-entries"><h2>Entries moved between accounts</h2>
-    <p class="small muted">An ownership date changed, so these entries were moved to the account their date belongs to (each original is reversed on its old account). Check them: a seller's settlement check recorded before the sale may have moved with the buyer's dues. To put one back, use Move to account on its row.</p>
+    <p class="small muted">An ownership date changed, so these entries were moved to the account their date belongs to (each original is reversed on its old account). Check them: a seller's settlement check recorded before the sale may have moved with the buyer's {% term "terms" %}. To put one back, use Move to account on its row.</p>
     {% for n in move_notices %}<div class="stack"><p><strong>{{ n.count }} entr{{ n.count|pluralize:"y,ies" }}</strong> from account {{ n.from_accounts }} to account {{ n.to_accounts }}, {{ n.created_at|short_date }}</p>
       <ul class="list">{% for e, note in n.moved %}<li><span class="grow">{{ e.posted_on|short_date }} · {{ e.description }}{% if e.reference %} <span class="muted">({{ e.reference }})</span>{% endif %} <span class="small muted">{{ note }}</span></span><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
       {% if can_manage %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'movechecked' %}" class="inline-form" data-confirm="Mark these moved entries checked? The item leaves My items; the entries stay as they are.">{% csrf_token %}<input type="hidden" name="notice" value="{{ n.pk }}"><button type="submit" class="secondary small">{% icon "check" %} Mark checked</button></form>{% endif %}</div>{% endfor %}

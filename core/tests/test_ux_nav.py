@@ -82,7 +82,7 @@ def test_rarely_used_setup_pages_move_to_settings(client, w):
     assert "Settings" in found
     for label in (
         "ARC request types",
-        "Lot neighbors",
+        "Home neighbors",
         "Letters and certificates",
         "Branding",
         "Features",
@@ -277,7 +277,7 @@ def test_balance_todo_shows_amount_and_due_date(client, w):
     )
     client.force_login(w["owner"])
     html = client.get(reverse("home")).content.decode()
-    assert f"$123.45 due on lot {w['lot_a'].number}" in html
+    assert f"$123.45 due for {w['lot_a'].label}" in html
     assert "due since" in html
     item = next(i for i in my_items.items_for(w["owner"]) if i.nav == "my_account")
     assert item.due == timezone.localdate() - datetime.timedelta(days=40)
@@ -396,7 +396,7 @@ def test_election_ballot_recorded_message(client, w, election):
     )
     client.force_login(w["owner"])
     html = client.get(reverse("election_detail", args=[election.pk])).content.decode()
-    assert f"Lot {w['lot_a'].number}: your ballot was recorded." in html
+    assert f"{w['lot_a'].label}: your ballot was recorded." in html
     assert "data-confirm-ballot" not in html
 
 
@@ -407,7 +407,7 @@ def test_owner_of_two_lots_is_told_to_cast_per_lot(client, w, election):
     assert len(elections.lots_actor_may_vote_for(election, two)) == 2
     client.force_login(two)
     html = client.get(reverse("election_detail", args=[election.pk])).content.decode()
-    assert "You can cast 2 ballots here, one for each lot" in html
+    assert "You can cast 2 ballots here, one for each home" in html
     item = next(i for i in my_items.items_for(two) if i.title.startswith("Election"))
     assert "one ballot each" in item.detail
 

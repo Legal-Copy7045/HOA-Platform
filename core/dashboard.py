@@ -107,7 +107,7 @@ def staff_panel(user, roles) -> dict:
                 "label": "Owed by owners",
                 "value": owed,
                 "money": True,
-                "hint": f"{_n(behind, 'lot', 'lots')} with a balance",
+                "hint": f"{_n(behind, 'home', 'homes')} with a balance",
                 "url": reverse("ledger_home"),
                 "tone": "warning" if owed else "success",
             }

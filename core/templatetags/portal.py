@@ -316,6 +316,14 @@ def quick_actions(context):
     return {"actions": actions_for(context["user"])}
 
 
+@register.inclusion_tag("partials/home_title.html")
+def home_title(lot, level="h1", show_lot_ref=True):
+    """A home as a heading (D40): the address is the title, the plat lot
+    number a muted subtitle in ``.lot-ref`` (the only place a page outside
+    the formal documents may show "Lot N")."""
+    return {"lot": lot, "level": level, "show_lot_ref": show_lot_ref}
+
+
 @register.filter
 def get_item(mapping, key):
     """{{ dict|get_item:key }} for dictionaries keyed by a variable."""
@@ -323,3 +331,28 @@ def get_item(mapping, key):
         return mapping.get(key)
     except AttributeError:
         return None
+
+
+def _charge_term(context):
+    """The board's word for the monthly charge, read once per render (D42)."""
+    from community.terms import charge_term
+
+    cache = context.render_context
+    if "charge_term" not in cache:
+        cache["charge_term"] = charge_term()
+    return cache["charge_term"]
+
+
+@register.simple_tag(takes_context=True)
+def term(context, form: str = "Term") -> str:
+    """{% term %} -> Assessment; {% term "terms" %} -> assessments. Forms:
+    term, terms, Term, Terms, TERM, TERMS (community/terms.py)."""
+    return _charge_term(context).variants().get(form, "")
+
+
+@register.simple_tag(takes_context=True)
+def with_term(context, text: str) -> str:
+    """{% with_term "Monthly {term} per home" %}: fills the placeholders."""
+    from community.terms import term_text
+
+    return term_text(str(text), _charge_term(context))

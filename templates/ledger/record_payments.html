@@ -11,7 +11,7 @@
       <h2 id="recorded-h">Recorded</h2>
       <div class="table-wrap"><table>
         <thead><tr><th>Home</th><th>Date received</th><th>Check</th><th class="num">Amount</th></tr></thead>
-        <tbody>{% for e, open in recorded %}<tr><td>{{ e.lot.street_address }} <span class="small muted">(Lot {{ e.lot.number }})</span></td><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.reference|default:"—" }}</td><td class="num">{{ e.amount_cents|cents|cut:"-" }}</td></tr>{% endfor %}</tbody>
+        <tbody>{% for e, open in recorded %}<tr><td>{{ e.lot.label }}</td><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.reference|default:"—" }}</td><td class="num">{{ e.amount_cents|cents|cut:"-" }}</td></tr>{% endfor %}</tbody>
         <tfoot><tr><th colspan="3">Total</th><th class="num">{{ recorded_total|cents }}</th></tr></tfoot>
       </table></div>
       {% if can_deposit %}
@@ -40,7 +40,7 @@
           <td><label class="sr-only" for="lot_{{ i }}">Home, row {{ forloop.counter }}</label>
             <select id="lot_{{ i }}" name="lot_{{ i }}"{% if row.errors %} aria-describedby="err_{{ i }}" aria-invalid="true"{% endif %}>
               <option value="">Choose a home</option>
-              {% for lot in lots %}<option value="{{ lot.pk }}"{% if row.values.lot == lot.pk|stringformat:"d" %} selected{% endif %}>{{ lot.street_address }} (Lot {{ lot.number }})</option>{% endfor %}
+              {% for lot in lots %}<option value="{{ lot.pk }}"{% if row.values.lot == lot.pk|stringformat:"d" %} selected{% endif %}>{{ lot.label }}</option>{% endfor %}
             </select></td>
           <td><label class="sr-only" for="amount_{{ i }}">Amount in dollars, row {{ forloop.counter }}</label><input id="amount_{{ i }}" name="amount_{{ i }}" inputmode="decimal" placeholder="75.00" value="{{ row.values.amount|default:'' }}"></td>
           <td><label class="sr-only" for="check_{{ i }}">Check number, row {{ forloop.counter }}</label><input id="check_{{ i }}" name="check_{{ i }}" maxlength="40" value="{{ row.values.check|default:'' }}"></td>

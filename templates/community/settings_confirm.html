@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Confirm the dues change · {{ SITE_NAME }}{% endblock %}
+{% block title %}Confirm the {% term "term" %} change · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'community_settings' %}">Community settings</a> / Confirm</div>
-  <div class="page-head"><div><h1>Change the monthly dues?</h1></div></div>
+  <div class="page-head"><div><h1>Change the monthly {% term "term" %}?</h1></div></div>
   <section class="card">
-    <div class="alert warning" role="alert">{% icon "alert" %}<span>Monthly dues would go {% if change.up %}up{% else %}down{% endif %} by {{ change.percent }}%: from <strong>{{ change.old|cents }}</strong> to <strong>{{ change.new|cents }} per month</strong>.</span></div>
-    <p>Every lot is charged the new amount from the next dues posting, and owners see it under Upcoming charges at once. Check the amount was typed in dollars and that the change was adopted as the Declaration and the Act require (a budget ratified by the owners or a recorded board decision).</p>
+    <div class="alert warning" role="alert">{% icon "alert" %}<span>The monthly {% term "term" %} would go {% if change.up %}up{% else %}down{% endif %} by {{ change.percent }}%: from <strong>{{ change.old|cents }}</strong> to <strong>{{ change.new|cents }} per month</strong>.</span></div>
+    <p>Every home is charged the new amount from the next {% term "term" %} posting, and owners see it under Upcoming charges at once. Check the amount was typed in dollars and that the change was adopted as the Declaration and the Act require (a budget ratified by the owners or a recorded board decision).</p>
     <form method="post" action="{% url 'community_rule_save' %}">{% csrf_token %}
       <input type="hidden" name="key" value="{{ post.key }}">
       <input type="hidden" name="value" value="{{ typed }}">
@@ -14,7 +14,7 @@
       <input type="hidden" name="notes" value="{{ post.notes }}">
       <input type="hidden" name="confirm" value="yes">
       <div class="form-actions">
-        <button type="submit">Yes, set dues to {{ change.new|cents }} per month</button>
+        <button type="submit">Yes, set the {% term "term" %} to {{ change.new|cents }} per month</button>
         <a class="btn secondary" href="{% url 'community_settings' %}#rule-{{ post.key }}">Cancel</a>
       </div>
     </form>

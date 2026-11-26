@@ -12,6 +12,7 @@ from audit.services import record_event
 from community.account_views import my_account_people
 from community.models import Lot
 from community.rules import rule, rule_with_citation
+from community.terms import term_text
 from core import features, policy
 from core.money import MoneyField, format_cents
 from core.workflow import WorkflowError
@@ -263,7 +264,7 @@ def ledger_home(request):
             lambda: services.post_late_fees(
                 year=today.year, month=today.month, actor=request.user, request=request
             ),
-            "Late fees posted to the lots on the late list.",
+            "Late fees posted to the homes on the late list.",
         )
         return redirect("ledger_home")
     if request.method == "POST":
@@ -276,11 +277,11 @@ def ledger_home(request):
             lambda: services.post_monthly_assessments(
                 year=year, month=month, actor=request.user, request=request
             ),
-            "Assessments posted (lots already charged for that month were skipped).",
+            term_text("Monthly {term} posted (homes already charged for that month were skipped)."),
         )
         return redirect("ledger_home")
     bal = services.balances()
-    lots = list(Lot.objects.for_user(request.user))
+    lots = sorted(Lot.objects.for_user(request.user), key=lambda lot: lot.sort_key)
     today = timezone.localdate()
     next_month = (today.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
     dues = rule("dues.monthly_cents") or 0
@@ -776,7 +777,7 @@ def _reserve_suggestion(request):
 
 
 class ResaleForm(forms.Form):
-    lot = forms.ModelChoiceField(queryset=Lot.objects.none())
+    lot = forms.ModelChoiceField(queryset=Lot.objects.none(), label="Home")
     requester_name = forms.CharField(max_length=120, label="Requested by (name)")
     requester_email = forms.EmailField(required=False)
     expected_settlement = _date(required=False)
@@ -786,7 +787,7 @@ class ResaleForm(forms.Form):
         lots = Lot.objects.for_user(user)
         if not policy.can(user, "resale.manage"):
             lots = lots.filter(pk__in=policy.roles_for(user).owned_lot_ids)
-        self.fields["lot"].queryset = lots
+        self.fields["lot"].queryset = lots.order_by("street_address", "number")
 
 
 @login_required

@@ -18,7 +18,7 @@
   {% with o=dash.owner s=dash.staff %}
   {% if user|can:"history.view_own" and not o and not s %}
     <section class="card"><h2>Your records</h2>
-      <p class="muted">You no longer own a lot here, so your login is read-only. You can still see your own account statements and requests from your time as an owner.</p>
+      <p class="muted">You no longer own a home here, so your login is read-only. You can still see your own account statements and requests from your time as an owner.</p>
       <a class="btn" href="{% url 'my_history' %}">{% icon "clock" %} View my history</a></section>
   {% endif %}
 
@@ -53,7 +53,7 @@
     <div class="grid grid-4">
       {% for a in o.accounts %}
         <a class="stat {% if a.balance > 0 %}tone-warning{% else %}tone-success{% endif %}" href="{% url 'my_account' %}">
-          <div class="label">Lot {{ a.lot.number }} account</div>
+          <div class="label">{{ a.lot.label }}</div>
           <div class="value">{% if a.balance > 0 %}{{ a.balance|cents }}{% elif a.balance < 0 %}{{ a.balance|cents|cut:"-" }}{% else %}$0.00{% endif %}</div>
           <div class="hint">{% if a.balance > 0 %}due{% elif a.balance < 0 %}in credit{% else %}paid up{% endif %}</div>
         </a>

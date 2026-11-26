@@ -22,7 +22,8 @@ NOTICES = {
     "People page if you did not expect it.",
     "board_seat_proposed": "A new board seat was proposed in the portal. A different board "
     "member must approve or decline it on the Approvals page.",
-    "account_change_requested": "An owner asked to add or remove someone on their account. "
+    "account_change_requested": "An owner asked to add or remove someone on their account "
+    "or on the deed. "
     "A board member (not the owner) can approve or decline it from My items.",
     "mfa_reset_code_locked": "A sign-in reset code was locked after too many wrong entries. "
     "Someone other than the owner may have been trying it. Contact the owner directly; "

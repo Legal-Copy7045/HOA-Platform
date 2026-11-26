@@ -82,6 +82,32 @@ def online_payments_enabled(request=None) -> bool:
     return features.enabled("online_payments", request) and config().available
 
 
+def fee_summary() -> str:
+    """The fee rule in one line for printed statements (D43): bank and
+    debit free, credit cards at the configured surcharge."""
+    bp = surcharge_bp()
+    if not bp:
+        return "No fee for any online payment."
+    return f"Bank transfer or debit card: no fee. Credit card: {percent_text(bp)} surcharge."
+
+
+def statement_pay_url(lot) -> str:
+    """The address behind a printed statement's "Pay online" QR code (D43),
+    or "" when online payments are not usable or the site address is unknown.
+
+    A plain address of a signed-in page: no token, account number or
+    personal data. ``home`` only picks which of the reader's own homes to
+    open (``views.pay_start``): anyone else who scans it signs in and then
+    sees their own account, never this one."""
+    from django.conf import settings
+    from django.urls import reverse
+
+    base = (getattr(settings, "PORTAL_BASE_URL", "") or "").rstrip("/")
+    if not base.startswith(("https://", "http://")) or not online_payments_enabled():
+        return ""
+    return f"{base}{reverse('pay_start')}?home={int(lot.pk)}"
+
+
 # --- For the accounting export and deposits (ledger.accounting) ----------------------------
 
 
@@ -112,13 +138,11 @@ def journal_items(start, end) -> dict[str, list[tuple]]:
     for p in StripePayment.objects.unscoped("accounting").select_related("lot"):
         day = timezone.localdate(p.recorded_at)
         if p.surcharge_cents and start <= day <= end:
-            out["surcharges"].append((day, f"S{p.pk}", p.surcharge_cents, p.lot.number))
+            out["surcharges"].append((day, f"S{p.pk}", p.surcharge_cents, p.lot))
     for ev, surcharge_part, _base in refund_portions():
         day = timezone.localdate(ev.seen_at)
         if surcharge_part and start <= day <= end:
-            out["surcharge_refunds"].append(
-                (day, f"E{ev.pk}", surcharge_part, ev.payment.lot.number)
-            )
+            out["surcharge_refunds"].append((day, f"E{ev.pk}", surcharge_part, ev.payment.lot))
     for bt in StripeBalanceTransaction.objects.exclude(fee_cents=0):
         day = timezone.localdate(bt.created)
         if start <= day <= end:

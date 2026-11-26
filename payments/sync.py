@@ -208,12 +208,12 @@ def _returned(payment: StripePayment) -> None:
         amount = format_cents(payment.base_cents)
         if done:
             detail = (
-                f"Bank payment of {amount} on lot {payment.lot.number} was returned; the "
+                f"Bank payment of {amount} for {payment.lot.label} was returned; the "
                 "payment was reversed on the account."
             )
         else:
             detail = (
-                f"Bank payment of {amount} on lot {payment.lot.number} was returned, but part "
+                f"Bank payment of {amount} for {payment.lot.label} was returned, but part "
                 "of it is recorded as refunded. Check at Stripe whether that refund went out; "
                 "reverse the refund entry if it did not, then reverse the payment."
             )
@@ -267,8 +267,8 @@ def _watch(payment: StripePayment) -> None:
             lot_id=payment.lot_id,
             amount=amount,
             ref=payment.payment_intent_id,
-            detail=f"A refund of {format_cents(amount)} was made at Stripe for lot "
-            f"{payment.lot.number}. Record it on the lot's account (reverse or adjust).",
+            detail=f"A refund of {format_cents(amount)} was made at Stripe for "
+            f"{payment.lot.label}. Record it on the home's account (reverse or adjust).",
         )
     for dispute in stripe_api.list_disputes(payment.charge_id).get("data") or []:
         if not isinstance(dispute, dict):
@@ -288,7 +288,7 @@ def _watch(payment: StripePayment) -> None:
             lot_id=payment.lot_id,
             amount=amount,
             ref=payment.payment_intent_id,
-            detail=f"The payer disputed {format_cents(amount)} on lot {payment.lot.number}. "
+            detail=f"The payer disputed {format_cents(amount)} for {payment.lot.label}. "
             "Answer it in the Stripe dashboard, then record the outcome on the account.",
         )
 

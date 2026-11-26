@@ -12,6 +12,7 @@ from community.models import Role
 from community.tests.factories import LotFactory, make_member
 from core.append_only import AppendOnlyError
 from core.scoping import system_access
+from core.tests.pdftext import pdf_text
 from core.workflow import WorkflowError
 from documents.tests.helpers import pdf
 
@@ -245,3 +246,13 @@ def test_deemed_approval_skips_a_request_decided_meanwhile(w, monkeypatch):
 
     monkeypatch.setattr(services.ARC, "apply", racing_apply)
     assert services.apply_deemed_approvals() == 1
+
+
+def test_decision_letter_names_the_address_with_the_lot_number(w):
+    req = submitted(w)
+    decision = services.decide(
+        req, outcome=ArcState.APPROVED, reasons="Fits the guidelines", actor=w["reviewer"]
+    )
+    lot = w["lot"]
+    text = pdf_text(services.decision_letter(req, decision))
+    assert f"{lot.street_address} (Lot {lot.number})" in text

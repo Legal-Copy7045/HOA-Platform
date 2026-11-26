@@ -25,6 +25,7 @@ from audit.services import record_event
 from comms.notify import send_now
 from community.models import Lot
 from community.rules import rule
+from community.terms import term_text
 from core.lists import safe_cell
 from core.money import format_cents
 from core.policy import SYSTEM, require
@@ -64,7 +65,7 @@ def _cents(value) -> str:
 GL_LABELS = {
     "cash": "Bank (operating cash)",
     "receivable": "Owner receivables",
-    "assessment": "Dues (assessment) income",
+    "assessment": "{Term} income",
     "late_fee": "Late fee income",
     "resale_fee": "Resale certificate fees",
     "other_charge": "Other owner charges",
@@ -79,7 +80,7 @@ GL_LABELS = {
 def gl_rows(setup: AccountingSetup) -> list[dict]:
     accounts = setup.accounts()
     return [
-        {"key": key, "label": label, "value": accounts.get(key, "")}
+        {"key": key, "label": term_text(label), "value": accounts.get(key, "")}
         for key, label in GL_LABELS.items()
     ]
 
@@ -112,25 +113,37 @@ def save_setup(*, gl_accounts: str, opening_cash_cents: int, opening_cash_on, ac
 
 # --- Accounting export -------------------------------------------------------------------
 
-EXPORT_HEADER = ["Date", "Journal", "Reference", "Account", "Debit", "Credit", "Memo"]
+# D40: owners appear by address in the memo; "Lot number" (last) is for the
+# accountant's matching to the plat and the register.
+EXPORT_HEADER = [
+    "Date",
+    "Journal",
+    "Reference",
+    "Account",
+    "Debit",
+    "Credit",
+    "Memo",
+    "Lot number",
+]
 
 
 def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
     """Double-entry journal lines for the period, for import into the
     accounting package (QuickBooks, Xero...). Owner charges and payments are
-    identified by lot number only, never by name. Vendor payments are by
+    identified by address and lot number only, never by name. Vendor payments are by
     vendor and expense category code."""
     from operations.models import InvoicePayment
 
     gl = AccountingSetup.get().accounts()
     rows: list[list[str]] = []
 
-    def pair(date, journal, ref, debit_acct, credit_acct, cents, memo):
+    def pair(date, journal, ref, debit_acct, credit_acct, cents, memo, lot=None):
         if cents < 0:  # a reversal: swap sides
             debit_acct, credit_acct, cents = credit_acct, debit_acct, -cents
         amount = _cents(cents)
-        rows.append([date.isoformat(), journal, ref, debit_acct, amount, "", memo])
-        rows.append([date.isoformat(), journal, ref, credit_acct, "", amount, memo])
+        number = str(lot.number) if lot is not None else ""
+        rows.append([date.isoformat(), journal, ref, debit_acct, amount, "", memo, number])
+        rows.append([date.isoformat(), journal, ref, credit_acct, "", amount, memo, number])
 
     with system_access("accounting export"):
         entries = list(
@@ -148,7 +161,7 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
     online = online_entry_ids()
     for e in entries:
         kind = e.reverses.kind if e.kind == EntryKind.REVERSAL and e.reverses else e.kind
-        memo = f"Lot {e.lot.number}: {e.get_kind_display()}"
+        memo = f"{e.lot.label}: {e.get_kind_display()}"
         ref = f"L{e.pk}"
         if kind == EntryKind.PAYMENT:
             # A payment is a negative entry: debit cash, credit receivables.
@@ -162,6 +175,7 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
                 gl["receivable"],
                 -e.amount_cents,
                 memo + (" (online)" if is_online else ""),
+                e.lot,
             )
         elif kind == EntryKind.REFUND:
             # Part of an online payment refunded at Stripe (D33-acctfix-5):
@@ -174,6 +188,7 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
                 gl["stripe_clearing"],
                 e.amount_cents,
                 memo + " (online)",
+                e.lot,
             )
         elif kind == EntryKind.CREDIT:
             pair(
@@ -184,17 +199,45 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
                 gl["receivable"],
                 -e.amount_cents,
                 memo,
+                e.lot,
             )
         else:
             income = gl.get(kind, gl["other_charge"])
-            pair(e.posted_on, "Owner charges", ref, gl["receivable"], income, e.amount_cents, memo)
+            pair(
+                e.posted_on,
+                "Owner charges",
+                ref,
+                gl["receivable"],
+                income,
+                e.amount_cents,
+                memo,
+                e.lot,
+            )
     stripe = journal_items(start, end)
-    for day, ref, cents, lot_number in stripe["surcharges"]:
-        memo = f"Lot {lot_number}: credit card surcharge"
-        pair(day, "Online payments", ref, gl["stripe_clearing"], gl["card_surcharge"], cents, memo)
-    for day, ref, cents, lot_number in stripe["surcharge_refunds"]:
-        memo = f"Lot {lot_number}: surcharge refunded"
-        pair(day, "Online payments", ref, gl["card_surcharge"], gl["stripe_clearing"], cents, memo)
+    for day, ref, cents, lot in stripe["surcharges"]:
+        memo = f"{lot.label}: credit card surcharge"
+        pair(
+            day,
+            "Online payments",
+            ref,
+            gl["stripe_clearing"],
+            gl["card_surcharge"],
+            cents,
+            memo,
+            lot,
+        )
+    for day, ref, cents, lot in stripe["surcharge_refunds"]:
+        memo = f"{lot.label}: surcharge refunded"
+        pair(
+            day,
+            "Online payments",
+            ref,
+            gl["card_surcharge"],
+            gl["stripe_clearing"],
+            cents,
+            memo,
+            lot,
+        )
     for day, ref, cents, kind in stripe["fees"]:
         memo = f"Stripe fee ({kind})"
         pair(day, "Online payments", ref, gl["processing_fees"], gl["stripe_clearing"], cents, memo)

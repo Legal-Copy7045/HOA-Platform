@@ -153,7 +153,7 @@ def record_ownership(
                 },
             )
     except IntegrityError as exc:
-        raise CommunityError("That person already owns this lot during that period.") from exc
+        raise CommunityError("That person already owns this home during that period.") from exc
     return ownership
 
 
@@ -1050,6 +1050,7 @@ def update_my_profile(
     directory_show_email: bool = False,
     directory_show_phone: bool = False,
     weekly_digest: bool | None = None,
+    statement_emails: bool | None = None,
     request: HttpRequest | None = None,
 ):
     """Anyone with a linked Person edits only their own profile."""
@@ -1072,6 +1073,8 @@ def update_my_profile(
         profile.directory_show_phone = in_directory and directory_show_phone
         if weekly_digest is not None:
             profile.weekly_digest = weekly_digest
+        if statement_emails is not None:
+            profile.statement_emails = statement_emails
         profile.save()
         _audit(
             "profile.updated",
@@ -1188,15 +1191,67 @@ def directory_entries():
                 {
                     "name": o.person.display_name,
                     "lot": o.lot.number,
+                    "address": o.lot.label,
                     "street_address": o.lot.street_address,
                     "email": o.person.email if p.directory_show_email else "",
                     "phone": p.phone if p.directory_show_phone else "",
+                    "_sort": o.lot.sort_key,
                 }
             )
+    entries.sort(key=lambda e: e.pop("_sort"))
     return entries
 
 
 # --- Owner-requested account changes (board approval) ---------------------------------
+
+
+def _added_person_email(email: str, no_login: bool) -> str:
+    """The email of someone an owner asks to add: required, because they sign
+    in with it, unless the owner ticked "They don't use email" (D41)."""
+    email = (email or "").strip()
+    if email:
+        from django.core.validators import validate_email
+
+        try:
+            validate_email(email)
+        except ValidationError as exc:
+            raise CommunityError("Enter a valid email address.") from exc
+    elif not no_login:
+        raise CommunityError(
+            "Enter their email: they sign in with it. If they don't use email, tick"
+            ' "They don\'t use email".'
+        )
+    return email
+
+
+def _check_deed_date(deed_date) -> None:
+    if not isinstance(deed_date, datetime.date):
+        raise CommunityError("Enter the date on the recorded deed.")
+    if deed_date > today():
+        raise CommunityError("The deed date cannot be in the future.")
+
+
+def _deed_before_account(account: Account, deed_date: datetime.date) -> bool:
+    """A co-owner whose deed is dated before the account began would move
+    the account's start (and possibly money between accounts): the board
+    records that from the home's page instead."""
+    return deed_date < account.opened_on
+
+
+def _remaining_owners(account: Account, ownership: Ownership, on: datetime.date):
+    """Owners of ``account`` other than ``ownership`` who hold it on ``on``
+    and are still owners."""
+    return (
+        Ownership.objects.filter(account=account, end_date__isnull=True, start_date__lte=on)
+        .exclude(pk=ownership.pk)
+        .order_by("start_date", "id")
+    )
+
+
+LAST_OWNER_MESSAGE = (
+    "The account must keep at least one owner on the deed. A sale to new owners is"
+    " recorded by the board as a transfer."
+)
 
 
 def request_account_change(
@@ -1206,46 +1261,100 @@ def request_account_change(
     kind: str = "",
     name: str = "",
     email: str = "",
+    no_login: bool = False,
     contact: AccountContact | None = None,
+    ownership_type: str = "",
+    deed_date: datetime.date | None = None,
+    ownership: Ownership | None = None,
+    deed=None,
     reason: str = "",
     actor,
     request=None,
 ):
-    """An owner on the deed asks to add or remove a contact on their account."""
-    from community.models import AccountChangeAction, AccountChangeRequest
+    """An owner on the deed asks to add or remove a contact on their account,
+    or (with the recorded deed attached) an owner on the deed (D41)."""
+    from community.models import (
+        ADDED_OWNER_TYPES,
+        DEED_FILE_LABEL,
+        AccountChangeAction,
+        AccountChangeRequest,
+    )
 
     require(actor, "account.request_change")
+    _refuse_read_only(actor)
     if actor is not SYSTEM and account.lot_id not in roles_for(actor).owned_lot_ids:
         raise PermissionDenied("account_change")
     if not account.is_active:
         raise CommunityError("This account is dormant.")
     fields = {"reason": (reason or "").strip()[:2000]}
-    if action == AccountChangeAction.ADD:
+    if action in (AccountChangeAction.ADD, AccountChangeAction.ADD_OWNER):
         name = " ".join((name or "").split())[:200]
-        email = (email or "").strip()
-        if kind not in ContactKind.values or not name:
-            raise CommunityError("Enter their name and choose what they may do.")
-        if email:
-            from django.core.validators import validate_email
-
-            try:
-                validate_email(email)
-            except ValidationError as exc:
-                raise CommunityError("Enter a valid email address, or leave it blank.") from exc
-        fields.update(kind=kind, name=name, email=email)
+        if not name:
+            raise CommunityError("Enter their name.")
+        no_login = bool(no_login)
+        fields.update(name=name, email=_added_person_email(email, no_login), no_login=no_login)
+        if action == AccountChangeAction.ADD:
+            if kind not in ContactKind.values:
+                raise CommunityError("Choose what they may do.")
+            fields["kind"] = kind
+        else:
+            if ownership_type not in ADDED_OWNER_TYPES:
+                raise CommunityError("Choose how they hold the deed: joint owner, trust or entity.")
+            _check_deed_date(deed_date)
+            if _deed_before_account(account, deed_date):
+                raise CommunityError(
+                    "The deed is dated before your account began. Send the board a message"
+                    " instead: they record it from the home's page."
+                )
+            fields.update(ownership_type=ownership_type, deed_date=deed_date)
     elif action == AccountChangeAction.REMOVE:
         if contact is None or contact.account_id != account.pk or contact.end_date is not None:
             raise CommunityError("Choose someone currently on this account.")
         fields.update(contact=contact, kind=contact.kind)
+    elif action == AccountChangeAction.REMOVE_OWNER:
+        if (
+            ownership is None
+            or ownership.account_id != account.pk
+            or ownership.end_date is not None
+        ):
+            raise CommunityError("Choose a current owner on this account.")
+        _check_deed_date(deed_date)
+        if deed_date < ownership.start_date:
+            raise CommunityError("The deed is dated before they became an owner.")
+        fields.update(ownership=ownership, deed_date=deed_date)
     else:
         raise CommunityError("Choose add or remove.")
+    owner_change = action in (AccountChangeAction.ADD_OWNER, AccountChangeAction.REMOVE_OWNER)
+    if owner_change and deed is None:
+        raise CommunityError("Attach a copy of the recorded deed.")
     with transaction.atomic(), system_access("request account change"):
+        Account.objects.select_for_update().filter(pk=account.pk).exists()
         pending = AccountChangeRequest.objects.filter(account=account, state="pending")
         if pending.count() >= 10:
             raise CommunityError("There are already several changes waiting for the board.")
+        if action == AccountChangeAction.REMOVE_OWNER:
+            if not _remaining_owners(account, ownership, deed_date).exists():
+                raise CommunityError(LAST_OWNER_MESSAGE)
+            if pending.filter(action=action, ownership=ownership).exists():
+                raise CommunityError("That change is already waiting for the board.")
         change = AccountChangeRequest.objects.create(
             account=account, action=action, requested_by=actor, **fields
         )
+        if owner_change:
+            from documents import attachments
+            from documents.services import DocumentError
+
+            try:
+                attachments.attach(
+                    change,
+                    deed,
+                    actor=_user(actor),
+                    label=DEED_FILE_LABEL,
+                    allowed=attachments.IMAGES_AND_PDF,
+                    request=request,
+                )
+            except DocumentError as exc:
+                raise CommunityError(str(exc)) from exc
         _audit(
             "account.change_requested",
             actor=actor,
@@ -1257,12 +1366,110 @@ def request_account_change(
     return change
 
 
+def _refuse_own_owner_change(change, actor) -> None:
+    """No self-grants (D41): the approver is not the person added to, or
+    removed from, the deed."""
+    from community.models import AccountChangeAction
+
+    if actor is SYSTEM:
+        return
+    if change.action == AccountChangeAction.REMOVE_OWNER:
+        mine = _person_of(actor)
+        if mine is not None and mine == change.ownership.person_id:
+            raise CommunityError("Another board member must decide a change to your own ownership.")
+    elif change.action == AccountChangeAction.ADD_OWNER and change.email:
+        from accounts.models import normalize_email_address
+
+        addresses = {normalize_email_address(actor.email or "")}
+        with system_access("self-grant check"):
+            person = Person.objects.filter(user=actor).first()
+        if person is not None:
+            addresses.add(normalize_email_address(person.email or ""))
+        if normalize_email_address(change.email) in addresses - {""}:
+            raise CommunityError("Another board member must decide a change that adds you.")
+
+
+def set_ownership_type(
+    ownership: Ownership, ownership_type: str, *, actor, request: HttpRequest | None = None
+) -> Ownership:
+    """Correct how an owner holds the deed (e.g. a sole owner becomes a joint
+    owner when a co-owner is added). Kept in the ownership's history."""
+    _authorize(actor, "ownership.manage")
+    if ownership_type not in OwnershipType.values:
+        raise CommunityError("Unknown ownership type.")
+    with transaction.atomic(), system_access("set ownership type"):
+        ownership = Ownership.objects.select_for_update().get(pk=ownership.pk)
+        if ownership.ownership_type == ownership_type:
+            return ownership
+        ownership.ownership_type = ownership_type
+        ownership.save(update_fields=["ownership_type"])
+        _audit(
+            "ownership.type_changed",
+            actor=actor,
+            request=request,
+            target=ownership,
+            metadata={
+                "lot_id": ownership.lot_id,
+                "person_id": ownership.person_id,
+                "ownership_type": ownership_type,
+            },
+        )
+    return ownership
+
+
+def _approve_owner_change(change, account: Account, *, actor, request):
+    """Make an approved deed change through the ownership services. Returns
+    the person added, if any."""
+    from community.models import AccountChangeAction
+
+    if not account.is_active:
+        raise CommunityError("This account is dormant.")
+    if change.action == AccountChangeAction.ADD_OWNER:
+        if _deed_before_account(account, change.deed_date):
+            raise CommunityError(
+                "The deed is dated before this account began: record this owner from the"
+                " home's page (Owners), where an earlier date is handled."
+            )
+        person = record_person(
+            display_name=change.name, email=change.email, actor=actor, request=request
+        )
+        added = record_ownership(
+            person=person,
+            lot=account.lot,
+            start_date=change.deed_date,
+            ownership_type=change.ownership_type,
+            actor=actor,
+            request=request,
+        )
+        if added.account_id != account.pk:
+            raise CommunityError("This owner would not join the current account.")
+        for other in Ownership.objects.filter(
+            account=account, end_date__isnull=True, ownership_type=OwnershipType.SOLE
+        ).exclude(pk=added.pk):
+            set_ownership_type(other, OwnershipType.JOINT, actor=actor, request=request)
+        return person
+    ownership = Ownership.objects.get(pk=change.ownership_id)
+    if ownership.end_date is not None:
+        raise CommunityError("This ownership has already ended.")
+    if not _remaining_owners(account, ownership, change.deed_date).exists():
+        raise CommunityError(LAST_OWNER_MESSAGE)
+    end_ownership(ownership, end_date=change.deed_date, actor=actor, request=request)
+    left = list(Ownership.objects.filter(account=account, end_date__isnull=True))
+    if len(left) == 1 and left[0].ownership_type == OwnershipType.JOINT:
+        set_ownership_type(left[0], OwnershipType.SOLE, actor=actor, request=request)
+    return None
+
+
 def decide_account_change(change, *, approve: bool, note: str = "", actor, request=None):
-    """A board member other than the requester approves (the change is made
-    through add/end_account_contact, as that board member) or declines."""
+    """A board member other than the requester (and, for a deed change, not
+    the person added or removed) approves or declines. The change is made
+    through the normal services as that board member. An added person with
+    an email is then invited to sign in; if the invitation cannot be made,
+    the approval stands and ``invitation_sent`` is False (D41)."""
     from community.models import AccountChangeAction, AccountChangeRequest
 
     require(actor, "account.approve_change")
+    person = None
     with transaction.atomic(), system_access("decide account change"):
         change = AccountChangeRequest.objects.select_for_update().get(pk=change.pk)
         if change.state != "pending":
@@ -1270,8 +1477,11 @@ def decide_account_change(change, *, approve: bool, note: str = "", actor, reque
         if actor is not SYSTEM and change.requested_by_id == actor.pk:
             raise CommunityError("Another board member must decide a change you asked for.")
         if approve:
-            account = Account.objects.get(pk=change.account_id)
-            if change.action == AccountChangeAction.ADD:
+            account = Account.objects.select_related("lot").get(pk=change.account_id)
+            if change.is_owner_change:
+                _refuse_own_owner_change(change, actor)
+                person = _approve_owner_change(change, account, actor=actor, request=request)
+            elif change.action == AccountChangeAction.ADD:
                 person = record_person(
                     display_name=change.name, email=change.email, actor=actor, request=request
                 )
@@ -1286,6 +1496,7 @@ def decide_account_change(change, *, approve: bool, note: str = "", actor, reque
             decided_by=None if actor is SYSTEM else actor,
             decided_at=timezone.now(),
             decision_note=(note or "").strip()[:2000],
+            person=person,
         )
         _audit(
             "account.change_decided",
@@ -1294,6 +1505,18 @@ def decide_account_change(change, *, approve: bool, note: str = "", actor, reque
             target=change.account,
             metadata={"action": change.action, "decision": "approved" if approve else "declined"},
         )
+    if approve and person is not None and change.will_invite:
+        # After the approval is saved: a failed invitation never undoes it.
+        from accounts.services import InvitationError, create_invitation
+
+        try:
+            create_invitation(person=person, actor=actor, request=request)
+        except (InvitationError, PermissionDenied):
+            sent = False
+        else:
+            sent = True
+        with system_access("record invitation outcome"):
+            AccountChangeRequest.objects.filter(pk=change.pk).update(invitation_sent=sent)
     change.refresh_from_db()
     return change
 
@@ -1333,7 +1556,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
         accounts = Account.objects.select_related("lot").order_by("lot__number", "-opened_on")
         if not include_dormant:
             accounts = accounts.filter(closed_on__isnull=True)
-        accounts = list(accounts)
+        accounts = sorted(accounts, key=lambda a: a.lot.sort_key)  # address order (D40)
         ownerships = list(
             Ownership.objects.filter(account__in=accounts).select_related("person", "account")
         )

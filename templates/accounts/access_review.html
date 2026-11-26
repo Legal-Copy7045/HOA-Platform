@@ -23,7 +23,7 @@
     <thead><tr><th>Login</th><th>Homes</th><th>Board, offices, roles</th><th>Account contact</th><th>Last sign-in</th><th>Authenticator</th><th>Flags</th></tr></thead>
     <tbody>{% for r in rows %}<tr>
       <td>{% if r.person %}<a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a>{% else %}<span class="muted">No person record</span>{% endif %}<div class="small muted">{{ r.user.email }}</div></td>
-      <td class="small">{% for n in r.lots %}Lot {{ n }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="small">{% for n in r.lots %}{{ n }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
       <td class="small">{% if r.board %}Board{% endif %}{% for o in r.offices %}{% if r.board or not forloop.first %}, {% endif %}{{ o }}{% endfor %}{% for x in r.roles %}{% if r.board or r.offices or not forloop.first %}, {% endif %}{{ x }}{% endfor %}{% if not r.board and not r.offices and not r.roles %}<span class="muted">-</span>{% endif %}</td>
       <td class="small">{% for c in r.contacts %}{{ c }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
       <td class="nowrap small">{% if r.user.last_login %}{{ r.user.last_login|date:"M j, Y" }}{% else %}<span class="muted">Never</span>{% endif %}</td>

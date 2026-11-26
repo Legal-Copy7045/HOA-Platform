@@ -12,6 +12,7 @@ from community import services as community
 from community.models import CommunityProfile, Role
 from community.tests.factories import LotFactory, make_member
 from core import pdf
+from core.tests.pdftext import pdf_text
 from ledger import letters, services
 from ledger.models import EntryKind, LetterKind
 
@@ -57,7 +58,7 @@ def test_first_notice_has_letter_amount_and_statement(w):
     data = letters.notice_pdf(w["lot"], LetterKind.FIRST)
     assert data.startswith(b"%PDF")
     assert b"DELINQUENT NOTICE" in data and b"$123.45" in data
-    assert b"ACCOUNT STATEMENT" in data and b"Gate repair share" in data
+    assert b"Account statement as of" in data and b"Gate repair share" in data
     assert b"CERTIFIED" not in data
     assert b"ten \\(10\\)" in data or b"ten (10)" in data
 
@@ -83,7 +84,9 @@ def test_statement_running_total_and_stub(w):
     paras, balance = letters.statement_paragraphs(w["lot"])
     assert balance == 12345
     text = "\n".join(t for _s, t in paras)
-    assert "Prior Balance" in text and "PAY THIS AMOUNT" in text and "Past Due" in text
+    # D43 wording: brought forward, the slip's amount due, past due since the date.
+    assert "Balance brought forward on" in text and "Amount due:" in text
+    assert "REMITTANCE SLIP" in text and "Past due since" in text
 
 
 def test_only_the_board_edits_wording_and_settings(w):
@@ -161,3 +164,17 @@ def test_resale_certificate_shows_application_data_in_bold(w):
 def test_unused_lot_without_owners_still_renders():
     lot = LotFactory()
     assert letters.statement_pdf(lot).startswith(b"%PDF")
+
+
+def test_formal_documents_show_the_address_with_the_lot_number(w):
+    """D40: statements, delinquency letters and the resale certificate name
+    the home as "<address> (Lot N)"."""
+    lot = w["lot"]
+    legal = f"{lot.street_address} (Lot {lot.number})"
+    assert lot.legal_label == legal
+    assert legal in pdf_text(letters.statement_pdf(lot))
+    for kind in (LetterKind.FIRST, LetterKind.SECOND, LetterKind.FINAL):
+        assert legal in pdf_text(letters.notice_pdf(lot, kind)), kind
+    req = services.request_resale(lot=lot, requester_name="Seller", actor=w["owner"])
+    text = pdf_text(services.resale_certificate(req))
+    assert f"with respect to {legal}" in text and f"Account of {legal}" in text

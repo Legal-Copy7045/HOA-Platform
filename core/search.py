@@ -53,7 +53,7 @@ class Result:
     url: str
     snippet: str = ""
     date: datetime.date | datetime.datetime | None = None
-    detail: str = ""  # a short plain label, e.g. "Lot 12" or "Message"
+    detail: str = ""  # a short plain label, e.g. an address or "Message"
 
 
 @dataclass(frozen=True)

@@ -10,6 +10,7 @@ from community.models import Role
 from community.tests.factories import LotFactory, make_member
 from compliance import services
 from compliance.models import Violation, ViolationState
+from core.tests.pdftext import pdf_text
 from core.workflow import WorkflowError
 
 pytestmark = pytest.mark.django_db
@@ -76,3 +77,9 @@ def test_owners_cannot_report():
             description="x",
             actor=make_member(lots=[LotFactory()]),
         )
+
+
+def test_notice_letter_names_the_address_with_the_lot_number(w):
+    v = services.VIOLATION.apply(w["v"], "send_notice", actor=w["manager"])
+    lot = w["lot"]
+    assert f"{lot.street_address} (Lot {lot.number})" in pdf_text(services.notice_letter(v))

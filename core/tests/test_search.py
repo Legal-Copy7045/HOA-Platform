@@ -222,7 +222,7 @@ OWNER_B_OR_BOARD_ONLY = [
     ("documents", "counsel"),
     ("meetings", "Executive pangolin"),
     ("records_requests", "capybara"),
-    ("rules", "Monthly dues"),
+    ("rules", "Monthly assessment"),
     ("lots", "Bravo"),
     ("people", "Quillfeather"),
     ("directory", "Quillfeather"),
@@ -319,13 +319,13 @@ def test_manager_finds_board_side_records_but_not_people(w):
     assert {"work_orders", "vendors", "invoices"} <= _areas(m, "iguana")
     assert _found(m, "Bravo", "lots")
     assert _found(m, "Quillfeather", "lots")  # owner names on the lots list
-    assert _found(m, "Monthly dues", "rules")
+    assert _found(m, "Monthly assessment", "rules")
     assert _found(m, "Quillfeather", "people") == []  # the People page is board only
 
 
 def test_lots_are_found_by_number(w):
     assert [r.title for r in _found(w["board"], str(w["lot_b"].number), "lots")] == [
-        f"Lot {w['lot_b'].number}"
+        w["lot_b"].label
     ]
 
 

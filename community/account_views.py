@@ -3,6 +3,7 @@ contact details, and read-only history for former owners."""
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -14,6 +15,7 @@ from community.models import (
     ContactKind,
     ContactMethod,
     ContactMethodKind,
+    Ownership,
     Person,
 )
 from core import policy
@@ -123,11 +125,13 @@ def contact_method_remove(request, pk):
 def pending_changes_for_lot(user, lot):
     from community.models import AccountChangeRequest
 
-    return (
+    changes = list(
         AccountChangeRequest.objects.for_user(user)
         .filter(account__lot=lot, state="pending")
-        .select_related("contact__person", "requested_by")
+        .select_related("contact__person", "ownership__person", "requested_by")
     )
+    _add_deed_files(changes)
+    return changes
 
 
 def account_context(user, lot) -> dict:
@@ -164,36 +168,137 @@ def my_account_people(user, lot_id) -> dict:
     return {"account": account, "owners": owners, "contacts": contacts}
 
 
+def _owner_ownerships(user, account):
+    """Current owners on the account, as the owner may see them."""
+    return (
+        Ownership.objects.for_user(user)
+        .filter(account=account, end_date__isnull=True)
+        .select_related("person")
+        .order_by("start_date", "id")
+    )
+
+
+def _request_forms(user, account, bound=None) -> dict:
+    """The owner's three request forms for one account (D41), with the one
+    just sent bound when it came back with errors."""
+    from community import forms
+
+    def auto_id(kind):
+        return f"{kind}-{account.pk}-%s"
+
+    out = {
+        "contact_form": forms.ContactAddRequestForm(auto_id=auto_id("contact")),
+        "owner_add_form": forms.OwnerAddRequestForm(auto_id=auto_id("owner-add")),
+        "owner_remove_form": forms.OwnerRemoveRequestForm(
+            auto_id=auto_id("owner-remove"), ownerships=_owner_ownerships(user, account)
+        ),
+        "open_panel": "",
+    }
+    if bound is not None and bound[0] == account.pk:
+        _pk, key, form = bound
+        out[key] = form
+        out["open_panel"] = key
+    return out
+
+
+def can_view_deed(user, change) -> bool:
+    """The recorded deed on a request: the board, and the owners of that
+    account (the change was already fetched through its scoped manager)."""
+    if policy.can(user, "account.approve_change"):
+        return True
+    return change.account.lot_id in policy.roles_for(user).owned_lot_ids and policy.can(
+        user, "account.request_change"
+    )
+
+
 @login_required
 @require_POST
 def account_change_request(request, pk):
-    """Owner: ask the board to add or remove someone on their account."""
+    """Owner: ask the board to add or remove someone on their account, or
+    (with the recorded deed) an owner on the deed (D41). A form that comes
+    back with errors is shown again on My home with what was typed."""
+    from community import forms
     from community.models import AccountChangeAction
 
     policy.require(request.user, "account.request_change")
     account = get_object_or_404(Account.objects.for_user(request.user), pk=pk)
-    contact = None
     action = request.POST.get("action", "")
     if action == AccountChangeAction.REMOVE:
         contact = get_object_or_404(
             AccountContact.objects.for_user(request.user), pk=request.POST.get("contact")
         )
-    _flash(
-        request,
-        lambda: services.request_account_change(
-            account,
-            action=action,
-            kind=request.POST.get("kind", ""),
-            name=request.POST.get("name", ""),
-            email=request.POST.get("email", ""),
-            contact=contact,
-            reason=request.POST.get("reason", ""),
-            actor=request.user,
-            request=request,
-        ),
-        "Sent to the board for approval. You'll see the result here.",
-    )
-    return redirect("my_lot")
+        _flash(
+            request,
+            lambda: services.request_account_change(
+                account,
+                action=action,
+                contact=contact,
+                reason=request.POST.get("reason", ""),
+                actor=request.user,
+                request=request,
+            ),
+            "Sent to the board for approval. You'll see the result here.",
+        )
+        return redirect("my_lot")
+    if action == AccountChangeAction.ADD:
+        key = "contact_form"
+        form = forms.ContactAddRequestForm(request.POST, auto_id=f"contact-{account.pk}-%s")
+    elif action == AccountChangeAction.ADD_OWNER:
+        key = "owner_add_form"
+        form = forms.OwnerAddRequestForm(
+            request.POST, request.FILES, auto_id=f"owner-add-{account.pk}-%s"
+        )
+    elif action == AccountChangeAction.REMOVE_OWNER:
+        key = "owner_remove_form"
+        form = forms.OwnerRemoveRequestForm(
+            request.POST,
+            request.FILES,
+            auto_id=f"owner-remove-{account.pk}-%s",
+            ownerships=_owner_ownerships(request.user, account),
+        )
+    else:
+        messages.error(request, "Choose add or remove.")
+        return redirect("my_lot")
+    if form.is_valid():
+        data = form.cleaned_data
+        try:
+            services.request_account_change(
+                account,
+                action=action,
+                kind=data.get("kind", ""),
+                name=data.get("name", ""),
+                email=data.get("email", ""),
+                no_login=data.get("no_login", False),
+                ownership_type=data.get("ownership_type", ""),
+                deed_date=data.get("deed_date"),
+                ownership=data.get("ownership"),
+                deed=data.get("deed"),
+                reason=data.get("reason", ""),
+                actor=request.user,
+                request=request,
+            )
+        except services.CommunityError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(request, "Sent to the board for approval. You'll see the result here.")
+            return redirect("my_lot")
+    from community.views import render_my_lot
+
+    return render_my_lot(request, bound=(account.pk, key, form))
+
+
+@login_required
+def account_change_deed(request, pk, file_id):
+    """The recorded deed attached to a deed-change request: private,
+    scan-gated, streamed after the scoped fetch (board and the account's
+    owners only)."""
+    from community.models import AccountChangeRequest
+    from documents import attachments
+
+    change = get_object_or_404(AccountChangeRequest.objects.for_user(request.user), pk=pk)
+    if not can_view_deed(request.user, change):
+        raise Http404
+    return attachments.serve(request, change, file_id)
 
 
 @login_required
@@ -210,6 +315,26 @@ def account_change_withdraw(request, pk):
     return redirect("my_lot")
 
 
+def _approved_message(change) -> tuple[str, str]:
+    """(level, text) for the board member who just approved."""
+    if change.invitation_sent is True:
+        return "success", "Approved: the account is updated and they were emailed an invitation."
+    if change.invitation_sent is False:
+        return (
+            "warning",
+            "Approved: the account is updated, but the invitation could not be created"
+            " (for example, the email already belongs to a login). Send it from Invitations"
+            " and sign-ups.",
+        )
+    if change.adds_person:
+        return (
+            "success",
+            "Approved. They are on the account as a record only: they cannot sign in until"
+            " the board adds an email to their record and invites them.",
+        )
+    return "success", "Approved: the account is updated."
+
+
 @login_required
 @require_POST
 def account_change_decide(request, pk, decision):
@@ -217,34 +342,53 @@ def account_change_decide(request, pk, decision):
 
     policy.require(request.user, "account.approve_change")
     change = get_object_or_404(AccountChangeRequest.objects.for_user(request.user), pk=pk)
-    _flash(
-        request,
-        lambda: services.decide_account_change(
+    try:
+        change = services.decide_account_change(
             change,
             approve=decision == "approve",
             note=request.POST.get("note", ""),
             actor=request.user,
             request=request,
-        ),
-        "Approved: the account is updated." if decision == "approve" else "Declined.",
-    )
+        )
+    except services.CommunityError as exc:
+        messages.error(request, str(exc))
+    else:
+        if decision == "approve":
+            level, text = _approved_message(change)
+            getattr(messages, level)(request, text)
+        else:
+            messages.success(request, "Declined.")
     return redirect("lot_detail", pk=change.account.lot_id)
 
 
-def owner_account_panel(user, lot_id) -> dict:
-    """My home: who is on the account and the owner's change requests."""
+def owner_account_panel(user, lot_id, bound=None) -> dict:
+    """My home: who is on the account, the owner's change requests and the
+    forms to ask for more."""
     from community.models import AccountChangeRequest
 
     data = my_account_people(user, lot_id)
     if not data:
         return {}
-    data["changes"] = AccountChangeRequest.objects.for_user(user).filter(account=data["account"])[
-        :10
-    ]
+    changes = list(
+        AccountChangeRequest.objects.for_user(user)
+        .filter(account=data["account"])
+        .select_related("contact__person", "ownership__person")[:10]
+    )
+    _add_deed_files(changes)
+    data["changes"] = changes
     data["can_request"] = lot_id in policy.roles_for(user).owned_lot_ids and policy.can(
         user, "account.request_change"
     )
+    if data["can_request"]:
+        data.update(_request_forms(user, data["account"], bound))
     return data
+
+
+def _add_deed_files(changes) -> None:
+    from documents.attachments import attachments_for
+
+    for ch in changes:
+        ch.deed_files = list(attachments_for(ch)) if ch.is_owner_change else []
 
 
 def _period_account(accounts, start, end):

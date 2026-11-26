@@ -448,8 +448,8 @@ class Command(BaseCommand):
                 "Yes. Apply under Home improvement approvals (ARC) before work starts.",
             ),
             (
-                "Dues",
-                "When are dues due? (demo)",
+                "Assessments",
+                "When is the monthly assessment due? (demo)",
                 "On the 1st of each month. Paying ahead is kept as a credit.",
             ),
         ]:
@@ -473,7 +473,7 @@ class Command(BaseCommand):
             actor=b1,
         )
 
-        # Lot neighbors from the (fictional) development plan: next-door lots
+        # Home neighbors from the (fictional) development plan: next-door lots
         # on each of the two roads (Milestone 3 phase 7).
         from arc import signoffs as arc_signoffs
 
@@ -546,7 +546,7 @@ class Command(BaseCommand):
             lot=lots[12],
             request_type="billing",
             subject="Question about my statement (demo)",
-            description="Is the March dues payment on my account?",
+            description="Is the March assessment payment on my account?",
             actor=owner12,
         )
 

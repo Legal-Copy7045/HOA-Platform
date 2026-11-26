@@ -8,7 +8,7 @@
   <section class="card" data-testid="payment-state">
     {% if checkout.state == "paid" %}
       <h2>Thank you, your payment was received</h2>
-      <p>{{ payment.base_cents|cents }} was paid on lot {{ checkout.lot.number }}{% if payment.surcharge_cents %}, plus a {{ payment.surcharge_cents|cents }} credit card surcharge{% endif %}. A receipt is on its way by email.</p>
+      <p>{{ payment.base_cents|cents }} was paid for {{ checkout.lot.label }}{% if payment.surcharge_cents %}, plus a {{ payment.surcharge_cents|cents }} credit card surcharge{% endif %}. A receipt is on its way by email.</p>
       <p class="small muted">Stripe reference {{ payment.payment_intent_id }}</p>
       <a class="btn secondary" href="{% url 'payment_receipt' payment.pk %}">{% icon "download" %} Download receipt (PDF)</a>
     {% elif checkout.state == "processing" %}
