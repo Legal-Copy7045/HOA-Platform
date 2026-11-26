@@ -32,6 +32,9 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Settings | One page for rarely used set-up pages: Community settings, ARC request types, Lot neighbors, Letters and certificates, Compliance calendar, Branding, Features. | `settings_hub` |
 | Passkeys and security | Your sign-in methods (passkey, authenticator app, recovery codes). | allauth MFA |
 | Download my data | A file with everything the portal holds about you, for your records. | JSON export |
+| Bank feed | Lines from the association's bank (through Teller, or imported statement files), matched to deposits and vendor payments for the monthly reconciliation. Board, manager and auditor only. | `ledger/bankfeeds`, `BankTransaction` |
+| Connect a bank | Linking the association's bank account through Teller (board only, after a fresh password or passkey check). | `bank_connect`, Teller Connect |
+| Match the columns | The step after uploading a CSV statement: which column is the date, description and amount. | `bank_import` (CSV mapping) |
 
 Dates: "Nov 3" for a date in the current month, "Nov 3, 2027" for any other
 (`{{ d|short_date }}`, `core.dates.short_date`).

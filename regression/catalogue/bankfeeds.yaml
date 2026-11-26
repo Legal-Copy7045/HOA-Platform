@@ -1,0 +1,22 @@
+# Bank feed (bankfeeds, D32-bankfeeds): Teller free tier and statement files.
+- feature: "Teller client: api.teller.io only, mutual TLS from base64 env via a private temp file, pagination, errors by status code only, no redirects"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feeds.py::test_(teller|mtls)"]
+- feature: "Bank access tokens encrypted (Fernet, BANK_FEED_TOKEN_KEY); connecting refused without the key; last four digits only"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feeds.py::test_(token_encryption|connect_refuses|connect_stores|last_four)"]
+- feature: "Connect a bank: board only, fresh re-authentication, single-use nonce, token never in URL/page/logs; Teller CSP only on that page"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feeds.py::test_(csp_allows|connect_page|enrollment_post)", "^manual:bank feed teller connect"]
+- feature: "Disconnect deletes the token and keeps history; daily sync and Sync now; needs-reconnecting status"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feeds.py::test_(disconnect|sync_is|daily_task)"]
+- feature: "Statement file import: defensive OFX/QFX parser (no DTD/entities, size caps), CSV column mapping, idempotent re-import, upload type checks"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feeds.py::test_(ofx|amount_and_text|csv|statement_types|import_refuses|bank_lines_are_append_only)", "^manual:bank feed statement file"]
+- feature: "Matching bank lines to deposits, vendor payments and returned items; confirmed matches pre-ticked on the reconciliation; balance filled from the feed"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feeds.py::test_(suggestions|confirmed_match|undo_returns|reconcile_page_fills)"]
+- feature: "Bank feed permissions (owners never; manager imports and matches, not connect/disconnect; auditor read-only), feature switch, health check row, audit without descriptions"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feeds.py::test_(owners_never|manager_imports|auditor_sees|pages_are_gone|health_row)", "^unit:core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data\\[bank_"]

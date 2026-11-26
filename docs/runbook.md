@@ -423,3 +423,75 @@ After loading the register, Board > Onboarding shows who has signed up. Use
 "Invite everyone not yet invited", then "Remind" a few days later. Owners with
 no email get a printable letter asking for one; invitations only ever go to
 the email on the owner's record.
+
+## Bank feed (Teller, free tier)
+
+The portal can read the association's bank account so the monthly
+reconciliation is mostly ticking boxes (Finance -> Accounting -> Bank feed).
+It is free: Teller's developer tier covers up to 100 live connections (we need
+one to three). It is read-only: nothing is paid or moved, and nothing posts to
+owner accounts. The portal keeps the account's last four digits only, never
+the full account or routing number, and stores Teller's access key encrypted.
+
+Teller does not cover every bank; smaller community banks may be missing. If
+the HOA's bank is not in Teller's list, skip to "Statement files" below: every
+US bank offers them and they are always free.
+
+**1. Teller account (the HOA's, not a personal one).** Sign up at teller.io
+with the HOA's shared email address and the board's password manager. In the
+dashboard, note the **Application ID**, then under **Certificates** create a
+certificate and download the two files (`certificate.pem` and
+`private_key.pem`). Keep them only in the password manager and on the VM;
+never paste them into chat, email or a ticket.
+
+**2. Put them on the VM.** Copy the two files to the VM (for example with
+`scp` into `/root/teller/`, folder mode 700), then:
+
+```bash
+cd /opt/hoa-portal
+sudo bash -c 'source infra/poc/lib.sh
+set_env .env TELLER_APPLICATION_ID "app_xxxxxxxxxxxx"
+set_env .env TELLER_ENVIRONMENT development
+set_env .env TELLER_CERTIFICATE_B64 "$(base64 -w0 /root/teller/certificate.pem)"
+set_env .env TELLER_PRIVATE_KEY_B64 "$(base64 -w0 /root/teller/private_key.pem)"
+grep -q "^BANK_FEED_TOKEN_KEY=." .env || set_env .env BANK_FEED_TOKEN_KEY "$(openssl rand -hex 32)"'
+sudo shred -u /root/teller/certificate.pem /root/teller/private_key.pem
+sudo bash infra/poc/start-portal.sh
+```
+
+Replace `app_xxxxxxxxxxxx` with the Application ID. `development` is Teller's
+free tier for **real** accounts (`sandbox` is for trying it with fake banks;
+`production` is Teller's paid tier). `set_env` writes the values with shell
+builtins, so they never appear on a command line. `BANK_FEED_TOKEN_KEY`
+encrypts the stored access key: it is generated once and must never change
+(a new key means reconnecting the bank). Keep a copy in the password manager.
+
+**3. Connect.** A board member: Admin -> Settings -> Features, switch on
+**Bank feed**. Then Finance -> Accounting -> Bank feed -> **Connect a bank**
+(the portal asks for your password or passkey again). Search for the HOA's
+bank in Teller's window; if it is not listed, use statement files instead.
+Sign in with the association's online-banking login. The account appears with
+its last four digits and the last few months of lines.
+
+**4. Every day after that** the portal syncs overnight; anyone on the board
+or the manager can press **Sync now**. System status shows a **Bank feed**
+check that fails if there was no sync for 3 days or the bank asks to be
+reconnected (banks do this every few months, or after a password change):
+then press **Connect a bank** again. **Disconnect** (board) deletes the access
+key and keeps the lines already imported.
+
+**Statement files (free with any bank).** On the bank's website, download the
+account's activity as **OFX** or **QFX** ("Quicken" or "Money" format) if
+offered, otherwise **CSV**. In Bank feed, add an account for statement files
+once (a name and the last four digits), then **Import a statement file**.
+A CSV file asks which column is the date, description and amount (or debit
+and credit). Importing the same or an overlapping file twice adds nothing
+twice.
+
+**Matching and the monthly reconciliation.** Bank feed suggests, for each bank
+line, the deposit or vendor payment with the same amount and a nearby date;
+the manager or a board member confirms each one. On **Reconcile a statement**
+the matched items are already ticked and the ending balance is filled in from
+the feed: check both against the paper or PDF statement before recording.
+Lines that match nothing (fees, interest) stay listed until they are entered
+in the books.
