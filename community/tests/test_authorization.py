@@ -291,6 +291,7 @@ MEMBER_READS = {
                 "budget.view_owner",
                 "sms.opt_in",
                 "reservation.request",
+                "event.rsvp",
             },
         ),
         (
