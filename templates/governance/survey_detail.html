@@ -44,6 +44,8 @@
         </section>
       {% elif survey.phase == "scheduled" and not responded_on %}
         <section class="card"><p>This survey opens on {{ survey.opens_on|date:"F j, Y" }}.</p></section>
+      {% elif survey.phase == "open" and not responded_on and not can_manage %}
+        <section class="card"><p class="muted">You can read this survey, but your access does not include answering it.</p></section>
       {% endif %}
 
       {% if results_visible and not can_manage %}<p><a href="{% url 'survey_results' survey.pk %}">{% icon "chart" %} See the results</a></p>{% endif %}

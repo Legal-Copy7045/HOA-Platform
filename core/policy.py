@@ -178,7 +178,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # The survey's own audience setting narrows who sees and answers each one
     # (owners only, or owners and account contacts including tenants).
     "survey.view": COMMUNITY,
-    "survey.respond": RESIDENTS,
+    # View-only contacts see a residents survey (and shared results) but
+    # cannot answer: "sees, cannot act" (regression R2-005).
+    "survey.respond": frozenset({OWNER, AUTHORIZED, TENANT}),
     "survey.manage": frozenset({BOARD}),
     # --- Event RSVPs and volunteer sign-ups (rsvp) ---
     # Residents who can see an event answer it (view-only contacts and former
