@@ -11,6 +11,20 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: weekly}
+  # The portal image's base (Dockerfile).
   - package-ecosystem: docker
     directory: /
     schedule: {interval: weekly}
+  # Infrastructure images in docker-compose.yml and docker-compose.tunnel.yml
+  # (cloudflared, ClamAV, Postgres, SeaweedFS, Mailpit), pinned to a version
+  # and digest (D57). Each update arrives as a pull request that CI tests:
+  # compose validation, the image build and the Trivy scan of the images.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: {interval: weekly}
+    ignore:
+      # A new Postgres major version needs a dump and restore (pg_upgrade),
+      # so it is a planned change, not a weekly pull request. Minor releases
+      # (security fixes) still arrive.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]

@@ -191,6 +191,13 @@ DUMMY_PROD_ENV = {
     "AUDIT_HASH_KEY": "k" * 40,
     "TRUSTED_PROXY_CIDRS": "172.30.50.10/32",
     "DJANGO_DEBUG": "false",
+    # Production refuses to start without ClamAV and clean-scan downloads
+    # (D57); HSTS defaults to a year there and mail is never redirected.
+    "DEPLOYMENT_STAGE": "production",
+    "DOCUMENT_SCANNER": "clamd",
+    "DOCUMENT_CLAMD_ADDRESS": "clamav:3310",
+    "DOCUMENT_REQUIRE_CLEAN_SCAN": "true",
+    "EMAIL_REDIRECT_ALL_TO": "",
 }
 # check --deploy warnings accepted during the POC (see docs/security-review-2026-11.md).
 ACCEPTED_DEPLOY_WARNINGS = {"security.W005", "security.W021", "hoa.W001"}
