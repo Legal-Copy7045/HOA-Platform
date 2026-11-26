@@ -6,6 +6,36 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.17.0 — 2026-11-26
+
+- Phones: every button and link is at least a thumb's size, buttons wrap
+  instead of running off their card, and money tables (My account, home
+  accounts, Owner accounts, Invoices, Collections, Invitations and more)
+  become one card per row. A bar at the bottom of the screen opens the
+  Dashboard, My account or My items, Voting or Search, and the Menu.
+- Filters and tabs (My requests, Voting, Homes and owners, Owner accounts,
+  Invoices, Invitations, Resolutions) change the list in place, without
+  reloading or jumping to the top; Back and Forward work.
+- One button per form: "Ask the board a question", "Ask for approval of a
+  project" and the Voting and Resolutions "New ..." buttons open their form
+  where they are and hide while it is open.
+- Main actions first: Pay online and the statement under the balance on My
+  account; Record a payment, Post a charge and Post a credit at the top of a
+  home account; the deposit total and Record deposit at the top of
+  Accounting.
+- Find a home by number, address or owner on Homes and owners; Owner
+  accounts can show only homes with a balance; Invitations filter by status.
+- The month to charge is a list of months in words with already-posted
+  months marked. With automatic posting on, the card shows when the month
+  was posted and the next run; if a month is missed, the board is emailed
+  once, it appears in My items and on System status, and the card offers
+  the button for that month.
+- File inputs look like the portal's buttons; date fields match the other
+  inputs; committee forms have visible labels; Community settings and ARC
+  request types fold into sections.
+- Contacts no longer see a resale certificate link they cannot use, and a
+  refused or missing page keeps the portal's layout with a way home (D48).
+
 ## 0.15.0 — 2026-11-26
 
 - Automatic payments (optional feature, off by default; needs Online

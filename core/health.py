@@ -188,6 +188,13 @@ def _payments():
     return health()
 
 
+def _assessment_posting():
+    """Automatic monthly posting (D48): only shown while it is switched on."""
+    from ledger.autopost import health
+
+    return health()
+
+
 LOW_MEMORY_MINUTES = 10
 
 
@@ -251,6 +258,7 @@ CHECKS = [
     ("memory", "Server memory", _memory),
     ("bank_feed", "Bank feed", _bank_feed),
     ("payments", "Online payments", _payments),
+    ("assessment_posting", "Monthly assessment posting", _assessment_posting),
 ]
 
 

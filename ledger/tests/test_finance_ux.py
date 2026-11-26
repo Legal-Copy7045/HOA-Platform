@@ -468,9 +468,10 @@ def test_recorded_list_is_scoped_to_payments(client, w):
 def test_dues_form_uses_a_month_picker_and_previews_the_charge(client, w):
     client.force_login(w["manager"])
     page = client.get(reverse("ledger_home")).content.decode()
-    assert 'type="month"' in page
+    # Months in words, not the browser's month grid (D48).
+    assert 'type="month"' not in page and '<select id="dperiod" name="period"' in page
     nxt = (TODAY.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
-    assert f'value="{nxt:%Y-%m}"' in page
+    assert f'value="{nxt:%Y-%m}" selected>{nxt:%B %Y}</option>' in page
     assert "Will charge <strong>2 homes $75.00 each</strong>" in page
 
 
@@ -565,7 +566,7 @@ def test_1099_table_scrolls_on_phones(client, w):
     client.force_login(w["board"])
     page = client.get(reverse("accounting") + f"?year={TODAY.year}").content.decode()
     section = page.split("<h2>1099 worksheet</h2>")[1]
-    assert '<div class="table-wrap"><table>' in section and "Mow Co" in section
+    assert '<div class="table-wrap"><table class="stack-sm">' in section and "Mow Co" in section
     assert 'class="table small"' not in page
 
 

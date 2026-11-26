@@ -19,28 +19,37 @@
       </section>
       <section class="card"><h2>Documents</h2>
         {% if documents %}<ul class="list">{% for d in documents %}<li><div class="todo-icon">{% icon "file" %}</div><a class="grow title" href="{% url 'document_detail' d.pk %}">{{ d.title }}</a>{% if d.current_version %}<a class="btn secondary small" href="{% url 'document_download' d.pk %}">{% icon "download" %}</a>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted small">No documents yet.</p>{% endif %}
-        {% if can_work %}<form method="post" enctype="multipart/form-data" action="{% url 'committee_upload' committee.pk %}" class="inline-form">{% csrf_token %}
-          <input type="text" name="title" maxlength="200" placeholder="Title" aria-label="Title"><input type="file" name="file" required aria-label="File"><button type="submit" class="secondary small">Add</button></form>
-          <p class="small muted">Visible to this committee and the board only.</p>{% endif %}
+        {% if can_work %}<details class="panel"><summary>Add a document</summary><div class="panel-body"><form method="post" enctype="multipart/form-data" action="{% url 'committee_upload' committee.pk %}">{% csrf_token %}
+          <div class="field"><label for="cd-title">Title (optional)</label><input id="cd-title" type="text" name="title" maxlength="200"></div>
+          <div class="field"><label for="cd-file">File</label><input id="cd-file" type="file" name="file" required></div>
+          <div class="form-actions"><button type="submit" class="secondary">Add</button></div></form>
+          <p class="small muted">Visible to this committee and the board only.</p></div></details>{% endif %}
       </section>
     </div>
     <aside>
       <section class="card"><h3>Members</h3>
         <ul class="list">{% for m in members %}<li><span class="grow">{{ m.person.display_name }}{% if m.role == "chair" %} <span class="badge tone-info">Chair</span>{% endif %}</span>
           {% if can_manage %}<form method="post" action="{% url 'committee_member_end' m.pk %}" data-confirm="End this membership?">{% csrf_token %}<button type="submit" class="danger small">End</button></form>{% endif %}</li>{% empty %}<li class="muted small">No members yet.</li>{% endfor %}</ul>
-        {% if can_manage and committee.active %}<form method="post" action="{% url 'committee_action' committee.pk 'appoint' %}">{% csrf_token %}
-          <select name="person" aria-label="Person">{% for p in people %}<option value="{{ p.pk }}">{{ p.display_name }}</option>{% endfor %}</select>
-          <select name="role" aria-label="Role">{% for v, l in roles %}<option value="{{ v }}"{% if v == "member" %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
-          <div class="form-actions"><button type="submit" class="secondary small">Appoint</button></div></form>{% endif %}
+        {% if can_manage and committee.active %}<details class="panel"><summary>Appoint a member</summary><div class="panel-body"><form method="post" action="{% url 'committee_action' committee.pk 'appoint' %}">{% csrf_token %}
+          <div class="field"><label for="cm-person">Person</label><select id="cm-person" name="person">{% for p in people %}<option value="{{ p.pk }}">{{ p.display_name }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="cm-role">Role</label><select id="cm-role" name="role">{% for v, l in roles %}<option value="{{ v }}"{% if v == "member" %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+          <div class="form-actions"><button type="submit" class="secondary">Appoint</button></div></form></div></details>{% endif %}
       </section>
       <section class="card"><h3>Tasks</h3>
         {% if tasks %}<ul class="list">{% for t in tasks %}<li><span class="grow">{{ t.title }}{% if t.due_date %} <span class="small muted">due {{ t.due_date|date:"M j" }}</span>{% endif %}</span>
           {% if can_work %}<form method="post" action="{% url 'committee_task_close' committee.pk t.pk %}">{% csrf_token %}<input type="hidden" name="status" value="done"><button type="submit" class="secondary small">Done</button></form>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted small">No open tasks.</p>{% endif %}
-        {% if can_work %}<form method="post" action="{% url 'committee_action' committee.pk 'task' %}">{% csrf_token %}<input type="text" name="title" maxlength="200" placeholder="New task" aria-label="Task" required><input type="date" name="due_date" aria-label="Due date"><div class="form-actions"><button type="submit" class="secondary small">Add task</button></div></form>{% endif %}
+        {% if can_work %}<details class="panel"><summary>Add a task</summary><div class="panel-body"><form method="post" action="{% url 'committee_action' committee.pk 'task' %}">{% csrf_token %}
+          <div class="field"><label for="ct-title">Task</label><input id="ct-title" type="text" name="title" maxlength="200" required></div>
+          <div class="field"><label for="ct-due">Due date (optional)</label><input id="ct-due" type="date" name="due_date"></div>
+          <div class="form-actions"><button type="submit" class="secondary">Add task</button></div></form></div></details>{% endif %}
       </section>
       <section class="card"><h3>Events</h3>
         {% if events %}<ul class="list">{% for e in events %}<li><div class="grow"><div class="title">{{ e.title }}</div><div class="small muted">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted small">Nothing scheduled.</p>{% endif %}
-        {% if can_work %}<form method="post" action="{% url 'committee_action' committee.pk 'event' %}">{% csrf_token %}<input type="text" name="title" maxlength="200" placeholder="Meeting or event" aria-label="Event title" required><input type="datetime-local" name="starts_at" aria-label="Starts" required><input type="text" name="location" maxlength="200" placeholder="Where" aria-label="Location"><div class="form-actions"><button type="submit" class="secondary small">Add event</button></div></form>{% endif %}
+        {% if can_work %}<details class="panel"><summary>Add an event</summary><div class="panel-body"><form method="post" action="{% url 'committee_action' committee.pk 'event' %}">{% csrf_token %}
+          <div class="field"><label for="ce-title">Meeting or event</label><input id="ce-title" type="text" name="title" maxlength="200" required></div>
+          <div class="field"><label for="ce-start">Starts</label><input id="ce-start" type="datetime-local" name="starts_at" required></div>
+          <div class="field"><label for="ce-where">Where (optional)</label><input id="ce-where" type="text" name="location" maxlength="200"></div>
+          <div class="form-actions"><button type="submit" class="secondary">Add event</button></div></form></div></details>{% endif %}
       </section>
     </aside>
   </div>

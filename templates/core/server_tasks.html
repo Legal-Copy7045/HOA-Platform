@@ -25,7 +25,7 @@
         {% elif update.behind %}Update available: {{ update.behind }} change{{ update.behind|pluralize }}.
         {% else %}Up to date{% if update.running_commit %} ({{ update.running_commit }}){% endif %}.{% endif %}</p>
       <p class="small muted">Updates are installed from System status (Install update), which shows what changed first.</p>
-      {% if can_run %}<p><a href="{% url 'system_status' %}">Open System status</a></p>{% endif %}
+      {% if can_run %}<p class="link-row"><a href="{% url 'system_status' %}">Open System status</a></p>{% endif %}
     </section>
   </div>
   <section class="card" id="task-list"><h2>Tasks</h2>

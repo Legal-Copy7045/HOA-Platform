@@ -321,7 +321,14 @@ def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict,
             url = children[0]["url"]
             label, icon = children[0]["label"], children[0]["icon"]
     count = counts.get(name, 0) + sum(counts.get(c["name"], 0) for c in children)
-    item = {"label": label, "url": url, "icon": icon, "current": False, "count": count}
+    item = {
+        "label": label,
+        "url": url,
+        "icon": icon,
+        "current": False,
+        "count": count,
+        "name": name,
+    }
     return item, children
 
 
@@ -370,6 +377,39 @@ def build(request) -> dict:
         sections[best[2]]["current"] = True
     return {
         "sections": sections,
+        "tabbar": tabbar(sections, roles.groups),
         "roles": [ROLE_LABELS[g] for g in ROLE_LABELS if g in roles.groups],
         "person_id": roles.person_id,
     }
+
+
+# Phone tab bar (WT-041, D48): the pages people open most, at the bottom of a
+# phone screen, plus Menu (the drawer). Built from the menu entries this person
+# already sees, so it never shows a page the menu hides. Staff get their work
+# queue; owners and contacts get their account and Voting.
+TABBAR_STAFF_GROUPS = frozenset({policy.BOARD, policy.MANAGER, policy.ARC_REVIEWER})
+TABBAR_STAFF = ("home", "my_items", "search")
+TABBAR_OWNER = ("home", "my_account", "voting")
+TABBAR_FALLBACK = ("my_items", "search")
+
+
+def tabbar(sections: list[dict], groups: frozenset[str]) -> list[dict]:
+    """Up to three tabs (the template adds Menu): each a menu entry, or Search."""
+    entries = {i["name"]: i for s in sections for i in s["items"]}
+    search = {
+        "label": "Search",
+        "url": reverse("search"),
+        "icon": "search",
+        "current": False,
+        "count": 0,
+        "name": "search",
+    }
+    wanted = TABBAR_STAFF if groups & TABBAR_STAFF_GROUPS else TABBAR_OWNER
+    tabs: list[dict] = []
+    for name in wanted + TABBAR_FALLBACK:
+        if len(tabs) == 3:
+            break
+        tab = search if name == "search" else entries.get(name)
+        if tab is not None and tab not in tabs:
+            tabs.append(tab)
+    return tabs

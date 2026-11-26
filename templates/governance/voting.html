@@ -4,11 +4,21 @@
 {% block content %}
   <div class="page-head"><div><h1>Voting</h1><p class="subtitle">{% if shown.votes %}Formal votes of the owners (binding){% endif %}{% if shown.votes and shown.elections %}, {% endif %}{% if shown.elections %}board elections{% endif %}{% if shown.surveys %}{% if shown.votes or shown.elections %} and {% endif %}surveys (to hear your views, nothing is decided by them){% endif %}.</p></div>
     {% if new.vote or new.election or new.survey %}<div class="actions">
-      {% if new.vote %}<a class="btn secondary" href="?new=vote#new-vote">{% icon "plus" %} New vote</a>{% endif %}
-      {% if new.election %}<a class="btn secondary" href="?new=election#new-election">{% icon "plus" %} New election</a>{% endif %}
-      {% if new.survey %}<a class="btn secondary" href="?new=survey#new-survey">{% icon "plus" %} New survey</a>{% endif %}
+      {% if new.vote and open_panel != "vote" %}<a class="btn secondary" href="?new=vote#new-vote" data-opens="new-vote">{% icon "plus" %} New vote</a>{% endif %}
+      {% if new.election and open_panel != "election" %}<a class="btn secondary" href="?new=election#new-election" data-opens="new-election">{% icon "plus" %} New election</a>{% endif %}
+      {% if new.survey and open_panel != "survey" %}<a class="btn secondary" href="?new=survey#new-survey" data-opens="new-survey">{% icon "plus" %} New survey</a>{% endif %}
     </div>{% endif %}
   </div>
+  {# One control per form (WT-009): the header button opens its panel here; a closed panel is not shown. #}
+  {% if vote_form %}<details class="panel"{% if open_panel == "vote" %} open{% else %} hidden{% endif %} data-hide-closed id="new-vote"><summary>New vote</summary><div class="panel-body">
+    <div class="alert info">{% icon "vote" %}<span>A vote here is a formal, binding vote of the owners, one ballot per home, using the quorum and pass rules from Community settings (each with its citation). To ask owners' opinions, make a survey instead: one question is fine.</span></div>
+    <form method="post" action="{% url 'votes' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=vote_form %}{{ vote_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
+  {% if election_form %}<details class="panel"{% if open_panel == "election" %} open{% else %} hidden{% endif %} data-hide-closed id="new-election"><summary>New election</summary><div class="panel-body">
+    <p class="small muted">Owners nominate owners; one ballot per home, cast online or by proxy. Ballots are kept apart from who voted.</p>
+    <form method="post" action="{% url 'elections' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=election_form %}{{ election_form }}<div class="form-actions"><button type="submit">Open nominations</button></div></form></div></details>{% endif %}
+  {% if survey_form %}<details class="panel"{% if open_panel == "survey" %} open{% else %} hidden{% endif %} data-hide-closed id="new-survey"><summary>New survey</summary><div class="panel-body">
+    <div class="alert info">{% icon "info" %}<span>A survey starts as a draft: add and order its questions, then open it. Once open, nothing about it can change. For a quick poll, give it one question.</span></div>
+    <form method="post" action="{% url 'surveys' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=survey_form %}{{ survey_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
 
   {% if proxy_meetings %}<section class="card" aria-labelledby="proxy-head"><h2 id="proxy-head">Give a proxy</h2>
     <p class="small muted">Can't attend a coming owners' meeting? A proxy lets someone you trust vote for your home there.</p>
@@ -18,32 +28,25 @@
       <a class="btn secondary small" href="{% url 'meeting_detail' p.meeting.pk %}#proxy">{% if p.given %}Change proxy{% else %}Give a proxy{% endif %}</a>
     </li>{% endfor %}</ul></section>{% endif %}
 
-  <nav class="filters" aria-label="Open or past">
-    <a href="?{% if kind %}type={{ kind }}{% endif %}"{% if not past %} aria-current="true"{% endif %}>Open{% if open_count %} <span class="badge">{{ open_count }}</span>{% endif %}</a>
-    <a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}"{% if past %} aria-current="true"{% endif %}>Past</a>
+  <div data-swap-region id="results" class="swap-anchor">
+  <nav class="filters" aria-label="Open or past" data-swap>
+    <a href="?{% if kind %}type={{ kind }}{% endif %}#results"{% if not past %} aria-current="true"{% endif %}>Open{% if open_count %} <span class="badge">{{ open_count }}</span>{% endif %}</a>
+    <a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}#results"{% if past %} aria-current="true"{% endif %}>Past</a>
   </nav>
-  {% if type_links|length > 1 %}<nav class="filters" aria-label="Type">
-    <a href="?{% if past %}status=past{% endif %}"{% if not kind %} aria-current="true"{% endif %}>All</a>
-    {% for key, label in type_links %}<a href="?type={{ key }}{% if past %}&amp;status=past{% endif %}"{% if kind == key %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+  {% if type_links|length > 1 %}<nav class="filters" aria-label="Type" data-swap>
+    <a href="?{% if past %}status=past{% endif %}#results"{% if not kind %} aria-current="true"{% endif %}>All</a>
+    {% for key, label in type_links %}<a href="?type={{ key }}{% if past %}&amp;status=past{% endif %}#results"{% if kind == key %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
   </nav>{% endif %}
 
   <section class="card">
     {% if rows %}<ul class="list">{% for r in rows %}
-      <li><div class="todo-icon">{% icon r.icon %}</div>
-        <div class="grow"><a class="title" href="{{ r.url }}">{{ r.title }}</a><div class="small muted">{{ r.meta }}</div></div>
+      <li class="row-link"><div class="todo-icon">{% icon r.icon %}</div>
+        <div class="grow"><a class="title row-main" href="{{ r.url }}">{{ r.title }}</a><div class="small muted">{{ r.meta }}</div></div>
         {% status r.state r.label %}</li>
     {% endfor %}</ul>
     {% elif past %}{% include "partials/empty.html" with icon="vote" title="Nothing past yet" %}
-    {% else %}{% include "partials/empty.html" with icon="vote" title="Nothing open right now" %}<p class="small"><a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}">See past ones</a></p>{% endif %}
+    {% else %}{% include "partials/empty.html" with icon="vote" title="Nothing open right now" %}<p class="small link-row"><a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}#results">See past ones</a></p>{% endif %}
   </section>
+  </div>
 
-  {% if vote_form %}<details class="panel"{% if open_panel == "vote" %} open{% endif %} id="new-vote"><summary>New vote</summary><div class="panel-body">
-    <div class="alert info">{% icon "vote" %}<span>A vote here is a formal, binding vote of the owners, one ballot per home, using the quorum and pass rules from Community settings (each with its citation). To ask owners' opinions, make a survey instead: one question is fine.</span></div>
-    <form method="post" action="{% url 'votes' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=vote_form %}{{ vote_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
-  {% if election_form %}<details class="panel"{% if open_panel == "election" %} open{% endif %} id="new-election"><summary>New election</summary><div class="panel-body">
-    <p class="small muted">Owners nominate owners; one ballot per home, cast online or by proxy. Ballots are kept apart from who voted.</p>
-    <form method="post" action="{% url 'elections' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=election_form %}{{ election_form }}<div class="form-actions"><button type="submit">Open nominations</button></div></form></div></details>{% endif %}
-  {% if survey_form %}<details class="panel"{% if open_panel == "survey" %} open{% endif %} id="new-survey"><summary>New survey</summary><div class="panel-body">
-    <div class="alert info">{% icon "info" %}<span>A survey starts as a draft: add and order its questions, then open it. Once open, nothing about it can change. For a quick poll, give it one question.</span></div>
-    <form method="post" action="{% url 'surveys' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=survey_form %}{{ survey_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
 {% endblock %}

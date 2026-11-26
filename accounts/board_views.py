@@ -51,9 +51,20 @@ def invitations(request):
         for r in rows:
             counts[r["status"]] += 1
             r["label"] = services.ONBOARDING_LABELS[r["status"]]
+        # Status pills (WT-050): see only the people who still need something.
+        show = request.GET.get("status", "")
+        groups = {
+            "needs": {"not_invited", "expired", "no_email"},
+            "invited": {"invited"},
+            "signed_up": {"signed_up"},
+        }
         context.update(
             {
-                "rows": rows,
+                "rows": [r for r in rows if r["status"] in groups[show]]
+                if show in groups
+                else rows,
+                "status_filter": show if show in groups else "",
+                "row_total": len(rows),
                 "counts": counts,
                 "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
                 "remind_count": len(services.reminder_due(rows=rows)),

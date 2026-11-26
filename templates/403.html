@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load portal %}{# Refused pages keep the portal layout and a way back (WT-048). Never says why in detail. #}
+{% block title %}No access · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <section class="error-page" data-testid="error-403">
+    <h1>You don't have access to this page</h1>
+    <p>Your sign-in doesn't include this part of the portal. If you think it should, ask the board.</p>
+    <p class="form-actions"><a class="btn" href="{% url 'home' %}">{% icon "home" %} Go to the dashboard</a></p>
+  </section>
+{% endblock %}

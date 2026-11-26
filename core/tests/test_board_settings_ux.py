@@ -162,7 +162,8 @@ def test_neighbors_save_all_saves_only_changed_rows(client, board, lots):
     signoffs.set_neighbors(a, left=b, actor=board)
     client.force_login(board)
     page = client.get(reverse("arc_neighbors")).content.decode()
-    assert page.count('name="save_all"') == 2
+    # One Save all, in the sticky bar (WT-032).
+    assert page.count('name="save_all"') == 1 and 'class="save-bar"' in page
     data = {"save_all": "1"}
     for lot in lots:
         data.update(

@@ -3,7 +3,7 @@
 {% block title %}Sysadmin activity · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Sysadmin activity</h1><p class="subtitle">Everything done by anyone holding the sysadmin role, every change to who holds it, and every break-glass command run on the server. Most recent first.</p></div></div>
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
     <tbody>{% for e in events %}<tr><td class="nowrap">{{ e.occurred_at|date:"M j, Y H:i" }}</td><td>{% if e.actor %}{{ e.actor.email }}{% else %}{{ e.get_actor_type_display }}{% endif %}{% if e.channel != "web" %} <span class="status tone-warning">{{ e.get_channel_display }}</span>{% endif %}</td>
       <td><code>{{ e.action }}</code></td><td class="small muted">{% for k, v in e.metadata.items %}{{ k }}={{ v }} {% endfor %}</td></tr>

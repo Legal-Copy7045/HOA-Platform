@@ -124,11 +124,26 @@ def lot_list(request):
     owners: dict[int, list] = {}
     for ownership in current:
         owners.setdefault(ownership.lot_id, []).append(ownership.person)
+    rows = [(lot, owners.get(lot.pk, [])) for lot in lots]
+    # Find one home without scrolling every row (WT-029): number, address or
+    # an owner's name. Never logged or audited, like portal search.
+    q = request.GET.get("q", "").strip()[:100]
+    if q:
+        needle = q.casefold().removeprefix("lot ").strip()
+        rows = [
+            (lot, people)
+            for lot, people in rows
+            if needle == str(lot.number)
+            or needle in lot.label.casefold()
+            or any(needle in p.display_name.casefold() for p in people)
+        ]
     return render(
         request,
         "community/lot_list.html",
         {
-            "rows": [(lot, owners.get(lot.pk, [])) for lot in lots],
+            "rows": rows,
+            "q": q,
+            "total": len(lots),
             "roster_view": False,
             "can_roster": policy.can(request.user, "roster.view"),
         },
@@ -522,6 +537,10 @@ def community_settings(request):
         sorted(groups.items(), key=lambda item: not any(r["needs_attention"] for r in item[1]))
     )
     attention = [r for rules in groups.values() for r in rules if r["needs_attention"]]
+    # Each group is a closed panel unless it holds a setting needing attention (WT-030).
+    group_attention = {
+        title: sum(1 for r in rules if r["needs_attention"]) for title, rules in groups.items()
+    }
     profile = CommunityProfile.get()
     return render(
         request,
@@ -529,6 +548,7 @@ def community_settings(request):
         {
             "groups": groups,
             "attention": attention,
+            "group_attention": group_attention,
             "group_notes": group_notes,
             "pa_disclaimer": pa_law.DISCLAIMER,
             "profile_form": forms.ProfileForm(

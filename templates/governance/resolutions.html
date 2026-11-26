@@ -4,17 +4,23 @@
 {% block content %}
   <div class="page-head"><div><h1>Resolutions and policies</h1><p class="subtitle">Adopted records are permanent. A change is recorded as a new resolution that supersedes the old one.</p></div>
     {% if can_record %}<div class="actions">
-      <a class="btn secondary" href="?new=record#record">{% icon "plus" %} Record a resolution</a>
-      {% if consents_on %}<a class="btn secondary" href="?new=consent#adopt-consent">{% icon "pencil" %} Adopt by written consent</a>{% endif %}
+      {% if not form.errors and open_panel != "record" %}<a class="btn secondary" href="?new=record#record" data-opens="record">{% icon "plus" %} Record a resolution</a>{% endif %}
+      {% if consents_on and not consent_form.errors and open_panel != "consent" %}<a class="btn secondary" href="?new=consent#adopt-consent" data-opens="adopt-consent">{% icon "pencil" %} Adopt by written consent</a>{% endif %}
     </div>{% endif %}
   </div>
+  {# One control per form: the header button opens its panel here; a closed panel is not shown. #}
+  {% if can_record %}<details class="panel"{% if form.errors or open_panel == "record" %} open{% else %} hidden{% endif %} data-hide-closed id="record"><summary>Record a resolution or policy</summary><div class="panel-body"><form method="post" action="{% url 'resolutions' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Record</button></div></form></div></details>
+  {% if consent_form %}<details class="panel"{% if consent_form.errors or open_panel == "consent" %} open{% else %} hidden{% endif %} data-hide-closed id="adopt-consent"><summary>Adopt by written consent</summary><div class="panel-body">
+    <div class="alert info">{% icon "info" %}<span>Sends the text to every serving board member to approve or decline. Counsel should confirm the Bylaws allow action without a meeting.</span></div>
+    <form method="post" action="{% url 'consents' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=consent_form %}{{ consent_form }}<div class="form-actions"><button type="submit">Send for signatures</button></div></form></div></details>{% endif %}{% endif %}
   {% if consents_on %}<section class="card" id="consents" aria-labelledby="consents-head"><div class="card-head"><h2 id="consents-head">Waiting for signatures</h2></div>
     <p class="small muted">Written consents: a board decision without a meeting. Every board member must approve in writing; one decline and it is not adopted. Once adopted it is recorded below as a resolution.</p>
     {% if waiting %}<ul class="list">{% for c in waiting %}<li><a class="grow title" href="{% url 'consent_detail' c.pk %}">{{ c.title }}</a><span class="small muted">{{ c.created_at|short_date }}</span>{% status c.state c.get_state_display %}</li>{% endfor %}</ul>
     {% else %}<p class="muted">Nothing is waiting for signatures.</p>{% endif %}
     {% if past_consents %}<details><summary class="small">Earlier written consents ({{ past_consents|length }})</summary><ul class="list">{% for c in past_consents %}<li><a class="grow title" href="{% url 'consent_detail' c.pk %}">{{ c.title }}</a><span class="small muted">{{ c.created_at|short_date }}</span>{% status c.state c.get_state_display %}</li>{% endfor %}</ul></details>{% endif %}
   </section>{% endif %}
-  <div class="filters"><a href="?"{% if not show_all %} aria-current="true"{% endif %}>In force</a><a href="?all=1"{% if show_all %} aria-current="true"{% endif %}>All, including superseded</a></div>
+  <div data-swap-region id="results" class="swap-anchor">
+  <nav class="filters" aria-label="Which resolutions" data-swap><a href="?#results"{% if not show_all %} aria-current="true"{% endif %}>In force</a><a href="?all=1#results"{% if show_all %} aria-current="true"{% endif %}>All, including superseded</a></nav>
   {% for r in rows %}
     <section class="card">
       <div class="card-head"><div><div class="small muted">{{ r.number }} · {{ r.get_kind_display }}</div><h2>{{ r.title }}</h2></div><div class="small muted nowrap">Adopted {{ r.adopted_on|date:"M j, Y" }}<br>Vote {{ r.votes_for }}-{{ r.votes_against }}-{{ r.abstentions }}</div></div>
@@ -22,8 +28,5 @@
       {% if r.supersedes or r.citation or r.meeting %}<div class="meta small">{% if r.supersedes %}<span>Supersedes {{ r.supersedes.number }}</span>{% endif %}{% if r.citation %}<span>{{ r.citation }}</span>{% endif %}{% if r.meeting and r.meeting.kind != "executive" %}<span>At <a href="{% url 'meeting_detail' r.meeting_id %}">{{ r.meeting.title }}</a></span>{% endif %}</div>{% endif %}
     </section>
   {% empty %}<section class="card">{% include "partials/empty.html" with icon="book" title="None recorded" %}</section>{% endfor %}
-  {% if can_record %}<details class="panel"{% if form.errors or open_panel == "record" %} open{% endif %} id="record"><summary>Record a resolution or policy</summary><div class="panel-body"><form method="post" action="{% url 'resolutions' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Record</button></div></form></div></details>
-  {% if consent_form %}<details class="panel"{% if consent_form.errors or open_panel == "consent" %} open{% endif %} id="adopt-consent"><summary>Adopt by written consent</summary><div class="panel-body">
-    <div class="alert info">{% icon "info" %}<span>Sends the text to every serving board member to approve or decline. Counsel should confirm the Bylaws allow action without a meeting.</span></div>
-    <form method="post" action="{% url 'consents' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=consent_form %}{{ consent_form }}<div class="form-actions"><button type="submit">Send for signatures</button></div></form></div></details>{% endif %}{% endif %}
+  </div>
 {% endblock %}
