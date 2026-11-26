@@ -139,7 +139,7 @@ def _backups():
 
     local = age("backup_local")
     if local is None:
-        return False, "No backup has run yet (infra/poc/backup.sh --install)"
+        return False, "No backup has run yet (Admin → Server tasks → Take a backup)"
     if local > BACKUP_STALE_HOURS:
         return False, f"Last backup {local} hours ago"
     if not offsite.configured():

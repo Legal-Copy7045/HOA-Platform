@@ -6,6 +6,12 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.6.2 — 2026-11-26
+
+- System status on a phone: cards stack in one column and their buttons fit;
+  a health check's button sits below its text. The Backups check points to
+  Server tasks instead of a server script.
+
 ## 0.6.1 — 2026-11-26
 
 - Faster checks before each update: the automated tests run in four parallel
