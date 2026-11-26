@@ -177,3 +177,7 @@
   check: "With test keys on the POC and Online payments switched on: an owner pays one charge by credit card 4242 4242 4242 4242 (surcharge shown first, TEST MODE banner), by debit card 4000 0566 5566 5556 (no fee) and by a test bank account (processing, then paid next day); each shows on My account against the chosen charge, a receipt email and PDF arrive, and Finance -> Online payments shows the payment, the payout and 'matches'."
   steps: "Follow docs/runbook.md 'Online payments (Stripe)' test-mode setup; sign in as a demo owner; Pay online three times; next day open Finance -> Online payments; on a phone check the pay page fits the screen."
   last: ""
+- key: streamline pay shortcut phone
+  check: "On a phone: the owner dashboard balance to-do shows \"Pay $X\" beside it without overlapping; it opens the ways to pay with the total for every open charge and \"Pay only some charges\" works; on a lot account (board) the \"Open collection case\" button fits and leads to the case, whose Letters panel prints the next notice."
+  steps: "Online payments on (test mode); sign in as a demo owner with a balance on a phone; tap Pay $X; tap Pay only some charges; sign in as board; Finance > Owner accounts > a lot with a balance; Open collection case."
+  last: ""

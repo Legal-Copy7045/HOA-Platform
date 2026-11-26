@@ -1,0 +1,16 @@
+# Streamlining 2026-11-26, finance and ARC flows. `match` runs over "<stage>:<check>".
+- feature: "Delinquency letters only from the collection case: no letter buttons on the lot account, one \"Open collection case\" (opens the case once, then goes to it; collections staff only), old notice address redirects to the case or the lot account, reprints from the case (collections staff only, audited)"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(lot_page_has_no_letter|open_collection_case|only_collections_staff|old_lot_notice|case_page_reprints)", "^unit:ledger/tests/test_letters.py::test_(notice_download|auditor_sees_the_case)", "^unit:core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data\\[collection_notice_pdf\\]"]
+- feature: "Pay shortcut: balance to-do \"Pay $X\" to the ways to pay with every open charge, methods first, \"Pay only some charges\" link; amounts always recomputed on the server (query values ignored, checkout bound to the server quote); only payers of that lot; no shortcut when online payments are off"
+  since: M5
+  match: ["^unit:payments/tests/test_pay_shortcut.py::test_"]
+- feature: "Record checks quick action for board and manager (core.my_items.quick_actions, {% quick_actions %})"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_record_checks_quick_action"]
+- feature: "ARC: \"Save and continue\" lands on the draft checklist; \"Finish your request #N\" to-do for the owner's unsent drafts only; owner ARC page tabs Mine / Asked of me with the waiting count"
+  since: M5
+  match: ["^unit:arc/tests/test_owner_ux.py::test_(save_and_continue|drafts_show)", "^unit:arc/tests/test_signoff_ux.py::test_(owner_arc_page_has|asked_of_me|board_review_list_has_no)"]
+- feature: "Pay shortcut and Open collection case at phone width"
+  since: M5
+  match: ["^manual:streamline pay shortcut phone"]
