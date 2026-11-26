@@ -628,7 +628,13 @@ ZIP_CHUNK_BYTES = 256 * 1024
 # the audit log, so it holds across web processes).
 ZIP_RATE_LIMIT = 10
 ZIP_RATE_WINDOW = datetime.timedelta(minutes=15)
-ZIP_SLOT_SECONDS = 10 * 60  # a slot left behind by a dead process expires
+# A download may run this long; then the stream stops (fixres SEC-002).
+ZIP_MAX_SECONDS = 30 * 60
+# The person's slot lives as long as the stream: it is renewed whenever a
+# chunk is sent and freed when the response closes; one left behind by a
+# dead process expires this long after its last chunk.
+ZIP_SLOT_SECONDS = ZIP_MAX_SECONDS + 10 * 60
+ZIP_RENEW_SECONDS = 60  # renew at most this often (one cache write)
 
 
 class PacketBusy(PacketError):
@@ -643,6 +649,12 @@ def _take_slot(user) -> bool:
     from django.core.cache import cache
 
     return cache.add(_slot_key(user), 1, timeout=ZIP_SLOT_SECONDS)
+
+
+def _renew_slot(user) -> None:
+    from django.core.cache import cache
+
+    cache.touch(_slot_key(user), timeout=ZIP_SLOT_SECONDS)
 
 
 def _free_slot(user) -> None:
@@ -698,12 +710,23 @@ class PacketZipStream:
         self.sink = _Sink()
         self._gen = self._chunks()
         self._closed = False
+        self._started = timezone.now()
+        self._renewed = self._started
 
     def __iter__(self):
         return self
 
     def __next__(self) -> bytes:
-        return next(self._gen)
+        now = timezone.now()
+        if (now - self._started).total_seconds() > ZIP_MAX_SECONDS:
+            # Too slow: stop, so one download never holds a web thread for long.
+            self.close()
+            raise StopIteration
+        chunk = next(self._gen)
+        if (now - self._renewed).total_seconds() >= ZIP_RENEW_SECONDS:
+            _renew_slot(self._user)  # still sending: the slot stays taken
+            self._renewed = now
+        return chunk
 
     def close(self) -> None:
         if self._closed:

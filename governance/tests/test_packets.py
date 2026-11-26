@@ -722,3 +722,37 @@ def test_minutes_approval_is_for_the_version_on_the_page(client, world):
     assert page.status_code == 200 and gov.minutes_approval(other) is None
     with pytest.raises(gov.GovernanceError):
         gov.approve_minutes(other, version_id=doc.current_version_id, actor=world["board"])
+
+
+# --- fixres SEC-002 / R2-002: the slot lasts as long as the stream ------------------------------
+
+
+def test_slow_reader_holds_one_slot_for_the_whole_stream(world, monkeypatch):
+    import datetime as dt
+
+    from django.utils import timezone as tz
+
+    monkeypatch.setattr(packets, "ZIP_CHUNK_BYTES", 1024)
+    packet = packets.build_packet(
+        world["meeting"],
+        variant="board",
+        attachment_ids=[world["board_doc"].pk],
+        actor=world["board"],
+    )
+    start = tz.now()
+    clock = {"now": start}
+    monkeypatch.setattr(tz, "now", lambda: clock["now"])
+    stream, _ = packets.packet_zip(packet, user=world["board"])
+    next(stream)
+    # A slow reader: one chunk every nine minutes, past the old ten-minute slot.
+    for minutes in (9, 18, 27):
+        clock["now"] = start + dt.timedelta(minutes=minutes)
+        next(stream)
+        with pytest.raises(packets.PacketBusy):
+            packets.packet_zip(packet, user=world["board"])
+    # Past the longest a download may run, the stream stops and frees the slot.
+    clock["now"] = start + dt.timedelta(seconds=packets.ZIP_MAX_SECONDS + 1)
+    with pytest.raises(StopIteration):
+        next(stream)
+    again, _ = packets.packet_zip(packet, user=world["board"])
+    again.close()
