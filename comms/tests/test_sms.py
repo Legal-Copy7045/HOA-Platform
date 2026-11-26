@@ -449,3 +449,99 @@ def test_stop_texts_only_touches_my_own_number(client, w, fake, sms_on):
     client.post(reverse("sms_stop"))
     assert _profile(w["other"]).sms_number != ""
     assert _profile(w["owner"]).sms_number == ""
+
+
+# --- Urgent text from the announcement form (streamlining) ---------------------------------
+
+TEXT_BOX = "Also send as an urgent text"
+
+
+def _announce(client, **extra):
+    data = {"title": "Water off Tuesday", "body": "Main repair.", "audience": "members"}
+    data.update(extra)
+    return client.post(reverse("announcements"), data)
+
+
+def test_announcement_form_offers_the_text_box_only_with_the_feature_and_permission(
+    client, w, fake
+):
+    from community.models import Role
+
+    setting = FeatureSetting.objects.create(key="sms", enabled=True)
+    _opt_in(w["owner"], "215-555-0123", fake)
+    FeatureSetting.objects.filter(pk=setting.pk).update(enabled=False)
+    client.force_login(w["board"])
+    assert TEXT_BOX not in client.get(reverse("announcements")).content.decode()  # feature off
+    FeatureSetting.objects.filter(pk=setting.pk).update(enabled=True)
+    page = client.get(reverse("announcements")).content.decode()
+    assert f"{TEXT_BOX} (1 opted in)" in page
+    # The manager publishes announcements but never sends urgent texts.
+    client.force_login(make_member(roles=[Role.MANAGER]))
+    assert TEXT_BOX not in client.get(reverse("announcements")).content.decode()
+
+
+def test_board_publishes_and_texts_in_one_step(
+    client, w, fake, sms_on, django_capture_on_commit_callbacks
+):
+    from comms.models import Announcement
+
+    _opt_in(w["owner"], "215-555-0123", fake)
+    client.force_login(w["board"])
+    with (
+        mock.patch("comms.tasks.send_urgent_sms.defer") as defer,
+        mock.patch("comms.tasks.email_announcement.defer"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        response = _announce(client, send_text="on")
+    assert response.status_code == 302
+    announcement = Announcement.objects.get()
+    notice = UrgentNotice.objects.get()
+    defer.assert_called_once_with(notice_id=notice.pk)
+    # The title is the text; it links to the new announcement.
+    assert notice.message == "Water off Tuesday"
+    assert notice.link_path == reverse("announcement_detail", args=[announcement.pk])
+    assert notice.sent_by == w["board"] and notice.recipients == 1
+    # Audit unchanged: the announcement and the queued text, counts only.
+    actions = list(AuditEvent.objects.values_list("action", flat=True))
+    assert "announcement.published" in actions and "sms.urgent_queued" in actions
+    # The sent log stays at its URL.
+    assert b"Water off Tuesday" in client.get(reverse("urgent_notice")).content
+
+
+def test_manager_cannot_text_by_posting_the_box(client, w, fake, sms_on):
+    from community.models import Role
+
+    _opt_in(w["owner"], "215-555-0123", fake)
+    client.force_login(make_member(roles=[Role.MANAGER]))
+    with mock.patch("comms.tasks.email_announcement.defer"):
+        response = _announce(client, send_text="on", text_message="Hello")
+    assert response.status_code == 302  # published as an announcement only
+    assert not UrgentNotice.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "extra,error",
+    [
+        ({"text_message": "Lot 4 owes $1,200"}, "amounts"),
+        ({"audience": "board"}, "all owners"),
+    ],
+)
+def test_a_text_that_cannot_go_out_publishes_nothing(client, w, fake, sms_on, extra, error):
+    from comms.models import Announcement
+
+    _opt_in(w["owner"], "215-555-0123", fake)
+    client.force_login(w["board"])
+    response = _announce(client, send_text="on", **extra)
+    assert response.status_code == 200
+    page = response.content.decode()
+    assert error in page and 'role="alert"' in page and "Water off Tuesday" in page
+    assert not Announcement.objects.exists() and not UrgentNotice.objects.exists()
+
+
+def test_no_one_opted_in_refuses_the_text_before_publishing(client, w, fake, sms_on):
+    from comms.models import Announcement
+
+    client.force_login(w["board"])
+    page = _announce(client, send_text="on").content.decode()
+    assert "No owners have opted in" in page
+    assert not Announcement.objects.exists()
