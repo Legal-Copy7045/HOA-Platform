@@ -3,6 +3,14 @@
 One entry per full run (newest first): date, commit, totals, failing check IDs,
 finding IDs, report link. No real names, hosts or addresses.
 
+## 2026-11-26 (late night) — verification after fixing every finding
+
+- Commit: d919d44. Totals: 3238 pass, 0 fail, 50 manual, 117 skip (retired IDs from the streamlining merges; live not run: no LIVE_HOST).
+- Stages: ci 11 pass; unit 2335 pass; page 892 pass; manual 50.
+- Fixed: all 26 findings of the previous run (BUG-001..010, R2-001..009, SEC-001..007) and the 17 residuals found by the verification reviews (fixmoney, fixgov, fixinfra, fixres). Security audit: 25 of 25 claims held; bandit and pip-audit clean.
+- Accepted: SEC-004 (info) Teller Connect script cannot be pinned (D34-fixinfra-2).
+- Report: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 5)
+
 ## 2026-11-26 (night) — M5 features, streamlining and accounting fixes
 
 - Commit: 5b7fb4e. Totals: 3063 pass, 1 fail, 50 manual, 96 skip (78 page and 12 unit IDs retired by the streamlining merges; live not run: no LIVE_HOST in the cloud session).
