@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Import homes and owners · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Import homes and owners</h1>
+    <p class="subtitle">Load the list of homes, their addresses and their owners from a spreadsheet. You see what would change before anything is written.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'lot_list' %}">Homes and owners</a></div></div>
+  <ol class="steps" aria-label="Importing the register"><li class="current" aria-current="step">Upload</li><li>Check</li><li>Import</li></ol>
+
+  <section class="card">
+    <h2>{% icon "download" %} 1. Get the template</h2>
+    <p>Fill in one row per owner (repeat the home on a second row for joint owners). The two EXAMPLE rows show the format: delete them before you upload.</p>
+    <p class="actions"><a class="btn secondary" href="{% url 'register_template' 'xlsx' %}">{% icon "download" %} Excel template (.xlsx)</a>
+      <a class="btn secondary" href="{% url 'register_template' 'csv' %}">{% icon "download" %} CSV template</a></p>
+    <details><summary>What goes in each column</summary>
+      <div class="table-wrap"><table><thead><tr><th>Column</th><th>Required?</th><th>What to enter</th></tr></thead>
+        <tbody>{% for name, required, text in columns %}<tr><td><code>{{ name }}</code></td><td>{{ required }}</td><td>{{ text }}</td></tr>{% endfor %}</tbody></table></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>{% icon "file" %} 2. Upload the filled-in register</h2>
+    {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ error }}</span></div>{% endif %}
+    <form method="post" enctype="multipart/form-data" data-busy="Checking the file for malware…">{% csrf_token %}
+      <label for="register-file">Register file</label>
+      <input id="register-file" type="file" name="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required aria-describedby="register-file-help"{% if error %} aria-invalid="true"{% endif %}>
+      <p class="help" id="register-file-help">CSV (UTF-8) or Excel .xlsx, up to {{ max_mb }} MB. Workbooks with macros (.xlsm) are not accepted. The file is checked for malware and kept privately for the board; delete it after the import (it is deleted automatically after {{ keep_days }} days).</p>
+      <div class="form-actions"><button type="submit">Upload and check</button></div>
+    </form>
+    <p class="small muted">Nothing is written until you press Import on the next page. Homes that already have owners in the portal are left alone.</p>
+  </section>
+
+  <section class="card"><h2>{% icon "clock" %} Earlier uploads</h2>
+    {% if history %}<ul class="list">{% for h in history %}<li><div class="grow"><div class="title"><a href="{% url 'register_import_detail' h.pk %}">{{ h.get_kind_display }} uploaded {{ h.uploaded_at|short_date }}</a></div>
+      <div class="small muted">By {{ h.uploaded_by.email }}{% if h.imported_at %} · imported {{ h.imported_at|short_date }}: {{ h.counts.lots_created|default:0 }} new home{{ h.counts.lots_created|default:0|pluralize }}, {{ h.counts.owners|default:0 }} owner{{ h.counts.owners|default:0|pluralize }}{% else %} · not imported{% endif %} · {% if h.has_file %}file kept{% else %}file deleted{% endif %}</div></div>
+      {% if h.has_file %}<form method="post" action="{% url 'register_import_remove' h.pk %}" data-confirm="Delete this file? The record of the import is kept.">{% csrf_token %}<input type="hidden" name="next" value="list"><button type="submit" class="secondary small">Delete file</button></form>{% endif %}</li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="inbox" title="Nothing uploaded yet" %}{% endif %}
+  </section>
+  {% if not homes %}<p class="small muted">The register can also be loaded on the server with <code>python manage.py import_register</code>.</p>{% endif %}
+{% endblock %}

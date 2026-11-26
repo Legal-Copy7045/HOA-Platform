@@ -125,8 +125,24 @@ _SPECS = [
     _spec("account.change_withdrawn", "Account change withdrawn", "action"),
     _spec("arc.project_type_saved", "ARC project type saved", "active"),
     _spec(
-        "register.imported", "Home and owner register imported", "lots", "owners", "people_created"
+        "register.imported",
+        "Home and owner register imported",
+        "lots",
+        "owners",
+        "people_created",
+        # D54 (portal import): counts only, never names, emails or addresses.
+        "lots_created",
+        "lots_left_alone",
+        "people_matched",
+        "rows",
     ),
+    # Register import in the portal (D54). Counts and scan results only.
+    _spec("lot.recorded", "Home added to the register", "lot_id"),
+    _spec("register.file_uploaded", "Register file uploaded", "kind", "scan", "size"),
+    _spec("register.upload_blocked", "Register file refused", "reason"),
+    _spec("register.file_rescanned", "Register file checked again", "scan"),
+    _spec("register.file_downloaded", "Register file downloaded", "kind"),
+    _spec("register.file_removed", "Register file removed", "reason"),
     _spec("contract.entered", "Contract entered", "amount_cap_cents", "schedule"),
     _spec("contract.ended", "Contract end date set", "ends_on"),
     _spec(

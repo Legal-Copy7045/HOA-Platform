@@ -224,6 +224,14 @@ PROTECTED = {
     "setup_home": ("GET", None),
     "setup_start": ("POST", None),
     "setup_step": ("GET", None),
+    # Import homes and owners (D54): board only.
+    "register_import": ("GET", None),
+    "register_template": ("GET", None),
+    "register_import_detail": ("GET", None),
+    "register_import_run": ("POST", None),
+    "register_import_rescan": ("POST", None),
+    "register_import_remove": ("POST", None),
+    "register_import_file": ("GET", None),
     "community_rule_save": ("POST", None),
     "community_profile_save": ("POST", None),
     "common_area_save": ("POST", None),
@@ -860,6 +868,10 @@ def _url(name, key, targets):
         kwargs["action"] = "join"
     elif name == "setup_step":
         kwargs["step"] = "charge"
+    elif name == "register_template":
+        kwargs["fmt"] = "xlsx"
+    elif name.startswith("register_import_"):
+        kwargs["pk"] = 1
     return reverse(name, kwargs=kwargs)
 
 

@@ -6,7 +6,7 @@
     <p class="subtitle">{% if roster_view %}Every {% if include_dormant %}account, current and previous{% else %}current account{% endif %}, with the people on it and the contact details on record. Exports are logged.{% else %}{{ rows|length }} homes. Ownership drives who can sign in for each home.{% endif %}</p></div>
     {% if roster_view %}<div class="actions">
       {% if include_dormant %}<a class="btn secondary" href="?view=roster">Current accounts only</a>{% else %}<a class="btn secondary" href="?view=roster&amp;previous=1">Include previous accounts</a>{% endif %}
-      <a class="btn secondary" href="?view=roster&amp;export=csv{% if include_dormant %}&amp;previous=1{% endif %}">{% icon "download" %} Export CSV</a></div>{% endif %}</div>
+      <a class="btn secondary" href="?view=roster&amp;export=csv{% if include_dormant %}&amp;previous=1{% endif %}">{% icon "download" %} Export CSV</a></div>{% elif can_import %}<div class="actions"><a class="btn secondary" href="{% url 'register_import' %}">{% icon "plus" %} Import homes and owners</a></div>{% endif %}</div>
   {% if can_roster %}<nav class="subnav" aria-label="Columns">
     <a href="{% url 'lot_list' %}"{% if not roster_view %} aria-current="page"{% endif %}>Homes</a>
     <a href="{% url 'lot_list' %}?view=roster"{% if roster_view %} aria-current="page"{% endif %}>Accounts, contacts and balances</a>
@@ -27,7 +27,7 @@
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Address</th><th>Current owners</th></tr></thead>
     <tbody>{% for lot, owners in rows %}<tr><td><a href="{% url 'lot_detail' lot.pk %}">{{ lot.label }}</a></td><td>{% for p in owners %}{{ p.display_name }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="status tone-warning">None recorded</span>{% endfor %}</td></tr>
-    {% empty %}<tr><td colspan="2">{% include "partials/empty.html" with icon="map" title="No homes yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>
+    {% empty %}<tr><td colspan="2">{% if can_import %}<div class="empty">{% icon "map" %}<p><strong>No homes yet</strong></p><p class="small">Start with the list of homes, their addresses and their owners.</p><p><a class="btn" href="{% url 'register_import' %}">Import homes and owners</a></p></div>{% else %}{% include "partials/empty.html" with icon="map" title="No homes yet" text="The board loads the list of homes and owners first." %}{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% endif %}
 {% endblock %}

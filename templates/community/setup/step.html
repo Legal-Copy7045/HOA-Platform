@@ -112,8 +112,9 @@
           <dt>Managers</dt><dd>{{ people.managers }}</dd>
           <dt>Invitations waiting</dt><dd>{{ people.pending_invitations }}</dd>
         </dl>
-        <p class="small muted">The owner register is loaded once on the server by a sysadmin (<code>python manage.py import_register</code>); after that, owners are recorded on People and Homes and owners.</p>
+        <p class="small muted">Start by importing the list of homes, their addresses and their owners from a spreadsheet (Import homes and owners; there is a template). After that, owners are recorded on People and Homes and owners.</p>
         <ul class="setup-links">
+          <li><a href="{% url 'register_import' %}">Import homes and owners</a></li>
           <li><a href="{% url 'people' %}">People</a></li>
           <li><a href="{% url 'lot_list' %}">Homes and owners</a></li>
           <li><a href="{% url 'invitations' %}">Invitations and sign-ups</a></li>

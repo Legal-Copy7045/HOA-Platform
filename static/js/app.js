@@ -83,6 +83,21 @@
     if (message && !window.confirm(message)) e.preventDefault();
   }, true);
 
+  // <form data-busy="Checking the file…"> shows that text on its button while
+  // the upload and malware check run, and stops a second press.
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (e.defaultPrevented || !form.getAttribute || !form.hasAttribute("data-busy")) return;
+    var button = form.querySelector("button[type=submit], button:not([type])");
+    if (!button) return;
+    var text = form.getAttribute("data-busy");
+    window.setTimeout(function () {
+      button.disabled = true;
+      button.textContent = text;
+      button.setAttribute("aria-busy", "true");
+    }, 0);
+  });
+
   // <input type="checkbox" data-show-password="id1 id2"> shows or hides those passwords.
   document.addEventListener("change", function (e) {
     var ids = e.target.getAttribute && e.target.getAttribute("data-show-password");

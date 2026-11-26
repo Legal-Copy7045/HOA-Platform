@@ -131,6 +131,7 @@ def lot_list(request):
             "rows": [(lot, owners.get(lot.pk, [])) for lot in lots],
             "roster_view": False,
             "can_roster": policy.can(request.user, "roster.view"),
+            "can_import": policy.can(request.user, "ownership.manage"),
         },
     )
 

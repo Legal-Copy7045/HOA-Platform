@@ -5,6 +5,7 @@ from community import (
     account_views,
     branding_views,
     profile_views,
+    register_views,
     reservation_views,
     retention_views,
     setup_views,
@@ -82,6 +83,38 @@ urlpatterns = [
         name="board_and_committees",
     ),
     path("lots/", views.lot_list, name="lot_list"),
+    # Import homes and owners (D54): board only.
+    path("lots/import/", register_views.register_import, name="register_import"),
+    re_path(
+        r"^lots/import/template\.(?P<fmt>csv|xlsx)$",
+        register_views.register_template,
+        name="register_template",
+    ),
+    path(
+        "lots/import/<int:pk>/",
+        register_views.register_import_detail,
+        name="register_import_detail",
+    ),
+    path(
+        "lots/import/<int:pk>/import/",
+        register_views.register_import_run,
+        name="register_import_run",
+    ),
+    path(
+        "lots/import/<int:pk>/check-again/",
+        register_views.register_import_rescan,
+        name="register_import_rescan",
+    ),
+    path(
+        "lots/import/<int:pk>/delete-file/",
+        register_views.register_import_remove,
+        name="register_import_remove",
+    ),
+    path(
+        "lots/import/<int:pk>/file/",
+        register_views.register_import_file,
+        name="register_import_file",
+    ),
     path("lots/<int:pk>/", views.lot_detail, name="lot_detail"),
     path("lots/<int:pk>/transfer/", views.lot_transfer, name="lot_transfer"),
     path("board/", views.board_home, name="board_home"),

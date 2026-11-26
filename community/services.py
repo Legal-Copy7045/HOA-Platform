@@ -110,6 +110,79 @@ def record_person(
     return person
 
 
+def record_lot(
+    *, number: int, street_address: str, actor, request: HttpRequest | None = None
+) -> Lot:
+    """A new home on the register (the register import, D54). Lots are never
+    deleted; an existing number is refused."""
+    _authorize(actor, "ownership.manage")
+    street_address = " ".join((street_address or "").split())[:200]
+    if not 1 <= int(number) <= 9999:
+        raise CommunityError("A lot number is a whole number from 1 to 9999.")
+    if not street_address:
+        raise CommunityError("A home needs its street address.")
+    with transaction.atomic(), system_access("record_lot"):
+        if Lot.objects.filter(number=number).exists():
+            raise CommunityError("That lot number is already on the register.")
+        lot = Lot.objects.create(number=number, street_address=street_address)
+        _audit(
+            "lot.recorded", actor=actor, request=request, target=lot, metadata={"lot_id": lot.pk}
+        )
+    return lot
+
+
+def record_imported_contact(
+    person: Person,
+    *,
+    phone: str = "",
+    mailing: dict | None = None,
+    actor,
+    request: HttpRequest | None = None,
+) -> None:
+    """Contact details from the register import (D54) for a person the import
+    has just recorded: a phone on their Phone list, and a mailing address for
+    post when the register gives one. Never overwrites a choice the person
+    made: a mailing address is set only while they have none."""
+    from community.models import ContactProfile
+
+    _authorize(actor, "person.manage")
+    with transaction.atomic(), system_access("record imported contact"):
+        if phone:
+            phone = _valid_phone(phone.strip())
+            if not ContactMethod.objects.filter(
+                person=person, kind=ContactMethodKind.PHONE, value=phone
+            ).exists():
+                ContactMethod.objects.create(
+                    person=person, kind=ContactMethodKind.PHONE, value=phone[:300]
+                )
+                _sync_profile_phone(person.pk)
+                _audit(
+                    "contact.method_added",
+                    actor=actor,
+                    request=request,
+                    target=person,
+                    metadata={"kind": ContactMethodKind.PHONE},
+                )
+        if mailing:
+            profile = ContactProfile.objects.filter(person=person).first() or ContactProfile(
+                person=person
+            )
+            if profile.mail_to_home is None and not profile.mail_street:
+                profile.mail_to_home = False
+                profile.mail_street = mailing["street"][:200]
+                profile.mail_city = mailing["city"][:80]
+                profile.mail_state = mailing["state"]
+                profile.mail_zip = mailing["zip"]
+                profile.save()
+                _audit(
+                    "profile.updated",
+                    actor=actor,
+                    request=request,
+                    target=profile,
+                    metadata={"mailing": "other", "via": "register_import"},
+                )
+
+
 # --- Ownership ----------------------------------------------------------------
 
 

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Register imported · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Register imported</h1>
+    <p class="subtitle">Imported {{ record.imported_at|short_date }} by {{ record.imported_by.email }}.</p></div></div>
+  <ol class="steps" aria-label="Importing the register"><li class="done">Upload<span class="sr-only"> (done)</span></li><li class="done">Check<span class="sr-only"> (done)</span></li><li class="done current" aria-current="step">Import</li></ol>
+  <section class="card">
+    <dl class="kv">
+      <dt>New homes</dt><dd>{{ record.counts.lots_created|default:0 }}</dd>
+      <dt>Homes given owners</dt><dd>{{ record.counts.lots_filled|default:0 }}</dd>
+      <dt>Owners recorded</dt><dd>{{ record.counts.owners|default:0 }}</dd>
+      <dt>New people</dt><dd>{{ record.counts.people_created|default:0 }}</dd>
+      <dt>Matched to people already in the portal</dt><dd>{{ record.counts.people_matched|default:0 }}</dd>
+      <dt>Homes left alone</dt><dd>{{ record.counts.lots_left_alone|default:0 }}</dd>
+    </dl>
+    <h2>Next</h2>
+    <ul class="setup-links">
+      <li><a href="{% url 'lot_list' %}">Homes and owners</a></li>
+      <li><a href="{% url 'invitations' %}">Invitations and sign-ups: invite everyone not yet invited</a></li>
+    </ul>
+  </section>
+  {% if record.has_file %}<section class="card"><h2>The uploaded file</h2>
+    <p>It holds owners' names and emails and is no longer needed. It is deleted automatically {{ keep_days }} days after upload.</p>
+    <form method="post" action="{% url 'register_import_remove' record.pk %}" data-confirm="Delete this file? The record of the import is kept.">{% csrf_token %}<button type="submit">Delete the file now</button></form>
+  </section>{% else %}<p class="small muted">The uploaded file has been deleted; this record of the import is kept.</p>{% endif %}
+{% endblock %}

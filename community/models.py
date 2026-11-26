@@ -1087,3 +1087,71 @@ class SetupStepRecord(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"Setup run {self.run}: {self.action} {self.step}".strip()
+
+
+def _register_key(instance, filename):
+    import uuid
+
+    return f"register-imports/{uuid.uuid4().hex}"
+
+
+class RegisterImport(NeverDeleteMixin, models.Model):
+    """A home and owner register uploaded in the portal (D54). The file is
+    private (random key, board only, streamed after a permission and scan
+    check) and is removed by the board after the import, or automatically
+    after ``REGISTER_IMPORT_FILE_DAYS``; this record of who, when and how
+    many stays. Holds counts only, never names, emails or addresses."""
+
+    class Kind(models.TextChoices):
+        CSV = "csv", "CSV"
+        XLSX = "xlsx", "Excel workbook"
+
+    file = models.FileField(upload_to=_register_key, max_length=200, blank=True)
+    kind = models.CharField(max_length=4, choices=Kind.choices)
+    original_filename = models.CharField(max_length=200)
+    size = models.PositiveIntegerField()
+    sha256 = models.CharField(max_length=64)
+    scan_result = models.CharField(max_length=16)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    uploaded_at = models.DateTimeField(default=timezone.now)
+    imported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    imported_at = models.DateTimeField(null=True, blank=True)
+    # Numbers only: rows, lots_created, lots_filled, lots_left_alone, owners,
+    # people_created, people_matched.
+    counts = models.JSONField(default=dict, blank=True)
+    file_removed_at = models.DateTimeField(null=True, blank=True)
+    file_removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-uploaded_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Register import #{self.pk}"
+
+    @property
+    def has_file(self) -> bool:
+        return bool(self.file) and self.file_removed_at is None
+
+
+class RegisterImportScan(AppendOnlyModel):
+    """A later malware scan of a register file ("Check again" after the
+    scanner was unavailable). The newest row wins over the first result."""
+
+    register_import = models.ForeignKey(
+        RegisterImport, on_delete=models.PROTECT, related_name="scans"
+    )
+    result = models.CharField(max_length=16)
+    scanner = models.CharField(max_length=50)
+    scanned_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-scanned_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"scan {self.result}"

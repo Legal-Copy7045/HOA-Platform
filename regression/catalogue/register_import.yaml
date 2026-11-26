@@ -1,0 +1,5 @@
+# Import homes and owners (D54). `match` runs over "<stage>:<check>".
+- feature: "Import homes and owners: CSV and Excel templates (Instructions sheet, EXAMPLE rows refused); upload limited to 2 MB before buffering, type by content, .xlsm and macro workbooks refused, zip bombs refused before opening; malware scan gate (infected refused and audited, scanner down blocks until checked again); dry-run check with problems by row and column; import through the services as the board member, idempotent, own home left for another board member; board only (manager, sysadmin, owners, tenants refused); private file, deletable and purged after 30 days; counts-only audit; import_register command shares the code"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:community/tests/test_register_import\\.py::test_", "^unit:community/tests/test_register_and_board_owners\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[register_", "^manual:import the register template from a phone and a laptop"]
