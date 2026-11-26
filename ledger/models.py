@@ -688,6 +688,8 @@ class BankMatch(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"bank match #{self.pk}"
+
+
 # --- Open-item accounting (decision D32-payments) ----------------------------------------
 # Every payment or credit is applied to specific charges, so each charge has
 # its own open balance. Applications are append-only: undoing one is a new,

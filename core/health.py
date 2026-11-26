@@ -166,6 +166,8 @@ def _bank_feed():
     if any(needs_attention(c) for c in teller):
         return False, "Not synced for more than 3 days"
     return True, "Synced in the last 3 days"
+
+
 def _payments():
     from payments.sync import health
 
