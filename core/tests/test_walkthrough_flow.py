@@ -353,7 +353,12 @@ def test_accounting_shows_a_summary_and_setup_has_its_own_tab(client, w):
     assert 'data-testid="setup-summary"' in html and "Set up accounting" in html
     assert "Account for each kind of entry" not in html
     page = client.get(reverse("accounting"), {"tab": "setup"}).content.decode()
-    for heading in ("Money coming in", "Money owed to the association", "Bank and card payments"):
+    for heading in (
+        "Money coming in",
+        "Money owed to the association",
+        "Bank and card payments",
+        "Money paid back to owners",  # D52 surplus fund
+    ):
         assert f"<h2>{heading}</h2>" in page
     assert 'placeholder="1000 Operating cash"' in page
     assert "Leave empty to use the standard account (4000 Assessment income)" in page
@@ -399,7 +404,7 @@ def test_accounting_setup_round_trips_unchanged(client, w):
     assert setup.opening_cash_cents == 125000
     assert setup.opening_cash_on == datetime.date(2026, 1, 1)
     summary = client.get(url).content.decode()
-    assert "Accounting set up: 10 accounts mapped (1 changed from the standard)" in summary
+    assert "Accounting set up: 11 accounts mapped (1 changed from the standard)" in summary
     assert "$1,250.00" in summary
 
 

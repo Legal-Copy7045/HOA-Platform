@@ -115,18 +115,27 @@ GL_GROUPS = [
             ("processing_fees", "What Stripe keeps for each online payment."),
         ],
     ),
+    (
+        "Money paid back to owners",
+        [
+            (
+                "surplus_fund",
+                "The fund a surplus distribution to every home is paid from (D52).",
+            ),
+        ],
+    ),
 ]
 
 
 def standard_accounts() -> dict[str, str]:
     """The account each key uses when its box is left empty."""
-    from ledger.models import DEFAULT_GL, ONLINE_GL
+    from ledger.models import DEFAULT_GL, DISBURSEMENT_GL, ONLINE_GL
 
     defaults = {
         k.strip(): v.strip()
         for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
     }
-    return {**defaults, **ONLINE_GL}
+    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL}
 
 
 def setup_groups(setup: AccountingSetup, values: dict[str, str] | None = None) -> list[dict]:
