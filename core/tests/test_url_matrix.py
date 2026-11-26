@@ -328,6 +328,11 @@ PROTECTED = {
     "payment_receipt": ("GET", "payment_b"),
     "online_payments": ("GET", None),
     "payment_alert_resolve": ("POST", "alert_b"),
+    # Automatic payments (D40-autopay; the feature is switched on in world()).
+    "autopay": ("GET", "lot_id_b"),
+    "autopay_start": ("POST", "lot_id_b"),
+    "autopay_cancel": ("POST", "lot_id_b"),
+    "autopay_return": ("GET", "autopay_setup_b"),
 }
 
 
@@ -638,10 +643,25 @@ def world():
             alert_b = PaymentAlert.objects.create(
                 kind="refund", key="re_test_matrixb", lot=lot_b, detail="Lot B refund"
             )
+            from payments.models import AutopaySetup
+
+            FeatureSetting.objects.create(key="autopay", enabled=True)
+            autopay_setup_b = AutopaySetup.objects.create(
+                nonce=secrets.token_hex(32),
+                lot=lot_b,
+                account=account_b,
+                person=person_b,
+                user=owner_b,
+                method_type="card",
+                customer_id="cus_test_matrixb",
+                session_id="cs_test_matrixautopayb",
+                expires_at=timezone.now() + timedelta(hours=24),
+            )
     targets = {
         "checkout_b": checkout_b.pk,
         "payment_b": payment_b.pk,
         "alert_b": alert_b.pk,
+        "autopay_setup_b": autopay_setup_b.pk,
         "bank_connection": bank_connection.pk,
         "reservation_b": reservation_b.pk,
         "area": area.pk,
@@ -771,7 +791,13 @@ def _url(name, key, targets):
         kwargs["action"] = "submit"
     elif name == "invoice_file":
         kwargs["file_id"] = targets["invoice_file"]
-    elif name == "my_statement_pdf" or name in ("pay_online", "pay_checkout"):
+    elif name == "my_statement_pdf" or name in (
+        "pay_online",
+        "pay_checkout",
+        "autopay",
+        "autopay_start",
+        "autopay_cancel",
+    ):
         kwargs = {"lot_id": targets["lot_id_b"]}
     elif name == "lot_ledger_action":
         kwargs["action"] = "credit"

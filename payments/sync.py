@@ -119,12 +119,16 @@ def poll_open_checkouts(now=None) -> int:
 
 @internal("payments poll")
 def poll_processing(now=None) -> int:
-    """Daily: bank payments still processing (ACH takes a few business days)."""
+    """Daily: bank payments still processing (ACH takes a few business days).
+    Automatic payments are asked about by payments.autopay (every few hours),
+    which also handles their failures."""
     if not config().available:
         return 0
     now = now or timezone.now()
     count = 0
-    for checkout in PendingCheckout.objects.filter(state=CheckoutState.PROCESSING):
+    for checkout in PendingCheckout.objects.filter(
+        state=CheckoutState.PROCESSING, autopay_attempt__isnull=True
+    ):
         check(checkout)
         count += 1
         if checkout.state == CheckoutState.PROCESSING and checkout.created_at < now - (

@@ -679,6 +679,10 @@ def account_periods_change(lot_id: int, *, actor, request=None):
             before = accounts.periods(lot_id)
             yield
             move_entries(lot_id, before, actor=actor, request=request)
+            # Automatic payments end with the ownership account (D40-autopay).
+            from payments.services import ownership_changed
+
+            ownership_changed(lot_id)
     finally:
         _period_change.reset(token)
 

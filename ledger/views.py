@@ -171,6 +171,7 @@ def _online_receipts(user, lot_id, since):
 @login_required
 def my_account(request):
     from community.models import CommunityProfile
+    from payments.autopay import for_payer as autopay_for_payer
 
     policy.require(request.user, "ledger.view_own")
     online = online_payments_enabled(request)
@@ -197,6 +198,8 @@ def my_account(request):
                 "pay_options": payment_options(statement.balance) if online else [],
                 "can_pay_online": lot.pk in payable,
                 "online_receipts": _online_receipts(request.user, lot.pk, since),
+                # Automatic payments (D40-autopay): payers only, feature on.
+                "autopay": autopay_for_payer(request.user, lot) if online else None,
                 **my_account_people(request.user, lot.pk),
             }
         )

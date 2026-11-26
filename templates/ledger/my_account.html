@@ -29,6 +29,13 @@
       </table></div>{% endif %}
       {% if a.online_receipts %}<h3>Online payments</h3>
       <ul class="list small">{% for p in a.online_receipts %}<li><div class="grow">{{ p.recorded_at|date:"M j, Y" }} &middot; {{ p.total_cents|cents }} &middot; {{ p.get_method_display }}</div><a href="{% url 'payment_receipt' p.pk %}">{% icon "download" %} Receipt (PDF)</a></li>{% endfor %}</ul>{% endif %}
+      {% if a.autopay %}<h3>Pay assessments automatically</h3>
+      <div class="small" data-testid="autopay-summary">
+        {% if a.autopay.status == "on" %}<p><span class="status tone-success">On</span> {% if a.autopay.description %}{{ a.autopay.description }}{% else %}Paying from your {{ a.autopay.label }}.{% endif %}</p>
+        {% elif a.autopay.status == "paused" %}<p><span class="status tone-warning">Paused</span> {{ a.autopay.description }}</p>
+        {% else %}<p>Have each monthly assessment paid on its due day from a bank account (no fee) or a card.</p>{% endif %}
+        <p><a href="{% url 'autopay' a.lot.pk %}">{% if a.autopay.status == "off" %}Set up automatic payments{% else %}Change or turn off{% endif %}</a></p>
+      </div>{% endif %}
       <h3>How to pay</h3>
       {% if online and a.statement.balance > 0 and a.can_pay_online %}<div class="small pay-options" data-testid="pay-options">{% for p in a.pay_options %}<div>{{ p.label }}: {% if p.fee_cents %}{{ a.statement.balance|cents }} + {{ p.fee_cents|cents }} surcharge = <strong>{{ p.total_cents|cents }}</strong>{% else %}<strong>{{ p.total_cents|cents }}</strong>{% endif %}</div>{% endfor %}<p class="muted">{{ disclosure }}</p></div>{% endif %}
       <div class="pay-by-check" data-testid="pay-by-check">

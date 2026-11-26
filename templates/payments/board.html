@@ -30,6 +30,14 @@
     <h3>Failed or not matched</h3>
     {% for c in failed %}<p class="small">#{{ c.pk }} &middot; lot {{ c.lot.number }} &middot; {{ c.total_cents|cents }} &middot; {{ c.get_state_display }}</p>{% empty %}<p class="small muted">None.</p>{% endfor %}
   </section>
+  {% if autopay %}<section class="card" data-testid="autopay-board"><h2>Automatic payments</h2>
+    <p class="small muted">Accounts whose monthly assessment is paid automatically. A failed payment is retried once after a soft decline; after a hard decline or a second failure the account is paused until the owner sets up a payment method again.</p>
+    <div class="table-wrap"><table><thead><tr><th>Lot</th><th>Account</th><th>Status</th><th>Pays by</th><th>Since</th><th class="num">Failures (90 days)</th></tr></thead>
+    <tbody>{% for r in autopay.enrolments %}<tr><td>{{ r.lot.number }}</td><td>{{ r.account.number }}</td><td>{% if r.status == "paused" %}<span class="status tone-warning">Paused</span>{% else %}<span class="status tone-success">On</span>{% endif %}</td><td>{{ r.method_type }}</td><td class="nowrap">{{ r.since|short_date }}</td><td class="num">{{ r.failures }}</td></tr>
+    {% empty %}<tr><td colspan="6" class="muted">No account pays automatically yet.</td></tr>{% endfor %}</tbody></table></div>
+    <h3>Recent failures</h3>
+    {% for f in autopay.failures %}<p class="small">{{ f.created_at|date:"M j, Y" }} &middot; lot {{ f.lot.number }} &middot; {{ f.attempt.period }} try {{ f.attempt.try_number }} &middot; {{ f.code }}</p>{% empty %}<p class="small muted">None.</p>{% endfor %}
+  </section>{% endif %}
   <section class="card"><h2>Payouts to the bank</h2>
     <div class="table-wrap"><table><thead><tr><th>Arrives</th><th>Payout</th><th class="num">Payments</th><th class="num">Refunds</th><th class="num">Fees</th><th class="num">Deposit</th></tr></thead>
     <tbody>{% for p in payouts %}<tr><td class="nowrap">{{ p.arrival_date|short_date }}</td><td class="small">{{ p.payout_id }}{% if not p.adds_up %} <span class="status tone-danger">does not add up</span>{% endif %}</td><td class="num">{{ p.gross_cents|cents }}</td><td class="num">{{ p.refunds_cents|cents }}</td><td class="num">{{ p.fees_cents|cents }}</td><td class="num">{{ p.amount_cents|cents }}</td></tr>

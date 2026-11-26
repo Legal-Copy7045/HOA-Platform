@@ -263,6 +263,15 @@ GUIDES["payments.credit_card_surcharge_bp"] = Guide(
     "after counsel review.",
 )
 
+GUIDES["payments.autopay_ceiling_percent"] = Guide(
+    BOARD,
+    "Not covered by the Act. A safety limit of the portal, not a fee: an owner authorizes "
+    "automatic payment of the monthly assessment, and anything larger is held for the board "
+    "to check. NACHA rules (bank debits) and card-network rules expect a recurring charge to "
+    "stay within what the payer authorized.",
+    "300 (three months of dues): Board resolution adopting automatic payments.",
+)
+
 GUIDES["retention.former_owner_contact_days"] = Guide(
     BOARD,
     "Not covered by the Act. Only contact details are cleared: ledger, ARC, violation, vote "

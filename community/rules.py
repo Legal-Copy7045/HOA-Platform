@@ -190,6 +190,16 @@ REGISTRY: dict[str, RuleSpec] = {
             "debit card payments never carry a fee.",
             maximum=300,
         ),
+        # Automatic payments (D40-autopay): a safety ceiling, not a fee.
+        RuleSpec(
+            "payments.autopay_ceiling_percent",
+            "Automatic payment ceiling, as a percent of the monthly dues (300 = three months)",
+            INT,
+            "300",
+            "Online payments",
+            "An automatic payment above this is not charged; the board gets an item instead. "
+            "Automatic payments only ever pay the month's assessment.",
+        ),
         RuleSpec(
             "retention.former_owner_contact_days",
             "Days after someone leaves before their contact details are cleared",

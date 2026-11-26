@@ -3,6 +3,9 @@ there is no webhook or other anonymous endpoint."""
 
 from __future__ import annotations
 
+import functools
+
+from allauth.account.decorators import reauthentication_required
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -230,8 +233,21 @@ def online_payments(request):
             "can_manage": policy.can(request.user, "payments.manage"),
             "disclosure": fees.disclosure(),
             "surcharge_bp": fees.surcharge_bp(),
+            "autopay": _autopay_board(request),
         },
     )
+
+
+def _autopay_board(request) -> dict | None:
+    """Automatic payments for the board (payments.manage; D40-autopay):
+    statuses and failure counts, no card or bank details."""
+    from core import features
+
+    if not features.enabled("autopay", request) or not policy.can(request.user, "payments.manage"):
+        return None
+    from payments.autopay import board_summary
+
+    return board_summary()
 
 
 @login_required
@@ -268,3 +284,139 @@ def payment_alert_resolve(request, pk):
     )
     messages.success(request, "Marked as done.")
     return redirect("online_payments")
+
+
+# --- Automatic payments (payments.autopay, D40-autopay) -----------------------------------
+
+
+def _autopay_lot(request, lot_id) -> Lot:
+    """A lot this person may pay for, with automatic payments available
+    (feature on, online payments on, Stripe set up); otherwise 404."""
+    from payments.autopay import autopay_enabled
+
+    if not autopay_enabled(request):
+        raise Http404
+    return _lot_for_payer(request, lot_id)
+
+
+def _autopay_payer(view):
+    """Who may use the page is checked before the password check, so another
+    home's address is a plain 404 (cross-owner rule)."""
+
+    @functools.wraps(view)
+    def wrapper(request, lot_id, *args, **kwargs):
+        policy.require(request.user, "payments.pay")
+        _autopay_lot(request, lot_id)
+        return view(request, lot_id, *args, **kwargs)
+
+    return wrapper
+
+
+@login_required
+@_autopay_payer
+@reauthentication_required(enabled=lambda r: r.method == "GET")
+def autopay(request, lot_id):
+    """Pay assessments automatically: what is set up, and the two ways to set
+    it up (bank account, no fee; card, credit cards with the surcharge).
+    Opened after a fresh password or passkey check, like other money set-up."""
+    from community.rules import rule
+    from payments import autopay as auto
+
+    policy.require(request.user, "payments.pay")
+    lot = _autopay_lot(request, lot_id)
+    info = auto.for_payer(request.user, lot)
+    if info is None:
+        raise Http404
+    monthly = rule("dues.monthly_cents") or 0
+    return render(
+        request,
+        "payments/autopay.html",
+        {
+            "lot": lot,
+            "info": info,
+            "monthly_cents": monthly,
+            "card_surcharge_cents": fees.surcharge(monthly, fees.CREDIT),
+            "surcharge_bp": fees.surcharge_bp(),
+            "surcharge_text": fees.percent_text(fees.surcharge_bp()),
+            "disclosure": fees.disclosure(),
+            "test_mode": not config().livemode,
+        },
+    )
+
+
+@login_required
+@_autopay_payer
+@reauthentication_required
+def autopay_start(request, lot_id):
+    """POST: start the set-up on Stripe's hosted page. (A GET, after the
+    password check sends someone back here, returns to the page.)"""
+    from payments import autopay as auto
+
+    policy.require(request.user, "payments.pay")
+    lot = _autopay_lot(request, lot_id)
+    if request.method != "POST":
+        return redirect("autopay", lot_id=lot.pk)
+    try:
+        url = auto.start_setup(
+            request.user, lot, method_type=request.POST.get("method", ""), request=request
+        )
+    except auto.AutopayError as exc:
+        messages.error(request, str(exc))
+        return redirect("autopay", lot_id=lot.pk)
+    return HttpResponseRedirect(url)
+
+
+@login_required
+def autopay_return(request, pk):
+    """Where Stripe sends the payer back: only a hint to check now. The
+    session id must be the one stored on this person's set-up."""
+    from payments import autopay as auto
+    from payments.models import AutopaySetup, SetupState
+
+    policy.require(request.user, "payments.pay")
+    if not auto.autopay_enabled(request):
+        raise Http404
+    setup = get_object_or_404(AutopaySetup.objects.for_user(request.user), pk=pk)
+    if setup.user_id != request.user.pk or setup.lot_id not in flow.payable_lot_ids(request.user):
+        raise Http404
+    session_id = request.GET.get("session_id", "")
+    if request.GET.get("cancelled"):
+        messages.info(request, "Nothing was set up.")
+        return redirect("my_account")
+    if session_id and session_id != setup.session_id:
+        raise Http404
+    state = auto.check_setup(setup)
+    if state == SetupState.DONE:
+        messages.success(
+            request,
+            "Automatic payments are set up. Each monthly assessment is paid on its due day.",
+        )
+    elif state == SetupState.WAITING:
+        messages.info(
+            request,
+            "Your bank account needs to be verified first (Stripe emails you about small test "
+            "deposits). Automatic payments start once it is verified.",
+        )
+    elif state == SetupState.OPEN:
+        messages.info(request, "Waiting for Stripe. Refresh My account in a minute.")
+    else:
+        messages.error(request, "Automatic payments were not set up. Nothing was saved.")
+    return redirect("my_account")
+
+
+@login_required
+@require_POST
+def autopay_cancel(request, lot_id):
+    from payments import autopay as auto
+
+    policy.require(request.user, "payments.pay")
+    lot = _autopay_lot(request, lot_id)
+    try:
+        auto.cancel(request.user, lot, request=request)
+    except auto.AutopayError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request, "Automatic payments are off. Nothing more will be charged automatically."
+        )
+    return redirect("my_account")
