@@ -295,8 +295,8 @@ The first run creates `/root/hoa-backup.key`. Copy it somewhere safe and
 offline (a password manager, or printed and locked away): without it the
 backups cannot be restored. Backups land in `/var/backups/hoa-portal/<date>/`
 (14 days kept). For an off-site copy, create a bucket the HOA owns (for
-example Cloudflare R2), put its details in `BACKUP_S3_*` in `.env`, and the
-nightly run uploads the already-encrypted files.
+example Cloudflare R2), and the nightly run uploads the already-encrypted
+files (see "Off-site backups that cannot be deleted" below).
 
 Prove a backup restores, without touching the live portal:
 
@@ -321,6 +321,47 @@ from the off-site bucket into a folder), run
 `python3 -I /opt/hoa-portal/infra/poc/backup_mac.py verify <folder> /root/hoa-backup.key`:
 it prints the time the backup was made, or refuses. Never put the key on a
 command line.
+
+## Off-site backups that cannot be deleted (Cloudflare R2, D31)
+
+In the Cloudflare dashboard, under R2:
+
+1. **Create bucket:** for example `oak-creek-backups`, location Automatic, storage class **Standard** (Infrequent Access isn't covered by the free tier and charges for every read). Leave public access off. Never use the bucket that holds the portal's files.
+2. **Bucket → Settings → Bucket lock rules → Add rule:** prefix `backups/`, retention **90 days**.
+3. **Bucket → Settings → Object lifecycle rules:** delete objects under `backups/` after **365 days**.
+4. **Manage R2 API tokens → Create API token:** permission "Object Read & Write", applied to this bucket only. Note the Access Key ID, the Secret Access Key and the Account ID.
+
+Then, on the VM:
+
+```bash
+sudo bash /opt/hoa-portal/infra/poc/setup-offsite-backups.sh
+```
+
+The script:
+
+- asks for the four values (the secret stays hidden);
+- saves them to `.env` and restarts the portal;
+- **proves the lock** by uploading a tiny probe file and trying to delete it (it refuses to continue if the delete works);
+- takes a backup, which goes off-site, and installs the nightly timer.
+
+The probe files stay in the bucket until the lock expires. They hold no data.
+
+Afterwards:
+
+- System status → Health checks → **Backups** shows the age of the last local and off-site copies and when the lock was last verified. The sysadmins get an email if either copy is more than 36 hours old.
+- Re-check the lock at any time:
+
+  ```bash
+  sudo docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web python manage.py check_offsite_lock
+  ```
+
+- Prove the off-site copy restores (downloads the newest complete backup, checks its keyed checksum, restores it into the scratch copy):
+
+  ```bash
+  sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh --from-offsite
+  ```
+
+Keep `/root/hoa-backup.key` offline and **outside the Cloudflare account**. Without it, the off-site backups can't be decrypted.
 
 ## Health alerts
 

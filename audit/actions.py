@@ -168,6 +168,7 @@ _SPECS = [
     _spec("collections.courtesy_sent", "Courtesy payment reminders sent", "count"),
     _spec("system.test_email_sent", "Test email sent", "ok"),
     _spec("system.host_alert", "Host security alert emailed", "kind", "lines", "sent"),
+    _spec("system.offsite_lock_checked", "Off-site backup lock checked", "locked"),
     _spec("system.check_updates", "Checked for portal updates"),
     _spec("system.install_update", "Portal update requested"),
     _spec("backup.files_exported", "File store exported (backup)", "count"),

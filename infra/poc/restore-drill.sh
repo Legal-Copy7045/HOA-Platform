@@ -7,6 +7,7 @@
 #   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh                       # newest backup
 #   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh /var/backups/hoa-portal/<date>
 #   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh --keep ...           # leave it running
+#   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh --from-offsite         # newest off-site backup
 #   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh --allow-unsigned <dir>
 #       (only for a backup made before stamped keyed checksums; prints a warning)
 #
@@ -18,11 +19,13 @@ trap 'echo "ERROR: restore-drill.sh stopped at line $LINENO (exit $?)." >&2' ERR
 
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 KEEP=0
+FROM_OFFSITE=0
 VERIFY_ARGS=()
 SRC=""
 for arg in "$@"; do
   case "$arg" in
     --keep) KEEP=1 ;;
+    --from-offsite) FROM_OFFSITE=1 ;;
     --allow-unsigned) VERIFY_ARGS=(--allow-unsigned) ;;
     -*) echo "Unknown option $arg." >&2; exit 1 ;;
     *) SRC="$arg" ;;
@@ -36,6 +39,21 @@ cd "$APP_DIR"
 command -v python3 >/dev/null || { echo "python3 is needed (apt-get install python3)." >&2; exit 1; }
 BACKUP_ROOT="${HOA_BACKUP_DIR:-/var/backups/hoa-portal}"
 KEY_FILE="${HOA_BACKUP_KEY:-/root/hoa-backup.key}"
+[ "$FROM_OFFSITE" -eq 1 ] && [ -n "$SRC" ] && { echo "Use either --from-offsite or a folder, not both." >&2; exit 1; }
+if [ "$FROM_OFFSITE" -eq 1 ]; then
+  # Download the newest complete off-site backup (still encrypted) with the
+  # live portal's off-site settings; it is then checked like any other.
+  LIVE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
+  REMOTE="$("${LIVE[@]}" exec -T web python manage.py pull_backup --list | tail -1 | tr -cd '0-9TZ-')"
+  [ -n "$REMOTE" ] || { echo "No complete backup found in the off-site bucket." >&2; exit 1; }
+  SRC="$(mktemp -d /root/hoa-offsite-drill.XXXXXX)"; chmod 700 "$SRC"
+  OFFSITE_DIR="$SRC"
+  trap 'rm -rf "$OFFSITE_DIR"' EXIT
+  echo "==> Downloading off-site backup $REMOTE"
+  for f in db.dump.enc files.tar.enc SHA256SUMS HMAC-SHA256; do
+    "${LIVE[@]}" exec -T web python manage.py pull_backup --name "$REMOTE-$f" > "$SRC/$f"
+  done
+fi
 if [ -z "$SRC" ]; then
   SRC="$(ls -1d "$BACKUP_ROOT"/*/ 2>/dev/null | sort | tail -1)"
 fi
@@ -81,6 +99,7 @@ scratch_store_ok "$EFFECTIVE_ENDPOINT" "$EFFECTIVE_BUCKET" "$LIVE_ENDPOINT" "$LI
   || { echo "Refusing to run the drill against that file store." >&2; exit 1; }
 
 cleanup() {
+  if [ -n "${OFFSITE_DIR:-}" ]; then rm -rf "$OFFSITE_DIR"; fi
   if [ "$KEEP" -eq 0 ]; then
     echo "==> Removing the drill copy"
     "${SCRATCH[@]}" down -v --remove-orphans >/dev/null 2>&1 || true

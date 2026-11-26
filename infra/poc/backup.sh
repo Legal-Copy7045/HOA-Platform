@@ -93,12 +93,15 @@ echo "==> Uploaded files"
 python3 -I "$APP_DIR/infra/poc/backup_mac.py" sign "$DEST" "$KEY_FILE" "$STAMP"
 echo "$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" > "$DEST/APP_VERSION"
 du -sh "$DEST" | awk '{print "    size: "$1}'
+# System status and the health alerts read these (core/health.py "Backups").
+"${COMPOSE[@]}" exec -T web python manage.py backup_heartbeat --kind local
 
 if [ -n "$(env_value BACKUP_S3_BUCKET)" ]; then
   echo "==> Copying off-site"
   for f in db.dump.enc files.tar.enc SHA256SUMS HMAC-SHA256; do
     "${COMPOSE[@]}" exec -T web python manage.py push_backup --name "$STAMP-$f" < "$DEST/$f"
   done
+  "${COMPOSE[@]}" exec -T web python manage.py backup_heartbeat --kind offsite
 else
   echo "    (no off-site bucket set: BACKUP_S3_BUCKET in .env; local copy only)"
 fi

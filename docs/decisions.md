@@ -322,3 +322,7 @@ The owner decided to keep the POC's uploaded files on the local SeaweedFS store 
 ## D30. Prepaid owners: future months show unpaid, prepayment drawn down monthly (2026-11-26)
 
 The owner ruled that a prepaid owner's future months are listed as not yet paid, and the prepayment is drawn down as each month's dues post (the existing drawdown). The regression finding BUG-005 is fixed only for its other half: a month whose dues were posted early is not also counted as an upcoming charge.
+
+## D31. Off-site backups in a locked R2 bucket (2026-11-26)
+
+The owner chose Cloudflare R2 for immutable off-site backups. The nightly backups are already encrypted and carry a keyed checksum before they leave the VM. They go to a separate R2 bucket (not the files bucket) whose bucket lock rule makes everything under `backups/` undeletable and unoverwritable for 90 days, even with valid keys, so a compromised VM or a stolen token cannot destroy them. A lifecycle rule removes backups after 365 days, which keeps cost low and keeps cleared contact details (D28) from living on much longer in backups than in the portal. R2 tokens cannot be write-only, so the lock is what makes the VM's read-and-write token safe. `infra/poc/setup-offsite-backups.sh` proves the lock by trying to delete a probe file (`check_offsite_lock`, audited). The health check alerts when no local or off-site backup has arrived for 36 hours, and `restore-drill.sh --from-offsite` proves the off-site copy restores. The backup key stays offline and outside the Cloudflare account.
