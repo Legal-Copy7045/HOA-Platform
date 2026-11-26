@@ -521,11 +521,12 @@ def test_accounting_setup_has_one_labeled_input_per_account(client, w):
     from ledger import accounting as acc
 
     client.force_login(w["board"])
-    page = client.get(reverse("accounting")).content.decode()
+    # The setup is its own tab of Accounting (owner request 2026-11-26).
+    page = client.get(reverse("accounting"), {"tab": "setup"}).content.decode()
     assert 'name="gl_accounts"' not in page
     for key in acc.GL_LABELS:
-        assert f'<label for="gl_{key}">' in page and f'name="gl_{key}"' in page
-    assert 'value="1000 Operating cash"' in page
+        assert f'<label for="id_gl_{key}">' in page and f'name="gl_{key}"' in page
+    assert 'placeholder="1000 Operating cash"' in page
 
 
 def test_accounting_setup_saves_each_account_into_the_stored_text(client, w):
@@ -539,6 +540,7 @@ def test_accounting_setup_saves_each_account_into_the_stored_text(client, w):
             "gl_cash": "1010 Main checking",
             "gl_assessment": "",
             "opening_cash": "0",
+            "opening_cash_on": "2026-01-01",
         },
     )
     accounts = AccountingSetup.get().accounts()

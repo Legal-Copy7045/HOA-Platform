@@ -13,6 +13,9 @@ import re
 from dataclasses import dataclass
 
 CENTS, DAYS, INT, PERCENT, BOOL, TEXT = "cents", "days", "int", "percent", "bool", "text"
+# Stored as whole hundredths of a percent (basis points), typed and shown as a
+# percent: "3" or "2.5" on the page is 300 or 250 in the database (WT-007).
+BASIS_POINTS = "bp"
 
 
 @dataclass(frozen=True)
@@ -168,7 +171,7 @@ REGISTRY: dict[str, RuleSpec] = {
         ),
         RuleSpec(
             "arc.signoff_auto_confirm",
-            "Accept automatically read sign-offs without a person confirming",
+            "Accept neighbor acknowledgements read from scanned forms without a person checking",
             BOOL,
             "false",
             "Architectural review",
@@ -220,12 +223,12 @@ REGISTRY: dict[str, RuleSpec] = {
         # recorded values stay in the rule history): credit cards only.
         RuleSpec(
             "payments.credit_card_surcharge_bp",
-            "Credit card surcharge (hundredths of a percent: 300 = 3%; at most 300)",
-            INT,
+            "Credit card surcharge (%)",
+            BASIS_POINTS,
             "300",
             "Online payments",
-            "Added to credit card payments only and shown before the owner pays. Bank and "
-            "debit card payments never carry a fee.",
+            "Added to credit card payments only and shown before the owner pays; at most 3%. "
+            "Bank and debit card payments never carry a fee.",
             maximum=300,
         ),
         # D44: official notices go by email only to owners who agreed.
@@ -281,7 +284,7 @@ REGISTRY: dict[str, RuleSpec] = {
 def _parse(spec: RuleSpec, raw: str | None):
     if raw in (None, ""):
         return None
-    if spec.kind in (CENTS, DAYS, INT, PERCENT):
+    if spec.kind in (CENTS, DAYS, INT, PERCENT, BASIS_POINTS):
         return int(raw)
     if spec.kind == BOOL:
         return raw.strip().lower() in ("1", "true", "yes")
@@ -293,7 +296,7 @@ def validate_value(key: str, raw: str) -> str:
     raw = (raw or "").strip()
     if raw == "":
         return raw
-    if spec.kind in (CENTS, DAYS, INT, PERCENT):
+    if spec.kind in (CENTS, DAYS, INT, PERCENT, BASIS_POINTS):
         # ASCII digits only and a sane size (review D9): str.isdigit() also
         # accepts characters like "²" that int() then refuses on every read.
         if not re.fullmatch(r"[0-9]{1,12}", raw):
@@ -301,6 +304,8 @@ def validate_value(key: str, raw: str) -> str:
         if spec.kind == PERCENT and int(raw) > 100:
             raise ValueError(f"{spec.shown_label}: must be 0-100.")
         if spec.maximum is not None and int(raw) > spec.maximum:
+            if spec.kind == BASIS_POINTS:
+                raise ValueError(f"{spec.shown_label}: at most {bp_display(spec.maximum)}%.")
             raise ValueError(f"{spec.shown_label}: at most {spec.maximum}.")
     if spec.kind == BOOL and raw.lower() not in ("true", "false", "yes", "no", "1", "0"):
         raise ValueError(f"{spec.shown_label}: enter yes or no.")
@@ -373,6 +378,26 @@ def rules_needing_attention() -> list[RuleSpec]:
         if not (g and g.fallback is not None):
             missing.append(spec)
     return missing
+
+
+def percent_to_bp(text: str) -> int:
+    """A percent as typed ("3", "2.5", "2.75%") in whole basis points. Up to
+    two decimals; anything else is refused rather than rounded."""
+    raw = (text or "").strip().rstrip("%").strip()
+    m = re.fullmatch(r"([0-9]{1,6})(?:\.([0-9]{0,2}))?", raw)
+    if not m:
+        raise ValueError("Enter a percent, e.g. 3 or 2.5.")
+    whole, frac = m.group(1), (m.group(2) or "").ljust(2, "0")
+    return int(whole) * 100 + int(frac)
+
+
+def bp_display(bp: int | str | None) -> str:
+    """Basis points as a percent without trailing zeros: 300 -> "3", 250 -> "2.5"."""
+    if bp in (None, ""):
+        return ""
+    bp = int(bp)
+    whole, frac = divmod(bp, 100)
+    return f"{whole}" if frac == 0 else f"{whole}.{frac:02d}".rstrip("0")
 
 
 def cents_display(cents: int | None) -> str:

@@ -2,6 +2,7 @@
 {% load portal %}
 {% block title %}Access review · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'people' %}">People</a> / Access review</nav>
   <div class="page-head"><div><h1>Access review</h1>
     <p class="subtitle">Every login, what it can reach, and anything worth a second look. Review it every {{ every_days }} days: end seats, offices and roles that should have ended from the person's page. Viewing this page is logged.</p></div></div>
 

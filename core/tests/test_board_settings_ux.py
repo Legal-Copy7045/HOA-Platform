@@ -120,7 +120,7 @@ def test_remind_button_confirms_with_the_count(_defer, client, board):
             created_at=timezone.now() - datetime.timedelta(days=age)
         )
     client.force_login(board)
-    page = client.get(reverse("invitations")).content.decode()
+    page = client.get(reverse("lot_list"), {"view": "signups"}).content.decode()
     assert 'data-confirm="Email a new invitation link to 1 person who was invited' in page
     assert "Remind those who haven't signed up (1)" in page
     assert len(accounts.reminder_due()) == 1

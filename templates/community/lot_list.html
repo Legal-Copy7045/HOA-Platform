@@ -3,13 +3,15 @@
 {% block title %}Homes and owners · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Homes and owners</h1>
-    <p class="subtitle">{% if roster_view %}Every {% if include_dormant %}account, current and previous{% else %}current account{% endif %}, with the people on it and the contact details on record. Exports are logged.{% else %}{{ rows|length }} homes. Ownership drives who can sign in for each home.{% endif %}</p></div>
+    <p class="subtitle">{% if roster_view %}Every {% if include_dormant %}account, current and previous{% else %}current account{% endif %}, with the people on it and the contact details on record. Exports are logged.{% elif signups_view %}Who has signed up to the portal. Invitations only ever go to the email on each person's record and only link a login to an existing person. To invite one person, open their record under <a href="{% url 'people' %}">People</a>.{% else %}{{ rows|length }} homes. Ownership drives who can sign in for each home.{% endif %}</p></div>
     {% if roster_view %}<div class="actions">
       {% if include_dormant %}<a class="btn secondary" href="?view=roster">Current accounts only</a>{% else %}<a class="btn secondary" href="?view=roster&amp;previous=1">Include previous accounts</a>{% endif %}
-      <a class="btn secondary" href="?view=roster&amp;export=csv{% if include_dormant %}&amp;previous=1{% endif %}">{% icon "download" %} Export CSV</a></div>{% endif %}</div>
-  {% if can_roster %}<nav class="subnav" aria-label="Columns">
-    <a href="{% url 'lot_list' %}"{% if not roster_view %} aria-current="page"{% endif %}>Homes</a>
-    <a href="{% url 'lot_list' %}?view=roster"{% if roster_view %} aria-current="page"{% endif %}>Accounts, contacts and balances</a>
+      <a class="btn secondary" href="?view=roster&amp;export=csv{% if include_dormant %}&amp;previous=1{% endif %}">{% icon "download" %} Export CSV</a></div>
+    {% elif signups_view %}<div class="actions"><a class="btn secondary" href="{% url 'invitations' %}?letters=1">{% icon "download" %} Letters for owners without email ({{ counts.no_email }})</a></div>{% endif %}</div>
+  {% if can_roster or can_signups %}<nav class="subnav" aria-label="Views">
+    <a href="{% url 'lot_list' %}"{% if not roster_view and not signups_view %} aria-current="page"{% endif %}>Homes</a>
+    {% if can_roster %}<a href="{% url 'lot_list' %}?view=roster"{% if roster_view %} aria-current="page"{% endif %}>Accounts, contacts and balances</a>{% endif %}
+    {% if can_signups %}<a href="{% url 'lot_list' %}?view=signups"{% if signups_view %} aria-current="page"{% endif %}>Sign-ups</a>{% endif %}
   </nav>{% endif %}
   {% if roster_view %}
   <div class="table-card"><div class="table-wrap"><table>
@@ -23,6 +25,35 @@
       <td class="num">{% if r.balance_cents is None %}-{% else %}{{ r.balance_cents|cents }}{% endif %}</td></tr>
     {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="users" title="No accounts yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
+  {% elif signups_view %}
+  <div class="grid grid-4" data-testid="signup-counts">
+    <div class="stat tone-success"><div class="label">Signed up</div><div class="value">{{ counts.signed_up }}</div><div class="hint">{{ signed_up_percent }}% of owners</div></div>
+    <div class="stat"><div class="label">Invited, waiting</div><div class="value">{{ counts.invited }}</div></div>
+    <div class="stat {% if counts.not_invited or counts.expired %}tone-warning{% endif %}"><div class="label">Not invited / expired</div><div class="value">{{ counts.not_invited|add:counts.expired }}</div></div>
+    <div class="stat {% if counts.no_email %}tone-warning{% endif %}"><div class="label">No email on record</div><div class="value">{{ counts.no_email }}</div></div>
+  </div>
+  <h2 id="notice-counts">Official notices</h2>
+  <p class="small muted">Per home: email if an owner on the deed chose email; otherwise the home gets paper. Homes not answered get paper until someone chooses.</p>
+  <div class="grid grid-3">
+    <div class="stat tone-success"><div class="label">Email notices</div><div class="value">{{ notice_counts.email }}</div><div class="hint">home{{ notice_counts.email|pluralize }}</div></div>
+    <div class="stat"><div class="label">Paper</div><div class="value">{{ notice_counts.paper }}</div><div class="hint">home{{ notice_counts.paper|pluralize }}</div></div>
+    <div class="stat {% if notice_counts.unanswered %}tone-warning{% endif %}"><div class="label">Not answered</div><div class="value">{{ notice_counts.unanswered }}</div><div class="hint">home{{ notice_counts.unanswered|pluralize }}</div></div>
+  </div>
+  <details class="panel"><summary>What owners agree to (wording version {{ notice_version }})</summary><div class="panel-body small">{{ notice_wording|linebreaks }}</div></details>
+  <div class="form-actions">
+    <form method="post" action="{% url 'invitations' %}" data-confirm="Send an invitation to every owner with an email who hasn't been invited (or whose invitation expired)?">{% csrf_token %}<input type="hidden" name="action" value="invite_all"><button type="submit">{% icon "mail" %} Invite everyone not yet invited ({{ counts.not_invited|add:counts.expired }})</button></form>
+    <form method="post" action="{% url 'invitations' %}" data-confirm="Email a new invitation link to {{ remind_count }} {% if remind_count == 1 %}person who was{% else %}people who were{% endif %} invited more than 3 days ago and {% if remind_count == 1 %}has{% else %}have{% endif %} not signed up yet? Their old links stop working.">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary"{% if not remind_count %} disabled{% endif %}>Remind those who haven't signed up ({{ remind_count }})</button></form>{% if counts.invited and counts.invited != remind_count %}<span class="small muted">Invitations sent in the last 3 days are not reminded yet.</span>{% endif %}
+  </div>
+  <h2>Sign-ups by home</h2>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Home</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>
+    <tbody>{% for r in rows %}<tr><td><a href="{% url 'lot_detail' r.lot.pk %}">{{ r.lot.label }}</a></td><td><a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
+      <td><span class="badge {% if r.status == 'signed_up' %}tone-success{% elif r.status == 'invited' %}tone-info{% else %}tone-warning{% endif %}">{{ r.label }}</span></td>
+      <td class="small muted">{% if r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="users" title="No owners recorded yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <h2>Every invitation</h2>
+  {% include "accounts/board/_invitation_table.html" %}
   {% else %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Address</th><th>Current owners</th></tr></thead>

@@ -170,7 +170,7 @@ def test_a_failed_invitation_leaves_the_approval_and_tells_the_board(client, w):
     response = client.post(
         reverse("account_change_decide", args=[change.pk, "approve"]), follow=True
     )
-    assert "Send it from Invitations and sign-ups" in response.content.decode()
+    assert "Send it from their record under People" in response.content.decode()
     change = _change(change.pk)
     assert change.state == "approved" and change.invitation_sent is False
     assert not Invitation.objects.unscoped("t").filter(person=change.person).exists()

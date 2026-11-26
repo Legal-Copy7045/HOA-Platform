@@ -385,8 +385,8 @@ def test_invoice_approval_is_in_my_items_for_others_only(w):
         actor=w["board"],
     )
     services.INVOICE.apply(invoice, "submit", actor=w["board"])
-    assert not [i for i in my_items.items_for(w["board"]) if i.area == "Approvals"]
-    assert [i for i in my_items.items_for(w["board2"]) if i.area == "Approvals"]
+    assert not [i for i in my_items.items_for(w["board"]) if i.area == "Invoices"]
+    assert [i for i in my_items.items_for(w["board2"]) if i.area == "Invoices"]
 
 
 # --- R2-009: view-only contacts never act, even when they own another home -------

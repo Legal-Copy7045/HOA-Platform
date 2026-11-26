@@ -5,6 +5,8 @@
   {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Accounting</h1><p class="subtitle">Journal export for the accounting package, bank deposits, monthly bank reconciliation, and the 1099 worksheet. Book cash balance today: <strong>{{ book_balance|cents }}</strong>.</p></div>
     {% if can_manage %}<div class="actions">{% if bank_feed_on %}<a class="btn secondary" href="{% url 'bank_feed' %}">{% icon "inbox" %} Bank feed</a>{% endif %}<a class="btn" href="{% url 'reconcile' %}?date={{ last_month_start|date:'Y-m' }}-{{ month_start|date:'d'|default:'01' }}">{% icon "check-circle" %} Reconcile a statement</a></div>{% endif %}</div>
+  {% if can_manage %}{% with su=setup_summary %}<p class="small" data-testid="setup-summary">{% if su.is_set_up %}{% icon "check-circle" %} Accounting set up: {{ su.mapped }} accounts mapped{% if su.changed %} ({{ su.changed }} changed from the standard){% endif %} · opening balance {{ su.opening_cents|cents }} on {{ su.opening_on|date:"M j, Y" }} · <a href="?tab=setup">Edit</a>{% else %}{% icon "alert" %} Not set up yet: record the opening bank balance and check which account each kind of entry goes to, so the export and reconciliation start from the right numbers. <a class="btn secondary" href="?tab=setup">Set up accounting</a>{% endif %}</p>{% endwith %}
+  <nav class="subnav" aria-label="Accounting"><a href="{% url 'accounting' %}" aria-current="page">Overview</a><a href="{% url 'accounting' %}?tab=setup">Setup</a></nav>{% endif %}
   <div class="split">
     <div>
       <section class="card"><h2>Journal export</h2>
@@ -12,7 +14,7 @@
           <div><label for="xs">From</label><input id="xs" type="date" name="start" value="{{ last_month_start|date:'Y-m-d' }}" required></div>
           <div><label for="xe">To</label><input id="xe" type="date" name="end" value="{{ today|date:'Y-m-d' }}" required></div>
           <button type="submit" class="secondary">{% icon "download" %} Download CSV</button></form>
-        <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by address and lot number only, never by name. Accounts come from the setup below.</p></section>
+        <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by address and lot number only, never by name. Accounts come from the Setup tab.</p></section>
       {% if can_manage %}<section class="card"><h2>Payments to deposit</h2>
         {% if undeposited %}<form method="post">{% csrf_token %}<input type="hidden" name="section" value="deposit">
           <ul class="list">{% for e in undeposited %}<li><label class="grow"><input type="checkbox" name="entries" value="{{ e.pk }}" checked> {{ e.posted_on|date:"M j" }} · {{ e.lot.label }}{% if e.reference %} · {{ e.reference }}{% endif %}</label><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
@@ -32,14 +34,6 @@
         {% if vendors_1099 %}<div class="table-wrap"><table><thead><tr><th>Vendor</th><th class="num">Paid</th><th>Over threshold</th><th>W-9</th></tr></thead><tbody>{% for r in vendors_1099 %}<tr><td>{{ r.vendor.name }}</td><td class="num">{{ r.total_cents|cents }}</td><td>{% if r.over %}<strong>Yes</strong>{% endif %}</td><td>{% if r.w9 %}On file{% else %}<span class="status tone-warning">Missing</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
         {% else %}<p class="muted small">No vendor payments that year.</p>{% endif %}
         <p class="small muted">A worksheet for the treasurer: corporations are generally exempt, and the IRS threshold is a setting under Community settings.</p></section>
-      {% if can_manage %}<section class="card"><h2>Setup</h2>
-        <form method="post">{% csrf_token %}<input type="hidden" name="section" value="setup">
-          <fieldset class="form-grid"><legend>Account for each kind of entry in the export</legend>
-            {% for g in gl_rows %}<div class="field"><label for="gl_{{ g.key }}">{{ g.label }}</label><input id="gl_{{ g.key }}" name="gl_{{ g.key }}" value="{{ g.value }}" maxlength="80"></div>{% endfor %}
-          </fieldset>
-          <p class="small muted">Account number and name as in your accounting package, e.g. "1000 Operating cash". Leave a box empty to use the standard account. Expenses use each invoice's category code.</p>
-          <div class="inline-form"><div><label for="oc">Opening bank balance</label><input id="oc" name="opening_cash" value="{{ setup.opening_cash_cents|cents_plain }}" inputmode="decimal"></div><div><label for="od">as of</label><input id="od" type="date" name="opening_cash_on" value="{{ setup.opening_cash_on|date:'Y-m-d' }}"></div></div>
-          <div class="form-actions"><button type="submit" class="secondary">Save setup</button></div></form></section>{% endif %}
     </div>
   </div>
 {% endblock %}

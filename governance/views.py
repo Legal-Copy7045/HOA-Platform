@@ -561,6 +561,8 @@ def records_requests(request):
             "can_submit": can_submit,
             "can_manage": can_manage and not mine,
             "mine": mine,
+            # Documents' "Ask to inspect it" opens the form (WT-017).
+            "open_form": request.GET.get("new") == "1",
         },
     )
 

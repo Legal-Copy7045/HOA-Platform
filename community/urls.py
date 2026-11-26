@@ -27,6 +27,11 @@ urlpatterns = [
     path("my-lot/", RedirectView.as_view(pattern_name="my_lot", permanent=False)),
     path("my-history/", account_views.my_history, name="my_history"),
     path(
+        "my-history/<int:index>/statement.pdf",
+        account_views.my_history_statement_pdf,
+        name="my_history_statement_pdf",
+    ),
+    path(
         "my-home/accounts/<int:pk>/change/",
         account_views.account_change_request,
         name="account_change_request",

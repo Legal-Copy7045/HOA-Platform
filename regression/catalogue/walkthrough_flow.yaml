@@ -1,0 +1,37 @@
+# Walkthrough fixes, builder C (D50): flow, naming, merges and navigation.
+- feature: "Sign-ups are a tab of Homes and owners for the board (counts, notices, bulk buttons, every invitation); invitations and onboarding redirect; the sysadmin's page is Invitations"
+  since: M5
+  match: ["^unit:accounts/tests/test_onboarding.py::test_(onboarding_redirects|invitations_redirects|sign_ups_tab|board_bulk|sysadmin_sees|page_shows|letters)", "^unit:community/tests/test_notice_consent.py::test_invitations_page_counts", "^unit:core/tests/test_board_settings_ux.py::test_remind"]
+- feature: "One name per thing: owner ARC area, record numbers without letter prefixes, My items groups after their pages, plain settings and report names, a tenant's Surveys"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_(owner_arc_area|record_numbers|my_items_groups|percent_typed|surcharge_saved|report_names)", "^unit:core/tests/test_nav_streamline.py::test_tenant_voting"]
+- feature: "Former owners: running balance, statement PDF of their own period, whom to ask (read-only)"
+  since: M5
+  match: ["^unit:community/tests/test_accounts.py::test_(my_history_has_running|former_owner_statement_pdf|others_cannot_download)", "^unit:core/tests/test_url_matrix.py::.*\\[my_history_statement_pdf\\]"]
+- feature: "People on the account listed on My home only; My account links there"
+  since: M5
+  match: ["^unit:community/tests/test_accounts.py::test_my_account_lists_people"]
+- feature: "Breadcrumbs on Settings pages, Access review and Neighbor acknowledgements"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_(hub_children_have_a_way_back|neighbor_acknowledgements_crumb)"]
+- feature: "Sysadmin activity: 30-day window with Older/Newer, by day, filters, audited CSV export"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_sysadmin_activity"]
+- feature: "Community settings index and folding sections; ARC request types fold to a line with the citation"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_(community_settings_has_an_index|arc_types_fold)", "^manual:community settings index and folding"]
+- feature: "ARC reviewer position starts empty and is required; steps a person can never take are hidden"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_(position_starts_empty|steps_a_reviewer)"]
+- feature: "Dashboard: role shortcuts for auditor and sysadmin; Quick actions under the to-dos"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_(auditor_and_sysadmin_get_shortcuts|quick_actions_sit)"]
+- feature: "Documents: records request link opens the form; packets grouped under Meeting packets"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_documents_records_link"]
+- feature: "Phone menu: staff open work sections with waiting items; Sign out at the top of the drawer"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_(staff_menu_opens|phone_drawer)", "^unit:core/tests/test_ux_nav.py::test_hub_entry_is_current", "^manual:phone menu sign out at the top"]
+- feature: "Accounting setup tab: grouped accounts, opening balance and date together, one-line summary"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough_flow.py::test_accounting_", "^unit:ledger/tests/test_finance_ux.py::test_accounting_setup", "^manual:accounting setup on a phone"]

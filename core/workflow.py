@@ -36,6 +36,13 @@ class WorkflowError(ValueError):
 Guard = Callable[[object, object], str | None]
 
 
+class NotForYou(str):
+    """A guard's reason that will not change for this person (say, they are
+    not an owner of the home): the step is refused like any other, but
+    ``Workflow.blocked()`` leaves it out instead of showing it disabled,
+    since it is never theirs to take (WT-015)."""
+
+
 @dataclass(frozen=True)
 class Transition:
     action: str
@@ -84,7 +91,9 @@ class Workflow:
 
     def blocked(self, obj, actor) -> list[tuple[Transition, str]]:
         """Steps that fit the current state and the actor's role, but that a
-        rule stops right now, with the reason (shown as a disabled step)."""
+        rule stops right now, with the reason (shown as a disabled step).
+        Steps the person could never take (a ``NotForYou`` reason) are left
+        out, so "Next steps" shows only what they may do later (WT-015)."""
         out = []
         for t in self.transitions.values():
             if obj.state not in t.sources or t.guard is None:
@@ -92,7 +101,7 @@ class Workflow:
             if actor is not SYSTEM and not can(actor, t.permission):
                 continue
             reason = t.guard(obj, actor)
-            if reason:
+            if reason and not isinstance(reason, NotForYou):
                 out.append((t, reason))
         return out
 

@@ -2,6 +2,7 @@
 {% load portal %}
 {% block title %}Features · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / Features</nav>
   <div class="page-head"><div><h1>Features</h1><p class="subtitle">Switch off what the community does not use. A switched-off feature leaves the menu and its pages; its records are kept and come back if you switch it on again. Homes, people, architectural review, owner accounts, documents and meetings are always on.</p></div></div>
   <section class="card"><ul class="list">{% for f, on, warning in rows %}<li>
     <div class="grow"><div class="title">{{ f.label }}</div><div class="small muted">{{ f.description }}{% if not f.url_names %} (coming soon){% endif %}</div></div>

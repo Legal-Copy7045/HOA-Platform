@@ -5,6 +5,6 @@
   {% else %}<div class="small muted">No sign-in: they don't use email. Approving keeps them on the account as a record only; they cannot sign in until the board adds an email to their record and invites them.</div>{% endif %}
 {% elif ch.state == "approved" %}
   {% if ch.invitation_sent is True %}<div class="small muted">Invitation to sign in emailed.</div>
-  {% elif ch.invitation_sent is False %}<div class="small muted">The invitation could not be sent yet: the board sends it from Invitations and sign-ups.</div>
+  {% elif ch.invitation_sent is False %}<div class="small muted">The invitation could not be sent yet: the board sends it from the person's record under People.</div>
   {% else %}<div class="small muted">On the account as a record only: no sign-in until the board adds an email and invites them.</div>{% endif %}
 {% endif %}{% endif %}

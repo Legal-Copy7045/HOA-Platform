@@ -535,3 +535,21 @@ tr.below-zero th, tr.below-zero td { background: var(--danger-bg); }
 .list > li.cal-row .todo-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .35rem; }
 .cal-menu .cal-note { margin: .35rem .7rem; max-width: 16rem; }
 .join-note a { overflow-wrap: anywhere; }
+
+/* In-page index of a long settings page, kept in view (WT-014). */
+.page-index { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .25rem .5rem; padding: .5rem .75rem; margin-bottom: 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.page-index a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 .4rem; }
+/* A card that folds to its heading line (Community settings, ARC request types). */
+details.collapsible > summary { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; cursor: pointer; min-height: 44px; }
+details.collapsible > summary h2 { margin: 0; }
+details.collapsible > summary .summary-edit { margin-left: auto; color: var(--green-700); }
+details.collapsible[open] > summary .summary-edit { display: none; }
+/* Phone drawer: the name, Profile, Sign-in and security and Sign out sit at
+   the top, not 2,000px down (WT-040). */
+@media (max-width: 820px) {
+  .sidebar .sidebar-foot { order: -1; border-top: 0; border-bottom: 1px solid rgba(255, 255, 255, .1); }
+}
+/* Accounting setup: one account per row, the whole value visible (2026-11-26). */
+.accounting-setup .setup-row { margin-bottom: .9rem; }
+.accounting-setup .setup-row input.full-width { width: 100%; max-width: 36rem; }
+.money-input { display: flex; align-items: center; gap: .3rem; }

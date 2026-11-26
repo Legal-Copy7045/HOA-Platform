@@ -2,6 +2,7 @@
 {% load portal %}
 {% block title %}Home neighbors · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / Home neighbors</nav>
   <div class="page-head"><div><h1>Home neighbors</h1><p class="subtitle">For each home, record its left and right neighbors from the development plan, and any other homes a project there affects. They are asked to acknowledge that home's architectural requests (the homeowner cannot remove them), and their owners are recused from reviewing them. Enter the neighbors' plat lot numbers; the address shows once saved.</p></div></div>
   <form method="post" id="neighbors-all" data-warn-unsaved="Home neighbors">{% csrf_token %}
     <div class="form-actions"><button type="submit" name="save_all" value="1">Save all</button><span class="small muted">Saves every row you changed (a row's own Save does the same).</span><span class="small status tone-warning" data-unsaved-note hidden>Unsaved changes</span></div>
