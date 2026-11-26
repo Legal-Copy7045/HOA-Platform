@@ -528,8 +528,9 @@ def items_for(user) -> list[Item]:
     if can(user, "arc.submit") and roles.owned_lot_ids:
         from arc.models import NEIGHBOR_VISIBLE_STATES, SignoffRequest
 
+        # The owner side (SEC-001), also for a board member who owns a lot.
         for so in (
-            SignoffRequest.objects.for_user(user)
+            own_records(SignoffRequest.objects.for_user(user), user)
             .filter(
                 lot_id__in=roles.owned_lot_ids,
                 state="pending",
