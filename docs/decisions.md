@@ -318,3 +318,7 @@ The retention rule (two years after someone's last ownership or contact role end
 ## D29. POC files stay on the local store (2026-11-26)
 
 The owner decided to keep the POC's uploaded files on the local SeaweedFS store for now rather than move them to Cloudflare R2. Nothing changes on the VM. `infra/poc/move-files-to-r2.sh` stays available for a later move; production still plans R2 (CLAUDE.md stack).
+
+## D30. Prepaid owners: future months show unpaid, prepayment drawn down monthly (2026-11-26)
+
+The owner ruled that a prepaid owner's future months are listed as not yet paid, and the prepayment is drawn down as each month's dues post (the existing drawdown). The regression finding BUG-005 is fixed only for its other half: a month whose dues were posted early is not also counted as an upcoming charge.
