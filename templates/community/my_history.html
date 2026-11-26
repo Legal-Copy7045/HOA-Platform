@@ -9,10 +9,10 @@
         <div class="muted small">{% if p.lot %}<span class="lot-ref">{{ p.lot.lot_ref }}</span> · {% endif %}{{ p.start|date:"M j, Y" }} – {{ p.end|date:"M j, Y" }}</div></div>
         <div class="balance"><div class="small muted">Balance when you sold</div><div class="amount-big">{{ p.sold_balance|cents }}</div>
           {% if p.credit_owed %}<div class="small" data-testid="credit-owed">Credit owed to you: <strong>{{ p.credit_owed|cents }}</strong>. The board refunds it; ask them if you have not heard.</div>{% endif %}</div></div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="stack-sm">
         <thead><tr><th>Date</th><th>Description</th><th class="num">Charges</th><th class="num">Payments</th><th class="num">Balance</th></tr></thead>
         <tbody>
-        {% for r in p.rows %}<tr><td class="nowrap">{% if r.posted_on %}{{ r.posted_on|date:"M j, Y" }}{% endif %}</td><td>{{ r.description }}</td><td class="num">{% if r.charge_cents %}{{ r.charge_cents|cents }}{% endif %}</td><td class="num">{% if r.payment_cents %}{{ r.payment_cents|cents }}{% endif %}</td><td class="num">{{ r.balance_cents|cents }}</td></tr>{% empty %}<tr><td colspan="5" class="muted">No activity in this period.</td></tr>{% endfor %}
+        {% for r in p.rows %}<tr><td class="nowrap muted-sm">{% if r.posted_on %}{{ r.posted_on|date:"M j, Y" }}{% endif %}</td><td class="cell-title">{{ r.description }}</td><td class="num" data-label="Charge">{% if r.charge_cents %}{{ r.charge_cents|cents }}{% endif %}</td><td class="num" data-label="Payment">{% if r.payment_cents %}{{ r.payment_cents|cents }}{% endif %}</td><td class="num" data-label="Balance">{{ r.balance_cents|cents }}</td></tr>{% empty %}<tr><td colspan="5" class="muted">No activity in this period.</td></tr>{% endfor %}
         </tbody>
       </table></div>
       {% if p.account %}<div class="form-actions"><a class="btn secondary" href="{% url 'my_history_statement_pdf' p.index %}">{% icon "download" %} Download statement (PDF)</a></div>{% endif %}

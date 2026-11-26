@@ -162,10 +162,10 @@ def test_feature_switches_still_gate_hubs_and_voting(client, w):
     client.force_login(w["owner"])
     features.set_feature("votes", False, actor=w["board"])
     page = client.get(reverse("voting")).content.decode()
-    assert 'href="?type=elections"' in page and 'href="?type=votes"' not in page
+    assert 'href="?type=elections#results"' in page and 'href="?type=votes' not in page
     features.set_feature("elections", False, actor=w["board"])
     page = client.get(reverse("voting")).content.decode()
-    assert "surveys (to hear your views" in page and 'href="?type=elections"' not in page
+    assert "surveys (to hear your views" in page and 'href="?type=elections' not in page
     features.set_feature("surveys", False, actor=w["board"])
     assert client.get(reverse("voting")).status_code == 404
     assert "Voting" not in labels(client.get(reverse("home")))

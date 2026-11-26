@@ -6,13 +6,13 @@
   <div class="page-head"><div><h1>Community settings</h1><p class="subtitle">Numbers here come from the Declaration, the Bylaws, the Rules and Regulations or a recorded board decision. Each needs a citation. Money is entered in dollars (e.g. 6.00).</p></div></div>
   <div class="alert info">{% icon "book" %}<span>Each setting shows where it usually comes from, what Pennsylvania law says, and an example. Where the Act supplies a value when your documents are silent, it is used as a <strong>PA law fallback</strong> until you record your own. {{ pa_disclaimer }}</span></div>
 
-  {% if attention %}<div class="alert warning" data-testid="attention-summary">{% icon "alert" %}<span><strong>{{ attention|length }} setting{{ attention|pluralize }} need{{ attention|pluralize:"s," }} attention</strong> (listed first below):
-    {% for r in attention %}<a href="#rule-{{ r.spec.key }}">{{ r.label }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
+  {% if attention %}<div class="alert warning" data-testid="attention-summary">{% icon "alert" %}<div><strong>{{ attention|length }} setting{{ attention|pluralize }} need{{ attention|pluralize:"s," }} attention</strong> (their sections are open and listed first below).
+    <details><summary class="small">Show the list</summary><ul class="links">{% for r in attention %}<li><a href="#rule-{{ r.spec.key }}">{{ r.label }}</a></li>{% endfor %}</ul></details></div></div>{% endif %}
 
   {# A sticky index of the sections; each section folds away, and only those
      needing attention start open (WT-014). A link to a rule opens its section (app.js). #}
   <nav class="page-index" aria-label="Sections of this page" data-testid="settings-index">
-    <a href="#sec-association">Association</a>{% for group, rules in groups.items %}<a href="#sec-{{ forloop.counter }}">{{ group }}{% for r in rules %}{% if r.needs_attention and forloop.first %} <span class="badge tone-warning" title="Needs attention">!</span>{% endif %}{% endfor %}</a>{% endfor %}<a href="#sec-areas">Common areas</a>
+    <a href="#sec-association">Association</a>{% for group, rules in groups.items %}<a href="#sec-{{ forloop.counter }}">{{ group }}{% if group_attention|get_item:group %} <span class="badge tone-warning" title="Needs attention">!</span>{% endif %}</a>{% endfor %}<a href="#sec-areas">Common areas</a>
   </nav>
 
   <details class="card collapsible" id="sec-association"><summary><h2>Association</h2></summary>
@@ -21,7 +21,8 @@
   </details>
 
   {% for group, rules in groups.items %}
-    <details class="card rules collapsible" id="sec-{{ forloop.counter }}"{% for r in rules %}{% if r.needs_attention and forloop.first %} open{% endif %}{% endfor %}><summary><h2>{{ group }}</h2><span class="small muted">{{ rules|length }} setting{{ rules|pluralize }}</span></summary>
+    {% with need=group_attention|get_item:group %}
+    <details class="card rules collapsible" id="sec-{{ forloop.counter }}"{% if need %} open{% endif %}><summary><h2>{{ group }}</h2>{% if need %}<span class="status tone-warning">{{ need }} need{{ need|pluralize:"s," }} attention</span>{% endif %}<span class="small muted">{{ rules|length }} setting{{ rules|pluralize }}</span></summary>
       {% with note=group_notes|get_item:group %}{% if note %}<p class="small muted pa-note">{% icon "book" %} {{ note }}</p>{% endif %}{% endwith %}
       <ul class="list">{% for r in rules %}<li class="rule{% if r.needs_attention %} attention{% endif %}" id="rule-{{ r.spec.key }}">
         <div class="grow rule-text"><div class="title">{{ r.label }}{% if r.needs_attention %} <span class="status tone-warning">needs attention</span>{% elif r.origin == "pa_law" %} <span class="status tone-info">PA law fallback</span>{% endif %}</div>{% if r.help %}<div class="small muted">{{ r.help }}</div>{% endif %}
@@ -42,6 +43,7 @@
         {% else %}<div class="rule-value"><strong>{{ r.shown|default:"-" }}</strong><div class="small muted">{% if r.origin == "pa_law" %}{{ r.guide.fallback_citation }}{% else %}{{ r.row.citation|default:"No citation" }}{% endif %}</div></div>{% endif %}
       </li>{% endfor %}</ul>
     </details>
+    {% endwith %}
   {% endfor %}
 
   <details class="card collapsible" id="sec-areas"><summary><h2>Common areas</h2></summary>

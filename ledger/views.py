@@ -179,9 +179,8 @@ def my_account(request):
     online = online_payments_enabled(request)
     payable = payable_lot_ids(request.user) if online else frozenset()
     accounts = []
-    for lot in Lot.objects.for_user(request.user).filter(
-        pk__in=policy.roles_for(request.user).account_lot_ids
-    ):
+    roles = policy.roles_for(request.user)
+    for lot in Lot.objects.for_user(request.user).filter(pk__in=roles.account_lot_ids):
         since = _ownership_start(request.user, lot.pk)
         statement = services.owner_statement(lot.pk, since)
         accounts.append(
@@ -199,6 +198,9 @@ def my_account(request):
                 "upcoming": services.upcoming_charges(statement.balance, lot_id=lot.pk),
                 "pay_options": payment_options(statement.balance) if online else [],
                 "can_pay_online": lot.pk in payable,
+                # Resale certificates are asked for by an owner on the deed
+                # (WT-001): contacts see a line saying so, not a link to a 403.
+                "is_owner": lot.pk in roles.owned_lot_ids,
                 "online_receipts": _online_receipts(request.user, lot.pk, since),
                 # Automatic payments (D46): payers only, feature on.
                 "autopay": autopay_for_payer(request.user, lot) if online else None,
@@ -212,6 +214,8 @@ def my_account(request):
         {
             "accounts": accounts,
             "online": online,
+            "can_request_resale": policy.can(request.user, "resale.request")
+            and any(a["is_owner"] for a in accounts),
             "test_mode": online and not payments_config().livemode,
             "disclosure": disclosure() if online else "",
             "payable_to": profile.legal_name,
@@ -289,14 +293,42 @@ def ledger_home(request):
     today = timezone.localdate()
     next_month = (today.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
     dues = rule("dues.monthly_cents") or 0
+    with_balance = request.GET.get("balance") == "1"
+    # With automatic posting on, the card shows its status instead of the
+    # picker, and the button only when this month's run looks missed (D48).
+    auto_post = bool(rule("dues.auto_post"))
+    auto = services.auto_post_status() if auto_post else None
+    if auto is not None:
+        from ledger import autopost
+
+        missed = autopost.missed()
+        auto["missed"] = missed is not None
+        auto["reason_text"] = missed["reason_text"] if missed else ""
+    # Months in words, not the browser's month grid (D48): the next month not
+    # yet posted is chosen, starting from next month.
+    month_options = services.assessment_months(today)
+    default_period = f"{next_month:%Y-%m}"
+    open_months = [m["value"] for m in month_options if not m["posted"]]
+    if default_period not in open_months:
+        later = [v for v in open_months if v > default_period]
+        default_period = later[0] if later else (open_months[-1] if open_months else "")
     return render(
         request,
         "ledger/home.html",
         {
-            "rows": [(lot, bal.get(lot.pk, 0)) for lot in lots],
+            # "With a balance" filter (WT-029): homes owing or in credit.
+            "rows": [
+                (lot, bal.get(lot.pk, 0)) for lot in lots if not with_balance or bal.get(lot.pk, 0)
+            ],
+            "with_balance": with_balance,
+            "home_count": len(lots),
             "total_owed": sum(v for v in bal.values() if v > 0),
             "total_credit": -sum(v for v in bal.values() if v < 0),
-            "default_period": f"{next_month:%Y-%m}",
+            "default_period": default_period,
+            "month_options": month_options,
+            "auto_post": auto_post,
+            "auto": auto,
+            "can_change_settings": policy.can(request.user, "community.manage_rules"),
             "dues_cents": dues,
             "dues_lots": len(lots),
             "dues_total": dues * len(lots),
@@ -1098,6 +1130,7 @@ def accounting(request):
         return _accounting_setup_page(request, AccountingSetupForm(initial=_setup_initial()))
     today = timezone.localdate()
     year = int(request.GET.get("year") or today.year - (1 if today.month < 4 else 0))
+    undeposited = list(acc.undeposited_payments()) if can_manage else []
     return render(
         request,
         "ledger/accounting.html",
@@ -1105,7 +1138,8 @@ def accounting(request):
             "can_manage": can_manage,
             "bank_feed_on": features.enabled("bank_feeds", request)
             and policy.can(request.user, "bank_feed.view"),
-            "undeposited": acc.undeposited_payments() if can_manage else [],
+            "undeposited": undeposited,
+            "undeposited_total": abs(sum(e.amount_cents for e in undeposited)),
             "batches": DepositBatch.objects.all()[:20],
             "reconciliations": BankReconciliation.objects.all()[:12],
             "setup_summary": acc.setup_summary(AccountingSetup.get()),

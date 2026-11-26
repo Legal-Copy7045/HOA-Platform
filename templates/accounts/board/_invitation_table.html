@@ -1,7 +1,7 @@
 {% load portal %}{# Every invitation with re-send and revoke (each button checks its own permission). Expects: invitations, can_resend, can_revoke. #}
-  <div class="table-card" id="every-invitation"><div class="table-wrap"><table>
+  <div class="table-card" id="every-invitation"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Sent to</th><th>Status</th><th>Created</th><th><span class="sr-only">Actions</span></th></tr></thead>
-    <tbody>{% for inv in invitations %}<tr><td>{{ inv.email }}</td><td>{% status inv.status %}</td><td class="nowrap">{{ inv.created_at|short_date }}</td>
+    <tbody>{% for inv in invitations %}<tr><td class="cell-title">{{ inv.email }}</td><td data-label="Status">{% status inv.status %}</td><td class="nowrap" data-label="Created">{{ inv.created_at|short_date }}</td>
       <td class="actions">{% if inv.status == "pending" or inv.status == "queued" or inv.status == "expired" %}{% if not inv.accepted_at and not inv.revoked_at %}
         {% if can_resend %}<form method="post" action="{% url 'invitation_action' inv.pk 'resend' %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Re-send</button></form>{% endif %}
         {% if can_revoke %}<form method="post" action="{% url 'invitation_action' inv.pk 'revoke' %}" class="inline" data-confirm="Revoke this invitation? The link stops working; the person can be invited again later.">{% csrf_token %}<button type="submit" class="danger small">Revoke</button></form>{% endif %}{% endif %}{% endif %}</td></tr>

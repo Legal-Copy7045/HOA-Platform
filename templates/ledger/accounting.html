@@ -17,8 +17,12 @@
         <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by address and lot number only, never by name. Accounts come from the Setup tab.</p></section>
       {% if can_manage %}<section class="card"><h2>Payments to deposit</h2>
         {% if undeposited %}<form method="post">{% csrf_token %}<input type="hidden" name="section" value="deposit">
-          <ul class="list">{% for e in undeposited %}<li><label class="grow"><input type="checkbox" name="entries" value="{{ e.pk }}" checked> {{ e.posted_on|date:"M j" }} · {{ e.lot.label }}{% if e.reference %} · {{ e.reference }}{% endif %}</label><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
+          {# The summary and the action first, the list to review after (WT-033). #}
+          <p data-testid="deposit-summary"><strong>{{ undeposited|length }} payment{{ undeposited|length|pluralize }}, {{ undeposited_total|cents }} in all.</strong> <span class="small muted">All are ticked; untick any that are not in this deposit.</span></p>
           <div class="inline-form"><div><label for="dd">Deposited on</label><input id="dd" type="date" name="deposited_on" value="{{ today|date:'Y-m-d' }}" required></div><div><label for="br">Bank reference</label><input id="br" name="bank_reference" maxlength="40" placeholder="Deposit slip number"></div><button type="submit">Record deposit</button></div>
+          <details><summary>Review or untick payments ({{ undeposited|length }})</summary>
+          <ul class="list">{% for e in undeposited %}<li><label class="grow"><input type="checkbox" name="entries" value="{{ e.pk }}" checked> {{ e.posted_on|date:"M j" }} · {{ e.lot.label }}{% if e.reference %} · {{ e.reference }}{% endif %}</label><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
+          </details>
         </form>{% else %}<p class="muted small">Every recorded payment is in a deposit.</p>{% endif %}</section>{% endif %}
       <section class="card"><h2>Deposits</h2>
         {% if batches %}<ul class="list">{% for b in batches %}<li><span class="grow">{{ b.deposited_on|date:"M j, Y" }}{% if b.bank_reference %} · {{ b.bank_reference }}{% endif %}{% if b.voids_id %} <span class="small muted">(voids #{{ b.voids_id }})</span>{% endif %}</span><span>{{ b.total_cents|cents }}</span>
@@ -31,7 +35,7 @@
         {% else %}<p class="muted small">None yet.</p>{% endif %}</section>
       <section class="card"><h2>1099 worksheet</h2>
         <form method="get" class="inline-form"><div><label for="yr">Calendar year</label><input id="yr" name="year" value="{{ year }}" inputmode="numeric" size="6"></div><button type="submit" class="secondary">Show</button><a class="btn secondary" href="{% url 'accounting_1099' year %}">{% icon "download" %} CSV</a></form>
-        {% if vendors_1099 %}<div class="table-wrap"><table><thead><tr><th>Vendor</th><th class="num">Paid</th><th>Over threshold</th><th>W-9</th></tr></thead><tbody>{% for r in vendors_1099 %}<tr><td>{{ r.vendor.name }}</td><td class="num">{{ r.total_cents|cents }}</td><td>{% if r.over %}<strong>Yes</strong>{% endif %}</td><td>{% if r.w9 %}On file{% else %}<span class="status tone-warning">Missing</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+        {% if vendors_1099 %}<div class="table-wrap"><table class="stack-sm"><thead><tr><th>Vendor</th><th class="num">Paid</th><th>Over threshold</th><th>W-9</th></tr></thead><tbody>{% for r in vendors_1099 %}<tr><td class="cell-title">{{ r.vendor.name }}</td><td class="num" data-label="Paid">{{ r.total_cents|cents }}</td><td>{% if r.over %}<strong>Over threshold</strong>{% endif %}</td><td data-label="W-9">{% if r.w9 %}On file{% else %}<span class="status tone-warning">Missing</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
         {% else %}<p class="muted small">No vendor payments that year.</p>{% endif %}
         <p class="small muted">A worksheet for the treasurer: corporations are generally exempt, and the IRS threshold is a setting under Community settings.</p></section>
     </div>

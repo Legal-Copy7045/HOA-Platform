@@ -107,7 +107,7 @@ def test_sign_ups_tab_has_counts_and_bulk_buttons_for_the_board(client, w):
     client.force_login(w["board"])
     page = _signups(client).content.decode()
     assert "<h1>Homes and owners</h1>" in page
-    assert 'href="/lots/?view=signups" aria-current="page"' in page
+    assert 'href="/lots/?view=signups#results" aria-current="page"' in page
     assert "With Email" in page and "Invite everyone not yet invited" in page
     assert "Every invitation" in page and "Official notices" in page
     # The bulk buttons and the letters download still go to the invitations URL.

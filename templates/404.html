@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load portal %}{# Missing and out-of-scope pages look the same (no hint that something exists, WT-048). #}
+{% block title %}Page not found · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <section class="error-page" data-testid="error-404">
+    <h1>Page not found</h1>
+    <p>This page doesn't exist, or it isn't one you can see. Check the link, or start again from the dashboard.</p>
+    <p class="form-actions"><a class="btn" href="{% url 'home' %}">{% icon "home" %} Go to the dashboard</a></p>
+  </section>
+{% endblock %}

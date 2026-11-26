@@ -42,6 +42,15 @@ def signups_context(request) -> dict:
     for r in rows:
         counts[r["status"]] += 1
         r["label"] = services.ONBOARDING_LABELS[r["status"]]
+    # Status pills (WT-050): see only the people who still need something.
+    show = request.GET.get("status", "")
+    groups = {
+        "needs": {"not_invited", "expired", "no_email"},
+        "invited": {"invited"},
+        "signed_up": {"signed_up"},
+    }
+    if show not in groups:
+        show = ""
     # D44: how homes get official notices (counts only) and the wording.
     from community import notices
     from community.services import notice_choice_counts
@@ -51,7 +60,9 @@ def signups_context(request) -> dict:
         "can_send": True,
         "can_resend": policy.can(request.user, "invite.resend"),
         "can_revoke": policy.can(request.user, "invite.revoke"),
-        "rows": rows,
+        "rows": [r for r in rows if r["status"] in groups[show]] if show else rows,
+        "status_filter": show,
+        "row_total": len(rows),
         "counts": counts,
         "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
         "remind_count": len(services.reminder_due(rows=rows)),

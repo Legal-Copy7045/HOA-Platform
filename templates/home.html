@@ -44,9 +44,11 @@
   </section>
   {% else %}
   <section class="card" id="todos">
-    <div class="card-head"><h2>Needs your attention</h2>{% if dash.todos_more %}<a class="small" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}</div>
+    <div class="card-head"><h2>Needs your attention</h2>{% if dash.todos_more %}<a class="small desktop-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}</div>
     {% if dash.todos %}
       <ul class="list">{% for t in dash.todos %}{% include "partials/todo.html" %}{% endfor %}</ul>
+      {# Phones show the first four (WT-049); the rest are one tap away. #}
+      {% if dash.todos|length > 4 or dash.todos_more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}
     {% else %}
       {% include "partials/empty.html" with icon="check-circle" title="You're all caught up" text="Nothing needs you right now." %}
     {% endif %}
@@ -84,7 +86,7 @@
     </div>
   {% endif %}
 
-  <div class="split">
+  <div class="split dash">
     <div>
       {% if user|can:"announcement.view" %}<section class="card">
         <div class="card-head"><h2>Latest news</h2><a href="{% url 'announcements' %}" class="small">All announcements</a></div>

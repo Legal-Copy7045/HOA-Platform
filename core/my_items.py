@@ -523,6 +523,25 @@ def items_for(user) -> list[Item]:
                     nav="ledger_home",
                 )
             )
+    # Automatic monthly posting missed a month (D48): stays until it is posted.
+    if can(user, "ledger.manage"):
+        from ledger import autopost
+
+        missed = autopost.missed()
+        if missed:
+            out.append(
+                Item(
+                    "Finance",
+                    f"{missed['title']}: post it now",
+                    f"{missed['reason_text']}. Homes already charged are skipped.",
+                    reverse("ledger_home") + autopost.POST_ANCHOR,
+                    "danger",
+                    missed["month"],
+                    nav="ledger_home",
+                    action_label="Post it now",
+                    action_url=reverse("ledger_home") + autopost.POST_ANCHOR,
+                )
+            )
     if can(user, "community.manage_rules"):
         from community.rules import rules_needing_attention
 

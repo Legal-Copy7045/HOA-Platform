@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -222,6 +222,70 @@ def upcoming_charges(
 
 def _period(year: int, month: int) -> str:
     return f"{year:04d}-{month:02d}"
+
+
+def assessment_months(today: datetime.date, *, back: int = 3, ahead: int = 3) -> list[dict]:
+    """Months to offer when posting the monthly charge (D48, replaces the
+    browser's month grid): ``back`` months before this one to ``ahead`` after,
+    each with how many homes already have it posted. Posting again stays safe:
+    homes already charged for a month are skipped."""
+    first = today.replace(day=1)
+    months = []
+    for offset in range(-back, ahead + 1):
+        index = first.year * 12 + first.month - 1 + offset
+        months.append(datetime.date(index // 12, index % 12 + 1, 1))
+    periods = [_period(m.year, m.month) for m in months]
+    with system_access("count posted assessments"):
+        lot_count = Lot.objects.count()
+        posted = {
+            row["period"]: row["n"]
+            for row in LedgerEntry.objects.filter(kind=EntryKind.ASSESSMENT, period__in=periods)
+            .order_by()
+            .values("period")
+            .annotate(n=Count("lot_id", distinct=True))
+        }
+    out = []
+    for month, period in zip(months, periods, strict=True):
+        n = posted.get(period, 0)
+        out.append(
+            {
+                "value": period,
+                "label": f"{month:%B %Y}",
+                "posted": bool(lot_count) and n >= lot_count,
+                "partly": 0 < n < lot_count,
+            }
+        )
+    return out
+
+
+# The automatic posting (ledger.tasks.monthly_assessments) runs early on the
+# 1st; after this hour, site time, a month still not posted is flagged.
+AUTO_POST_DEADLINE_HOUR = 6
+
+
+def auto_post_status(now: datetime.datetime | None = None) -> dict:
+    """For the Owner accounts card when ``dues.auto_post`` is on (D48): this
+    month's posting (how many homes, when), the next run, and whether the
+    run looks missed (past the 1st's run and this month not on every home)."""
+    now = timezone.localtime(now or timezone.now())
+    first = now.date().replace(day=1)
+    period = _period(first.year, first.month)
+    with system_access("auto-post status"):
+        lot_count = Lot.objects.count()
+        rows = LedgerEntry.objects.filter(kind=EntryKind.ASSESSMENT, period=period).order_by()
+        homes = rows.values("lot_id").distinct().count()
+        first_created = rows.order_by("created_at").values_list("created_at", flat=True).first()
+    next_first = (first + datetime.timedelta(days=32)).replace(day=1)
+    past_run = now.date() > first or now.hour >= AUTO_POST_DEADLINE_HOUR
+    return {
+        "month": first,
+        "period": period,
+        "homes": homes,
+        "posted_on": timezone.localdate(first_created) if first_created else None,
+        "next": next_first,
+        "complete": bool(lot_count) and homes >= lot_count,
+        "missed": past_run and bool(lot_count) and homes < lot_count,
+    }
 
 
 @internal("ledger service")

@@ -2,27 +2,29 @@
 {% load portal %}
 {% block title %}Homes and owners · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  {# The whole page is the swap region: the views change the header's subtitle and buttons too (D48). #}
+  <div data-swap-region id="results" class="swap-anchor">
   <div class="page-head"><div><h1>Homes and owners</h1>
     <p class="subtitle">{% if roster_view %}Every {% if include_dormant %}account, current and previous{% else %}current account{% endif %}, with the people on it and the contact details on record. Exports are logged.{% elif signups_view %}Who has signed up to the portal. Invitations only ever go to the email on each person's record and only link a login to an existing person. To invite one person, open their record under <a href="{% url 'people' %}">People</a>.{% else %}{{ rows|length }} homes. Ownership drives who can sign in for each home.{% endif %}</p></div>
     {% if roster_view %}<div class="actions">
       {% if include_dormant %}<a class="btn secondary" href="?view=roster">Current accounts only</a>{% else %}<a class="btn secondary" href="?view=roster&amp;previous=1">Include previous accounts</a>{% endif %}
       <a class="btn secondary" href="?view=roster&amp;export=csv{% if include_dormant %}&amp;previous=1{% endif %}">{% icon "download" %} Export CSV</a></div>
     {% elif signups_view %}<div class="actions"><a class="btn secondary" href="{% url 'invitations' %}?letters=1">{% icon "download" %} Letters for owners without email ({{ counts.no_email }})</a></div>{% endif %}</div>
-  {% if can_roster or can_signups %}<nav class="subnav" aria-label="Views">
-    <a href="{% url 'lot_list' %}"{% if not roster_view and not signups_view %} aria-current="page"{% endif %}>Homes</a>
-    {% if can_roster %}<a href="{% url 'lot_list' %}?view=roster"{% if roster_view %} aria-current="page"{% endif %}>Accounts, contacts and balances</a>{% endif %}
-    {% if can_signups %}<a href="{% url 'lot_list' %}?view=signups"{% if signups_view %} aria-current="page"{% endif %}>Sign-ups</a>{% endif %}
+  {% if can_roster or can_signups %}<nav class="subnav" aria-label="Views" data-swap>
+    <a href="{% url 'lot_list' %}#results"{% if not roster_view and not signups_view %} aria-current="page"{% endif %}>Homes</a>
+    {% if can_roster %}<a href="{% url 'lot_list' %}?view=roster#results"{% if roster_view %} aria-current="page"{% endif %}>Accounts, contacts and balances</a>{% endif %}
+    {% if can_signups %}<a href="{% url 'lot_list' %}?view=signups#results"{% if signups_view %} aria-current="page"{% endif %}>Sign-ups</a>{% endif %}
   </nav>{% endif %}
   {% if roster_view %}
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Account</th><th>Home</th><th>Owners</th><th>Other people</th><th>Contact</th><th class="num">Balance</th></tr></thead>
     <tbody>{% for r in roster %}<tr{% if not r.account.is_active %} class="muted"{% endif %}>
-      <td class="nowrap">{{ r.account.number }}{% if not r.account.is_active %} <span class="badge">{{ r.account.status_label }}</span>{% endif %}</td>
-      <td><a href="{% url 'lot_detail' r.lot.pk %}">{{ r.lot.label }}</a></td>
+      <td class="nowrap muted-sm" data-label="Account">{{ r.account.number }}{% if not r.account.is_active %} <span class="badge">{{ r.account.status_label }}</span>{% endif %}</td>
+      <td class="cell-title"><a href="{% url 'lot_detail' r.lot.pk %}">{{ r.lot.label }}</a></td>
       <td>{% for p in r.owners %}{{ p.display_name }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
       <td class="small">{% for c in r.contacts %}{{ c.person.display_name }} <span class="muted">({{ c.get_kind_display }})</span>{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
       <td class="small">{% for e in r.emails %}{{ e }}<br>{% endfor %}{% for p in r.phones %}{{ p }}<br>{% endfor %}</td>
-      <td class="num">{% if r.balance_cents is None %}-{% else %}{{ r.balance_cents|cents }}{% endif %}</td></tr>
+      <td class="num" data-label="Balance">{% if r.balance_cents is None %}-{% else %}{{ r.balance_cents|cents }}{% endif %}</td></tr>
     {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="users" title="No accounts yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% elif signups_view %}
@@ -44,21 +46,30 @@
     <form method="post" action="{% url 'invitations' %}" data-confirm="Send an invitation to every owner with an email who hasn't been invited (or whose invitation expired)?">{% csrf_token %}<input type="hidden" name="action" value="invite_all"><button type="submit">{% icon "mail" %} Invite everyone not yet invited ({{ counts.not_invited|add:counts.expired }})</button></form>
     <form method="post" action="{% url 'invitations' %}" data-confirm="Email a new invitation link to {{ remind_count }} {% if remind_count == 1 %}person who was{% else %}people who were{% endif %} invited more than 3 days ago and {% if remind_count == 1 %}has{% else %}have{% endif %} not signed up yet? Their old links stop working.">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary"{% if not remind_count %} disabled{% endif %}>Remind those who haven't signed up ({{ remind_count }})</button></form>{% if counts.invited and counts.invited != remind_count %}<span class="small muted">Invitations sent in the last 3 days are not reminded yet.</span>{% endif %}
   </div>
-  <h2>Sign-ups by home</h2>
-  <div class="table-card"><div class="table-wrap"><table>
+  <h2 id="signups-by-home">Sign-ups by home</h2>
+  <nav class="filters" aria-label="Sign-up status" data-swap>
+    <a href="?view=signups#results"{% if not status_filter %} aria-current="true"{% endif %}>Everyone ({{ row_total }})</a>
+    <a href="?view=signups&amp;status=needs#results"{% if status_filter == "needs" %} aria-current="true"{% endif %}>Not invited ({{ counts.not_invited|add:counts.expired|add:counts.no_email }})</a>
+    <a href="?view=signups&amp;status=invited#results"{% if status_filter == "invited" %} aria-current="true"{% endif %}>Waiting ({{ counts.invited }})</a>
+    <a href="?view=signups&amp;status=signed_up#results"{% if status_filter == "signed_up" %} aria-current="true"{% endif %}>Signed up ({{ counts.signed_up }})</a>
+  </nav>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Home</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>
-    <tbody>{% for r in rows %}<tr><td><a href="{% url 'lot_detail' r.lot.pk %}">{{ r.lot.label }}</a></td><td><a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
-      <td><span class="badge {% if r.status == 'signed_up' %}tone-success{% elif r.status == 'invited' %}tone-info{% else %}tone-warning{% endif %}">{{ r.label }}</span></td>
-      <td class="small muted">{% if r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% endif %}</td></tr>
-    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="users" title="No owners recorded yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>
+    <tbody>{% for r in rows %}<tr class="row-link"><td class="muted-sm" data-label="Home"><a href="{% url 'lot_detail' r.lot.pk %}">{{ r.lot.label }}</a></td><td class="cell-title"><a class="row-main" href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
+      <td data-label="Status"><span class="badge {% if r.status == 'signed_up' %}tone-success{% elif r.status == 'invited' %}tone-info{% else %}tone-warning{% endif %}">{{ r.label }}</span></td>
+      <td class="small muted" data-label="Invitation">{% if r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4">{% if status_filter %}{% include "partials/empty.html" with icon="users" title="Nobody here" %}{% else %}{% include "partials/empty.html" with icon="users" title="No owners recorded yet" text="Load the register first (import_register)." %}{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   <h2>Every invitation</h2>
   {% include "accounts/board/_invitation_table.html" %}
   {% else %}
-  <div class="table-card"><div class="table-wrap"><table>
+  <form method="get" class="inline-form list-search" role="search" action="#results"><div class="grow"><label for="lot-q">Find a home</label><input id="lot-q" type="search" name="q" value="{{ q }}" maxlength="100" placeholder="Number, address or owner" autocomplete="off"></div><button type="submit" class="secondary">Find</button>{% if q %}<a class="btn secondary" href="{% url 'lot_list' %}#results">Show all {{ total }}</a>{% endif %}</form>
+  {% if q %}<p class="small muted" role="status">{{ rows|length }} of {{ total }} homes match “{{ q }}”.</p>{% endif %}
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Address</th><th>Current owners</th></tr></thead>
-    <tbody>{% for lot, owners in rows %}<tr><td><a href="{% url 'lot_detail' lot.pk %}">{{ lot.label }}</a></td><td>{% for p in owners %}{{ p.display_name }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="status tone-warning">None recorded</span>{% endfor %}</td></tr>
-    {% empty %}<tr><td colspan="2">{% include "partials/empty.html" with icon="map" title="No homes yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>
+    <tbody>{% for lot, owners in rows %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'lot_detail' lot.pk %}">{{ lot.label }}</a> <span class="lot-ref small">{{ lot.lot_ref }}</span></td><td>{% for p in owners %}{{ p.display_name }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="status tone-warning">None recorded</span>{% endfor %}</td></tr>
+    {% empty %}<tr><td colspan="2">{% if q %}{% include "partials/empty.html" with icon="search" title="No home matches" %}{% else %}{% include "partials/empty.html" with icon="map" title="No homes yet" text="Load the register first (import_register)." %}{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% endif %}
+  </div>
 {% endblock %}

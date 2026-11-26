@@ -870,3 +870,26 @@ class PaymentApplication(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"application #{self.pk}"
+
+
+class PostingFailure(models.TextChoices):
+    NOT_RUN = "not_run", "The automatic posting did not run"
+    NO_AMOUNT = "no_amount", "No monthly amount is set in Community settings"
+    ERROR = "error", "The automatic posting stopped with an error"
+
+
+class AssessmentPostingCheck(models.Model):
+    """One row per month the automatic posting (rule ``dues.auto_post``) was
+    found missing or failed (D48): why, and when the board was emailed, so
+    the email goes once a month. Operational state, no personal data; the
+    alert clears itself once the month is posted."""
+
+    period = models.CharField(max_length=7, primary_key=True, help_text="YYYY-MM")
+    reason = models.CharField(
+        max_length=16, choices=PostingFailure.choices, default=PostingFailure.NOT_RUN
+    )
+    failed_at = models.DateTimeField(null=True, blank=True)
+    emailed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return self.period
