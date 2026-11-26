@@ -132,3 +132,32 @@ def test_applicant_panel_is_simple_with_more_options(client, w):
     assert "<summary>More options</summary>" in page
     assert page.index("Print a paper form") < page.index("<summary>More options</summary>")
     assert page.index("<summary>More options</summary>") < page.index("Ask another homeowner")
+
+
+# --- Owner ARC page tabs "Mine" / "Asked of me" (streamlining) ---------------------------------
+
+
+def test_owner_arc_page_has_mine_and_asked_of_me_tabs(client, w):
+    client.force_login(w["neighbor"])
+    mine = client.get(reverse("arc_list") + "?mine=1").content.decode()
+    assert 'class="subnav"' in mine
+    assert f'href="{reverse("arc_list")}?mine=1" aria-current="page">Mine</a>' in mine
+    assert f'href="{reverse("signoffs_mine")}">Asked of me' in mine
+    assert '1<span class="sr-only"> waiting for your answer</span>' in mine
+    asked = client.get(reverse("signoffs_mine")).content.decode()
+    assert f'href="{reverse("signoffs_mine")}" aria-current="page">Asked of me' in asked
+    assert "Rear fence" in asked
+
+
+def test_asked_of_me_shows_only_my_lots(client, w):
+    client.force_login(w["outsider"])
+    asked = client.get(reverse("signoffs_mine")).content.decode()
+    assert "Rear fence" not in asked and "waiting for your answer" not in asked
+    mine = client.get(reverse("arc_list") + "?mine=1").content.decode()
+    assert "waiting for your answer" not in mine
+
+
+def test_board_review_list_has_no_owner_tabs(client, w):
+    client.force_login(w["board"])
+    page = client.get(reverse("arc_list")).content.decode()
+    assert "Asked of me" not in page

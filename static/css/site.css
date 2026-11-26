@@ -242,6 +242,7 @@ details:not(.panel) > summary { cursor: pointer; color: var(--green-700); font-w
 .subnav a { display: inline-flex; align-items: center; min-height: 44px; padding: .5rem .8rem; text-decoration: none; color: var(--muted); font-weight: 600; font-size: .92rem; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .subnav a:hover { color: var(--ink); }
 .subnav a[aria-current="page"] { color: var(--green-700); border-bottom-color: var(--green-700); }
+.subnav a .badge { margin-left: .4rem; }
 .choice-list { display: grid; gap: .4rem; margin: .5rem 0 1rem; }
 .choice-list label { border: 1px solid var(--line); border-radius: 8px; padding: .6rem .8rem; background: var(--surface); font-weight: 500; display: flex; gap: .6rem; align-items: center; cursor: pointer; }
 .choice-list label:hover { border-color: #b9d3c4; }

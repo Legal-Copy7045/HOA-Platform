@@ -359,3 +359,48 @@ def test_owner_file_service_refuses_other_owners_and_non_drafts(w):
     with pytest.raises(services.ArcError, match="draft"):
         services.add_owner_files(w["req"], [png()], actor=w["owner"], request=None)
     assert not attachments_for(w["req"]).exists()
+
+
+# --- Save and continue, and "Finish your request" (streamlining) -------------------------------
+
+
+def _finish_items(user):
+    from core import my_items
+
+    return [i for i in my_items.items_for(user) if i.title.startswith("Finish your request")]
+
+
+def test_save_and_continue_lands_on_the_checklist(client, w):
+    client.force_login(w["owner"])
+    page = client.get(reverse("arc_list") + "?mine=1").content.decode()
+    assert ">Save and continue</button>" in page and "Save as a draft" not in page
+    response = client.post(
+        reverse("arc_list") + "?mine=1",
+        {
+            "lot": w["lot"].pk,
+            "project_type": "Fence",
+            "title": "Side gate",
+            "description": "Wood",
+            "planned_start": timezone.localdate().isoformat(),
+        },
+    )
+    req = ArcRequest.objects.for_user(w["owner"]).get(title="Side gate")
+    assert response.status_code == 302
+    assert response.url == reverse("arc_detail", args=[req.pk]) + "#steps"
+    page = client.get(response.url).content.decode()
+    assert 'id="steps"' in page and f"Request #{req.pk} is saved as a draft" in page
+
+
+def test_drafts_show_as_finish_your_request(client, w):
+    items = _finish_items(w["owner"])
+    assert [i.title for i in items] == [f"Finish your request #{w['req'].pk}"]
+    assert items[0].url == reverse("arc_detail", args=[w["req"].pk]) + "#steps"
+    assert items[0].nav == "arc_list?mine=1"
+    client.force_login(w["owner"])
+    assert f"Finish your request #{w['req'].pk}" in client.get(reverse("home")).content.decode()
+    # Nobody else is asked to finish it, the board included.
+    for who in ("stranger", "board", "reviewer"):
+        assert not _finish_items(w[who]), who
+    # Once sent, the to-do goes away.
+    services.ARC.apply(w["req"], "submit", actor=w["owner"])
+    assert not _finish_items(w["owner"])

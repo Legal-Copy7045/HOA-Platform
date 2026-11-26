@@ -531,8 +531,25 @@ def items_for(user) -> list[Item]:
                 )
             )
     if can(user, "arc.submit") and roles.owned_lot_ids:
-        from arc.models import NEIGHBOR_VISIBLE_STATES, SignoffRequest
+        from arc.models import NEIGHBOR_VISIBLE_STATES, ArcRequest, SignoffRequest
 
+        # My own drafts, not sent yet (only an owner of the lot can send one).
+        for r in (
+            own_records(ArcRequest.objects.for_user(user), user)
+            .filter(state="draft", lot_id__in=roles.owned_lot_ids)
+            .order_by("created_at")
+        ):
+            out.append(
+                Item(
+                    "My home",
+                    f"Finish your request #{r.pk}",
+                    f"{r.title}: add plans or photos, then send it on",
+                    reverse("arc_detail", args=[r.pk]) + "#steps",
+                    "info",
+                    nav="arc_list?mine=1",
+                    icon="pencil",
+                )
+            )
         # The owner side (SEC-001), also for a board member who owns a lot.
         for so in (
             own_records(SignoffRequest.objects.for_user(user), user)
@@ -552,7 +569,8 @@ def items_for(user) -> list[Item]:
                     "a project",
                     reverse("signoff_detail", args=[so.pk]),
                     "info",
-                    nav="signoffs_mine",
+                    # Counted on the owner's ARC page ("Asked of me" tab).
+                    nav="arc_list?mine=1",
                 )
             )
     if can(user, "vote.cast"):
