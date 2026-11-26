@@ -20,6 +20,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Pay online | An owner or authorized contact pays chosen charges on Stripe's hosted page: bank account or debit card (no fee), or credit card (with the surcharge). | `pay_online`, `payments.checkout` |
 | Payment status | The page Stripe returns the payer to; the portal asks Stripe itself whether the payment went through. | `pay_return` |
 | Credit card surcharge | The fee on credit card payments only (never bank or debit), at most 3%. Not part of the account balance. | `payments.credit_card_surcharge_bp` |
+| Pay assessments automatically | Automatic payments: each monthly assessment (never late fees or other charges) is paid on its due day from a bank account (no fee) or card (credit cards with the surcharge) the payer saved on Stripe's page. Turned off any time on My account; ends when the home is sold. | `autopay`, `payments.autopay` |
 | Online payments | The board's page of Stripe payments, bank payments processing, problems to handle, payouts and the daily check against Stripe. | `online_payments`, `payments.sync` |
 | Account number | The number of one ownership period of a lot (changes when the lot is sold). Shown as plain text, not a badge. | `Account.number` |
 | My home improvement requests (ARC) | Asking the Architectural Review Committee to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |

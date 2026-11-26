@@ -18,3 +18,7 @@
 - feature: "Stripe client refuses HTTP redirects so the key is never sent to another host (SEC-007)"
   since: M5
   match: ["^unit:payments/tests/test_stripe_redirects\\.py::test_"]
+- feature: "Automatic payments (D40-autopay): setup-mode Stripe Checkout bound to AutopaySetup, payers only with a fresh password check, only the month's assessment charged on the due day once per account-month (idempotent), card surcharge only on credit cards, bank debits recorded once settled, failures emailed and on My items, one retry for soft declines then paused, credit used first, ceiling held for the board, cancel and sale detach, feature off does nothing, statement sentence"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:payments/tests/test_autopay\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[autopay", "^manual:stripe test autopay"]
