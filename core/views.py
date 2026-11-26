@@ -207,6 +207,8 @@ def _send_test_email(request):
             "The mail server refused or did not answer. Check the EMAIL_ settings in .env "
             "(see Outgoing email below), restart, and try again.",
         )
+    if request.POST.get("next") == "server_tasks":
+        return redirect("server_tasks")
     return redirect("system_status")
 
 
