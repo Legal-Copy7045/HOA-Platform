@@ -248,6 +248,17 @@ def test_signin_help_is_open_and_explains_the_two_board_member_reset(client):
     assert "_auth_user_id" not in client.session
 
 
+def test_signin_help_links_signed_in_people_to_their_recovery_page(client):
+    """Signed out, the lost-everything button starts a recovery; signed in it
+    goes straight to the recovery status page instead of through a redirect."""
+    signed_out = client.get(reverse("signin_help")).content.decode()
+    assert f'href="{reverse("recovery_request")}"' in signed_out
+    client.force_login(make_member(lots=[LotFactory()]))
+    signed_in = client.get(reverse("signin_help")).content.decode()
+    assert f'href="{reverse("account_recovery_status")}"' in signed_in
+    assert f'href="{reverse("recovery_request")}"' not in signed_in
+
+
 def test_signin_help_names_the_contact_from_community_settings(client):
     contact = _contact()
     assert contact in client.get(reverse("signin_help")).content.decode()
