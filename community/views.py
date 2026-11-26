@@ -284,13 +284,22 @@ def person_detail(request, pk):
 
     person = _scoped(Person, request, pk)
     user = request.user
+    has_mfa = bool(person.user_id and has_strong_authenticator(person.user))
+    setup_again = None
+    if person.user_id and not has_mfa and policy.can(user, "invite.send"):
+        # D59: a login that never finished setting up gets a new setup link;
+        # any other login without an authenticator needs the reset.
+        from accounts.services import setup_again_refusal
+
+        setup_again = {"refusal": setup_again_refusal(person)}
     return render(
         request,
         "community/person_detail.html",
         {
             "person": person,
             "is_me": person.user_id == user.pk,
-            "has_mfa": person.user_id and has_strong_authenticator(person.user),
+            "has_mfa": has_mfa,
+            "setup_again": setup_again,
             "ownerships": Ownership.objects.for_user(user)
             .filter(person=person)
             .select_related("lot"),

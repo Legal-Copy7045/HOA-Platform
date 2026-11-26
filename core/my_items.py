@@ -483,6 +483,23 @@ def items_for(user) -> list[Item]:
                     nav="reservations",
                 )
             )
+    if can(user, "invite.send"):
+        # D59: signed in once but never added a passkey or app, so they cannot
+        # get back in; the board sends a new setup link or starts a reset.
+        from accounts.services import STUCK_WITHOUT_AUTHENTICATOR_DAYS, stuck_logins
+
+        for person in stuck_logins():
+            out.append(
+                Item(
+                    "People",
+                    f"{person.display_name} can't sign in yet",
+                    f"No passkey or app after {STUCK_WITHOUT_AUTHENTICATOR_DAYS} days: "
+                    "send a new setup link or start a sign-in reset",
+                    reverse("person_detail", args=[person.pk]),
+                    "warning",
+                    nav="people",
+                )
+            )
     if can(user, "access_review.record"):
         from accounts.access_review import REVIEW_EVERY_DAYS, is_due
 

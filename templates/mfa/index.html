@@ -20,7 +20,7 @@
     <p class="small">An <strong>authenticator app</strong> (for example Google Authenticator, Microsoft Authenticator, or your password manager) shows a short code you type after your password.</p>
     <p class="small">An emailed sign-in code never counts: it only replaces the password, and you still need your passkey or app.</p>
   </details>
-  <form method="post" action="{% url 'account_logout' %}" class="setup-signout" data-confirm="Sign out now? You'll need a new invitation or reset from the board to finish setting up.">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>
+  <form method="post" action="{% url 'account_logout' %}" class="setup-signout" data-confirm="Sign out now? Without a passkey or app you can't sign back in: the board would need to send you a new setup link.">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>
 {% elif signin_setup.step == 3 %}
   {% include "accounts/_setup_steps.html" with steps=signin_setup.steps %}
   <h1>Last step: save your recovery codes</h1>

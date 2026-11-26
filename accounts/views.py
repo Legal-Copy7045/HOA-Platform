@@ -27,7 +27,7 @@ def invite_landing(request, token):
     if request.user.is_authenticated:
         return render(request, INVALID, {"signed_in": True}, status=400)
     invitation = services.find_open_invitation(token)
-    if invitation is None:
+    if invitation is None or not services.matches_record(invitation):
         return render(request, INVALID, status=404)
     request.session.cycle_key()
     request.session[SESSION_KEY] = invitation.pk
@@ -49,6 +49,9 @@ def invite_accept(request):
         or invitation is None
         or not token_hash
         or not hmac.compare_digest(invitation.token_hash or "", token_hash)
+        # The person's email changed since the link was sent (D59): the link
+        # is dead before a password is typed, not only when it is saved.
+        or not services.matches_record(invitation)
     ):
         request.session.pop(SESSION_KEY, None)
         request.session.pop(SESSION_TOKEN_KEY, None)
