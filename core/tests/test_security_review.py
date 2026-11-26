@@ -281,6 +281,56 @@ def test_the_last_authenticator_cannot_be_removed(db):
     assert get_adapter().can_delete_authenticator(only) is True
 
 
+def test_the_only_passkey_cannot_be_removed_through_the_page(client, db):
+    """SEC-004: allauth's passkey removal did not ask the adapter."""
+    from allauth.mfa.models import Authenticator
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from community.tests.factories import LotFactory, make_member
+
+    user = make_member(lots=[LotFactory()], mfa=False)
+    passkey = Authenticator.objects.create(
+        user=user, type=Authenticator.Type.WEBAUTHN, data={"name": "Phone"}
+    )
+    client.force_login(user)
+    session = client.session
+    session["account_authentication_methods_user"] = str(user.pk)
+    session["account_authentication_methods"] = [
+        {"method": "password", "at": timezone.now().timestamp(), "reauthenticated": True}
+    ]
+    session.save()
+    remove = reverse("mfa_remove_webauthn", args=[passkey.pk])
+    page = client.get(reverse("mfa_list_webauthn")).content.decode()
+    assert remove not in page and "cannot be removed" in page
+    response = client.post(remove)
+    assert response.status_code == 302
+    assert Authenticator.objects.filter(pk=passkey.pk).exists()
+    # With a second passkey either one can go.
+    Authenticator.objects.create(
+        user=user, type=Authenticator.Type.WEBAUTHN, data={"name": "Laptop"}
+    )
+    assert remove in client.get(reverse("mfa_list_webauthn")).content.decode()
+    client.post(remove)
+    assert not Authenticator.objects.filter(pk=passkey.pk).exists()
+
+
+def test_the_only_authenticator_app_shows_no_turn_off(client, db):
+    """SEC-004: no Remove or Turn off on the last strong authenticator."""
+    from allauth.mfa.models import Authenticator
+    from django.urls import reverse
+
+    from community.tests.factories import LotFactory, make_member
+
+    user = make_member(lots=[LotFactory()])  # an authenticator app only
+    client.force_login(user)
+    turn_off = reverse("mfa_deactivate_totp")
+    page = client.get(reverse("mfa_index")).content.decode()
+    assert "Sign-in and security" in page and turn_off not in page
+    Authenticator.objects.create(user=user, type=Authenticator.Type.WEBAUTHN, data={"name": "x"})
+    assert turn_off in client.get(reverse("mfa_index")).content.decode()
+
+
 def test_break_glass_enrollment_code_only_when_the_board_cannot_reset(db):
     """R2: the first officer who missed the setup window had no way back."""
     import io

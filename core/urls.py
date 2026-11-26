@@ -2,6 +2,7 @@ from django.conf import settings
 from django.http import Http404
 from django.urls import include, path, re_path
 
+from accounts import mfa_views
 from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
 from core import hub_views, preview
@@ -37,6 +38,13 @@ urlpatterns = [
     # come before allauth's own URLs so they win.
     path("accounts/signup/", not_available),
     path("accounts/email/", not_available),
+    # The last passkey or app cannot be removed (SEC-004).
+    path("accounts/2fa/webauthn/", mfa_views.list_passkeys, name="mfa_list_webauthn"),
+    path(
+        "accounts/2fa/webauthn/keys/<int:pk>/remove/",
+        mfa_views.remove_passkey,
+        name="mfa_remove_webauthn",
+    ),
     path("accounts/", include("allauth.urls")),
     path("", include("accounts.urls")),
     path("", include("community.urls")),

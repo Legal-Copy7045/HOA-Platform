@@ -40,7 +40,8 @@
     </section>
     <section class="card"><h2>{% icon "clock" %} Authenticator app</h2>
       {% if authenticators.totp %}<p class="muted small"><span class="badge tone-success">On</span> You type a 6-digit code from the app after your password.</p>
-        <div class="form-actions"><a class="btn danger" href="{% url 'mfa_deactivate_totp' %}">Turn off</a></div>
+        {% if authenticators.webauthn %}<div class="form-actions"><a class="btn danger" href="{% url 'mfa_deactivate_totp' %}">Turn off</a></div>
+        {% else %}<p class="small muted">It's your only second step, so it stays on. Add a passkey first if you want to turn it off.</p>{% endif %}
       {% else %}<p class="muted small">Not set up. An app on your phone shows a new 6-digit code every 30 seconds.</p>
         <div class="form-actions"><a class="btn secondary" href="{% url 'mfa_activate_totp' %}">Set up an authenticator app</a></div>{% endif %}
     </section>
