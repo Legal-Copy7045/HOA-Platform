@@ -25,6 +25,13 @@ from governance.models import (
 )
 
 
+def _form_id(value) -> int:
+    """A record id from a form field; anything else (letters, a huge number)
+    is 0, which the service refuses with a message, never a 500 (BUG-007)."""
+    value = (value or "").strip()
+    return int(value) if value.isascii() and value.isdigit() and len(value) <= 9 else 0
+
+
 def _flash(request, fn, ok: str):
     try:
         result = fn()
@@ -405,8 +412,8 @@ def vote_action(request, pk, action):
             request,
             lambda: services.cast_ballot(
                 vote,
-                option_id=int(request.POST.get("option") or 0),
-                lot_id=int(lot) if lot else None,
+                option_id=_form_id(request.POST.get("option")),
+                lot_id=_form_id(lot) if lot else None,
                 actor=request.user,
                 request=request,
             ),

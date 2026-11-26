@@ -157,6 +157,27 @@ def test_informal_poll_one_ballot_per_owner_and_ballots_never_change(board):
         ballot.delete()
 
 
+def test_ballot_with_malformed_option_or_lot_gets_a_message_not_500(client, board):
+    """Review BUG-007."""
+    from django.urls import reverse
+
+    owner = make_member(lots=[LotFactory()])
+    vote, (yes, _) = _vote(board)
+    services.open_vote(vote, actor=board)
+    client.force_login(owner)
+    url = reverse("vote_action", args=[vote.pk, "cast"])
+    for bad in ("abc", "²", "9" * 30):
+        response = client.post(url, {"option": bad}, follow=True)
+        assert response.status_code == 200
+        assert b"Choose one of the options" in response.content
+    assert not Ballot.objects.filter(vote=vote).exists()
+    # A garbled lot field is refused or ignored, never a 500 (an informal
+    # poll has no lot, so the ballot is recorded).
+    response = client.post(url, {"option": str(yes.pk), "lot": "x"}, follow=True)
+    assert response.status_code == 200
+    assert Ballot.objects.filter(vote=vote).count() == 1
+
+
 def test_formal_vote_needs_rules_and_counts_one_ballot_per_lot(board):
     vote, (yes, no) = _vote(board, VoteKind.FORMAL)
     with pytest.raises(services.GovernanceError, match="quorum"):
