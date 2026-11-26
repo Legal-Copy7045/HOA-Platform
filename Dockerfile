@@ -26,7 +26,13 @@ WORKDIR /app
 COPY requirements/base.txt requirements/base.txt
 RUN --mount=type=secret,id=extra_ca,required=false \
     if [ -f /run/secrets/extra_ca ]; then export PIP_CERT=/run/secrets/extra_ca; fi; \
-    pip install --require-hashes -r requirements/base.txt
+    pip install --require-hashes -r requirements/base.txt \
+ && python -m pip uninstall -y pip \
+ && rm -rf /usr/local/lib/python3*/ensurepip/_bundled
+# pip is needed only to build the image. It is removed with its vendored
+# libraries (urllib3, msgpack, setuptools' pkg_resources, listed in its SBOM),
+# which the image scan flags and the portal never runs; nothing in the
+# container installs packages (the filesystem is read-only anyway).
 
 # Copied as root: the runtime user can read the code but never change it.
 COPY . .
