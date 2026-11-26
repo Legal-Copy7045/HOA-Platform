@@ -37,6 +37,25 @@ def w(settings):
 ACCOUNT = "000123456789"
 ROUTING = "021000021"
 
+# What the first masking (migration 0016, frozen) did; kept as it was.
+CASES_0016 = [
+    (f"WIRE FROM ACCT {ACCOUNT} RTN {ROUTING}", f"WIRE FROM ACCT {MASK}6789 RTN {MASK}0021"),
+    ("ACCT#0001-2345-6789 PMT", f"ACCT#{MASK}6789 PMT"),
+    ("ACH ID 1234 5678 9012", f"ACH ID {MASK}9012"),
+    ("REF 123456", f"REF {MASK}3456"),
+    ("CHECK 10234", "CHECK 10234"),
+    ("CHECK 1001", "CHECK 1001"),
+    ("DEPOSIT 2026-11-15 BRANCH 7", "DEPOSIT 2026-11-15 BRANCH 7"),
+    ("POSTED 20261115", "POSTED 20261115"),
+    ("ENTRY 11/15/2026", "ENTRY 11/15/2026"),
+    ("SETTLED 111526", "SETTLED 111526"),
+    ("TOTAL 1234567.89", "TOTAL 1234567.89"),
+    ("TOTAL $250000", "TOTAL $250000"),
+    ("1,234,567.89 TRANSFER", "1,234,567.89 TRANSFER"),
+    ("", ""),
+]
+
+# The importer now (fixres BUG-004 / SEC-003 / R2-004), and migration 0020.
 CASES = [
     (f"WIRE FROM ACCT {ACCOUNT} RTN {ROUTING}", f"WIRE FROM ACCT {MASK}6789 RTN {MASK}0021"),
     ("ACCT#0001-2345-6789 PMT", f"ACCT#{MASK}6789 PMT"),
@@ -45,12 +64,26 @@ CASES = [
     ("CHECK 10234", "CHECK 10234"),  # check numbers (five digits or fewer) stay
     ("CHECK 1001", "CHECK 1001"),
     ("DEPOSIT 2026-11-15 BRANCH 7", "DEPOSIT 2026-11-15 BRANCH 7"),  # dates stay
-    ("POSTED 20261115", "POSTED 20261115"),
     ("ENTRY 11/15/2026", "ENTRY 11/15/2026"),
+    ("ENTRY 11.15.26 CHECK 1001", "ENTRY 11.15.26 CHECK 1001"),
+    ("CHECK 1001 11/15/2026", "CHECK 1001 11/15/2026"),  # a date never joins a number
     ("SETTLED 111526", "SETTLED 111526"),
-    ("TOTAL 1234567.89", "TOTAL 1234567.89"),  # amounts stay
-    ("TOTAL $250000", "TOTAL $250000"),
-    ("1,234,567.89 TRANSFER", "1,234,567.89 TRANSFER"),
+    ("TOTAL $250000", "TOTAL $250000"),  # amounts after "$" stay
+    ("TOTAL $1,234,567.89", "TOTAL $1,234,567.89"),
+    ("PAID 1500.00", "PAID 1500.00"),  # small amounts with cents stay
+    ("PAID 12,345.67", "PAID 12,345.67"),
+    # Masked now (they were kept before):
+    ("ACCT 1234.5678.9012", f"ACCT {MASK}9012"),
+    ("ACCT 1234/5678/9012", f"ACCT {MASK}9012"),
+    ("WIRE,000123456789,01,REF", f"WIRE,{MASK}8901,REF"),
+    ("ACCT 0001234567,5 x", f"ACCT {MASK}5675 x"),
+    ("ACCT 000123456789.00", f"ACCT {MASK}8900"),
+    ("ACCT 12152024", f"ACCT {MASK}2024"),  # 8 digits read as a date: still masked
+    ("POSTED 20261115", f"POSTED {MASK}1115"),
+    ("TOTAL 1234567.89", f"TOTAL {MASK}6789"),
+    ("1,234,567.89 TRANSFER", f"{MASK}6789 TRANSFER"),
+    ("ACCT 2026-13-45", f"ACCT {MASK}1345"),  # not a real date
+    (f"ACCT {MASK}6789", f"ACCT {MASK}6789"),  # masking twice changes nothing
     ("", ""),
 ]
 
@@ -63,6 +96,20 @@ def test_redact_numbers(raw, expected):
 def test_redaction_never_keeps_more_than_four_digits_of_a_long_number():
     text = clean_description("Payee 9" * 10 + " 4111 1111 1111 4321 " + "x" * 300)
     assert "4111" not in text and text.count(MASK) == 1 and len(text) <= 200
+
+
+def test_a_number_at_the_length_cap_is_masked_before_the_cut():
+    """BUG-004: before, the text was cut to 200 characters first, so a number
+    cut at the end kept its first five digits."""
+    raw = "x" * 193 + " " + ACCOUNT + " tail"
+    text = clean_description(raw)
+    assert len(text) <= 200
+    assert "00012" not in text and ACCOUNT not in text
+
+
+def test_a_text_cut_upstream_has_its_trailing_digits_masked():
+    assert redact_numbers("MEMO 00012", cut=True) == f"MEMO {MASK}"
+    assert redact_numbers("MEMO 00012") == "MEMO 00012"
 
 
 OFX_WIRE = f"""OFXHEADER:100
@@ -170,9 +217,57 @@ def test_reimporting_a_file_without_fitid_adds_nothing(client, w):
 _migration = importlib.import_module("ledger.migrations.0016_redact_bank_descriptions")
 
 
+_migration_0020 = importlib.import_module("ledger.migrations.0020_redact_bank_descriptions_again")
+
+
+@pytest.mark.parametrize(("raw", "expected"), CASES_0016)
+def test_first_migration_masking_is_frozen(raw, expected):
+    assert _migration.redact_numbers(raw) == expected
+
+
 @pytest.mark.parametrize(("raw", "expected"), CASES)
-def test_migration_masking_matches_the_importer(raw, expected):
-    assert _migration.redact_numbers(raw) == redact_numbers(raw) == expected
+@pytest.mark.parametrize("cut", [False, True])
+def test_second_migration_masking_matches_the_importer(raw, expected, cut):
+    assert _migration_0020.redact_numbers(raw, cut=cut) == redact_numbers(raw, cut=cut)
+    if not cut:
+        assert redact_numbers(raw) == expected
+
+
+def test_second_migration_remasks_what_the_first_let_through(w):
+    conn = _file_account(w)
+    day = datetime.date(2026, 11, 3)
+    descriptions = {
+        "dots": "WIRE ACCT 1234.5678.9012",
+        "comma": "WIRE,000123456789,01,REF",
+        "date8": "ACCT 12152024",
+        "cut": "x" * 189 + " ACCT 00012",  # cut by the old order at the cap
+        "clean": "CHECK 1001 11/15/2026",
+    }
+    rows = {
+        key: BankTransaction.objects.create(
+            connection=conn,
+            bank_id=f"ofx:{key}",
+            posted_on=day,
+            amount_cents=100,
+            description=text,
+            source="ofx",
+        )
+        for key, text in descriptions.items()
+    }
+    # The first masking keeps them all as they are (the finding).
+    for key in ("dots", "comma", "date8", "cut"):
+        assert _migration.redact_numbers(descriptions[key]) == descriptions[key]
+    _migration_0020.redact(global_apps, SimpleNamespace(connection=connection))
+    stored = {k: BankTransaction.objects.get(pk=r.pk).description for k, r in rows.items()}
+    assert stored["dots"] == f"WIRE ACCT {MASK}9012"
+    assert stored["comma"] == f"WIRE,{MASK}8901,REF"
+    assert stored["date8"] == f"ACCT {MASK}2024"
+    assert stored["cut"].endswith(f"ACCT {MASK}") and "00012" not in stored["cut"]
+    assert stored["clean"] == descriptions["clean"]
+    for key, text in descriptions.items():
+        assert stored[key] == redact_numbers(text, cut=len(text) >= _migration_0020.CUT_AT)
+    with pytest.raises(DatabaseError), transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute("UPDATE ledger_banktransaction SET kind = 'x'")
 
 
 def test_migration_redacts_stored_descriptions_and_nothing_else(w):

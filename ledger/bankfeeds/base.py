@@ -73,64 +73,113 @@ def clean_text(value, limit: int = DESCRIPTION_MAX) -> str:
     return _SPACES.sub(" ", text).strip()[:limit]
 
 
-# A run of six or more digits, single spaces or dashes allowed between them
-# (account and routing numbers are often written "0001 2345 6789").
-_DIGIT_RUN = re.compile(r"(?<!\d)\d(?:[ -]?\d){5,}(?!\d)")
-_AMOUNT_TAIL = re.compile(r"[.,]\d{1,2}(?!\d)")
-_DATE_SHAPES = ([6], [8], [4, 2, 2], [2, 2, 4], [2, 2, 2])
 MASK = "\u2022\u2022\u2022\u2022"  # "••••"
+# A run of digit groups joined by single spaces, dashes, dots, slashes or
+# commas (account and routing numbers are written "0001 2345 6789",
+# "1234.5678.9012", "WIRE,000123456789,01"), never starting right after a
+# digit or a mask dot (so masking twice changes nothing).
+_RUN = r"(?<![\d\u2022])\d+(?:[ ./,-]\d+)*"
+# A date written with one kind of separator: 2026-11-15, 11/15/2026, 11.15.26.
+_DATE = (
+    r"(?<![\d\u2022])(?<!\d[./,-])"
+    r"(?:\d{4}(?P<s1>[-/.])\d{1,2}(?P=s1)\d{1,2}|\d{1,2}(?P<s2>[-/.])\d{1,2}(?P=s2)(?:\d{4}|\d{2}))"
+    r"(?!\d)(?![./,-]\d)"
+)
+_RUN_RE = re.compile(_RUN)
+_DATE_RE = re.compile(_DATE)
+# What may stay after a "$": dollars (thousands commas allowed), optional cents.
+_DOLLARS = re.compile(r"(?:\d{1,3}(?:,\d{3})+|\d{1,9})(?:\.\d{2})?")
+# An amount with no "$": at most five digits of dollars, then exactly two of cents.
+_SMALL_AMOUNT = re.compile(r"(?:\d{1,2},\d{3}|\d{1,5})[.,]\d{2}")
 
 
-def _plausible_date(digits: str) -> bool:
-    """YYYYMMDD / MMDDYYYY (8 digits) or YYMMDD / MMDDYY (6 digits)."""
-
-    def ok(y, m, d):
-        try:
-            datetime.date(y, m, d)
-        except ValueError:
-            return False
-        return True
-
-    if len(digits) == 8:
-        y1, y2 = int(digits[:4]), int(digits[4:])
-        return (1900 <= y1 <= 2100 and ok(y1, int(digits[4:6]), int(digits[6:]))) or (
-            1900 <= y2 <= 2100 and ok(y2, int(digits[:2]), int(digits[2:4]))
-        )
-    if len(digits) == 6:
-        a, b, c = int(digits[:2]), int(digits[2:4]), int(digits[4:])
-        return ok(2000 + a, b, c) or ok(2000 + c, a, b)
+def _real_date(text: str) -> bool:
+    groups = [int(g) for g in re.split(r"[-/.]", text)]
+    if len(re.split(r"[-/.]", text)[0]) == 4:
+        candidates = [(groups[0], groups[1], groups[2])]
+    else:
+        year = groups[2] + (2000 if groups[2] < 100 else 0)
+        candidates = [(year, groups[0], groups[1]), (year, groups[1], groups[0])]
+    for y, m, d in candidates:
+        if 1900 <= y <= 2100:
+            try:
+                datetime.date(y, m, d)
+            except ValueError:
+                continue
+            return True
     return False
 
 
-def redact_numbers(text: str, limit: int = DESCRIPTION_MAX) -> str:
+def _plain_six_digit_date(digits: str) -> bool:
+    """YYMMDD or MMDDYY written without separators (six digits only)."""
+    a, b, c = int(digits[:2]), int(digits[2:4]), int(digits[4:])
+    for y, m, d in ((2000 + a, b, c), (2000 + c, a, b)):
+        try:
+            datetime.date(y, m, d)
+        except ValueError:
+            continue
+        return True
+    return False
+
+
+def redact_numbers(text: str, limit: int = DESCRIPTION_MAX, *, cut: bool = False) -> str:
     """Mask long digit runs (account and routing numbers) down to the last four.
 
-    The portal never stores bank account numbers (SEC-004): any run of six or
-    more digits becomes "••••1234", unless it is plainly an amount (followed by
-    cents, or after a "$") or a date (6 or 8 digits that read as one, written
-    without separators or with them). Short numbers such as check numbers
-    (five digits or fewer) are kept. Over-masking is preferred to keeping a
-    number.
+    The portal never stores bank account numbers (SEC-004, fixres BUG-004):
+    any run of six or more digits, grouped with spaces, dashes, dots,
+    slashes or commas or not, becomes "••••1234". Kept: a date written with
+    separators that is a real date (2026-11-15, 11/15/2026), a six-digit
+    run that reads as a date, an amount after a "$", and a small amount with
+    cents (at most five digits of dollars). Eight or more digits without
+    separators are masked even when they read as a date. With ``cut`` (the
+    text was cut at a length cap) a digit run at the very end is masked
+    whole: it may be the start of a longer number. Short numbers such as
+    check numbers (five digits or fewer) are kept. Over-masking is preferred
+    to keeping a number. The text is masked first and only then cut to
+    ``limit``.
     """
+    text = text or ""
+    # Real dates are kept whole; the text between them is masked piece by
+    # piece, so a date never joins the number next to it.
+    pieces, pos = [], 0
+    for match in _DATE_RE.finditer(text):
+        if _real_date(match.group(0)):
+            pieces.append(_mask_runs(text[pos : match.start()], cut=False))
+            pieces.append(match.group(0))
+            pos = match.end()
+    pieces.append(_mask_runs(text[pos:], cut=cut))
+    return "".join(pieces)[:limit]
 
+
+def _mask_runs(text: str, *, cut: bool) -> str:
     def replace(match: re.Match) -> str:
         raw = match.group(0)
         digits = "".join(c for c in raw if c.isdigit())
-        plain = raw.isdigit()
-        before = text[max(0, match.start() - 1) : match.start()]
-        if plain and (before == "$" or _AMOUNT_TAIL.match(text, match.end())):
+        if cut and match.end() == len(text) and len(digits) >= 3:
+            return MASK
+        if len(digits) < 6:
             return raw
-        shape = [len(group) for group in re.split(r"[ -]", raw)]
-        if shape in _DATE_SHAPES and _plausible_date(digits):
+        before = text[max(0, match.start() - 2) : match.start()]
+        if (before.endswith("$") or before == "$ ") and _DOLLARS.fullmatch(raw):
+            return raw
+        if _SMALL_AMOUNT.fullmatch(raw):
+            return raw
+        if raw.isdigit() and len(raw) == 6 and _plain_six_digit_date(raw):
             return raw
         return MASK + digits[-4:]
 
-    return _DIGIT_RUN.sub(replace, text or "")[:limit]
+    return _RUN_RE.sub(replace, text)
+
+
+# How much of a bank's text is read before masking (masking comes before the
+# cut to DESCRIPTION_MAX, so a number at the cap is never half kept).
+RAW_MAX = 4096
 
 
 def clean_description(value, limit: int = DESCRIPTION_MAX) -> str:
-    """A bank line's description: clean_text, then long numbers masked."""
-    return redact_numbers(clean_text(value, limit), limit)
+    """A bank line's description: clean_text, long numbers masked, then cut."""
+    text = clean_text(value, RAW_MAX)
+    return redact_numbers(text, limit, cut=len(text) >= RAW_MAX)
 
 
 def last_four(value) -> str:

@@ -22,12 +22,13 @@ from dataclasses import dataclass, field
 from ledger.bankfeeds.base import (
     BANK_ID_MAX,
     KIND_MAX,
+    RAW_MAX,
     BalanceInfo,
     BankFeedError,
     TransactionInfo,
+    clean_description,
     clean_text,
     last_four,
-    redact_numbers,
     to_cents,
 )
 
@@ -86,14 +87,15 @@ def ofx_date(value: str) -> datetime.date:
 def _transaction(values: dict[str, str]) -> TransactionInfo:
     posted = ofx_date(values.get("DTPOSTED", ""))
     amount = to_cents(values.get("TRNAMT", ""))
-    name = clean_text(values.get("NAME") or values.get("PAYEE"))
-    memo = clean_text(values.get("MEMO"))
+    # Read in full and masked before the cut (fixres BUG-004).
+    name = clean_text(values.get("NAME") or values.get("PAYEE"), RAW_MAX)
+    memo = clean_text(values.get("MEMO"), RAW_MAX)
     description = name
     if memo and memo.casefold() != name.casefold():
         description = f"{name} · {memo}" if name else memo
     if values.get("CHECKNUM") and not description:
         description = f"Check {clean_text(values['CHECKNUM'], 20)}"
-    description = redact_numbers(clean_text(description))  # never keep account numbers
+    description = clean_description(description)  # never keep account numbers
     fitid = clean_text(values.get("FITID"), BANK_ID_MAX - 4)
     # FITID is required by the standard; without one, parse() keys the line by
     # (date, amount, description) and how often it already appeared in the file.
