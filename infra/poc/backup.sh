@@ -91,7 +91,7 @@ echo "==> Uploaded files"
 # (SEC-008, R2-003). The key is read from its file inside python, never put
 # on a command line (R2-004). Checked before every restore.
 python3 -I "$APP_DIR/infra/poc/backup_mac.py" sign "$DEST" "$KEY_FILE" "$STAMP"
-echo "$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" > "$DEST/APP_VERSION"
+echo "$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" > "$DEST/APP_VERSION"
 du -sh "$DEST" | awk '{print "    size: "$1}'
 
 if [ -n "$(env_value BACKUP_S3_BUCKET)" ]; then
