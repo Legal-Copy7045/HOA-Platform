@@ -123,7 +123,7 @@ def _ago(hours):
 def test_backups_health_check(settings):
     settings.BACKUP_S3_BUCKET = ""
     ok, detail = health._backups()
-    assert not ok and "backup.sh --install" in detail
+    assert not ok and "Server tasks" in detail
     call_command("backup_heartbeat", "--kind", "local")
     ok, detail = health._backups()
     assert ok and "no off-site copy" in detail

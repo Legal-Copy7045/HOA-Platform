@@ -295,3 +295,14 @@ def test_sysadmin_can_clear_sticky_checks_only_and_it_is_audited(client):
     client.force_login(make_member(board=True))
     response = client.post(reverse("system_status"), {"action": "clear_check", "check": "email"})
     assert response.status_code == 403
+
+
+def test_status_page_stacks_on_phones(client):
+    from pathlib import Path
+
+    client.force_login(make_member(roles=[Role.SYSADMIN]))
+    page = client.get(reverse("system_status")).content.decode()
+    assert 'class="grid grid-4 stack-sm"' in page and 'class="list health-list"' in page
+    css = Path("static/css/site.css").read_text()
+    assert ".grid.stack-sm { grid-template-columns: 1fr; }" in css
+    assert ".health-list > li { flex-wrap: wrap; }" in css
