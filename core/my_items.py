@@ -59,6 +59,7 @@ MY_ITEMS_PERMISSIONS = (
 )
 
 AREA_NAV = {
+    "Written consent": "resolutions",
     "Requests": "requests",
     "Architectural review": "arc_list",
     "Violations": "violations",
@@ -71,6 +72,7 @@ AREA_NAV = {
 }
 
 AREA_ICONS = {
+    "Written consent": "pencil",
     "My home": "home",
     "Requests": "mail",
     "Approvals": "check-circle",
@@ -326,6 +328,21 @@ def items_for(user) -> list[Item]:
                     "The owner responded",
                     reverse("violation_detail", args=[x.pk]),
                     "info",
+                )
+            )
+    from core import features
+
+    if features.enabled("consents"):
+        from governance.elections import consents_awaiting
+
+        for c in consents_awaiting(user):
+            out.append(
+                Item(
+                    "Written consent",
+                    c.title,
+                    "Waiting for your written approval or decline",
+                    reverse("consent_detail", args=[c.pk]),
+                    "warning",
                 )
             )
     if can(user, "collections.manage"):

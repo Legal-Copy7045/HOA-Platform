@@ -563,3 +563,21 @@ def withdraw_consent(consent: ConsentRequest, *, actor, request=None) -> None:
     )
     if updated:
         record_event("consent.withdrawn", actor=actor, request=request, target=consent)
+
+
+def consents_awaiting(user) -> list:
+    """Open written consents this board member has not answered yet (My
+    items). Empty for anyone who cannot sign."""
+    if not can(user, "resolution.record"):
+        return []
+    me = _person(user)
+    if me is None:
+        return []
+    from governance.models import ConsentRequest, ConsentState
+
+    with system_access("consents awaiting a signer"):
+        return list(
+            ConsentRequest.objects.filter(state=ConsentState.OPEN, signers=me)
+            .exclude(signatures__person=me)
+            .order_by("created_at", "pk")
+        )

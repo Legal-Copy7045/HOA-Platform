@@ -500,3 +500,45 @@ def test_notice_without_a_deadline_leaves_board_tasks_alone(client, w):
     assert gov.notice_deadlines(executive) == ([], None)
     with pytest.raises(gov.GovernanceError):
         gov.complete_notice_deadline(executive, 1, actor=w["board"])
+
+
+def test_existing_meetings_get_their_calendar_event_once(w):
+    """Data migration 0012: meetings made before meetings went on the calendar
+    get an event; a hand-made matching event is linked, not duplicated;
+    executive sessions, cancelled and past meetings are left alone."""
+    import importlib
+
+    from django.apps import apps
+
+    from comms.models import Event
+    from core.scoping import system_access
+    from governance.models import Meeting
+
+    mig = importlib.import_module(
+        "governance.migrations.0012_calendar_events_for_existing_meetings"
+    )
+    soon = timezone.now() + datetime.timedelta(days=9)
+    with system_access("t"):
+        made = {}
+        for title, kind, status, when in [
+            ("Old board meeting", "board", "scheduled", soon),
+            ("Annual meeting (hand-made event)", "annual", "scheduled", soon),
+            ("Executive session", "executive", "scheduled", soon),
+            ("Cancelled meeting", "board", "cancelled", soon),
+            ("Last year's meeting", "board", "held", timezone.now() - datetime.timedelta(days=300)),
+        ]:
+            made[title] = Meeting.objects.create(
+                title=title, kind=kind, status=status, starts_at=when, created_by=w["board"]
+            )
+        manual = Event.objects.create(
+            title="Annual meeting (hand-made event)", starts_at=soon, created_by=w["board"]
+        )
+        before = Event.objects.count()
+        mig.forwards(apps, None)
+        mig.forwards(apps, None)  # running twice adds nothing
+        linked = {t: Meeting.objects.get(pk=m.pk).calendar_event_id for t, m in made.items()}
+        assert Event.objects.count() == before + 1
+    assert linked["Annual meeting (hand-made event)"] == manual.pk
+    assert linked["Old board meeting"] is not None
+    for title in ("Executive session", "Cancelled meeting", "Last year's meeting"):
+        assert linked[title] is None, title
