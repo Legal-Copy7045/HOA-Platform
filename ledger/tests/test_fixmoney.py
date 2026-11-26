@@ -110,7 +110,7 @@ def test_backdated_sale_moves_the_buyers_dues_and_check_to_the_buyers_account(cl
     seller_dues = _charge(w, DUES, ago(40), "Dues before the sale")
     _pay(w, DUES, ago(38), "301", apply_to=[seller_dues.pk])
     buyers_dues = _charge(w, DUES, ago(15), "Dues after the sale")
-    buyers_check = _pay(w, DUES, ago(10), "302")
+    buyers_check = _pay(w, DUES, ago(10), "CHK-BUYER-302")
     (seller_account,) = _accounts(w["lot"])
     assert buyers_dues.account_id == buyers_check.account_id == seller_account.pk
     buyer = _sell(w, ago(20))  # recorded today, effective 20 days ago
@@ -138,7 +138,7 @@ def test_backdated_sale_moves_the_buyers_dues_and_check_to_the_buyers_account(cl
     client.force_login(w["owner"])
     page = client.get(reverse("my_history")).content.decode()
     assert "Dues before the sale" in page and "Dues after the sale" not in page
-    assert "302" not in page and "Moved to account" not in page
+    assert "CHK-BUYER-302" not in page and "Moved to account" not in page
     client.force_login(buyer)
     page = client.get(reverse("my_account")).content.decode()
     assert "Dues after the sale" in page and "Dues before the sale" not in page
