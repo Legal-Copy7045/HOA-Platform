@@ -69,6 +69,7 @@
 {% if user.is_authenticated and nav %}
       </main>
     </div>
+    {% if nav.tabbar %}<nav class="tabbar" aria-label="Quick links">{% for t in nav.tabbar %}<a href="{{ t.url }}"{% if t.current or request.resolver_match.url_name == t.name %} aria-current="true"{% endif %}>{% icon t.icon %}<span>{{ t.label }}</span>{% if t.count %}<span class="badge-count">{{ t.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</a>{% endfor %}<button type="button" data-nav-toggle aria-controls="sidebar" aria-expanded="false">{% icon "menu" %}<span>Menu</span></button></nav>{% endif %}
   </div>
 {% else %}
     </div>

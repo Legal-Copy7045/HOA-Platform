@@ -12,11 +12,32 @@ def monthly_assessments(timestamp: int) -> int:
     """Only if the board turned on dues.auto_post; otherwise they post by button."""
     if not rule("dues.auto_post"):
         return 0
+    from ledger import autopost
+    from ledger.models import PostingFailure
+
     today = timezone.localdate()
+    period = f"{today:%Y-%m}"
     try:
         return post_monthly_assessments(year=today.year, month=today.month, actor=SYSTEM)
     except LedgerError:
+        # Say why without personal data, for the board's alert (D48).
+        reason = PostingFailure.ERROR if rule("dues.monthly_cents") else PostingFailure.NO_AMOUNT
+        autopost.record_failure(period, reason)
         return 0
+    except Exception:
+        autopost.record_failure(period, PostingFailure.ERROR)
+        raise
+    finally:
+        autopost.check_and_alert()
+
+
+@app.periodic(cron="15 12 * * *")  # daily, about 07:15 site time (cron is UTC)
+@app.task(queue="maintenance", queueing_lock="monthly_assessments_check")
+def monthly_assessments_check(timestamp: int) -> bool:
+    """Tell the board (once a month) when automatic posting missed a month (D48)."""
+    from ledger import autopost
+
+    return autopost.check_and_alert()
 
 
 @app.periodic(cron="41 6 * * *")  # daily

@@ -60,6 +60,13 @@ MY_ITEMS_PERMISSIONS = (
 
 AREA_NAV = {
     "Written consent": "resolutions",
+    "Invoices": "invoices",
+    "Second approvals": "approvals",
+    "Homes and owners": "lot_list",
+    "Common area bookings": "reservations",
+    "Recurring deadlines": "tasks",
+    "People": "people",
+    "Voting": "voting",
     "Requests": "requests",
     "Architectural review": "arc_list",
     "Violations": "violations",
@@ -75,7 +82,12 @@ AREA_ICONS = {
     "Written consent": "pencil",
     "My home": "home",
     "Requests": "mail",
-    "Approvals": "check-circle",
+    "Second approvals": "check-circle",
+    "Invoices": "receipt",
+    "Homes and owners": "map",
+    "Common area bookings": "calendar",
+    "People": "users",
+    "Voting": "vote",
     "Architectural review": "pencil",
     "Violations": "flag",
     "Collections": "dollar",
@@ -83,15 +95,20 @@ AREA_ICONS = {
     "Work orders": "wrench",
     "Vendors": "shield",
     "Records requests": "inbox",
-    "Compliance": "calendar",
+    "Recurring deadlines": "calendar",
     "Tasks": "list",
     "Setup": "sliders",
 }
 
+# Each group is named after the menu entry its items open (WT-006).
 AREAS = [
     "My home",
+    "Voting",
     "Requests",
-    "Approvals",
+    "Second approvals",
+    "Invoices",
+    "Homes and owners",
+    "Common area bookings",
     "Architectural review",
     "Violations",
     "Collections",
@@ -99,8 +116,9 @@ AREAS = [
     "Work orders",
     "Vendors",
     "Records requests",
-    "Compliance",
+    "Recurring deadlines",
     "Tasks",
+    "People",
     "Setup",
 ]
 
@@ -168,8 +186,9 @@ def items_for(user) -> list[Item]:
         ):
             out.append(
                 Item(
-                    "Approvals",
-                    f"Invoice {inv}",
+                    "Invoices",
+                    # The vendor's own invoice number, not a portal record number (WT-005).
+                    f"Invoice {inv.number} · {inv.vendor}",
                     "Needs your approval",
                     reverse("invoice_detail", args=[inv.pk]),
                     "warning",
@@ -186,7 +205,7 @@ def items_for(user) -> list[Item]:
             if n.person.user_id != user.pk:
                 out.append(
                     Item(
-                        "Approvals",
+                        "Second approvals",
                         "Proposed board seat",
                         "Needs a second board member",
                         reverse("approvals"),
@@ -201,7 +220,7 @@ def items_for(user) -> list[Item]:
             if n.is_open and n.nominated_by_id != user.pk:
                 out.append(
                     Item(
-                        "Approvals",
+                        "Second approvals",
                         "Sysadmin nomination",
                         "Needs a second board member",
                         reverse("approvals"),
@@ -217,7 +236,7 @@ def items_for(user) -> list[Item]:
             if reset.status == "awaiting_approval" and reset.started_by_id != user.pk:
                 out.append(
                     Item(
-                        "Approvals",
+                        "Second approvals",
                         "Sign-in reset",
                         "Needs a second board member",
                         reverse("approvals"),
@@ -232,7 +251,7 @@ def items_for(user) -> list[Item]:
         if to_pay:
             out.append(
                 Item(
-                    "Finance",
+                    "Invoices",
                     f"{to_pay} approved invoice{'' if to_pay == 1 else 's'} to pay",
                     "Record the payment when the check is cut",
                     reverse("invoices") + "?state=approved",
@@ -252,7 +271,7 @@ def items_for(user) -> list[Item]:
         ):
             out.append(
                 Item(
-                    "Approvals",
+                    "Homes and owners",
                     f"{ch.account.lot.label}: {ch.get_action_display().lower()} on the account",
                     "An owner asked for this change",
                     reverse("lot_detail", args=[ch.account.lot_id]) + "#accounts",
@@ -272,7 +291,7 @@ def items_for(user) -> list[Item]:
                 out.append(
                     Item(
                         "Architectural review",
-                        f"ARC #{r.pk} {r.title}",
+                        f"Request #{r.pk} · {r.title}",
                         "Check it is complete to start the review clock",
                         reverse("arc_detail", args=[r.pk]),
                         "info",
@@ -288,7 +307,7 @@ def items_for(user) -> list[Item]:
                 out.append(
                     Item(
                         "Architectural review",
-                        f"ARC #{r.pk} {r.title}",
+                        f"Request #{r.pk} · {r.title}",
                         "Your position is needed"
                         + (
                             f" · decision due {short_date(r.review_due_on)}"
@@ -408,7 +427,7 @@ def items_for(user) -> list[Item]:
         for c in due_soon(today):
             out.append(
                 Item(
-                    "Compliance",
+                    "Recurring deadlines",
                     c.title,
                     f"{'Overdue since' if c.due_on < today else 'Due'} {short_date(c.due_on)}",
                     reverse("tasks") + "?tab=deadlines",
@@ -455,7 +474,7 @@ def items_for(user) -> list[Item]:
         for r in pending_for_staff(user):
             out.append(
                 Item(
-                    "Approvals",
+                    "Common area bookings",
                     f"Booking: {r.area.name} ({r.lot.label})",
                     f"Confirm or decline · {timezone.localtime(r.starts_at):%b %-d, %-I:%M %p}",
                     reverse("reservation_detail", args=[r.pk]),
@@ -470,7 +489,7 @@ def items_for(user) -> list[Item]:
         if is_due():
             out.append(
                 Item(
-                    "Compliance",
+                    "People",
                     "Quarterly access review",
                     f"Review every login's access (due every {REVIEW_EVERY_DAYS} days)",
                     reverse("access_review"),
@@ -502,6 +521,25 @@ def items_for(user) -> list[Item]:
                     "warning",
                     timezone.localdate(n.created_at),
                     nav="ledger_home",
+                )
+            )
+    # Automatic monthly posting missed a month (D48): stays until it is posted.
+    if can(user, "ledger.manage"):
+        from ledger import autopost
+
+        missed = autopost.missed()
+        if missed:
+            out.append(
+                Item(
+                    "Finance",
+                    f"{missed['title']}: post it now",
+                    f"{missed['reason_text']}. Homes already charged are skipped.",
+                    reverse("ledger_home") + autopost.POST_ANCHOR,
+                    "danger",
+                    missed["month"],
+                    nav="ledger_home",
+                    action_label="Post it now",
+                    action_url=reverse("ledger_home") + autopost.POST_ANCHOR,
                 )
             )
     if can(user, "community.manage_rules"):
@@ -655,7 +693,7 @@ def items_for(user) -> list[Item]:
             if ballot_choices_for(vote, user)["can_vote"]:
                 out.append(
                     Item(
-                        "My home",
+                        "Voting",
                         f"Vote: {vote.title}",
                         "Your ballot is open",
                         reverse("vote_detail", args=[vote.pk]),
@@ -674,7 +712,7 @@ def items_for(user) -> list[Item]:
             if lots:
                 out.append(
                     Item(
-                        "My home",
+                        "Voting",
                         f"Election: {election.title}",
                         "Your ballot is open"
                         + (f" ({len(lots)} homes: one ballot each)" if len(lots) > 1 else ""),
@@ -691,7 +729,7 @@ def items_for(user) -> list[Item]:
         for survey in surveys.waiting_for(user):
             out.append(
                 Item(
-                    "My home",
+                    "Voting",
                     f"Survey: {survey.title}",
                     f"Survey waiting for your answer · closes {short_date(survey.closes_on)}",
                     reverse("survey_detail", args=[survey.pk]),

@@ -9,9 +9,9 @@
   {% if recorded %}
     <section class="card" aria-labelledby="recorded-h">
       <h2 id="recorded-h">Recorded</h2>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="stack-sm">
         <thead><tr><th>Home</th><th>Date received</th><th>Check</th><th class="num">Amount</th></tr></thead>
-        <tbody>{% for e, open in recorded %}<tr><td>{{ e.lot.label }}</td><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.reference|default:"—" }}</td><td class="num">{{ e.amount_cents|cents|cut:"-" }}</td></tr>{% endfor %}</tbody>
+        <tbody>{% for e, open in recorded %}<tr><td class="cell-title">{{ e.lot.label }}</td><td class="nowrap muted-sm">{{ e.posted_on|date:"M j, Y" }}</td><td data-label="Check #">{{ e.reference|default:"—" }}</td><td class="num">{{ e.amount_cents|cents|cut:"-" }}</td></tr>{% endfor %}</tbody>
         <tfoot><tr><th colspan="3">Total</th><th class="num">{{ recorded_total|cents }}</th></tr></tfoot>
       </table></div>
       {% if can_deposit %}
@@ -31,20 +31,20 @@
 
   <form method="post" novalidate>{% csrf_token %}
     <input type="hidden" name="rows" value="{{ row_count }}">
-    <div class="table-card"><div class="table-wrap"><table class="batch-table">
+    <div class="table-card"><div class="table-wrap"><table class="batch-table stack-sm">
       <thead><tr><th scope="col">#</th><th scope="col">Home <span class="required-mark" aria-hidden="true">*</span></th><th scope="col">Amount ($) <span class="required-mark" aria-hidden="true">*</span></th><th scope="col">Check number</th><th scope="col">Date received</th></tr></thead>
       <tbody>
       {% for row in rows %}{% with i=forloop.counter0 %}
         <tr{% if row.errors %} class="row-error"{% endif %}>
-          <td class="muted">{{ forloop.counter }}</td>
-          <td><label class="sr-only" for="lot_{{ i }}">Home, row {{ forloop.counter }}</label>
+          <td class="muted cell-title">Check {{ forloop.counter }}</td>
+          <td data-label="Home"><label class="sr-only" for="lot_{{ i }}">Home, row {{ forloop.counter }}</label>
             <select id="lot_{{ i }}" name="lot_{{ i }}"{% if row.errors %} aria-describedby="err_{{ i }}" aria-invalid="true"{% endif %}>
               <option value="">Choose a home</option>
               {% for lot in lots %}<option value="{{ lot.pk }}"{% if row.values.lot == lot.pk|stringformat:"d" %} selected{% endif %}>{{ lot.label }}</option>{% endfor %}
             </select></td>
-          <td><label class="sr-only" for="amount_{{ i }}">Amount in dollars, row {{ forloop.counter }}</label><input id="amount_{{ i }}" name="amount_{{ i }}" inputmode="decimal" placeholder="75.00" value="{{ row.values.amount|default:'' }}"></td>
-          <td><label class="sr-only" for="check_{{ i }}">Check number, row {{ forloop.counter }}</label><input id="check_{{ i }}" name="check_{{ i }}" maxlength="40" value="{{ row.values.check|default:'' }}"></td>
-          <td><label class="sr-only" for="date_{{ i }}">Date received, row {{ forloop.counter }}</label><input id="date_{{ i }}" name="date_{{ i }}" type="date" max="{{ today|date:'Y-m-d' }}" value="{{ row.values.date|default:'' }}"></td>
+          <td data-label="Amount"><label class="sr-only" for="amount_{{ i }}">Amount in dollars, row {{ forloop.counter }}</label><input id="amount_{{ i }}" name="amount_{{ i }}" inputmode="decimal" placeholder="75.00" value="{{ row.values.amount|default:'' }}"></td>
+          <td data-label="Check #"><label class="sr-only" for="check_{{ i }}">Check number, row {{ forloop.counter }}</label><input id="check_{{ i }}" name="check_{{ i }}" maxlength="40" value="{{ row.values.check|default:'' }}"></td>
+          <td data-label="Date received"><label class="sr-only" for="date_{{ i }}">Date received, row {{ forloop.counter }}</label><input id="date_{{ i }}" name="date_{{ i }}" type="date" max="{{ today|date:'Y-m-d' }}" value="{{ row.values.date|default:'' }}"></td>
         </tr>
         {% if row.errors %}<tr class="row-error"><td></td><td colspan="4"><div class="error" id="err_{{ i }}" role="alert">Row {{ forloop.counter }}: {{ row.errors|join:" " }}</div></td></tr>{% endif %}
       {% endwith %}{% endfor %}

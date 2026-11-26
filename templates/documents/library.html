@@ -18,7 +18,7 @@
       </li>{% endfor %}</ul>
     </section>
   {% empty %}<section class="card">{% if q %}{% include "partials/empty.html" with icon="folder" title="Nothing matches that search" %}{% else %}{% include "partials/empty.html" with icon="folder" title="No documents here yet" %}{% endif %}</section>{% endfor %}
-  {% if can_ask_records %}<p class="small muted">{% icon "info" %} Can't find a record? <a href="{% url 'records_requests' %}">Ask to inspect it</a>. Owners have a right to see the association's records.</p>{% endif %}
+  {% if can_ask_records %}<p class="small muted">{% icon "info" %} Can't find a record? <a href="{% url 'records_requests' %}?mine=1&amp;new=1#new-request">Ask to inspect it</a>. Owners have a right to see the association's records.</p>{% endif %}
   {% if can_manage %}
     <details class="panel"><summary>New folder{% if current %} inside {{ current.name }}{% endif %}</summary><div class="panel-body">
       <form method="post" action="{% url 'folder_create' %}" class="inline-form">{% csrf_token %}{% if current %}<input type="hidden" name="parent" value="{{ current.pk }}">{% endif %}

@@ -2,6 +2,7 @@
 {% load portal %}
 {% block title %}Contact retention · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / Contact retention</nav>
   <div class="page-head"><div><h1>Contact retention</h1>
     <p class="subtitle">{% if days %}Contact details of people who left more than {{ days }} days ago are cleared every night{% if citation %} ({{ citation }}){% endif %}.{% else %}Switched off: contact details of people who left are kept.{% endif %} Only their phone, text-message number, mailing address, extra contact methods and directory choices are cleared. Their name, login and every record (account history, ARC, violations, votes, audit) are kept. Earlier values stay in the change history, which is part of the audit trail and is never erased.</p></div>
     <div class="actions"><a class="btn secondary" href="{% url 'community_settings' %}">{% icon "sliders" %} Change the rule</a></div></div>

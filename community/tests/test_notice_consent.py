@@ -327,10 +327,11 @@ def test_invitations_page_counts_homes_by_notice_choice(client):
     make_member(lots=[silent_lot])
     assert services.notice_choice_counts() == {"email": 2, "paper": 1, "unanswered": 1}
     client.force_login(board)
-    page = client.get(reverse("invitations")).content.decode()
+    signups = {"view": "signups"}
+    page = client.get(reverse("lot_list"), signups).content.decode()
     assert "Email notices" in page and "Not answered" in page
     assert notices.CONSENT_VERSION in page and "postage" in page
-    counts = client.get(reverse("invitations")).context["notice_counts"]
+    counts = client.get(reverse("lot_list"), signups).context["notice_counts"]
     assert counts == {"email": 2, "paper": 1, "unanswered": 1}
 
 

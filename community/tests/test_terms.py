@@ -90,7 +90,7 @@ def test_changing_the_term_changes_labels_and_new_entries_not_old_ones(client):
 
     client.force_login(board)
     page = client.get(reverse("community_settings")).content.decode()
-    assert "Monthly dues per home" in page and "<h2>Dues</h2>" in page
+    assert "Monthly dues per home" in page and "<summary><h2>Dues</h2>" in page
     assert "Monthly assessment per home" not in page
     client.force_login(owner)
     page = client.get(reverse("my_account")).content.decode()
@@ -99,7 +99,7 @@ def test_changing_the_term_changes_labels_and_new_entries_not_old_ones(client):
     _set_term("Fee")
     client.force_login(board)
     page = client.get(reverse("community_settings")).content.decode()
-    assert "Monthly fee per home" in page and "<h2>Fees</h2>" in page
+    assert "Monthly fee per home" in page and "<summary><h2>Fees</h2>" in page
     assert REGISTRY["dues.monthly_cents"].shown_label == "Monthly fee per home"
     page = client.get(reverse("ledger_home")).content.decode()
     assert "Post the monthly fee" in page

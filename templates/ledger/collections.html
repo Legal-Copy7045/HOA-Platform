@@ -5,15 +5,15 @@
   {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Collections</h1><p class="subtitle">Tracking only: reminders, payment plans and referrals are recorded by people. Nothing is charged or filed automatically.</p></div></div>
   <h2>Overdue balances <span class="muted small">(over 30 days)</span></h2>
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Home</th><th class="num">Balance</th>{% for label in bucket_labels %}<th class="num">{{ label }}</th>{% endfor %}</tr></thead>
-    <tbody>{% for lot, bal, cols in delinquent %}<tr><td><a href="{% url 'lot_ledger' lot.pk %}">{{ lot.label }}</a></td><td class="num"><strong>{{ bal|cents }}</strong></td>{% for label, amount in cols %}<td class="num">{% if amount and forloop.last %}<span class="status tone-danger">{{ amount|cents }}</span>{% else %}{{ amount|cents }}{% endif %}</td>{% endfor %}</tr>
+    <tbody>{% for lot, bal, cols in delinquent %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'lot_ledger' lot.pk %}">{{ lot.label }}</a></td><td class="num" data-label="Balance"><strong>{{ bal|cents }}</strong></td>{% for label, amount in cols %}<td class="num" data-label="{{ label }}">{% if amount and forloop.last %}<span class="status tone-danger">{{ amount|cents }}</span>{% else %}{{ amount|cents }}{% endif %}</td>{% endfor %}</tr>
     {% empty %}<tr><td colspan="7">{% include "partials/empty.html" with icon="check-circle" title="No overdue balances" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   <h2>Cases</h2>
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Case</th><th>Home</th><th>Status</th><th>Opened</th></tr></thead>
-    <tbody>{% for c in cases %}<tr><td><a href="{% url 'collection_detail' c.pk %}">#{{ c.pk }}</a></td><td>{{ c.lot.label }}</td><td>{% status c.state c.get_state_display %}</td><td class="nowrap">{{ c.opened_at|date:"M j, Y" }}</td></tr>
+    <tbody>{% for c in cases %}<tr class="row-link"><td><a class="row-main" href="{% url 'collection_detail' c.pk %}">Case #{{ c.pk }}</a></td><td class="cell-title">{{ c.lot.label }}</td><td>{% status c.state c.get_state_display %}</td><td class="nowrap" data-label="Opened">{{ c.opened_at|date:"M j, Y" }}</td></tr>
     {% empty %}<tr><td colspan="4" class="muted">No cases.</td></tr>{% endfor %}</tbody>
   </table></div></div>
 {% endblock %}

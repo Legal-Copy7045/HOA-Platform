@@ -13,19 +13,23 @@
           {% if a.statement.balance > 0 and a.due.due_on %}<div class="small" data-testid="due-by">{% if a.due.past_due %}<span class="status tone-danger">Past due since {{ a.due.due_on|date:"M j, Y" }}</span>{% else %}Due by {{ a.due.due_on|date:"M j, Y" }}{% endif %}</div>{% endif %}
         </div>
       </div>
+      <div class="form-actions account-actions">
+        {% if online and a.statement.balance > 0 and a.can_pay_online %}<a class="btn" href="{% url 'pay_online' a.lot.pk %}">{% icon "wallet" %} Pay online</a>{% endif %}
+        <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
+      </div>
       {% include "ledger/_open_charges.html" with open_charges=a.open_charges open_before=a.open_before unapplied=a.unapplied %}
       <h3>Statement</h3>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="stack-sm statement">
         <thead><tr><th>Date</th><th>Description</th><th class="num">Charges</th><th class="num">Payments</th><th class="num">Balance</th></tr></thead>
         <tbody>
-        {% for r in a.rows %}<tr><td class="nowrap">{{ r.posted_on|date:"M j, Y" }}</td><td>{{ r.description }}</td><td class="num">{% if r.charge_cents %}{{ r.charge_cents|cents }}{% endif %}</td><td class="num">{% if r.payment_cents %}{{ r.payment_cents|cents }}{% endif %}</td><td class="num">{% if r.balance_cents < 0 %}{{ r.balance_cents|cents|cut:"-" }} credit{% else %}{{ r.balance_cents|cents }}{% endif %}</td></tr>
+        {% for r in a.rows %}<tr><td class="nowrap muted-sm">{{ r.posted_on|date:"M j, Y" }}</td><td class="cell-title">{{ r.description }}</td><td class="num" data-label="Charge">{% if r.charge_cents %}{{ r.charge_cents|cents }}{% endif %}</td><td class="num" data-label="Payment">{% if r.payment_cents %}{{ r.payment_cents|cents }}{% endif %}</td><td class="num" data-label="Balance">{% if r.balance_cents < 0 %}{{ r.balance_cents|cents|cut:"-" }} credit{% else %}{{ r.balance_cents|cents }}{% endif %}</td></tr>
         {% empty %}<tr><td colspan="5" class="muted">No activity yet.</td></tr>{% endfor %}
         </tbody>
       </table></div>
       {% if a.upcoming %}<h3>Upcoming charges</h3>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="stack-sm">
         <thead><tr><th>Due</th><th>Description</th><th class="num">Amount</th></tr></thead>
-        <tbody>{% for c in a.upcoming %}<tr><td class="nowrap">{{ c.due_on|date:"M j, Y" }}</td><td>{{ c.description }}{% if c.covered_by_credit %} <span class="badge tone-success">covered by credit</span>{% endif %}</td><td class="num">{{ c.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
+        <tbody>{% for c in a.upcoming %}<tr><td class="nowrap muted-sm" data-label="Due">{{ c.due_on|date:"M j, Y" }}</td><td class="cell-title">{{ c.description }}{% if c.covered_by_credit %} <span class="badge tone-success">covered by credit</span>{% endif %}</td><td class="num" data-label="Amount">{{ c.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
       </table></div>{% endif %}
       {% if a.online_receipts %}<h3>Online payments</h3>
       <ul class="list small">{% for p in a.online_receipts %}<li><div class="grow">{{ p.recorded_at|date:"M j, Y" }} &middot; {{ p.total_cents|cents }} &middot; {{ p.get_method_display }}</div><a href="{% url 'payment_receipt' p.pk %}">{% icon "download" %} Receipt (PDF)</a></li>{% endfor %}</ul>{% endif %}
@@ -43,18 +47,9 @@
         {% if remit_lines %}<address>{% for line in remit_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% else %}<p class="small muted">Ask the board where to send checks.</p>{% endif %}
         <p class="small muted">Write your address on the check so the payment reaches the right account.</p>
       </div>
-      {% if a.account %}<h3>On this account</h3>
-      <p class="small muted">Account number {{ a.account.number }}</p>
-      <ul class="list">
-        {% for p in a.owners %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow">{{ p.display_name }} <span class="small muted">Owner</span></div></li>{% endfor %}
-        {% for c in a.contacts %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow">{{ c.person.display_name }} <span class="small muted">{{ c.get_kind_display }}</span></div></li>{% endfor %}
-      </ul>
-      <p class="small muted">To add or remove someone, ask the board.</p>{% endif %}
-      <div class="form-actions">
-        <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
-        {% if online and a.statement.balance > 0 and a.can_pay_online %}<a class="btn" href="{% url 'pay_online' a.lot.pk %}">{% icon "wallet" %} Pay online</a>{% endif %}
-      </div>
+      {% if a.account %}<p class="small muted" data-testid="account-people-link">Account number {{ a.account.number }} · <a href="{% url 'my_lot' %}#people-{{ a.lot.pk }}">People on this account</a></p>{% endif %}
     </section>
   {% endfor %}
-  <p><a href="{% url 'resales' %}">Selling your home? Request a resale certificate</a></p>
+  {% if can_request_resale %}<p class="link-row"><a href="{% url 'resales' %}">Selling your home? Request a resale certificate</a></p>
+  {% elif accounts %}<p class="small muted" data-testid="resale-owner-only">Selling the home? Only an owner on the deed can ask for a resale certificate.</p>{% endif %}
 {% endblock %}

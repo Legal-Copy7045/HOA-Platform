@@ -285,5 +285,5 @@ def request_work_order(request, pk):
     except services.OperationsError as exc:
         messages.error(request, str(exc))
         return redirect("request_detail", pk=req.pk)
-    messages.success(request, f"Work order WO-{wo.pk} created.")
+    messages.success(request, f"Work order #{wo.pk} created.")
     return redirect("request_detail", pk=req.pk)

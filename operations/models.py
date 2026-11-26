@@ -113,7 +113,7 @@ class WorkOrder(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"WO-{self.pk} {self.title}"
+        return f"Work order #{self.pk} · {self.title}"
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Work orders are cancelled, not deleted.")

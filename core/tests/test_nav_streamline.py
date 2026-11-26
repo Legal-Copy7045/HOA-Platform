@@ -114,7 +114,12 @@ MENUS = {
     "owner": {"": ["Dashboard"], "My home": MY_HOME, "Community": COMMUNITY},
     "authorized": {"": ["Dashboard"], "My home": CONTACT_HOME, "Community": COMMUNITY},
     "view_only": {"": ["Dashboard"], "My home": CONTACT_HOME, "Community": COMMUNITY},
-    "tenant": {"": ["Dashboard"], "My home": ["My requests"], "Community": NOT_BUDGET},
+    # A tenant can only answer surveys, so Voting is named Surveys (WT-018).
+    "tenant": {
+        "": ["Dashboard"],
+        "My home": ["My requests"],
+        "Community": ["Surveys" if c == "Voting" else c for c in NOT_BUDGET],
+    },
     "former_owner": {"": ["Dashboard"], "My home": ["My history"]},
     "board": {
         "": ["Dashboard", "My items"],
@@ -128,7 +133,6 @@ MENUS = {
             "Board tasks",
             "People",
             "Homes and owners",
-            "Invitations and sign-ups",
         ],
         "Maintenance": MAINTENANCE,
         "Finance": FINANCE,
@@ -164,7 +168,7 @@ MENUS = {
     },
     "sysadmin": {
         "": ["Dashboard"],
-        "Admin": ["System status", "Server tasks", "Invitations and sign-ups", "Branding"],
+        "Admin": ["System status", "Server tasks", "Invitations", "Branding"],
     },
 }
 
@@ -212,7 +216,6 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Board tasks",
         "People",
         "Homes and owners",
-        "Invitations and sign-ups",
     ]
     assert sections["Maintenance"] == ["Work orders", "Vendors", "Contracts"]
     assert sections["Finance"] == [
@@ -230,6 +233,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
     for gone in (
         "Board overview",
         "Approvals",
+        "Invitations and sign-ups",
         "Second approvals",
         "Written consents",
         "Urgent texts",
@@ -267,10 +271,13 @@ def test_former_owner_has_history_not_my_requests(client, board):
 
 def test_tenant_voting_goes_straight_to_surveys(client, board):
     tenant = role_users(board)["tenant"]
-    item = entry(client, tenant, "Voting")
-    # Straight to the filtered Voting list, not the old /surveys/ redirect.
+    item = entry(client, tenant, "Surveys")
+    # Straight to the filtered Voting list, not the old /surveys/ redirect,
+    # named like the page's heading (WT-018).
     assert item["url"] == reverse("voting") + "?type=surveys"
-    assert client.get(item["url"]).status_code == 200
+    page = client.get(item["url"])
+    assert page.status_code == 200
+    assert "<h1>Surveys</h1>" in page.content.decode()
 
 
 def test_sysadmin_settings_goes_straight_to_branding(client):
@@ -279,7 +286,7 @@ def test_sysadmin_settings_goes_straight_to_branding(client):
     assert sections["Admin"] == [
         "System status",
         "Server tasks",
-        "Invitations and sign-ups",
+        "Invitations",
         "Branding",
     ]
     item = entry(client, sysadmin, "Branding")

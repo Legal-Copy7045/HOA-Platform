@@ -241,3 +241,27 @@
   check: "On a phone the meeting page's Board actions panel starts closed below the agenda, opens with one tap, and shows only the steps that apply (send notice first; Mark held disabled with its reason until the meeting starts; minutes after Mark held)."
   steps: "As a demo board member open a coming and a past demo meeting on a phone."
   last: ""
+- key: community settings index and folding
+  check: "On Community settings the section index stays in view while scrolling, a section folds and unfolds, and a link in the 'needs attention' summary opens its section at the rule."
+  steps: "Sign in as a board member; open Settings, Community settings; scroll; click a section link and an attention link."
+  last: "not done yet"
+- key: phone menu sign out at the top
+  check: "On a phone, the menu drawer shows the name, Profile, Sign-in and security and Sign out at the top; for board, manager and ARC the sections with waiting items are open and My home and Community closed (new browser)."
+  steps: "Private window on a phone; sign in as board; open Menu."
+  last: "not done yet"
+- key: accounting setup on a phone
+  check: "Finance, Accounting, Setup on a phone: one column, each account input full width showing the whole value, the $ beside the opening balance, Save at the bottom."
+  steps: "Sign in as board on a phone; open Accounting; tap Setup."
+  last: "not done yet"
+- key: one control per form
+  check: "On My requests, Architectural review (Mine), Voting and Resolutions, the header button (Ask the board a question, Ask for approval of a project, New vote / election / survey, Record a resolution) opens its form in place and disappears while the form is open; closing the form brings the button back. With JavaScript off the button loads the page with the form open and no button."
+  steps: "As a demo owner and as the board, on a phone and a desktop, press each header button, close the form again; repeat once with JavaScript disabled."
+  last: ""
+- key: filters switch in place
+  check: "Filter and tab links (My requests Open / Closed / All, Voting Open / Past and type, Homes and owners, Owner accounts With a balance, Invoices status, Invitations status, Resolutions) change only the list: the page does not reload or jump to the top, the chosen tab is marked, Back and Forward step through the filters, and a reload keeps the filter."
+  steps: "Scroll so the filters are mid-screen, tap each filter, then use Back and Forward; check with a screen reader that the current filter is announced."
+  last: ""
+- key: phone tab bar
+  check: "On a phone every signed-in page has a bottom bar (owners: Dashboard, My account, Voting, Menu; board, manager and ARC: Dashboard, My items, Search, Menu) that never covers a page's last button, shows waiting counts, and whose Menu opens the drawer; it is absent on a desktop and in print."
+  steps: "Sign in as a demo owner and a board member on an iPhone and an Android phone; scroll to the bottom of a long page (My account, Owner accounts); open Menu from the bar; print a page."
+  last: ""

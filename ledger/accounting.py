@@ -85,6 +85,89 @@ def gl_rows(setup: AccountingSetup) -> list[dict]:
     ]
 
 
+# The setup page groups the accounts under plain headings, each with a line
+# on what lands there (owner request 2026-11-26). Labels stay GL_LABELS.
+GL_GROUPS = [
+    (
+        "Money coming in",
+        [
+            ("assessment", "Monthly {terms} owners are charged."),
+            ("late_fee", "Late fees posted on overdue accounts."),
+            ("resale_fee", "Fees for resale certificates when a home is sold."),
+            ("other_charge", "Any other charge posted to an owner's account."),
+            ("card_surcharge", "The surcharge owners pay when they pay by credit card."),
+        ],
+    ),
+    (
+        "Money owed to the association",
+        [
+            ("receivable", "What owners owe: every charge until it is paid."),
+            ("credit", "Credits and adjustments given to owners."),
+        ],
+    ),
+    (
+        "Bank and card payments",
+        [
+            ("cash", "The bank account owners' checks and transfers are deposited into."),
+            ("stripe_clearing", "Online payments while they sit at Stripe before the payout."),
+            ("processing_fees", "What Stripe keeps for each online payment."),
+        ],
+    ),
+]
+
+
+def standard_accounts() -> dict[str, str]:
+    """The account each key uses when its box is left empty."""
+    from ledger.models import DEFAULT_GL, ONLINE_GL
+
+    defaults = {
+        k.strip(): v.strip()
+        for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
+    }
+    return {**defaults, **ONLINE_GL}
+
+
+def setup_groups(setup: AccountingSetup, values: dict[str, str] | None = None) -> list[dict]:
+    """The setup form's rows by heading. A row's value is the account only
+    when it differs from the standard one (shown as the placeholder), so
+    saving without changes keeps every account as it was. ``values`` are
+    what was typed, for a form shown again with errors."""
+    accounts = setup.accounts()
+    standard = standard_accounts()
+    out = []
+    for heading, rows in GL_GROUPS:
+        items = []
+        for key, help_text in rows:
+            current = accounts.get(key, "")
+            items.append(
+                {
+                    "key": key,
+                    "label": term_text(GL_LABELS[key]),
+                    "help": term_text(help_text),
+                    "standard": standard.get(key, ""),
+                    "value": values.get(key, "")
+                    if values is not None
+                    else ("" if current == standard.get(key) else current),
+                }
+            )
+        out.append({"heading": heading, "rows": items})
+    return out
+
+
+def setup_summary(setup: AccountingSetup) -> dict:
+    """One line for the Accounting page: how many accounts are mapped (and
+    changed from the standard), and the opening balance and its date."""
+    accounts = setup.accounts()
+    standard = standard_accounts()
+    return {
+        "mapped": sum(1 for key in GL_LABELS if accounts.get(key)),
+        "changed": sum(1 for key in GL_LABELS if accounts.get(key) != standard.get(key)),
+        "opening_cents": setup.opening_cash_cents,
+        "opening_on": setup.opening_cash_on,
+        "is_set_up": setup.opening_cash_on is not None,
+    }
+
+
 def gl_text(setup: AccountingSetup, values: dict[str, str]) -> str:
     """The stored text from one value per key. A blank box keeps the default;
     keys the form does not show are kept as they were."""

@@ -1,4 +1,5 @@
-{% load portal %}
+{% load portal %}{# Date range and export (WT-047): behind "Filter and export" on phones, open when a filter is set; static/js/app.js opens it on wider screens. #}
+<details class="list-filter"{% if tools.date_from or tools.date_to %} open{% endif %}><summary>{% icon "sliders" %} Filter and export</summary><div class="panel-body">
 <form method="get" class="inline-form list-tools" aria-label="Filter the list">
   {% for k, v in request.GET.items %}{% if k not in "show from to page export" %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
   {% if tools.has_states %}<label class="small">Show <select name="show"><option value="open"{% if tools.show == "open" %} selected{% endif %}>Open</option><option value="closed"{% if tools.show == "closed" %} selected{% endif %}>Closed</option><option value="all"{% if tools.show == "all" %} selected{% endif %}>All</option></select></label>{% endif %}
@@ -7,3 +8,4 @@
   <button type="submit" class="secondary small">Apply</button>
   {% if can_export %}<button type="submit" name="export" value="csv" class="secondary small">{% icon "download" %} Export CSV</button>{% endif %}
 </form>
+</div></details>

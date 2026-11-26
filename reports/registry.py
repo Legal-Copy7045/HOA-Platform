@@ -190,7 +190,7 @@ def owner_transfers(start, end):
 
 @report(
     "paid_by_vendor",
-    "Paid invoices by service provider",
+    "Paid invoices by vendor",
     "Vendor contact details and amounts paid in the date range.",
     "Association",
     RANGE,
@@ -320,7 +320,7 @@ def work_orders_report(start, end):
 
 @report(
     "ar_aging",
-    "AR aging",
+    "Unpaid balances by age",
     "Owners with a balance, by how long charges have been open.",
     "Financials",
     AS_OF,
@@ -360,7 +360,13 @@ def _budget(fiscal_year):
     return Budget.objects.filter(fiscal_year=fiscal_year).first()
 
 
-@report("budget", "Budget", "The budget for the fiscal year.", "Financials", FISCAL_YEAR)
+@report(
+    "budget",
+    "Budget lines",
+    "Each line of the fiscal year's budget with its annual amount.",
+    "Financials",
+    FISCAL_YEAR,
+)
 def budget_report(fiscal_year):
     budget = _budget(fiscal_year)
     if budget is None:
@@ -374,7 +380,7 @@ def budget_report(fiscal_year):
 
 @report(
     "budget_spread",
-    "Budget spread",
+    "Budget vs actual by month",
     "Monthly budget, actual and variance for the fiscal year.",
     "Financials",
     FISCAL_YEAR,

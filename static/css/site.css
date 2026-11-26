@@ -535,3 +535,167 @@ tr.below-zero th, tr.below-zero td { background: var(--danger-bg); }
 .list > li.cal-row .todo-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .35rem; }
 .cal-menu .cal-note { margin: .35rem .7rem; max-width: 16rem; }
 .join-note a { overflow-wrap: anywhere; }
+
+/* In-page index of a long settings page, kept in view (WT-014). */
+.page-index { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .25rem .5rem; padding: .5rem .75rem; margin-bottom: 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.page-index a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 .4rem; }
+/* A card that folds to its heading line (Community settings, ARC request types). */
+details.collapsible > summary { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; cursor: pointer; min-height: 44px; }
+details.collapsible > summary h2 { margin: 0; }
+details.collapsible > summary .summary-edit { margin-left: auto; color: var(--green-700); }
+details.collapsible[open] > summary .summary-edit { display: none; }
+/* Phone drawer: the name, Profile, Sign-in and security and Sign out sit at
+   the top, not 2,000px down (WT-040). */
+@media (max-width: 820px) {
+  .sidebar .sidebar-foot { order: -1; border-top: 0; border-bottom: 1px solid rgba(255, 255, 255, .1); }
+}
+/* Accounting setup: one account per row, the whole value visible (2026-11-26). */
+.accounting-setup .setup-row { margin-bottom: .9rem; }
+.accounting-setup .setup-row input.full-width { width: 100%; max-width: 36rem; }
+.money-input { display: flex; align-items: center; gap: .3rem; }
+
+/* ---------- Phone layout and shared UI shell (walkthrough fixes, D48) ----------
+   Fixed at the source, not per page: tap targets of at least 44px on phones,
+   buttons that wrap instead of running out of their card, styled file inputs,
+   stacked tables, whole-row links, and the phone tab bar. */
+
+/* Buttons never run out of their card (WT-019, WT-038). */
+.card .btn, .card button, .split > aside .btn, .split > aside button[type=submit] { max-width: 100%; }
+.split > aside .btn, .split > aside button[type=submit], .stack-actions .btn { white-space: normal; text-align: center; }
+@media (max-width: 820px) {
+  .btn, :where(button[type=submit]:not(.link)), button.secondary, button.danger { white-space: normal; text-align: center; max-width: 100%; }
+}
+
+/* File inputs look like the portal's secondary button (owner feedback). The
+   native input stays (accessible, works with capture and multiple). */
+input[type=file], .inline-form input[type=file] { width: 100%; max-width: 32rem; min-width: 0; flex: 1 1 100%; color: var(--ink-2); }
+input[type=file]::file-selector-button {
+  font: inherit; font-weight: 600; font-size: .92rem; margin: 0 .75rem 0 0; padding: .5rem .95rem; min-height: 40px;
+  border-radius: 8px; border: 1px solid #8a8f88; background: var(--surface); color: var(--ink); cursor: pointer; }
+input[type=file]::file-selector-button:hover { background: var(--surface-2); border-color: var(--ink-2); }
+input[type=file]:focus-visible { outline: 3px solid var(--green-700); outline-offset: 2px; }
+select { max-width: 100%; }
+/* Native date fields look like the portal's other inputs (owner feedback, D48);
+   the browser's own date picker is left as it is. */
+input[type=date], input[type=datetime-local], input[type=time] { -webkit-appearance: none; appearance: none; display: block; line-height: 1.3; min-width: 10rem; text-align: left; }
+.inline-form input[type=date], .inline-fields input[type=date] { display: inline-block; }
+input[type=date]::-webkit-date-and-time-value, input[type=datetime-local]::-webkit-date-and-time-value { text-align: left; }
+input[type=date]::-webkit-calendar-picker-indicator, input[type=datetime-local]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; }
+@media (max-width: 820px) {
+  input[type=file] { max-width: 100%; white-space: normal; }
+  input[type=file]::file-selector-button { min-height: 44px; display: block; margin: 0 0 .4rem; }
+}
+
+/* A paragraph that holds only a link (WT-036). */
+.link-row a, p.link-row > a { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; }
+@media (max-width: 820px) { a.tap { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; min-width: 44px; } }
+
+/* Whole-row links: a row or list item that opens one thing. The first link's
+   ::after covers the row; other controls in the row stay on top. */
+.row-link { position: relative; }
+.row-link .row-main::after { content: ""; position: absolute; inset: 0; }
+.row-link a:not(.row-main), .row-link button, .row-link form, .row-link input, .row-link select, .row-link summary { position: relative; z-index: 1; }
+tr.row-link:hover, li.row-link:hover { background: var(--green-50); }
+tr.row-link:hover .row-main { text-decoration: underline; }
+
+/* Tables become stacked cards on phones (WT-027). Cells with data-label
+   show the column name; the cell marked .cell-title leads each card. */
+@media (max-width: 640px) {
+  table.stack-sm, table.stack-sm tbody { display: block; width: 100%; }
+  table.stack-sm thead { display: none; }
+  table.stack-sm tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .9rem; padding: .65rem .75rem; border-bottom: 1px solid var(--line-2); }
+  table.stack-sm tbody tr:last-child { border-bottom: 0; }
+  table.stack-sm td, table.stack-sm th { display: block; border: 0; padding: 0; text-align: left; white-space: normal; }
+  table.stack-sm td:empty { display: none; }
+  table.stack-sm td:first-child, table.stack-sm th:first-child, table.stack-sm .cell-title { flex: 1 1 100%; }
+  table.stack-sm .cell-title { order: -1; font-weight: 600; }
+  table.stack-sm .muted-sm { color: var(--muted); font-size: .85rem; }
+  table.stack-sm td.num { font-weight: 600; }
+  table.stack-sm td[data-label]::before { content: attr(data-label) " "; color: var(--muted); font-size: .8rem; font-weight: 600; margin-right: .25rem; }
+  table.stack-sm td.actions, table.stack-sm td.row-actions { flex: 1 1 100%; text-align: left; margin-top: .3rem; }
+  table.stack-sm td[colspan] { flex: 1 1 100%; }
+  .table-wrap:has(> table.stack-sm) { overflow-x: visible; }
+  /* Record payments: each check is a small card of full-width fields (WT-039). */
+  table.stack-sm.batch-table td { flex: 1 1 100%; }
+  table.stack-sm.batch-table td[data-label]::before { display: block; margin: .3rem 0 .15rem; }
+  table.stack-sm.batch-table input, table.stack-sm.batch-table select { min-width: 0; width: 100%; max-width: none; }
+  table.stack-sm.neighbors td[data-label] { flex: 1 1 30%; }
+  table.stack-sm.neighbors td[data-label]::before { display: block; }
+}
+
+/* Tap targets on phones (WT-028, WT-034, WT-035, WT-036, WT-037). */
+@media (max-width: 820px) {
+  td > a:first-child:not(.btn), th > a:first-child:not(.btn), td > strong > a:only-child {
+    display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+  td a[href*="/lots/"], td .lot-link { white-space: nowrap; }
+  .list > li > a.title, .list > li > a.grow, .list > li .grow > a.title:first-child, ul.links a {
+    display: inline-flex; align-items: center; min-height: 44px; }
+  .list > li > a.title, .list > li > a.grow { display: flex; }
+  h2 > a:only-child, h3 > a:only-child, .card-head > a.small, .card-head > a:not(.btn), .meta > a, .page-head .meta a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .15rem; }
+  label.choice, .checkbox label, label:has(> input[type=checkbox]), label:has(> input[type=radio]), li > label:has(input[type=checkbox]) {
+    min-height: 44px; display: flex; align-items: center; gap: .6rem; }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; flex: none; }
+  .wf-action.is-blocked button { min-height: 44px; }
+  /* Two summary tiles per row, not one (WT-042). */
+  .grid-3:has(> .stat), .grid-4:has(> .stat), .grid-2:has(> .stat) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+  .grid:has(> .stat) > .stat:only-child { grid-column: 1 / -1; }
+  .stat .value { font-size: 1.2rem; overflow-wrap: anywhere; }
+}
+
+/* In-page filters and tabs (owner feedback): one row that scrolls sideways
+   on phones (WT-046); links swap the list in place (static/js/app.js). */
+@media (max-width: 640px) {
+  .subnav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .subnav::-webkit-scrollbar { display: none; }
+  .subnav a { flex: none; }
+}
+[data-swap-region][aria-busy="true"] { opacity: .6; transition: opacity .1s; }
+.swap-anchor { scroll-margin-top: 4.5rem; }
+
+/* List filters behind a disclosure on phones (WT-047). */
+details.list-filter { margin: 0 0 .75rem; }
+details.list-filter > summary { width: max-content; }
+/* On wider screens static/js/app.js opens it on load and hides the summary. */
+@media (min-width: 821px) { details.list-filter.js-open > summary { display: none; } }
+
+/* Dashboard on phones (WT-041, WT-049): quick actions before the news, and
+   the first four to-dos with a full-width "See all". */
+.phone-only { display: none; }
+@media (max-width: 960px) {
+  .split.dash { display: flex; flex-direction: column; }
+  .split.dash > aside { display: contents; }
+  .split.dash #quick-actions { order: -1; }
+}
+@media (max-width: 820px) {
+  .phone-only { display: revert; }
+  .btn.phone-only { display: inline-flex; }
+  .desktop-only { display: none; }
+  #todos .list > li:nth-child(n+5) { display: none; }
+  #todos .see-all { width: 100%; margin-top: .5rem; }
+  .topbar .brand span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .topbar .brand { min-width: 0; min-height: 44px; }
+}
+
+/* Phone tab bar (WT-041): the four things people open most, at the bottom. */
+.tabbar { display: none; }
+@media (max-width: 820px) {
+  .tabbar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: fixed; left: 0; right: 0; bottom: 0; z-index: 35;
+    background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(20, 30, 25, .06);
+    padding: 0 0 env(safe-area-inset-bottom); }
+  .tabbar a, .tabbar button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .1rem;
+    min-height: 56px; padding: .3rem .2rem; font: inherit; font-size: .72rem; font-weight: 600; color: var(--ink-2); text-decoration: none;
+    background: none; border: 0; border-radius: 0; cursor: pointer; }
+  .tabbar a[aria-current] { color: var(--green-700); box-shadow: inset 0 3px 0 var(--green-700); }
+  .tabbar .icon { width: 22px; height: 22px; }
+  .tabbar .badge-count { position: absolute; top: .3rem; left: calc(50% + .35rem); background: #f2c14e; color: #3a2a00; font-size: .68rem; font-weight: 700; padding: 0 .35rem; border-radius: 99px; line-height: 1.5; }
+  .shell:has(.tabbar) .content { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+}
+@media print { .tabbar { display: none !important; } }
+
+/* Sticky save bar for bulk editors (WT-032). */
+.save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem;
+  background: var(--surface); border-top: 1px solid var(--line); padding: .6rem 0; margin-top: .5rem; }
+@media (max-width: 820px) { .shell:has(.tabbar) .save-bar { bottom: calc(56px + env(safe-area-inset-bottom)); } }
+
+/* Error pages in the portal layout (WT-048). */
+.error-page { max-width: 36rem; }

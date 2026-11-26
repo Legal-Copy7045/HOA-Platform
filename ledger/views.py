@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -178,9 +179,8 @@ def my_account(request):
     online = online_payments_enabled(request)
     payable = payable_lot_ids(request.user) if online else frozenset()
     accounts = []
-    for lot in Lot.objects.for_user(request.user).filter(
-        pk__in=policy.roles_for(request.user).account_lot_ids
-    ):
+    roles = policy.roles_for(request.user)
+    for lot in Lot.objects.for_user(request.user).filter(pk__in=roles.account_lot_ids):
         since = _ownership_start(request.user, lot.pk)
         statement = services.owner_statement(lot.pk, since)
         accounts.append(
@@ -198,6 +198,9 @@ def my_account(request):
                 "upcoming": services.upcoming_charges(statement.balance, lot_id=lot.pk),
                 "pay_options": payment_options(statement.balance) if online else [],
                 "can_pay_online": lot.pk in payable,
+                # Resale certificates are asked for by an owner on the deed
+                # (WT-001): contacts see a line saying so, not a link to a 403.
+                "is_owner": lot.pk in roles.owned_lot_ids,
                 "online_receipts": _online_receipts(request.user, lot.pk, since),
                 # Automatic payments (D46): payers only, feature on.
                 "autopay": autopay_for_payer(request.user, lot) if online else None,
@@ -211,6 +214,8 @@ def my_account(request):
         {
             "accounts": accounts,
             "online": online,
+            "can_request_resale": policy.can(request.user, "resale.request")
+            and any(a["is_owner"] for a in accounts),
             "test_mode": online and not payments_config().livemode,
             "disclosure": disclosure() if online else "",
             "payable_to": profile.legal_name,
@@ -288,14 +293,42 @@ def ledger_home(request):
     today = timezone.localdate()
     next_month = (today.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
     dues = rule("dues.monthly_cents") or 0
+    with_balance = request.GET.get("balance") == "1"
+    # With automatic posting on, the card shows its status instead of the
+    # picker, and the button only when this month's run looks missed (D48).
+    auto_post = bool(rule("dues.auto_post"))
+    auto = services.auto_post_status() if auto_post else None
+    if auto is not None:
+        from ledger import autopost
+
+        missed = autopost.missed()
+        auto["missed"] = missed is not None
+        auto["reason_text"] = missed["reason_text"] if missed else ""
+    # Months in words, not the browser's month grid (D48): the next month not
+    # yet posted is chosen, starting from next month.
+    month_options = services.assessment_months(today)
+    default_period = f"{next_month:%Y-%m}"
+    open_months = [m["value"] for m in month_options if not m["posted"]]
+    if default_period not in open_months:
+        later = [v for v in open_months if v > default_period]
+        default_period = later[0] if later else (open_months[-1] if open_months else "")
     return render(
         request,
         "ledger/home.html",
         {
-            "rows": [(lot, bal.get(lot.pk, 0)) for lot in lots],
+            # "With a balance" filter (WT-029): homes owing or in credit.
+            "rows": [
+                (lot, bal.get(lot.pk, 0)) for lot in lots if not with_balance or bal.get(lot.pk, 0)
+            ],
+            "with_balance": with_balance,
+            "home_count": len(lots),
             "total_owed": sum(v for v in bal.values() if v > 0),
             "total_credit": -sum(v for v in bal.values() if v < 0),
-            "default_period": f"{next_month:%Y-%m}",
+            "default_period": default_period,
+            "month_options": month_options,
+            "auto_post": auto_post,
+            "auto": auto,
+            "can_change_settings": policy.can(request.user, "community.manage_rules"),
             "dues_cents": dues,
             "dues_lots": len(lots),
             "dues_total": dues * len(lots),
@@ -1027,6 +1060,35 @@ def _money(value) -> int:
     return parse_cents(value)
 
 
+class AccountingSetupForm(forms.Form):
+    """Accounting setup: one optional account per kind of entry (empty keeps
+    the standard account) and the opening bank balance with its date, which
+    go together (owner request 2026-11-26)."""
+
+    opening_cash = MoneyField(label="Opening bank balance", required=False, allow_negative=True)
+    opening_cash_on = forms.DateField(
+        label="As of", required=False, widget=forms.DateInput(attrs={"type": "date"})
+    )
+
+    def __init__(self, *args, **kwargs):
+        from ledger import accounting as acc
+
+        super().__init__(*args, **kwargs)
+        for key in acc.GL_LABELS:
+            self.fields[f"gl_{key}"] = forms.CharField(required=False, max_length=80)
+
+    def clean(self):
+        data = super().clean()
+        amount, on = data.get("opening_cash"), data.get("opening_cash_on")
+        if "opening_cash" in self.errors or "opening_cash_on" in self.errors:
+            return data
+        if amount is not None and on is None:
+            self.add_error("opening_cash_on", "Enter the date of the opening balance.")
+        if on is not None and amount is None:
+            self.add_error("opening_cash", "Enter the opening balance for that date.")
+        return data
+
+
 @login_required
 def accounting(request):
     """Export, deposits, reconciliation, 1099 worksheet and setup."""
@@ -1055,17 +1117,7 @@ def accounting(request):
                 acc.void_deposit(batch, actor=request.user, request=request)
                 messages.success(request, "Deposit voided; its payments are undeposited again.")
             elif section == "setup":
-                acc.save_setup(
-                    gl_accounts=acc.gl_text(
-                        AccountingSetup.get(),
-                        {key: request.POST.get(f"gl_{key}", "") for key in acc.GL_LABELS},
-                    ),
-                    opening_cash_cents=_money(request.POST.get("opening_cash") or "0"),
-                    opening_cash_on=_date(request.POST.get("opening_cash_on")),
-                    actor=request.user,
-                    request=request,
-                )
-                messages.success(request, "Saved.")
+                return _accounting_setup_save(request)
             else:
                 raise Http404
         except acc.AccountingError as exc:
@@ -1073,8 +1125,12 @@ def accounting(request):
         except ValueError:
             messages.error(request, "Check the amount (dollars, e.g. 1250.00).")
         return redirect("accounting")
+    if request.GET.get("tab") == "setup":
+        policy.require(request.user, "accounting.manage")
+        return _accounting_setup_page(request, AccountingSetupForm(initial=_setup_initial()))
     today = timezone.localdate()
     year = int(request.GET.get("year") or today.year - (1 if today.month < 4 else 0))
+    undeposited = list(acc.undeposited_payments()) if can_manage else []
     return render(
         request,
         "ledger/accounting.html",
@@ -1082,11 +1138,11 @@ def accounting(request):
             "can_manage": can_manage,
             "bank_feed_on": features.enabled("bank_feeds", request)
             and policy.can(request.user, "bank_feed.view"),
-            "undeposited": acc.undeposited_payments() if can_manage else [],
+            "undeposited": undeposited,
+            "undeposited_total": abs(sum(e.amount_cents for e in undeposited)),
             "batches": DepositBatch.objects.all()[:20],
             "reconciliations": BankReconciliation.objects.all()[:12],
-            "setup": (setup := AccountingSetup.get()),
-            "gl_rows": acc.gl_rows(setup),
+            "setup_summary": acc.setup_summary(AccountingSetup.get()),
             "book_balance": acc.book_balance(today),
             "year": year,
             "vendors_1099": acc.vendor_1099_totals(year),
@@ -1095,6 +1151,65 @@ def accounting(request):
             "today": today,
         },
     )
+
+
+def _setup_initial() -> dict:
+    from core.templatetags.portal import cents_plain
+    from ledger.models import AccountingSetup
+
+    setup = AccountingSetup.get()
+    if setup.opening_cash_on is None and not setup.opening_cash_cents:
+        return {}
+    return {
+        "opening_cash": cents_plain(setup.opening_cash_cents),
+        "opening_cash_on": setup.opening_cash_on,
+    }
+
+
+def _accounting_setup_page(request, form, status=200):
+    """Accounting's Setup tab: accounts grouped under plain headings, then
+    the opening balance (owner request 2026-11-26)."""
+    from ledger import accounting as acc
+    from ledger.models import AccountingSetup
+
+    typed = None
+    if form.is_bound:
+        typed = {key: form.data.get(f"gl_{key}", "") for key in acc.GL_LABELS}
+    return render(
+        request,
+        "ledger/accounting_setup.html",
+        {
+            "form": form,
+            "groups": acc.setup_groups(AccountingSetup.get(), typed),
+            "summary": acc.setup_summary(AccountingSetup.get()),
+        },
+        status=status,
+    )
+
+
+def _accounting_setup_save(request):
+    from ledger import accounting as acc
+    from ledger.models import AccountingSetup
+
+    form = AccountingSetupForm(request.POST)
+    if not form.is_valid():
+        return _accounting_setup_page(request, form)
+    data = form.cleaned_data
+    try:
+        acc.save_setup(
+            gl_accounts=acc.gl_text(
+                AccountingSetup.get(), {key: data[f"gl_{key}"] for key in acc.GL_LABELS}
+            ),
+            opening_cash_cents=data["opening_cash"] or 0,
+            opening_cash_on=data["opening_cash_on"],
+            actor=request.user,
+            request=request,
+        )
+    except acc.AccountingError as exc:
+        form.add_error(None, str(exc))
+        return _accounting_setup_page(request, form)
+    messages.success(request, "Accounting setup saved.")
+    return redirect(reverse("accounting") + "?tab=setup")
 
 
 @login_required

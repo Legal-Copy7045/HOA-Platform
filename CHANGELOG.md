@@ -6,6 +6,71 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.18.0 — 2026-11-26
+
+- Phones: every button and link is at least a thumb's size, buttons wrap
+  instead of running off their card, and money tables (My account, home
+  accounts, Owner accounts, Invoices, Collections, Invitations and more)
+  become one card per row. A bar at the bottom of the screen opens the
+  Dashboard, My account or My items, Voting or Search, and the Menu.
+- Filters and tabs (My requests, Voting, Homes and owners, Owner accounts,
+  Invoices, Invitations, Resolutions) change the list in place, without
+  reloading or jumping to the top; Back and Forward work.
+- One button per form: "Ask the board a question", "Ask for approval of a
+  project" and the Voting and Resolutions "New ..." buttons open their form
+  where they are and hide while it is open.
+- Main actions first: Pay online and the statement under the balance on My
+  account; Record a payment, Post a charge and Post a credit at the top of a
+  home account; the deposit total and Record deposit at the top of
+  Accounting.
+- Find a home by number, address or owner on Homes and owners; Owner
+  accounts can show only homes with a balance; Invitations filter by status.
+- The month to charge is a list of months in words with already-posted
+  months marked. With automatic posting on, the card shows when the month
+  was posted and the next run; if a month is missed, the board is emailed
+  once, it appears in My items and on System status, and the card offers
+  the button for that month.
+- File inputs look like the portal's buttons; date fields match the other
+  inputs; committee forms have visible labels; Community settings and ARC
+  request types fold into sections.
+- Contacts no longer see a resale certificate link they cannot use, and a
+  refused or missing page keeps the portal's layout with a way home (D48).
+
+## 0.17.0 — 2026-11-26
+
+- Homes and owners has a Sign-ups view for the board (who has signed up,
+  how homes get official notices, invite everyone, reminders and every
+  invitation); the separate "Invitations and sign-ups" menu entry is gone and
+  its old address leads there. The sysadmin's page is now called Invitations.
+- One name per thing: "My home improvement requests (ARC)" on My home and
+  My history, "Work order #3", "Invoice PP-102 · vendor", My items groups named
+  after the page they open (Voting, Invoices, Second approvals, People...),
+  plainer report names, and a tenant's Voting is called Surveys.
+- Community settings: a section index at the top, sections that fold away,
+  the card surcharge typed as a percent (3 or 2.5; still at most 3%), and
+  plain wording for reading neighbor acknowledgements from scanned forms.
+  ARC request types fold to one line each with their citation.
+- Former owners: My history shows a running balance, a statement PDF for
+  their period, and whom to ask about the balance.
+- My account links to the people on the account on My home instead of
+  listing them twice.
+- Ways back: breadcrumbs on every Settings page, Access review and Neighbor
+  acknowledgements.
+- Sysadmin activity shows 30 days at a time with Older and Newer, by day,
+  with filters and a CSV export (recorded in the audit log).
+- ARC reviewers choose their position from an empty list (nothing is
+  recorded by accident), and steps they can never take are no longer shown.
+- Auditors and sysadmins see their usual pages on the dashboard instead of
+  an always-empty to-do list; Quick actions moved up under the to-dos.
+- Documents: "Ask to inspect it" opens the request form; meeting packets are
+  listed under "Meeting packets".
+- Phone menu: staff see their work sections open when something waits there,
+  and Sign out is at the top of the drawer.
+- Accounting setup has its own tab, grouped under plain headings with a line
+  on what each account is for, the whole account visible, and the opening
+  balance and its date required together; Accounting shows a one-line
+  summary.
+
 ## 0.16.0 — 2026-11-26
 
 - Meeting notices now include the join link itself (owner decision), and the

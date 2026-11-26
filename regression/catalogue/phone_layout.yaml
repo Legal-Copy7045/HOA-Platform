@@ -1,0 +1,29 @@
+# Phone layout and the shared UI shell (walkthrough fixes, D48).
+# `match` runs over "<stage>:<check>".
+- feature: "Contacts see no resale link (only owners on the deed ask), and refused or missing pages keep the portal layout with a way home (403.html, 404.html; out-of-scope pages look missing)"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_(contacts_see_no_resale|owner_still_sees_the_resale|refused_page_keeps|missing_and_out_of_scope)"]
+- feature: "Money tables stack as cards on phones (table.stack-sm with data-label headers) and the main actions come first (Pay online, statement, Record a payment)"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_(money_tables_stack|main_actions_come_first)"]
+- feature: "One control per form: a header button opens its panel in place and is hidden while it is open (requests, ARC, Voting, Resolutions)"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_(request_header_button|arc_header_button|voting_new_buttons|resolutions_buttons|opener_script)", "^manual:one control per form"]
+- feature: "Filter and tab links swap the list in place (nav[data-swap], [data-swap-region], history, no jump to the top; no-JS links land on #results)"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_(filter_navs_swap|swap_script|request_filter_swap)", "^manual:filters switch in place"]
+- feature: "Find a home on Homes and owners, Owner accounts 'With a balance', Invitations status pills; owners still refused"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_(find_a_home|owner_accounts_with_a_balance|invitations_status_pills|owner_cannot_open_lists)"]
+- feature: "Month to charge is a list of months in words (3 back to 3 ahead), already-posted months marked, next unposted month chosen; same YYYY-MM value"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_(month_to_charge|posted_months_are_marked|partly_posted_month|submitted_month)", "^unit:ledger/tests/test_finance_ux\\.py::test_(dues_form_uses|posting_dues_from)"]
+- feature: "Automatic monthly posting on Owner accounts: status instead of the button while on; a missed month warns with a button, a My items entry, a failing health check and one board email a month; the task records why it failed (no personal data)"
+  since: M5
+  match: ["^unit:ledger/tests/test_autopost\\.py::test_"]
+- feature: "Phone tab bar (Dashboard, My account or My items, Voting or Search, Menu) built from the menu entries the person already sees"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_tab_bar", "^manual:phone tab bar"]
+- feature: "Tap targets, overflow and file inputs fixed in site.css at the source; committee forms with visible labels; list filters behind 'Filter and export' on phones"
+  since: M5
+  match: ["^unit:core/tests/test_phone_layout\\.py::test_(site_css_fixes|file_inputs_and_date|committee_forms|collection_list_filters)", "^walkthrough:.*phone: .* tap targets", "^walkthrough:.*nothing runs off screen"]

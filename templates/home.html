@@ -35,15 +35,32 @@
     </section>
   {% endwith %}{% endif %}
 
-  {# To-dos first (UX review): the same list as My items and the sidebar counts. #}
+  {# To-dos first (UX review): the same list as My items and the sidebar counts.
+     Roles that are never assigned anything get their usual pages instead (WT-016). #}
+  {% if dash.shortcuts %}
+  <section class="card" id="shortcuts">
+    <h2>Your pages</h2>
+    <ul class="list">{% for q in dash.shortcuts %}<li><a class="title" href="{{ q.url }}">{% icon q.icon %} {{ q.label }}</a></li>{% endfor %}</ul>
+  </section>
+  {% else %}
   <section class="card" id="todos">
-    <div class="card-head"><h2>Needs your attention</h2>{% if dash.todos_more %}<a class="small" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}</div>
+    <div class="card-head"><h2>Needs your attention</h2>{% if dash.todos_more %}<a class="small desktop-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}</div>
     {% if dash.todos %}
       <ul class="list">{% for t in dash.todos %}{% include "partials/todo.html" %}{% endfor %}</ul>
+      {# Phones show the first four (WT-049); the rest are one tap away. #}
+      {% if dash.todos|length > 4 or dash.todos_more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}
     {% else %}
       {% include "partials/empty.html" with icon="check-circle" title="You're all caught up" text="Nothing needs you right now." %}
     {% endif %}
   </section>
+  {% endif %}
+  {# Frequent tasks right under the to-dos, so they are near the top on a phone (WT-041). #}
+  {% if dash.quick %}
+    <nav class="card quick-row" id="quick-actions" aria-labelledby="quick-actions-h">
+      <h2 id="quick-actions-h">Quick actions</h2>
+      <div class="form-actions">{% for q in dash.quick %}<a class="btn secondary" href="{{ q.url }}">{% icon q.icon %} {{ q.label }}</a>{% endfor %}</div>
+    </nav>
+  {% endif %}
 
   {% for m in o.proxy_meetings %}
     <div class="alert info">{% icon "vote" %}<span><strong>{{ m.title }}</strong>, {{ m.starts_at|date:"l, F j, Y" }}: owners vote at this meeting. Can't attend? <a href="{% url 'meeting_detail' m.pk %}#proxy">Give a proxy</a></span></div>
@@ -69,7 +86,7 @@
     </div>
   {% endif %}
 
-  <div class="split">
+  <div class="split dash">
     <div>
       {% if user|can:"announcement.view" %}<section class="card">
         <div class="card-head"><h2>Latest news</h2><a href="{% url 'announcements' %}" class="small">All announcements</a></div>
@@ -105,14 +122,6 @@
           <li class="todo"><a class="todo-link" href="{% url 'event_detail' e.pk %}"><span class="todo-icon">{% icon "calendar" %}</span><span class="grow"><span class="title">{{ e.title }}</span><span class="small muted todo-detail">{{ e.starts_at|date:"D M j, g:i A" }}{% if e.location %} · {{ e.location }}{% endif %}</span></span></a></li>
         {% endfor %}</ul>
       </section>{% endif %}
-      {% if dash.quick %}
-        <section class="card" id="quick-actions">
-          <h2>Quick actions</h2>
-          <ul class="list">
-            {% for q in dash.quick %}<li><a class="title" href="{{ q.url }}">{% icon q.icon %} {{ q.label }}</a></li>{% endfor %}
-          </ul>
-        </section>
-      {% endif %}
     </aside>
   </div>
   {% endwith %}

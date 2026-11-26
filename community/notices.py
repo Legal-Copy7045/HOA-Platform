@@ -4,7 +4,7 @@ The wording an owner agrees to lives here, in one place, with a version.
 When the wording changes, bump ``CONSENT_VERSION``: answers already given
 keep the version they agreed to (``ContactProfile.notice_consent_version``),
 so the association can show exactly what each owner accepted. The board sees
-the current wording on Invitations and sign-ups.
+the current wording on the Sign-ups view of Homes and owners.
 
 Counsel should confirm the wording and the list of notice types before the
 portal is used with real owners (see docs/decisions.md, D44).
