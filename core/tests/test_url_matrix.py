@@ -43,6 +43,11 @@ PUBLIC = {
     "login_background_image",
     # Sign-in help (forgot password, lost phone): one of the sign-in steps.
     "signin_help",
+    # Self-service account recovery (D58): the email form, the emailed link
+    # and its confirm/finish page are sign-in steps too.
+    "recovery_request",
+    "recovery_link",
+    "recovery_continue",
 }
 # Links emailed before sign-in became mandatory (D24): sign-in first, then
 # only the neighboring lot's owner is sent on to their review page.
@@ -218,6 +223,8 @@ PROTECTED = {
     "invitation_action": ("POST", "invitation"),
     "reset_start": ("POST", "person"),
     "reset_decide": ("POST", "reset"),
+    # D58: a board page about one recovery (owners get 403).
+    "recovery_board": ("GET", "recovery_b"),
     "sysadmin_activity": ("GET", None),
     "system_status": ("GET", None),
     "server_tasks": ("GET", None),
@@ -380,6 +387,7 @@ PROTECTED = {
     "paper_mail_envelopes": ("GET", "mailing"),
     "paper_mail_labels": ("GET", "mailing"),
     "paper_mail_mark": ("POST", "mailing"),
+    "paper_mail_piece_checked": ("POST", "mailing"),
 }
 
 
@@ -413,7 +421,7 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        for key in ("push", "sms", "bank_feeds"):  # off by default; pages checked here
+        for key in ("push", "sms", "bank_feeds", "usps_tracking"):  # off by default; checked here
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
@@ -791,6 +799,7 @@ def world():
         "nomination": SysadminNomination.objects.unscoped("t").get(pk=nomination.pk).pk,
         "invitation": Invitation.objects.unscoped("t").get(pk=invitation.pk).pk,
         "reset": MfaReset.objects.unscoped("t").get(pk=reset.pk).pk,
+        "recovery_b": _recovery_for(owner_b).pk,
         "board_announcement": board_note.pk,
         "event": board_event.pk,
         "event_slot": event_slot.pk,
@@ -828,6 +837,19 @@ def world():
         "lot_b": lot_b,
         "targets": targets,
     }
+
+
+def _recovery_for(user):
+    from accounts.models import AccountRecovery
+
+    now = timezone.now()
+    return AccountRecovery.objects.create(
+        subject=user,
+        wait_hours=48,
+        lock_hours=48,
+        ready_at=now + timedelta(hours=48),
+        expires_at=now + timedelta(days=9),
+    )
 
 
 def _url(name, key, targets):

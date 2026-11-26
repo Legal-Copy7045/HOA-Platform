@@ -21,7 +21,15 @@ def w():
     }
 
 
-OFF_BY_DEFAULT = {"reservations", "push", "sms", "bank_feeds", "online_payments", "autopay"}
+OFF_BY_DEFAULT = {
+    "reservations",
+    "push",
+    "sms",
+    "bank_feeds",
+    "online_payments",
+    "autopay",
+    "usps_tracking",
+}
 
 
 def test_defaults_reservations_alerts_off_everything_else_on():

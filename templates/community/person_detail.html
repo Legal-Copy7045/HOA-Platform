@@ -47,6 +47,7 @@
       <section class="card"><h3>Login</h3>
         {% if person.user_id %}
           <p class="small">Has a login. MFA {% if has_mfa %}enrolled{% else %}<strong>not enrolled</strong>{% endif %}.</p>
+          {% if setup_again and not setup_again.refusal and not is_me %}<p class="small muted">They signed in but never added a passkey or app, so they can't get back in. A new setup link goes to {{ person.email }}.</p><form method="post" action="{% url 'invite_person' person.pk %}" data-confirm="Email a new setup link? They choose a password again and add a passkey or app; any earlier link stops working.">{% csrf_token %}<div class="form-actions"><button type="submit">{% icon "mail" %} Send a new setup link</button></div></form>{% elif setup_again.refusal %}<p class="small muted">{{ setup_again.refusal }}</p>{% endif %}
           {% if not is_me %}<details class="panel"><summary>Start a sign-in reset</summary><div class="panel-body">
             <p class="muted small">For a lost authenticator. Only after confirming it really is them. A different board member must approve.</p>
             <form method="post" action="{% url 'reset_start' person.pk %}">{% csrf_token %}{{ reset_form }}<div class="form-actions"><button type="submit" class="secondary">Start reset</button></div></form></div></details>{% endif %}

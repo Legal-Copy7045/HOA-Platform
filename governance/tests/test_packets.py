@@ -141,6 +141,21 @@ def test_packet_page_is_for_builders_only(client, world):
     assert b"<h1>Meeting packet</h1>" in response.content
 
 
+def test_packet_crumb_goes_straight_to_the_meetings_list(client, world):
+    """Never through the `meetings` redirect (D49, D57): the Calendar's
+    meetings view while the Calendar is on, the Meetings page while it is off."""
+    from core.models import FeatureSetting
+
+    client.force_login(world["board"])
+    url = reverse("meeting_packet", args=[world["meeting"].pk])
+    crumbs = client.get(url).content.decode().split('class="crumbs"', 1)[1].split("</div>", 1)[0]
+    assert f'href="{reverse("calendar")}?type=meetings"' in crumbs
+    assert f'href="{reverse("meetings")}"' not in crumbs
+    FeatureSetting.objects.update_or_create(key="calendar", defaults={"enabled": False})
+    crumbs = client.get(url).content.decode().split('class="crumbs"', 1)[1].split("</div>", 1)[0]
+    assert f'href="{reverse("meetings")}"' in crumbs
+
+
 # --- Board packet -----------------------------------------------------------------------
 
 

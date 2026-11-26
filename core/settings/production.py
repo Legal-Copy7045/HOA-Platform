@@ -9,8 +9,19 @@ from .base import env
 
 DEBUG = False
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
-# Start short on the POC; raise to 31536000 for production (runbook).
-SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=3600)
+
+# Where this server runs: "production" (real owners) or "poc" (the proof of
+# concept VM, fictional data). Production settings default to "production",
+# so a forgotten value gets the strict rules, never the relaxed ones.
+DEPLOYMENT_STAGE = env("DEPLOYMENT_STAGE", default="production")
+
+# HSTS: a year in production (the minimum below); the POC starts short so a
+# certificate mistake there is not remembered by browsers for long (runbook).
+_hsts = env("SECURE_HSTS_SECONDS", default="").strip()
+SECURE_HSTS_SECONDS = (
+    int(_hsts) if _hsts else (31536000 if DEPLOYMENT_STAGE == "production" else 3600)
+)
+HSTS_PRODUCTION_MINIMUM = 31536000
 
 # Emailed links must point at the public site. If PORTAL_BASE_URL was not
 # set (e.g. an older .env), use the public hostname rather than localhost.
@@ -49,12 +60,33 @@ if ADMIN_ENABLED:  # noqa: F405
     _problems.append("ADMIN_ENABLED must be false in production (decision Q9)")
 if env.bool("DJANGO_DEBUG", default=False):
     _problems.append("DJANGO_DEBUG must be false in production")
+
+# Stage rules (external review 2026-11-26, D57). Both the POC and production
+# hold uploaded files, so both scan every upload with ClamAV and serve only
+# files the scanner passed. Production also sends real mail to real people
+# (no redirect) and keeps HSTS for at least a year.
+if DEPLOYMENT_STAGE not in ("production", "poc"):
+    _problems.append('DEPLOYMENT_STAGE must be "production" or "poc"')
+if DOCUMENT_SCANNER != "clamd":  # noqa: F405
+    _problems.append(
+        "DOCUMENT_SCANNER must be clamd (the ClamAV container) on the POC and in production"
+    )
+elif not DOCUMENT_CLAMD_ADDRESS:  # noqa: F405
+    _problems.append("DOCUMENT_CLAMD_ADDRESS must name the ClamAV daemon (for example clamav:3310)")
+if not DOCUMENT_REQUIRE_CLEAN_SCAN:  # noqa: F405
+    _problems.append("DOCUMENT_REQUIRE_CLEAN_SCAN must be true on the POC and in production")
+if DEPLOYMENT_STAGE == "production":
+    if EMAIL_REDIRECT_ALL_TO:  # noqa: F405
+        _problems.append("EMAIL_REDIRECT_ALL_TO must be empty in production")
+    if SECURE_HSTS_SECONDS < HSTS_PRODUCTION_MINIMUM:
+        _problems.append(
+            f"SECURE_HSTS_SECONDS must be at least {HSTS_PRODUCTION_MINIMUM} in production"
+        )
 if _problems:
     raise ImproperlyConfigured("Unsafe production configuration: " + "; ".join(_problems))
 
 # Demo data may only be loaded on a deployment explicitly marked as the POC
 # (security review 2026-11). Anywhere else the flag is ignored.
-DEPLOYMENT_STAGE = env("DEPLOYMENT_STAGE", default="production")
 if DEPLOYMENT_STAGE != "poc":
     SEED_DEMO_ALLOWED = False
     # Outside the POC a board seat always needs a second board member (D21);

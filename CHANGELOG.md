@@ -6,6 +6,87 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.29.0 — 2026-11-26
+
+- USPS tracking for paper mail (optional, Admin → Features → USPS tracking):
+  once a sysadmin enters the association's USPS Business Customer Gateway
+  login on the server (`sudo bash infra/poc/set-usps.sh`), the portal reads
+  USPS Informed Visibility scans of barcoded letters every 4 hours for 30
+  days after mailing. The mailing page shows each letter's status (Mailed,
+  Processed, Sorted for delivery on a date, No scans after 5 days) and the
+  last scan; the meeting page says how many paper notices were sorted for
+  delivery. Letters with no scan after 5 days go on My items to check the
+  address. Paper mail settings shows whether tracking is connected; System
+  status has a "USPS tracking" check, and the Server step of Community setup
+  shows whether it is set up.
+
+## 0.28.0 — 2026-11-26
+
+- Forgot your password? The sign-in page links straight to it. The emailed
+  link (valid an hour, works once) still asks for your passkey, authenticator
+  app or a recovery code before you choose a new password, never signs you in
+  by itself, and every address on file is told "Your password was changed".
+- Fewer lockouts: My items asks you to add a backup sign-in method (a second
+  passkey, or a passkey and an app) and to make new recovery codes when two or
+  fewer are left. Recovery codes are shown once, with a printable page and a
+  text-file download.
+- Lost your phone and your recovery codes? Homeowners, account contacts and
+  tenants can recover their sign-in themselves from Sign-in help: a 48-hour
+  wait, alerts to every email address on file, your phone (if you get texts)
+  and the board, Cancel for you and the board (signing in normally cancels it
+  too), then a new passkey or app. For 48 hours afterwards votes, proxies,
+  contact details, notice and text choices, automatic payments and account
+  change requests are locked, with a banner saying until when. Board members,
+  officers and staff keep the two-board-member reset.
+- The waiting period and the lock are Community settings ("Sign-in and
+  security", also a step of Community setup): at least 48 and 24 hours, at
+  most 14 days.
+- A board "new setup link" is refused for a login with any account recovery
+  on record; that person needs the two-board-member reset.
+
+## 0.27.0 — 2026-11-26
+
+- Someone who accepted their invitation but closed the browser before adding
+  a passkey or app is no longer stuck. The board sees them on Sign-ups as
+  "Signed in, no passkey or app yet" and in My items after a week, and can
+  send a new setup link to the address on record. Anyone who ever had a
+  passkey or app still needs the two-board-member sign-in reset.
+- The "Your setup link expired" page says what happened and what to do next.
+- An invitation link stops working as soon as the person's email on record
+  changes.
+- Being signed out for having no passkey or app is recorded in the audit
+  log. New tests check that every page in the portal sends a login without
+  a passkey or app to setup (D59).
+
+## 0.26.0 — 2026-11-26
+
+Hardening after an external review (D57).
+
+- Files waiting for a malware scan: System status lists each one (where it
+  belongs, when it was uploaded, how long it has waited, size, scan attempts
+  and what the last attempt said, and "Stuck" after 15 minutes), never its
+  name or whose it is. "Scan waiting files now" queues them. Files the
+  scanner could not check at upload are now retried by themselves, two
+  minutes later and every 10 minutes while the scanner answers; before, they
+  stayed blocked until someone ran a command. A health check fails when a
+  file has waited more than 30 minutes.
+- Production refuses to start without ClamAV and clean-scan-only downloads
+  (the POC too), with mail redirected to one inbox, or with HSTS under a
+  year.
+- Backups health: in production, a missing or day-and-a-half-old off-site
+  copy, or no passed restore drill in 90 days, is a failure; restore drills
+  record themselves and Server tasks shows the last one. The POC says plainly
+  when it is not production-ready.
+- django-allauth 65.23.0 (security release for rate limits).
+- CI: secret scanning (gitleaks), a vulnerability scan of the image (Trivy),
+  CodeQL, and the page crawl of every role.
+- Infrastructure images (cloudflared, ClamAV, Postgres, SeaweedFS, Mailpit)
+  are pinned and updated through tested Dependabot pull requests; the VM no
+  longer pulls the newest cloudflared every day.
+- The meeting packet page's crumb goes straight to the meetings list.
+- Documentation: README, late fees, the security review's scope, and a
+  go-live checklist in the runbook.
+
 ## 0.25.0 — 2026-11-26
 
 - Secret ballots, election ballots and anonymous survey answers can no

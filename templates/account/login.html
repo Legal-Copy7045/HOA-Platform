@@ -32,7 +32,7 @@
     <div class="form-actions"><a class="btn secondary block" href="{{ request_login_code_url }}" aria-describedby="login-code-hint">{% icon "mail" %} Send me a sign-in code</a></div>
     <p class="small muted" id="login-code-hint">Instead of your password. You'll still need your authenticator app or passkey.</p>
   {% endif %}
-  <p class="center"><a href="{% url 'signin_help' %}">Forgot password or lost my phone?</a></p>
+  <p class="center"><a href="{% url 'account_reset_password' %}">Forgot your password?</a> · <a href="{% url 'signin_help' %}">Lost your phone?</a></p>
   {% if SOCIALACCOUNT_ENABLED %}
     {% include "socialaccount/snippets/login.html" with page_layout="entrance" %}
   {% endif %}

@@ -209,12 +209,13 @@ def test_page_warns_when_the_agent_is_not_running(client, admin):
 def test_backups_card_shows_local_offsite_and_lock(client, admin, settings):
     settings.BACKUP_S3_BUCKET = "backups"
     now = timezone.now()
-    for name in ("backup_local", "backup_offsite", "offsite_lock"):
+    for name in ("backup_local", "backup_offsite", "offsite_lock", "restore_drill"):
         Heartbeat.objects.create(name=name, at=now)
     client.force_login(admin)
     page = client.get(URL).content.decode()
     card = page.split('id="backups"', 1)[1].split("</section>", 1)[0]
     assert "Last backup on the server" in card and "Off-site lock verified" in card
+    assert "Last restore drill passed" in card
     assert "None yet" not in card and "Not verified" not in card
     assert "Take a backup now" in card
 

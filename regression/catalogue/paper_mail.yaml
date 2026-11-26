@@ -7,3 +7,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:core/tests/test_imb\\.py::test_", "^unit:comms/tests/test_papermail_concurrency\\.py::test_"]
+- feature: "USPS tracking (D60, optional feature usps_tracking): IV-MTR client on urllib (https only to the configured *.usps.com hosts, redirects refused, documented sign-in fields, token in memory with refresh and expiry, 404/403/429/401 handling, paced under 400 a minute); pull-only polling every 4 hours of pieces marked mailed in the last 30 days and not final; append-only scans deduped by piece, time and opcode; statuses Mailed / Processed / Sorted for delivery / No scans after 5 days / Gave up after 30 days; mailing page status column and counts, meeting page line, My items once per letter until checked, health check, set-up status; feature off hides it; check_usps_iv and set-usps.sh (hidden prompt, set_env, check after restart); audit and logs counts only"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:comms/tests/test_usps_tracking\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::.*\\[paper_mail_piece_checked", "^manual:usps tracking in the test environment"]

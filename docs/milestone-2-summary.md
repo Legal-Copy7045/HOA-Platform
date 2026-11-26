@@ -36,10 +36,11 @@ no Content-Security-Policy violations.
    section. Most important: monthly dues amount, ARC review days and
    whether deemed approval applies, violation cure days, meeting notice
    days, resale fee and deadline, voting quorum and pass threshold.
-2. **Late fees** (our morning review): the $6 fee is recorded but cannot be
-   posted. After reviewing PA law and the Declaration, decide whether to
-   turn on `LEDGER_LATE_FEES_ENABLED`, and whether fees should ever be
-   automatic.
+2. **Late fees** (decided 2026-11-25, D21; this note is kept as history):
+   the board posts the fee from the late list with a button while
+   `LEDGER_LATE_FEES_ENABLED` is true (the default, an emergency off
+   switch on the server); automatic posting happens only when the board
+   switches on the `late_fee.auto_apply` rule (off by default).
 3. **Counsel review** before real use of: formal votes, resale certificate
    contents (68 Pa.C.S. § 5407), violation notice wording and hearing
    process, collections referral steps.

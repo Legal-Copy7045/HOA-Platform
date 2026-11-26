@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Start account recovery · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Start account recovery?</h1>
+  <p>Only do this if you've lost your phone or passkey <strong>and</strong> your recovery codes. If you still have any of them, sign in as usual instead.</p>
+  <ul class="small">
+    <li>Your recovery waits <strong>{{ wait }} hours</strong>, for your security.</li>
+    <li>We tell you at every email address we have for you, by text if you get our texts, and the board. Anyone can cancel it, and signing in with your passkey or app cancels it too.</li>
+    <li>After the wait you set up a new passkey or app. For {{ lock }} hours afterwards voting, proxies, contact details, notice choices and automatic payments are locked.</li>
+  </ul>
+  <form method="post">{% csrf_token %}<div class="form-actions"><button type="submit" class="block">Start the {{ wait }}-hour wait</button></div></form>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Cancel, I'll sign in</a></div>
+{% endblock %}

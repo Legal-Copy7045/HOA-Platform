@@ -121,12 +121,15 @@ def _ago(hours):
 
 @pytest.mark.django_db
 def test_backups_health_check(settings):
+    settings.DEPLOYMENT_STAGE = "poc"
     settings.BACKUP_S3_BUCKET = ""
     ok, detail = health._backups()
     assert not ok and "Server tasks" in detail
     call_command("backup_heartbeat", "--kind", "local")
     ok, detail = health._backups()
-    assert ok and "no off-site copy" in detail
+    # POC/local: no off-site copy is allowed, but said plainly (D57).
+    assert ok and "Not production-ready: no off-site copy" in detail
+    assert "restore drill never run" in detail
     settings.BACKUP_S3_BUCKET = "oak-creek-backups"
     ok, detail = health._backups()
     assert not ok and "off-site copy never" in detail
@@ -140,6 +143,71 @@ def test_backups_health_check(settings):
     assert not ok and "off-site copy 40 hours ago" in detail
     Heartbeat.objects.filter(name="backup_local").update(at=_ago(50))
     assert health._backups() == (False, "Last backup 50 hours ago")
+
+
+def _fresh_backups(offsite=True):
+    call_command("backup_heartbeat", "--kind", "local")
+    if offsite:
+        call_command("backup_heartbeat", "--kind", "offsite")
+    Heartbeat.objects.create(name="offsite_lock", at=timezone.now())
+
+
+@pytest.mark.django_db
+def test_production_needs_an_offsite_copy(settings):
+    settings.DEPLOYMENT_STAGE = "production"
+    settings.BACKUP_S3_BUCKET = ""
+    _fresh_backups(offsite=False)
+    call_command("backup_heartbeat", "--kind", "restore_drill")
+    ok, detail = health._backups()
+    assert not ok and "no off-site copy is set up" in detail and "production" in detail
+
+
+@pytest.mark.django_db
+def test_production_fails_on_an_offsite_copy_older_than_36_hours(settings):
+    settings.DEPLOYMENT_STAGE = "production"
+    settings.BACKUP_S3_BUCKET = "oak-creek-backups"
+    _fresh_backups()
+    call_command("backup_heartbeat", "--kind", "restore_drill")
+    assert health._backups()[0]
+    Heartbeat.objects.filter(name="backup_offsite").update(at=_ago(37))
+    ok, detail = health._backups()
+    assert not ok and "off-site copy 37 hours ago" in detail
+
+
+@pytest.mark.django_db
+def test_production_needs_a_restore_drill_every_90_days(settings):
+    settings.DEPLOYMENT_STAGE = "production"
+    settings.BACKUP_S3_BUCKET = "oak-creek-backups"
+    _fresh_backups()
+    ok, detail = health._backups()
+    assert not ok and "restore drill never run" in detail and "every 90 days" in detail
+    call_command("backup_heartbeat", "--kind", "restore_drill")
+    ok, detail = health._backups()
+    assert ok and "restore drill 0 days ago" in detail
+    Heartbeat.objects.filter(name="restore_drill").update(at=_ago(24 * 89))
+    assert health._backups()[0]
+    Heartbeat.objects.filter(name="restore_drill").update(at=_ago(24 * 91))
+    ok, detail = health._backups()
+    assert not ok and "restore drill 91 days ago" in detail
+
+
+@pytest.mark.django_db
+def test_poc_shows_an_old_restore_drill_but_stays_ok(settings):
+    settings.DEPLOYMENT_STAGE = "poc"
+    settings.BACKUP_S3_BUCKET = "oak-creek-backups"
+    _fresh_backups()
+    ok, detail = health._backups()
+    assert ok and "restore drill never run" in detail
+    assert "Not production-ready: no restore drill in 90 days" in detail
+
+
+def test_the_drill_records_itself_on_the_live_portal_only_when_signed():
+    drill = (POC / "restore-drill.sh").read_text()
+    record = drill.index("backup_heartbeat --kind restore_drill")
+    # Only after every check passed, and only for a backup with the keyed checksum.
+    assert drill.index("Restore drill passed") < record
+    assert drill.rindex("${#VERIFY_ARGS[@]} -eq 0", 0, record) > drill.index("Restore drill passed")
+    assert "-f docker-compose.tunnel.yml" in drill[drill.rindex("LIVE=(", 0, record) : record]
 
 
 def test_scripts_record_backups_and_drill_from_offsite():

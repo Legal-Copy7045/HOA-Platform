@@ -282,6 +282,12 @@ def _server_status():
         push_ready = push.configured()
     except Exception:
         push_ready = False
+    try:
+        from comms import usps_tracking
+
+        usps = usps_tracking.setup_status()
+    except Exception as exc:  # shown like a failed check
+        usps = {"state": "failing", "text": f"Check failed ({type(exc).__name__})"}
     return {
         "email_ok": email_ok,
         "email_detail": email_detail,
@@ -294,6 +300,7 @@ def _server_status():
         "stripe": stripe,
         "teller": teller.configured(),
         "push": push_ready,
+        "usps": usps,
         "sms": getattr(settings, "SMS_PROVIDER", "none") != "none",
     }
 

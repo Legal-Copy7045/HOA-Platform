@@ -13,6 +13,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -244,10 +245,17 @@ def paper_mail_detail(request, pk):
         if mailing.meeting_id
         else None
     )
+    from comms import usps_tracking
+
+    tracking = None
+    if usps_tracking.feature_on(request):
+        tracking = usps_tracking.mailing_tracking(mailing, letters)
     return render(
         request,
         "comms/paper_mail_detail.html",
         {
+            "tracking": tracking,
+            "sorted_meaning": usps_tracking.SORTED_MEANING,
             "m": mailing,
             "closing": closing,
             "first": first,
@@ -332,6 +340,27 @@ def paper_mail_mark(request, pk):
     return redirect("paper_mail_detail", pk=mailing.pk)
 
 
+@login_required
+@require_POST
+def paper_mail_piece_checked(request, pk):
+    """USPS tracking (D60): the address of a letter with no scan was checked."""
+    mailing = _mailing(request, pk)
+    from comms import usps_tracking
+    from comms.models import MailPiece
+
+    piece = get_object_or_404(
+        MailPiece.objects.for_user(request.user).filter(mailing=mailing),
+        pk=_int(request.POST.get("piece")) or 0,
+    )
+    try:
+        usps_tracking.mark_checked(piece, actor=request.user, request=request)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Marked as checked. It leaves My items.")
+    return redirect(reverse("paper_mail_detail", args=[mailing.pk]) + "#tracking")
+
+
 _SETTING_FIELDS = tuple(SettingsForm.base_fields)
 
 
@@ -358,10 +387,19 @@ def paper_mail_settings(request):
             "form": form,
             "current": current,
             "service_types": papermail.SERVICE_TYPES,
+            "usps": _usps_status(request),
             "stid_url": papermail.STID_URL,
         },
         status=400 if form.errors else 200,
     )
+
+
+def _usps_status(request) -> dict | None:
+    from comms import usps_tracking
+
+    if not usps_tracking.feature_on(request):
+        return None
+    return usps_tracking.setup_status()
 
 
 @login_required

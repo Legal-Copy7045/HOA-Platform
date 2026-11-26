@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Finish account recovery · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Finish account recovery</h1>
+  {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ error }}</span></div>{% endif %}
+  {% if recovery.status == "ready" %}
+    <p>The waiting period is over. Next, on this phone or computer:</p>
+    <ol class="small">
+      <li>Your old passkeys, authenticator app and recovery codes are removed, and every other place you're signed in is signed out.</li>
+      <li>You add a new passkey or authenticator app right away, in this browser, and save new recovery codes.</li>
+    </ol>
+    <p class="small muted">For {{ lock_hours }} hours afterwards voting, proxies, contact details, notice and text choices, automatic payments and account change requests are locked.</p>
+    <form method="post">{% csrf_token %}<div class="form-actions"><button type="submit" class="block">Remove the old ones and continue</button></div></form>
+  {% elif recovery.status == "waiting" %}
+    <div class="alert info">{% icon "clock" %}<span>The waiting period is not over yet: come back on {{ ready }}.</span></div>
+  {% else %}
+    <div class="alert warning">{% icon "alert" %}<span>This recovery is not open any more (it was cancelled, finished or expired). You can start a new one from Sign-in help.</span></div>
+  {% endif %}
+  <div class="form-actions"><a class="btn secondary" href="{% url 'signin_help' %}">Sign-in help</a></div>
+{% endblock %}

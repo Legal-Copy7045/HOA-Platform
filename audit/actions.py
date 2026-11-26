@@ -70,18 +70,64 @@ _SPECS = [
     _spec("auth.logout", "Signed out"),
     _spec("auth.login_failed", "Failed sign-in"),
     _spec("auth.lockout", "Sign-in locked out after repeated failures"),
+    # D59: a login with no passkey or app was signed out (no setup window here).
+    _spec(
+        "auth.setup_window_closed", "Signed out: no passkey or app and no setup window", "reason"
+    ),
     _spec("mfa.authenticator_added", "Authenticator added", "type"),
     _spec("mfa.authenticator_removed", "Authenticator removed", "type"),
     _spec("mfa.recovery_codes_regenerated", "Recovery codes regenerated", "type"),
     _spec("password.changed", "Password changed or set"),
     _spec("password.reset", "Password reset by email link"),
+    # D58: the emailed reset link still needs the passkey, app or a recovery code.
+    _spec(
+        "password.reset_verified", "Password reset: passkey, app or recovery code checked", "type"
+    ),
+    _spec("password.reset_verify_failed", "Password reset: wrong code for the second step"),
+    _spec("mfa.recovery_codes_viewed", "Recovery codes shown, printed or downloaded", "how"),
+    # D58: self-service account recovery with a waiting period. Ids and states
+    # only: never an email address or phone number.
+    _spec("account_recovery.link_sent", "Account recovery link emailed", "user_id", "purpose"),
+    _spec(
+        "account_recovery.link_refused",
+        "Account recovery link not sent",
+        "user_id",
+        "reason",
+    ),
+    _spec(
+        "account_recovery.started",
+        "Account recovery requested (waiting period started)",
+        "recovery_id",
+        "user_id",
+        "wait_hours",
+        "lock_hours",
+        "emails",
+        "sms",
+        "board",
+    ),
+    _spec(
+        "account_recovery.cancelled",
+        "Account recovery cancelled",
+        "recovery_id",
+        "user_id",
+        "by",
+    ),
+    _spec(
+        "account_recovery.completed",
+        "Account recovery completed: old sign-in methods removed",
+        "recovery_id",
+        "user_id",
+        "removed",
+        "lock_hours",
+    ),
     # invitations (step 6)
     _spec("person.login_linked", "Login linked to a person", "person_id", "user_id"),
-    _spec("invite.created", "Invitation created", "person_id"),
+    # setup_again: a new setup link for a login that never enrolled (D59).
+    _spec("invite.created", "Invitation created", "person_id", "setup_again"),
     _spec("invite.resent", "Invitation re-sent", "person_id"),
     _spec("invite.revoked", "Invitation revoked", "person_id"),
     _spec("invite.sent", "Invitation email sent", "person_id", "send_count"),
-    _spec("invite.accepted", "Invitation accepted", "person_id"),
+    _spec("invite.accepted", "Invitation accepted", "person_id", "setup_again"),
     # two-person flows (step 7)
     _spec("role.sysadmin_nominated", "Sysadmin nominated", "person_id"),
     _spec("role.sysadmin_approved", "Sysadmin nomination approved", "person_id"),
@@ -194,6 +240,9 @@ _SPECS = [
     _spec("system.host_alert", "Host security alert emailed", "kind", "lines", "sent"),
     _spec("system.offsite_lock_checked", "Off-site backup lock checked", "locked"),
     _spec("system.health_check_cleared", "Health check cleared", "check"),
+    _spec(
+        "system.scan_waiting_queued", "Waiting files queued for a malware scan", "waiting", "queued"
+    ),
     _spec("system.check_updates", "Checked for portal updates"),
     _spec("system.install_update", "Portal update requested"),
     _spec("system.schedule_update", "Portal update scheduled for tonight", "at"),
@@ -244,6 +293,17 @@ _SPECS = [
     _spec("mailing.printed", "Paper mailing printed", "format", "letters", "pages", "barcode"),
     _spec("mailing.mailed", "Paper mailing marked mailed", "kind", "letters", "homes"),
     _spec("mailing.settings_changed", "Paper mail settings changed", "window", "barcode"),
+    # USPS tracking (D60): counts only, never a barcode, address or name.
+    _spec(
+        "usps.polled",
+        "USPS scans read",
+        "queried",
+        "new_scans",
+        "not_found",
+        "not_ours",
+        "outcome",
+    ),
+    _spec("mailpiece.checked", "Letter with no USPS scan checked", "mailing_id"),
     _spec("meeting.status_changed", "Meeting held or cancelled", "status"),
     _spec("meeting.minutes_attached", "Minutes attached to meeting", "document_id"),
     _spec("meeting.attendance", "Attendance recorded", "person_id", "present"),

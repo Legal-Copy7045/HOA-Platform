@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Check your email · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Check your email</h1>
+  <p>If that address belongs to an account that can be recovered this way, we've emailed it a link. It works once, for an hour.</p>
+  <p class="small muted">Nothing arrived? Check your spam folder. Board members, officers and the association's staff don't get a link: ask two board members for an assisted reset.</p>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+{% endblock %}

@@ -186,7 +186,11 @@ def sms_stop(request):
     if request.POST.get("opt_in") == "on":
         messages.info(request, "Text alerts stay on.")
         return redirect(reverse("my_profile") + "#texts")
-    sms.stop(user=request.user, request=request)
+    try:
+        sms.stop(user=request.user, request=request)
+    except sms.SmsError as exc:
+        messages.error(request, str(exc))
+        return redirect(reverse("my_profile") + "#texts")
     messages.success(request, "Urgent texts are off. We removed your mobile number.")
     return redirect("my_profile")
 

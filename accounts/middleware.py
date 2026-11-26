@@ -81,6 +81,18 @@ class RequireMFAMiddleware:
             # password (or emailed reset) alone never opens the account.
             from django.contrib.auth import logout
 
+            from audit.services import record_event
+
+            # Audited (D59): the board can see who keeps getting stuck here.
+            record_event(
+                "auth.setup_window_closed",
+                request=request,
+                actor=user,
+                target=user,
+                metadata={
+                    "reason": "expired" if request.session.get(enrollment.SESSION_KEY) else "none"
+                },
+            )
             logout(request)
             return redirect("account_setup_expired")
         if (

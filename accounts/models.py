@@ -217,3 +217,105 @@ class AccessReview(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"Access review #{self.pk}"
+
+
+class RecoveryCancelledBy(models.TextChoices):
+    PERSON = "person", "The person, on the recovery page"
+    BOARD = "board", "A board member"
+    SIGNED_IN = "signed_in", "The person signed in with their passkey or app"
+
+
+class AccountRecovery(ScopedModel):
+    """Self-service recovery of a lost authenticator, with a waiting period (D58).
+
+    Only for ordinary logins (owners, account contacts, tenants, former
+    owners); staff roles use the two-board-member reset (MfaReset). The wait
+    and the post-recovery lock in effect when the request starts are stored
+    on it, so a later change of the board's settings applies to new requests
+    only. Never deleted: cancelled or completed.
+    """
+
+    subject = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    started_at = models.DateTimeField(default=timezone.now)
+    wait_hours = models.PositiveSmallIntegerField()
+    lock_hours = models.PositiveSmallIntegerField()
+    ready_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    cancel_reason = models.CharField(max_length=12, choices=RecoveryCancelledBy.choices, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "subject__person"
+
+    class Meta:
+        ordering = ["-started_at", "-id"]
+        indexes = [models.Index(fields=["subject", "started_at"])]
+
+    def __str__(self) -> str:
+        return f"Account recovery #{self.pk}"
+
+    @property
+    def status(self) -> str:
+        now = timezone.now()
+        if self.cancelled_at:
+            return "cancelled"
+        if self.completed_at:
+            return "completed"
+        if now < self.ready_at:
+            return "waiting"
+        return "ready" if now < self.expires_at else "expired"
+
+    @property
+    def is_open(self) -> bool:
+        return self.status in ("waiting", "ready")
+
+    @property
+    def lock_until(self):
+        if not self.completed_at:
+            return None
+        from datetime import timedelta
+
+        return self.completed_at + timedelta(hours=self.lock_hours)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Recoveries are cancelled, never deleted.")
+
+
+class RecoveryLinkPurpose(models.TextChoices):
+    START = "start", "Start a recovery"
+    FINISH = "finish", "Finish a recovery"
+
+
+class RecoveryLink(ScopedModel):
+    """A single-use emailed link for account recovery. Only the SHA-256 of the
+    token is stored; the token itself exists only in the email."""
+
+    subject = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    purpose = models.CharField(max_length=8, choices=RecoveryLinkPurpose.choices)
+    recovery = models.ForeignKey(
+        AccountRecovery, null=True, blank=True, on_delete=models.PROTECT, related_name="links"
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    objects = ScopedQuerySet.as_manager()
+    scope_person_path = "subject__person"
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Recovery link #{self.pk}"
+
+    @property
+    def usable(self) -> bool:
+        return self.used_at is None and self.expires_at > timezone.now()
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Recovery links expire, never deleted.")

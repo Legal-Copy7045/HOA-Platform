@@ -1,11 +1,17 @@
 {% extends "base.html" %}
 {% load portal signin %}
-{% block title %}Finish setting up your account · {{ SITE_NAME }}{% endblock %}
+{% block title %}Your setup link expired · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% signin_contact as contact %}{% enrollment_window as window %}
-  <h1>Your account isn't set up yet</h1>
-  <div class="alert warning">{% icon "lock" %}<span>This account has no passkey or authenticator app, and the time to add one has run out.</span></div>
-  <p class="muted">For your security, a password alone never opens an account. Ask the board to send you a new invitation, or to start a sign-in reset. You'll then have {{ window }} to add a passkey or authenticator app in the same browser.</p>
+  <h1>Your setup link expired</h1>
+  <div class="alert warning">{% icon "lock" %}<span>This account has no passkey or authenticator app yet, and the time to add one has run out (or the browser was closed before it was added).</span></div>
+  <p>For your security, a password or an emailed code alone never opens an account. You have done nothing wrong, and nothing is lost.</p>
+  <h2>What to do next</h2>
+  <ol class="steps">
+    <li><strong>Never finished setting up?</strong> Ask the board to send you a <strong>new setup link</strong>. It comes by email to the address the association has for you.</li>
+    <li><strong>Lost the phone or passkey you set up?</strong> Ask the board for a <strong>sign-in reset</strong>. Two board members check it's you and give you a one-time code.</li>
+    <li>Open the link (or sign in and enter the code) on the phone or computer you'll use, and add a passkey or authenticator app straight away: you have {{ window }}, in that same browser.</li>
+  </ol>
   <div class="alert info">{% icon "info" %}<span>{% if contact %}Contact {{ contact }}.{% else %}Contact a board member.{% endif %}</span></div>
-  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a> <a class="btn secondary" href="{% url 'signin_help' %}">How sign-in help works</a></div>
 {% endblock %}

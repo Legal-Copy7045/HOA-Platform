@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builds and starts the portal behind the Cloudflare tunnel on the POC VM, and
-# installs the daily cloudflared update timer.
+# installs the update agent. Infrastructure images (cloudflared, ClamAV,
+# Postgres, the file store) are pinned in the compose files and updated by
+# Dependabot pull requests, never pulled as "latest" here (D57).
 #
 #   cd /opt/hoa-portal && sudo bash infra/poc/start-portal.sh                 # normal
 #   cd /opt/hoa-portal && sudo bash infra/poc/start-portal.sh --full-restart  # stop everything first
@@ -84,34 +86,15 @@ echo "==> Starting (migrations run first, as the owner role; unchanged services 
 "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 300 \
   || { echo "Some services are not healthy yet; status below." >&2; }
 
-echo "==> Installing daily cloudflared update"
-cat > /etc/systemd/system/hoa-cloudflared-update.service <<UNIT
-[Unit]
-Description=Update the HOA portal's cloudflared container if a new release exists
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/docker compose --project-directory $APP_DIR -f docker-compose.yml -f docker-compose.tunnel.yml pull cloudflared
-ExecStart=/usr/bin/docker compose --project-directory $APP_DIR -f docker-compose.yml -f docker-compose.tunnel.yml up -d --no-deps cloudflared
-ExecStartPost=/usr/bin/docker image prune -f
-UNIT
-cat > /etc/systemd/system/hoa-cloudflared-update.timer <<'UNIT'
-[Unit]
-Description=Daily cloudflared update check for the HOA portal
-
-[Timer]
-OnCalendar=*-*-* 04:00:00
-RandomizedDelaySec=1h
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-UNIT
-systemctl daemon-reload
-systemctl enable --now hoa-cloudflared-update.timer >/dev/null
+# cloudflared is pinned in docker-compose.tunnel.yml and updated by a
+# Dependabot pull request plus the normal portal update (D57). Remove the old
+# daily pull of the newest cloudflared from VMs that still have it.
+if [ -e /etc/systemd/system/hoa-cloudflared-update.timer ]; then
+  echo "==> Removing the old daily cloudflared update (now pinned and updated with the portal)"
+  systemctl disable --now hoa-cloudflared-update.timer >/dev/null 2>&1 || true
+  rm -f /etc/systemd/system/hoa-cloudflared-update.timer /etc/systemd/system/hoa-cloudflared-update.service
+  systemctl daemon-reload
+fi
 
 echo "==> Installing the update agent (System status: update available / install)"
 cat > /etc/systemd/system/hoa-portal-agent.service <<UNIT
@@ -144,10 +127,8 @@ systemctl enable --now hoa-portal-agent.timer >/dev/null
 if [ "${NEEDS_RESCAN:-0}" = "1" ]; then
   echo
   echo "Malware scanning is now on. Files uploaded before today can't be downloaded"
-  echo "until they are scanned once. Run this, with your sysadmin login email:"
-  echo
-  echo "  docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web \\"
-  echo "    python manage.py rescan_files --actor you@example.org --reason \"malware scanning switched on\""
+  echo "until they are scanned once. The background worker scans them by itself within"
+  echo "10 minutes of ClamAV being ready (System status -> Waiting for a scan)."
 fi
 echo
 echo "File store check:"
@@ -156,4 +137,3 @@ echo
 echo "Tunnel log (last lines; look for 'Registered tunnel connection'):"
 "${COMPOSE[@]}" logs --tail 5 --no-log-prefix cloudflared | grep -v -i token || true
 echo
-echo "Next cloudflared update check: $(systemctl show hoa-cloudflared-update.timer -p NextElapseUSecRealtime --value)"

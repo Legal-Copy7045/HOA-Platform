@@ -29,7 +29,7 @@
   </table></div></div>
   {% elif signups_view %}
   <div class="grid grid-4" data-testid="signup-counts">
-    <div class="stat tone-success"><div class="label">Signed up</div><div class="value">{{ counts.signed_up }}</div><div class="hint">{{ signed_up_percent }}% of owners</div></div>
+    <div class="stat tone-success"><div class="label">Signed up</div><div class="value">{{ counts.signed_up }}</div><div class="hint">{{ signed_up_percent }}% of owners{% if counts.no_authenticator %}; {{ counts.no_authenticator }} more signed in without a passkey or app{% endif %}</div></div>
     <div class="stat"><div class="label">Invited, waiting</div><div class="value">{{ counts.invited }}</div></div>
     <div class="stat {% if counts.not_invited or counts.expired %}tone-warning{% endif %}"><div class="label">Not invited / expired</div><div class="value">{{ counts.not_invited|add:counts.expired }}</div></div>
     <div class="stat {% if counts.no_email %}tone-warning{% endif %}"><div class="label">No email on record</div><div class="value">{{ counts.no_email }}</div></div>
@@ -52,12 +52,13 @@
     <a href="?view=signups&amp;status=needs#results"{% if status_filter == "needs" %} aria-current="true"{% endif %}>Not invited ({{ counts.not_invited|add:counts.expired|add:counts.no_email }})</a>
     <a href="?view=signups&amp;status=invited#results"{% if status_filter == "invited" %} aria-current="true"{% endif %}>Waiting ({{ counts.invited }})</a>
     <a href="?view=signups&amp;status=signed_up#results"{% if status_filter == "signed_up" %} aria-current="true"{% endif %}>Signed up ({{ counts.signed_up }})</a>
+    {% if counts.no_authenticator %}<a href="?view=signups&amp;status=no_authenticator#results"{% if status_filter == "no_authenticator" %} aria-current="true"{% endif %}>No passkey or app ({{ counts.no_authenticator }})</a>{% endif %}
   </nav>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Home</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>
     <tbody>{% for r in rows %}<tr class="row-link"><td class="muted-sm" data-label="Home"><a href="{% url 'lot_detail' r.lot.pk %}">{{ r.lot.label }}</a></td><td class="cell-title"><a class="row-main" href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
       <td data-label="Status"><span class="badge {% if r.status == 'signed_up' %}tone-success{% elif r.status == 'invited' %}tone-info{% else %}tone-warning{% endif %}">{{ r.label }}</span></td>
-      <td class="small muted" data-label="Invitation">{% if r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% endif %}</td></tr>
+      <td class="small muted" data-label="Invitation">{% if r.status == "no_authenticator" %}{% if r.setup_link_open %}New setup link {% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% elif r.setup_refusal %}{{ r.setup_refusal }}{% else %}<form method="post" action="{% url 'invite_person' r.person.pk %}" class="inline" data-confirm="Email {{ r.person.display_name }} a new setup link? They choose a password again and add a passkey or app; any earlier link stops working.">{% csrf_token %}<input type="hidden" name="back" value="signups"><button type="submit" class="secondary small">Send a new setup link</button></form>{% endif %}{% elif r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% endif %}</td></tr>
     {% empty %}<tr><td colspan="4">{% if status_filter %}{% include "partials/empty.html" with icon="users" title="Nobody here" %}{% else %}{% include "partials/empty.html" with icon="users" title="No owners recorded yet" text="Load the register first (import_register)." %}{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   <h2>Every invitation</h2>

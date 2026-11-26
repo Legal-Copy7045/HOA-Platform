@@ -136,6 +136,13 @@ class AutopayError(ValueError):
     pass
 
 
+def _refuse_if_locked(user) -> None:
+    """D58: no automatic-payment changes for a while after a recovery."""
+    from accounts.recovery import refuse_if_locked
+
+    refuse_if_locked(user, "automatic payments", AutopayError)
+
+
 def autopay_enabled(request=None) -> bool:
     """The board switched on both features and Stripe is set up here."""
     from core import features
@@ -406,6 +413,7 @@ def start_setup(
 
     _refuse_read_only(user)
     flow.require_can_pay(user, lot)
+    _refuse_if_locked(user)
     if not autopay_enabled():
         raise AutopayError("Automatic payments are not available right now.")
     if method_type not in AutopayType.values:
@@ -761,6 +769,7 @@ def cancel(user, lot, *, request=None) -> None:
 
     _refuse_read_only(user)
     flow.require_can_pay(user, lot)
+    _refuse_if_locked(user)
     account = _current_account(lot.pk)
     if account is None or state(account.pk).status == OFF:
         raise AutopayError("Automatic payments are not set up for this home.")
