@@ -32,5 +32,11 @@ set_env .env STRIPE_SECRET_KEY "$KEY"
 unset KEY
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
+echo "==> Checking the key with Stripe (read-only)"
+COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
+if ! "${COMPOSE[@]}" exec -T web python manage.py check_stripe; then
+  echo "The check failed (above). To undo: cp .env.before-stripe .env && sudo bash infra/poc/start-portal.sh" >&2
+  exit 1
+fi
 echo "Done. Switch on Online payments in Admin -> Features, then open Finance -> Online payments."
 echo "To undo: cp .env.before-stripe .env && sudo bash infra/poc/start-portal.sh"

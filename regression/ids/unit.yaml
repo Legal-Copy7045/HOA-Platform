@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-2653
+# highest issued: UNIT-2661
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -2639,3 +2639,11 @@ UNIT-2650: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_s
 UNIT-2651: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[autopay_return]"
 UNIT-2652: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[autopay_start]"
 UNIT-2653: "payments/tests/test_autopay.py::test_a_bank_debit_stuck_for_weeks_goes_to_the_board"
+UNIT-2654: "core/tests/test_setup_scripts.py::test_teller_script_checks_the_files_and_never_takes_secrets_on_the_command_line"
+UNIT-2655: "core/tests/test_setup_scripts.py::test_stripe_script_checks_the_key_after_saving_it"
+UNIT-2656: "core/tests/test_setup_scripts.py::test_check_teller_reports_what_is_missing"
+UNIT-2657: "core/tests/test_setup_scripts.py::test_check_teller_refuses_a_file_that_is_not_pem"
+UNIT-2658: "core/tests/test_setup_scripts.py::test_check_teller_sandbox_needs_no_certificate"
+UNIT-2659: "core/tests/test_setup_scripts.py::test_check_stripe_reports_mode_and_missing_rights"
+UNIT-2660: "core/tests/test_setup_scripts.py::test_plain_secondary_buttons_get_the_full_button_style"
+UNIT-2661: "core/tests/test_host_tasks.py::test_test_email_starts_from_server_tasks_to_your_own_address"

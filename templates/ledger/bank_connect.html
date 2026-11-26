@@ -5,7 +5,7 @@
   {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'accounting' %}">Accounting</a> / <a href="{% url 'bank_feed' %}">Bank feed</a> / Connect a bank</div>
   <div class="page-head"><div><h1>Connect a bank</h1><p class="subtitle">Teller opens a window where you choose the association's bank and sign in there. The portal never sees the bank password, and keeps only the account's last four digits and an encrypted, read-only access key.</p></div></div>
-  {% if problems %}<div class="alert warning" role="alert">{% icon "alert" %}<div><strong>Connecting is not available yet.</strong><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul><p class="small">See docs/runbook.md, "Bank feed (Teller, free tier)". Statement files can be imported meanwhile.</p></div></div>
+  {% if problems %}<div class="alert warning" role="alert">{% icon "alert" %}<div><strong>Connecting is not available yet.</strong><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul><p class="small">A sysadmin sets this up once on the server with <code>sudo bash infra/poc/set-teller.sh</code>. Statement files can be imported meanwhile.</p></div></div>
   {% else %}
   <section class="card">
     <p>Use the bank's online-banking sign-in for the association's account (not a personal one). If the bank is not in Teller's list, import statement files instead: every bank offers them.</p>

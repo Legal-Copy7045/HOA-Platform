@@ -96,3 +96,7 @@
   since: M5
   docs: docs/runbook.md
   match: ["^unit:core/tests/test_error_signatures"]
+- feature: "Guided one-time set-up scripts for secrets typed on the server: set-teller.sh (checks the certificate and key, saves them, token key, restart, check_teller) and set-stripe-key.sh (check_stripe after saving); Server tasks test email Start button; plain secondary buttons styled"
+  since: M5
+  docs: docs/runbook.md
+  match: ["^unit:core/tests/test_setup_scripts\\.py::test_", "^unit:core/tests/test_host_tasks\\.py::test_test_email_starts_from_server_tasks"]

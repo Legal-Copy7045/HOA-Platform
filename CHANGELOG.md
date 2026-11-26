@@ -6,6 +6,19 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.15.1 — 2026-11-26
+
+- Bank feed: a guided one-time script sets up Teller on the server
+  (`sudo bash infra/poc/set-teller.sh`): it checks the certificate and key
+  belong together and have not expired, saves them, creates the token key,
+  restarts and checks the result. The Bank feed page now says this in plain
+  words instead of pointing at a developer document.
+- The Stripe key script now checks the key with Stripe after saving it
+  (test or live mode, and whether the read rights are in place).
+- Server tasks: "Send a test email" has a Start button.
+- Sign-in: the "Use my passkey instead" button is styled like the other
+  buttons (it had no padding or rounded corners).
+
 ## 0.15.0 — 2026-11-26
 
 - Automatic payments (optional feature, off by default; needs Online

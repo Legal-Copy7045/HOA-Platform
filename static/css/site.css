@@ -131,7 +131,7 @@ a.title:hover { color: var(--green-700); text-decoration: underline; }
 .tiles .tile span { color: var(--muted); font-size: .87rem; }
 
 /* ---------- Buttons ---------- */
-.btn, :where(button[type=submit]:not(.link)), input[type=submit], button.primary {
+.btn, :where(button[type=submit]:not(.link)), input[type=submit], button.primary, button.secondary, button.danger {
   display: inline-flex; align-items: center; justify-content: center; gap: .4rem; font: inherit; font-weight: 600; font-size: .92rem;
   padding: .5rem .95rem; border-radius: 8px; border: 1px solid var(--green-700); background: var(--green-700); color: #fff;
   cursor: pointer; text-decoration: none; line-height: 1.2; min-height: 44px; white-space: nowrap; }
