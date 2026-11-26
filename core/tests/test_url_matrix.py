@@ -96,7 +96,6 @@ MEMBER_PAGES = {
     "documents",
     "meetings",
     "resolutions",
-    "votes",
     "records_requests",
     "arc_list",
     "violations",
@@ -105,18 +104,23 @@ MEMBER_PAGES = {
     "requests",
     "faq",
     "signoffs_mine",
-    "elections",
     "owner_budget",
     "reservations",
     # Navigation and UX review (ux_nav): hub pages.
     "voting",
     "community_info",
-    # Surveys (M5): the list shows only surveys for the viewer's audience.
-    "surveys",
     # Portal search (core.search): see also test_search_never_shows_board_only_content.
     "search",
     # Reserve plan (reserves): the adopted plan's summary.
     "reserve_summary",
+}
+
+# Governance streamlining (2026-11-26): old list pages that now redirect to
+# the one Voting page with their type preselected (bookmarks, emailed links).
+VOTING_REDIRECTS = {
+    "votes": "/voting/?type=votes",
+    "elections": "/voting/?type=elections",
+    "surveys": "/voting/?type=surveys",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -332,6 +336,7 @@ def test_every_named_url_is_classified():
         | OLD_EMAIL_LINKS
         | OWN_ACCOUNT
         | MEMBER_PAGES
+        | set(VOTING_REDIRECTS)
         | set(PROTECTED)
         | set(COMMUNITY_DETAIL)
         and not name.startswith(OWN_ACCOUNT_PREFIXES)
@@ -426,7 +431,7 @@ def world():
             description="Lot B wants the 2019 audit", actor=owner_b
         )
         draft_vote = governance.create_vote(
-            title="Draft: special assessment", kind="informal", options=["Yes", "No"], actor=board
+            title="Draft: special assessment", kind="formal", options=["Yes", "No"], actor=board
         )
         from governance import surveys as gov_surveys
 
@@ -905,6 +910,19 @@ def test_reset_code_is_shown_once_to_the_approver(client, world):
     assert code.encode() in response.content
     assert response["Cache-Control"].startswith("max-age=0")
     assert code not in str(list(AuditEvent.objects.values_list("metadata", flat=True)))
+
+
+@pytest.mark.parametrize("name", sorted(VOTING_REDIRECTS))
+def test_old_voting_lists_redirect_signed_in_members_only(client, world, name):
+    response = client.get(reverse(name))
+    assert response["Location"].startswith(reverse("account_login"))
+    client.force_login(world["owner_a"])
+    response = client.get(reverse(name))
+    assert response.status_code == 302 and response["Location"] == VOTING_REDIRECTS[name]
+    page = client.get(response["Location"])
+    assert page.status_code == 200
+    for secret in BOARD_ONLY_MARKERS:
+        assert secret not in page.content
 
 
 @pytest.mark.parametrize("name", sorted(MEMBER_PAGES | {"my_profile", "export_my_data"}))

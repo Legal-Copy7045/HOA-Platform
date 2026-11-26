@@ -123,7 +123,7 @@ def test_hub_entry_is_current_on_its_pages_and_its_group_opens(client, w):
 def test_voting_entry_current_on_votes_and_elections(client, w):
     client.force_login(w["owner"])
     for name in ("votes", "elections", "voting"):
-        response = client.get(reverse(name))
+        response = client.get(reverse(name), follow=True)  # old lists redirect to Voting
         current = [i["label"] for s in nav(response) for i in s["items"] if i["current"]]
         assert current == ["Voting"], name
 
@@ -132,9 +132,10 @@ def test_feature_switches_still_gate_hubs_and_voting(client, w):
     client.force_login(w["owner"])
     features.set_feature("votes", False, actor=w["board"])
     page = client.get(reverse("voting")).content.decode()
-    assert "Board elections" in page and "All votes and polls" not in page
+    assert 'href="?type=elections"' in page and 'href="?type=votes"' not in page
     features.set_feature("elections", False, actor=w["board"])
-    assert "All surveys" in client.get(reverse("voting")).content.decode()
+    page = client.get(reverse("voting")).content.decode()
+    assert "surveys (to hear your views" in page and 'href="?type=elections"' not in page
     features.set_feature("surveys", False, actor=w["board"])
     assert client.get(reverse("voting")).status_code == 404
     assert "Voting" not in labels(client.get(reverse("home")))
@@ -160,6 +161,8 @@ def test_nav_labels_match_page_headings(client, w):
             for item in s["items"]:
                 if item["label"] in ("Dashboard", "Budget"):  # greeting; budget's own title
                     continue
+                if item["label"] == "Written consents":  # leaves the sidebar (streamlining):
+                    continue  # its URL now redirects to Resolutions and policies
                 page = client.get(item["url"]).content.decode()
                 h1 = re.search(r"<h1[^>]*>(.*?)</h1>", page, re.S)
                 if not h1 or item["label"] not in h1.group(1):
@@ -294,10 +297,9 @@ def test_proxy_offered_on_dashboard_when_a_meeting_has_a_vote(client, w):
 
 def _poll(board, **kw):
     from governance import services as gov
+    from governance.tests.helpers import legacy_poll
 
-    vote = gov.create_vote(
-        title="Pond fountain?", kind="informal", options=["Yes", "No"], actor=board, **kw
-    )
+    vote = legacy_poll(board, **kw)
     return gov.open_vote(vote, actor=board), list(vote.options.all())
 
 
@@ -320,7 +322,9 @@ def test_secret_ballot_only_says_recorded(client, w):
     client.force_login(w["owner"])
     html = client.get(reverse("vote_detail", args=[vote.pk])).content.decode()
     assert "Your ballot was recorded" in html and "You voted on" not in html
-    assert "Your ballot was recorded" in client.get(reverse("voting")).content.decode()
+    # An informal poll (from before polls became surveys) is listed under Past.
+    past = client.get(reverse("voting") + "?status=past").content.decode()
+    assert "Your ballot was recorded" in past
 
 
 @pytest.fixture
@@ -375,8 +379,10 @@ def test_owner_of_two_lots_is_told_to_cast_per_lot(client, w, election):
 
 def test_elections_tab_and_proxy_links(client, w, election):
     client.force_login(w["owner"])
-    html = client.get(reverse("elections")).content.decode()
-    assert 'href="/elections/" aria-current="page">Elections</a>' in html
+    response = client.get(reverse("elections"))
+    assert response["Location"] == f"{reverse('voting')}?type=elections"
+    html = client.get(response["Location"]).content.decode()
+    assert election.title in html
     html = client.get(reverse("election_detail", args=[election.pk])).content.decode()
     assert f"{reverse('meeting_detail', args=[election.meeting_id])}#proxy" in html
 

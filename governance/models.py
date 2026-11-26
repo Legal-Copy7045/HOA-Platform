@@ -50,6 +50,11 @@ class Meeting(models.Model):
     minutes_document = models.ForeignKey(
         "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
+    # The meeting's entry on the community calendar, made and cancelled with
+    # the meeting (governance.services). Executive sessions never get one.
+    calendar_event = models.OneToOneField(
+        "comms.Event", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -157,6 +162,8 @@ class RecordsRequest(ScopedModel):
 
 
 class VoteKind(models.TextChoices):
+    # No new informal polls: they are surveys now (owner decision 2026-11-26).
+    # Old informal rows stay readable.
     INFORMAL = "informal", "Informal poll (non-binding, one per owner)"
     FORMAL = "formal", "Formal vote (one per lot)"
 
@@ -174,6 +181,14 @@ class Vote(models.Model):
     secret = models.BooleanField(default=False, help_text="Hide who chose what (counts only).")
     status = models.CharField(max_length=16, choices=VoteStatus.choices, default=VoteStatus.DRAFT)
     closes_at = models.DateTimeField(null=True, blank=True)
+    meeting = models.ForeignKey(
+        Meeting,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        help_text="The owners' meeting this vote belongs to, if any.",
+    )
     # Formal votes: rule values and citations are frozen when the vote opens.
     quorum_percent = models.PositiveSmallIntegerField(null=True, blank=True)
     pass_percent = models.PositiveSmallIntegerField(null=True, blank=True)

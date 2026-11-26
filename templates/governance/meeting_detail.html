@@ -20,19 +20,35 @@
         </div>{% empty %}<p class="muted small">No packet yet.</p>{% endfor %}
         {% if can_build_packet and m.status != "cancelled" %}<p><a class="btn small" href="{% url 'meeting_packet' m.pk %}">Build packet</a></p>{% endif %}
       </section>{% endif %}
-      <section class="card"><h3>Notice</h3>{% if m.notice_sent_at %}<p>{% icon "check" %} Sent {{ m.notice_sent_at|date:"M j, Y" }}</p>{% else %}<p class="muted small">Not sent yet.</p>{% endif %}</section>
+      <section class="card"><h3>Notice</h3>{% if m.notice_sent_at %}<p>{% icon "check" %} Sent {{ m.notice_sent_at|date:"M j, Y" }}</p>{% elif m.kind == "executive" %}<p class="muted small">Executive sessions are not noticed to owners and are not on the community calendar.</p>{% else %}<p class="muted small">Not sent yet.</p>{% endif %}
+        {% if m.calendar_event_id and m.kind != "executive" %}<p class="small"><a href="{% url 'event_detail' m.calendar_event_id %}">{% icon "calendar" %} On the community calendar</a></p>{% endif %}</section>
       {% if can_manage %}
         <section class="card"><h3>Board actions</h3>
           {% if m.status == "scheduled" %}<div class="stack">
-            {% if m.kind != "executive" %}<form method="post" action="{% url 'meeting_action' m.pk 'notice' %}" data-confirm="Email the notice to every owner who has consented?">{% csrf_token %}<button type="submit">{% icon "mail" %} Send notice to owners</button></form>{% endif %}
+            {% if m.kind != "executive" %}<form method="post" action="{% url 'meeting_action' m.pk 'notice' %}" data-confirm="Email the notice to every owner who has consented? Owners who have not consented to email need a paper notice; the page lists how many.">{% csrf_token %}
+              {% if deadlines %}<p><label for="notice-deadline">Also mark this deadline done</label><select id="notice-deadline" name="deadline"><option value="">(none)</option>{% for d in deadlines %}<option value="{{ d.pk }}"{% if d.pk == deadline_default %} selected{% endif %}>{{ d.title }} (due {{ d.due_on|short_date }})</option>{% endfor %}</select></p>
+              <p class="help">From the recurring deadlines on Board tasks.</p>{% endif %}
+              <button type="submit">{% icon "mail" %} Send notice to owners</button></form>{% endif %}
             <form method="post" action="{% url 'meeting_action' m.pk 'held' %}">{% csrf_token %}<button type="submit" class="secondary">Mark held</button></form>
-            <form method="post" action="{% url 'meeting_action' m.pk 'cancelled' %}" data-confirm="Cancel this meeting?">{% csrf_token %}<button type="submit" class="danger">Cancel meeting</button></form>
+            <form method="post" action="{% url 'meeting_action' m.pk 'cancelled' %}" data-confirm="Cancel this meeting?{% if m.calendar_event_id %} It is taken off the community calendar.{% endif %} Owners already sent a notice are not told automatically: post an announcement.">{% csrf_token %}<button type="submit" class="danger">Cancel meeting</button></form>
           </div>{% endif %}
-          {% if minutes_choices %}<form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}">{% csrf_token %}<label for="doc">Attach minutes</label><select id="doc" name="document">{% for d in minutes_choices %}<option value="{{ d.pk }}">{{ d.title }}</option>{% endfor %}</select><p class="help">From Documents, category Minutes.</p><button type="submit" class="secondary small">Attach</button></form>{% endif %}
+          {% if minutes_form %}<form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}" enctype="multipart/form-data" class="stack">{% csrf_token %}<input type="hidden" name="how" value="upload">
+            <h4>Upload the minutes</h4>{% include "partials/form_errors.html" with form=minutes_form %}{{ minutes_form }}
+            <p class="help">Saved in Documents under Meeting minutes{% if m.kind == "executive" %}, board only{% else %}, for all owners{% endif %}, and attached here.</p>
+            <button type="submit" class="secondary small">Upload and attach</button></form>{% endif %}
+          {% if minutes_choices and not m.minutes_document_id %}<details><summary class="small">Or attach minutes already in Documents</summary><form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}">{% csrf_token %}<label for="doc">Minutes document</label><select id="doc" name="document">{% for d in minutes_choices %}<option value="{{ d.pk }}">{{ d.title }}</option>{% endfor %}</select><p class="help">From Documents, category Minutes.</p><button type="submit" class="secondary small">Attach</button></form></details>{% endif %}
         </section>
       {% endif %}
     </aside>
   </div>
+  {% if linked_votes or linked_elections or linked_resolutions or can_record_resolution %}<section class="card" id="decisions"><div class="card-head"><h2>Votes, elections and resolutions</h2>
+    {% if can_record_resolution and m.status != "cancelled" %}<a class="btn secondary small" href="{% url 'resolutions' %}?meeting={{ m.pk }}#record">{% icon "plus" %} Record a resolution adopted at this meeting</a>{% endif %}</div>
+    {% if linked_votes or linked_elections or linked_resolutions %}<ul class="list">
+      {% for v in linked_votes %}<li><div class="todo-icon">{% icon "vote" %}</div><div class="grow"><a class="title" href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a><div class="small muted">{{ v.get_kind_display }}</div></div>{% status v.status v.get_status_display %}</li>{% endfor %}
+      {% for e in linked_elections %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow"><a class="title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a><div class="small muted">Board election · {{ e.seats }} seat{{ e.seats|pluralize }}</div></div>{% status e.state e.get_state_display %}</li>{% endfor %}
+      {% for r in linked_resolutions %}<li><div class="todo-icon">{% icon "book" %}</div><div class="grow"><a class="title" href="{% url 'resolutions' %}?all=1">{{ r.number }} {{ r.title }}</a><div class="small muted">{{ r.get_kind_display }} · adopted {{ r.adopted_on|short_date }} · vote {{ r.votes_for }}-{{ r.votes_against }}-{{ r.abstentions }}</div></div></li>{% endfor %}
+    </ul>{% else %}<p class="muted small">Nothing linked to this meeting yet.</p>{% endif %}
+  </section>{% endif %}
   {% if quorum %}<section class="card"><h2>Quorum</h2>
     <p><strong>{{ quorum.represented }}</strong> of {{ quorum.eligible }} lots represented ({{ quorum.in_person }} in person, {{ quorum.by_proxy }} by proxy). Needed: {{ quorum.needed }} ({{ quorum.percent }}%).
       {% if quorum.met %}<span class="badge tone-success">Quorum met</span>{% else %}<span class="badge tone-warning">No quorum yet</span>{% endif %}</p>

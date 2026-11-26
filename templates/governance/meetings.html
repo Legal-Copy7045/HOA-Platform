@@ -11,5 +11,5 @@
       {% status m.status %}</li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="calendar" title="No meetings yet" %}{% endif %}
   </section>
-  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Schedule a meeting</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Schedule</button></div></form></div></details>{% endif %}
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Schedule a meeting</summary><div class="panel-body"><p class="small muted">The meeting goes on the community calendar by itself, and comes off it if you cancel the meeting. Executive sessions never appear on the calendar.</p><form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Schedule</button></div></form></div></details>{% endif %}
 {% endblock %}

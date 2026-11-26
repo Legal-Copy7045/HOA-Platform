@@ -285,13 +285,8 @@ class Command(BaseCommand):
             body="See the calendar and meeting page.",
             actor=b1,
         )
+        # The annual meeting's calendar entry is made with the meeting below.
         start = timezone.now() + datetime.timedelta(days=21)
-        comms.create_event(
-            title="Annual owners' meeting (demo)",
-            starts_at=start,
-            location="Community room (fictional)",
-            actor=b1,
-        )
         # Event RSVPs and volunteer sign-ups (comms.rsvp).
         from comms import rsvp
 
@@ -308,10 +303,11 @@ class Command(BaseCommand):
         rsvp.answer(picnic, answer="going", guests=2, actor=owner3)
         rsvp.answer(picnic, answer="maybe", actor=owner12)
         rsvp.sign_up(dessert, actor=owner3)
-        governance.create_meeting(
+        annual_meeting = governance.create_meeting(
             title="Annual owners' meeting (demo)",
             kind="annual",
             starts_at=start,
+            location="Community room (fictional)",
             agenda="1. Budget\n2. Elections\n3. Pond",
             actor=b1,
         )
@@ -323,16 +319,34 @@ class Command(BaseCommand):
             votes_for=5,
             actor=b1,
         )
-        poll = governance.create_vote(
-            title="Add a fountain to the north pond? (demo)",
-            kind="informal",
-            options=["Yes", "No", "No opinion"],
-            actor=b1,
-        )
-        governance.open_vote(poll, actor=b1)
-        # An anonymous survey (M5), open for two weeks, with two answers.
+        # A quick poll is a one-question survey (informal polls became surveys).
         from governance import surveys as gov_surveys
 
+        poll = gov_surveys.create_survey(
+            title="Add a fountain to the north pond? (demo)",
+            audience="owners",
+            opens_on=t,
+            closes_on=t + datetime.timedelta(days=14),
+            actor=b1,
+        )
+        gov_surveys.add_question(
+            poll,
+            kind="single",
+            prompt="Should the board get quotes for a fountain?",
+            choices=["Yes", "No", "No opinion"],
+            required=True,
+            actor=b1,
+        )
+        gov_surveys.open_survey(poll, actor=b1)
+        # A formal vote for the annual meeting, still a draft.
+        governance.create_vote(
+            title="Adopt the updated pet rules (demo)",
+            kind="formal",
+            options=["Yes", "No"],
+            meeting=annual_meeting,
+            actor=b1,
+        )
+        # An anonymous survey (M5), open for two weeks, with two answers.
         survey = gov_surveys.create_survey(
             title="Pool and clubhouse survey (demo)",
             intro="Help us plan next season. Informal: nothing is decided by it.",
@@ -477,7 +491,11 @@ class Command(BaseCommand):
         from governance import elections as gov_elections
 
         gov_elections.create_election(
-            title="Annual board election (demo)", seats=2, citation="Bylaws (demo)", actor=b1
+            title="Annual board election (demo)",
+            seats=2,
+            citation="Bylaws (demo)",
+            meeting=annual_meeting,
+            actor=b1,
         )
 
         # ARC project types owners choose from (Milestone 3).

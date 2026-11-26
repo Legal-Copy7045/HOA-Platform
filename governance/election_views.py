@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from community.models import BoardSeat, Lot, Ownership, Person
@@ -33,43 +34,6 @@ def _flash(request, fn, ok):
 
 
 # --- Elections --------------------------------------------------------------------------
-
-
-@login_required
-def election_list(request):
-    policy.require(request.user, "vote.view")
-    can_manage = policy.can(request.user, "vote.manage")
-    if request.method == "POST":
-        policy.require(request.user, "vote.manage")
-        election = _flash(
-            request,
-            lambda: elections.create_election(
-                title=request.POST.get("title", ""),
-                seats=int(request.POST.get("seats") or 0),
-                term_years=int(request.POST.get("term_years") or 2),
-                citation=request.POST.get("citation", ""),
-                meeting=Meeting.objects.for_user(request.user)
-                .filter(pk=request.POST.get("meeting") or 0)
-                .first(),
-                actor=request.user,
-                request=request,
-            ),
-            "Election created: nominations are open.",
-        )
-        if election:
-            return redirect("election_detail", pk=election.pk)
-        return redirect("elections")
-    return render(
-        request,
-        "governance/elections.html",
-        {
-            "rows": Election.objects.all(),
-            "can_manage": can_manage,
-            "meetings": Meeting.objects.for_user(request.user).filter(status="scheduled")
-            if can_manage
-            else [],
-        },
-    )
 
 
 def _owner_choices():
@@ -297,23 +261,25 @@ def proxy_revoke(request, pk):
 
 @login_required
 def consents(request):
+    """Old list URL: written consents live on Resolutions and policies now.
+    POST still proposes one (the form there posts here)."""
     policy.require(request.user, "resolution.record")
-    if request.method == "POST":
-        consent = _flash(
-            request,
-            lambda: elections.propose_consent(
-                title=request.POST.get("title", ""),
-                text=request.POST.get("text", ""),
-                citation=request.POST.get("citation", ""),
-                actor=request.user,
-                request=request,
-            ),
-            "Sent to every board member for signature.",
-        )
-        if consent:
+    if request.method != "POST":
+        return redirect(f"{reverse('resolutions')}#consents")
+    from governance.views import ConsentForm, render_resolutions
+
+    form = ConsentForm(request.POST)
+    if form.is_valid():
+        try:
+            consent = elections.propose_consent(
+                actor=request.user, request=request, **form.cleaned_data
+            )
+        except elections.ElectionError as exc:
+            form.add_error(None, str(exc))
+        else:
+            messages.success(request, "Sent to every board member for signature.")
             return redirect("consent_detail", pk=consent.pk)
-        return redirect("consents")
-    return render(request, "governance/consents.html", {"rows": ConsentRequest.objects.all()[:100]})
+    return render_resolutions(request, consent_form=form, open_panel="consent")
 
 
 @login_required

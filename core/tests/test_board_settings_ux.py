@@ -135,7 +135,7 @@ def test_switching_a_feature_off_names_what_disappears(client, board):
     Vote.objects.create(title="Pond fence", kind="informal", status="open", created_by=board)
     client.force_login(board)
     page = client.get(reverse("feature_settings")).content.decode()
-    assert "Switch off Votes and polls? It leaves the menu for everyone" in page
+    assert "Switch off Votes? It leaves the menu for everyone" in page
     assert "1 vote is open." in page
     assert "Its records are kept" in page
 

@@ -9,7 +9,7 @@
       <div class="grow"><a class="title" href="{% url 'event_detail' e.pk %}">{% if e.cancelled %}<s>{{ e.title }}</s>{% else %}{{ e.title }}{% endif %}</a>{% if e.rsvp_enabled and not e.cancelled %} <span class="badge tone-info">RSVP</span>{% endif %}{% if e.pk in going %} <span class="badge tone-success">You're going</span>{% endif %}
         <div class="small muted">{{ e.starts_at|date:"D g:i A" }}{% if e.ends_at %}–{{ e.ends_at|date:"g:i A" }}{% endif %}{% if e.location %} · {{ e.location }}{% endif %}{% if e.audience == "board" %} · Board only{% endif %}</div>
         {% if e.description %}<div class="small">{{ e.description|linebreaksbr }}</div>{% endif %}</div>
-      {% if e.cancelled %}<span class="status tone-danger">Cancelled</span>{% elif can_manage %}<form method="post" action="{% url 'event_cancel' e.pk %}" class="inline" data-confirm="Cancel this event?">{% csrf_token %}<button type="submit" class="danger small">Cancel</button></form>{% endif %}
+      {% if e.cancelled %}<span class="status tone-danger">Cancelled</span>{% elif e.pk in meeting_events %}<span class="small muted">Meeting</span>{% elif can_manage %}<form method="post" action="{% url 'event_cancel' e.pk %}" class="inline" data-confirm="Cancel this event?">{% csrf_token %}<button type="submit" class="danger small">Cancel</button></form>{% endif %}
     </li>{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="calendar" title="Nothing scheduled" %}{% endif %}
   </section>

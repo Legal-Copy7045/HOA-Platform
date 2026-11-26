@@ -101,8 +101,16 @@ def _render(request, event, *, rsvp_form=None, settings_form=None, slot_form=Non
         "slot_form": slot_form or SlotForm(),
         "names": rsvp.answers_with_names(event, user) if names_ok and event.rsvp_enabled else None,
         "names_ok": names_ok,
+        "meeting": _meeting_for(event, user),
     }
     return render(request, "comms/event_detail.html", context, status=status)
+
+
+def _meeting_for(event, user):
+    """The meeting behind this event (made by governance), to link to it."""
+    from governance.services import meeting_for_event
+
+    return meeting_for_event(event, user)
 
 
 @login_required

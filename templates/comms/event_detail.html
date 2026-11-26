@@ -4,7 +4,7 @@
 {% block content %}
   <div class="page-head"><div><h1>{% if e.cancelled %}<s>{{ e.title }}</s>{% else %}{{ e.title }}{% endif %}</h1>
     <p class="subtitle">{{ e.starts_at|date:"l, F j, Y g:i A" }}{% if e.ends_at %}–{{ e.ends_at|date:"g:i A" }}{% endif %}{% if e.location %} · {{ e.location }}{% endif %}</p></div>
-    <div class="actions"><a class="btn secondary" href="{% url 'calendar' %}">Calendar</a></div></div>
+    <div class="actions">{% if meeting %}<a class="btn" href="{% url 'meeting_detail' meeting.pk %}">{% icon "file" %} Meeting page</a>{% endif %}<a class="btn secondary" href="{% url 'calendar' %}">Calendar</a></div></div>
 
   {% if e.cancelled %}<div class="alert danger" role="alert">{% icon "alert" %}<span>This event was cancelled.</span></div>{% endif %}
 

@@ -262,7 +262,7 @@ def test_audience_owners_only_excludes_tenants(w, client):
         _answer(survey, w["tenant"])
     client.force_login(w["tenant"])
     assert client.get(reverse("survey_detail", args=[survey.pk])).status_code == 404
-    assert b"Pool hours survey" not in client.get(reverse("surveys")).content
+    assert b"Pool hours survey" not in client.get(reverse("surveys"), follow=True).content
     assert not surveys.waiting_for(w["tenant"])
 
     residents = _survey(w, audience="residents")
@@ -539,7 +539,7 @@ def test_owner_cannot_see_drafts_or_board_steps(w, client):
     client.force_login(w["owner_a"])
     assert client.get(reverse("survey_detail", args=[survey.pk])).status_code == 404
     assert client.get(reverse("survey_results", args=[survey.pk])).status_code == 404
-    assert b"Pool hours survey" not in client.get(reverse("surveys")).content
+    assert b"Pool hours survey" not in client.get(reverse("surveys"), follow=True).content
     for name, kwargs in (
         ("survey_action", {"pk": survey.pk, "action": "open"}),
         ("survey_question_action", {"pk": survey.questions.first().pk, "action": "remove"}),
