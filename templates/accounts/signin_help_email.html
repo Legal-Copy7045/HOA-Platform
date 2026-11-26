@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load portal signin %}
+{% block title %}No access to your email · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% signin_contact as contact %}
+  <h1>No access to your email</h1>
+  <p>We send sign-in links, reset links and security alerts to your email. If you can't read it any more, it can't be used to prove who you are, and anyone who now controls that mailbox mustn't be able to use it to get into your account. So this can't be done online.</p>
+  <h2>What to do</h2>
+  <ol class="steps">
+    <li>Contact the board. Two board members check it's really you, in person or by phone.</li>
+    <li>They update the email address on your record, and if needed reset your sign-in. The one-time code for that is given to you in person or by phone, never by email.</li>
+    <li>Then you sign in and add a passkey or authenticator app.</li>
+  </ol>
+  <div class="alert info">{% icon "info" %}<span>{% if contact %}Contact {{ contact }}.{% else %}Contact a board member.{% endif %}</span></div>
+  <p class="small muted">Can you still sign in with your passkey or app? Then you're fine for now: ask the board to change the email on your record.</p>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'signin_help' %}">Back</a> <a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+{% endblock %}

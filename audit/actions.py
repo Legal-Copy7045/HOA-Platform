@@ -74,6 +74,14 @@ _SPECS = [
     _spec(
         "auth.setup_window_closed", "Signed out: no passkey or app and no setup window", "reason"
     ),
+    # D62: "Ask the board" on Can't sign in? matched a login that never set up
+    # a passkey or app (recorded only then; ids only).
+    _spec(
+        "auth.setup_link_requested",
+        "Asked the board for a new setup link",
+        "person_id",
+        "user_id",
+    ),
     _spec("mfa.authenticator_added", "Authenticator added", "type"),
     _spec("mfa.authenticator_removed", "Authenticator removed", "type"),
     _spec("mfa.recovery_codes_regenerated", "Recovery codes regenerated", "type"),

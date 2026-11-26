@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Lost your phone or passkey · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Lost your phone or passkey</h1>
+  <p>When you set up your account you were given <strong>recovery codes</strong> to print or save. Each one works once instead of the 6-digit code. A passkey you also added on another phone or computer works too.</p>
+  <form method="get" action="{% url 'signin_help_device' %}" novalidate>
+    {% if error %}<div class="alert danger" role="alert" id="have_error">{% icon "alert" %}<span>{{ error }}</span></div>{% endif %}
+    <fieldset class="choices"{% if error %} aria-describedby="have_error"{% endif %}>
+      <legend>Do you have a recovery code, or another device with your passkey?</legend>
+      <label class="choice" for="have_yes"><input type="radio" name="have" value="yes" id="have_yes" required> Yes, I have one of those</label>
+      <label class="choice" for="have_no"><input type="radio" name="have" value="no" id="have_no"> No, I have neither</label>
+    </fieldset>
+    <div class="form-actions"><button type="submit" class="block">Continue</button></div>
+  </form>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'signin_help' %}">Back</a></div>
+{% endblock %}

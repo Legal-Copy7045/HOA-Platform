@@ -13,5 +13,5 @@
     <li>Open the link (or sign in and enter the code) on the phone or computer you'll use, and add a passkey or authenticator app straight away: you have {{ window }}, in that same browser.</li>
   </ol>
   <div class="alert info">{% icon "info" %}<span>{% if contact %}Contact {{ contact }}.{% else %}Contact a board member.{% endif %}</span></div>
-  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a> <a class="btn secondary" href="{% url 'signin_help' %}">How sign-in help works</a></div>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a> <a class="btn secondary" href="{% url 'signin_help_setup' %}">Ask the board for a new setup link</a></div>
 {% endblock %}

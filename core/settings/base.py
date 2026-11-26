@@ -218,6 +218,8 @@ ACCOUNT_RATE_LIMITS = {
     "login_failed": "10/m/ip,20/h/key",
     # D58: "lost my phone and recovery codes" form, per client and per address.
     "account_recovery": "10/h/ip,3/h/key",
+    # D62: "Ask the board for a new setup link" on Can't sign in?
+    "setup_link_request": "10/h/ip,3/h/key",
 }
 # D58: emailed password reset links work once (the token changes with the
 # password) and only for an hour. The link still needs the passkey or app.

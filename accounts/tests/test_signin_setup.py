@@ -224,8 +224,8 @@ def test_login_page_has_labels_and_the_passkey_first(client):
     assert page.index('id="passkey_login"') < page.index('id="id_login"')
     assert "Sign in with a passkey" in page
     assert "You'll still need your authenticator app or passkey." in page
-    assert reverse("signin_help") in page and "Lost your phone?" in page
-    assert reverse("account_reset_password") in page and "Forgot your password?" in page
+    # D62: one "Can't sign in?" link instead of the two separate ones.
+    assert reverse("signin_help") in page and "Can't sign in?" in page
     assert "placeholder=" not in page
 
 
@@ -240,17 +240,18 @@ def test_wrong_password_error_is_announced(client):
 def test_signin_help_is_open_and_explains_the_two_board_member_reset(client):
     page = client.get(reverse("signin_help"))
     assert page.status_code == 200
-    text = page.content.decode()
-    assert "two board members" in text
-    assert "contact a board member" in text
-    assert reverse("account_reset_password") in text
-    assert "recovery codes" in text
     assert "_auth_user_id" not in client.session
+    # D62: the board-assisted reset is explained on "I can't get into my email".
+    text = client.get(reverse("signin_help_email")).content.decode()
+    assert "Two board members" in text
+    assert "Contact a board member" in text
+    assert "recovery codes" in client.get(reverse("signin_help_device")).content.decode()
 
 
 def test_signin_help_names_the_contact_from_community_settings(client):
     contact = _contact()
-    assert contact in client.get(reverse("signin_help")).content.decode()
+    for name in ("signin_help_setup", "signin_help_email"):
+        assert contact in client.get(reverse(name)).content.decode(), name
 
 
 def test_board_sets_the_signin_contact_on_community_settings(client):

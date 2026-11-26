@@ -494,8 +494,26 @@ def items_for(user) -> list[Item]:
         # D59: signed in once but never added a passkey or app, so they cannot
         # get back in; the board sends a new setup link or starts a reset.
         from accounts.services import STUCK_WITHOUT_AUTHENTICATOR_DAYS, stuck_logins
+        from accounts.setup_requests import open_requests
 
+        # D62: asked for one themselves on Can't sign in?
+        asked = set()
+        for person, asked_at in open_requests():
+            asked.add(person.pk)
+            out.append(
+                Item(
+                    "People",
+                    f"{person.display_name} asked for a new setup link",
+                    f"From Can't sign in? on {short_date(timezone.localdate(asked_at))}: "
+                    "send it from their page if you know it's them",
+                    reverse("person_detail", args=[person.pk]),
+                    "warning",
+                    nav="people",
+                )
+            )
         for person in stuck_logins():
+            if person.pk in asked:
+                continue
             out.append(
                 Item(
                     "People",
