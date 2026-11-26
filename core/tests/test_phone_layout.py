@@ -158,19 +158,19 @@ def test_voting_new_buttons_open_their_panel_with_no_second_heading(client, w):
     page = client.get(reverse("voting")).content.decode()
     assert 'data-opens="new-vote"' in page
     # The closed panel is not shown: only the header button offers "New vote".
-    assert '<details class="panel" hidden data-hide-closed id="new-vote">' in page
+    assert '<details class="panel" hidden id="new-vote" data-hide-closed>' in page
     page = client.get(reverse("voting") + "?new=vote").content.decode()
     assert 'data-opens="new-vote"' not in page
-    assert '<details class="panel" open data-hide-closed id="new-vote">' in page
+    assert '<details class="panel" open id="new-vote" data-hide-closed>' in page
     assert 'data-opens="new-election"' in page
 
 
 def test_resolutions_buttons_open_their_panel(client, w):
     client.force_login(w["board"])
     page = client.get(reverse("resolutions")).content.decode()
-    assert 'data-opens="record"' in page and 'hidden data-hide-closed id="record"' in page
+    assert 'data-opens="record"' in page and 'hidden id="record" data-hide-closed' in page
     page = client.get(reverse("resolutions") + "?new=record").content.decode()
-    assert 'data-opens="record"' not in page and 'open data-hide-closed id="record"' in page
+    assert 'data-opens="record"' not in page and 'open id="record" data-hide-closed' in page
 
 
 def test_opener_script_hides_the_button_while_open():

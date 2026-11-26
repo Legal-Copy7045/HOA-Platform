@@ -10,13 +10,13 @@
     </div>{% endif %}
   </div>
   {# One control per form (WT-009): the header button opens its panel here; a closed panel is not shown. #}
-  {% if vote_form %}<details class="panel"{% if open_panel == "vote" %} open{% else %} hidden{% endif %} data-hide-closed id="new-vote"><summary>New vote</summary><div class="panel-body">
+  {% if vote_form %}<details class="panel"{% if open_panel == "vote" %} open{% else %} hidden{% endif %} id="new-vote" data-hide-closed><summary>New vote</summary><div class="panel-body">
     <div class="alert info">{% icon "vote" %}<span>A vote here is a formal, binding vote of the owners, one ballot per home, using the quorum and pass rules from Community settings (each with its citation). To ask owners' opinions, make a survey instead: one question is fine.</span></div>
     <form method="post" action="{% url 'votes' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=vote_form %}{{ vote_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
-  {% if election_form %}<details class="panel"{% if open_panel == "election" %} open{% else %} hidden{% endif %} data-hide-closed id="new-election"><summary>New election</summary><div class="panel-body">
+  {% if election_form %}<details class="panel"{% if open_panel == "election" %} open{% else %} hidden{% endif %} id="new-election" data-hide-closed><summary>New election</summary><div class="panel-body">
     <p class="small muted">Owners nominate owners; one ballot per home, cast online or by proxy. Ballots are kept apart from who voted.</p>
     <form method="post" action="{% url 'elections' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=election_form %}{{ election_form }}<div class="form-actions"><button type="submit">Open nominations</button></div></form></div></details>{% endif %}
-  {% if survey_form %}<details class="panel"{% if open_panel == "survey" %} open{% else %} hidden{% endif %} data-hide-closed id="new-survey"><summary>New survey</summary><div class="panel-body">
+  {% if survey_form %}<details class="panel"{% if open_panel == "survey" %} open{% else %} hidden{% endif %} id="new-survey" data-hide-closed><summary>New survey</summary><div class="panel-body">
     <div class="alert info">{% icon "info" %}<span>A survey starts as a draft: add and order its questions, then open it. Once open, nothing about it can change. For a quick poll, give it one question.</span></div>
     <form method="post" action="{% url 'surveys' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=survey_form %}{{ survey_form }}<div class="form-actions"><button type="submit">Create draft</button></div></form></div></details>{% endif %}
 

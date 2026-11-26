@@ -648,7 +648,7 @@ details.list-filter > summary { width: max-content; }
   #todos .list > li:nth-child(n+5) { display: none; }
   #todos .see-all { width: 100%; margin-top: .5rem; }
   .topbar .brand span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .topbar .brand { min-width: 0; }
+  .topbar .brand { min-width: 0; min-height: 44px; }
 }
 
 /* Phone tab bar (WT-041): the four things people open most, at the bottom. */
