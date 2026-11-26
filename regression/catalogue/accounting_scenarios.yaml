@@ -1,0 +1,10 @@
+# Accounting and payments scenarios end to end (independent QA). Every scenario ends with the
+# global invariants in ledger/tests/accounting_invariants.py. `match` runs over "<stage>:<check>".
+- feature: "Accounting scenarios end to end with global invariants (open charges - credit == balance, open amounts within bounds, append-only money tables refused by trigger and runtime role, online payments matched to Stripe, balanced journal naming no owner): applying payments, overpayment and credit, sale with credit, late fees, Eastern dates, aging, collections, statements and resale certificate, corrections, bounced checks, concurrency, reports"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_accounting_scenarios\\.py::test_", "^unit:ledger/tests/test_accounting_concurrency\\.py::test_"]
+- feature: "Stripe payment scenarios end to end with the same invariants: card, debit and bank success with surcharge, fee and payout in the journal; declined, abandoned, expired; ACH processing, success and return; refunds, disputes, surcharge safety net; tampering (forged, foreign, replayed, mismatched, double-clicked, production with test key, manual online); payouts against the bank"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:payments/tests/test_payment_scenarios\\.py::test_"]
