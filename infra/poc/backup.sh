@@ -17,6 +17,7 @@ SCRIPT_PATH="$(readlink -f "$0")"
 APP_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 cd "$APP_DIR"
 [ -f .env ] || { echo "No .env in $APP_DIR." >&2; exit 1; }
+command -v python3 >/dev/null || { echo "python3 is needed (apt-get install python3)." >&2; exit 1; }
 
 BACKUP_ROOT="${HOA_BACKUP_DIR:-/var/backups/hoa-portal}"
 KEY_FILE="${HOA_BACKUP_KEY:-/root/hoa-backup.key}"
@@ -84,11 +85,12 @@ echo "==> Uploaded files"
   | encrypt > "$DEST/files.tar.enc"
 
 ( cd "$DEST" && sha256sum db.dump.enc files.tar.enc > SHA256SUMS )
-# A keyed checksum: someone who can write to the off-site bucket cannot swap a
-# backup without the backup key (SEC-008). Checked before every restore.
-( cd "$DEST" && for f in db.dump.enc files.tar.enc; do
-    printf '%s  %s\n' "$(openssl dgst -sha256 -hmac "$(cat "$KEY_FILE")" -r "$f" | cut -d' ' -f1)" "$f"
-  done > HMAC-SHA256 )
+# A keyed checksum over the stamp, the name and the bytes of each file, with a
+# key derived from the backup key: someone who can write to the off-site
+# bucket cannot swap in, rename or replay an older file without the key
+# (SEC-008, R2-003). The key is read from its file inside python, never put
+# on a command line (R2-004). Checked before every restore.
+python3 -I "$APP_DIR/infra/poc/backup_mac.py" sign "$DEST" "$KEY_FILE" "$STAMP"
 echo "$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)" > "$DEST/APP_VERSION"
 du -sh "$DEST" | awk '{print "    size: "$1}'
 

@@ -16,6 +16,8 @@ set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 APP_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
+# shellcheck source=infra/poc/lib.sh
+source "$APP_DIR/infra/poc/lib.sh"
 cd "$APP_DIR"
 LOG=/var/log/hoa-portal-update.log
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
@@ -75,7 +77,15 @@ SELECT state,
 SQL
 )"
 
-if [ "$STATE" = "requested" ]; then
+if [ "$STATE" = "requested" ] && ! branch_allowed "$BRANCH" "$(env_value ALLOW_BRANCH)"; then
+  # Only main receives CI-tested, reviewed merges (D25, review R2-011). Another
+  # branch installs from here only when .env names it in ALLOW_BRANCH.
+  echo "=== $(date -u +%FT%TZ) update refused: the checkout is on $BRANCH, not main" >>"$LOG"
+  psql_run -v message="Not installed: the VM follows ${BRANCH:0:60}; updates install only from main (or ALLOW_BRANCH in .env)." >/dev/null <<'SQL'
+UPDATE core_updatestatus SET state = 'failed', state_changed_at = now(), message = :'message'
+ WHERE id = 1;
+SQL
+elif [ "$STATE" = "requested" ]; then
   psql_run >/dev/null <<'SQL'
 UPDATE core_updatestatus SET state = 'running', state_changed_at = now(), message = '' WHERE id = 1;
 SQL

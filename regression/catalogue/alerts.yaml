@@ -9,3 +9,6 @@
 - feature: "Urgent text messages: verified opt-in (hashed codes, 10 minutes, rate-limited), board-only urgent notices with counts-only audit, STOP handling, Twilio-compatible provider"
   since: M4
   match: ["^unit:comms/tests/test_sms.py::test_", "^manual:urgent text arrives"]
+- feature: "Push limits (review R2-007): at most 10 devices per login (oldest dropped), adding devices rate-limited per login, a device removed after repeated failures or when its host does not exist, push on its own queue one job at a time so email is never held up"
+  since: M4
+  match: ["^unit:comms/tests/test_pwa_push.py::test_(a_login_keeps|adding_devices|a_device_is_removed|a_push_host|push_runs)"]
