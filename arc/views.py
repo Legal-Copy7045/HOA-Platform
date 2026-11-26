@@ -417,7 +417,8 @@ def arc_attach(request, pk):
     req = _get(request, pk)
     # The owner adds files to their draft; intake adds them while the request
     # is open, and never to a request they are recused from (review A5).
-    allowed = (services.owns_lot(request.user, req) and req.state == ArcState.DRAFT) or (
+    by_owner = services.owns_lot(request.user, req) and req.state == ArcState.DRAFT
+    allowed = by_owner or (
         policy.can(request.user, "arc.intake")
         and req.state in services.AFFECTED_LOTS_STATES
         and not services.is_recused(request.user, req)
@@ -426,13 +427,15 @@ def arc_attach(request, pk):
     if not allowed or not uploads:
         messages.error(request, "Files can be added to a draft by the owner, or by intake.")
         return redirect("arc_detail", pk=req.pk)
-    attachments.attach_many(
-        request,
-        req,
-        uploads,
-        actor=request.user,
-        label=request.POST.get("label", ""),
-    )
+    label = request.POST.get("label", "")
+    if by_owner:
+        # Through the service, so the neighbors are asked again (BUG-001).
+        try:
+            services.add_owner_files(req, uploads, actor=request.user, request=request, label=label)
+        except services.ArcError as exc:
+            messages.error(request, str(exc))
+    else:
+        attachments.attach_many(request, req, uploads, actor=request.user, label=label)
     return redirect("arc_detail", pk=req.pk)
 
 

@@ -25,6 +25,7 @@ from django.utils import timezone
 from audit.services import record_event
 from community.models import BoardSeat, Lot, Ownership, Person
 from community.rules import rule
+from community.services import _refuse_read_only
 from core import policy
 from core.policy import can, require
 from core.scoping import system_access
@@ -239,6 +240,28 @@ def lots_actor_may_vote_for(election: Election, actor) -> list[dict]:
     ]
 
 
+def my_lots_participation(election: Election, user) -> tuple[list, list]:
+    """Ballots cast for the lots this person owns, as (mine, earlier): mine
+    were cast since they own the lot; earlier ones before they owned it (the
+    seller's). Only that a ballot was cast, never its choices (D21). A buyer
+    is never told the seller's ballot was theirs (reviews BUG-004, R2-010)."""
+    roles = policy.roles_for(user)
+    if not roles.owned_lot_ids:
+        return [], []
+    since = dict(roles.owned_since)
+    mine, earlier = [], []
+    with system_access("my lots' election participation"):
+        rows = (
+            ElectionParticipation.objects.filter(election=election, lot_id__in=roles.owned_lot_ids)
+            .select_related("lot")
+            .order_by("lot__number")
+        )
+        for row in rows:
+            ours = row.lot_id in since and timezone.localdate(row.cast_at) >= since[row.lot_id]
+            (mine if ours else earlier).append(row)
+    return mine, earlier
+
+
 def cast_election_ballot(
     election: Election, *, lot_id: int, candidate_ids: list[int], actor, request=None
 ) -> None:
@@ -247,6 +270,7 @@ def cast_election_ballot(
         lot_id = int(lot_id)
     except (TypeError, ValueError) as exc:
         raise ElectionError("Choose from the candidates on the ballot.") from exc
+    _refuse_read_only(actor)  # a former owner's login changes nothing (BUG-002)
     with transaction.atomic():
         locked = Election.objects.select_for_update().get(pk=election.pk)
         if locked.state != ElectionState.VOTING:
@@ -384,13 +408,21 @@ def grant_proxy(meeting: Meeting, *, lot: Lot, holder: Person, actor, request=No
 
 def live_proxies(queryset, on=None):
     """Proxies not revoked whose grantor still owns the lot: a sale ends the
-    seller's proxy (security review SEC-003)."""
+    seller's proxy (security review SEC-003). The holder must also still be
+    able to act: an owner of some lot, or on the board. A holder who has sold
+    (a read-only former owner) can no longer use it (review BUG-002)."""
     from django.db.models import Exists, OuterRef
 
     owns = Ownership.objects.active(on).filter(
         person_id=OuterRef("grantor_id"), lot_id=OuterRef("lot_id")
     )
-    return queryset.filter(revoked_at__isnull=True).filter(Exists(owns))
+    holder_owns = Ownership.objects.active(on).filter(person_id=OuterRef("holder_id"))
+    holder_seat = BoardSeat.objects.active(on).filter(person_id=OuterRef("holder_id"))
+    return (
+        queryset.filter(revoked_at__isnull=True)
+        .filter(Exists(owns))
+        .filter(Exists(holder_owns) | Exists(holder_seat))
+    )
 
 
 def revoke_proxy(proxy: Proxy, *, actor, request=None) -> None:

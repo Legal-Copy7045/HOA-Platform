@@ -20,6 +20,7 @@ from arc.models import (
 )
 from community.models import Lot
 from core import policy
+from core.scoping import own_records
 from documents import attachments
 from documents.services import DocumentError
 
@@ -249,8 +250,9 @@ def signoffs_mine(request):
     """Sign-offs neighbors have asked of the lots I own."""
     policy.require(request.user, "arc.submit")
     roles = policy.roles_for(request.user)
+    # The owner side only, also for a board member (SEC-001: owner era).
     rows = (
-        SignoffRequest.objects.for_user(request.user)
+        own_records(SignoffRequest.objects.for_user(request.user), request.user)
         .filter(lot_id__in=roles.owned_lot_ids)
         .exclude(state="withdrawn")
         .select_related("arc_request__lot", "lot")
@@ -264,8 +266,13 @@ def signoffs_mine(request):
 
 
 def _neighbor_signoff(request, pk) -> SignoffRequest:
+    # The owner side only, also for a board member: acknowledgements sent
+    # since this person owns the lot, on requests still open (SEC-001).
     signoff = get_object_or_404(
-        SignoffRequest.objects.for_user(request.user).select_related("arc_request__lot"), pk=pk
+        own_records(SignoffRequest.objects.for_user(request.user), request.user).select_related(
+            "arc_request__lot"
+        ),
+        pk=pk,
     )
     if signoff.lot_id not in policy.roles_for(request.user).owned_lot_ids:
         raise Http404  # the applicant sees statuses on their request, not this page
