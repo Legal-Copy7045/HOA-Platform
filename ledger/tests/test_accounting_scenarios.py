@@ -295,11 +295,6 @@ def test_reversing_a_paid_late_fee_frees_the_money_and_is_not_charged_again(w, b
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: late fee charged although the month's dues were paid on time "
-    "(late_fee_candidates tests the lot balance, not whether the assessment is open)",
-)
 def test_no_late_fee_when_the_months_dues_were_paid_on_time(w, books):
     _dues(2026, 10)
     _pay(w, 4500, D(2026, 10, 1))

@@ -11,7 +11,7 @@ from community.tests.factories import LotFactory, make_member
 from core.policy import SYSTEM
 from core.scoping import system_access
 from ledger import allocation, services
-from ledger.models import PaymentApplication
+from ledger.models import LedgerEntry, PaymentApplication
 
 pytestmark = pytest.mark.django_db
 D = datetime.date
@@ -95,3 +95,45 @@ def test_credit_applied_by_hand_takes_effect_on_the_day_it_is_applied(w):
     assert row.effective_on == TODAY and allocation.charge_status(charge) == "paid"
     a = _aging_consistent(w["lot"].pk, D(2026, 3, 5))  # not applied yet on that day
     assert a["credit"] == 700 and sum(a[b] for b in services.BUCKETS) == 700
+
+
+# --- 2. Late fees follow the month's own dues --------------------------------------------------
+
+
+def _october(w):
+    services.post_monthly_assessments(year=2026, month=10, actor=SYSTEM)
+    with system_access("t"):
+        return LedgerEntry.objects.get(lot=w["lot"], kind="assessment", period="2026-10")
+
+
+def _late_lots(on):
+    rows = services.late_fee_candidates(year=2026, month=10, on=on)
+    return {r["lot"].pk: r["balance_cents"] for r in rows}
+
+
+def test_late_fee_only_while_that_months_dues_are_open(w):
+    dues = _october(w)
+    _charge(w, 3000, D(2026, 9, 1), "Older fine")  # older and unpaid, but not October's dues
+    _pay(w, 4500, D(2026, 10, 2), reference="10", apply_to=[dues.pk])
+    assert w["lot"].pk not in _late_lots(D(2026, 10, 20))
+    assert services.balance(w["lot"].pk) == 3000  # owes money, yet the dues were on time
+
+
+def test_partly_paid_dues_are_late_for_what_is_left(w):
+    _october(w)
+    _pay(w, 4000, D(2026, 10, 3), reference="11")
+    assert _late_lots(D(2026, 10, 16)) == {}  # still in the grace period
+    assert _late_lots(D(2026, 10, 20)) == {w["lot"].pk: 500}
+
+
+def test_prepaid_credit_covers_the_dues_so_no_late_fee(w):
+    _pay(w, 9000, D(2026, 9, 20), reference="12")
+    _october(w)
+    assert _late_lots(D(2026, 10, 20)) == {}
+
+
+def test_dues_paid_after_the_check_date_still_count_as_open_then(w):
+    _october(w)
+    _pay(w, 4500, D(2026, 10, 25), reference="13")
+    assert _late_lots(D(2026, 10, 20)) == {w["lot"].pk: 4500}
+    assert _late_lots(D(2026, 10, 26)) == {}

@@ -1167,8 +1167,12 @@ def set_case_follow_up(case: CollectionCase, on, *, actor, request=None) -> Coll
 
 
 def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
-    """Lots past the grace period for this month's dues that still owe
-    money and have no late fee for the month yet."""
+    """Lots whose dues for this month are still open (unpaid, in whole or in
+    part) on ``on``, past the grace period of the late-fee rule, and have no
+    late fee for the month yet (D33-acctfix-2). Other open charges, such as a
+    charge not yet due, never make the month's dues late; a credit that paid
+    the dues (a prepayment) means they are not late. ``balance_cents`` is
+    what is still open of that month's dues."""
     on = on or timezone.localdate()
     fee = rule("late_fee.cents")
     grace = rule("late_fee.grace_days")
@@ -1183,16 +1187,14 @@ def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
                 "lot_id", flat=True
             )
         )
-        owed = balances()
         for entry in assessments.select_related("lot"):
             late_from = entry.posted_on + datetime.timedelta(days=int(grace) + 1)
             if on < late_from or entry.lot_id in already:
                 continue
-            if owed.get(entry.lot_id, 0) <= 0:
-                continue  # paid up, or in credit (prepayment covers it)
-            out.append(
-                {"lot": entry.lot, "balance_cents": owed[entry.lot_id], "late_from": late_from}
-            )
+            open_cents = _allocation().state_as_of(entry.lot_id, on).open.get(entry.pk, 0)
+            if open_cents <= 0:
+                continue  # this month's dues are paid (or reversed)
+            out.append({"lot": entry.lot, "balance_cents": open_cents, "late_from": late_from})
     return out
 
 
