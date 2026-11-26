@@ -545,6 +545,8 @@ class ReserveStudySnapshot(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"reserve plan adopted {self.adopted_on}"
+
+
 # --- Bank feed (optional feature "bank_feeds", D32-bankfeeds) ---------------------------
 # Lines mirrored from the HOA's bank (Teller, or a statement file). Never full
 # account or routing numbers: the last four digits only.
