@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 
 from django.db import connection, transaction
 from django.db.models import Max
+from django.utils import timezone
 
 from core.scoping import internal, system_access
 
@@ -217,7 +218,12 @@ def after_post(entry, directed: list[int] | None = None) -> list:
         PaymentApplication.objects.bulk_create(
             [
                 PaymentApplication(
-                    lot_id=entry.lot_id, source_id=s, charge_id=c, amount_cents=cents, kind=kind
+                    lot_id=entry.lot_id,
+                    source_id=s,
+                    charge_id=c,
+                    amount_cents=cents,
+                    kind=kind,
+                    effective_on=entry.posted_on,
                 )
                 for s, c, cents, kind in rows
             ]
@@ -247,10 +253,16 @@ def apply(entry, charge_ids: list[int]) -> list:
             if cents > 0:
                 book._apply(entry.pk, charge_id, cents, DIRECTED, out)
         book.settle(AUTO, out)
+        today = timezone.localdate()
         PaymentApplication.objects.bulk_create(
             [
                 PaymentApplication(
-                    lot_id=entry.lot_id, source_id=s, charge_id=c, amount_cents=cents, kind=k
+                    lot_id=entry.lot_id,
+                    source_id=s,
+                    charge_id=c,
+                    amount_cents=cents,
+                    kind=k,
+                    effective_on=today,
                 )
                 for s, c, cents, k in out
             ]
@@ -269,6 +281,9 @@ def backfill(entry_model, application_model, number_model, *, qs=None) -> dict[s
     qs = qs or (lambda model: model.objects.all())
     done_lots = set(qs(application_model).values_list("lot_id", flat=True).distinct())
     lot_ids = sorted(set(qs(entry_model).values_list("lot_id", flat=True).distinct()))
+    # The historical model of migration 0009 has no ``effective_on`` yet
+    # (migration 0012 fills it in for those rows).
+    dated = "effective_on" in {f.name for f in application_model._meta.get_fields()}
     created = 0
     for lot_id in lot_ids:
         if lot_id in done_lots:
@@ -276,13 +291,18 @@ def backfill(entry_model, application_model, number_model, *, qs=None) -> dict[s
         book = LotBook()
         rows = []
         for e in qs(entry_model).filter(lot_id=lot_id).order_by("id"):
-            rows += book.post(_Entry.of(e), kind=MIGRATION)
+            rows += [(*row, e.posted_on) for row in book.post(_Entry.of(e), kind=MIGRATION)]
         application_model.objects.bulk_create(
             [
                 application_model(
-                    lot_id=lot_id, source_id=s, charge_id=c, amount_cents=cents, kind=MIGRATION
+                    lot_id=lot_id,
+                    source_id=s,
+                    charge_id=c,
+                    amount_cents=cents,
+                    kind=MIGRATION,
+                    **({"effective_on": on} if dated else {}),
                 )
-                for s, c, cents, _k in rows
+                for s, c, cents, _k, on in rows
             ]
         )
         created += len(rows)
@@ -450,27 +470,53 @@ def unapplied_credit(lot_id: int) -> int:
     return sum(book.remaining(e.id) for e in book.entries.values() if e.amount < 0)
 
 
+@dataclass
+class AsOf:
+    """A lot's open items as they stood on a date."""
+
+    entries: dict  # id -> LedgerEntry posted by then
+    open: dict[int, int]  # charge id -> open cents
+    credit: int  # money not applied to any charge
+    balance: int
+
+
 @internal("allocation")
-def open_items_as_of(lot_id: int, as_of: datetime.date) -> tuple[list[list], int]:
-    """[(due_on, open_cents)] of charges open on ``as_of`` and the unapplied
-    credit, counting only entries posted by then (for aging)."""
+def state_as_of(lot_id: int, as_of: datetime.date) -> AsOf:
+    """Open amounts on ``as_of``: only entries posted by then, and only the
+    applications made by entries posted by then (``effective_on``), so a
+    reversal posted later does not reach back (D33-acctfix-3).
+
+    Backdated entries can make a past state slightly inconsistent (an
+    application dated before an earlier one it followed); open amounts are
+    kept between zero and the charge, and the credit is what keeps open
+    charges - credit equal to the balance on that date."""
     from ledger.models import LedgerEntry, PaymentApplication
 
     entries = {e.pk: e for e in LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of)}
     applied: dict[int, int] = defaultdict(int)
-    for s, c, cents in PaymentApplication.objects.filter(lot_id=lot_id).values_list(
-        "source_id", "charge_id", "amount_cents"
-    ):
+    for s, c, cents in PaymentApplication.objects.filter(
+        lot_id=lot_id, effective_on__lte=as_of
+    ).values_list("source_id", "charge_id", "amount_cents"):
         if s in entries and c in entries:
-            applied[s] += cents
             applied[c] += cents
-    charges_ = sorted(
-        [e.posted_on, e.amount_cents - applied[e.pk]]
+    open_ = {
+        e.pk: min(max(e.amount_cents - applied[e.pk], 0), e.amount_cents)
         for e in entries.values()
-        if e.amount_cents > 0 and e.amount_cents - applied[e.pk] > 0
+        if e.amount_cents > 0
+    }
+    balance = sum(e.amount_cents for e in entries.values())
+    credit = max(sum(open_.values()) - balance, 0)
+    return AsOf(entries, open_, credit, balance)
+
+
+def open_items_as_of(lot_id: int, as_of: datetime.date) -> tuple[list[list], int]:
+    """[(due_on, open_cents)] of charges open on ``as_of`` and the unapplied
+    credit, counting only entries and applications posted by then (aging)."""
+    state = state_as_of(lot_id, as_of)
+    charges_ = sorted(
+        [state.entries[pk].posted_on, cents] for pk, cents in state.open.items() if cents > 0
     )
-    credit = sum(-e.amount_cents - applied[e.pk] for e in entries.values() if e.amount_cents < 0)
-    return charges_, credit
+    return charges_, state.credit
 
 
 @internal("allocation")

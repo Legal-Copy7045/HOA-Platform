@@ -351,11 +351,6 @@ def test_partial_payments_move_the_aging_buckets(w, books):
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: aging as of a past date counts the unwind rows of a reversal posted later "
-    "(open_items_as_of uses every application, whatever entry created it)",
-)
 def test_aging_as_of_a_date_before_a_bounce_shows_the_charge_paid(w, books):
     charge = _charge(w, 3000, "Fine", D(2026, 1, 5))
     payment = _pay(w, 3000, D(2026, 1, 10), reference="77")

@@ -743,6 +743,11 @@ class PaymentApplication(ScopedAppendOnlyModel):
     )
     amount_cents = models.BigIntegerField()
     kind = models.CharField(max_length=10, choices=ApplicationKind.choices)
+    # The posting date of the entry whose posting made this row (the date the
+    # application took effect), so views "as of" a past date leave out rows a
+    # later entry made, such as the undo rows of a later reversal
+    # (D33-acctfix-3). Applying existing credit by hand takes the local date.
+    effective_on = models.DateField()
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
