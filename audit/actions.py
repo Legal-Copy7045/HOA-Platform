@@ -461,6 +461,7 @@ _SPECS = [
         "account_id",
         "setup_id",
         "method",
+        "schedule",
     ),
     _spec(
         "payments.autopay_enrolled",
@@ -470,6 +471,7 @@ _SPECS = [
         "setup_id",
         "method",
         "replaced",
+        "schedule",
     ),
     _spec(
         "payments.autopay_setup_mismatch",
@@ -500,6 +502,7 @@ _SPECS = [
         "try",
         "method",
         "amount_cents",
+        "schedule",
     ),
     _spec(
         "payments.autopay_failed",
@@ -520,13 +523,57 @@ _SPECS = [
     ),
     _spec(
         "payments.autopay_held",
-        "Automatic payment held back: above the ceiling",
+        "Automatic payment held back: more than the board approved",
         "lot_id",
         "account_id",
         "amount_cents",
         "period",
     ),
     _spec("payments.autopay_detach_failed", "Stripe could not detach a payment method", "code"),
+    # D47: schedule (monthly / once a year) and board review above the limit.
+    _spec(
+        "payments.autopay_schedule_changed",
+        "Automatic payments: schedule changed by the payer",
+        "lot_id",
+        "account_id",
+        "schedule",
+        "month",
+    ),
+    _spec(
+        "payments.autopay_review_requested",
+        "Automatic payment above the review limit: waiting for the board",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "schedule",
+        "period",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.autopay_review_approved",
+        "Automatic payment approved by the board",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.autopay_review_declined",
+        "Automatic payment declined by the board",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.autopay_review_expired",
+        "Automatic payment not reviewed in time (or schedule changed): not charged",
+        "lot_id",
+        "account_id",
+        "review_id",
+        "amount_cents",
+        "code",
+    ),
     # Accounting fixes (D33-acctfix)
     _spec(
         "ledger.refund_recorded", "Online refund recorded on an account", "lot_id", "amount_cents"

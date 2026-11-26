@@ -22,7 +22,11 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:ledger/tests/test_statement_(layout|moves)\\.py::test_", "^unit:ledger/tests/test_letters\\.py::test_", "^manual:statement pay online qr code"]
-- feature: "Automatic payments (D46): setup-mode Stripe Checkout bound to AutopaySetup, payers only with a fresh password check, only the month's assessment charged on the due day once per account-month (idempotent), card surcharge only on credit cards, bank debits recorded once settled, failures emailed and on My items, one retry for soft declines then paused, credit used first, ceiling held for the board, cancel and sale detach, feature off does nothing, statement sentence"
+- feature: "Automatic payments (D46): setup-mode Stripe Checkout bound to AutopaySetup, payers only with a fresh password check, only the month's assessment charged on the due day once per account-month (idempotent), card surcharge only on credit cards, bank debits recorded once settled, failures emailed and on My items, one retry for soft declines then paused, credit used first, review limit replaces the ceiling (D47), cancel and sale detach, feature off does nothing, statement sentence"
   since: M5
   docs: docs/decisions.md
   match: ["^unit:payments/tests/test_autopay\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[autopay", "^manual:stripe test autopay"]
+- feature: "Automatic payments once a year and board review (D47): annual schedule charges the next 12 months less credit (surcharge on credit cards over the whole amount) once per account-year, drawn down month by month by open-item allocation; bridge months before the first yearly payment and after a change of month charged monthly, no month charged twice across schedules; schedule change by payers only, audited; charges above $500 wait for a board member who does not pay for the home (never the manager), approve charges once, decline emails the payer, 14-day expiry; sale ends it and credit stays with the seller; feature off 404"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:payments/tests/test_autopay_annual\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[autopay_(schedule|review)\\]", "^manual:stripe test autopay annual"]

@@ -243,9 +243,16 @@ FEATURES: list[Feature] = [
     _f(
         "autopay",
         "Automatic payments",
-        "Owners can have each monthly assessment paid automatically from a saved bank "
-        "account or card (Stripe; needs Online payments on).",
-        {"autopay", "autopay_start", "autopay_return", "autopay_cancel"},
+        "Owners can have each monthly assessment, or twelve months once a year, paid "
+        "automatically from a saved bank account or card (Stripe; needs Online payments on).",
+        {
+            "autopay",
+            "autopay_start",
+            "autopay_return",
+            "autopay_cancel",
+            "autopay_schedule",
+            "autopay_review",
+        },
         default=False,
     ),
 ]

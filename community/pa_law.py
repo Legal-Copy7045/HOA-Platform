@@ -288,13 +288,14 @@ GUIDES["notices.electronic_consent_required"] = Guide(
     "On: owners choose email or post at sign-up; Bylaws notice article, as confirmed by counsel.",
 )
 
-GUIDES["payments.autopay_ceiling_percent"] = Guide(
+GUIDES["payments.autopay_review_cents"] = Guide(
     BOARD,
-    "Not covered by the Act. A safety limit of the portal, not a fee: an owner authorizes "
-    "automatic payment of the monthly assessment, and anything larger is held for the board "
-    "to check. NACHA rules (bank debits) and card-network rules expect a recurring charge to "
-    "stay within what the payer authorized.",
-    "300 (three months of dues): Board resolution adopting automatic payments.",
+    "Not covered by the Act. A safeguard of the portal, not a fee: an owner authorizes "
+    "automatic payment of the assessment (monthly, or twelve months at once), and a charge "
+    "above this amount waits until a board member who does not pay for that home approves "
+    "it. NACHA rules (bank debits) and card-network rules expect a recurring charge to stay "
+    "within what the payer authorized.",
+    "$500.00: Board resolution adopting automatic payments.",
 )
 
 GUIDES["retention.former_owner_contact_days"] = Guide(

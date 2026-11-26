@@ -499,6 +499,10 @@ def items_for(user) -> list[Item]:
             )
     if can(user, "payments.manage"):
         out.extend(_online_payment_items(user, roles))
+        # Automatic payments above the review limit (D47).
+        from payments.autopay_review import board_items as autopay_review_items
+
+        out.extend(autopay_review_items(user))
     # Entries moved between ownership accounts, to check (fixres BUG-003).
     if can(user, "ledger.manage"):
         from ledger.models import EntryMoveNotice

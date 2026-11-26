@@ -662,9 +662,11 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    stays on the Customer at Stripe (the audit log shows
    `payments.autopay_detach_failed`; detach it in the dashboard).
 2. Admin -> Features: switch on **Automatic payments** (Online payments must
-   be on too). Community settings: **Automatic payment ceiling** (default 300
-   = three months of dues) with its citation; the due day (`dues.due_day`) is
-   when the charge is made.
+   be on too). Community settings: **Automatic payments above this wait for
+   the board's review** (`payments.autopay_review_cents`, default $500.00, D47)
+   with its citation; the due day (`dues.due_day`) is when the charge is made.
+   The old percent ceiling (`payments.autopay_ceiling_percent`) is retired: a
+   value recorded for it stays in the history and is ignored.
 3. As a demo owner: My account -> Pay assessments automatically (asks for
    the password again) -> bank account or card -> Stripe's setup page. Test
    card `4242 4242 4242 4242` (credit, surcharge), `4000 0566 5566 5556`
@@ -679,8 +681,19 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    Stripe says the charge succeeded (cards at once, bank debits after a few
    business days).
 5. The board sees every account's status and recent failures on Finance ->
-   Online payments ("Automatic payments"). An amount over the ceiling is not
-   charged: a My item "Automatic payment held back".
+   Online payments ("Automatic payments"). A charge above the review limit
+   (surcharge included) is not charged: a My item "Approve automatic payment
+   of $X for <address>"; Approve (charged on the next hourly run) or Decline
+   with a reason (the owners are emailed) under "Waiting for review". Not
+   decided within 14 days, nothing is charged and the owners are told. A
+   board member never decides a payment for a home they pay for.
+6. Once a year (D47): the payer picks "Once a year" and a month; on that
+   month's due day the next 12 months' assessments are charged at once, less
+   any credit, and the money is drawn down month by month as credit. Months
+   before the first yearly payment (or in a gap after changing the month)
+   are charged monthly as usual; no month is charged twice. At the
+   default limit ($500) every yearly payment waits for the board's approval.
+   No Stripe key rights change.
 
 ### 2. Securing the HOA's Stripe account
 
