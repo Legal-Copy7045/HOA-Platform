@@ -33,7 +33,8 @@
       <div class="grow"><div class="title">{{ t.label }}</div><div class="small muted">{{ t.description }}</div></div>
       {% if can_run %}<form method="post" data-confirm="{{ t.confirm }}">{% csrf_token %}<input type="hidden" name="kind" value="{{ t.kind }}"><button type="submit" class="secondary small"{% if current %} disabled title="Another task is waiting or running"{% endif %}>Start</button></form>{% endif %}
     </li>{% endfor %}
-    <li><div class="grow"><div class="title">Send a test email</div><div class="small muted">On System status: sends a test email to your own address.</div></div></li>
+    <li><div class="grow"><div class="title">Send a test email</div><div class="small muted">Sends a test email to your own address, to check outgoing email works.</div></div>
+      {% if can_run %}<form method="post" action="{% url 'system_status' %}">{% csrf_token %}<input type="hidden" name="action" value="test_email"><input type="hidden" name="next" value="server_tasks"><button type="submit" class="secondary small">Start</button></form>{% endif %}</li>
     </ul></section>
   <h2>History</h2>
   <div class="table-card"><div class="table-wrap"><table>

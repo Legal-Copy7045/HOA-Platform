@@ -488,26 +488,23 @@ certificate and download the two files (`certificate.pem` and
 never paste them into chat, email or a ticket.
 
 **2. Put them on the VM.** Copy the two files to the VM (for example with
-`scp` into `/root/teller/`, folder mode 700), then:
+`scp` into `/root/teller/`, folder mode 700), then run the guided script and
+answer its questions (the Application ID, `development`, and the two file
+paths, which default to `/root/teller/`):
 
 ```bash
-cd /opt/hoa-portal
-sudo bash -c 'source infra/poc/lib.sh
-set_env .env TELLER_APPLICATION_ID "app_xxxxxxxxxxxx"
-set_env .env TELLER_ENVIRONMENT development
-set_env .env TELLER_CERTIFICATE_B64 "$(base64 -w0 /root/teller/certificate.pem)"
-set_env .env TELLER_PRIVATE_KEY_B64 "$(base64 -w0 /root/teller/private_key.pem)"
-grep -q "^BANK_FEED_TOKEN_KEY=." .env || set_env .env BANK_FEED_TOKEN_KEY "$(openssl rand -hex 32)"'
-sudo shred -u /root/teller/certificate.pem /root/teller/private_key.pem
-sudo bash infra/poc/start-portal.sh
+sudo bash /opt/hoa-portal/infra/poc/set-teller.sh
 ```
 
-Replace `app_xxxxxxxxxxxx` with the Application ID. `development` is Teller's
-free tier for **real** accounts (`sandbox` is for trying it with fake banks;
-`production` is Teller's paid tier). `set_env` writes the values with shell
-builtins, so they never appear on a command line. `BANK_FEED_TOKEN_KEY`
-encrypts the stored access key: it is generated once and must never change
-(a new key means reconnecting the bank). Keep a copy in the password manager.
+It checks that the files are a certificate and a key that belong together
+and have not expired, saves them in `.env` (never on a command line), creates
+`BANK_FEED_TOKEN_KEY` if there is none, restarts the portal, checks the result
+with `manage.py check_teller`, and offers to delete the copied files.
+`development` is Teller's free tier for **real** accounts (`sandbox` is for
+trying it with fake banks; `production` is Teller's paid tier).
+`BANK_FEED_TOKEN_KEY` encrypts the stored access key: it is generated once and
+must never change (a new key means reconnecting the bank). Keep a copy in the
+password manager. To undo: `cp .env.before-teller .env` and restart.
 
 **3. Connect.** A board member: Admin -> Settings -> Features, switch on
 **Bank feed**. Then Finance -> Accounting -> Bank feed -> **Connect a bank**

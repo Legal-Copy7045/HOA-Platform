@@ -121,6 +121,22 @@ def test_sysadmin_page_offers_the_tasks_with_confirm_texts(client, admin, settin
     assert "Portal update" in page and "Send a test email" in page
 
 
+def test_test_email_starts_from_server_tasks_to_your_own_address(client, admin, mailoutbox):
+    client.force_login(admin)
+    page = client.get(URL).content.decode()
+    assert 'name="action" value="test_email"' in page and 'name="next" value="server_tasks"' in page
+    response = client.post(
+        reverse("system_status"), {"action": "test_email", "next": "server_tasks"}
+    )
+    assert response.status_code == 302 and response["Location"] == URL
+    assert [m.to for m in mailoutbox] == [[admin.email]]
+    assert AuditEvent.objects.filter(action="system.test_email_sent").exists()
+    board = make_member(board=True)
+    client.force_login(board)
+    assert 'value="test_email"' not in client.get(URL).content.decode()
+    assert client.post(reverse("system_status"), {"action": "test_email"}).status_code == 403
+
+
 def test_one_task_at_a_time(client, admin):
     client.force_login(admin)
     client.post(URL, {"kind": "backup"})

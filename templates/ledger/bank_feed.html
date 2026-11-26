@@ -5,7 +5,7 @@
   {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'accounting' %}">Accounting</a> / Bank feed</div>
   <div class="page-head"><div><h1>Bank feed</h1><p class="subtitle">Lines from the association's bank, matched to the deposits and vendor payments in the books. Confirmed matches are ticked for you when you reconcile a statement. Nothing here posts to owner accounts.</p></div>
-    {% if can_connect %}<div class="actions">{% if teller_ready %}<a class="btn" href="{% url 'bank_connect' %}">{% icon "key" %} Connect a bank</a>{% else %}<span class="small muted">Connecting a bank needs Teller set up on the server (docs/runbook.md, "Bank feed").</span>{% endif %}</div>{% endif %}</div>
+    {% if can_connect %}<div class="actions">{% if teller_ready %}<a class="btn" href="{% url 'bank_connect' %}">{% icon "key" %} Connect a bank</a>{% else %}<span class="small muted">Connecting a bank needs a one-time set-up on the server by a sysadmin (about 5 minutes). Until then, import statement files from your bank's website below.</span>{% endif %}</div>{% endif %}</div>
 
   <div class="split">
     <div>
