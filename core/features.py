@@ -69,6 +69,20 @@ FEATURES: list[Feature] = [
         "Board elections, nominations, proxies.",
         {"elections", "election_detail", "election_action", "proxy_grant", "proxy_revoke"},
     ),
+    # --- Surveys (M5) ---
+    _f(
+        "surveys",
+        "Surveys",
+        "Informal multi-question surveys of owners (and, if chosen, tenants).",
+        {
+            "surveys",
+            "survey_detail",
+            "survey_action",
+            "survey_question_action",
+            "survey_results",
+            "survey_export",
+        },
+    ),
     _f(
         "consents",
         "Written consents",
@@ -176,7 +190,7 @@ SHARED_BY_KIND = {
 BY_URL = {name: f.key for f in FEATURES for name in f.url_names}
 # Pages that show several features' records: on while any of them is on
 # (the page itself leaves out the parts that are off).
-ANY_OF = {"voting": frozenset({"votes", "elections"})}
+ANY_OF = {"voting": frozenset({"votes", "elections", "surveys"})}
 
 
 def _load() -> dict[str, bool]:

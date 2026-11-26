@@ -277,12 +277,16 @@ def voting(request):
     from governance import elections as election_services
     from governance.models import Election
 
-    policy.require(request.user, "vote.view")
-    show_votes = features.enabled("votes", request)
-    show_elections = features.enabled("elections", request)
-    if not (show_votes or show_elections):
-        raise Http404
     user = request.user
+    can_votes = policy.can(user, "vote.view")
+    can_surveys = policy.can(user, "survey.view")  # tenants too (surveys for residents)
+    if not (can_votes or can_surveys):
+        policy.require(user, "vote.view")
+    show_votes = can_votes and features.enabled("votes", request)
+    show_elections = can_votes and features.enabled("elections", request)
+    show_surveys = can_surveys and features.enabled("surveys", request)
+    if not (show_votes or show_elections or show_surveys):
+        raise Http404
     can_manage = policy.can(user, "vote.manage")
     vote_rows, election_rows = [], []
     if show_votes:
@@ -301,14 +305,25 @@ def voting(request):
                     "voted": bool(election_services.my_lots_participation(e, user)[0]),
                 }
             )
+    survey_rows = []
+    if show_surveys:
+        from governance import surveys
+
+        survey_rows = [
+            {"survey": s, "responded": surveys.has_responded(s, user)}
+            for s in surveys.visible_surveys(user)
+            if s.phase in ("open", "scheduled", "draft")
+        ][:10]
     return render(
         request,
         "governance/voting.html",
         {
             "vote_rows": vote_rows,
             "election_rows": election_rows,
+            "survey_rows": survey_rows,
             "show_votes": show_votes,
             "show_elections": show_elections,
+            "show_surveys": show_surveys,
         },
     )
 

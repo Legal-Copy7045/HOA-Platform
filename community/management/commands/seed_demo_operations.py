@@ -265,6 +265,41 @@ class Command(BaseCommand):
             actor=b1,
         )
         governance.open_vote(poll, actor=b1)
+        # An anonymous survey (M5), open for two weeks, with two answers.
+        from governance import surveys as gov_surveys
+
+        survey = gov_surveys.create_survey(
+            title="Pool and clubhouse survey (demo)",
+            intro="Help us plan next season. Informal: nothing is decided by it.",
+            audience="residents",
+            opens_on=t,
+            closes_on=t + datetime.timedelta(days=14),
+            anonymous=True,
+            share_results=True,
+            actor=b1,
+        )
+        q_time = gov_surveys.add_question(
+            survey,
+            kind="single",
+            prompt="Best pool opening time?",
+            choices=["7 am", "9 am", "11 am"],
+            required=True,
+            actor=b1,
+        )
+        q_rate = gov_surveys.add_question(
+            survey, kind="rating", prompt="How do you rate the clubhouse?", actor=b1
+        )
+        gov_surveys.add_question(survey, kind="text", prompt="Anything else?", actor=b1)
+        gov_surveys.open_survey(survey, actor=b1)
+        for who, pick, stars in ((owner3, 0, 4), (owner12, 1, 3)):
+            gov_surveys.submit_response(
+                survey,
+                answers={
+                    q_time.pk: [str(list(q_time.choices.all())[pick].pk)],
+                    q_rate.pk: [str(stars)],
+                },
+                actor=who,
+            )
         governance.submit_records_request(description="2025 reserve study (demo)", actor=owner12)
 
         req = arc.create_request(
