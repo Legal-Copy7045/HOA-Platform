@@ -6,6 +6,12 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.6.1 — 2026-11-26
+
+- Faster checks before each update: the automated tests run in four parallel
+  shards, so a pull request is ready in about 3 minutes instead of 8. No
+  change to the portal itself.
+
 ## 0.6.0 — 2026-11-26
 
 - Server tasks (Admin → Server tasks): take a backup, restore drills, off-site

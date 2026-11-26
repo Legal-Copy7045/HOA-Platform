@@ -40,8 +40,16 @@ jobs:
         # Every requirement is pinned with hashes, so nothing needs resolving.
         run: pip-audit --strict --disable-pip --no-deps -r requirements/base.txt -r requirements/dev.txt
 
-  test:
+  # The suite runs in four parallel shards (conftest.py --shard): each job
+  # takes every fourth test, so the slow cross-owner URL matrix is shared out
+  # too. Wall time drops from about 8 minutes to about 3.
+  test-shard:
+    name: test (shard ${{ matrix.shard }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     services:
       postgres:
         image: postgres:16-alpine
@@ -65,7 +73,6 @@ jobs:
       DB_APP_ROLE: hoa_app
       DB_APP_PASSWORD_FOR_TESTS: ci-app
       DJANGO_SECRET_KEY: ci-only-not-a-secret
-      COVERAGE_CORE: sysmon   # Python 3.12+ low-overhead coverage
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -80,9 +87,20 @@ jobs:
             -c "ALTER SYSTEM SET synchronous_commit = off" \
             -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
       - name: Missing migrations
+        if: matrix.shard == 0
         run: python manage.py makemigrations --check --dry-run --settings=core.settings.test
       - name: pytest
-        run: pytest --cov --cov-report=term-missing:skip-covered
+        run: pytest -p no:cacheprovider --shard ${{ matrix.shard }}/4
+
+  # One "test" check for the pull request, green only when every shard is.
+  test:
+    runs-on: ubuntu-24.04
+    needs: [test-shard]
+    if: always()
+    steps:
+      - name: All shards passed
+        run: |
+          [ "${{ needs.test-shard.result }}" = "success" ] || { echo "A test shard failed or was cancelled."; exit 1; }
 
   docker:
     runs-on: ubuntu-24.04

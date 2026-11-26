@@ -99,7 +99,7 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 - Run locally: `docker compose up` (site http://localhost:8000, mail http://localhost:8025)
 - All CI checks, stopping at the first failure: `scripts/check.sh`
 - Full regression (stages, stable IDs, report): `python3 regression/run.py` then `python3 regression/report.py` (the `/regression` skill does the whole run)
-- Tests (needs Postgres with the two roles from `docker/postgres/init-roles.sh`): `pytest`
+- Tests (needs Postgres with the two roles from `docker/postgres/init-roles.sh`): `pytest` (CI runs four shards in parallel with `pytest --shard K/4`, conftest.py; a summary job keeps the single `test` check)
 - Lint: `ruff check . && ruff format --check .`
 - Security: `bandit -q -c pyproject.toml -r .` and `pip-audit --strict -r requirements/base.txt -r requirements/dev.txt`
 - Update dependencies: edit `requirements/*.in`, then `pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements/base.txt requirements/base.in` (and the same for dev)
