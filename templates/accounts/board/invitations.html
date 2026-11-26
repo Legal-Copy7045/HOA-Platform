@@ -1,14 +1,36 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Invitations · {{ SITE_NAME }}{% endblock %}
+{% block title %}Invitations and sign-ups · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Invitations</h1><p class="subtitle">Invitations only link a login to an existing person. To invite someone, open their record under <a href="{% url 'people' %}">People</a>.</p></div></div>
+  <div class="page-head"><div><h1>Invitations and sign-ups</h1><p class="subtitle">{% if can_send %}Who has signed up to the portal. {% endif %}Invitations only ever go to the email on each person's record and only link a login to an existing person.{% if can_send %} To invite one person, open their record under <a href="{% url 'people' %}">People</a>.{% endif %}</p></div>
+    {% if can_send %}<div class="actions"><a class="btn secondary" href="?letters=1">{% icon "download" %} Letters for owners without email ({{ counts.no_email }})</a></div>{% endif %}</div>
+  {% if can_send %}
+  <h2>Sign-ups by lot</h2>
+  <div class="grid grid-4">
+    <div class="stat tone-success"><div class="label">Signed up</div><div class="value">{{ counts.signed_up }}</div><div class="hint">{{ signed_up_percent }}% of owners</div></div>
+    <div class="stat"><div class="label">Invited, waiting</div><div class="value">{{ counts.invited }}</div></div>
+    <div class="stat {% if counts.not_invited or counts.expired %}tone-warning{% endif %}"><div class="label">Not invited / expired</div><div class="value">{{ counts.not_invited|add:counts.expired }}</div></div>
+    <div class="stat {% if counts.no_email %}tone-warning{% endif %}"><div class="label">No email on record</div><div class="value">{{ counts.no_email }}</div></div>
+  </div>
+  <div class="form-actions">
+    <form method="post" data-confirm="Send an invitation to every owner with an email who hasn't been invited (or whose invitation expired)?">{% csrf_token %}<input type="hidden" name="action" value="invite_all"><button type="submit">{% icon "mail" %} Invite everyone not yet invited ({{ counts.not_invited|add:counts.expired }})</button></form>
+    <form method="post" data-confirm="Email a new invitation link to {{ remind_count }} {% if remind_count == 1 %}person who was{% else %}people who were{% endif %} invited more than 3 days ago and {% if remind_count == 1 %}has{% else %}have{% endif %} not signed up yet? Their old links stop working.">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary"{% if not remind_count %} disabled{% endif %}>Remind those who haven't signed up ({{ remind_count }})</button></form>{% if counts.invited and counts.invited != remind_count %}<span class="small muted">Invitations sent in the last 3 days are not reminded yet.</span>{% endif %}
+  </div>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Lot</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>
+    <tbody>{% for r in rows %}<tr><td>{{ r.lot.number }}</td><td><a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
+      <td><span class="badge {% if r.status == 'signed_up' %}tone-success{% elif r.status == 'invited' %}tone-info{% else %}tone-warning{% endif %}">{{ r.label }}</span></td>
+      <td class="small muted">{% if r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="users" title="No owners recorded yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <h2>Every invitation</h2>
+  {% endif %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Sent to</th><th>Status</th><th>Created</th><th><span class="sr-only">Actions</span></th></tr></thead>
-    <tbody>{% for inv in invitations %}<tr><td>{{ inv.email }}</td><td>{% status inv.status %}</td><td class="nowrap">{{ inv.created_at|date:"M j, Y" }}</td>
+    <tbody>{% for inv in invitations %}<tr><td>{{ inv.email }}</td><td>{% status inv.status %}</td><td class="nowrap">{{ inv.created_at|short_date }}</td>
       <td class="actions">{% if inv.status == "pending" or inv.status == "queued" or inv.status == "expired" %}{% if not inv.accepted_at and not inv.revoked_at %}
-        <form method="post" action="{% url 'invitation_action' inv.pk 'resend' %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Re-send</button></form>
-        <form method="post" action="{% url 'invitation_action' inv.pk 'revoke' %}" class="inline" data-confirm="Revoke this invitation?">{% csrf_token %}<button type="submit" class="danger small">Revoke</button></form>{% endif %}{% endif %}</td></tr>
+        {% if can_resend %}<form method="post" action="{% url 'invitation_action' inv.pk 'resend' %}" class="inline">{% csrf_token %}<button type="submit" class="secondary small">Re-send</button></form>{% endif %}
+        {% if can_revoke %}<form method="post" action="{% url 'invitation_action' inv.pk 'revoke' %}" class="inline" data-confirm="Revoke this invitation? The link stops working; the person can be invited again later.">{% csrf_token %}<button type="submit" class="danger small">Revoke</button></form>{% endif %}{% endif %}{% endif %}</td></tr>
     {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="mail" title="No invitations yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
 {% endblock %}

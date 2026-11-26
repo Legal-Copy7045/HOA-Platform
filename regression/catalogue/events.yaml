@@ -1,0 +1,14 @@
+# Event RSVPs and volunteer sign-ups on the calendar (comms/rsvp.py).
+# `match` runs over "<stage>:<check>".
+- feature: "Event RSVPs: board or manager turn them on (headcount cap counting guests, guests per person, deadline defaulting to the start); owners, authorized contacts and tenants answer Going / Maybe / Not going once each, changeable until the deadline with history; full or closed refused with a clear message"
+  since: M5
+  match: ["^unit:comms/tests/test_rsvp.py::test_(answer_and_change|one_answer_per_person|answers_need|deadline_closes|default_deadline|cancelled_event|cap_counts|guest_limit|tenant_and_authorized|manager_sets_up|refusal_rerenders|board_page_forms|tenant_answers)", "^unit:comms/tests/test_rsvp_concurrency.py::test_concurrent_going"]
+- feature: "Volunteer sign-ups: board slots with a capacity, join and leave until the deadline, never overfilled under concurrent sign-ups (slot row locked), removed slots hidden"
+  since: M5
+  match: ["^unit:comms/tests/test_rsvp.py::test_(slot_capacity|removed_slot)", "^unit:comms/tests/test_rsvp_concurrency.py::test_concurrent_sign_ups"]
+- feature: "Event RSVP privacy: other owners see counts only, the board sees names and an audited CSV export, former owners and board-only events refused, every event URL classified in the cross-owner matrix"
+  since: M5
+  match: ["^unit:comms/tests/test_rsvp.py::test_(owner_sees_counts|board_export_is_audited|own_data_export|former_owner_cannot|owner_cannot_answer_a_board)", "^unit:core/tests/test_url_matrix.py::test_.*event_(detail|rsvp|slot)"]
+- feature: "Events I'm going to on the dashboard, RSVP badge on the calendar, reminder email the day before for people going (once per event, weekly digest honoured, link only)"
+  since: M5
+  match: ["^unit:comms/tests/test_rsvp.py::test_(calendar_badge|reminder_)", "^manual:event rsvp on a phone"]

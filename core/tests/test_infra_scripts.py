@@ -401,3 +401,254 @@ def test_root_scripts_read_the_version_from_the_app_users_checkout():
         text = (POC / name).read_text()
         assert "rev-parse --short HEAD" in text
         assert 'git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse' in text
+
+
+# --- R2-002: the off-site drill restores the backup its names pointed at ----------------------
+
+
+@pytestmark_bash
+@pytest.mark.parametrize(
+    ("remote", "signed", "ok"),
+    [
+        ("2026-11-25T0230Z", "2026-11-25T0230Z", True),
+        # An older signed backup copied under a newer name.
+        ("2026-11-25T0230Z", "2026-08-01T0230Z", False),
+        ("9999-12-31T2359Z", "2026-08-01T0230Z", False),
+        # No stamp inside (unsigned): refused off-site.
+        ("2026-11-25T0230Z", "", False),
+        # Named and signed in the future.
+        ("2026-12-31T2359Z", "2026-12-31T2359Z", False),
+    ],
+)
+def test_offsite_stamp_must_match_the_signed_stamp(remote, signed, ok):
+    result = _lib('offsite_stamp_ok "$1" "$2" "$3"', remote, signed, "2026-11-26T1200Z")
+    assert (result.returncode == 0) is ok
+
+
+def test_restore_drill_compares_the_offsite_name_with_the_signed_stamp():
+    drill = Path(POC, "restore-drill.sh").read_text()
+    verify = drill.index('backup_mac.py" verify')
+    check = drill.index('offsite_stamp_ok "$REMOTE" "$STAMP"')
+    assert verify < check < drill.index("==> Starting an empty database")
+    assert drill.rindex('if [ "$FROM_OFFSITE" -eq 1 ]; then', 0, check) > verify
+    assert "exit 1" in drill[check : check + 200]
+
+
+# --- R2-006: host alerts advance their baselines only after delivery ---------------------------
+
+
+def _embedded(name: str) -> str:
+    """The text of a script that harden-host.sh installs with a heredoc."""
+    text = Path(POC, "harden-host.sh").read_text()
+    start = text.index(f"/usr/local/sbin/{name} <<'SCRIPT'\n") + len(
+        f"/usr/local/sbin/{name} <<'SCRIPT'\n"
+    )
+    return text[start : text.index("\nSCRIPT\n", start)] + "\n"
+
+
+def _fake_bin(directory: Path, name: str, body: str) -> None:
+    path = directory / name
+    path.write_text("#!/usr/bin/env bash\n" + body)
+    path.chmod(0o755)
+
+
+def _run_installed(tmp_path: Path, name: str, alert_rc: int, *, replace: dict[str, str]):
+    """Run an installed timer script with fake aide/ausearch/docker on PATH.
+    The fake docker reads the alert from stdin, saves it, and exits alert_rc."""
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    (state / "app_dir").write_text(str(tmp_path) + "\n")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    _fake_bin(bin_dir, "docker", f'cat >> "{tmp_path}/sent.txt"\nexit {alert_rc}\n')
+    _fake_bin(
+        bin_dir,
+        "aide",
+        'case "$*" in\n'
+        '  *--check*) echo "changed: /etc/sudoers"; exit 4 ;;\n'
+        f'  *--update*) echo new > "{state}/aide.db.new"; exit 4 ;;\n'
+        "esac\n",
+    )
+    _fake_bin(
+        bin_dir,
+        "ausearch",
+        'for a in "$@"; do [ "$prev" = --checkpoint ] && echo "after" > "$a"; prev="$a"; done\n'
+        'echo "type=SYSCALL comm=vi exe=/usr/bin/vi key=hoa_sudo"\n',
+    )
+    script = _embedded(name).replace("/var/lib/hoa-host-security", str(state))
+    for old, new in replace.items():
+        script = script.replace(old, new)
+    path = tmp_path / name
+    path.write_text(script)
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin"}
+    result = subprocess.run(  # noqa: S603  # nosec B603
+        [BASH, str(path)], capture_output=True, text=True, env=env
+    )
+    return result, state
+
+
+@pytestmark_bash
+@pytest.mark.parametrize(("alert_rc", "delivered"), [(0, True), (1, False)])
+def test_integrity_baseline_and_audit_checkpoint_move_only_after_delivery(
+    tmp_path, alert_rc, delivered
+):
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "aide.db").write_text("old")
+    (state / "audit.checkpoint").write_text("before")
+    result, state = _run_installed(tmp_path, "hoa-integrity-check", alert_rc, replace={})
+    sent = (tmp_path / "sent.txt").read_text()
+    assert "changed: /etc/sudoers" in sent and "hoa_sudo" in sent
+    if delivered:
+        assert result.returncode == 0
+        assert (state / "aide.db").read_text().strip() == "new"
+        assert (state / "audit.checkpoint").read_text().strip() == "after"
+    else:
+        assert result.returncode != 0
+        assert (state / "aide.db").read_text() == "old"  # reported again next night
+        assert not (state / "aide.db.new").exists()
+        assert (state / "audit.checkpoint").read_text() == "before"
+        assert "not delivered" in result.stderr
+
+
+@pytestmark_bash
+@pytest.mark.parametrize(("alert_rc", "delivered"), [(0, True), (1, False)])
+def test_falco_offset_moves_only_after_delivery(tmp_path, alert_rc, delivered):
+    log = tmp_path / "alerts.jsonl"
+    log.write_text('{"priority": "Warning", "rule": "Shell in container", "output": "x"}\n')
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "falco_offset").write_text("0\n")
+    result, state = _run_installed(
+        tmp_path,
+        "hoa-host-alerts",
+        alert_rc,
+        replace={"/var/log/falco/alerts.jsonl": str(log)},
+    )
+    assert "Shell in container" in (tmp_path / "sent.txt").read_text()
+    offset = (state / "falco_offset").read_text().strip()
+    if delivered:
+        assert result.returncode == 0 and offset == str(log.stat().st_size)
+    else:
+        assert result.returncode != 0 and offset == "0"
+
+
+def test_timer_scripts_never_ignore_a_failed_alert():
+    for name in ("hoa-integrity-check", "hoa-host-alerts"):
+        script = _embedded(name)
+        for line in script.splitlines():
+            if "host_alert" in line or "| alert " in line:
+                assert "|| true" not in line, (name, line)
+
+
+# --- R2-009: Falco's signing key is checked against its published fingerprint -----------------
+
+
+def test_falco_key_is_pinned_to_the_published_fingerprint():
+    text = Path(POC, "harden-host.sh").read_text()
+    start = text.index("==> 4. Falco")
+    section = text[start : text.index("apt-get update -qq", start)]
+    # Published at https://falco.org/docs/setup/packages/ (status "Trusted").
+    assert 'FALCO_KEY_FPR_PUBLISHED="478B2FBBC75F4237B731DA4365106822B35B1B1F"' in section
+    assert "HOA_FALCO_KEY_FPR" in section
+    assert "gpg --show-keys --with-colons" in section
+    assert 'grep -qxF "$FALCO_KEY_FPR"' in section
+    # Refuses (and stops) before anything reaches the apt keyring.
+    refuse = section.index('grep -qxF "$FALCO_KEY_FPR"')
+    install = section.index('install -m 0644 "$FALCO_TMP/falco.gpg"')
+    assert refuse < section.index("exit 1") < install
+    # Only the pinned key is exported into the keyring; never the raw download.
+    assert 'gpg --batch --export "$FALCO_KEY_FPR"' in section
+    assert "| gpg --dearmor" not in text
+    assert "sources.list.d/falcosecurity.list" in text[text.index("==> 4.") :]
+
+
+# --- fixres R2-005: the off-site drill skips future-dated names --------------------------------
+
+
+@pytestmark_bash
+@pytest.mark.parametrize(
+    ("names", "picked"),
+    [
+        (["2026-11-24T0230Z", "2026-11-25T0230Z"], "2026-11-25T0230Z"),
+        # A set named in the future is skipped; the newest valid one is used.
+        (["2026-11-24T0230Z", "2026-11-25T0230Z", "2099-01-01T0000Z"], "2026-11-25T0230Z"),
+        (["2026-11-25T0230Z", "not-a-stamp", "2026-11-26T1300Z"], "2026-11-25T0230Z"),
+        (["2099-01-01T0000Z"], None),
+        ([], None),
+    ],
+)
+def test_offsite_drill_picks_the_newest_backup_not_in_the_future(names, picked):
+    result = _lib('offsite_pick "$1"', "2026-11-26T1200Z", stdin="".join(f"{n}\n" for n in names))
+    if picked is None:
+        assert result.returncode != 0
+    else:
+        assert result.returncode == 0 and result.stdout.strip() == picked
+    if any(n > "2026-11-26T1200Z" for n in names if n[:1] == "2"):
+        assert "dated in the future" in result.stderr
+
+
+def test_restore_drill_uses_the_picker_and_still_checks_the_signed_stamp():
+    drill = Path(POC, "restore-drill.sh").read_text()
+    assert 'offsite_pick "$(date -u +%Y-%m-%dT%H%MZ)"' in drill
+    assert "pull_backup --list | tail -1" not in drill
+    assert drill.index("offsite_pick") < drill.index('offsite_stamp_ok "$REMOTE" "$STAMP"')
+
+
+# --- fixres R2-006: a re-run keeps a verified Falco keyring without falco.org ------------------
+
+GPG = shutil.which("gpg")
+
+
+def _falco_step() -> str:
+    text = Path(POC, "harden-host.sh").read_text()
+    start = text.index("# On a re-run, a keyring")
+    return text[start : text.index('echo "deb [signed-by=', start)]
+
+
+def _gpg(args, env, text=False):
+    return subprocess.run(  # noqa: S603  # nosec B603
+        [GPG, "--batch", *args], check=True, capture_output=True, env=env, text=text
+    ).stdout
+
+
+def _keyring(tmp_path, name) -> tuple[Path, str]:
+    home = tmp_path / f"gnupg-{name}"
+    home.mkdir(mode=0o700)
+    env = {"GNUPGHOME": str(home), "PATH": "/usr/bin:/bin"}
+    uid = f"{name} <{name}@example.invalid>"
+    _gpg(["--passphrase", "", "--quick-gen-key", uid, "ed25519", "sign", "never"], env)
+    out = _gpg(["--with-colons", "--list-keys"], env, text=True)
+    fpr = next(line.split(":")[9] for line in out.splitlines() if line.startswith("fpr"))
+    ring = tmp_path / f"{name}.gpg"
+    ring.write_bytes(_gpg(["--export", fpr], env))
+    return ring, fpr
+
+
+def _run_falco_step(tmp_path, keyring: Path, fpr: str) -> subprocess.CompletedProcess:
+    script = (
+        "set -euo pipefail\n"
+        'curl() { echo "DOWNLOAD $*" >&2; return 7; }\n'  # falco.org unreachable
+        f'FALCO_KEYRING="{keyring}"\nFALCO_KEY_FPR="{fpr}"\n' + _falco_step()
+    )
+    return subprocess.run(  # noqa: S603  # nosec B603
+        [BASH, "-c", script],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "GNUPGHOME": str(tmp_path / "g")},
+    )
+
+
+@pytest.mark.skipif(BASH is None or GPG is None, reason="bash and gpg needed")
+def test_falco_rerun_keeps_the_pinned_keyring_without_downloading(tmp_path):
+    (tmp_path / "g").mkdir(mode=0o700)
+    ring, fpr = _keyring(tmp_path, "pinned")
+    result = _run_falco_step(tmp_path, ring, fpr)
+    assert result.returncode == 0, result.stderr
+    assert "already installed and verified" in result.stdout
+    assert "DOWNLOAD" not in result.stderr
+    # A keyring with another key, or none, still needs the download and check.
+    other, _ = _keyring(tmp_path, "other")
+    for keyring in (other, tmp_path / "missing.gpg"):
+        result = _run_falco_step(tmp_path, keyring, fpr)
+        assert result.returncode != 0 and "DOWNLOAD" in result.stderr

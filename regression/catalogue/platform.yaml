@@ -43,7 +43,7 @@
 - feature: "Routine updates immediately or as a weekly digest (links only); official notices always immediate"
   since: M4
   match: ["^unit:comms/tests/test_digest"]
-- feature: "Bulk onboarding: sign-up status, invite everyone, reminders, letters for owners without email (invitations only to the email on record)"
+- feature: "Bulk onboarding on Invitations and sign-ups: sign-up status, invite everyone, reminders, letters for owners without email (invitations only to the email on record)"
   since: M4
   match: ["^unit:accounts/tests/test_onboarding"]
 - feature: "Feature switches: board turns optional features on and off (reservations off by default); a switched-off feature leaves the menu and my items and its pages answer 404; records kept; switching audited; sysadmin and owners cannot switch"
@@ -65,3 +65,12 @@
 - feature: "Off-site backups (D31): upload to a locked R2 bucket, complete backups listed and downloaded, lock probe audited, Backups health check (local and off-site age, lock verified), restore drill from off-site"
   since: M4
   match: ["^unit:core/tests/test_offsite"]
+- feature: "Off-site restore drill refuses a backup whose signed stamp is not the stamp in its object name, or is in the future (R2-002)"
+  since: M5
+  match: ["^unit:core/tests/test_infra_scripts.py::test_(offsite_stamp_must_match|restore_drill_compares)"]
+- feature: "Host alerts: AIDE baseline, audit checkpoint and Falco offset advance only after the alert reached a sysadmin; host_alert exits non-zero when it sent to nobody (R2-006)"
+  since: M5
+  match: ["^unit:core/tests/test_infra_scripts.py::test_(integrity_baseline|falco_offset|timer_scripts)", "^unit:core/tests/test_host_alert_delivery.py::test_"]
+- feature: "Falco apt key trusted only with Falco's published fingerprint; mismatch stops the script; only the pinned key goes into the keyring (R2-009)"
+  since: M5
+  match: ["^unit:core/tests/test_infra_scripts.py::test_falco_key_is_pinned"]

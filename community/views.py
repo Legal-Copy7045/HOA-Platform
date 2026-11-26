@@ -78,12 +78,41 @@ def my_lot(request):
     )
 
 
+@login_required
+def board_and_committees(request):
+    """Who serves: board members with their offices, and the committees with
+    their members. Names and offices only, for every resident (streamlining)."""
+    from core import features
+
+    policy.require(request.user, "board_committees.view")
+    committees = []
+    if features.enabled("committees", request):
+        from governance import services as governance
+
+        committees = governance.committees_public(actor=request.user)
+    return render(
+        request,
+        "community/board_and_committees.html",
+        {
+            "board": services.board_members_public(actor=request.user),
+            "committees": committees,
+            "show_committees": features.enabled("committees", request),
+        },
+    )
+
+
 # --- Lots (board, auditor; owners only their own via the detail page) -------------
 
 
 @login_required
 def lot_list(request):
+    """Lots and owners: every lot with its current owners; the roster view
+    adds each account's other people, contact details and balance (and the
+    CSV export). The old Roster page redirects here."""
     policy.require(request.user, "lot.view_all")
+    roster_view = request.GET.get("view") == "roster" and policy.can(request.user, "roster.view")
+    if roster_view:
+        return _roster(request)
     lots = Lot.objects.for_user(request.user)
     current = Ownership.objects.for_user(request.user).active().select_related("person")
     owners: dict[int, list] = {}
@@ -94,6 +123,8 @@ def lot_list(request):
         "community/lot_list.html",
         {
             "rows": [(lot, owners.get(lot.pk, [])) for lot in lots],
+            "roster_view": False,
+            "can_roster": policy.can(request.user, "roster.view"),
         },
     )
 
@@ -171,34 +202,11 @@ def ownership_end(request, pk):
 
 @login_required
 def board_home(request):
+    """The old Board overview: its alerts are at the top of My items now, so
+    bookmarks and emailed links land there."""
     if not policy.can(request.user, "task.manage"):  # board and manager
         policy.require(request.user, "person.manage")
-    from accounts.models import Invitation, MfaReset
-
-    open_nominations = [n for n in SysadminNomination.objects.for_user(request.user) if n.is_open]
-    resets_waiting = [
-        r for r in MfaReset.objects.for_user(request.user) if r.status == "awaiting_approval"
-    ]
-    from core.my_items import counts, items_for_request
-
-    return render(
-        request,
-        "community/board_home.html",
-        {
-            "item_counts": counts(items_for_request(request)),
-            "thin": policy.thinly_covered_actions(),
-            "past_term": BoardSeat.objects.for_user(request.user)
-            .past_term_end()
-            .select_related("person"),
-            "open_nominations": open_nominations,
-            "resets_waiting": resets_waiting,
-            "approvals_waiting": len(open_nominations) + len(resets_waiting),
-            "preview_lots": Lot.objects.for_user(request.user).order_by("number")
-            if policy.can(request.user, "portal.preview_as_owner")
-            else [],
-            "invites_open": Invitation.objects.for_user(request.user).pending().count(),
-        },
-    )
+    return redirect("my_items")
 
 
 @login_required
@@ -216,7 +224,17 @@ def people(request):
             return _done(request, "Person added.", reverse("person_detail", args=[person.pk]))
         return _invalid(request, form, reverse("people"))
     people_ = Person.objects.for_user(request.user).select_related("user")
-    return render(request, "community/people.html", {"people": people_, "form": form})
+    context = {"people": people_, "form": form}
+    if policy.can(request.user, "access_review.record"):
+        # The quarterly access review lives here, not in Settings (streamlining).
+        from accounts import access_review
+
+        last = access_review.latest()
+        context["access_review"] = {
+            "last_on": last.reviewed_at if last else None,
+            "due": access_review.is_due(),
+        }
+    return render(request, "community/people.html", context)
 
 
 @login_required
@@ -488,9 +506,19 @@ def community_settings(request):
                 }
             ),
             "areas": CommonArea.objects.all(),
+            # Areas are edited with their booking rules (streamlining).
+            "booking_rules_on": _booking_rules_on(request),
             "area_form": forms.CommonAreaForm(),
             "can_edit": policy.can(request.user, "community.manage_rules"),
         },
+    )
+
+
+def _booking_rules_on(request) -> bool:
+    from core import features
+
+    return features.enabled("reservations", request) and policy.can(
+        request.user, "reservation.configure"
     )
 
 
@@ -595,6 +623,8 @@ def common_area_save(request):
     policy.require(request.user, "community.manage_rules")
     form = forms.CommonAreaForm(request.POST)
     back = reverse("community_settings")
+    if request.POST.get("back") == "booking_rules" and _booking_rules_on(request):
+        back = reverse("reservation_settings")
     if not form.is_valid():
         return _invalid(request, form, back)
     try:
@@ -606,7 +636,15 @@ def common_area_save(request):
 
 @login_required
 def roster(request):
-    """Board roster: every account with its people, contact details and balance."""
+    """The old Roster page: now the roster view of Lots and owners."""
+    policy.require(request.user, "roster.view")
+    query = request.GET.copy()
+    query["view"] = "roster"
+    return redirect(reverse("lot_list") + "?" + query.urlencode())
+
+
+def _roster(request):
+    """Roster view: every account with its people, contact details and balance."""
     from core.lists import csv_response, wants_csv
     from core.money import format_cents
 
@@ -648,8 +686,13 @@ def roster(request):
         )
     return render(
         request,
-        "community/roster.html",
-        {"rows": rows, "include_dormant": include_dormant},
+        "community/lot_list.html",
+        {
+            "roster": rows,
+            "include_dormant": include_dormant,
+            "roster_view": True,
+            "can_roster": True,
+        },
     )
 
 

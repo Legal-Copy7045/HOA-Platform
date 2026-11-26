@@ -1,4 +1,5 @@
-"""Owner accounts (one per lot), budgets, collections and resale certificates.
+"""Owner accounts (one per ownership period of a lot), budgets, collections
+and resale certificates.
 
 Ledger entries are append-only integer cents (CLAUDE.md rules 5 and 7):
 positive amounts are charges (the lot owes more), negative amounts are
@@ -12,6 +13,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 from core.append_only import AppendOnlyModel, ScopedAppendOnlyModel
 from core.scoping import ScopedModel, ScopedQuerySet
@@ -25,6 +27,9 @@ class EntryKind(models.TextChoices):
     PAYMENT = "payment", "Payment received"
     CREDIT = "credit", "Credit / adjustment"
     REVERSAL = "reversal", "Reversal"
+    # Part of an online payment the board refunded at Stripe, recorded on the
+    # account (positive: the owner has that money back). D33-acctfix-5.
+    REFUND = "refund", "Payment refunded"
 
 
 CHARGE_KINDS = {
@@ -32,6 +37,7 @@ CHARGE_KINDS = {
     EntryKind.LATE_FEE,
     EntryKind.OTHER_CHARGE,
     EntryKind.RESALE_FEE,
+    EntryKind.REFUND,
 }
 
 
@@ -39,6 +45,12 @@ class LedgerEntry(ScopedAppendOnlyModel):
     scope_lot_path = "lot"
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    # The ownership account this entry belongs to (D33-acctfix-1): set when
+    # the entry is first saved, from its posting date (ledger/accounts.py).
+    # Money is applied only within one account; a sale starts a new one.
+    account = models.ForeignKey(
+        "community.Account", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     posted_on = models.DateField()
     kind = models.CharField(max_length=16, choices=EntryKind.choices)
     amount_cents = models.BigIntegerField()
@@ -48,6 +60,13 @@ class LedgerEntry(ScopedAppendOnlyModel):
     reverses = models.OneToOneField(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="reversed_by"
     )
+    # Set on the copy of an entry moved to the ownership account it belongs
+    # to after the account periods changed (a sale recorded with an earlier
+    # date, D34-fixmoney-1): the original is reversed on its old account and
+    # this copy, same date, kind and amount, is posted on the right one.
+    moved_from = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="moved_to"
+    )
     posted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
@@ -55,16 +74,19 @@ class LedgerEntry(ScopedAppendOnlyModel):
 
     class Meta:
         ordering = ["posted_on", "id"]
-        indexes = [models.Index(fields=["lot", "posted_on"])]
+        indexes = [
+            models.Index(fields=["lot", "posted_on"]),
+            models.Index(fields=["account", "posted_on"]),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["lot", "period"],
-                condition=models.Q(kind="assessment"),
+                condition=models.Q(kind="assessment", moved_from__isnull=True),
                 name="one_assessment_per_lot_per_month",
             ),
             models.UniqueConstraint(
                 fields=["lot", "period"],
-                condition=models.Q(kind="late_fee") & ~models.Q(period=""),
+                condition=models.Q(kind="late_fee", moved_from__isnull=True) & ~models.Q(period=""),
                 name="one_late_fee_per_lot_per_month",
             ),
             models.CheckConstraint(
@@ -74,6 +96,46 @@ class LedgerEntry(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"entry #{self.pk}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self._state.adding and self.account_id is None and not kwargs.get("raw"):
+            from ledger.accounts import for_new_entry
+
+            self.account_id = for_new_entry(self)
+        super().save(*args, **kwargs)
+
+
+class EntryMoveNotice(ScopedModel):
+    """A board to-do after entries were moved to another ownership account
+    (fixres BUG-003): which entries, from and to which accounts. The board
+    checks the list (a seller's settlement check may have moved with the
+    buyer's dues) and marks it checked; never deleted."""
+
+    scope_lot_path = "lot"
+    objects = ScopedQuerySet.as_manager()
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    copy_ids = models.JSONField(default=list)
+    from_accounts = models.CharField(max_length=200, blank=True)
+    to_accounts = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    checked_at = models.DateTimeField(null=True, blank=True)
+    checked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Entries moved on lot {self.lot_id}"
+
+    @property
+    def count(self) -> int:
+        return len(self.copy_ids)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Move notices are checked, not deleted.")
 
 
 # --- Budgets ---------------------------------------------------------------------------
@@ -268,6 +330,13 @@ DEFAULT_GL = (
     "other_charge = 4900 Other owner charges\n"
     "credit = 4950 Owner credits and adjustments"
 )
+# Online payments (D32-payments): added to every setup without changing the
+# stored default above.
+ONLINE_GL = {
+    "stripe_clearing": "1050 Stripe clearing",
+    "card_surcharge": "4300 Credit card surcharge income",
+    "processing_fees": "6150 Payment processing fees",
+}
 
 
 class AccountingSetup(models.Model):
@@ -300,7 +369,7 @@ class AccountingSetup(models.Model):
             k.strip(): v.strip()
             for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
         }
-        return {**defaults, **out}
+        return {**defaults, **ONLINE_GL, **out}
 
 
 class DepositBatch(AppendOnlyModel):
@@ -336,6 +405,17 @@ class DepositItem(ScopedAppendOnlyModel):
         return f"deposit item #{self.pk}"
 
 
+# Cash-book items a bank statement clears. A "payout" is a Stripe payout
+# (payments.StripePayout) reaching the bank: online payments reach the bank
+# only that way, never in deposit batches (D33-acctfix-6).
+CASH_ITEM_KINDS = [
+    ("deposit", "Deposit"),
+    ("payment", "Payment"),
+    ("returned", "Returned item"),
+    ("payout", "Stripe payout"),
+]
+
+
 class BankReconciliation(AppendOnlyModel):
     """A month's bank statement matched to the cash book. Kept as recorded;
     a redo is a new reconciliation for the same date."""
@@ -365,10 +445,7 @@ class ReconciledItem(AppendOnlyModel):
     reconciliation = models.ForeignKey(
         BankReconciliation, on_delete=models.PROTECT, related_name="items"
     )
-    kind = models.CharField(
-        max_length=8,
-        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
-    )
+    kind = models.CharField(max_length=8, choices=CASH_ITEM_KINDS)
     object_id = models.PositiveBigIntegerField()
     amount_cents = models.BigIntegerField()
 
@@ -418,3 +495,355 @@ class CollectionLetter(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"{self.kind} letter"
+
+
+# --- Reserve plan (in-house reserve study) -------------------------------------------------
+
+
+class ReserveCategory(models.TextChoices):
+    ROADS = "roads", "Roads and paving"
+    STORMWATER = "stormwater", "Stormwater and ponds"
+    SIGNS = "signs", "Signs and entrance"
+    LANDSCAPING = "landscaping", "Landscaping"
+    FENCING = "fencing", "Fencing"
+    LIGHTING = "lighting", "Lighting"
+    OTHER = "other", "Other"
+
+
+class ReserveComponent(models.Model):
+    """Something the association will one day replace, at today's cost.
+    Changing the plan is a board decision; every change is kept (history)."""
+
+    name = models.CharField(max_length=120)
+    category = models.CharField(
+        max_length=12, choices=ReserveCategory.choices, default=ReserveCategory.OTHER
+    )
+    quantity = models.CharField(max_length=60, blank=True, help_text='e.g. "1,200 sq yd"')
+    replacement_cost_cents = models.BigIntegerField()
+    useful_life_years = models.PositiveSmallIntegerField()
+    remaining_life_years = models.PositiveSmallIntegerField(null=True, blank=True)
+    # The calendar year the "years left" figure was stated in (BUG-007), so
+    # it ages: 5 years left stated in 2026 means due in 2031, whatever year
+    # the plan starts in.
+    remaining_life_as_of = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_replaced_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True, help_text="Board only")
+    active = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["category", "name", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(replacement_cost_cents__gte=0),
+                name="reserve_component_cost_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(useful_life_years__gte=1),
+                name="reserve_component_life_at_least_one",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(remaining_life_years__isnull=False)
+                | models.Q(last_replaced_year__isnull=False),
+                name="reserve_component_remaining_or_last_replaced",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(remaining_life_years__isnull=True)
+                | models.Q(remaining_life_as_of__isnull=False),
+                name="reserve_component_years_left_has_year",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Reserve components are switched off (not active), not deleted.")
+
+    def due_year(self) -> int:
+        """The calendar year it next comes due."""
+        if self.remaining_life_years is not None:
+            as_of = self.remaining_life_as_of or timezone.localdate().year
+            return as_of + self.remaining_life_years
+        return self.last_replaced_year + self.useful_life_years
+
+    def remaining_life(self, start_year: int) -> int:
+        """Years left at the start of ``start_year`` (0 = due that year, or
+        overdue). "Years left" ages from the year it was stated (BUG-007)."""
+        return max(0, self.due_year() - start_year)
+
+    @property
+    def years_left_now(self) -> int:
+        """Years left counted from this calendar year (what the form shows)."""
+        return self.remaining_life(timezone.localdate().year)
+
+
+class ReservePlanSettings(models.Model):
+    """One row: the board's reserve plan inputs. Rates are basis points."""
+
+    starting_balance_cents = models.BigIntegerField(null=True, blank=True)
+    balance_as_of = models.DateField(null=True, blank=True)
+    annual_contribution_cents = models.BigIntegerField(default=0)
+    inflation_bp = models.PositiveIntegerField(default=300)
+    interest_bp = models.PositiveIntegerField(default=100)
+    horizon_years = models.PositiveSmallIntegerField(default=30)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    def __str__(self) -> str:
+        return "reserve plan settings"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("The reserve plan settings are kept.")
+
+    @classmethod
+    def get(cls) -> ReservePlanSettings:
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class ReserveStudySnapshot(AppendOnlyModel):
+    """A reserve plan as the board adopted it: the inputs and the figures it
+    produced, kept as recorded. A later adoption is a new snapshot."""
+
+    adopted_on = models.DateField(default=timezone.localdate)
+    adopted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    start_year = models.PositiveSmallIntegerField()
+    horizon_years = models.PositiveSmallIntegerField()
+    starting_balance_cents = models.BigIntegerField()
+    balance_as_of = models.DateField(null=True, blank=True)
+    annual_contribution_cents = models.BigIntegerField()
+    inflation_bp = models.PositiveIntegerField()
+    interest_bp = models.PositiveIntegerField()
+    fully_funded_cents = models.BigIntegerField()
+    percent_funded = models.IntegerField(null=True, blank=True)
+    needed_contribution_cents = models.BigIntegerField()
+    total_expense_cents = models.BigIntegerField()
+    lowest_end_cents = models.BigIntegerField()
+    lowest_year = models.PositiveSmallIntegerField()
+    first_negative_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Components as adopted (no board notes) and the next items due.
+    components = models.JSONField(default=list)
+    next_items = models.JSONField(default=list)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-adopted_on", "-id"]
+
+    def __str__(self) -> str:
+        return f"reserve plan adopted {self.adopted_on}"
+
+
+# --- Bank feed (optional feature "bank_feeds", D32-bankfeeds) ---------------------------
+# Lines mirrored from the HOA's bank (Teller, or a statement file). Never full
+# account or routing numbers: the last four digits only.
+
+
+class BankProvider(models.TextChoices):
+    FILE = "file", "Statement files"
+    TELLER = "teller", "Teller"
+
+
+class BankConnectionStatus(models.TextChoices):
+    ACTIVE = "active", "Connected"
+    NEEDS_REAUTH = "needs_reauth", "Needs reconnecting"
+    DISCONNECTED = "disconnected", "Disconnected"
+
+
+class BankConnection(models.Model):
+    """One bank account the portal reads. Disconnecting deletes the access
+    token and keeps the account's imported lines."""
+
+    provider = models.CharField(max_length=10, choices=BankProvider.choices)
+    display_name = models.CharField(max_length=80)
+    institution_name = models.CharField(max_length=80, blank=True)
+    account_last_four = models.CharField(max_length=4, blank=True)
+    # Teller's own opaque ids ("acc_...", "enr_..."), not bank numbers.
+    external_account_id = models.CharField(max_length=64, blank=True)
+    enrollment_id = models.CharField(max_length=64, blank=True)
+    # Fernet token from BANK_FEED_TOKEN_KEY; empty once disconnected.
+    token_encrypted = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=14, choices=BankConnectionStatus.choices, default=BankConnectionStatus.ACTIVE
+    )
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_error_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    disconnected_at = models.DateTimeField(null=True, blank=True)
+    disconnected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["display_name", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(account_last_four__regex=r"^[0-9]{0,4}$"),
+                name="bank_connection_last_four_only",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"bank connection #{self.pk}"
+
+    @property
+    def label(self) -> str:
+        tail = f" ··{self.account_last_four}" if self.account_last_four else ""
+        return f"{self.display_name}{tail}"
+
+
+class BankTransactionSource(models.TextChoices):
+    TELLER = "teller", "Teller"
+    OFX = "ofx", "OFX/QFX file"
+    CSV = "csv", "CSV file"
+
+
+class BankTransaction(AppendOnlyModel):
+    """A line from the bank: positive amounts are money in. Mirrors the bank,
+    so never corrected here; re-imports are skipped by the bank's own id."""
+
+    connection = models.ForeignKey(
+        BankConnection, on_delete=models.PROTECT, related_name="transactions"
+    )
+    bank_id = models.CharField(max_length=255)
+    posted_on = models.DateField()
+    amount_cents = models.BigIntegerField()
+    description = models.CharField(max_length=200, blank=True)
+    kind = models.CharField(max_length=40, blank=True)
+    source = models.CharField(max_length=8, choices=BankTransactionSource.choices)
+    imported_at = models.DateTimeField(default=timezone.now)
+    imported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-posted_on", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["connection", "bank_id"], name="bank_transaction_once_per_connection"
+            )
+        ]
+        indexes = [models.Index(fields=["posted_on", "amount_cents"])]
+
+    def __str__(self) -> str:
+        return f"bank line #{self.pk}"
+
+
+class BankBalance(AppendOnlyModel):
+    """The bank's ledger balance on a date, as reported by the feed or file."""
+
+    connection = models.ForeignKey(BankConnection, on_delete=models.PROTECT, related_name="+")
+    as_of = models.DateField()
+    balance_cents = models.BigIntegerField()
+    source = models.CharField(max_length=8, choices=BankTransactionSource.choices)
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-as_of", "-id"]
+
+    def __str__(self) -> str:
+        return f"bank balance {self.as_of}"
+
+
+class BankMatch(AppendOnlyModel):
+    """A bank line confirmed as one cash-book item (deposit, vendor payment or
+    returned payment). Undoing is a new row pointing at the match it undoes."""
+
+    transaction = models.ForeignKey(BankTransaction, on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(max_length=8, choices=CASH_ITEM_KINDS)
+    object_id = models.PositiveBigIntegerField()
+    undoes = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="undone_by"
+    )
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    confirmed_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return f"bank match #{self.pk}"
+
+
+# --- Open-item accounting (decision D32-payments) ----------------------------------------
+# Every payment or credit is applied to specific charges, so each charge has
+# its own open balance. Applications are append-only: undoing one is a new,
+# negative application. ledger/allocation.py is the only writer.
+
+
+class ChargeNumber(ScopedAppendOnlyModel):
+    """The human number of a charge ("Invoice 2026-0142"): year and a
+    sequence within the year, given once when the charge posts."""
+
+    scope_lot_path = "entry__lot"
+
+    entry = models.OneToOneField(
+        LedgerEntry, on_delete=models.PROTECT, primary_key=True, related_name="charge_number"
+    )
+    year = models.PositiveSmallIntegerField()
+    seq = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["year", "seq"], name="charge_number_unique")]
+
+    def __str__(self) -> str:
+        return self.label
+
+    @property
+    def label(self) -> str:
+        return f"{self.year}-{self.seq:04d}"
+
+
+class ApplicationKind(models.TextChoices):
+    AUTO = "auto", "By the application rule"
+    DIRECTED = "directed", "To the charges chosen"
+    REVERSAL = "reversal", "Reversal matched to its entry"
+    UNWIND = "unwind", "Undone by a reversal"
+    MIGRATION = "migration", "Rebuilt from history"
+
+
+class PaymentApplication(ScopedAppendOnlyModel):
+    """``amount_cents`` of a payment or credit (``source``, a negative entry)
+    applied to a charge (``charge``, a positive entry). Negative rows undo
+    earlier ones."""
+
+    scope_lot_path = "lot"
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    source = models.ForeignKey(
+        LedgerEntry, on_delete=models.PROTECT, related_name="applications_out"
+    )
+    charge = models.ForeignKey(
+        LedgerEntry, on_delete=models.PROTECT, related_name="applications_in"
+    )
+    amount_cents = models.BigIntegerField()
+    kind = models.CharField(max_length=10, choices=ApplicationKind.choices)
+    # The posting date of the entry whose posting made this row (the date the
+    # application took effect), so views "as of" a past date leave out rows a
+    # later entry made, such as the undo rows of a later reversal
+    # (D33-acctfix-3). Applying existing credit by hand takes the local date.
+    effective_on = models.DateField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["id"]
+        indexes = [models.Index(fields=["lot", "id"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(amount_cents=0), name="payment_application_nonzero"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"application #{self.pk}"

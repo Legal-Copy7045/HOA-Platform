@@ -12,12 +12,14 @@ from audit.services import record_event
 from community.account_views import my_account_people
 from community.models import Lot
 from community.rules import rule, rule_with_citation
-from core import policy
-from core.money import MoneyField
+from core import features, policy
+from core.money import MoneyField, format_cents
 from core.workflow import WorkflowError
 from documents import attachments
 from documents.attachments import pdf_response
-from ledger import services
+from ledger import accounts as ledger_accounts
+from ledger import allocation, services
+from ledger.accounts import CURRENT
 from ledger.models import (
     Budget,
     CollectionCase,
@@ -29,7 +31,9 @@ from ledger.models import (
     ResaleRequest,
 )
 from operations.models import ExpenseCategory
-from payments.services import online_payments_enabled, payment_options
+from payments.checkout import payable_lot_ids
+from payments.providers import config as payments_config
+from payments.services import disclosure, online_payments_enabled, payment_options
 
 
 def _date(**kw):
@@ -51,6 +55,60 @@ class PaymentForm(forms.Form):
     reference = forms.CharField(
         max_length=40, required=False, help_text="Check number - never account numbers."
     )
+    apply_to = forms.TypedMultipleChoiceField(
+        coerce=int,
+        required=False,
+        label="Apply payment to\u2026",
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Leave all unticked to pay the oldest charges first (the application rule).",
+    )
+
+    def __init__(self, *args, open_charges=(), accounts=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        numbers = {a.pk: a.number for a in accounts}
+        self.fields["apply_to"].choices = [
+            (
+                c.entry.pk,
+                f"{c.label}: {c.title} ({format_cents(c.open_cents)} open)"
+                + (
+                    f" \u00b7 account {numbers.get(c.entry.account_id, '(none)')}"
+                    if len(numbers) > 1
+                    else ""
+                ),
+            )
+            for c in open_charges
+        ]
+        if not open_charges:
+            del self.fields["apply_to"]
+        _account_field(self, accounts)
+
+
+def _account_field(form, accounts) -> None:
+    """An "Account" choice when the lot has had more than one owner: a
+    former owner's account stays open to the board for what is still owed
+    either way (D33-acctfix-1). Blank: the account the date falls in."""
+    if len(accounts) < 2:
+        return
+    form.fields["account_id"] = forms.TypedChoiceField(
+        coerce=int,
+        required=False,
+        empty_value=None,
+        label="Account",
+        choices=[("", "The owners' account on that date")]
+        + [
+            (
+                a.pk,
+                f"{a.number} \u00b7 {'current owners' if a.is_active else 'former owner'}"
+                + (f" ({_signed(a.balance_cents)})" if a.balance_cents else ""),
+            )
+            for a in accounts
+        ],
+        help_text="Payments and credits pay only charges of the same account.",
+    )
+
+
+def _signed(cents: int) -> str:
+    return f"owes {format_cents(cents)}" if cents > 0 else f"credit {format_cents(-cents)}"
 
 
 class ChargeForm(forms.Form):
@@ -63,10 +121,18 @@ class ChargeForm(forms.Form):
     amount_cents = MoneyField(label="Amount ($)")
     description = forms.CharField(max_length=200)
 
+    def __init__(self, *args, accounts=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        _account_field(self, accounts)
+
 
 class CreditForm(forms.Form):
     amount_cents = MoneyField(label="Amount ($)")
     description = forms.CharField(max_length=200, label="Reason")
+
+    def __init__(self, *args, accounts=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        _account_field(self, accounts)
 
 
 def _flash(request, fn, ok):
@@ -88,12 +154,27 @@ def _ownership_start(user, lot_id):
     return policy.roles_for(user).lot_since.get(lot_id)
 
 
+def _online_receipts(user, lot_id, since):
+    """Online payments on this account in the viewer's own time (receipts)."""
+    from ledger.accounts import current_account_id
+    from payments.models import StripePayment
+
+    # The account it was paid on only: never the former owners' (SEC-001).
+    rows = StripePayment.objects.for_user(user).filter(
+        lot_id=lot_id, entry__account_id=current_account_id(lot_id)
+    )
+    if since:
+        rows = rows.filter(recorded_at__date__gte=since)
+    return list(rows[:12])
+
+
 @login_required
 def my_account(request):
     from community.models import CommunityProfile
 
     policy.require(request.user, "ledger.view_own")
-    online = online_payments_enabled()
+    online = online_payments_enabled(request)
+    payable = payable_lot_ids(request.user) if online else frozenset()
     accounts = []
     for lot in Lot.objects.for_user(request.user).filter(
         pk__in=policy.roles_for(request.user).account_lot_ids
@@ -103,11 +184,19 @@ def my_account(request):
         accounts.append(
             {
                 "lot": lot,
+                # Today's ownership account only (D33-acctfix-1).
+                "open_charges": allocation.open_charges(lot.pk, since=since, account=CURRENT),
+                "open_before": (
+                    allocation.open_before(lot.pk, since, account=CURRENT) if since else 0
+                ),
+                "unapplied": allocation.unapplied_credit(lot.pk, account=CURRENT),
                 "statement": statement,
                 "rows": services.statement_rows(statement),
                 "due": services.amount_due(lot.pk),
                 "upcoming": services.upcoming_charges(statement.balance, lot_id=lot.pk),
                 "pay_options": payment_options(statement.balance) if online else [],
+                "can_pay_online": lot.pk in payable,
+                "online_receipts": _online_receipts(request.user, lot.pk, since),
                 **my_account_people(request.user, lot.pk),
             }
         )
@@ -118,6 +207,8 @@ def my_account(request):
         {
             "accounts": accounts,
             "online": online,
+            "test_mode": online and not payments_config().livemode,
+            "disclosure": disclosure() if online else "",
             "payable_to": profile.legal_name,
             "remit_lines": [line for line in profile.remit_to.splitlines() if line.strip()],
         },
@@ -217,9 +308,14 @@ def ledger_home(request):
 def lot_ledger(request, pk):
     _finance(request)
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
-    entries = (
+    entries = list(
         LedgerEntry.objects.for_user(request.user).filter(lot=lot).select_related("reversed_by")
     )
+    notes = services.moved_notes(entries)
+    for e in entries:
+        e.moved_note = notes.get(e.pk, "")
+    open_charges = allocation.open_charges(lot.pk)
+    lot_accounts = ledger_accounts.lot_accounts(lot.pk)
     return render(
         request,
         "ledger/lot.html",
@@ -230,9 +326,13 @@ def lot_ledger(request, pk):
             "aging": (aging := services.aging(lot.pk)),
             "aging_columns": services.aging_columns(aging),
             "can_manage": policy.can(request.user, "ledger.manage"),
-            "payment_form": PaymentForm(),
-            "charge_form": ChargeForm(),
-            "credit_form": CreditForm(),
+            "open_charges": open_charges,
+            # Former owners' accounts with money still owed either way.
+            "former_accounts": [a for a in lot_accounts if not a.is_active and a.balance_cents],
+            "payment_form": PaymentForm(open_charges=open_charges, accounts=lot_accounts),
+            "charge_form": ChargeForm(accounts=lot_accounts),
+            "credit_form": CreditForm(accounts=lot_accounts),
+            "move_notices": services.open_move_notices(lot.pk, user=request.user),
             "open_case": CollectionCase.objects.for_user(request.user)
             .filter(lot=lot)
             .exclude(state="closed")
@@ -247,8 +347,11 @@ def lot_ledger_action(request, pk, action):
     _finance(request)
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
     actor = request.user
+    lot_accounts = ledger_accounts.lot_accounts(lot.pk)
     if action == "payment":
-        form = PaymentForm(request.POST)
+        form = PaymentForm(
+            request.POST, open_charges=allocation.open_charges(lot.pk), accounts=lot_accounts
+        )
         if form.is_valid():
             _flash(
                 request,
@@ -258,7 +361,7 @@ def lot_ledger_action(request, pk, action):
                 "Payment recorded.",
             )
     elif action == "charge":
-        form = ChargeForm(request.POST)
+        form = ChargeForm(request.POST, accounts=lot_accounts)
         if form.is_valid():
             _flash(
                 request,
@@ -268,7 +371,7 @@ def lot_ledger_action(request, pk, action):
                 "Charge posted.",
             )
     elif action == "credit":
-        form = CreditForm(request.POST)
+        form = CreditForm(request.POST, accounts=lot_accounts)
         if form.is_valid():
             _flash(
                 request,
@@ -288,7 +391,28 @@ def lot_ledger_action(request, pk, action):
             ),
             "Reversal posted.",
         )
+    elif action == "movechecked":
+        from ledger.models import EntryMoveNotice
+
+        notice = get_object_or_404(
+            EntryMoveNotice.objects.for_user(actor),
+            pk=request.POST.get("notice"),
+            lot=lot,
+        )
+        _flash(
+            request,
+            lambda: services.check_move_notice(notice, actor=actor, request=request),
+            "Moved entries marked checked.",
+        )
     elif action == "collection":
+        # "Open collection case": go to the lot's open case, creating it if
+        # there is none yet.
+        policy.require(actor, "collections.manage")
+        existing = (
+            CollectionCase.objects.for_user(actor).filter(lot=lot).exclude(state="closed").first()
+        )
+        if existing is not None:
+            return redirect("collection_detail", pk=existing.pk)
         case = _flash(
             request,
             lambda: services.open_case(lot=lot, actor=actor, request=request),
@@ -604,8 +728,27 @@ def budget_detail(request, pk):
             "report": services.budget_vs_actual(budget),
             "form": LineForm(),
             "can_manage": policy.can(request.user, "budget.manage"),
+            "reserve": _reserve_suggestion(request),
         },
     )
+
+
+def _reserve_suggestion(request):
+    """The latest adopted reserve plan's contribution, for the budget page."""
+    from core import features
+    from ledger import reserve_plan, reserves
+
+    if not features.enabled("reserves", request):
+        return None
+    snapshot = reserve_plan.latest_snapshot()
+    if snapshot is None:
+        return None
+    lots = Lot.objects.unscoped("reserve per-lot figure").count()
+    return {
+        "snapshot": snapshot,
+        "per_lot_month": reserves.per_lot_monthly(snapshot.needed_contribution_cents, lots),
+        "lots": lots,
+    }
 
 
 # --- Resale certificates -------------------------------------------------------------------
@@ -716,16 +859,32 @@ def resale_pdf(request, pk):
 
 @login_required
 def owner_budget(request):
-    """The association's budget as owners see it (summary lines only)."""
+    """Budget and reserves: the association's budget as owners see it
+    (summary lines only) and the adopted reserve plan's summary (no board
+    notes). Each part shows while its feature is on (core.features.ANY_OF)."""
+    from core import features
+
     policy.require(request.user, "budget.view_owner")
-    budget = services.owner_visible_budget()
+    show_budget = features.enabled("owner_budget", request)
+    show_reserves = features.enabled("reserves", request) and policy.can(
+        request.user, "reserves.view_summary"
+    )
+    budget = services.owner_visible_budget() if show_budget else None
+    snapshot = None
+    if show_reserves:
+        from ledger import reserve_plan
+
+        snapshot = reserve_plan.latest_snapshot()
     return render(
         request,
         "ledger/owner_budget.html",
         {
+            "show_budget": show_budget,
+            "show_reserves": show_reserves,
             "budget": budget,
             "summary": services.budget_summary(budget) if budget else None,
             "dues": rule_with_citation("dues.monthly_cents"),
+            "snapshot": snapshot,
         },
     )
 
@@ -779,20 +938,50 @@ def letters_settings(request):
         "ledger/letters_settings.html",
         {
             "profile": CommunityProfile.get(),
+            "reserve_snapshot": _adopted_reserves(request),
             "templates": [letters.template(k) for k in LetterKind.values],
             "placeholders": letters.PLACEHOLDERS,
         },
     )
 
 
+def _adopted_reserves(request):
+    from core import features
+    from ledger import reserve_plan
+
+    return reserve_plan.latest_snapshot() if features.enabled("reserves", request) else None
+
+
 @login_required
 def lot_notice_pdf(request, pk, kind):
+    """Old address of the lot-page notice buttons. Delinquency letters now
+    come only from the collection case (streamlining 2026-11-26): send people
+    to the lot's case, or back to the lot's account to open one."""
     _finance(request)
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
     if kind not in ("statement", "first", "second", "final"):
         raise Http404
-    data = services.generate_notice(lot, kind, actor=request.user, request=request)
-    return pdf_response(data, f"{kind}-lot-{lot.number}.pdf")
+    cases = CollectionCase.objects.for_user(request.user).filter(lot=lot)
+    case = cases.exclude(state="closed").first() or cases.order_by("-pk").first()
+    if case is not None:
+        return redirect("collection_detail", pk=case.pk)
+    messages.info(
+        request,
+        "Delinquency letters are sent from the collection case. "
+        'Use "Open collection case" on this page first.',
+    )
+    return redirect("lot_ledger", pk=lot.pk)
+
+
+@login_required
+def collection_notice_pdf(request, pk, kind):
+    """Reprint a notice (or the statement) from the collection case."""
+    _finance(request)
+    case = get_object_or_404(CollectionCase.objects.for_user(request.user), pk=pk)
+    if kind not in ("statement", "first", "second", "final"):
+        raise Http404
+    data = services.generate_notice(case.lot, kind, actor=request.user, request=request)
+    return pdf_response(data, f"{kind}-lot-{case.lot.number}.pdf")
 
 
 # --- Money tools (Milestone 4 part 3) ------------------------------------------------------
@@ -866,6 +1055,8 @@ def accounting(request):
         "ledger/accounting.html",
         {
             "can_manage": can_manage,
+            "bank_feed_on": features.enabled("bank_feeds", request)
+            and policy.can(request.user, "bank_feed.view"),
             "undeposited": acc.undeposited_payments() if can_manage else [],
             "batches": DepositBatch.objects.all()[:20],
             "reconciliations": BankReconciliation.objects.all()[:12],
@@ -934,6 +1125,7 @@ def reconcile(request):
                 cleared_deposit_ids=request.POST.getlist("deposits"),
                 cleared_payment_ids=request.POST.getlist("payments"),
                 cleared_returned_ids=request.POST.getlist("returned"),
+                cleared_payout_ids=request.POST.getlist("payouts"),
                 note=request.POST.get("note", ""),
                 actor=request.user,
                 request=request,
@@ -951,6 +1143,7 @@ def reconcile(request):
                 messages.success(request, "Reconciled: the statement balances.")
             return redirect("accounting")
         return redirect(f"{request.path}?date={statement_date.isoformat()}")
+    feed = _bank_feed_for_statement(request, statement_date)
     return render(
         request,
         "ledger/reconcile.html",
@@ -958,8 +1151,31 @@ def reconcile(request):
             "statement_date": statement_date,
             "open": acc.uncleared(statement_date) if statement_date else None,
             "book": acc.book_balance(statement_date) if statement_date else None,
+            **feed,
         },
     )
+
+
+def _bank_feed_for_statement(request, statement_date) -> dict:
+    """Bank feed help on the reconcile page (feature "bank_feeds"): items
+    matched to bank lines are ticked in advance, and the statement balance
+    can be filled in from a connected account."""
+    from ledger.bankfeeds import matching
+    from ledger.bankfeeds import services as bank
+
+    empty = {"ticked": {k: set() for k in ("deposit", "payment", "returned", "payout")}}
+    if not statement_date or not bank.feature_on(request):
+        return empty
+    accounts = list(bank.connections())
+    chosen = next((a for a in accounts if str(a.pk) == request.GET.get("feed", "")), None)
+    if chosen is None and len(accounts) == 1:
+        chosen = accounts[0]
+    return {
+        "ticked": matching.matched_for_statement(statement_date),
+        "feed_accounts": accounts,
+        "feed_account": chosen,
+        "feed_balance": bank.feed_balance(chosen, statement_date) if chosen else None,
+    }
 
 
 @login_required

@@ -355,7 +355,7 @@ Afterwards:
   sudo docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web python manage.py check_offsite_lock
   ```
 
-- Prove the off-site copy restores (downloads the newest complete backup, checks its keyed checksum, restores it into the scratch copy):
+- Prove the off-site copy restores (downloads the newest complete backup, checks its keyed checksum, refuses it unless the time signed inside the checksum is the time in its name and not in the future, so an old backup copied under a newer name cannot pass, then restores it into the scratch copy):
 
   ```bash
   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh --from-offsite
@@ -385,10 +385,12 @@ It sets up:
 
 - **Automatic security updates** (unattended-upgrades; never reboots by itself). With Ubuntu Pro attached, ESM updates come the same way and Livepatch applies kernel fixes without a reboot.
 - **auditd** watching `.env`, the backup key, SSH keys and config, sudoers, users and groups, and systemd units.
-- **AIDE**, a nightly (03:30) file-integrity check of /etc, /root, /usr/local, /boot and the hoa user's SSH keys. Changes are emailed, then accepted as the new baseline.
-- **Falco** (modern eBPF), watching the containers at runtime: shells, unexpected programs, writes and secret reads. Alerts at warning and above go to `/var/log/falco/alerts.jsonl`, and a summary is emailed at most every 10 minutes.
+- **AIDE**, a nightly (03:30) file-integrity check of /etc, /root, /usr/local, /boot and the hoa user's SSH keys. Changes are emailed, and accepted as the new baseline only once the email reached at least one sysadmin; if it did not (mail down, or no sysadmin email set), the old baseline stays, the same changes are reported again the next night, and the timer shows as failed.
+- **Falco** (modern eBPF), watching the containers at runtime: shells, unexpected programs, writes and secret reads. Alerts at warning and above go to `/var/log/falco/alerts.jsonl`, and a summary is emailed at most every 10 minutes; alerts that could not be emailed are sent again on the next run.
 
-Emails go to every active sysadmin through the portal's mail settings, and each one is audited (`system.host_alert`). System status → Host security shows whether each service is running.
+Emails go to every active sysadmin through the portal's mail settings, and each one is audited (`system.host_alert`, with how many were sent). `host_alert` exits with an error when it reached nobody, so make sure at least one sysadmin has an email address.
+
+Falco's packages are trusted only through Falco's signing key with the fingerprint Falco publishes (the "Trusted" row of the key table at https://falco.org/docs/setup/packages/; pinned in `harden-host.sh` as `478B2FBBC75F4237B731DA4365106822B35B1B1F`, checked 2026-11-26). If the downloaded key does not match, the script prints the fingerprints it found and stops before installing Falco. When Falco rotates its key (announced on falco.org/blog), compare the new fingerprint with that page and re-run with it: `sudo HOA_FALCO_KEY_FPR=<fingerprint> bash /opt/hoa-portal/infra/poc/harden-host.sh`, then update the pinned value in the script. System status → Host security shows whether each service is running.
 
 If an alert is unexpected:
 
@@ -423,3 +425,230 @@ After loading the register, Board > Onboarding shows who has signed up. Use
 "Invite everyone not yet invited", then "Remind" a few days later. Owners with
 no email get a printable letter asking for one; invitations only ever go to
 the email on the owner's record.
+
+## Bank feed (Teller, free tier)
+
+The portal can read the association's bank account so the monthly
+reconciliation is mostly ticking boxes (Finance -> Accounting -> Bank feed).
+It is free: Teller's developer tier covers up to 100 live connections (we need
+one to three). It is read-only: nothing is paid or moved, and nothing posts to
+owner accounts. The portal keeps the account's last four digits only, never
+the full account or routing number, and stores Teller's access key encrypted.
+
+Teller does not cover every bank; smaller community banks may be missing. If
+the HOA's bank is not in Teller's list, skip to "Statement files" below: every
+US bank offers them and they are always free.
+
+**1. Teller account (the HOA's, not a personal one).** Sign up at teller.io
+with the HOA's shared email address and the board's password manager. In the
+dashboard, note the **Application ID**, then under **Certificates** create a
+certificate and download the two files (`certificate.pem` and
+`private_key.pem`). Keep them only in the password manager and on the VM;
+never paste them into chat, email or a ticket.
+
+**2. Put them on the VM.** Copy the two files to the VM (for example with
+`scp` into `/root/teller/`, folder mode 700), then:
+
+```bash
+cd /opt/hoa-portal
+sudo bash -c 'source infra/poc/lib.sh
+set_env .env TELLER_APPLICATION_ID "app_xxxxxxxxxxxx"
+set_env .env TELLER_ENVIRONMENT development
+set_env .env TELLER_CERTIFICATE_B64 "$(base64 -w0 /root/teller/certificate.pem)"
+set_env .env TELLER_PRIVATE_KEY_B64 "$(base64 -w0 /root/teller/private_key.pem)"
+grep -q "^BANK_FEED_TOKEN_KEY=." .env || set_env .env BANK_FEED_TOKEN_KEY "$(openssl rand -hex 32)"'
+sudo shred -u /root/teller/certificate.pem /root/teller/private_key.pem
+sudo bash infra/poc/start-portal.sh
+```
+
+Replace `app_xxxxxxxxxxxx` with the Application ID. `development` is Teller's
+free tier for **real** accounts (`sandbox` is for trying it with fake banks;
+`production` is Teller's paid tier). `set_env` writes the values with shell
+builtins, so they never appear on a command line. `BANK_FEED_TOKEN_KEY`
+encrypts the stored access key: it is generated once and must never change
+(a new key means reconnecting the bank). Keep a copy in the password manager.
+
+**3. Connect.** A board member: Admin -> Settings -> Features, switch on
+**Bank feed**. Then Finance -> Accounting -> Bank feed -> **Connect a bank**
+(the portal asks for your password or passkey again). Search for the HOA's
+bank in Teller's window; if it is not listed, use statement files instead.
+Sign in with the association's online-banking login. The account appears with
+its last four digits and the last few months of lines.
+
+**4. Every day after that** the portal syncs overnight; anyone on the board
+or the manager can press **Sync now**. System status shows a **Bank feed**
+check that fails if there was no sync for 3 days or the bank asks to be
+reconnected (banks do this every few months, or after a password change):
+then press **Connect a bank** again. **Disconnect** (board) deletes the access
+key and keeps the lines already imported.
+
+**Accepted risk: Teller's Connect script (D34-fixinfra-2).** The Connect a
+bank page loads Teller's script from `https://cdn.teller.io/connect/connect.js`.
+Teller publishes it only at that unversioned address, with no integrity hash,
+so the browser cannot check that the file is the one we reviewed. If Teller's
+CDN were ever compromised, that script could act as the signed-in board member
+on that one page. Limits in place: only this page allows it (its
+Content-Security-Policy admits scripts from Teller's `/connect/` path only,
+nowhere else on the site), the page needs a fresh password or passkey check,
+the script is fetched without a referrer, and it is opened only when a board
+member connects or reconnects the bank (every few months). To reduce it
+further: connect from a browser profile used only for this, sign out right
+after.
+If Teller starts publishing a versioned URL or an integrity hash, pin it in
+`ledger/bankfeeds/teller.py` (`CONNECT_SCRIPT`) with `integrity` and
+`crossorigin` on the script tag. If the browser console on Connect a bank
+reports a blocked Teller script, the path rule in `teller.CONNECT_CSP` needs
+the reported address.
+
+**Statement files (free with any bank).** On the bank's website, download the
+account's activity as **OFX** or **QFX** ("Quicken" or "Money" format) if
+offered, otherwise **CSV**. In Bank feed, add an account for statement files
+once (a name and the last four digits), then **Import a statement file**.
+A CSV file asks which column is the date, description and amount (or debit
+and credit). Importing the same or an overlapping file twice adds nothing
+twice.
+
+**Matching and the monthly reconciliation.** Bank feed suggests, for each bank
+line, the deposit or vendor payment with the same amount and a nearby date;
+the manager or a board member confirms each one. On **Reconcile a statement**
+the matched items are already ticked and the ending balance is filled in from
+the feed: check both against the paper or PDF statement before recording.
+Lines that match nothing (fees, interest) stay listed until they are entered
+in the books.
+## Online payments (Stripe)
+
+Decision D32-payments. Owners (and authorized contacts) pay chosen charges on
+Stripe's hosted Checkout page: **bank account (no fee)**, **debit card (no
+fee)** or **credit card (+ surcharge, at most 3%)**. The portal never sees a
+card or bank number, has **no webhook** (no anonymous endpoint, D24) and learns
+about payments only by asking Stripe with its key:
+
+- when the owner returns to the Payment status page (a hint to check now),
+- every 15 minutes for checkouts started in the last 24 hours,
+- daily for bank payments still processing, refunds, disputes and returned
+  bank payments on payments of the last 120 days, the Stripe balance and
+  payouts, and then the reconciliation (ledger versus Stripe).
+
+A payment is recorded only when the session and PaymentIntent fetched from
+Stripe match the checkout this signed-in person started (its id and random
+nonce in the metadata, the lot, account and person, amount and currency,
+test or live mode, status succeeded and the charge captured). Anything else
+records nothing, is audited (`payments.mismatch`) and shows on the board's My
+items.
+
+### 1. Test mode (now)
+
+1. Create a Stripe account for testing (any email the board controls). Stay
+   in **Test mode** (the toggle in the dashboard).
+2. Developers -> API keys -> **Create restricted key**, named "HOA portal",
+   with ONLY these rights (everything else None):
+   - Checkout Sessions: **Write**
+   - PaymentIntents: Read
+   - Charges: Read
+   - Balance transactions (Balance): Read
+   - Payouts: Read
+   - Disputes: Read
+   - Refunds: **Read** (never Write)
+
+   No refund, customer, product, payout or transfer write rights and no
+   account settings. With this key a stolen secret can only create checkouts
+   that pay the HOA. (Because the key cannot refund, a surcharge taken from a
+   debit card by mistake becomes a board My item "Refund $X surcharge to lot
+   N (debit card)"; refund it in the Stripe dashboard and the portal closes
+   the item when it sees the refund.)
+3. On the VM, put the key in `.env` (hidden prompt; never paste a key into a
+   chat, ticket or the repository):
+
+   ```bash
+   sudo bash /opt/hoa-portal/infra/poc/set-stripe-key.sh
+   ```
+
+4. Admin -> Features: switch on **Online payments**. Community settings:
+   check **Credit card surcharge** (default 300 = 3%) and give it its
+   citation (board resolution).
+5. Finance -> Online payments shows "TEST MODE"; owners' pay pages carry a
+   TEST MODE banner. Try it as a demo owner (Pay online on My account):
+   - Credit card: `4242 4242 4242 4242`, any future date, any CVC. The
+     surcharge line shows on Stripe's page.
+   - Debit card: `4000 0566 5566 5556` (Visa debit). No fee. On the credit
+     card session Stripe refuses it (funding filter); on the debit session it
+     is accepted.
+   - Bank account: in Stripe's Financial Connections test screen choose the
+     **Test Institution** and a "Success" account, or enter routing
+     `110000000` and account `000123456789`. It shows "processing" and is
+     recorded when Stripe reports it succeeded (the daily poll; the next
+     morning). Account `000111111116` fails. Stripe's docs list more test
+     numbers (returns and disputes).
+
+What Stripe's API offers (checked against Stripe's changelog, Nov 2026; the
+portal pins API version `2026-08-26.dahlia`):
+
+- `payment_method_options[card][restrictions][funding_types_blocked]`
+  (values `credit`, `debit`, `prepaid`; added in 2026-08-26.dahlia) keeps a
+  credit card session to credit cards and the debit session to debit cards.
+  Cards whose funding type is unknown can still get through; the safety net
+  after payment reads the charge's `payment_method_details.card.funding`.
+- `wallet_options[link][display]=never` hides Link on both card sessions.
+  Apple Pay and Google Pay cannot be switched off per session on hosted
+  Checkout (only for the whole account in Settings -> Payment methods). A
+  wallet payment is a card payment and reports the underlying card's
+  funding, so the same safety net applies. If the board wants no wallets,
+  turn them off in that Stripe setting.
+- Stripe's API version 2026-09-30 removes `payment_method_types` from
+  Checkout Sessions (replaced by allowed/excluded payment method types).
+  Before moving the pinned version, change `payments/checkout.py`.
+- Bank payments use `us_bank_account` with `verification_method=automatic`:
+  instant verification through Stripe Financial Connections where the bank
+  supports it, micro-deposits otherwise (1-2 business days for the owner).
+- Costs (confirm on stripe.com/pricing before go-live; the HOA pays all of
+  them except the credit card surcharge): cards about 2.9% + 30 cents; ACH
+  Direct Debit 0.8% capped at $5; Financial Connections verification may
+  carry its own small fee; disputes $15 each; failed/returned ACH $4.
+
+### 2. Securing the HOA's Stripe account
+
+- Hardware security key (passkey) two-step sign-in for every Stripe user.
+- At most two Administrators (the treasurer and one other board member);
+  everyone else View only. No management company admin.
+- Turn on Stripe email alerts for changes to the payout bank account and for
+  new team members.
+- Payout schedule: daily (smaller deposits, easier to match).
+- Radar: keep the default rules on.
+
+### 3. What the board does
+
+- **My items** shows: payments that did not match (check them in Stripe's
+  dashboard), returned bank payments (already reversed on the account),
+  refunds made in Stripe (record them on the lot's account: reverse or
+  adjust), disputes (answer in Stripe), surcharges to refund, and, for the
+  treasurer, differences found by the daily reconciliation.
+- **Finance -> Online payments**: recent payments, bank payments processing,
+  failures, payouts (gross payments, refunds, fees and the net deposit) and
+  the last reconciliation. Close an item with "Mark done" and a note.
+- The accounting export books online payments to **Stripe clearing**, the
+  surcharge to **credit card surcharge income**, Stripe's fees to **payment
+  processing fees**, and each payout from Stripe clearing to the bank, so the
+  books balance. Online payments never go into deposit batches.
+- The health check **Online payments** fails when the daily reconciliation
+  finds a ledger payment Stripe does not have, a Stripe charge the ledger
+  does not have after 24 hours, or a payout that does not add up; the board
+  and sysadmins get an email (no personal data).
+
+### 4. Go-live checklist (before live keys)
+
+1. The HOA's own Stripe account, opened in the association's legal name with
+   its EIN, the HOA's operating bank account for payouts, and the account
+   security above.
+2. Card-network surcharge registration: tell Visa and Mastercard (through
+   Stripe's surcharging guide/acquirer) at least **30 days before**
+   surcharging, and check state rules (Pennsylvania allows surcharges).
+3. Counsel approves the disclosure wording ("A 3% surcharge applies to
+   credit card payments; no surcharge on debit cards or bank payments. The
+   surcharge is not greater than our cost of accepting credit cards.") and
+   the receipt, and the board records the surcharge rule with its citation.
+4. A restore-and-migrate drill (CLAUDE.md) and one real end-to-end payment
+   of each kind in test mode on the production server's settings.
+5. Live restricted key with the same rights, entered with the same hidden
+   prompt, and `DEPLOYMENT_STAGE=production` plus `PAYMENTS_LIVE_ALLOWED=true`
+   in the production `.env`. The portal refuses live keys without both, and
+   refuses test keys in production.

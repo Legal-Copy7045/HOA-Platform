@@ -1,10 +1,33 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}All lots · {{ SITE_NAME }}{% endblock %}
+{% block title %}Lots and owners · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Lots</h1><p class="subtitle">{{ rows|length }} lots. Ownership drives who can sign in for each lot.</p></div></div>
+  <div class="page-head"><div><h1>Lots and owners</h1>
+    <p class="subtitle">{% if roster_view %}Every {% if include_dormant %}account, current and previous{% else %}current account{% endif %}, with the people on it and the contact details on record. Exports are logged.{% else %}{{ rows|length }} lots. Ownership drives who can sign in for each lot.{% endif %}</p></div>
+    {% if roster_view %}<div class="actions">
+      {% if include_dormant %}<a class="btn secondary" href="?view=roster">Current accounts only</a>{% else %}<a class="btn secondary" href="?view=roster&amp;previous=1">Include previous accounts</a>{% endif %}
+      <a class="btn secondary" href="?view=roster&amp;export=csv{% if include_dormant %}&amp;previous=1{% endif %}">{% icon "download" %} Export CSV</a></div>{% endif %}</div>
+  {% if can_roster %}<nav class="subnav" aria-label="Columns">
+    <a href="{% url 'lot_list' %}"{% if not roster_view %} aria-current="page"{% endif %}>Lots</a>
+    <a href="{% url 'lot_list' %}?view=roster"{% if roster_view %} aria-current="page"{% endif %}>Accounts, contacts and balances</a>
+  </nav>{% endif %}
+  {% if roster_view %}
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Account</th><th>Lot</th><th>Owners</th><th>Other people</th><th>Contact</th><th class="num">Balance</th></tr></thead>
+    <tbody>{% for r in roster %}<tr{% if not r.account.is_active %} class="muted"{% endif %}>
+      <td class="nowrap">{{ r.account.number }}{% if not r.account.is_active %} <span class="badge">{{ r.account.status_label }}</span>{% endif %}</td>
+      <td><a href="{% url 'lot_detail' r.lot.pk %}">Lot {{ r.lot.number }}</a><div class="small muted">{{ r.lot.street_address }}</div></td>
+      <td>{% for p in r.owners %}{{ p.display_name }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="small">{% for c in r.contacts %}{{ c.person.display_name }} <span class="muted">({{ c.get_kind_display }})</span>{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="small">{% for e in r.emails %}{{ e }}<br>{% endfor %}{% for p in r.phones %}{{ p }}<br>{% endfor %}</td>
+      <td class="num">{% if r.balance_cents is None %}-{% else %}{{ r.balance_cents|cents }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="users" title="No accounts yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  {% else %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Lot</th><th>Address</th><th>Current owners</th></tr></thead>
-    <tbody>{% for lot, owners in rows %}<tr><td><a href="{% url 'lot_detail' lot.pk %}">Lot {{ lot.number }}</a></td><td>{{ lot.street_address }}</td><td>{% for p in owners %}{{ p.display_name }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="status tone-warning">None recorded</span>{% endfor %}</td></tr>{% endfor %}</tbody>
+    <tbody>{% for lot, owners in rows %}<tr><td><a href="{% url 'lot_detail' lot.pk %}">Lot {{ lot.number }}</a></td><td>{{ lot.street_address }}</td><td>{% for p in owners %}{{ p.display_name }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="status tone-warning">None recorded</span>{% endfor %}</td></tr>
+    {% empty %}<tr><td colspan="3">{% include "partials/empty.html" with icon="map" title="No lots yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
+  {% endif %}
 {% endblock %}

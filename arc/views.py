@@ -4,12 +4,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from arc import services
 from arc.models import ArcRequest, ArcState, Decision, Position
-from arc.signoff_views import panel_context
+from arc.signoff_views import asked_of_me_waiting, panel_context
 from audit.services import record_event
 from community.models import Lot
 from core import policy
@@ -152,10 +153,10 @@ def arc_list(request):
             else:
                 messages.success(
                     request,
-                    "Your draft is saved. Next, add plans or photos, then send it on "
-                    "(the steps are below).",
+                    f"Request #{req.pk} is saved as a draft. Next, add plans or photos, "
+                    "then send it on (the steps are below).",
                 )
-                return redirect("arc_detail", pk=req.pk)
+                return redirect(reverse("arc_detail", args=[req.pk]) + "#steps")
         # Invalid: the page is shown again with what was typed, a summary at
         # the top of the form and the errors beside each field.
     from core.lists import csv_response, filter_list, paginate, wants_csv
@@ -211,6 +212,9 @@ def arc_list(request):
             "page": page,
             "tools": tools,
             "can_export": can_view_all and not mine,
+            # Owner side: tabs "Mine" / "Asked of me" (neighbor acknowledgements).
+            "arc_tab": "mine" if mine and can_submit else "",
+            "asked_count": asked_of_me_waiting(request.user) if mine and can_submit else 0,
         },
     )
 

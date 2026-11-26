@@ -35,7 +35,22 @@ FEATURES: list[Feature] = [
         "Board news posted to owners.",
         {"announcements", "announcement_detail"},
     ),
-    _f("calendar", "Calendar", "Community events and meeting dates.", {"calendar", "event_cancel"}),
+    _f(
+        "calendar",
+        "Calendar",
+        "Community events and meeting dates, with RSVPs and volunteer sign-ups.",
+        {
+            "calendar",
+            "event_cancel",
+            # Event RSVPs and volunteer sign-ups (rsvp)
+            "event_detail",
+            "event_rsvp",
+            "event_rsvp_settings",
+            "event_slot_add",
+            "event_slot_action",
+            "event_rsvp_export",
+        },
+    ),
     _f("faq", "FAQ", "Frequently asked questions page.", {"faq"}),
     _f(
         "directory",
@@ -59,8 +74,8 @@ FEATURES: list[Feature] = [
     ),
     _f(
         "votes",
-        "Votes and polls",
-        "Informal polls and formal votes of the owners.",
+        "Votes",
+        "Formal (binding) votes of the owners. Polls are surveys.",
         {"votes", "vote_detail", "vote_action"},
     ),
     _f(
@@ -69,10 +84,24 @@ FEATURES: list[Feature] = [
         "Board elections, nominations, proxies.",
         {"elections", "election_detail", "election_action", "proxy_grant", "proxy_revoke"},
     ),
+    # --- Surveys (M5) ---
+    _f(
+        "surveys",
+        "Surveys",
+        "Informal multi-question surveys of owners (and, if chosen, tenants).",
+        {
+            "surveys",
+            "survey_detail",
+            "survey_action",
+            "survey_question_action",
+            "survey_results",
+            "survey_export",
+        },
+    ),
     _f(
         "consents",
         "Written consents",
-        "Board resolutions adopted by unanimous written consent.",
+        "Board resolutions adopted by unanimous written consent (on Resolutions and policies).",
         {"consents", "consent_detail"},
     ),
     _f(
@@ -81,9 +110,9 @@ FEATURES: list[Feature] = [
         "Owners' requests to inspect association records.",
         {"records_requests", "records_request_detail", "records_request_action"},
     ),
-    _f(
-        "owner_budget", "Budget for owners", "The adopted budget shown to owners.", {"owner_budget"}
-    ),
+    # The Budget and reserves page ("owner_budget") is in ANY_OF below: it is
+    # on while this or the reserve plan is on, and shows only the parts on.
+    _f("owner_budget", "Budget for owners", "The adopted budget shown to owners.", set()),
     _f(
         "violations",
         "Violations",
@@ -161,6 +190,52 @@ FEATURES: list[Feature] = [
         {"sms_start", "sms_verify", "urgent_notice"},
         default=False,
     ),
+    # --- Reserve plan (reserves) ---
+    _f(
+        "reserves",
+        "Reserve plan",
+        "An in-house reserve study: what will need replacing, when, and the reserve "
+        "contribution that keeps the fund above zero.",
+        {
+            "reserve_plan",
+            "reserve_component",
+            "reserve_adopt",
+            "reserve_export",
+            "reserve_summary",
+        },
+    ),
+    # Bank feed (bankfeeds, D32-bankfeeds): Teller's free tier or statement files.
+    _f(
+        "bank_feeds",
+        "Bank feed",
+        "Bank lines from Teller (free tier) or statement files, matched for reconciliation.",
+        {
+            "bank_feed",
+            "bank_connect",
+            "bank_sync",
+            "bank_disconnect",
+            "bank_import",
+            "bank_account_add",
+            "bank_match",
+        },
+        default=False,
+    ),
+    # Online payments (D32-payments): also needs Stripe keys on the server.
+    _f(
+        "online_payments",
+        "Online payments",
+        "Owners pay by bank account, debit card or credit card on Stripe's hosted page "
+        "(needs Stripe keys on the server).",
+        {
+            "pay_online",
+            "pay_checkout",
+            "pay_return",
+            "payment_receipt",
+            "online_payments",
+            "payment_alert_resolve",
+        },
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"
@@ -176,7 +251,11 @@ SHARED_BY_KIND = {
 BY_URL = {name: f.key for f in FEATURES for name in f.url_names}
 # Pages that show several features' records: on while any of them is on
 # (the page itself leaves out the parts that are off).
-ANY_OF = {"voting": frozenset({"votes", "elections"})}
+ANY_OF = {
+    "voting": frozenset({"votes", "elections", "surveys"}),
+    # Budget and reserves (streamlining): the budget and the reserve summary.
+    "owner_budget": frozenset({"owner_budget", "reserves"}),
+}
 
 
 def _load() -> dict[str, bool]:

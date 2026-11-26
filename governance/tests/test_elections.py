@@ -337,3 +337,19 @@ def test_nomination_list_shows_addresses_not_names(client, w):
     client.post(reverse("election_action", args=[w["e"].pk, "nominate"]), {"lot": lot_b.pk})
     page = client.get(reverse("election_detail", args=[w["e"].pk])).content.decode()
     assert _person(b).display_name in page
+
+
+def test_a_consent_waits_in_my_items_until_each_board_member_answers(w):
+    from core.my_items import items_for
+
+    def waiting(user):
+        return [i for i in items_for(user) if i.area == "Written consent"]
+
+    consent = elections.propose_consent(title="Buy salt", text="Buy 2 tons.", actor=w["board"])
+    assert [i.title for i in waiting(w["board"])] == ["Buy salt"]
+    assert [i.title for i in waiting(w["board2"])] == ["Buy salt"]
+    assert waiting(w["owners"][0]) == []
+    elections.sign_consent(consent, approve=True, actor=w["board"])
+    assert waiting(w["board"]) == [] and len(waiting(w["board2"])) == 1
+    elections.sign_consent(consent, approve=True, actor=w["board2"])
+    assert waiting(w["board2"]) == []  # adopted: nothing left to answer

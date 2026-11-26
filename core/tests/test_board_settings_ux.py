@@ -120,7 +120,7 @@ def test_remind_button_confirms_with_the_count(_defer, client, board):
             created_at=timezone.now() - datetime.timedelta(days=age)
         )
     client.force_login(board)
-    page = client.get(reverse("onboarding")).content.decode()
+    page = client.get(reverse("invitations")).content.decode()
     assert 'data-confirm="Email a new invitation link to 1 person who was invited' in page
     assert "Remind those who haven't signed up (1)" in page
     assert len(accounts.reminder_due()) == 1
@@ -135,7 +135,7 @@ def test_switching_a_feature_off_names_what_disappears(client, board):
     Vote.objects.create(title="Pond fence", kind="informal", status="open", created_by=board)
     client.force_login(board)
     page = client.get(reverse("feature_settings")).content.decode()
-    assert "Switch off Votes and polls? It leaves the menu for everyone" in page
+    assert "Switch off Votes? It leaves the menu for everyone" in page
     assert "1 vote is open." in page
     assert "Its records are kept" in page
 

@@ -118,6 +118,10 @@ class Account(ScopedModel):
     closed_on = models.DateField(
         null=True, blank=True, help_text="Exclusive: the last day is the day before."
     )
+    # When the closing was recorded (fixres BUG-001): an entry posted while
+    # the account was still open, dated after a closing recorded later with
+    # an earlier date, was put here by the date rule, not chosen by hand.
+    closed_recorded_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     history = HistoricalRecords()
 

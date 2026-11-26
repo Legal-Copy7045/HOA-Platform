@@ -92,12 +92,92 @@ def test_lot_page_and_collections_show_the_same_buckets(client, w):
     assert "1\u201330 days" in report and "Over 90 days" in report
 
 
-def test_lot_page_uses_plain_notice_buttons_not_a_menu(client, w):
+def _owing(w):
+    services.post_charge(
+        lot=w["lot"],
+        kind="other_charge",
+        amount_cents=9000,
+        description="Gate share",
+        posted_on=TODAY - datetime.timedelta(days=45),
+        actor=w["board"],
+    )
+
+
+def _cases(lot):
+    from ledger.models import CollectionCase
+
+    with system_access("test"):
+        return list(CollectionCase.objects.filter(lot=lot))
+
+
+def test_lot_page_has_no_letter_buttons_only_open_collection_case(client, w):
+    """Delinquency letters come only from the collection case (streamlining)."""
+    _owing(w)
     client.force_login(w["board"])
     page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
-    assert "menu-details" not in page
+    assert "menu-details" not in page and "notice-buttons" not in page
     for kind in ("first", "second", "final"):
-        assert reverse("lot_notice_pdf", args=[w["lot"].pk, kind]) in page
+        assert reverse("lot_notice_pdf", args=[w["lot"].pk, kind]) not in page
+    assert page.count("Open collection case") == 1
+    assert reverse("lot_ledger_action", args=[w["lot"].pk, "collection"]) in page
+
+
+def test_open_collection_case_creates_it_once_then_goes_to_it(client, w):
+    _owing(w)
+    client.force_login(w["manager"])
+    url = reverse("lot_ledger_action", args=[w["lot"].pk, "collection"])
+    first = client.post(url)
+    [case] = _cases(w["lot"])
+    assert first.status_code == 302 and first.url == reverse("collection_detail", args=[case.pk])
+    second = client.post(url)
+    assert second.url == reverse("collection_detail", args=[case.pk])
+    assert len(_cases(w["lot"])) == 1
+    assert AuditEvent.objects.filter(action="collection.opened").count() == 1
+    # With a case open, the lot page links straight to it.
+    page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
+    assert reverse("collection_detail", args=[case.pk]) in page
+    assert url not in page
+
+
+def test_only_collections_staff_open_a_case(client, w):
+    _owing(w)
+    url = reverse("lot_ledger_action", args=[w["lot"].pk, "collection"])
+    client.force_login(w["auditor"])
+    page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
+    assert "Open collection case" not in page
+    assert client.post(url).status_code == 403
+    client.force_login(w["owner"])
+    assert client.post(url).status_code in (403, 404)
+    assert _cases(w["lot"]) == []
+
+
+def test_old_lot_notice_address_redirects_to_the_case(client, w):
+    _owing(w)
+    client.force_login(w["board"])
+    old = reverse("lot_notice_pdf", args=[w["lot"].pk, "first"])
+    # No case yet: back to the lot's account with a pointer; nothing generated.
+    response = client.get(old)
+    assert response.status_code == 302
+    assert response.url == reverse("lot_ledger", args=[w["lot"].pk])
+    case = services.open_case(lot=w["lot"], actor=w["board"])
+    response = client.get(old)
+    assert response.status_code == 302
+    assert response.url == reverse("collection_detail", args=[case.pk])
+    assert not AuditEvent.objects.filter(action="ledger.notice_generated").exists()
+
+
+def test_case_page_reprints_from_the_case(client, w):
+    _owing(w)
+    case = services.open_case(lot=w["lot"], actor=w["board"])
+    client.force_login(w["board"])
+    page = client.get(reverse("collection_detail", args=[case.pk])).content.decode()
+    for kind in ("statement", "first", "second", "final"):
+        assert reverse("collection_notice_pdf", args=[case.pk, kind]) in page
+    assert "/notice-" not in page
+    response = client.get(reverse("collection_notice_pdf", args=[case.pk, "final"]))
+    assert response.status_code == 200 and response["Content-Type"] == "application/pdf"
+    event = AuditEvent.objects.get(action="ledger.notice_generated")
+    assert event.metadata == {"kind": "final", "lot_id": w["lot"].pk}
 
 
 # --- My account --------------------------------------------------------------------------------
@@ -142,7 +222,10 @@ def test_statement_rows_keep_a_running_balance(w):
 
 def test_my_account_hides_pay_online_and_fees_when_payments_are_off(client, w):
     community.set_rule(
-        key="payments.card_fee_bp", value="300", citation="Board resolution", actor=SYSTEM
+        key="payments.credit_card_surcharge_bp",
+        value="300",
+        citation="Board resolution",
+        actor=SYSTEM,
     )
     services.post_charge(
         lot=w["lot"], kind="other_charge", amount_cents=10000, description="x", actor=w["board"]
@@ -150,21 +233,28 @@ def test_my_account_hides_pay_online_and_fees_when_payments_are_off(client, w):
     client.force_login(w["owner"])
     page = client.get(reverse("my_account")).content.decode()
     assert "Pay online" not in page
-    assert "convenience fee" not in page
+    assert "surcharge" not in page
 
 
 def test_my_account_shows_pay_online_and_fees_when_payments_work(client, w):
     community.set_rule(
-        key="payments.card_fee_bp", value="300", citation="Board resolution", actor=SYSTEM
+        key="payments.credit_card_surcharge_bp",
+        value="300",
+        citation="Board resolution",
+        actor=SYSTEM,
     )
     services.post_charge(
         lot=w["lot"], kind="other_charge", amount_cents=10000, description="x", actor=w["board"]
     )
     client.force_login(w["owner"])
-    with mock.patch("ledger.views.online_payments_enabled", return_value=True):
+    with (
+        mock.patch("ledger.views.online_payments_enabled", return_value=True),
+        mock.patch("ledger.views.payable_lot_ids", return_value=frozenset({w["lot"].pk})),
+    ):
         page = client.get(reverse("my_account")).content.decode()
-    assert "Pay online" in page and "disabled>Pay online" not in page
-    assert "convenience fee" in page and "$103.00" in page
+    assert "Pay online" in page and reverse("pay_online", args=[w["lot"].pk]) in page
+    assert "surcharge" in page and "$103.00" in page
+    assert "Bank account (no fee)" in page and "Debit card (no fee)" in page
 
 
 def test_my_account_says_who_to_pay_and_where_to_mail(client, w):
@@ -397,30 +487,31 @@ def test_posting_dues_from_the_month_picker(client, w):
 
 
 def test_every_finance_page_shows_the_same_tabs(client, w):
+    """Streamlining 2026-11-26: tabs only across Owner accounts, Collections,
+    Accounting and Reports; the rest of Finance is in the sidebar."""
     client.force_login(w["board"])
-    tabs = ["Owner accounts", "Invoices", "Contracts", "Accounting", "Letters", "Reports"]
-    for name in ("ledger_home", "invoices", "contracts", "vendors", "accounting", "collections"):
+    tabs = ["Owner accounts", "Collections", "Accounting", "Reports"]
+    for name in ("ledger_home", "accounting", "collections", "reports", "reconcile"):
         page = client.get(reverse(name)).content.decode()
         nav = page.split('aria-label="Finance"')[1].split("</nav>")[0]
-        for tab in tabs:
-            assert f">{tab}</a>" in nav, (name, tab)
+        assert [t for t in tabs if f">{t}</a>" in nav] == tabs, name
+        assert ">Invoices</a>" not in nav and ">Letters</a>" not in nav
 
 
 def test_finance_tabs_leave_out_switched_off_features(client, w):
-    from core import features
-
-    features.set_feature("contracts", False, actor=w["board"])
+    """Pages outside the four (other Finance pages, Maintenance) have no tab
+    bar at all: the sidebar is the one menu."""
     client.force_login(w["board"])
-    page = client.get(reverse("ledger_home")).content.decode()
-    nav = page.split('aria-label="Finance"')[1].split("</nav>")[0]
-    assert ">Contracts</a>" not in nav and ">Invoices</a>" in nav
+    for name in ("invoices", "contracts", "vendors", "work_orders", "budgets", "letters_settings"):
+        page = client.get(reverse(name)).content.decode()
+        assert 'aria-label="Finance"' not in page, name
 
 
 def test_manager_does_not_see_the_letters_tab(client, w):
     client.force_login(w["manager"])
     page = client.get(reverse("ledger_home")).content.decode()
     nav = page.split('aria-label="Finance"')[1].split("</nav>")[0]
-    assert ">Letters</a>" not in nav
+    assert ">Letters</a>" not in nav and ">Owner accounts</a>" in nav
 
 
 # --- Accounting setup and 1099 table ----------------------------------------------------------
@@ -546,3 +637,25 @@ def test_invoice_file_is_shown_above_the_approval_buttons(client, w):
     assert "Your approval" in page
     assert page.index("Invoice file") < page.index("Your approval")
     assert "Ask for the invoice before approving." in page
+
+
+# --- Record checks quick action (streamlining) --------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("who", "shown"), [("board", True), ("manager", True), ("auditor", False), ("owner", False)]
+)
+def test_record_checks_quick_action_is_for_board_and_manager(w, who, shown):
+    from django.template import Context, Template
+
+    from core import my_items
+
+    actions = my_items.quick_actions(w[who])
+    html = Template("{% load portal %}{% quick_actions %}").render(Context({"user": w[who]}))
+    if shown:
+        assert actions == [
+            {"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"}
+        ]
+        assert f'href="{reverse("record_payments")}"' in html and "Record checks" in html
+    else:
+        assert actions == [] and html.strip() == ""

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load portal static %}
+{% block title %}Connect a bank · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'accounting' %}">Accounting</a> / <a href="{% url 'bank_feed' %}">Bank feed</a> / Connect a bank</div>
+  <div class="page-head"><div><h1>Connect a bank</h1><p class="subtitle">Teller opens a window where you choose the association's bank and sign in there. The portal never sees the bank password, and keeps only the account's last four digits and an encrypted, read-only access key.</p></div></div>
+  {% if problems %}<div class="alert warning" role="alert">{% icon "alert" %}<div><strong>Connecting is not available yet.</strong><ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul><p class="small">See docs/runbook.md, "Bank feed (Teller, free tier)". Statement files can be imported meanwhile.</p></div></div>
+  {% else %}
+  <section class="card">
+    <p>Use the bank's online-banking sign-in for the association's account (not a personal one). If the bank is not in Teller's list, import statement files instead: every bank offers them.</p>
+    <div id="teller-connect" data-application-id="{{ application_id }}" data-environment="{{ environment }}">
+      <button type="button" id="teller-open">{% icon "key" %} Choose the bank</button>
+      <p class="small muted" id="teller-status" role="status" aria-live="polite"></p>
+    </div>
+    <form method="post" id="teller-enrollment" hidden>{% csrf_token %}<input type="hidden" name="nonce" value="{{ nonce }}"><input type="hidden" name="access_token" value=""></form>
+  </section>
+  <script src="{{ connect_script }}" referrerpolicy="no-referrer"></script>
+  <script src="{% static 'js/bank-connect.js' %}"></script>
+  {% endif %}
+{% endblock %}

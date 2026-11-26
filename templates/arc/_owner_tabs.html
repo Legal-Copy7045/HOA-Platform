@@ -1,0 +1,4 @@
+{% load portal %}<nav class="subnav" aria-label="My home improvement requests">
+    <a href="{% url 'arc_list' %}?mine=1"{% if arc_tab == "mine" %} aria-current="page"{% endif %}>Mine</a>
+    <a href="{% url 'signoffs_mine' %}"{% if arc_tab == "asked" %} aria-current="page"{% endif %}>Asked of me{% if asked_count %} <span class="badge tone-warning">{{ asked_count }}<span class="sr-only"> waiting for your answer</span></span>{% endif %}</a>
+  </nav>

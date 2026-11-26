@@ -45,18 +45,56 @@ def create_meeting(*, title, kind, starts_at, location="", agenda="", actor, req
     require(actor, "meeting.manage")
     if kind not in MeetingKind.values or not single_line(title):
         raise GovernanceError("A meeting needs a title and a type.")
-    meeting = Meeting.objects.create(
-        title=single_line(title)[:200],
-        kind=kind,
-        starts_at=starts_at,
-        location=location[:200],
-        agenda=agenda,
-        created_by=actor,
-    )
-    record_event(
-        "meeting.created", actor=actor, request=request, target=meeting, metadata={"kind": kind}
-    )
+    with transaction.atomic():
+        meeting = Meeting.objects.create(
+            title=single_line(title)[:200],
+            kind=kind,
+            starts_at=starts_at,
+            location=location[:200],
+            agenda=agenda,
+            created_by=actor,
+        )
+        record_event(
+            "meeting.created", actor=actor, request=request, target=meeting, metadata={"kind": kind}
+        )
+        _add_to_calendar(meeting, actor=actor, request=request)
     return meeting
+
+
+def _add_to_calendar(meeting: Meeting, *, actor, request=None) -> None:
+    """Put the meeting on the community calendar. Executive sessions never go
+    on it: owners must not learn of them from the calendar."""
+    if meeting.kind == MeetingKind.EXECUTIVE:
+        return
+    from comms import services as comms_services
+
+    event = comms_services.create_event(
+        title=meeting.title,
+        starts_at=meeting.starts_at,
+        location=meeting.location,
+        description=(
+            f"{meeting.get_kind_display()}. The agenda and minutes are on the meeting page."
+        ),
+        actor=actor,
+        request=request,
+    )
+    Meeting.objects.filter(pk=meeting.pk).update(calendar_event=event)
+    meeting.calendar_event = event
+
+
+def meeting_event_ids() -> set[int]:
+    """Calendar events that belong to a meeting (the calendar sends people to
+    the meeting page and leaves cancelling to it)."""
+    return set(
+        Meeting.objects.filter(calendar_event__isnull=False).values_list(
+            "calendar_event_id", flat=True
+        )
+    )
+
+
+def meeting_for_event(event, user) -> Meeting | None:
+    """The meeting behind a calendar event, if this person may open it."""
+    return Meeting.objects.for_user(user).filter(calendar_event=event).first()
 
 
 def notice_shortfall_days(meeting: Meeting, sent_at=None) -> int | None:
@@ -118,6 +156,41 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
     return {"emailed": emailed, "paper": paper, "short_days": shortfall}
 
 
+def notice_deadlines(meeting: Meeting) -> tuple[list, int | None]:
+    """Recurring deadlines (Board tasks) that sending this meeting's notice can
+    mark done: the active "Meetings and elections" items. For an annual
+    meeting, the annual-meeting item is offered first."""
+    if meeting.kind == MeetingKind.EXECUTIVE or meeting.status != MeetingStatus.SCHEDULED:
+        return [], None
+    from operations.models import ComplianceCategory, ComplianceItem
+
+    items = list(ComplianceItem.objects.filter(active=True, category=ComplianceCategory.GOVERNANCE))
+    default = None
+    if meeting.kind == MeetingKind.ANNUAL:
+        default = next((i.pk for i in items if "annual" in i.title.lower()), None)
+    return items, default
+
+
+def complete_notice_deadline(meeting: Meeting, item_id: int, *, actor, request=None):
+    """Mark the chosen recurring deadline done once the notice went out
+    (through the operations service, which checks the permission)."""
+    from operations import services as operations_services
+    from operations.models import ComplianceCategory, ComplianceItem
+
+    require(actor, "meeting.manage")
+    if meeting.kind == MeetingKind.EXECUTIVE:
+        raise GovernanceError("Executive sessions are not noticed to owners.")
+    item = ComplianceItem.objects.filter(
+        active=True, category=ComplianceCategory.GOVERNANCE, pk=item_id
+    ).first()
+    if item is None:
+        raise GovernanceError("That deadline is not open.")
+    try:
+        return operations_services.complete_compliance_item(item, actor=actor, request=request)
+    except operations_services.OperationsError as exc:
+        raise GovernanceError(str(exc)) from exc
+
+
 def set_meeting_status(meeting, status, *, actor, request=None):
     require(actor, "meeting.manage")
     if meeting.status != MeetingStatus.SCHEDULED or status not in (
@@ -125,14 +198,23 @@ def set_meeting_status(meeting, status, *, actor, request=None):
         MeetingStatus.CANCELLED,
     ):
         raise GovernanceError("Only a scheduled meeting can be marked held or cancelled.")
-    Meeting.objects.filter(pk=meeting.pk).update(status=status)
-    record_event(
-        "meeting.status_changed",
-        actor=actor,
-        request=request,
-        target=meeting,
-        metadata={"status": status},
-    )
+    with transaction.atomic():
+        Meeting.objects.filter(pk=meeting.pk).update(status=status)
+        record_event(
+            "meeting.status_changed",
+            actor=actor,
+            request=request,
+            target=meeting,
+            metadata={"status": status},
+        )
+        if status == MeetingStatus.CANCELLED and meeting.calendar_event_id:
+            from comms import services as comms_services
+            from comms.models import Event
+
+            event = Event.objects.get(pk=meeting.calendar_event_id)
+            if not event.cancelled:
+                comms_services.cancel_event(event, actor=actor, request=request)
+    meeting.status = status
 
 
 def attach_minutes(meeting, document, *, actor, request=None):
@@ -154,6 +236,120 @@ def attach_minutes(meeting, document, *, actor, request=None):
         target=meeting,
         metadata={"document_id": document.pk},
     )
+
+
+def upload_minutes(meeting, *, file, title="", actor, request=None):
+    """Upload the minutes straight from the meeting page: a new document in
+    Meeting minutes (through the documents service, with its file checks),
+    attached to the meeting. Executive-session minutes are board only."""
+    from documents import services as document_services
+    from documents.models import Category, Visibility
+
+    require(actor, "meeting.manage")
+    require(actor, "document.manage")
+    if Meeting.objects.filter(pk=meeting.pk, minutes_document__isnull=False).exists():
+        raise GovernanceError(
+            "Minutes are already attached. Publish a corrected version of that document instead."
+        )
+    when = timezone.localtime(meeting.starts_at).strftime("%B %-d, %Y")
+    try:
+        with transaction.atomic():
+            document = document_services.create_document(
+                title=single_line(title)[:200] or f"Minutes: {meeting.title} ({when})"[:200],
+                category=Category.MINUTES,
+                visibility=Visibility.BOARD
+                if meeting.kind == MeetingKind.EXECUTIVE
+                else Visibility.OWNERS,
+                file=file,
+                actor=actor,
+                request=request,
+            )
+            attach_minutes(meeting, document, actor=actor, request=request)
+    except document_services.DocumentError as exc:
+        raise GovernanceError(str(exc)) from exc
+    return document
+
+
+def minutes_approval(meeting):
+    """The board's approval of the meeting's minutes as they stand now (the
+    attached document's current version), or None while they are a draft. A
+    corrected version published after approval is a draft again."""
+    from governance.models import MinutesApproval
+
+    if not meeting.minutes_document_id:
+        return None
+    with system_access("minutes approval status"):
+        from documents.models import Document
+
+        current = (
+            Document.objects.filter(pk=meeting.minutes_document_id)
+            .values_list("current_version_id", flat=True)
+            .first()
+        )
+    if current is None:
+        return None
+    return (
+        MinutesApproval.objects.filter(
+            meeting=meeting, document_id=meeting.minutes_document_id, version_id=current
+        )
+        .select_related("recorded_by")
+        .first()
+    )
+
+
+def approve_minutes(meeting, *, approved_on=None, note="", version_id=None, actor, request=None):
+    """Record that the board approved the meeting's attached minutes: the
+    version the board member read (``version_id``, from the form), refused
+    if another version has been published since (fixres BUG-006); internal
+    callers may leave it out for the current version. A board decision: the
+    manager may attach drafts but not approve them (SEC-003). Append-only
+    and audited."""
+    from governance.models import MinutesApproval
+
+    require(actor, "minutes.adopt")
+    approved_on = approved_on or timezone.localdate()
+    with transaction.atomic():
+        current = Meeting.objects.select_for_update().get(pk=meeting.pk)
+        if not current.minutes_document_id:
+            raise GovernanceError("Attach the minutes before marking them approved.")
+        if current.status != MeetingStatus.HELD:
+            raise GovernanceError("Only minutes of a held meeting can be approved.")
+        if approved_on > timezone.localdate():
+            raise GovernanceError("The approval date can't be in the future.")
+        if approved_on < timezone.localdate(current.starts_at):
+            raise GovernanceError("The approval date can't be before the meeting.")
+        with system_access("approve minutes"):
+            from documents.models import Document
+
+            document = Document.objects.select_related("current_version").get(
+                pk=current.minutes_document_id
+            )
+        version = document.current_version
+        if version is None:
+            raise GovernanceError("The minutes document has no file yet.")
+        if version_id is not None and version.pk != version_id:
+            raise GovernanceError(
+                f"A new version of the minutes (version {version.number}) was published "
+                "after you opened this page. Read it, then mark it approved if it is right."
+            )
+        if MinutesApproval.objects.filter(meeting=current, version=version).exists():
+            raise GovernanceError("These minutes are already marked approved.")
+        approval = MinutesApproval.objects.create(
+            meeting=current,
+            document=document,
+            version=version,
+            approved_on=approved_on,
+            note=single_line(note)[:200],
+            recorded_by=None if actor is SYSTEM else actor,
+        )
+    record_event(
+        "meeting.minutes_approved",
+        actor=None if actor is SYSTEM else actor,
+        request=request,
+        target=meeting,
+        metadata={"document_id": document.pk, "version": version.number},
+    )
+    return approval
 
 
 def record_attendance(meeting, person, *, present=True, by_proxy=False, actor, request=None):
@@ -316,13 +512,22 @@ def create_vote(
     description="",
     secret=False,
     closes_at=None,
+    meeting=None,
     actor,
     request=None,
 ) -> Vote:
     require(actor, "vote.manage")
     options = [o.strip() for o in options if o and o.strip()]
+    if kind == VoteKind.INFORMAL:
+        # Owner decision 2026-11-26: informal polls are one-question surveys.
+        raise GovernanceError("Informal polls are now surveys: create a survey instead.")
     if kind not in VoteKind.values or not single_line(title):
         raise GovernanceError("A vote needs a title and a type.")
+    if meeting is not None and (
+        meeting.kind not in (MeetingKind.ANNUAL, MeetingKind.SPECIAL)
+        or meeting.status != MeetingStatus.SCHEDULED
+    ):
+        raise GovernanceError("A vote can belong only to a coming owners' meeting.")
     if len(options) < 2 or len(set(options)) != len(options):
         raise GovernanceError("Give at least two different options.")
     with transaction.atomic():
@@ -332,6 +537,7 @@ def create_vote(
             description=description,
             secret=secret,
             closes_at=closes_at,
+            meeting=meeting,
             created_by=actor,
         )
         for i, label in enumerate(options):
@@ -578,6 +784,27 @@ def committees_for(user):
     if can(user, "committee.view_all"):
         return Committee.objects.all()
     return Committee.objects.filter(pk__in=_policy.roles_for(user).committee_ids)
+
+
+def committees_public(*, actor) -> list[dict]:
+    """Board and committees page: each active committee's name and purpose
+    and its current members' names and roles (chair or member), nothing else,
+    for everyone who sees the community pages."""
+    require(actor, "board_committees.view")
+    rows = []
+    for committee in Committee.objects.filter(active=True):
+        members = [
+            {"name": m.person.display_name, "role": m.get_role_display()}
+            for m in committee_members(committee)
+        ]
+        rows.append(
+            {
+                "committee": committee,
+                "members": members,
+                "can_open": can_view_committee(actor, committee),
+            }
+        )
+    return rows
 
 
 def create_committee(*, name: str, purpose: str = "", citation: str = "", actor, request=None):

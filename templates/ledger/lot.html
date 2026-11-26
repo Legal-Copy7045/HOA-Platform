@@ -5,25 +5,32 @@
   {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'ledger_home' %}">Owner accounts</a> / Lot {{ lot.number }}</div>
   <div class="page-head">
-    <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<a href="{% url 'collection_detail' open_case.pk %}">{% icon "alert" %}Open collection case</a>{% endif %}</div></div>
+    <div><h1>Lot {{ lot.number }} account</h1><div class="meta"><span>{{ lot.street_address }}</span>{% if open_case %}<span>{% icon "alert" %}Collection case #{{ open_case.pk }} open</span>{% endif %}</div></div>
     <div class="actions">
       <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">{% icon "download" %} Statement</a>
       {% if can_manage %}<a class="btn secondary" href="{% url 'record_payments' %}">{% icon "receipt" %} Record payments</a>{% endif %}
+      {% if user|can:"collections.manage" %}{% if open_case %}<a class="btn secondary" href="{% url 'collection_detail' open_case.pk %}" data-testid="open-collection-case">{% icon "alert" %} Open collection case</a>{% elif balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" class="inline-form" data-confirm="Open a collection case for this lot? Delinquency letters are sent from the case, step by step.">{% csrf_token %}<button type="submit" class="secondary" data-testid="open-collection-case">{% icon "alert" %} Open collection case</button></form>{% endif %}{% endif %}
     </div>
   </div>
-  {% if user|can:"collections.manage" %}<div class="actions-row notice-buttons" role="group" aria-label="Delinquency notices">
-    <span class="small muted">Delinquency notice with statement (PDF):</span>
-    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'first' %}">{% icon "mail" %} First notice</a>
-    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'second' %}">{% icon "mail" %} Second notice</a>
-    <a class="btn secondary small" href="{% url 'lot_notice_pdf' lot.pk 'final' %}">{% icon "mail" %} Final notice</a>
-  </div>{% endif %}
   <div class="grid grid-3">
     <div class="stat {% if balance > 0 %}tone-warning{% elif balance < 0 %}tone-success{% endif %}"><div class="label">Balance</div><div class="value">{{ balance|cents }}</div>{% if aging.credit %}<div class="hint">unapplied credit {{ aging.credit|cents }}</div>{% endif %}</div>
     {% for label, amount in aging_columns %}<div class="stat{% if amount and forloop.counter > 3 %} tone-danger{% endif %}"><div class="label">{{ label }}</div><div class="value">{{ amount|cents }}</div></div>{% endfor %}
   </div>
+  <section class="card">{% include "ledger/_open_charges.html" with open_charges=open_charges unapplied=aging.credit %}</section>
+  {% if former_accounts %}<section class="card" data-testid="former-accounts"><h2>Former owners' accounts</h2>
+    <p class="small muted">Money stays with the account it was posted under: a former owner's credit never pays the new owners' charges. Choose the account when recording a refund check or a late payment for it.</p>
+    <ul class="list">{% for a in former_accounts %}<li><span class="grow">Account {{ a.number }} <span class="small muted">{{ a.opened_on|short_date }} – {{ a.closed_on|short_date }}</span></span>{% if a.balance_cents < 0 %}<span>Credit owed to former owner: <strong>{{ a.balance_cents|cents|cut:"-" }}</strong></span>{% else %}<span>Still owed by former owner: <strong>{{ a.balance_cents|cents }}</strong></span>{% endif %}</li>{% endfor %}</ul>
+  </section>{% endif %}
+  {% if move_notices %}<section class="card" id="moved" data-testid="moved-entries"><h2>Entries moved between accounts</h2>
+    <p class="small muted">An ownership date changed, so these entries were moved to the account their date belongs to (each original is reversed on its old account). Check them: a seller's settlement check recorded before the sale may have moved with the buyer's dues. To put one back, reverse the copy and record it again with the account choice.</p>
+    {% for n in move_notices %}<div class="stack"><p><strong>{{ n.count }} entr{{ n.count|pluralize:"y,ies" }}</strong> from account {{ n.from_accounts }} to account {{ n.to_accounts }}, {{ n.created_at|short_date }}</p>
+      <ul class="list">{% for e, note in n.moved %}<li><span class="grow">{{ e.posted_on|short_date }} · {{ e.description }}{% if e.reference %} <span class="muted">({{ e.reference }})</span>{% endif %} <span class="small muted">{{ note }}</span></span><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
+      {% if can_manage %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'movechecked' %}" class="inline-form" data-confirm="Mark these moved entries checked? The item leaves My items; the entries stay as they are.">{% csrf_token %}<input type="hidden" name="notice" value="{{ n.pk }}"><button type="submit" class="secondary small">{% icon "check" %} Mark checked</button></form>{% endif %}</div>{% endfor %}
+  </section>{% endif %}
+  <h2>All entries</h2>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Date</th><th>Entry</th><th class="num">Amount</th>{% if can_manage %}<th><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>
-    <tbody>{% for e in entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}{% if e.reference %} <span class="muted">({{ e.reference }})</span>{% endif %}</td><td class="num">{{ e.amount_cents|cents }}</td>
+    <tbody>{% for e in entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}{% if e.reference %} <span class="muted">({{ e.reference }})</span>{% endif %}{% if e.moved_note %} <span class="status tone-warning">{{ e.moved_note }}</span>{% endif %}</td><td class="num">{{ e.amount_cents|cents }}</td>
       {% if can_manage %}<td>{% if e.kind != "reversal" %}{% if e.reversed_by %}<span class="status tone-neutral">Reversed</span>{% else %}<details class="row-menu"><summary>Reverse</summary><form method="post" action="{% url 'lot_ledger_action' lot.pk 'reverse' %}" class="inline-form" data-confirm="Post a reversing entry? The original stays on the record.">{% csrf_token %}<input type="hidden" name="entry" value="{{ e.pk }}"><input name="reason" placeholder="Reason" required aria-label="Reason"><button type="submit" class="danger small">Reverse</button></form></details>{% endif %}{% endif %}</td>{% endif %}</tr>
     {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="receipt" title="No entries yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
@@ -31,6 +38,5 @@
     <details class="panel"><summary>Record a payment</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'payment' %}" class="form-grid">{% csrf_token %}{{ payment_form }}<div class="form-actions"><button type="submit">Record payment</button></div></form></div></details>
     <details class="panel"><summary>Post a charge</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'charge' %}" class="form-grid">{% csrf_token %}{{ charge_form }}<div class="form-actions"><button type="submit">Post charge</button></div></form></div></details>
     <details class="panel"><summary>Post a credit</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'credit' %}" class="form-grid">{% csrf_token %}{{ credit_form }}<div class="form-actions"><button type="submit">Post credit</button></div></form></div></details>
-    {% if not open_case and balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" data-confirm="Open a collection case for this lot?">{% csrf_token %}<button type="submit" class="secondary">Open a collection case</button></form>{% endif %}
   {% endif %}
 {% endblock %}

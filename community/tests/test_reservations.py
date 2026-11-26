@@ -317,6 +317,9 @@ def test_board_saves_rules_in_dollars(client, world):
     client.post(
         reverse("reservation_area_save", args=[area.pk]),
         {
+            prefix + "name": area.name,
+            prefix + "kind": area.kind,
+            prefix + "active": "on",
             prefix + "bookable": "on",
             prefix + "max_hours": "4",
             prefix + "fee_cents": "25.00",
@@ -332,6 +335,89 @@ def test_board_saves_rules_in_dollars(client, world):
     page = client.get(reverse("reservations")).content.decode()
     assert "$25.00" in page and "not paid here" in page
     assert client.get(reverse("reservation_settings")).status_code == 403
+
+
+def test_area_and_its_rules_are_edited_together(client, world):
+    """Streamlining: the area's own details are saved with its booking rules."""
+    client.force_login(world["board"])
+    area = world["area"]
+    prefix = f"a{area.pk}-"
+    page = client.get(reverse("reservation_settings")).content.decode()
+    assert "<h1>Common area booking rules</h1>" in page
+    assert f'name="{prefix}name"' in page and f'name="{prefix}citation"' in page
+    response = client.post(
+        reverse("reservation_area_save", args=[area.pk]),
+        {
+            prefix + "name": "Lakeside pavilion",
+            prefix + "kind": "amenity",
+            prefix + "notes": "Lights on a timer",
+            prefix + "active": "on",
+            prefix + "bookable": "on",
+            prefix + "max_hours": "6",
+            prefix + "citation": "Rules §4.4",
+        },
+    )
+    assert response.status_code == 302
+    area.refresh_from_db()
+    assert (area.name, area.notes, area.active) == ("Lakeside pavilion", "Lights on a timer", True)
+    rules = reservations.settings_for(area)
+    assert (rules.max_hours, rules.citation) == (6, "Rules §4.4")
+    actions = set(AuditEvent.objects.values_list("action", flat=True))
+    assert {"community.common_area_saved", "reservation.settings_saved"} <= actions
+
+
+def test_invalid_area_form_comes_back_with_what_was_typed(client, world):
+    client.force_login(world["board"])
+    area = world["area"]
+    prefix = f"a{area.pk}-"
+    response = client.post(
+        reverse("reservation_area_save", args=[area.pk]),
+        {prefix + "name": "", prefix + "kind": "amenity", prefix + "max_hours": "6"},
+    )
+    assert response.status_code == 400
+    page = response.content.decode()
+    assert 'role="alert"' in page and 'value="6"' in page
+    area.refresh_from_db()
+    assert area.name == "Pavilion"
+    # A service refusal (too long a booking) saves neither part.
+    response = client.post(
+        reverse("reservation_area_save", args=[area.pk]),
+        {prefix + "name": "Renamed", prefix + "kind": "amenity", prefix + "max_hours": "9999"},
+    )
+    assert response.status_code == 400
+    area.refresh_from_db()
+    assert area.name == "Pavilion"
+
+
+def test_retired_areas_stay_listed_and_new_ones_are_added_here(client, world):
+    client.force_login(world["board"])
+    response = client.post(
+        reverse("common_area_save"),
+        {"name": "Tennis court", "kind": "amenity", "back": "booking_rules"},
+    )
+    assert response["Location"] == reverse("reservation_settings")
+    court = CommonArea.objects.get(name="Tennis court")
+    CommonArea.objects.filter(pk=court.pk).update(active=False)
+    page = client.get(reverse("reservation_settings")).content.decode()
+    assert "Tennis court · not in use" in page
+    # From Community settings the add form still goes back there.
+    response = client.post(reverse("common_area_save"), {"name": "Pond", "kind": "amenity"})
+    assert response["Location"] == reverse("community_settings")
+    settings_page = client.get(reverse("community_settings")).content.decode()
+    assert reverse("reservation_settings") in settings_page
+
+
+def test_only_the_board_edits_areas_and_rules(client, world):
+    area = world["area"]
+    prefix = f"a{area.pk}-"
+    data = {prefix + "name": "Hacked", prefix + "kind": "amenity"}
+    for who in ("manager", "owner_a"):
+        client.force_login(world[who])
+        assert client.get(reverse("reservation_settings")).status_code == 403
+        response = client.post(reverse("reservation_area_save", args=[area.pk]), data)
+        assert response.status_code == 403
+    area.refresh_from_db()
+    assert area.name == "Pavilion"
 
 
 def test_calendar_shows_confirmed_bookings_without_names(client, world):

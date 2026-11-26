@@ -50,6 +50,16 @@ def send_push(user_ids: list[int], title: str, path: str) -> dict:
     return deliver(user_ids, title=title, path=path)
 
 
+@app.periodic(cron="37 * * * *")  # hourly: events starting within the next day
+@app.task(queue="email", queueing_lock="event_reminders")
+def event_reminders(timestamp: int) -> int:
+    """Remind people going to an event the day before (events that asked
+    for it). Each event is reminded once."""
+    from comms.rsvp import send_reminders
+
+    return send_reminders()
+
+
 @app.task(queue="email", retry=0)
 def send_urgent_sms(notice_id: int) -> dict:
     """Text an urgent notice to the owners who opted in (once: no retries,

@@ -1,27 +1,21 @@
-"""The one Finance tab bar (UX review): the same tabs on every finance page,
-whichever app the page belongs to. Tabs the user cannot use, or whose
-optional feature is switched off, are left out."""
+"""A small tab bar across the four day-to-day money pages: Owner accounts,
+Collections, Accounting and Reports. It shows only on those pages (and the
+pages under them); everything else in Finance and Maintenance is reached from
+the sidebar. Tabs the user cannot use are left out."""
 
 from django import template
 from django.urls import reverse
 
-from core import features, policy
+from core import policy
 
 register = template.Library()
 
-# (label, URL name, path fragment that marks the tab current, permission, feature)
+# (label, URL name, path prefix that belongs to the tab, permission)
 TABS = (
-    ("Owner accounts", "ledger_home", "/finance/ledger", None, None),
-    ("Invoices", "invoices", "/finance/invoices", None, None),
-    ("Contracts", "contracts", "/finance/contracts", None, "contracts"),
-    ("Work orders", "work_orders", "/finance/work-orders", None, "work_orders"),
-    ("Vendors", "vendors", "/finance/vendors", None, "work_orders"),
-    ("Budgets", "budgets", "/finance/budgets", None, None),
-    ("Accounting", "accounting", "/finance/accounting", None, None),
-    ("Collections", "collections", "/finance/collections", None, None),
-    ("Letters", "letters_settings", "/finance/letters", "letters.manage", None),
-    ("Resale", "resales", "/resale", "resale.request", "resale"),
-    ("Reports", "reports", "/reports", None, None),
+    ("Owner accounts", "ledger_home", "/finance/ledger", "finance.view"),
+    ("Collections", "collections", "/finance/collections", "finance.view"),
+    ("Accounting", "accounting", "/finance/accounting", "finance.view"),
+    ("Reports", "reports", "/reports", "reports.view"),
 )
 
 
@@ -31,10 +25,10 @@ def finance_tabs(context):
     user = getattr(request, "user", None)
     path = getattr(request, "path", "")
     tabs = []
-    for label, url_name, fragment, permission, feature in TABS:
-        if permission and not policy.can(user, permission):
+    for label, url_name, prefix, permission in TABS:
+        if not policy.can(user, permission):
             continue
-        if feature and not features.enabled(feature, request):
-            continue
-        tabs.append({"label": label, "url": reverse(url_name), "current": fragment in path})
+        tabs.append({"label": label, "url": reverse(url_name), "current": path.startswith(prefix)})
+    if not any(t["current"] for t in tabs):
+        return []  # not one of these pages: no tab bar
     return tabs

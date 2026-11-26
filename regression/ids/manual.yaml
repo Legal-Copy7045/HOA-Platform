@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-037
+# highest issued: MAN-051
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -37,3 +37,17 @@ MAN-034: "move files to R2 compares counts"
 MAN-035: "push and SMS settings reach the containers"
 MAN-036: "host hardening on the VM"
 MAN-037: "off-site backups locked"
+MAN-038: "meeting packet"
+MAN-039: "survey answering on a phone"
+MAN-040: "search on a phone"
+MAN-041: "event rsvp on a phone"
+MAN-042: "reserve plan on a phone"
+MAN-043: "bank feed teller connect"
+MAN-044: "bank feed statement file"
+MAN-045: "stripe test payment"
+MAN-046: "streamline pay shortcut phone"
+MAN-047: "voting page at phone width"
+MAN-048: "streamlined menu per role"
+MAN-049: "streamlined community pages at phone width"
+MAN-050: "urgent text from an announcement"
+MAN-051: "sale keeps each owner's money"

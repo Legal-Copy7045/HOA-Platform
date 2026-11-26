@@ -84,6 +84,9 @@ BOARD_ONLY_MARKERS = (
     b"Lot B pond",
     b"Lot B nephew",
     b"Lot B pavilion party",
+    b"Draft survey: special assessment",
+    # Reserve plan (reserves): component notes are board only.
+    b"Board note on reserve pond liner",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -93,7 +96,6 @@ MEMBER_PAGES = {
     "documents",
     "meetings",
     "resolutions",
-    "votes",
     "records_requests",
     "arc_list",
     "violations",
@@ -102,12 +104,24 @@ MEMBER_PAGES = {
     "requests",
     "faq",
     "signoffs_mine",
-    "elections",
     "owner_budget",
     "reservations",
     # Navigation and UX review (ux_nav): hub pages.
     "voting",
     "community_info",
+    # Portal search (core.search): see also test_search_never_shows_board_only_content.
+    "search",
+    # Reserve plan (reserves): the adopted plan's summary (now a redirect to
+    # Budget and reserves, streamlining).
+    "reserve_summary",
+}
+
+# Governance streamlining (2026-11-26): old list pages that now redirect to
+# the one Voting page with their type preselected (bookmarks, emailed links).
+VOTING_REDIRECTS = {
+    "votes": "/voting/?type=votes",
+    "elections": "/voting/?type=elections",
+    "surveys": "/voting/?type=surveys",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -116,6 +130,11 @@ COMMUNITY_DETAIL = {
     "election_detail": ("GET", "election"),
     "election_action": ("POST", "election"),
 }
+
+# Board and committees (streamlining, owner decision 2026-11-26): every
+# resident sees board members' names and offices and each committee's name
+# and members by design; topics, tasks, files and contact details never.
+NAMES_AND_OFFICES = {"board_and_committees"}
 
 # name -> (method, kwargs builder key). Every one must refuse owner A when
 # pointed at owner B's data, and send anonymous visitors to sign in.
@@ -211,6 +230,12 @@ PROTECTED = {
     "records_request_action": ("POST", "records_request_b"),
     "vote_detail": ("GET", "draft_vote"),
     "vote_action": ("POST", "draft_vote"),
+    # Surveys (M5): a draft is invisible to owners; board steps are refused.
+    "survey_detail": ("GET", "draft_survey"),
+    "survey_action": ("POST", "draft_survey"),
+    "survey_question_action": ("POST", "draft_survey_question"),
+    "survey_results": ("GET", "draft_survey"),
+    "survey_export": ("GET", "draft_survey"),
     "arc_detail": ("GET", "arc_b"),
     "arc_edit": ("POST", "arc_b"),
     "arc_action": ("POST", "arc_b"),
@@ -247,6 +272,7 @@ PROTECTED = {
     "collection_detail": ("GET", "collection"),
     "collection_action": ("POST", "collection"),
     "collection_letter": ("POST", "collection"),
+    "collection_notice_pdf": ("GET", "collection"),
     "accounting": ("GET", None),
     "accounting_export": ("GET", None),
     "accounting_1099": ("GET", None),
@@ -269,6 +295,38 @@ PROTECTED = {
     "access_review_record": ("POST", None),
     "retention": ("GET", None),
     "retention_run": ("POST", None),
+    # Meeting packets (M5): the build page is for builders; the board packet's
+    # .zip lives on a meeting owners can see, and must still refuse them.
+    "meeting_packet": ("GET", "executive_meeting"),
+    "meeting_packet_zip": ("GET", "board_packet"),
+    # Event RSVPs and volunteer sign-ups (rsvp): a board-only event's pages
+    # are 404 for owners; the board side is 403.
+    "event_detail": ("GET", "event"),
+    "event_rsvp": ("POST", "event"),
+    "event_rsvp_settings": ("POST", "event"),
+    "event_slot_add": ("POST", "event"),
+    "event_slot_action": ("POST", "event_slot"),
+    "event_rsvp_export": ("GET", "event"),
+    # Reserve plan (reserves)
+    "reserve_plan": ("GET", None),
+    "reserve_component": ("GET", "reserve_component"),
+    "reserve_adopt": ("POST", None),
+    "reserve_export": ("GET", None),
+    # Bank feed (bankfeeds; the feature is switched on in world()).
+    "bank_feed": ("GET", None),
+    "bank_connect": ("GET", None),
+    "bank_account_add": ("POST", None),
+    "bank_import": ("POST", None),
+    "bank_match": ("POST", None),
+    "bank_sync": ("POST", "bank_connection"),
+    "bank_disconnect": ("POST", "bank_connection"),
+    # Online payments (D32-payments; the feature is switched on in world()).
+    "pay_online": ("GET", "lot_id_b"),
+    "pay_checkout": ("POST", "lot_id_b"),
+    "pay_return": ("GET", "checkout_b"),
+    "payment_receipt": ("GET", "payment_b"),
+    "online_payments": ("GET", None),
+    "payment_alert_resolve": ("POST", "alert_b"),
 }
 
 
@@ -285,8 +343,10 @@ def test_every_named_url_is_classified():
         | OLD_EMAIL_LINKS
         | OWN_ACCOUNT
         | MEMBER_PAGES
+        | set(VOTING_REDIRECTS)
         | set(PROTECTED)
         | set(COMMUNITY_DETAIL)
+        | NAMES_AND_OFFICES
         and not name.startswith(OWN_ACCOUNT_PREFIXES)
     }
     assert unclassified == set(), f"Classify these URLs in {__name__}: {sorted(unclassified)}"
@@ -300,7 +360,7 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        for key in ("push", "sms"):  # off by default; their pages are checked here
+        for key in ("push", "sms", "bank_feeds"):  # off by default; pages checked here
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
@@ -333,6 +393,10 @@ def world():
             audience="board",
             actor=board,
         )
+        from comms import rsvp
+
+        rsvp.save_settings(board_event, enabled=True, actor=board)
+        event_slot = rsvp.add_slot(board_event, title="Board snacks", capacity=2, actor=board)
         task = create_task(title="Chase the pond contractor", actor=board)
         from documents import services as documents
         from documents.tests.helpers import pdf
@@ -360,11 +424,33 @@ def world():
             starts_at=timezone.now() + timedelta(days=5),
             actor=board,
         )
+        from governance import packets
+
+        packet_meeting = governance.create_meeting(
+            title="Open board meeting",
+            kind="board",
+            starts_at=timezone.now() + timedelta(days=6),
+            actor=board,
+        )
+        board_packet = packets.build_packet(
+            packet_meeting, variant="board", attachment_ids=[board_document.pk], actor=board
+        )
         records_request_b = governance.submit_records_request(
             description="Lot B wants the 2019 audit", actor=owner_b
         )
         draft_vote = governance.create_vote(
-            title="Draft: special assessment", kind="informal", options=["Yes", "No"], actor=board
+            title="Draft: special assessment", kind="formal", options=["Yes", "No"], actor=board
+        )
+        from governance import surveys as gov_surveys
+
+        draft_survey = gov_surveys.create_survey(
+            title="Draft survey: special assessment",
+            opens_on=timezone.localdate(),
+            closes_on=timezone.localdate() + timedelta(days=7),
+            actor=board,
+        )
+        draft_survey_question = gov_surveys.add_question(
+            draft_survey, kind="text", prompt="Thoughts?", actor=board
         )
         from arc import services as arc
         from documents.attachments import attach
@@ -410,6 +496,18 @@ def world():
         )
         collection = ledger.open_case(lot=lot_b, actor=board)
         budget = ledger.create_budget(fiscal_year=2027, actor=board)
+        from ledger import reserve_plan
+
+        reserve_component = reserve_plan.save_component(
+            name="Pond liner",
+            category="stormwater",
+            replacement_cost_cents=4500000,
+            useful_life_years=20,
+            remaining_life_years=3,
+            notes="Board note on reserve pond liner",
+            actor=board,
+        )
+        reserve_plan.adopt(actor=board)
         resale_b = ledger.request_resale(
             lot=lot_b, requester_name="Lot B Buyer Agent", actor=owner_b
         )
@@ -494,7 +592,56 @@ def world():
             actor=owner_b,
         )
         reservations.approve(reservation_b, actor=board)
+        from ledger.bankfeeds import services as bank_feed
+
+        bank_connection = bank_feed.add_file_account(display_name="Operating", actor=board)
+        # Online payments: owner B's checkout, payment and a board item on it.
+        import secrets
+
+        from core.scoping import system_access
+        from payments.models import PaymentAlert, PendingCheckout, StripePayment
+
+        FeatureSetting.objects.create(key="online_payments", enabled=True)
+        with system_access("t"):
+            checkout_b = PendingCheckout.objects.create(
+                nonce=secrets.token_hex(32),
+                lot=lot_b,
+                account=account_b,
+                person=person_b,
+                user=owner_b,
+                method="bank",
+                base_cents=5000,
+                total_cents=5000,
+                expires_at=timezone.now() + timedelta(hours=24),
+                session_id="cs_test_matrixb",
+                state="paid",
+            )
+            entry_b = ledger.record_online_payment(
+                lot=lot_b,
+                amount_cents=5000,
+                received_on=timezone.localdate(),
+                payment_intent_id="pi_test_matrixb",
+                apply_to=[],
+                actor=SYSTEM,
+            )
+            payment_b = StripePayment.objects.create(
+                checkout=checkout_b,
+                lot=lot_b,
+                entry=entry_b,
+                payment_intent_id="pi_test_matrixb",
+                charge_id="py_test_matrixb",
+                method="bank",
+                funding="bank",
+                base_cents=5000,
+            )
+            alert_b = PaymentAlert.objects.create(
+                kind="refund", key="re_test_matrixb", lot=lot_b, detail="Lot B refund"
+            )
     targets = {
+        "checkout_b": checkout_b.pk,
+        "payment_b": payment_b.pk,
+        "alert_b": alert_b.pk,
+        "bank_connection": bank_connection.pk,
         "reservation_b": reservation_b.pk,
         "area": area.pk,
         "account_b": account_b.pk,
@@ -524,12 +671,17 @@ def world():
         "reset": MfaReset.objects.unscoped("t").get(pk=reset.pk).pk,
         "board_announcement": board_note.pk,
         "event": board_event.pk,
+        "event_slot": event_slot.pk,
         "task": task.pk,
         "board_document": board_document.pk,
         "lot_b_document": lot_b_document.pk,
         "executive_meeting": executive_meeting.pk,
+        "packet_meeting": packet_meeting.pk,
+        "board_packet": board_packet.pk,
         "records_request_b": records_request_b.pk,
         "draft_vote": draft_vote.pk,
+        "draft_survey": draft_survey.pk,
+        "draft_survey_question": draft_survey_question.pk,
         "arc_b": arc_b.pk,
         "arc_b_file": arc_b_file.pk,
         "violation_b": violation_b.pk,
@@ -541,6 +693,7 @@ def world():
         "lot_id_b": lot_b.pk,
         "collection": collection.pk,
         "budget": budget.pk,
+        "reserve_component": reserve_component.pk,
         "resale_b": resale_b.pk,
         "report": "ar_aging",
     }
@@ -573,8 +726,10 @@ def _url(name, key, targets):
         kwargs["action"] = "notice"
     elif name == "records_request_action":
         kwargs["action"] = "withdraw"
-    elif name == "vote_action":
+    elif name == "vote_action" or name == "survey_action":
         kwargs["action"] = "open"
+    elif name == "survey_question_action":
+        kwargs["action"] = "remove"
     elif name == "arc_action":
         kwargs["action"] = "withdraw"
     elif name == "arc_decide":
@@ -615,13 +770,13 @@ def _url(name, key, targets):
         kwargs["action"] = "submit"
     elif name == "invoice_file":
         kwargs["file_id"] = targets["invoice_file"]
-    elif name == "my_statement_pdf":
+    elif name == "my_statement_pdf" or name in ("pay_online", "pay_checkout"):
         kwargs = {"lot_id": targets["lot_id_b"]}
     elif name == "lot_ledger_action":
         kwargs["action"] = "credit"
     elif name == "lot_statement_pdf":
         kwargs["kind"] = "statement"
-    elif name == "lot_notice_pdf":
+    elif name == "lot_notice_pdf" or name == "collection_notice_pdf":
         kwargs["kind"] = "first"
     elif name == "accounting_1099":
         kwargs = {"year": 2026}
@@ -633,6 +788,10 @@ def _url(name, key, targets):
         kwargs = {"key": "ar_aging"}
     elif name == "reservation_action":
         kwargs["action"] = "cancel"
+    elif name == "meeting_packet_zip":
+        kwargs = {"pk": targets["packet_meeting"], "packet_id": targets["board_packet"]}
+    elif name == "event_slot_action":
+        kwargs["action"] = "join"
     return reverse(name, kwargs=kwargs)
 
 
@@ -709,8 +868,9 @@ def test_role_page_access(client, world, who, allowed, denied):
 
 def test_board_pages_load(client, world):
     client.force_login(world["board"])
+    # The old Board overview sends bookmarks to My items (streamlining).
+    assert client.get(reverse("board_home"))["Location"] == reverse("my_items")
     for name in (
-        "board_home",
         "people",
         "approvals",
         "invitations",
@@ -761,6 +921,19 @@ def test_reset_code_is_shown_once_to_the_approver(client, world):
     assert code not in str(list(AuditEvent.objects.values_list("metadata", flat=True)))
 
 
+@pytest.mark.parametrize("name", sorted(VOTING_REDIRECTS))
+def test_old_voting_lists_redirect_signed_in_members_only(client, world, name):
+    response = client.get(reverse(name))
+    assert response["Location"].startswith(reverse("account_login"))
+    client.force_login(world["owner_a"])
+    response = client.get(reverse(name))
+    assert response.status_code == 302 and response["Location"] == VOTING_REDIRECTS[name]
+    page = client.get(response["Location"])
+    assert page.status_code == 200
+    for secret in BOARD_ONLY_MARKERS:
+        assert secret not in page.content
+
+
 @pytest.mark.parametrize("name", sorted(MEMBER_PAGES | {"my_profile", "export_my_data"}))
 def test_member_pages_require_sign_in(client, world, name):
     response = client.get(reverse(name))
@@ -771,10 +944,35 @@ def test_member_pages_require_sign_in(client, world, name):
 @pytest.mark.parametrize("name", sorted(MEMBER_PAGES))
 def test_member_pages_hide_board_only_content_from_owners(client, world, name):
     client.force_login(world["owner_a"])
-    response = client.get(reverse(name))
+    # follow: old pages that now redirect to their merged page (streamlining).
+    response = client.get(reverse(name), follow=True)
     assert response.status_code == 200
     for secret in BOARD_ONLY_MARKERS:
         assert secret not in response.content
+
+
+@pytest.mark.parametrize(
+    "q", ["Lot B", "Board", "pond", "counsel", "Executive", "audit", "Draft", "nephew", "Bravo"]
+)
+def test_search_never_shows_board_only_content(client, world, q):
+    """Searching for words from owner B's and board-only records finds none of
+    them for owner A (the <mark> highlight is removed before checking)."""
+    client.force_login(world["owner_a"])
+    response = client.get(reverse("search"), {"q": q})
+    assert response.status_code == 200
+    page = response.content.replace(b"<mark>", b"").replace(b"</mark>", b"")
+    for secret in BOARD_ONLY_MARKERS:
+        assert secret not in page
+    assert b"2 Bravo Way" not in page
+
+
+def test_board_search_finds_the_same_records(client, world):
+    """Positive control for the test above: the words do find these records."""
+    client.force_login(world["board"])
+    page = client.get(reverse("search"), {"q": "Lot B"}).content
+    page = page.replace(b"<mark>", b"").replace(b"</mark>", b"")
+    for secret in (b"Lot B hot tub", b"Lot B boat in driveway", b"Lot B leaking gutter"):
+        assert secret in page
 
 
 def test_export_contains_only_my_own_records(client, world):
@@ -784,6 +982,24 @@ def test_export_contains_only_my_own_records(client, world):
     data = json.loads(client.get(reverse("export_my_data")).content)
     assert [o["lot"] for o in data["community"]["ownerships"]] == [world["lot_a"].number]
     assert "Bravo" not in json.dumps(data)
+
+
+@pytest.mark.parametrize("name", sorted(NAMES_AND_OFFICES))
+def test_board_and_committees_shows_names_and_offices_only(client, world, name):
+    response = client.get(reverse(name))
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("account_login"))
+    client.force_login(world["owner_a"])
+    page = client.get(reverse(name)).content
+    # By design: committee names and members' names (owner B chairs nothing
+    # secret here), the board with offices.
+    assert b"Lot B pond committee" in page
+    # Never: committee topics, tasks, notes, other lots' records or contact details.
+    for secret in (*BOARD_ONLY_MARKERS, b"Lot B pond plans", b"Lot B pond task"):
+        if secret != b"Lot B pond":
+            assert secret not in page
+    for detail in (b"2 Bravo Way", b"1 Alpha Way", b"@"):
+        assert detail not in page.split(b"<main", 1)[-1]
 
 
 @pytest.mark.parametrize("name", sorted(COMMUNITY_DETAIL))

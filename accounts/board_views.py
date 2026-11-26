@@ -16,10 +16,52 @@ from core import policy
 
 @login_required
 def invitations(request):
+    """Invitations and sign-ups: the per-lot sign-up status and the bulk
+    buttons (board, ``invite.send``) above every invitation with re-send and
+    revoke (board or sysadmin). Each button keeps its own permission check;
+    sysadmins see invitation status only, not the register (decision D9)."""
+    from documents.attachments import pdf_response
+
     policy.require(request.user, "invite.resend")
-    rows = Invitation.objects.for_user(request.user).select_related("person")[:200]
-    # Sysadmins see invitation status only, not the register (decision D9).
-    return render(request, "accounts/board/invitations.html", {"invitations": rows})
+    can_send = policy.can(request.user, "invite.send")
+    if request.method == "POST":
+        policy.require(request.user, "invite.send")
+        action = request.POST.get("action")
+        if action == "invite_all":
+            n = services.invite_everyone(actor=request.user, request=request)
+            messages.success(request, f"{n} invitation(s) sent.")
+        elif action == "remind":
+            n = services.remind_pending(actor=request.user, request=request)
+            messages.success(request, f"{n} reminder(s) sent.")
+        return redirect("invitations")
+    context = {
+        "invitations": Invitation.objects.for_user(request.user).select_related("person")[:200],
+        "can_send": can_send,
+        "can_resend": policy.can(request.user, "invite.resend"),
+        "can_revoke": policy.can(request.user, "invite.revoke"),
+    }
+    if can_send:
+        rows = services.onboarding_rows()
+        if request.GET.get("letters") == "1":
+            return pdf_response(
+                services.email_request_letters_pdf([r for r in rows if r["status"] == "no_email"]),
+                "portal-letters.pdf",
+            )
+        counts = dict.fromkeys(services.ONBOARDING_LABELS, 0)
+        for r in rows:
+            counts[r["status"]] += 1
+            r["label"] = services.ONBOARDING_LABELS[r["status"]]
+        context.update(
+            {
+                "rows": rows,
+                "counts": counts,
+                "signed_up_percent": round(100 * counts["signed_up"] / len(rows)) if rows else 0,
+                "remind_count": len(services.reminder_due(rows=rows)),
+            }
+        )
+    elif request.GET.get("letters") == "1":
+        policy.require(request.user, "invite.send")
+    return render(request, "accounts/board/invitations.html", context)
 
 
 @login_required

@@ -227,7 +227,7 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
         run("seed_demo_operations")
     client.force_login(make_member(board=True))
     for name in (
-        "board_home",
+        "my_items",
         "community_settings",
         "ledger_home",
         "collections",
@@ -239,7 +239,7 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
         "arc_list",
         "violations",
         "meetings",
-        "votes",
+        "voting",
         "resolutions",
         "records_requests",
         "announcements",
@@ -249,6 +249,11 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
         "tasks",
     ):
         assert client.get(reverse(name)).status_code == 200, name
+    # The annual meeting's calendar entry is made by the meeting (not twice).
+    from comms.models import Event
+
+    assert Event.objects.filter(title="Annual owners' meeting (demo)").count() == 1
+    assert client.get(reverse("voting") + "?status=past").status_code == 200
 
 
 def test_rescan_blocks_a_file_found_infected_later(client, sysadmin, settings):

@@ -127,7 +127,11 @@ def record_ownership(
         raise CommunityError("Unknown ownership type.")
     _refuse_self_grant(actor, person, "an ownership")
     try:
-        with transaction.atomic(), system_access("record_ownership"):
+        with (
+            transaction.atomic(),
+            system_access("record_ownership"),
+            _periods_change(lot.pk, actor=actor, request=request),
+        ):
             ownership = Ownership.objects.create(
                 person=person,
                 lot=lot,
@@ -163,7 +167,11 @@ def end_ownership(
     """End an ownership. With the default (today) access stops immediately."""
     _authorize(actor, "ownership.manage")
     end_date = end_date or today()
-    with transaction.atomic(), system_access("end_ownership"):
+    with (
+        transaction.atomic(),
+        system_access("end_ownership"),
+        _periods_change(ownership.lot_id, actor=actor, request=request),
+    ):
         ownership = Ownership.objects.select_for_update().get(pk=ownership.pk)
         if ownership.end_date is not None and ownership.end_date <= end_date:
             raise CommunityError("This ownership has already ended.")
@@ -208,7 +216,11 @@ def transfer_lot(
         raise CommunityError("Each new owner may be listed only once.")
     if ownership_type is None:
         ownership_type = OwnershipType.SOLE if len(new_owners) == 1 else OwnershipType.JOINT
-    with transaction.atomic(), system_access("transfer_lot"):
+    with (
+        transaction.atomic(),
+        system_access("transfer_lot"),
+        _periods_change(lot.pk, actor=actor, request=request),
+    ):
         Lot.objects.select_for_update().get(pk=lot.pk)
         current = list(Ownership.objects.select_for_update().filter(lot=lot).active(transfer_date))
         continuing = {o.person_id for o in current} & {p.pk for p in new_owners}
@@ -245,6 +257,14 @@ def transfer_lot(
 
 
 # --- Accounts (Milestone 3) -------------------------------------------------------
+
+
+def _periods_change(lot_id: int, *, actor, request):
+    """Ownership changes move account periods; entries already posted for a
+    period that now belongs to another account follow it (D34-fixmoney-1)."""
+    from ledger.services import account_periods_change
+
+    return account_periods_change(lot_id, actor=actor, request=request)
 
 
 @internal("community accounts")
@@ -290,7 +310,9 @@ def _close_account_if_empty(account_id: int | None, on: datetime.date) -> None:
     still_owned = Ownership.objects.filter(account_id=account_id).active(on).exists()
     if still_owned:
         return
-    Account.objects.filter(pk=account_id, closed_on__isnull=True).update(closed_on=on)
+    Account.objects.filter(pk=account_id, closed_on__isnull=True).update(
+        closed_on=on, closed_recorded_at=timezone.now()
+    )
     # Contacts and tenants of a dormant account lose access with it.
     AccountContact.objects.filter(account_id=account_id, end_date__isnull=True).update(end_date=on)
     _invalidate_roles()
@@ -299,7 +321,7 @@ def _close_account_if_empty(account_id: int | None, on: datetime.date) -> None:
 @internal("community accounts")
 def _reopen_account(account_id: int | None) -> None:
     if account_id is not None:
-        Account.objects.filter(pk=account_id).update(closed_on=None)
+        Account.objects.filter(pk=account_id).update(closed_on=None, closed_recorded_at=None)
 
 
 def set_account_number(account: Account, number: str, *, actor, request=None) -> Account:
@@ -447,6 +469,36 @@ def staff_people(action: str) -> list[Person]:
     with system_access("staff people"):
         people = list(Person.objects.filter(user__isnull=False, user__is_active=True))
     return [p for p in people if can(p.user, action)]
+
+
+def board_members_public(*, actor, on=None) -> list[dict]:
+    """Board and committees page: each current board member's name and
+    offices, nothing else (no contact details, lots or seat history), for
+    everyone who sees the community pages."""
+    from community.models import BoardSeat, Office, OfficeHolding
+
+    require(actor, "board_committees.view")
+    with system_access("board and committees page"):
+        seated = dict(
+            BoardSeat.objects.active(on)
+            .order_by("person__display_name")
+            .values_list("person_id", "person__display_name")
+        )
+        offices: dict[int, list[str]] = {}
+        for person_id, office in OfficeHolding.objects.active(on).values_list(
+            "person_id", "office"
+        ):
+            offices.setdefault(person_id, []).append(office)
+    order = {value: i for i, value in enumerate(Office.values)}
+    labels = dict(Office.choices)
+    rows = []
+    for person_id, name in seated.items():
+        held = sorted((o for o in offices.get(person_id, []) if o in labels), key=order.get)
+        rank = order[held[0]] if held else len(order)
+        rows.append({"name": name, "offices": [labels[o] for o in held], "rank": rank})
+    # Officers first, in the usual order; then the other directors by name.
+    rows.sort(key=lambda r: (r["rank"], r["name"]))
+    return rows
 
 
 def notice_emails_for_users(users) -> list[str]:
@@ -1275,7 +1327,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
     asked. For the board, manager and auditor."""
     require(actor, "roster.view")
     from community.models import ContactProfile
-    from ledger.services import balances
+    from ledger.services import account_balances
 
     with system_access("board roster"):
         accounts = Account.objects.select_related("lot").order_by("lot__number", "-opened_on")
@@ -1289,7 +1341,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
             AccountContact.objects.filter(account__in=accounts).select_related("person")
         )
         phones = dict(ContactProfile.objects.values_list("person_id", "phone"))
-        owed = balances()
+        owed = account_balances()
     by_account: dict[int, dict] = {a.pk: {"owners": [], "contacts": []} for a in accounts}
     for o in ownerships:
         if o.account_id in by_account and (o.end_date is None or not o.account.is_active):
@@ -1308,7 +1360,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
                 "contacts": by_account[a.pk]["contacts"],
                 "emails": [p.email for p in owners if p.email],
                 "phones": [phones[p.pk] for p in owners if phones.get(p.pk)],
-                "balance_cents": owed.get(a.lot_id, 0) if a.is_active else None,
+                "balance_cents": owed.get(a.pk, 0) if a.is_active else None,
             }
         )
     return rows

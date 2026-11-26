@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ survey.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'voting' %}?type=surveys">Voting</a> / {{ survey.title|truncatechars:40 }}</div>
+  <div class="page-head"><div><h1>{{ survey.title }}</h1>
+    <div class="meta">{% status survey.phase survey.phase_label %}<span>{% icon "calendar" %}{{ survey.opens_on|date:"M j, Y" }} to {{ survey.closes_on|date:"M j, Y" }}</span><span>{% icon "users" %}{{ survey.get_audience_display }}</span>{% if survey.anonymous %}<span>{% icon "lock" %}Anonymous</span>{% endif %}</div></div>
+    {% if can_manage %}<div class="actions">
+      {% if survey.status != "draft" %}<a class="btn secondary" href="{% url 'survey_results' survey.pk %}">{% icon "chart" %} Results</a><a class="btn secondary" href="{% url 'survey_export' survey.pk %}">{% icon "download" %} Download CSV</a>{% endif %}
+      {% if survey.status == "open" %}<form method="post" action="{% url 'survey_action' survey.pk 'close' %}" data-confirm="Close this survey now? No more answers can be given, and it cannot be reopened.">{% csrf_token %}<button type="submit" class="danger">Close survey</button></form>{% endif %}
+    </div>{% endif %}
+  </div>
+  <div class="alert info">{% icon "info" %}<span>This survey is informal. It is not a vote, and nothing is decided by it.{% if survey.anonymous %} It is anonymous: your answers are stored without your name, and the portal never shows anyone, including the board, which answers are yours.{% else %} The board can see who gave each answer.{% endif %}</span></div>
+  <div class="split">
+    <div>
+      {% if survey.intro %}<section class="card prose">{{ survey.intro|linebreaks }}</section>{% endif %}
+
+      {% if responded_on %}
+        <section class="card" id="answered"><h2>Your answers</h2>
+          <p class="voted">{% icon "check-circle" %} You answered on {{ responded_on|date:"M j, Y" }}. Answers can't be changed.</p>
+          {% if my_answers %}<dl class="kv">{% for q in questions %}<dt>{{ q.prompt }}</dt><dd>{% for a in my_answers|get_item:q.pk %}{% if a.choice %}{{ a.choice.label }}{% elif a.rating %}{{ a.rating }} of 5{% else %}{{ a.text }}{% endif %}{% if not forloop.last %}; {% endif %}{% empty %}<span class="muted">No answer</span>{% endfor %}</dd>{% endfor %}</dl>
+          {% elif survey.anonymous %}<p class="small muted">Because the survey is anonymous, your answers are not linked to you and can't be shown back to you.</p>{% endif %}
+        </section>
+      {% endif %}
+
+      {% if answer_form %}
+        <section class="card" id="answer"><h2>Your answers</h2>
+          <form method="post" action="{% url 'survey_detail' survey.pk %}" data-confirm="Send your answers? They can't be changed afterwards.">{% csrf_token %}
+            {% include "partials/form_errors.html" with form=answer_form %}{{ answer_form.non_field_errors }}
+            {% for q, field in answer_form.rows %}
+              {% if q.kind == "text" %}
+                <div class="field{% if field.errors %} has-error{% endif %}"><label for="{{ field.auto_id }}">{{ q.prompt }}{% if q.required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}</label>{{ field }}<div class="help">Up to 1,000 characters.</div>{{ field.errors }}</div>
+              {% else %}
+                <fieldset class="choices{% if field.errors %} has-error{% endif %}" id="{{ field.auto_id }}"><legend>{{ q.prompt }}{% if q.required %}<span class="required-mark" aria-hidden="true">*</span>{% endif %}</legend>
+                  {% if q.kind == "multiple" %}<p class="help">{% if q.max_picks %}Choose up to {{ q.max_picks }}.{% else %}Choose all that apply.{% endif %}</p>{% elif q.kind == "rating" %}<p class="help">1 is the lowest, 5 the highest.</p>{% endif %}
+                  {% for opt in field %}<label class="choice">{{ opt.tag }}<span>{{ opt.choice_label }}</span></label>{% endfor %}
+                  {{ field.errors }}
+                </fieldset>
+              {% endif %}
+            {% endfor %}
+            <p class="help">Questions marked <span class="required-mark" aria-hidden="true">*</span><span class="sr-only">with a star</span> need an answer. Answers can't be changed once sent.</p>
+            <div class="form-actions"><button type="submit">Send answers</button></div>
+          </form>
+        </section>
+      {% elif survey.phase == "scheduled" and not responded_on %}
+        <section class="card"><p>This survey opens on {{ survey.opens_on|date:"F j, Y" }}.</p></section>
+      {% elif survey.phase == "open" and not responded_on and not can_manage %}
+        <section class="card"><p class="muted">You can read this survey, but your access does not include answering it.</p></section>
+      {% endif %}
+
+      {% if results_visible and not can_manage %}<p><a href="{% url 'survey_results' survey.pk %}">{% icon "chart" %} See the results</a></p>{% endif %}
+
+      {% if can_manage and survey.status == "draft" %}
+        <section class="card"><div class="card-head"><h2>Questions</h2><span class="small muted">{{ question_rows|length }} question{{ question_rows|length|pluralize }}</span></div>
+          {% if question_rows %}<ol class="list">{% for q, qform in question_rows %}
+            <li><div class="grow"><strong>{{ q.prompt }}</strong>{% if q.required %} <span class="small muted">(required)</span>{% endif %}
+              <div class="small muted">{{ q.get_kind_display }}{% if q.kind == "multiple" and q.max_picks %}, up to {{ q.max_picks }}{% endif %}{% if q.choices.all %}: {% for c in q.choices.all %}{{ c.label }}{% if not forloop.last %} · {% endif %}{% endfor %}{% endif %}</div>
+              <details class="panel"{% if qform.errors %} open{% endif %}><summary>Edit this question</summary><div class="panel-body">
+                <form method="post" action="{% url 'survey_question_action' q.pk 'edit' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=qform %}{{ qform }}<div class="form-actions"><button type="submit">Save question</button></div></form>
+              </div></details></div>
+              <div class="actions">
+                {% if not forloop.first %}<form method="post" action="{% url 'survey_question_action' q.pk 'up' %}">{% csrf_token %}<button type="submit" class="secondary small" aria-label="Move up: {{ q.prompt }}">Up</button></form>{% endif %}
+                {% if not forloop.last %}<form method="post" action="{% url 'survey_question_action' q.pk 'down' %}">{% csrf_token %}<button type="submit" class="secondary small" aria-label="Move down: {{ q.prompt }}">Down</button></form>{% endif %}
+                <form method="post" action="{% url 'survey_question_action' q.pk 'remove' %}" data-confirm="Remove this question from the draft?">{% csrf_token %}<button type="submit" class="danger small" aria-label="Remove: {{ q.prompt }}">Remove</button></form>
+              </div></li>
+          {% endfor %}</ol>
+          {% else %}{% include "partials/empty.html" with icon="list" title="No questions yet" %}{% endif %}
+        </section>
+        <details class="panel"{% if question_form.errors or not question_rows %} open{% endif %}><summary>Add a question</summary><div class="panel-body">
+          <form method="post" action="{% url 'survey_action' survey.pk 'question' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=question_form %}{{ question_form }}<div class="form-actions"><button type="submit">Add question</button></div></form>
+        </div></details>
+        <details class="panel"{% if settings_form.errors %} open{% endif %}><summary>Survey details</summary><div class="panel-body">
+          <form method="post" action="{% url 'survey_action' survey.pk 'settings' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=settings_form %}{{ settings_form }}<div class="form-actions"><button type="submit">Save details</button></div></form>
+        </div></details>
+        {% if question_rows %}<section class="card"><h2>Open the survey</h2>
+          <form method="post" action="{% url 'survey_action' survey.pk 'open' %}" data-confirm="Open this survey? Its questions and details are fixed once it opens.">{% csrf_token %}
+            <div class="field checkbox"><label for="notify"><input type="checkbox" id="notify" name="notify" value="1" checked> Email everyone it is for</label><div class="help">People who chose the weekly digest get it there.</div></div>
+            <div class="form-actions"><button type="submit">Open survey</button></div>
+          </form></section>{% endif %}
+      {% elif can_manage %}
+        <section class="card"><h2>Questions</h2><ol class="list">{% for q in questions %}<li><div class="grow">{{ q.prompt }}<div class="small muted">{{ q.get_kind_display }}{% if q.required %} · required{% endif %}</div></div></li>{% endfor %}</ol></section>
+      {% endif %}
+    </div>
+    {% if can_manage and survey.status != "draft" %}<aside><section class="card"><h3>Sharing</h3>
+      <p class="small">{% if survey.share_results %}Owners see the totals once the survey closes. Written answers are never shared.{% else %}Only the board sees the results.{% endif %}</p>
+      <form method="post" action="{% url 'survey_action' survey.pk survey.share_results|yesno:'unshare,share' %}">{% csrf_token %}<button type="submit" class="secondary">{% if survey.share_results %}Stop sharing results{% else %}Share totals with owners{% endif %}</button></form>
+    </section></aside>{% endif %}
+  </div>
+{% endblock %}

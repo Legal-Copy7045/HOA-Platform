@@ -72,3 +72,44 @@ branch_allowed() {
   [ -n "$allow" ] && [ "$branch" = "$allow" ] && return 0
   return 1
 }
+
+# offsite_pick <now stamp>  (stdin: backup names, oldest first, as pull_backup --list)
+# Prints the newest well-formed name not dated after <now>. Names in the
+# future or not shaped like a stamp are skipped with a warning, so one
+# mislabelled set in the bucket cannot block every drill (R2-005); the
+# chosen backup's signed stamp is still checked against its name.
+offsite_pick() {
+  local now="$1" name best=""
+  while IFS= read -r name; do
+    name="$(printf '%s' "$name" | tr -cd '0-9TZ-')"
+    [ -n "$name" ] || continue
+    if ! [[ "$name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{4}Z$ ]]; then
+      echo "WARNING: skipping off-site backup with an unexpected name: $name" >&2
+      continue
+    fi
+    if [[ "$name" > "$now" ]]; then
+      echo "WARNING: skipping off-site backup $name: it is dated in the future." >&2
+      continue
+    fi
+    if [ -z "$best" ] || [[ "$name" > "$best" ]]; then best="$name"; fi
+  done
+  [ -n "$best" ] || return 1
+  printf '%s\n' "$best"
+}
+
+# offsite_stamp_ok <stamp in the object names> <stamp inside the signed checksum> <now stamp>
+# The off-site drill picks a backup by its object names; the keyed checksum
+# says when it was really made. They must be the same, and not in the future,
+# or an older signed backup copied under a newer name would pass (R2-002).
+offsite_stamp_ok() {
+  local remote="$1" signed="$2" now="$3"
+  if [ -z "$signed" ] || [ "$signed" != "$remote" ]; then
+    echo "The off-site backup is named $remote but its keyed checksum says ${signed:-nothing}." >&2
+    return 1
+  fi
+  if [[ "$remote" > "$now" ]]; then
+    echo "The off-site backup $remote is dated in the future." >&2
+    return 1
+  fi
+  return 0
+}

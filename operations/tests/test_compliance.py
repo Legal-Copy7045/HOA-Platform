@@ -71,7 +71,66 @@ def test_starter_items_and_permissions(client, board):
     client.force_login(owner)
     assert client.get(reverse("compliance")).status_code == 403
     client.force_login(make_member(roles=[Role.MANAGER]))
-    assert b"Form 1120-H" in client.get(reverse("compliance")).content
+    assert b"Form 1120-H" in client.get(reverse("compliance"), follow=True).content
+
+
+# --- Recurring deadlines tab of Board tasks (streamlining) -----------------------------
+
+
+def _deadlines_url():
+    return reverse("tasks") + "?tab=deadlines"
+
+
+def test_compliance_redirects_to_the_recurring_deadlines_tab(client, board):
+    client.force_login(board)
+    response = client.get(reverse("compliance"))
+    assert response.status_code == 302 and response["Location"] == _deadlines_url()
+    page = client.get(_deadlines_url()).content.decode()
+    assert "<h1>Board tasks</h1>" in page and "Recurring deadlines" in page
+    assert 'aria-current="page">Recurring deadlines' in page
+
+
+def test_deadline_forms_post_to_the_tab_and_stay_audited(client, board):
+    from audit.models import AuditEvent
+
+    client.force_login(board)
+    response = client.post(
+        _deadlines_url(),
+        {"title": "Annual report", "due_on": "2027-04-15", "recurrence": "annual"},
+    )
+    assert response.status_code == 302 and response["Location"] == _deadlines_url()
+    from operations.models import BoardTask, ComplianceItem
+
+    item = ComplianceItem.objects.get(title="Annual report")
+    assert not BoardTask.objects.filter(title="Annual report").exists()
+    before = AuditEvent.objects.count()
+    client.post(_deadlines_url(), {"action": "done", "item": item.pk, "due_on": "2027-04-15"})
+    item.refresh_from_db()
+    assert item.due_on == datetime.date(2028, 4, 15)
+    assert AuditEvent.objects.count() > before
+
+
+def test_deadlines_tab_needs_permission_and_the_feature(client, board):
+    from core import features
+
+    owner = make_member(lots=[LotFactory()])
+    client.force_login(owner)
+    assert client.get(_deadlines_url()).status_code == 403
+    assert client.post(_deadlines_url(), {"title": "x", "due_on": "2027-01-01"}).status_code == 403
+    features.set_feature("compliance", False, actor=board)
+    client.force_login(board)
+    page = client.get(_deadlines_url()).content.decode()
+    assert "Recurring deadlines" not in page  # the tasks tab, without the deadlines tab
+    assert client.post(_deadlines_url(), {"title": "x", "due_on": "2027-01-01"}).status_code == 404
+    assert client.get(reverse("compliance")).status_code == 404
+
+
+def test_due_deadlines_link_to_the_tab_in_my_items(board):
+    from django.utils import timezone
+
+    _item(board, timezone.localdate() + datetime.timedelta(days=3))
+    found = [i for i in my_items.items_for(board) if i.area == "Compliance"]
+    assert found and found[0].url == _deadlines_url()
 
 
 # --- Budget notices ----------------------------------------------------------------------

@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core import policy
@@ -23,6 +24,7 @@ from governance.models import (
     Vote,
     VoteKind,
 )
+from governance.packets import visible_packets
 
 
 def _form_id(value) -> int:
@@ -78,7 +80,9 @@ def meetings(request):
                 lambda: services.create_meeting(
                     actor=request.user, request=request, **form.cleaned_data
                 ),
-                "Meeting scheduled.",
+                "Meeting scheduled."
+                if form.cleaned_data["kind"] == MeetingKind.EXECUTIVE
+                else "Meeting scheduled and added to the calendar.",
             )
             if m:
                 return redirect("meeting_detail", pk=m.pk)
@@ -94,12 +98,100 @@ def meetings(request):
     )
 
 
-@login_required
-def meeting_detail(request, pk):
-    meeting = get_object_or_404(Meeting.objects.for_user(request.user), pk=pk)
-    can_manage = policy.can(request.user, "meeting.manage")
+class ApproveMinutesForm(forms.Form):
+    approved_on = forms.DateField(
+        label="Approved on",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        help_text="The day the board approved them, usually at its next meeting.",
+    )
+    note = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Note",
+        help_text="Optional, e.g. which meeting approved them or with what corrections.",
+    )
+    # The version shown on the page: the one approved (fixres BUG-006).
+    version = forms.IntegerField(widget=forms.HiddenInput)
+
+    def __init__(self, *args, version=None, **kwargs):
+        kwargs.setdefault("auto_id", "approve_%s")
+        super().__init__(*args, **kwargs)
+        self.fields["approved_on"].initial = timezone.localdate()
+        if version is not None:
+            self.fields["version"].initial = version.pk
+
+
+class MinutesUploadForm(forms.Form):
+    file = forms.FileField(label="Minutes file", help_text="A PDF or Word file.")
+    title = forms.CharField(
+        max_length=200,
+        required=False,
+        help_text="Leave empty to name it after the meeting and its date.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("auto_id", "minutes_%s")
+        super().__init__(*args, **kwargs)
+
+
+def _linked(request, meeting) -> dict:
+    """Votes, elections and resolutions that belong to this meeting."""
+    from core import features
+    from governance.models import Election
+
+    user = request.user
+    out = {"linked_votes": [], "linked_elections": [], "linked_resolutions": []}
+    if policy.can(user, "vote.view"):
+        if features.enabled("votes", request):
+            rows = Vote.objects.filter(meeting=meeting)
+            if not policy.can(user, "vote.manage"):
+                rows = rows.exclude(status="draft")
+            out["linked_votes"] = list(rows)
+        if features.enabled("elections", request):
+            out["linked_elections"] = list(Election.objects.filter(meeting=meeting))
+    if policy.can(user, "resolution.view"):
+        out["linked_resolutions"] = list(Resolution.objects.filter(meeting=meeting))
+    return out
+
+
+def _for_version(form, version):
+    """A refused approval form, offering the version now current (the page
+    names it), with what was typed kept (fixres BUG-006)."""
+    if form is None or version is None or not form.is_bound:
+        return form
+    if str(form.data.get("version")) != str(version.pk):
+        form.data = form.data.copy()
+        form.data["version"] = str(version.pk)
+    return form
+
+
+def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, status=200):
+    user = request.user
+    can_manage = policy.can(user, "meeting.manage")
+    approval = services.minutes_approval(meeting)
+    can_approve = (
+        policy.can(user, "minutes.adopt")
+        and meeting.minutes_document_id
+        and meeting.status == MeetingStatus.HELD
+        and approval is None
+    )
+    minutes_version = None
+    if can_approve:
+        doc = (
+            Document.objects.for_user(user)
+            .select_related("current_version")
+            .filter(pk=meeting.minutes_document_id)
+            .first()
+        )
+        minutes_version = doc.current_version if doc else None
+    can_upload = can_manage and policy.can(user, "document.manage")
     minutes_choices = (
-        Document.objects.for_user(request.user).filter(category="minutes") if can_manage else []
+        Document.objects.for_user(user).filter(category="minutes") if can_manage else []
+    )
+    deadlines, deadline_default = (
+        services.notice_deadlines(meeting)
+        if can_manage and policy.can(user, "compliance.manage")
+        else ([], None)
     )
     return render(
         request,
@@ -108,11 +200,34 @@ def meeting_detail(request, pk):
             "m": meeting,
             "can_manage": can_manage,
             "minutes_choices": minutes_choices,
+            "minutes_form": minutes_form
+            or (MinutesUploadForm() if can_upload and not meeting.minutes_document_id else None),
+            "minutes_approval": approval,
+            "approve_form": (
+                _for_version(approve_form, minutes_version)
+                or ApproveMinutesForm(version=minutes_version)
+            )
+            if can_approve
+            else None,
+            "minutes_version": minutes_version,
+            "deadlines": deadlines,
+            "deadline_default": deadline_default,
+            "can_record_resolution": policy.can(user, "resolution.record"),
             "attendance": meeting.attendance.select_related("person") if can_manage else [],
             "short_days": services.notice_shortfall_days(meeting) if can_manage else None,
-            **meeting_extras(request.user, meeting),
+            "packets": visible_packets(user, meeting),
+            "can_build_packet": policy.can(user, "meeting.packet_build"),
+            **_linked(request, meeting),
+            **meeting_extras(user, meeting),
         },
+        status=status,
     )
+
+
+@login_required
+def meeting_detail(request, pk):
+    meeting = get_object_or_404(Meeting.objects.for_user(request.user), pk=pk)
+    return _render_meeting(request, meeting)
 
 
 @login_required
@@ -121,6 +236,7 @@ def meeting_action(request, pk, action):
     policy.require(request.user, "meeting.manage")
     meeting = get_object_or_404(Meeting.objects.for_user(request.user), pk=pk)
     if action == "notice":
+        deadline_id = _form_id(request.POST.get("deadline"))
         result = _flash(
             request,
             lambda: services.send_notice(meeting, actor=request.user, request=request),
@@ -139,17 +255,61 @@ def meeting_action(request, pk, action):
                     f"Notice is {result['short_days']} day(s) shorter "
                     "than the governing rule requires.",
                 )
+            if deadline_id:
+                _flash(
+                    request,
+                    lambda: services.complete_notice_deadline(
+                        meeting, deadline_id, actor=request.user, request=request
+                    ),
+                    "The deadline is marked done on Board tasks.",
+                )
     elif action in ("held", "cancelled"):
         _flash(
             request,
             lambda: services.set_meeting_status(
                 meeting, MeetingStatus(action), actor=request.user, request=request
             ),
-            "Updated.",
+            "Meeting cancelled and taken off the calendar."
+            if action == "cancelled" and meeting.calendar_event_id
+            else "Updated.",
         )
+    elif action == "minutes" and request.POST.get("how") == "upload":
+        form = MinutesUploadForm(request.POST, request.FILES)
+        if form.is_valid() and _saved(
+            request,
+            form,
+            lambda: services.upload_minutes(
+                meeting,
+                file=form.cleaned_data["file"],
+                title=form.cleaned_data["title"],
+                actor=request.user,
+                request=request,
+            ),
+            "Minutes uploaded and attached.",
+        ):
+            return redirect("meeting_detail", pk=meeting.pk)
+        return _render_meeting(request, meeting, minutes_form=form)
+    elif action == "approve_minutes":
+        policy.require(request.user, "minutes.adopt")
+        form = ApproveMinutesForm(request.POST)
+        if form.is_valid() and _saved(
+            request,
+            form,
+            lambda: services.approve_minutes(
+                meeting,
+                approved_on=form.cleaned_data["approved_on"],
+                note=form.cleaned_data["note"],
+                version_id=form.cleaned_data["version"],
+                actor=request.user,
+                request=request,
+            ),
+            "Minutes marked approved. Owner packets now include them as approved minutes.",
+        ):
+            return redirect("meeting_detail", pk=meeting.pk)
+        return _render_meeting(request, meeting, approve_form=form)
     elif action == "minutes":
         doc = get_object_or_404(
-            Document.objects.for_user(request.user), pk=request.POST.get("document")
+            Document.objects.for_user(request.user), pk=_form_id(request.POST.get("document"))
         )
         _flash(
             request,
@@ -167,44 +327,114 @@ class ResolutionForm(forms.Form):
     title = forms.CharField(max_length=200)
     text = forms.CharField(widget=forms.Textarea(attrs={"rows": 5}))
     adopted_on = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    meeting = forms.ModelChoiceField(
+        label="Adopted at meeting",
+        queryset=Meeting.objects.none(),
+        required=False,
+        empty_label="(none)",
+    )
     votes_for = forms.IntegerField(min_value=0, initial=0)
     votes_against = forms.IntegerField(min_value=0, initial=0)
     abstentions = forms.IntegerField(min_value=0, initial=0)
     supersedes = forms.ModelChoiceField(queryset=Resolution.objects.none(), required=False)
     citation = forms.CharField(max_length=200, required=False)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user, **kwargs):
+        kwargs.setdefault("auto_id", "res_%s")
         super().__init__(*args, **kwargs)
         self.fields["supersedes"].queryset = services.in_force()
+        self.fields["meeting"].queryset = Meeting.objects.for_user(user).exclude(
+            status=MeetingStatus.CANCELLED
+        )
+        self.fields["meeting"].label_from_instance = lambda m: (
+            f"{m.title} · {timezone.localtime(m.starts_at):%b %-d, %Y}"
+        )
+
+
+class ConsentForm(forms.Form):
+    title = forms.CharField(max_length=200)
+    text = forms.CharField(label="Resolution text", widget=forms.Textarea(attrs={"rows": 6}))
+    citation = forms.CharField(
+        label="Authority",
+        max_length=200,
+        required=False,
+        help_text="The section that allows action without a meeting, for example Bylaws §4.6.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("auto_id", "consent_%s")
+        super().__init__(*args, **kwargs)
+
+
+def _consents_on(request) -> bool:
+    from core import features
+
+    return features.enabled("consents", request) and policy.can(request.user, "resolution.record")
+
+
+def render_resolutions(request, *, form=None, consent_form=None, open_panel=""):
+    """Resolutions and policies, with (for the board) the written consents
+    waiting for signatures and the form to adopt one by written consent.
+    Consent signatures stay their own records: an adopted consent is recorded
+    as a resolution by the consent service, never typed in here."""
+    from governance.models import ConsentRequest, ConsentState
+
+    user = request.user
+    show_all = request.GET.get("all") == "1"
+    rows = Resolution.objects.all() if show_all else services.in_force()
+    can_record = policy.can(user, "resolution.record")
+    consents_on = _consents_on(request)
+    initial = {}
+    meeting_id = _form_id(request.GET.get("meeting"))
+    if can_record and meeting_id:
+        meeting = Meeting.objects.for_user(user).filter(pk=meeting_id).first()
+        if meeting is not None:
+            initial = {"meeting": meeting.pk, "adopted_on": timezone.localdate(meeting.starts_at)}
+            open_panel = open_panel or "record"
+    if form is None:
+        form = ResolutionForm(initial=initial, user=user)
+    waiting, past_consents = [], []
+    if consents_on:
+        consents = list(ConsentRequest.objects.all()[:100])
+        waiting = [c for c in consents if c.state == ConsentState.OPEN]
+        past_consents = [c for c in consents if c.state != ConsentState.OPEN]
+    return render(
+        request,
+        "governance/resolutions.html",
+        {
+            "rows": rows.select_related("supersedes", "meeting"),
+            "show_all": show_all,
+            "form": form,
+            "can_record": can_record,
+            "consents_on": consents_on,
+            "waiting": waiting,
+            "past_consents": past_consents,
+            "consent_form": consent_form or (ConsentForm() if consents_on else None),
+            "open_panel": open_panel or request.GET.get("new", ""),
+        },
+    )
 
 
 @login_required
 def resolutions(request):
     policy.require(request.user, "resolution.view")
-    form = ResolutionForm(request.POST or None)
-    if request.method == "POST":
-        policy.require(request.user, "resolution.record")
-        if form.is_valid() and _saved(
-            request,
-            form,
-            lambda: services.record_resolution(
-                actor=request.user, request=request, **form.cleaned_data
-            ),
-            "Recorded.",
-        ):
-            return redirect("resolutions")
-    show_all = request.GET.get("all") == "1"
-    rows = Resolution.objects.all() if show_all else services.in_force()
-    return render(
+    if request.method != "POST":
+        return render_resolutions(request)
+    policy.require(request.user, "resolution.record")
+    form = ResolutionForm(request.POST, user=request.user)
+    if form.is_valid() and _saved(
         request,
-        "governance/resolutions.html",
-        {
-            "rows": rows.select_related("supersedes"),
-            "show_all": show_all,
-            "form": form,
-            "can_record": policy.can(request.user, "resolution.record"),
-        },
-    )
+        form,
+        lambda: services.record_resolution(
+            actor=request.user, request=request, **form.cleaned_data
+        ),
+        "Recorded.",
+    ):
+        meeting = form.cleaned_data.get("meeting")
+        if meeting is not None:
+            return redirect("meeting_detail", pk=meeting.pk)
+        return redirect("resolutions")
+    return render_resolutions(request, form=form, open_panel="record")
 
 
 # --- Records requests -------------------------------------------------------------------
@@ -266,95 +496,7 @@ records_request_action = transition_view(
 )
 
 
-# --- Voting (votes and elections on one page) -------------------------------------------
-
-
-@login_required
-def voting(request):
-    """Owners' one "Voting" page: open and past votes and polls, and board
-    elections. Each half follows its own feature switch."""
-    from core import features
-    from governance import elections as election_services
-    from governance.models import Election
-
-    policy.require(request.user, "vote.view")
-    show_votes = features.enabled("votes", request)
-    show_elections = features.enabled("elections", request)
-    if not (show_votes or show_elections):
-        raise Http404
-    user = request.user
-    can_manage = policy.can(user, "vote.manage")
-    vote_rows, election_rows = [], []
-    if show_votes:
-        rows = Vote.objects.all()
-        if not can_manage:
-            rows = rows.exclude(status="draft")
-        for v in sorted(rows[:50], key=lambda v: v.status != "open"):
-            vote_rows.append({"vote": v, "voted": services.my_ballots(v, user)})
-    if show_elections:
-        for e in Election.objects.all()[:20]:
-            election_rows.append(
-                {
-                    "election": e,
-                    "can_vote": bool(election_services.lots_actor_may_vote_for(e, user)),
-                    # Only ballots cast since this person owns the lot (R2-010).
-                    "voted": bool(election_services.my_lots_participation(e, user)[0]),
-                }
-            )
-    return render(
-        request,
-        "governance/voting.html",
-        {
-            "vote_rows": vote_rows,
-            "election_rows": election_rows,
-            "show_votes": show_votes,
-            "show_elections": show_elections,
-        },
-    )
-
-
 # --- Votes ---------------------------------------------------------------------------------
-
-
-class VoteForm(forms.Form):
-    title = forms.CharField(max_length=200)
-    kind = forms.ChoiceField(choices=VoteKind.choices)
-    description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
-    options = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 3}),
-        help_text="One option per line, e.g. Yes / No / Abstain.",
-    )
-    secret = forms.BooleanField(required=False)
-    closes_at = forms.DateTimeField(
-        required=False, widget=forms.DateTimeInput(attrs={"type": "datetime-local"})
-    )
-
-
-@login_required
-def votes(request):
-    policy.require(request.user, "vote.view")
-    form = VoteForm(request.POST or None)
-    if request.method == "POST":
-        policy.require(request.user, "vote.manage")
-        if form.is_valid():
-            data = dict(form.cleaned_data)
-            data["options"] = data["options"].splitlines()
-            vote = _saved(
-                request,
-                form,
-                lambda: services.create_vote(actor=request.user, request=request, **data),
-                "Vote created as a draft.",
-            )
-            if vote:
-                return redirect("vote_detail", pk=vote.pk)
-    rows = Vote.objects.all()
-    if not policy.can(request.user, "vote.manage"):
-        rows = rows.exclude(status="draft")
-    return render(
-        request,
-        "governance/votes.html",
-        {"rows": rows, "form": form, "can_manage": policy.can(request.user, "vote.manage")},
-    )
 
 
 @login_required

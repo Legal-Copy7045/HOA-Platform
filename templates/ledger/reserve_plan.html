@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Reserve plan · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="page-head">
+    <div><h1>Reserve plan</h1>
+      <p class="subtitle">What the association will need to replace, when, and whether the reserve fund keeps up. A simple in-house reserve study: the board keeps the list current and records the plan as adopted, usually with the budget.</p></div>
+    <div class="actions">
+      <a class="btn secondary" href="{% url 'reserve_export' %}">{% icon "download" %} Download CSV</a>
+      {% if can_manage %}<form method="post" action="{% url 'reserve_adopt' %}" data-confirm="Record this plan as adopted by the board today? Its figures are kept exactly as they are now and owners see its summary; later changes need a new adoption.">{% csrf_token %}<button type="submit">{% icon "check" %} Record as adopted</button></form>{% endif %}
+    </div>
+  </div>
+
+  {% if snapshots %}{% with s=snapshots.0 %}<div class="alert info">{% icon "info" %}<span>Latest adopted plan: <strong>reserve plan adopted {{ s.adopted_on|date:"F j, Y" }}</strong>. Owners see its summary under Community info.</span></div>{% endwith %}
+  {% else %}<div class="alert warning">{% icon "alert" %}<span>No reserve plan has been adopted yet. Owners see nothing until the board records one as adopted.</span></div>{% endif %}
+  {% if result.first_negative_year %}<div class="alert danger">{% icon "alert" %}<span>At the current contribution the reserve fund drops below zero in <strong>{{ result.first_negative_year }}</strong> (lowest {{ result.lowest_end_cents|cents }} in {{ result.lowest_year }}).</span></div>{% endif %}
+
+  <div class="grid grid-4">
+    <div class="stat"><div class="label">Percent funded today</div><div class="value">{% if result.percent_funded is None %}-{% else %}{{ result.percent_funded }}%{% endif %}</div><div class="hint">Balance compared with the fully funded balance of {{ result.fully_funded_cents|cents }}</div></div>
+    <div class="stat"><div class="label">Reserve balance</div><div class="value">{{ balance.cents|cents }}</div><div class="hint">{% if balance.source == "typed" %}Typed by the board{% elif balance.source == "letters" %}From Letters and certificates (resale certificate){% else %}Not entered yet{% endif %}{% if balance.as_of %}, as of {{ balance.as_of|short_date }}{% endif %}</div></div>
+    <div class="stat"><div class="label">Contribution per year</div><div class="value">{{ plan.annual_contribution_cents|cents }}</div><div class="hint">Current plan setting</div></div>
+    <div class="stat"><div class="label">Needed per year</div><div class="value">{{ result.needed_contribution_cents|cents }}</div><div class="hint">Smallest level amount that never goes below zero{% if lots %}; about {{ needed_per_lot_month|cents }} per lot per month ({{ lots }} lots){% endif %}</div></div>
+  </div>
+
+  <h2>Year by year</h2>
+  <p class="muted small">From {{ result.inputs.start_year }} for {{ plan.horizon_years }} years, with {{ inflation|default:"0" }}% inflation and {{ interest|default:"0" }}% interest a year. Costs are today's costs raised by inflation for each year and rounded to the cent. Interest is earned on the balance at the start of each year (a balance below zero earns nothing) and rounded to the cent. Each component comes due when its years left run out, then again every useful life.</p>
+  <div class="table-card"><div class="table-wrap"><table class="dense">
+    <thead><tr><th scope="col">Year</th><th scope="col" class="num">Starting balance</th><th scope="col" class="num">Contribution</th><th scope="col" class="num">Interest</th><th scope="col" class="num">Expenses</th><th scope="col" class="num">Ending balance</th><th scope="col">Replacements due</th></tr></thead>
+    <tbody>{% for r in result.rows %}
+      <tr{% if r.negative %} class="below-zero"{% endif %}><th scope="row">{{ r.year }}</th><td class="num">{{ r.begin_cents|cents }}</td><td class="num">{{ r.contribution_cents|cents }}</td><td class="num">{{ r.interest_cents|cents }}</td><td class="num">{% if r.expense_cents %}{{ r.expense_cents|cents }}{% else %}-{% endif %}</td><td class="num"><strong>{{ r.end_cents|cents }}</strong>{% if r.negative %} <span class="status tone-danger">Below zero</span>{% endif %}</td><td class="small">{% for name, c in r.items %}{{ name }} {{ c|cents }}{% if not forloop.last %}; {% endif %}{% endfor %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div></div>
+
+  <h2>Components</h2>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th scope="col">Component</th><th scope="col">Category</th><th scope="col">Quantity</th><th scope="col" class="num">Cost today</th><th scope="col" class="num">Useful life</th><th scope="col" class="num">Years left</th><th scope="col">In plan</th></tr></thead>
+    <tbody>{% for c in components %}
+      <tr><td><a href="{% url 'reserve_component' c.pk %}">{{ c.name }}</a></td><td>{{ c.get_category_display }}</td><td>{{ c.quantity|default:"-" }}</td><td class="num">{{ c.replacement_cost_cents|cents }}</td><td class="num">{{ c.useful_life_years }}</td><td class="num">{% if c.remaining_life_years is not None %}{{ c.years_left_now }}{% else %}last replaced {{ c.last_replaced_year }}{% endif %}</td><td>{% if c.active %}Yes{% else %}<span class="muted">No</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="7">{% include "partials/empty.html" with icon="chart" title="No components yet" text="Add the roads, ponds, signs and other things the association will one day replace." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+
+  {% if can_manage %}
+    <details class="panel"{% if open_component or not components %} open{% endif %}><summary>Add a component</summary><div class="panel-body">
+      {% include "partials/form_errors.html" with form=component_form %}
+      <form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="section" value="component">{{ component_form }}<div class="form-actions"><button type="submit">Add component</button></div></form>
+    </div></details>
+    <details class="panel"{% if open_settings %} open{% endif %}><summary>Plan settings</summary><div class="panel-body">
+      {% include "partials/form_errors.html" with form=settings_form %}
+      <p class="muted small">The portal's ledger holds owner accounts only, so type the reserve fund's balance from the bank statement. Rates are percents per year, e.g. 3 or 2.5.</p>
+      <form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="section" value="settings">{{ settings_form }}<div class="form-actions"><button type="submit">Save settings</button></div></form>
+    </div></details>
+  {% endif %}
+
+  <h2>Adopted plans</h2>
+  {% if snapshots %}<div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th scope="col">Adopted</th><th scope="col" class="num">Balance</th><th scope="col" class="num">Percent funded</th><th scope="col" class="num">Contribution</th><th scope="col" class="num">Needed</th><th scope="col">Below zero from</th></tr></thead>
+    <tbody>{% for s in snapshots %}<tr><td>{{ s.adopted_on|short_date }}</td><td class="num">{{ s.starting_balance_cents|cents }}</td><td class="num">{% if s.percent_funded is None %}-{% else %}{{ s.percent_funded }}%{% endif %}</td><td class="num">{{ s.annual_contribution_cents|cents }}</td><td class="num">{{ s.needed_contribution_cents|cents }}</td><td>{{ s.first_negative_year|default:"Never" }}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  {% else %}<p class="muted">None yet.</p>{% endif %}
+{% endblock %}

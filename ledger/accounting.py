@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import datetime
 import io
+from dataclasses import dataclass
 
 from django.conf import settings
 from django.db import transaction
@@ -28,6 +29,7 @@ from core.lists import safe_cell
 from core.money import format_cents
 from core.policy import SYSTEM, require
 from core.scoping import system_access
+from ledger.accounts import CURRENT
 from ledger.models import (
     AccountingSetup,
     BankReconciliation,
@@ -67,6 +69,10 @@ GL_LABELS = {
     "resale_fee": "Resale certificate fees",
     "other_charge": "Other owner charges",
     "credit": "Owner credits and adjustments",
+    # Online payments (D32-payments)
+    "stripe_clearing": "Stripe clearing (balance at Stripe)",
+    "card_surcharge": "Credit card surcharge income",
+    "processing_fees": "Payment processing fees",
 }
 
 
@@ -137,20 +143,37 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
             .select_related("invoice__vendor", "invoice__category")
             .order_by("paid_on", "id")
         )
+    from payments.services import journal_items, online_entry_ids
+
+    online = online_entry_ids()
     for e in entries:
         kind = e.reverses.kind if e.kind == EntryKind.REVERSAL and e.reverses else e.kind
         memo = f"Lot {e.lot.number}: {e.get_kind_display()}"
         ref = f"L{e.pk}"
         if kind == EntryKind.PAYMENT:
             # A payment is a negative entry: debit cash, credit receivables.
+            # Online payments sit at Stripe until the payout reaches the bank.
+            is_online = e.pk in online or e.reverses_id in online
             pair(
                 e.posted_on,
                 "Owner payments",
                 ref,
-                gl["cash"],
+                gl["stripe_clearing"] if is_online else gl["cash"],
                 gl["receivable"],
                 -e.amount_cents,
-                memo,
+                memo + (" (online)" if is_online else ""),
+            )
+        elif kind == EntryKind.REFUND:
+            # Part of an online payment refunded at Stripe (D33-acctfix-5):
+            # the owner owes it again; the money left Stripe clearing.
+            pair(
+                e.posted_on,
+                "Owner payments",
+                ref,
+                gl["receivable"],
+                gl["stripe_clearing"],
+                e.amount_cents,
+                memo + " (online)",
             )
         elif kind == EntryKind.CREDIT:
             pair(
@@ -165,6 +188,19 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
         else:
             income = gl.get(kind, gl["other_charge"])
             pair(e.posted_on, "Owner charges", ref, gl["receivable"], income, e.amount_cents, memo)
+    stripe = journal_items(start, end)
+    for day, ref, cents, lot_number in stripe["surcharges"]:
+        memo = f"Lot {lot_number}: credit card surcharge"
+        pair(day, "Online payments", ref, gl["stripe_clearing"], gl["card_surcharge"], cents, memo)
+    for day, ref, cents, lot_number in stripe["surcharge_refunds"]:
+        memo = f"Lot {lot_number}: surcharge refunded"
+        pair(day, "Online payments", ref, gl["card_surcharge"], gl["stripe_clearing"], cents, memo)
+    for day, ref, cents, kind in stripe["fees"]:
+        memo = f"Stripe fee ({kind})"
+        pair(day, "Online payments", ref, gl["processing_fees"], gl["stripe_clearing"], cents, memo)
+    for day, ref, cents, payout_id in stripe["payouts"]:
+        memo = f"Stripe payout {payout_id}"[:120]
+        pair(day, "Online payments", ref, gl["cash"], gl["stripe_clearing"], cents, memo)
     for p in payments:
         inv = p.invoice
         expense = f"{inv.category.code} {inv.category.name}".strip()
@@ -197,18 +233,41 @@ def export_csv(start, end, *, actor, request=None) -> bytes:
 # --- Deposit batches ----------------------------------------------------------------------
 
 
-def undeposited_payments():
-    """Owner payments not in a (non-voided) deposit yet."""
-    with system_access("undeposited payments"):
-        deposited = (
+def _deposited_ids() -> set[int]:
+    """Payments in a (non-voided) deposit. A payment moved to another
+    ownership account (D34-fixmoney-1) is the same check: its copy counts as
+    deposited when the original was."""
+    with system_access("deposited payments"):
+        deposited = set(
             DepositItem.objects.values("entry_id")
             .annotate(total=Sum("amount_cents"))
             .exclude(total=0)
             .values_list("entry_id", flat=True)
         )
+        moved = dict(
+            LedgerEntry.objects.filter(
+                kind=EntryKind.PAYMENT, moved_from__isnull=False
+            ).values_list("moved_from_id", "pk")
+        )
+    frontier = list(deposited)
+    while frontier:
+        copy = moved.get(frontier.pop())
+        if copy is not None and copy not in deposited:
+            deposited.add(copy)
+            frontier.append(copy)
+    return deposited
+
+
+def undeposited_payments():
+    """Owner payments not in a (non-voided) deposit yet."""
+    with system_access("undeposited payments"):
+        deposited = _deposited_ids()
+        from payments.services import online_entry_ids
+
         return list(
             LedgerEntry.objects.filter(kind=EntryKind.PAYMENT, reversed_by__isnull=True)
             .exclude(pk__in=list(deposited))
+            .exclude(pk__in=list(online_entry_ids()))
             .select_related("lot")
             .order_by("posted_on", "id")
         )
@@ -281,14 +340,10 @@ def _cleared_ids(kind: str) -> set[int]:
 
 def _returned_items(since, as_of):
     """Owner payments that were deposited and then bounced: the reversal of a
-    deposited payment is money the bank takes back (BUG-016)."""
+    deposited payment is money the bank takes back (BUG-016). Moving a
+    payment to another ownership account is not a return (D34-fixmoney-1)."""
     with system_access("returned items"):
-        deposited = set(
-            DepositItem.objects.values("entry_id")
-            .annotate(total=Sum("amount_cents"))
-            .exclude(total=0)
-            .values_list("entry_id", flat=True)
-        )
+        deposited = _deposited_ids()
         return list(
             LedgerEntry.objects.filter(
                 kind=EntryKind.REVERSAL,
@@ -296,14 +351,45 @@ def _returned_items(since, as_of):
                 posted_on__gt=since,
                 posted_on__lte=as_of,
             )
+            .exclude(reverses__moved_to__isnull=False)
             .select_related("lot")
             .order_by("posted_on", "id")
         )
 
 
+@dataclass(frozen=True)
+class PayoutItem:
+    """A Stripe payout as a cash-book deposit: online payments reach the bank
+    only in payouts, never in deposit batches, so each payout counts once,
+    on its arrival date (D33-acctfix-6)."""
+
+    pk: int
+    payout_id: str
+    arrival_date: datetime.date
+    amount_cents: int
+    status: str
+
+    @property
+    def stripe_says_arrived(self) -> bool:
+        return self.status == "paid"
+
+
+def _payouts(since, as_of) -> list[PayoutItem]:
+    """Stripe payouts arriving after ``since`` through ``as_of``."""
+    from payments.sync import payouts_for_matching
+
+    if as_of <= since:
+        return []
+    return [
+        PayoutItem(p["id"], p["payout_id"], p["arrival_date"], p["amount_cents"], p["status"])
+        for p in payouts_for_matching(since + datetime.timedelta(days=1), as_of)
+        if p["status"] not in ("failed", "canceled")
+    ]
+
+
 def book_balance(as_of: datetime.date) -> int:
-    """Opening cash + deposits - vendor payments - bounced deposited
-    payments, through ``as_of``."""
+    """Opening cash + deposits + Stripe payouts - vendor payments - bounced
+    deposited payments, through ``as_of``."""
     from operations.models import InvoicePayment
 
     setup = AccountingSetup.get()
@@ -321,11 +407,13 @@ def book_balance(as_of: datetime.date) -> int:
         or 0
     )
     returned = sum(e.amount_cents for e in _returned_items(since, as_of))
-    return setup.opening_cash_cents + deposits - paid - returned
+    payouts = sum(p.amount_cents for p in _payouts(since, as_of))
+    return setup.opening_cash_cents + deposits + payouts - paid - returned
 
 
 def uncleared(as_of: datetime.date) -> dict:
-    """Deposits and vendor payments through ``as_of`` not yet on a statement."""
+    """Deposits, Stripe payouts and vendor payments through ``as_of`` not yet
+    on a statement."""
     from operations.models import InvoicePayment
 
     setup = AccountingSetup.get()
@@ -343,7 +431,9 @@ def uncleared(as_of: datetime.date) -> dict:
         if p.pk not in _cleared_ids("payment")
     ]
     returned = [e for e in _returned_items(since, as_of) if e.pk not in _cleared_ids("returned")]
-    return {"deposits": deposits, "payments": payments, "returned": returned}
+    cleared_payouts = _cleared_ids("payout")
+    payouts = [p for p in _payouts(since, as_of) if p.pk not in cleared_payouts]
+    return {"deposits": deposits, "payments": payments, "returned": returned, "payouts": payouts}
 
 
 def reconcile(
@@ -353,12 +443,18 @@ def reconcile(
     cleared_deposit_ids,
     cleared_payment_ids,
     cleared_returned_ids=(),
+    cleared_payout_ids=None,
     note: str = "",
     actor,
     request=None,
 ) -> BankReconciliation:
     """Record a statement: the ticked items clear; the rest are outstanding.
-    The difference should be zero; a non-zero one is recorded as found."""
+    The difference should be zero; a non-zero one is recorded as found.
+
+    ``cleared_payout_ids``: the Stripe payouts ticked. Left out (None), the
+    payouts Stripe reports as paid (arrived at the bank) clear and any
+    others stay outstanding; the reconciliation page always sends the
+    board's ticks."""
     require(actor, "accounting.manage")
     with transaction.atomic():
         AccountingSetup.objects.select_for_update().get(pk=AccountingSetup.get().pk)
@@ -366,12 +462,23 @@ def reconcile(
         deposits = {d.pk: d for d in open_items["deposits"]}
         payments = {p.pk: p for p in open_items["payments"]}
         returned = {e.pk: e for e in open_items["returned"]}
+        payouts = {p.pk: p for p in open_items["payouts"]}
         dep_ids = {int(i) for i in cleared_deposit_ids}
         pay_ids = {int(i) for i in cleared_payment_ids}
         ret_ids = {int(i) for i in cleared_returned_ids}
-        if not (dep_ids <= set(deposits) and pay_ids <= set(payments) and ret_ids <= set(returned)):
+        if cleared_payout_ids is None:
+            po_ids = {k for k, p in payouts.items() if p.stripe_says_arrived}
+        else:
+            po_ids = {int(i) for i in cleared_payout_ids}
+        if not (
+            dep_ids <= set(deposits)
+            and pay_ids <= set(payments)
+            and ret_ids <= set(returned)
+            and po_ids <= set(payouts)
+        ):
             raise AccountingError("Some ticked items are not open on this date.")
         outstanding_dep = sum(d.total_cents for k, d in deposits.items() if k not in dep_ids)
+        outstanding_dep += sum(p.amount_cents for k, p in payouts.items() if k not in po_ids)
         outstanding_pay = sum(p.amount_cents for k, p in payments.items() if k not in pay_ids)
         outstanding_pay += sum(e.amount_cents for k, e in returned.items() if k not in ret_ids)
         book = book_balance(statement_date)
@@ -406,6 +513,13 @@ def reconcile(
                 kind="payment",
                 object_id=k,
                 amount_cents=payments[k].amount_cents,
+            )
+        for k in po_ids:
+            ReconciledItem.objects.create(
+                reconciliation=rec,
+                kind="payout",
+                object_id=k,
+                amount_cents=payouts[k].amount_cents,
             )
     record_event(
         "accounting.reconciled",
@@ -487,7 +601,7 @@ def send_courtesy_reminders(*, today=None) -> int:
     link = settings.PORTAL_BASE_URL + reverse("my_account")
     with system_access("courtesy reminders"):
         for lot in Lot.objects.order_by("number"):
-            owed = past_due(lot.pk, today)
+            owed = past_due(lot.pk, today, account=CURRENT)
             if owed <= 0 or CourtesyReminder.objects.filter(lot=lot, period=period).exists():
                 continue
             emails = {
@@ -568,7 +682,7 @@ def generate_case_letter(case: CollectionCase, *, actor, request=None) -> tuple[
                 f"The notice period from the last letter runs until {due:%B %-d}; "
                 "the next letter can go out then."
             )
-        owed = past_due(case.lot_id)
+        owed = past_due(case.lot_id, account=CURRENT)  # the current owners' account
         if owed <= 0:
             raise AccountingError("This account is not past due.")
         data = letters.notice_pdf(case.lot, kind)

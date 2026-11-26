@@ -28,6 +28,10 @@ class FileType:
     zip_member: str | None = None  # Office files are zip archives with this entry
     text: bool = False
     ext: str = ""  # the extension that was validated (set by check_upload)
+    # Text that must appear (any case) in the first 8 KB, for text formats
+    # with no fixed first bytes (bank statement files).
+    contains: tuple[bytes, ...] = ()
+    encodings: tuple[str, ...] = ("utf-8",)
 
 
 TYPES: dict[str, FileType] = {
@@ -47,7 +51,23 @@ TYPES: dict[str, FileType] = {
     ),
     "txt": FileType("text/plain", text=True),
     "csv": FileType("text/csv", text=True),
+    # Bank statement files (bank feed import only, never the document library).
+    # Banks still write OFX 1.x in Windows-1252.
+    "ofx": FileType(
+        "application/x-ofx",
+        text=True,
+        contains=(b"ofxheader", b"<ofx>"),
+        encodings=("utf-8", "cp1252"),
+    ),
+    "qfx": FileType(
+        "application/x-ofx",
+        text=True,
+        contains=(b"ofxheader", b"<ofx>"),
+        encodings=("utf-8", "cp1252"),
+    ),
 }
+# Accepted only where a caller names them in ``allowed``.
+EXPLICIT_ONLY = frozenset({"ofx", "qfx"})
 
 
 # Office parts that can run or fetch code when the file is opened.
@@ -111,25 +131,28 @@ def _office_problem(archive: zipfile.ZipFile, kind: FileType) -> str | None:
     return None
 
 
-def _check_text(uploaded) -> None:
-    decoder = codecs.getincrementaldecoder("utf-8")()
-    uploaded.seek(0)
-    try:
-        for chunk in uploaded.chunks():
-            if b"\x00" in chunk:
-                raise UploadRejected("Text files must not contain binary data.")
-            decoder.decode(chunk)
-        decoder.decode(b"", final=True)
-    except UnicodeDecodeError as exc:
-        raise UploadRejected("Text files must be UTF-8.") from exc
-    finally:
+def _check_text(uploaded, encodings=("utf-8",)) -> None:
+    for n, encoding in enumerate(encodings):
+        decoder = codecs.getincrementaldecoder(encoding)()
         uploaded.seek(0)
+        try:
+            for chunk in uploaded.chunks():
+                if b"\x00" in chunk:
+                    raise UploadRejected("Text files must not contain binary data.")
+                decoder.decode(chunk)
+            decoder.decode(b"", final=True)
+            return
+        except UnicodeDecodeError as exc:
+            if n == len(encodings) - 1:
+                raise UploadRejected("Text files must be UTF-8.") from exc
+        finally:
+            uploaded.seek(0)
 
 
 def check_upload(uploaded, *, allowed: set[str] | None = None) -> FileType:
     name = (uploaded.name or "").lower()
     ext = name.rsplit(".", 1)[-1] if "." in name else ""
-    allowed = allowed or set(TYPES)
+    allowed = allowed or set(TYPES) - EXPLICIT_ONLY
     if ext not in allowed:
         raise UploadRejected(f"Only these file types are accepted: {', '.join(sorted(allowed))}.")
     if uploaded.size > settings.DOCUMENT_MAX_BYTES:
@@ -143,8 +166,10 @@ def check_upload(uploaded, *, allowed: set[str] | None = None) -> FileType:
     uploaded.seek(0)
     if kind.magic and not any(head.startswith(m) for m in kind.magic):
         raise UploadRejected("The file's contents do not match its type.")
+    if kind.contains and not any(m in head.lower() for m in kind.contains):
+        raise UploadRejected("The file's contents do not match its type.")
     if kind.text:
-        _check_text(uploaded)
+        _check_text(uploaded, kind.encodings)
     if kind.zip_member:
         try:
             with zipfile.ZipFile(uploaded) as archive:
@@ -161,7 +186,7 @@ def check_upload(uploaded, *, allowed: set[str] | None = None) -> FileType:
     return kind
 
 
-_EXT_FOR_TYPE = {t.content_type: e for e, t in TYPES.items() if e != "jpeg"}
+_EXT_FOR_TYPE = {t.content_type: e for e, t in TYPES.items() if e not in ("jpeg", "qfx")}
 
 
 def safe_filename(name: str, ext: str) -> str:

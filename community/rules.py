@@ -23,6 +23,7 @@ class RuleSpec:
     default: str | None = None  # used until the board sets a value
     group: str = "General"
     help: str = ""
+    maximum: int | None = None  # a hard upper limit (card-network caps)
 
 
 REGISTRY: dict[str, RuleSpec] = {
@@ -169,20 +170,25 @@ REGISTRY: dict[str, RuleSpec] = {
             "vote.pass_percent", "Share of votes cast needed to pass", PERCENT, None, "Voting"
         ),
         RuleSpec(
-            "payments.card_fee_bp",
-            "Card convenience fee (hundredths of a percent: 295 = 2.95%)",
-            INT,
-            None,
-            "Online payments",
-            "Added to card payments and shown before the owner pays (decision D21).",
+            "ledger.assessments_before_fees",
+            "Apply payments to dues before late fees and other charges",
+            BOOL,
+            "false",
+            "Dues",
+            "Off: each payment pays the oldest charge first. On: dues first (oldest first), then "
+            "late fees and other charges. An owner may still direct a payment to chosen charges.",
         ),
+        # Decision D32-payments (replaces the D21 card and bank fees, whose
+        # recorded values stay in the rule history): credit cards only.
         RuleSpec(
-            "payments.bank_fee_cents",
-            "Bank transfer convenience fee (flat)",
-            CENTS,
-            None,
+            "payments.credit_card_surcharge_bp",
+            "Credit card surcharge (hundredths of a percent: 300 = 3%; at most 300)",
+            INT,
+            "300",
             "Online payments",
-            "Added to bank transfer payments and shown before the owner pays.",
+            "Added to credit card payments only and shown before the owner pays. Bank and "
+            "debit card payments never carry a fee.",
+            maximum=300,
         ),
         RuleSpec(
             "retention.former_owner_contact_days",
@@ -235,6 +241,8 @@ def validate_value(key: str, raw: str) -> str:
             raise ValueError(f"{spec.label}: enter a whole number.")
         if spec.kind == PERCENT and int(raw) > 100:
             raise ValueError(f"{spec.label}: must be 0-100.")
+        if spec.maximum is not None and int(raw) > spec.maximum:
+            raise ValueError(f"{spec.label}: at most {spec.maximum}.")
     if spec.kind == BOOL and raw.lower() not in ("true", "false", "yes", "no", "1", "0"):
         raise ValueError(f"{spec.label}: enter yes or no.")
     return raw

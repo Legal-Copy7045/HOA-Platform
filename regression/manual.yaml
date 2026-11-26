@@ -76,6 +76,7 @@
 - key: scanner reloads in place
   check: "On the VM, ClamAV runs with ConcurrentDatabaseReload disabled and memory stays near one signature copy during a reload."
   steps: "docker compose exec clamav clamconf -n | grep Concurrent (expect disabled); watch docker stats during a freshclam update; upload a test file just after and see it scanned once the reload finishes."
+  last: ""
 - key: guided sign-in setup on a phone
   check: "A new owner accepts an invitation on a phone and follows the three steps: password (show-password toggle works), 'Use this phone's fingerprint or face' creates a passkey, recovery codes shown; no menu until 'I've saved them'."
   steps: "Invite a test person; open the link on an iPhone and an Android phone; finish all three steps; confirm the home page then shows the menu."
@@ -83,6 +84,7 @@
 - key: recovery codes print
   check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer)."
   steps: "During setup or from Sign-in and security > Show codes, press Print and look at the print preview."
+  last: ""
 - key: install the app
   check: "The portal installs to a phone home screen and a desktop, opens standalone with the leaf icon, still asks for sign-in, and shows no cached page after signing out."
   steps: "Android Chrome: menu, Install app. iPhone Safari: Share, Add to Home Screen. Desktop Chrome: install icon. Open it, sign in, browse; sign out; reopen offline: expect the browser's offline page, never a portal page."
@@ -94,6 +96,7 @@
 - key: urgent text arrives
   check: "With a Twilio test account and the sms feature on, an owner confirms a number by code and receives the board's urgent text with the link and STOP note; replying STOP stops later texts."
   steps: "Set SMS_PROVIDER=twilio and test credentials; Admin, Features: Urgent text messages on; My profile: enter a mobile number, enter the texted code; Board, Urgent texts: send; reply STOP; send again and check the owner is no longer counted."
+  last: ""
 - key: my account how to pay
   check: "On a phone, My account reads clearly for an owner: amount and Due by, who to make checks payable to and where to mail them, a statement with Charges / Payments / Balance that fits or scrolls sideways."
   steps: "Set Remit to under Finance, Letters; sign in as a demo owner with a balance on a phone; open My account."
@@ -105,9 +108,11 @@
 - key: settings dues confirmation
   check: "Community settings shows '= $75.00 per month' while typing dues, and asks for confirmation when dues change by more than 25%."
   steps: "Community settings, Monthly dues: type 75; then type 150 and save: a confirmation page names the old and new amounts."
+  last: ""
 - key: reservation booking on a phone
   check: "With Common area reservations switched on, an owner books an area on a phone (date and time pickers work), gets the email, and a board member confirms it from My items."
   steps: "Admin > Features: switch on reservations; Booking rules: make one area bookable; as an owner request a slot on a phone; as a board member confirm it; check the owner's email and the Calendar page."
+  last: ""
 - key: sidebar groups on a phone
   check: "On a phone, the Menu button opens the sidebar with focus inside it; Board, Finance and Admin start closed unless the current page is inside; a group opened or closed stays that way on the next page."
   steps: "Sign in as a board member on a phone; open Menu; open Finance; go to another page; open Menu again (Finance still open); press Escape or tap outside (focus returns to Menu)."
@@ -123,6 +128,7 @@
 - key: print a page with values
   check: "Printing Community settings or an owner statement shows the values in the fields and leaves out buttons and menus."
   steps: "Open the page; browser Print preview."
+  last: ""
 - key: owner ARC on a phone
   check: "On a phone, an owner asks for approval of a project: Kind's guidance appears when a kind is picked, 'If other, where?' shows only for Other, the camera and photo library are offered for plans and photos, several photos upload at once with thumbnails, and the checklist sends the request."
   steps: "Sign in as a demo owner on an iPhone and an Android phone; My architectural requests; Ask for approval of a project; pick a kind and Other; save; add three photos at once; send."
@@ -132,10 +138,70 @@
   steps: "As the neighbor, open the emailed link on a phone; pick 'I object' and try to send with no comment; then pick 'no objection' and send."
   last: ""
 - key: host hardening on the VM
-  check: "After harden-host.sh, System status shows Host security with every line on; touching the .env sends an audit email the next morning; a shell opened inside the web container produces a Falco email within 10 minutes."
-  steps: "sudo bash infra/poc/harden-host.sh; open System status after a minute; sudo touch /opt/hoa-portal/.env; docker compose exec web sh -c 'echo hi' and wait 10 minutes; check the sysadmin inbox; next morning check for the audit email."
+  check: "After harden-host.sh (which prints 'Falco signing key 478B2FBB... verified'), System status shows Host security with every line on; touching the .env sends an audit email the next morning; a shell opened inside the web container produces a Falco email within 10 minutes."
+  steps: "sudo bash infra/poc/harden-host.sh and look for the 'verified' line; open System status after a minute; sudo touch /opt/hoa-portal/.env; docker compose exec web sh -c 'echo hi' and wait 10 minutes; check the sysadmin inbox; next morning check for the audit email."
   last: ""
 - key: off-site backups locked
   check: "setup-offsite-backups.sh reports 'Locked'; the bucket shows the backup files under backups/; deleting one in the Cloudflare dashboard is refused; System status Backups shows the off-site age and 'lock verified'; restore-drill.sh --from-offsite passes."
   steps: "Follow docs/runbook.md 'Off-site backups that cannot be deleted'; then try deleting a backups/ object in the R2 dashboard; open System status; run the off-site drill."
+  last: ""
+- key: meeting packet
+  check: "The board packet PDF opens in a PDF reader with the cover, agenda, minutes note, financial totals, the open-items page marked Confidential – board only, and the attachment index; the .zip opens and holds the PDF and the listed attachments; the owner packet shows on the meeting page for an owner and has no receivables, violations or collections."
+  steps: "As a board member open a meeting, Build packet, build both variants with an attachment; open both PDFs and the .zip; sign in as an owner and open the meeting page and the owner packet."
+  last: ""
+- key: survey answering on a phone
+  check: "An owner answers a survey with every kind of question on a phone, and the board sees the results and downloads the CSV (anonymous survey: no names in it)."
+  steps: "Board: Voting > Surveys, create a draft with one question of each kind, open it with email on; owner: open the emailed link, answer at phone width; board: Results, Download CSV."
+  last: ""
+- key: search on a phone
+  check: "On a phone the search icon in the top bar opens Search; results are grouped by area with counts, matches are highlighted, nothing runs off the screen, and a one-letter search shows the 'at least 2 characters' message."
+  steps: "Sign in as a demo owner on a phone; tap the search icon; search a street name, then 'a'; then on a computer use the box at the top of the menu."
+  last: ""
+- key: event rsvp on a phone
+  check: "On a phone, an owner answers an event's RSVP (Going with guests), signs up for a volunteer slot and leaves it; another owner sees only counts; a board member sees names and downloads the CSV; with the reminder on, people going get one email the day before with a link only."
+  steps: "As a board member open an event from the Calendar, open RSVP settings, turn RSVPs on with a cap, guests and the reminder, add a slot; as an owner on a phone answer and sign up; as a second owner check no names show; as the board download the CSV; check the inbox the day before the event."
+  last: ""
+- key: reserve plan on a phone
+  check: "Finance > Reserve plan reads on a phone: the four figures stack, the year-by-year table scrolls sideways inside its card (not the page), below-zero years are tinted and say 'Below zero', and the Add a component and Plan settings panels open and save."
+  steps: "Sign in as a demo board member on a phone; Finance > Reserve plan; scroll the table; open Plan settings, type 3.5 for inflation and save; add a component; then open Budget and reserves (Reserves section) as a demo owner."
+  last: ""
+- key: bank feed teller connect
+  check: "With Teller set up (sandbox first, then development), Connect a bank asks for the password or passkey, opens Teller's window without CSP errors in the browser console, and after choosing a bank shows the account with its last four digits and recent lines; Sync now adds nothing twice; Disconnect asks first and keeps the lines; no other page's Content-Security-Policy mentions teller.io."
+  steps: "Follow docs/runbook.md 'Bank feed (Teller, free tier)' with TELLER_ENVIRONMENT=sandbox; open the browser console on Connect a bank; connect a sandbox bank; press Sync now twice; check another page's response headers; Disconnect. If the console reports a blocked Teller host or script path, add it to teller.CONNECT_CSP (scripts are allowed from https://cdn.teller.io/connect/ only)."
+  last: ""
+- key: bank feed statement file
+  check: "A real OFX or QFX download and a CSV download from the HOA's bank import into Bank feed (CSV after Match the columns), amounts and dates look right, importing the same file again adds nothing, a matching deposit is offered and once confirmed is ticked on Reconcile a statement with the ending balance filled in; the pages work at phone width."
+  steps: "Download last month's activity as OFX/QFX and as CSV from the bank's website; Finance > Accounting > Bank feed; add an account for statement files; import each; confirm a suggested match; open Reconcile a statement for the month end; repeat on a phone."
+  last: ""
+- key: stripe test payment
+  check: "With test keys on the POC and Online payments switched on: an owner pays one charge by credit card 4242 4242 4242 4242 (surcharge shown first, TEST MODE banner), by debit card 4000 0566 5566 5556 (no fee) and by a test bank account (processing, then paid next day); each shows on My account against the chosen charge, a receipt email and PDF arrive, and Finance -> Online payments shows the payment, the payout and 'matches'."
+  steps: "Follow docs/runbook.md 'Online payments (Stripe)' test-mode setup; sign in as a demo owner; Pay online three times; next day open Finance -> Online payments; on a phone check the pay page fits the screen."
+  last: ""
+- key: streamline pay shortcut phone
+  check: "On a phone: the owner dashboard balance to-do shows \"Pay $X\" beside it without overlapping; it opens the ways to pay with the total for every open charge and \"Pay only some charges\" works; on a lot account (board) the \"Open collection case\" button fits and leads to the case, whose Letters panel prints the next notice."
+  steps: "Online payments on (test mode); sign in as a demo owner with a balance on a phone; tap Pay $X; tap Pay only some charges; sign in as board; Finance > Owner accounts > a lot with a balance; Open collection case."
+  last: ""
+- key: voting page at phone width
+  check: "The Voting page's Open/Past and type filters, the New vote/election/survey panels and Give a proxy read well at phone width, and an existing POC's old annual-meeting calendar entry (seeded before meetings made their own) is not shown twice."
+  steps: "On a phone, open Voting as an owner and as a board member; open each New panel; open Calendar and check the annual meeting appears once (cancel the old hand-made entry if there are two)."
+  last: ""
+- key: streamlined menu per role
+  check: "On a phone and a desktop, the sidebar shows My home / Community / Association / Maintenance / Finance / Admin with only the entries for the role (owner, tenant, board, manager, sysadmin); a tenant's Voting opens Surveys; a sysadmin's Admin shows Branding directly; no second tab bar under meetings, voting or Finance pages other than Owner accounts / Collections / Accounting / Reports; My items starts with the set-up warnings."
+  steps: "Sign in on the POC as a demo owner, a demo tenant, a board member, the manager and the sysadmin; open each section; on the board login open My items and People (Access review panel); start Preview as owner from a lot's page and exit."
+  last: ""
+- key: streamlined community pages at phone width
+  check: "Lots and owners (both views), Invitations and sign-ups, Budget and reserves, Board and committees, Common area booking rules and Board tasks > Recurring deadlines read well on a phone: no sideways scrolling outside the tables, tabs reachable, forms usable; Board and committees shows names and offices only."
+  steps: "On the POC with demo data, open each page as a demo board member on a phone (Board and committees also as a demo owner and a tenant); switch the Lots and owners view; open an area on Common area booking rules and save; open Recurring deadlines and edit an item."
+  last: ""
+- key: urgent text from an announcement
+  check: "With the sms feature on and a test provider, the announcement form shows 'Also send as an urgent text (N opted in)' to a board member only; ticking it publishes the announcement and the phone that opted in gets one text linking to it; a text with an amount or email is refused before anything is published."
+  steps: "Board > Admin > Features: switch on Urgent text messages; opt a demo owner's test phone in on My profile; as a board member publish an announcement with the box ticked; check the phone; try again with '$100' in the text."
+  last: ""
+- key: sale keeps each owner's money
+  check: "On the POC, after a lot with a credit is transferred: the lot's account page shows 'Former owners' accounts' with 'Credit owed to former owner'; the buyer's My account does not show the seller's credit or history; the seller's My history shows 'Credit owed to you'; posting the refund check as a charge on the old account (Account choice on the form) clears both; the pages fit a phone screen. On Online payments, a test-mode partial refund made in the Stripe dashboard appears as 'Refund to record' and 'Record on the account' posts the payment's share."
+  steps: "Finance > Owner accounts > a demo lot: record an overpayment; transfer the lot to a demo person (Lots > Transfer); open the lot account page, the buyer's My account and the seller's My history; post the refund charge on the old account; repeat on a phone. For the refund: pay online with 4242 4242 4242 4242, refund half in the Stripe test dashboard, wait for the poller, press Record on the account."
+  last: ""
+- key: moved entries board check
+  check: "After a sale recorded with an earlier date on a lot with entries posted in the buyer's time, My items shows 'Lot N: K entries moved to another account' with both account numbers; the lot's account page lists them under 'Entries moved between accounts', each moved copy reads 'Moved from account N on <date>' (also on the buyer's My account and statement PDF); Mark checked removes the item; the list and the table fit a phone screen."
+  steps: "Finance > Owner accounts > a demo lot: post a charge and a check dated last week; Lots > Transfer to a demo person with a date before them; open My items, the lot's account page and the buyer's My account; download the buyer's statement; press Mark checked; repeat on a phone."
   last: ""

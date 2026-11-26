@@ -14,6 +14,52 @@ class AnnouncementForm(forms.Form):
     body = forms.CharField(widget=forms.Textarea(attrs={"rows": 6}))
     audience = forms.ChoiceField(choices=Audience.choices[:2])
     urgent = forms.BooleanField(required=False)
+    # Urgent texts (streamlining): only when the "sms" feature is on and the
+    # person may send them (sms.send_urgent); otherwise the fields are removed.
+    send_text = forms.BooleanField(required=False)
+    text_message = forms.CharField(
+        label="Text message (optional)",
+        required=False,
+        max_length=300,
+        widget=forms.Textarea(attrs={"rows": 2, "maxlength": 300}),
+        help_text="Up to 300 characters; the title is used if left blank. No names, "
+        "addresses, amounts or anything about one home. The text links to this announcement.",
+    )
+
+    def __init__(self, *args, can_text: bool = False, opted_in: int = 0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.can_text = can_text
+        self.opted_in = opted_in
+        if can_text:
+            self.fields["send_text"].label = f"Also send as an urgent text ({opted_in} opted in)"
+        else:
+            del self.fields["send_text"]
+            del self.fields["text_message"]
+
+    def clean(self):
+        from comms import sms
+
+        data = super().clean()
+        if not (self.can_text and data.get("send_text")):
+            return data
+        # Checked before publishing, so a text that cannot go out never
+        # leaves a published announcement behind.
+        if not sms.can_send():
+            self.add_error("send_text", "Text messages are not set up yet (no provider).")
+            return data
+        if not self.opted_in:
+            self.add_error("send_text", "No owners have opted in to text messages yet.")
+            return data
+        if data.get("audience") != Audience.MEMBERS:
+            self.add_error("send_text", "Texts go to owners: choose all owners as the audience.")
+            return data
+        try:
+            data["text_message"] = sms.check_message(
+                data.get("text_message") or data.get("title") or ""
+            )
+        except sms.SmsError as exc:
+            self.add_error("text_message", str(exc))
+        return data
 
 
 class EventForm(forms.Form):
@@ -30,19 +76,30 @@ class EventForm(forms.Form):
 @login_required
 def announcements(request):
     policy.require(request.user, "announcement.view")
-    form = AnnouncementForm(request.POST or None)
+    can_text = _can_text(request)
+    opted_in = 0
+    if can_text:
+        from community.services import sms_recipients
+
+        opted_in = len(sms_recipients())
+    form = AnnouncementForm(request.POST or None, can_text=can_text, opted_in=opted_in)
     if request.method == "POST":
         policy.require(request.user, "announcement.publish")
         if form.is_valid():
+            data = dict(form.cleaned_data)
+            send_text = data.pop("send_text", False)
+            text = data.pop("text_message", "")
             try:
-                services.publish_announcement(
-                    actor=request.user, request=request, **form.cleaned_data
+                announcement = services.publish_announcement(
+                    actor=request.user, request=request, **data
                 )
             except services.CommsError as exc:
-                messages.error(request, str(exc))
+                form.add_error(None, str(exc))
             else:
                 messages.success(request, "Published. Members are being emailed a link.")
-            return redirect("announcements")
+                if send_text:
+                    _send_text(request, announcement, text)
+                return redirect("announcements")
     items = Announcement.objects.for_user(request.user)[:100]
     read = set(
         AnnouncementRead.objects.filter(user=request.user).values_list("announcement_id", flat=True)
@@ -54,8 +111,35 @@ def announcements(request):
             "items": [(a, a.pk in read) for a in items],
             "form": form,
             "can_publish": policy.can(request.user, "announcement.publish"),
+            "open_form": bool(form.errors),
         },
     )
+
+
+def _can_text(request) -> bool:
+    """The urgent-text box: the "sms" feature on and sms.send_urgent."""
+    from comms import sms
+
+    return sms.available(request) and policy.can(request.user, "sms.send_urgent")
+
+
+def _send_text(request, announcement, text: str) -> None:
+    """Queue the urgent text linking to the new announcement. The service
+    checks sms.send_urgent again; a refusal leaves the announcement published."""
+    from comms import sms
+
+    try:
+        notice = sms.send_urgent_notice(
+            actor=request.user,
+            message=text,
+            link=f"announcement:{announcement.pk}",
+            request=request,
+        )
+    except sms.SmsError as exc:
+        messages.error(request, f"The announcement is published, but no text was sent: {exc}")
+    else:
+        n = notice.recipients
+        messages.success(request, f"Urgent text sending to {n} owner{'s' if n != 1 else ''}.")
 
 
 @login_required
@@ -84,11 +168,26 @@ def calendar(request):
         "comms/calendar.html",
         {
             "events": services.upcoming(request.user)[:200],
+            "meeting_events": _meeting_events(),
+            "going": _going(request.user),
             "bookings": _bookings(request),
             "form": form,
             "can_manage": policy.can(request.user, "calendar.manage"),
         },
     )
+
+
+def _meeting_events() -> set[int]:
+    """Events a meeting made: they are cancelled from the meeting page."""
+    from governance.services import meeting_event_ids
+
+    return meeting_event_ids()
+
+
+def _going(user) -> set[int]:
+    from comms.rsvp import going_event_ids
+
+    return going_event_ids(user)
 
 
 def _bookings(request) -> list[dict]:
@@ -109,6 +208,9 @@ def _bookings(request) -> list[dict]:
 def event_cancel(request, pk):
     policy.require(request.user, "calendar.manage")
     event = get_object_or_404(Event.objects.for_user(request.user), pk=pk)
+    if event.pk in _meeting_events():
+        messages.error(request, "This is a meeting: cancel it from the meeting page.")
+        return redirect("calendar")
     try:
         services.cancel_event(event, actor=request.user, request=request)
     except services.CommsError as exc:

@@ -57,7 +57,7 @@ def test_menu_has_dashboard_and_a_homeowner_section(client, w):
     client.force_login(w["board_owner"])
     page = client.get(reverse("home")).content.decode()
     assert ">Dashboard<" in page
-    assert ">Homeowner<" in page and ">My home<" in page
+    assert 'data-nav-group="my-home"' in page and ">My home<" in page
     assert "/arc/?mine=1" in page  # my own ARC requests
     assert ">Architectural review<" in page  # the board's review list, separately
 

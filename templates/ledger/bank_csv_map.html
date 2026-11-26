@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Match the columns · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'accounting' %}">Accounting</a> / <a href="{% url 'bank_feed' %}">Bank feed</a> / Match the columns</div>
+  <div class="page-head"><div><h1>Match the columns</h1><p class="subtitle">Importing into {{ conn.label }}. Say which column holds what; the first lines of the file are shown below.</p></div></div>
+  {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<div><strong>Nothing has been imported yet.</strong> {{ error }}</div></div>{% endif %}
+  <form method="post" action="{% url 'bank_import' %}">{% csrf_token %}
+    <input type="hidden" name="step" value="map"><input type="hidden" name="account" value="{{ conn.pk }}">
+    <textarea name="csv_text" hidden aria-hidden="true">{{ csv_text }}</textarea>
+    <section class="card"><div class="form-grid">
+      {% for f in fields %}<div class="field"><label for="col_{{ f.key }}">{{ f.label }}{% if f.required %}<span class="required-mark" aria-hidden="true">*</span><span class="sr-only"> (required)</span>{% endif %}</label>
+        <select id="col_{{ f.key }}" name="col_{{ f.key }}"{% if f.required %} required{% endif %}><option value="">{% if f.required %}Choose{% else %}(none){% endif %}</option>{% for i, h in headers %}<option value="{{ i }}"{% if f.selected == i %} selected{% endif %}>{{ h }}</option>{% endfor %}</select></div>{% endfor %}
+    </div>
+    <p class="small muted">Use Amount when one column has money in as positive and money out as negative. Otherwise choose both Debit (money out) and Credit (money in).</p>
+    <div class="field"><label><input type="checkbox" name="flip" value="1"{% if flip %} checked{% endif %}> My bank shows money out as positive amounts in the Amount column</label></div>
+    <div class="form-actions"><button type="submit">Import</button><a class="btn secondary" href="{% url 'bank_feed' %}">Cancel</a></div></section>
+  </form>
+  <section class="card"><h2>First lines of the file</h2><div class="table-wrap"><table><thead><tr>{% for i, h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>{% for row in sample %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

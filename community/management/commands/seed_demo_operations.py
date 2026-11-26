@@ -197,6 +197,39 @@ class Command(BaseCommand):
             ledger.add_line(budget, kind=kind, name=name, annual_cents=cents, actor=b1, **extra)
         ledger.adopt_budget(budget, actor=b1)
 
+        # Reserve plan (synthetic figures): a few components, settings, adopted.
+        from ledger import reserve_plan
+
+        reserve_plan.save_settings(
+            starting_balance_cents=4200000,
+            balance_as_of=datetime.date(t.year, 1, 1),
+            annual_contribution_cents=1500000,
+            inflation_bp=300,
+            interest_bp=150,
+            horizon_years=30,
+            actor=b1,
+        )
+        for name, category, quantity, cost, life, left in (
+            ("Main road paving (demo)", "roads", "4,800 sq yd", 26000000, 25, 9),
+            ("Road sealcoat and crack fill (demo)", "roads", "4,800 sq yd", 1800000, 5, 1),
+            ("Pond dredging (demo)", "stormwater", "1 pond", 6000000, 20, 12),
+            ("Stormwater inlets (demo)", "stormwater", "14 inlets", 2100000, 30, 18),
+            ("Entrance sign (demo)", "signs", "2 signs", 1200000, 20, 4),
+            ("Split-rail fence (demo)", "fencing", "900 ft", 1350000, 20, 7),
+            ("Entrance lighting (demo)", "lighting", "6 fixtures", 900000, 15, 0),
+        ):
+            reserve_plan.save_component(
+                name=name,
+                category=category,
+                quantity=quantity,
+                replacement_cost_cents=cost,
+                useful_life_years=life,
+                remaining_life_years=left,
+                notes="Demo estimate, not a real bid.",
+                actor=b1,
+            )
+        reserve_plan.adopt(actor=b1)
+
         for month in range(1, t.month + 1):
             ledger.post_monthly_assessments(year=t.year, month=month, actor=b1)
         for number, lot in lots.items():
@@ -224,6 +257,22 @@ class Command(BaseCommand):
                     reference="4001",
                     actor=b1,
                 )
+        # Open-item accounting (D32-payments): an invoice partly paid and directed.
+        gate = ledger.post_charge(
+            lot=lots[3],
+            kind="other_charge",
+            amount_cents=6000,
+            description="Gate remote replacement (demo)",
+            actor=b1,
+        )
+        ledger.record_payment(
+            lot=lots[3],
+            amount_cents=2500,
+            received_on=t,
+            reference="5001",
+            apply_to=[gate.pk],
+            actor=b1,
+        )
         ledger.open_case(lot=lots[27], actor=b1)
 
         comms.publish_announcement(
@@ -236,17 +285,29 @@ class Command(BaseCommand):
             body="See the calendar and meeting page.",
             actor=b1,
         )
+        # The annual meeting's calendar entry is made with the meeting below.
         start = timezone.now() + datetime.timedelta(days=21)
-        comms.create_event(
-            title="Annual owners' meeting (demo)",
-            starts_at=start,
-            location="Community room (fictional)",
+        # Event RSVPs and volunteer sign-ups (comms.rsvp).
+        from comms import rsvp
+
+        picnic = comms.create_event(
+            title="Community picnic (demo)",
+            starts_at=timezone.now() + datetime.timedelta(days=10),
+            location="Pavilion (fictional)",
+            description="Burgers and lemonade provided. Bring a chair.",
             actor=b1,
         )
-        governance.create_meeting(
+        rsvp.save_settings(picnic, enabled=True, cap=80, max_guests=4, remind=True, actor=b1)
+        dessert = rsvp.add_slot(picnic, title="Bring a dessert", capacity=6, actor=b1)
+        rsvp.add_slot(picnic, title="Set up tables 9-10am", capacity=3, actor=b1)
+        rsvp.answer(picnic, answer="going", guests=2, actor=owner3)
+        rsvp.answer(picnic, answer="maybe", actor=owner12)
+        rsvp.sign_up(dessert, actor=owner3)
+        annual_meeting = governance.create_meeting(
             title="Annual owners' meeting (demo)",
             kind="annual",
             starts_at=start,
+            location="Community room (fictional)",
             agenda="1. Budget\n2. Elections\n3. Pond",
             actor=b1,
         )
@@ -258,13 +319,66 @@ class Command(BaseCommand):
             votes_for=5,
             actor=b1,
         )
-        poll = governance.create_vote(
+        # A quick poll is a one-question survey (informal polls became surveys).
+        from governance import surveys as gov_surveys
+
+        poll = gov_surveys.create_survey(
             title="Add a fountain to the north pond? (demo)",
-            kind="informal",
-            options=["Yes", "No", "No opinion"],
+            audience="owners",
+            opens_on=t,
+            closes_on=t + datetime.timedelta(days=14),
             actor=b1,
         )
-        governance.open_vote(poll, actor=b1)
+        gov_surveys.add_question(
+            poll,
+            kind="single",
+            prompt="Should the board get quotes for a fountain?",
+            choices=["Yes", "No", "No opinion"],
+            required=True,
+            actor=b1,
+        )
+        gov_surveys.open_survey(poll, actor=b1)
+        # A formal vote for the annual meeting, still a draft.
+        governance.create_vote(
+            title="Adopt the updated pet rules (demo)",
+            kind="formal",
+            options=["Yes", "No"],
+            meeting=annual_meeting,
+            actor=b1,
+        )
+        # An anonymous survey (M5), open for two weeks, with two answers.
+        survey = gov_surveys.create_survey(
+            title="Pool and clubhouse survey (demo)",
+            intro="Help us plan next season. Informal: nothing is decided by it.",
+            audience="residents",
+            opens_on=t,
+            closes_on=t + datetime.timedelta(days=14),
+            anonymous=True,
+            share_results=True,
+            actor=b1,
+        )
+        q_time = gov_surveys.add_question(
+            survey,
+            kind="single",
+            prompt="Best pool opening time?",
+            choices=["7 am", "9 am", "11 am"],
+            required=True,
+            actor=b1,
+        )
+        q_rate = gov_surveys.add_question(
+            survey, kind="rating", prompt="How do you rate the clubhouse?", actor=b1
+        )
+        gov_surveys.add_question(survey, kind="text", prompt="Anything else?", actor=b1)
+        gov_surveys.open_survey(survey, actor=b1)
+        for who, pick, stars in ((owner3, 0, 4), (owner12, 1, 3)):
+            gov_surveys.submit_response(
+                survey,
+                answers={
+                    q_time.pk: [str(list(q_time.choices.all())[pick].pk)],
+                    q_rate.pk: [str(stars)],
+                },
+                actor=who,
+            )
         governance.submit_records_request(description="2025 reserve study (demo)", actor=owner12)
 
         req = arc.create_request(
@@ -377,7 +491,11 @@ class Command(BaseCommand):
         from governance import elections as gov_elections
 
         gov_elections.create_election(
-            title="Annual board election (demo)", seats=2, citation="Bylaws (demo)", actor=b1
+            title="Annual board election (demo)",
+            seats=2,
+            citation="Bylaws (demo)",
+            meeting=annual_meeting,
+            actor=b1,
         )
 
         # ARC project types owners choose from (Milestone 3).
@@ -444,4 +562,60 @@ class Command(BaseCommand):
             visibility="owners",
             actor=b1,
             file=SimpleUploadedFile("declaration.pdf", declaration),
+        )
+
+        # Meeting packets (M5): last month's board meeting with minutes, and
+        # both packets for this month's.
+        from governance import packets
+
+        october = governance.create_meeting(
+            title="Last month's board meeting (demo)",
+            kind="board",
+            starts_at=timezone.now() - datetime.timedelta(days=30),
+            agenda="1. Minutes\n2. Pond",
+            actor=b1,
+        )
+        governance.set_meeting_status(october, "held", actor=b1)
+        minutes = documents.create_document(
+            title="Board meeting minutes (demo)",
+            category="minutes",
+            visibility="owners",
+            actor=b1,
+            file=SimpleUploadedFile(
+                "minutes.pdf",
+                pdf.render([("heading", "Minutes (FICTIONAL DEMO)"), ("normal", "Placeholder.")]),
+            ),
+        )
+        governance.attach_minutes(october, minutes, actor=b1)
+        november = governance.create_meeting(
+            title="Board meeting (demo)",
+            kind="board",
+            starts_at=timezone.now() + datetime.timedelta(days=10),
+            agenda="1. Call to order\n2. Approve last month's minutes\n3. Treasurer's report"
+            "\n4. Pond outlet (demo)",
+            actor=b1,
+        )
+        packets.build_packet(november, variant="board", minutes_id=minutes.pk, actor=b1)
+        packets.build_packet(november, variant="owner", actor=b1)
+        # Bank feed (optional feature "bank_feeds", off until the board turns
+        # it on): a statement-file account with fictional lines. The check
+        # line matches invoice PP-101's payment and is offered as a match.
+        from ledger.bankfeeds import services as bank_feed
+        from ledger.bankfeeds.base import TransactionInfo
+
+        bank = bank_feed.add_file_account(
+            display_name="Operating checking (demo)",
+            institution_name="Demo Community Bank",
+            last_four_digits="0000",
+            actor=b1,
+        )
+        bank_feed.store_lines(
+            bank,
+            [
+                TransactionInfo("demo:1", t, -32000, "CHECK 1001 (demo)", "check"),
+                TransactionInfo("demo:2", t, -1200, "MONTHLY SERVICE FEE (demo)", "fee"),
+                TransactionInfo("demo:3", t, 37, "INTEREST PAID (demo)", "int"),
+            ],
+            source="csv",
+            actor=b1,
         )

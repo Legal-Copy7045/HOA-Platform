@@ -50,6 +50,11 @@ class Meeting(models.Model):
     minutes_document = models.ForeignKey(
         "documents.Document", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
+    # The meeting's entry on the community calendar, made and cancelled with
+    # the meeting (governance.services). Executive sessions never get one.
+    calendar_event = models.OneToOneField(
+        "comms.Event", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -157,6 +162,8 @@ class RecordsRequest(ScopedModel):
 
 
 class VoteKind(models.TextChoices):
+    # No new informal polls: they are surveys now (owner decision 2026-11-26).
+    # Old informal rows stay readable.
     INFORMAL = "informal", "Informal poll (non-binding, one per owner)"
     FORMAL = "formal", "Formal vote (one per lot)"
 
@@ -174,6 +181,14 @@ class Vote(models.Model):
     secret = models.BooleanField(default=False, help_text="Hide who chose what (counts only).")
     status = models.CharField(max_length=16, choices=VoteStatus.choices, default=VoteStatus.DRAFT)
     closes_at = models.DateTimeField(null=True, blank=True)
+    meeting = models.ForeignKey(
+        Meeting,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        help_text="The owners' meeting this vote belongs to, if any.",
+    )
     # Formal votes: rule values and citations are frozen when the vote opens.
     quorum_percent = models.PositiveSmallIntegerField(null=True, blank=True)
     pass_percent = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -593,3 +608,263 @@ class BallotLink(ScopedModel):
 
     def __str__(self) -> str:
         return f"ballot link #{self.pk}"
+
+
+# --- Meeting packets (M5) -------------------------------------------------------------
+
+
+class PacketVariant(models.TextChoices):
+    BOARD = "board", "Board packet"
+    OWNER = "owner", "Owner packet"
+
+
+class MeetingPacket(AppendOnlyModel):
+    """One build of a meeting packet. The PDF itself is a version of a library
+    document (immutable, scanned and access-controlled like any document);
+    this row records which version, who built it and what was attached."""
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.PROTECT, related_name="packets")
+    variant = models.CharField(max_length=8, choices=PacketVariant.choices)
+    document = models.ForeignKey("documents.Document", on_delete=models.PROTECT, related_name="+")
+    version = models.ForeignKey(
+        "documents.DocumentVersion", on_delete=models.PROTECT, related_name="+"
+    )
+    built_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    built_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-built_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.get_variant_display()} for meeting {self.meeting_id}"
+
+
+class MeetingPacketItem(AppendOnlyModel):
+    """An attachment listed in a packet's index: the exact document version,
+    and whether it passed the malware-scan rule when the packet was built."""
+
+    packet = models.ForeignKey(MeetingPacket, on_delete=models.PROTECT, related_name="items")
+    position = models.PositiveSmallIntegerField()
+    document = models.ForeignKey("documents.Document", on_delete=models.PROTECT, related_name="+")
+    version = models.ForeignKey(
+        "documents.DocumentVersion", on_delete=models.PROTECT, related_name="+"
+    )
+    role = models.CharField(max_length=16, default="attachment")  # attachment | minutes
+    included = models.BooleanField()
+    skipped_reason = models.CharField(max_length=120, blank=True)
+
+    class Meta:
+        ordering = ["position"]
+        constraints = [
+            models.UniqueConstraint(fields=["packet", "position"], name="packet_item_position")
+        ]
+
+    def __str__(self) -> str:
+        return f"packet {self.packet_id} item {self.position}"
+
+
+class MinutesApproval(AppendOnlyModel):
+    """The board's record that a meeting's minutes were approved (SEC-003):
+    the exact document version, the day of approval and who recorded it.
+    Attaching minutes (manager or board) is only a draft; owner packets
+    present minutes as approved only through this record. A corrected
+    version needs its own approval."""
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.PROTECT, related_name="minutes_approvals")
+    document = models.ForeignKey("documents.Document", on_delete=models.PROTECT, related_name="+")
+    version = models.ForeignKey(
+        "documents.DocumentVersion", on_delete=models.PROTECT, related_name="+"
+    )
+    approved_on = models.DateField()
+    note = models.CharField(max_length=200, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-recorded_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["meeting", "version"], name="minutes_approval_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"minutes approval for meeting {self.meeting_id}"
+
+
+# --- Surveys (informal, non-binding; M5) ------------------------------------------------
+
+from core.append_only import ScopedAppendOnlyModel  # noqa: E402
+
+
+class SurveyAudience(models.TextChoices):
+    OWNERS = "owners", "Owners only"
+    RESIDENTS = "residents", "Owners and account contacts, including tenants"
+
+
+class SurveyStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    OPEN = "open", "Open"
+    CLOSED = "closed", "Closed"
+
+
+class Survey(models.Model):
+    """A multi-question survey of opinion. Never binding. The questions can
+    change only while it is a draft; once opened it is fixed (service, and a
+    database trigger as the backstop)."""
+
+    title = models.CharField(max_length=200)
+    intro = models.TextField(blank=True)
+    audience = models.CharField(
+        max_length=12, choices=SurveyAudience.choices, default=SurveyAudience.OWNERS
+    )
+    opens_on = models.DateField()
+    closes_on = models.DateField()
+    # Anonymous: answers are stored with no link to the person (like secret
+    # ballots, D21/D23); a separate row records only that they responded.
+    anonymous = models.BooleanField(default=False)
+    share_results = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=8, choices=SurveyStatus.choices, default=SurveyStatus.DRAFT
+    )
+    opened_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-opens_on", "-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(closes_on__gte=models.F("opens_on")),
+                name="survey_closes_after_opening",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Surveys are kept.")
+
+    @property
+    def phase(self) -> str:
+        """draft, scheduled (opened, before its first day), open or closed."""
+        if self.status == SurveyStatus.DRAFT:
+            return "draft"
+        today = timezone.localdate()
+        if self.status == SurveyStatus.CLOSED or today > self.closes_on:
+            return "closed"
+        return "scheduled" if today < self.opens_on else "open"
+
+    @property
+    def phase_label(self) -> str:
+        return {
+            "draft": "Draft",
+            "scheduled": "Opens soon",
+            "open": "Open",
+            "closed": "Closed",
+        }[self.phase]
+
+
+class QuestionKind(models.TextChoices):
+    SINGLE = "single", "Single choice"
+    MULTIPLE = "multiple", "Multiple choice"
+    RATING = "rating", "Rating 1 to 5"
+    TEXT = "text", "Short text"
+
+
+TEXT_ANSWER_MAX = 1000
+
+
+class SurveyQuestion(models.Model):
+    survey = models.ForeignKey(Survey, on_delete=models.PROTECT, related_name="questions")
+    position = models.PositiveSmallIntegerField(default=0)
+    kind = models.CharField(max_length=8, choices=QuestionKind.choices)
+    prompt = models.CharField(max_length=300)
+    required = models.BooleanField(default=False)
+    max_picks = models.PositiveSmallIntegerField(null=True, blank=True)  # multiple choice
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self) -> str:
+        return self.prompt
+
+
+class SurveyChoice(models.Model):
+    question = models.ForeignKey(SurveyQuestion, on_delete=models.CASCADE, related_name="choices")
+    label = models.CharField(max_length=200)
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self) -> str:
+        return self.label
+
+
+class SurveyParticipation(ScopedAppendOnlyModel):
+    """That a person responded (one per person), at day precision only. On an
+    anonymous survey this is the only row that names them; their answers are
+    stored apart with nothing that links them."""
+
+    scope_person_path = "person"
+
+    survey = models.ForeignKey(Survey, on_delete=models.PROTECT, related_name="+")
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    responded_on = models.DateField(default=timezone.localdate)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["survey", "person"], name="survey_respond_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"survey participation #{self.pk}"
+
+
+class SurveyResponse(ScopedAppendOnlyModel):
+    """One submitted set of answers. Named surveys record who and when;
+    anonymous ones neither, and a random id keeps the insertion order out of
+    the ids. The database refuses a named row on an anonymous survey."""
+
+    scope_person_path = "person"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    survey = models.ForeignKey(Survey, on_delete=models.PROTECT, related_name="+")
+    person = models.ForeignKey(
+        "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return "survey response"
+
+
+class SurveyAnswer(AppendOnlyModel):
+    """One answer (one row per pick on multiple choice). No person, no time."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    response = models.ForeignKey(SurveyResponse, on_delete=models.PROTECT, related_name="+")
+    question = models.ForeignKey(SurveyQuestion, on_delete=models.PROTECT, related_name="+")
+    choice = models.ForeignKey(
+        SurveyChoice, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    text = models.CharField(max_length=TEXT_ANSWER_MAX, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(rating__isnull=True) | models.Q(rating__gte=1, rating__lte=5),
+                name="survey_rating_1_to_5",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return "survey answer"

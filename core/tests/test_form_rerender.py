@@ -18,7 +18,7 @@ TYPED = "Typed-but-not-lost-7731"
 CASES = {
     "meetings": {"title": TYPED, "kind": "board"},  # no start time
     "resolutions": {"title": TYPED, "kind": "resolution"},  # no text or date
-    "votes": {"title": TYPED, "kind": "poll"},  # no options
+    "votes": {"title": TYPED},  # no options (formal votes only; polls are surveys)
     "vendors": {"contact_name": TYPED},  # no name
     "work_orders": {"description": TYPED},  # no title
     "invoices": {"number": TYPED},  # no vendor, amount...

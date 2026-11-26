@@ -1,5 +1,5 @@
 """My items: one queue of everything waiting on the signed-in person, with a
-count per area for the board home. Each item links to the page where the
+count per area for the top of the My items page. Each item links to the page where the
 real workflow step is taken (approve, decide, reply...), not just a comment.
 
 Items come from each area's own scoped queries, so nobody sees an item for
@@ -32,6 +32,9 @@ class Item:
     nav: str = ""
     # Icon in lists; defaults from the area (UX review: one icon per area).
     icon: str = ""
+    # An optional shortcut shown beside the item (e.g. "Pay $150.00").
+    action_label: str = ""
+    action_url: str = ""
 
     def __post_init__(self):
         if not self.nav:
@@ -56,6 +59,7 @@ MY_ITEMS_PERMISSIONS = (
 )
 
 AREA_NAV = {
+    "Written consent": "resolutions",
     "Requests": "requests",
     "Architectural review": "arc_list",
     "Violations": "violations",
@@ -68,6 +72,7 @@ AREA_NAV = {
 }
 
 AREA_ICONS = {
+    "Written consent": "pencil",
     "My home": "home",
     "Requests": "mail",
     "Approvals": "check-circle",
@@ -325,6 +330,21 @@ def items_for(user) -> list[Item]:
                     "info",
                 )
             )
+    from core import features
+
+    if features.enabled("consents"):
+        from governance.elections import consents_awaiting
+
+        for c in consents_awaiting(user):
+            out.append(
+                Item(
+                    "Written consent",
+                    c.title,
+                    "Waiting for your written approval or decline",
+                    reverse("consent_detail", args=[c.pk]),
+                    "warning",
+                )
+            )
     if can(user, "collections.manage"):
         from ledger.models import CollectionCase
 
@@ -380,7 +400,10 @@ def items_for(user) -> list[Item]:
                     vendor.insurance_expires_on,
                 )
             )
-    if can(user, "compliance.manage"):
+    # Recurring deadlines (Board tasks tab): hidden with the "compliance" feature.
+    from core.features import enabled as feature_on
+
+    if can(user, "compliance.manage") and feature_on("compliance"):
         from operations.services import due_soon
 
         for c in due_soon(today):
@@ -389,10 +412,10 @@ def items_for(user) -> list[Item]:
                     "Compliance",
                     c.title,
                     f"{'Overdue since' if c.due_on < today else 'Due'} {short_date(c.due_on)}",
-                    reverse("compliance"),
+                    reverse("tasks") + "?tab=deadlines",
                     _due_tone(c.due_on, today),
                     c.due_on,
-                    nav="compliance",
+                    nav="tasks",
                 )
             )
     if can(user, "records_request.manage"):
@@ -456,6 +479,32 @@ def items_for(user) -> list[Item]:
                     nav="access_review",
                 )
             )
+    if can(user, "payments.manage"):
+        out.extend(_online_payment_items(user, roles))
+    # Entries moved between ownership accounts, to check (fixres BUG-003).
+    if can(user, "ledger.manage"):
+        from ledger.models import EntryMoveNotice
+
+        for n in (
+            EntryMoveNotice.objects.for_user(user)
+            .filter(checked_at__isnull=True)
+            .select_related("lot")
+            .order_by("created_at")
+        ):
+            out.append(
+                Item(
+                    "Finance",
+                    f"Lot {n.lot.number}: {n.count} entr{'y' if n.count == 1 else 'ies'}"
+                    " moved to another account",
+                    f"From account {n.from_accounts} to account {n.to_accounts} after an"
+                    " ownership date changed. Check that none was placed on purpose, such as"
+                    " a seller's settlement check.",
+                    reverse("lot_ledger", args=[n.lot_id]) + "#moved",
+                    "warning",
+                    timezone.localdate(n.created_at),
+                    nav="ledger_home",
+                )
+            )
     if can(user, "community.manage_rules"):
         from community.rules import rules_needing_attention
 
@@ -479,9 +528,24 @@ def items_for(user) -> list[Item]:
                     "Fewer than two people with two-step sign-in can act",
                     f"{len(thin)} action{'' if len(thin) == 1 else 's'}: invite another"
                     " board member",
-                    reverse("board_home"),
+                    reverse("my_items") + "#coverage",
                     "warning",
-                    nav="board_home",
+                    nav="my_items",
+                )
+            )
+    if can(user, "person.manage"):
+        from community.models import BoardSeat
+
+        for seat in BoardSeat.objects.for_user(user).past_term_end().select_related("person"):
+            out.append(
+                Item(
+                    "Setup",
+                    f"{seat.person.display_name}'s board term has ended",
+                    f"The term was due to end on {short_date(seat.term_end)}. If a successor"
+                    " has been elected, end this seat.",
+                    reverse("person_detail", args=[seat.person_id]),
+                    "warning",
+                    nav="people",
                 )
             )
 
@@ -526,8 +590,25 @@ def items_for(user) -> list[Item]:
                 )
             )
     if can(user, "arc.submit") and roles.owned_lot_ids:
-        from arc.models import NEIGHBOR_VISIBLE_STATES, SignoffRequest
+        from arc.models import NEIGHBOR_VISIBLE_STATES, ArcRequest, SignoffRequest
 
+        # My own drafts, not sent yet (only an owner of the lot can send one).
+        for r in (
+            own_records(ArcRequest.objects.for_user(user), user)
+            .filter(state="draft", lot_id__in=roles.owned_lot_ids)
+            .order_by("created_at")
+        ):
+            out.append(
+                Item(
+                    "My home",
+                    f"Finish your request #{r.pk}",
+                    f"{r.title}: add plans or photos, then send it on",
+                    reverse("arc_detail", args=[r.pk]) + "#steps",
+                    "info",
+                    nav="arc_list?mine=1",
+                    icon="pencil",
+                )
+            )
         # The owner side (SEC-001), also for a board member who owns a lot.
         for so in (
             own_records(SignoffRequest.objects.for_user(user), user)
@@ -547,7 +628,8 @@ def items_for(user) -> list[Item]:
                     "a project",
                     reverse("signoff_detail", args=[so.pk]),
                     "info",
-                    nav="signoffs_mine",
+                    # Counted on the owner's ARC page ("Asked of me" tab).
+                    nav="arc_list?mine=1",
                 )
             )
     if can(user, "vote.cast"):
@@ -587,6 +669,23 @@ def items_for(user) -> list[Item]:
                         icon="vote",
                     )
                 )
+    # --- Surveys (M5): open surveys this person is asked to answer ---
+    if can(user, "survey.respond"):
+        from governance import surveys
+
+        for survey in surveys.waiting_for(user):
+            out.append(
+                Item(
+                    "My home",
+                    f"Survey: {survey.title}",
+                    f"Survey waiting for your answer · closes {short_date(survey.closes_on)}",
+                    reverse("survey_detail", args=[survey.pk]),
+                    "info",
+                    survey.closes_on,
+                    nav="voting",
+                    icon="list",
+                )
+            )
     if can(user, "ledger.view_own"):
         out.extend(_balance_items(user, roles))
 
@@ -598,44 +697,66 @@ def items_for(user) -> list[Item]:
     return [i for i in out if features.path_enabled(i.url, states_=states)]
 
 
-def oldest_unpaid_on(statement, since) -> datetime.date | None:
-    """The posting date of the oldest charge not yet covered by payments
-    (payments and credits pay the oldest charges first)."""
-    charges = []  # [posted_on, remaining]
-    if statement.brought_forward > 0:
-        charges.append([since, statement.brought_forward])
-    credit = -statement.brought_forward if statement.brought_forward < 0 else 0
-    for entry in sorted(statement.entries, key=lambda e: (e.posted_on, e.pk or 0)):
-        if entry.amount_cents > 0:
-            charges.append([entry.posted_on, entry.amount_cents])
-        else:
-            credit += -entry.amount_cents
-    for charge in charges:
-        used = min(credit, charge[1])
-        charge[1] -= used
-        credit -= used
-        if charge[1] > 0:
-            return charge[0]
-    return None
+def _online_payment_items(user, roles) -> list[Item]:
+    """Online payment problems for the board (D32-payments): mismatches,
+    returned bank payments, refunds and disputes to record, surcharges to
+    refund. Reconciliation differences go to the treasurer (or the whole
+    board while nobody holds that office)."""
+    from payments.models import AlertKind, PaymentAlert
+
+    alerts = list(
+        PaymentAlert.objects.for_user(user).filter(resolved_at__isnull=True).select_related("lot")
+    )
+    if not alerts:
+        return []
+    treasurer = "treasurer" in roles.offices
+    if not treasurer and any(a.kind == AlertKind.RECONCILIATION for a in alerts):
+        from community.models import OfficeHolding
+        from core.scoping import system_access
+
+        with system_access("treasurer exists"):
+            someone = OfficeHolding.objects.filter(office="treasurer").active().exists()
+        treasurer = not someone
+    out = []
+    for a in alerts:
+        if a.kind == AlertKind.RECONCILIATION and not treasurer:
+            continue
+        out.append(
+            Item(
+                "Finance",
+                a.get_kind_display() + (f" (lot {a.lot.number})" if a.lot_id else ""),
+                a.detail,
+                reverse("online_payments"),
+                "danger" if a.kind in (AlertKind.MISMATCH, AlertKind.RECONCILIATION) else "warning",
+                timezone.localdate(a.created_at),
+                nav="online_payments",
+            )
+        )
+    return out
 
 
 def _balance_items(user, roles) -> list[Item]:
-    """A balance due on one of my accounts, with the amount and since when."""
+    """A balance due on one of my accounts, with the amount and since when.
+    The date is My account's (open items: the oldest charge still open on
+    the account, BUG-006) and the button's amount is what the payment page
+    quotes for it (BUG-008)."""
     from community.models import Lot
     from core.money import format_cents
-    from ledger.services import owner_statement
+    from ledger.services import amount_due, owner_statement
 
     out = []
+    payable = _payable_online(user)
     for lot in Lot.objects.for_user(user).filter(pk__in=roles.account_lot_ids).order_by("number"):
         since = roles.lot_since.get(lot.pk)
         statement = owner_statement(lot.pk, since)
         if statement.balance <= 0:
             continue
-        oldest = oldest_unpaid_on(statement, since)
+        oldest = amount_due(lot.pk).due_on
         # A charge posted ahead of its month is due by that date, not overdue
         # since it (review BUG-005).
         upcoming = oldest is not None and oldest > timezone.localdate()
         when = f" · due {'by' if upcoming else 'since'} {short_date(oldest)}" if oldest else ""
+        label, url = _pay_shortcut(user, lot) if lot.pk in payable else ("", "")
         out.append(
             Item(
                 "My home",
@@ -646,13 +767,53 @@ def _balance_items(user, roles) -> list[Item]:
                 oldest,
                 nav="my_account",
                 icon="wallet",
+                action_label=label,
+                action_url=url,
             )
         )
     return out
 
 
+def _pay_shortcut(user, lot) -> tuple[str, str]:
+    """The "Pay $X" button: straight to the ways to pay with every open
+    charge the payer can choose, labelled with exactly what that page
+    quotes. When it quotes nothing (say, only charges from before this
+    person's time are open), the button opens the page to type an amount."""
+    from core.money import format_cents
+    from payments.checkout import PaymentError, quote_all
+
+    url = reverse("pay_online", args=[lot.pk])
+    try:
+        q = quote_all(user, lot)
+    except PaymentError:
+        return "Pay online", url + "?choose=1"
+    return f"Pay {format_cents(q.base_cents)}", url + "?all=1"
+
+
+def _payable_online(user) -> frozenset[int]:
+    """Lots this person can pay online now (feature on, provider set up)."""
+    if not policy.can(user, "payments.pay"):
+        return frozenset()
+    from payments.checkout import payable_lot_ids
+    from payments.services import online_payments_enabled
+
+    if not online_payments_enabled():
+        return frozenset()
+    return payable_lot_ids(user)
+
+
+def quick_actions(user) -> list[dict]:
+    """Shortcuts for staff on My items and the dashboard (rendered with
+    {% quick_actions %}). Each one is a link to a page that checks the same
+    permission itself."""
+    out = []
+    if policy.can(user, "ledger.manage"):
+        out.append({"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"})
+    return out
+
+
 def counts(items: list[Item]) -> list[dict]:
-    """Per-area counts (with overdue counts) for the board home."""
+    """Per-area counts (with overdue counts) for the My items page."""
     by_area: dict[str, dict] = {}
     for it in items:
         row = by_area.setdefault(it.area, {"area": it.area, "count": 0, "overdue": 0})
@@ -664,7 +825,7 @@ def counts(items: list[Item]) -> list[dict]:
 
 def items_for_request(request) -> list[Item]:
     """items_for(request.user), computed once per request: the sidebar counts
-    and the page itself (dashboard, My items, Board overview) share it.
+    and the page itself (dashboard, My items) share it.
 
     Not cached across requests: a count must drop the moment the step is
     taken, and the items come from many apps' records, so there is no single

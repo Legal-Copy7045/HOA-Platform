@@ -242,6 +242,7 @@ details:not(.panel) > summary { cursor: pointer; color: var(--green-700); font-w
 .subnav a { display: inline-flex; align-items: center; min-height: 44px; padding: .5rem .8rem; text-decoration: none; color: var(--muted); font-weight: 600; font-size: .92rem; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .subnav a:hover { color: var(--ink); }
 .subnav a[aria-current="page"] { color: var(--green-700); border-bottom-color: var(--green-700); }
+.subnav a .badge { margin-left: .4rem; }
 .choice-list { display: grid; gap: .4rem; margin: .5rem 0 1rem; }
 .choice-list label { border: 1px solid var(--line); border-radius: 8px; padding: .6rem .8rem; background: var(--surface); font-weight: 500; display: flex; gap: .6rem; align-items: center; cursor: pointer; }
 .choice-list label:hover { border-color: #b9d3c4; }
@@ -469,6 +470,7 @@ details.menu-details > .panel-body br { display: none; }
 .todo-link:hover .title { color: var(--green-700); text-decoration: underline; }
 .todo-link .todo-detail { display: block; }
 .todo-link .todo-arrow { color: var(--muted); }
+.list > li.todo .todo-action { flex: none; }
 /* ---------- Homeowner ARC, requests and notices (UX review) ---------- */
 .checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
 .checklist > li { display: flex; gap: .75rem; align-items: flex-start; padding: .75rem 0; border-top: 1px solid var(--line-2); }
@@ -485,3 +487,17 @@ details.menu-details > .panel-body br { display: none; }
 .group-pinned { border-color: var(--green-700); }
 fieldset.choices { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; }
 fieldset.choices legend { padding: 0; margin-bottom: .4rem; }
+
+/* ---------- Search (core.search) ---------- */
+.nav-search { display: flex; gap: .35rem; margin: 0 .9rem .4rem; }
+.nav-search input { flex: 1; min-width: 0; min-height: 44px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .25); color: #fff; }
+.nav-search input::placeholder { color: #a9cbb7; }
+.nav-search button { min-height: 44px; min-width: 44px; padding: 0 .6rem; background: transparent; border: 1px solid rgba(255, 255, 255, .35); color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+.nav-search input:focus-visible, .nav-search button:focus-visible { outline-color: #f2c14e; }
+.topbar-search { margin-left: auto; color: #fff; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 8px; }
+.topbar-search:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.search-results mark { background: var(--warning-bg); color: inherit; padding: 0 .1em; border-radius: 3px; }
+.search-snippet { color: var(--ink-2); overflow-wrap: anywhere; margin-top: .15rem; }
+.search-results .title { overflow-wrap: anywhere; }
+/* Reserve plan: years whose ending balance is below zero (also labeled in text). */
+tr.below-zero th, tr.below-zero td { background: var(--danger-bg); }

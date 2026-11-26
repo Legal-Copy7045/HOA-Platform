@@ -245,24 +245,50 @@ def arc_signoff_form(request, pk):
 # --- The neighbor's side (portal) ---------------------------------------------------
 
 
-@login_required
-def signoffs_mine(request):
-    """Sign-offs neighbors have asked of the lots I own."""
-    policy.require(request.user, "arc.submit")
-    roles = policy.roles_for(request.user)
-    # The owner side only, also for a board member (SEC-001: owner era).
-    rows = (
-        own_records(SignoffRequest.objects.for_user(request.user), request.user)
+def asked_of_me(user):
+    """Acknowledgements neighbors have asked of the lots this person owns
+    (the owner side only, also for a board member: SEC-001 owner era)."""
+    roles = policy.roles_for(user)
+    return (
+        own_records(SignoffRequest.objects.for_user(user), user)
         .filter(lot_id__in=roles.owned_lot_ids)
         .exclude(state="withdrawn")
+    )
+
+
+def asked_of_me_waiting(user) -> int:
+    """How many are still waiting for this person's answer (the tab count)."""
+    from arc.models import NEIGHBOR_VISIBLE_STATES
+
+    return (
+        asked_of_me(user)
+        .filter(
+            state="pending",
+            sent_at__isnull=False,
+            arc_request__state__in=NEIGHBOR_VISIBLE_STATES,
+        )
+        .count()
+    )
+
+
+@login_required
+def signoffs_mine(request):
+    """The "Asked of me" tab of the owner's ARC page: sign-offs neighbors
+    have asked of the lots I own."""
+    policy.require(request.user, "arc.submit")
+    rows = list(
+        asked_of_me(request.user)
         .select_related("arc_request__lot", "lot")
         .order_by("state", "-created_at")
     )
-    rows = list(rows)
     for row in rows:
         row.asked_because = signoffs.asked_because(row)
         row.respond_by = signoffs.respond_by(row) if row.state == "pending" else None
-    return render(request, "arc/signoffs_mine.html", {"rows": rows})
+    return render(
+        request,
+        "arc/signoffs_mine.html",
+        {"rows": rows, "arc_tab": "asked", "asked_count": asked_of_me_waiting(request.user)},
+    )
 
 
 def _neighbor_signoff(request, pk) -> SignoffRequest:

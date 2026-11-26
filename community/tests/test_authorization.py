@@ -268,6 +268,8 @@ MEMBER_READS = {
     "resolution.view",
     "vote.view",
     "reservation.view",
+    "survey.view",  # Surveys (M5); each survey's audience narrows it further
+    "board_committees.view",  # Board and committees: names and offices only
 }
 
 
@@ -291,6 +293,10 @@ MEMBER_READS = {
                 "budget.view_owner",
                 "sms.opt_in",
                 "reservation.request",
+                "survey.respond",
+                "event.rsvp",
+                "reserves.view_summary",
+                "payments.pay",
             },
         ),
         (
@@ -308,11 +314,15 @@ MEMBER_READS = {
                 "committee.view_all",
                 "roster.view",
                 "budget.view_owner",
+                "reserves.view",
+                "reserves.view_summary",
+                "bank_feed.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
         ("sysadmin", {"system.view_status", "invite.resend", "invite.revoke", "branding.manage"}),
-        ("former", {"history.view_own", "request.view_own"}),
+        # Former owners read their old requests inside My history.
+        ("former", {"history.view_own"}),
     ],
 )
 def test_permission_matrix(world, who, allowed):
@@ -340,6 +350,7 @@ def test_manager_does_data_entry_but_never_approves_or_votes():
         "budget.manage",
         "person.manage",
         "role.sysadmin.approve",
+        "reserves.manage",
     ):
         assert not policy.can(manager, action), action
 

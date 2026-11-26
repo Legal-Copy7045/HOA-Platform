@@ -93,6 +93,13 @@ SMS_AUTH_TOKEN=
 SMS_FROM=
 # SMS_API_BASE=https://api.twilio.com
 
+# Bank feed (optional; docs/runbook.md "Bank feed (Teller, free tier)").
+BANK_FEED_TOKEN_KEY=$(secret 32)
+TELLER_APPLICATION_ID=
+TELLER_ENVIRONMENT=development
+TELLER_CERTIFICATE_B64=
+TELLER_PRIVATE_KEY_B64=
+
 TUNNEL_TOKEN=${TUNNEL_TOKEN}
 ENV
 chmod 600 .env

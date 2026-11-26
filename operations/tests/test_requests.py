@@ -351,7 +351,7 @@ def test_my_items_lists_unassigned_and_my_requests_with_counts(client, w):
     assert {"area": "Requests", "count": 1, "overdue": 0} in counts
     client.force_login(w["board2"])
     assert b"Broken fence" in client.get(reverse("my_items")).content
-    assert b"My items" in client.get(reverse("board_home")).content
+    assert client.get(reverse("board_home"))["Location"] == reverse("my_items")
 
 
 def test_owner_sees_requests_waiting_on_them(w):
@@ -443,3 +443,130 @@ def test_authorized_contact_and_tenant_still_raise_for_the_lot(w):
     assert _submit(w, user=authorized, subject="By authorized").lot_id == w["lot"].pk
     tenant = _contact(w["lot"], "tenant")
     assert _submit(w, user=tenant, subject="By tenant").lot_id == w["lot"].pk
+
+
+# --- Streamlining: view-only contacts read the account's requests; former owners in
+# My history ---------------------------------------------------------------------------
+
+
+def test_view_only_contact_sees_the_accounts_requests_read_only(client, w):
+    req = _submit(w, subject="Fence report")
+    other = services.submit_request(
+        lot=w["other"],
+        request_type="general",
+        subject="Lot B question",
+        description="y",
+        actor=w["other_owner"],
+    )
+    viewer = _contact(w["lot"], "view_only")
+    client.force_login(viewer)
+    page = client.get(reverse("requests") + "?mine=1").content.decode()
+    assert "Fence report" in page and "Lot B question" not in page
+    assert "You can read them" in page  # read-only wording, no form
+    assert "Ask the board a question" not in page and 'name="subject"' not in page
+    detail = client.get(reverse("request_detail", args=[req.pk]))
+    assert detail.status_code == 200
+    assert client.get(reverse("request_detail", args=[other.pk])).status_code == 404
+    # Can see, never act: no thread post, no withdraw, no photos, no new request.
+    assert not threads.access("request", req, viewer).post
+    with pytest.raises(threads.ThreadError):
+        threads.post("request", req, body="Me too", actor=viewer)
+    client.post(reverse("thread_post", args=["request", req.pk]), {"body": "Me too"})
+    client.post(reverse("request_action", args=[req.pk, "withdraw"]))
+    req.refresh_from_db()
+    assert req.state == "submitted"
+    assert not services.can_add_request_photos(viewer, req)
+    response = client.post(
+        reverse("requests") + "?mine=1",
+        {"lot": w["lot"].pk, "request_type": "general", "subject": "Sneaky", "description": "y"},
+    )
+    assert response.status_code == 403
+    assert not OwnerRequest.objects.unscoped("t").filter(subject="Sneaky").exists()
+
+
+def test_owner_who_is_view_only_elsewhere_cannot_post_or_withdraw_there(w):
+    viewer = w["other_owner"]  # owns "other"; view-only contact on "lot"
+    req = _submit(w)
+    _add_contact(viewer, w["lot"], "view_only")
+    assert OwnerRequest.objects.for_user(viewer).filter(pk=req.pk).exists()
+    assert not threads.access("request", req, viewer).post
+    # Even one raised in their name earlier (e.g. when they were authorized).
+    OwnerRequest.objects.unscoped("t").filter(pk=req.pk).update(requested_by=viewer)
+    req.refresh_from_db()
+    assert not threads.access("request", req, viewer).post
+    with pytest.raises(WorkflowError):
+        services.OWNER_REQUEST.apply(req, "withdraw", actor=viewer)
+    # Their own home still works.
+    mine = services.submit_request(
+        lot=w["other"], request_type="general", subject="Mine", description="y", actor=viewer
+    )
+    assert threads.access("request", mine, viewer).post
+    services.OWNER_REQUEST.apply(mine, "withdraw", actor=viewer)
+
+
+def test_former_owner_reads_old_requests_in_my_history(client, w):
+    old = _submit(w, subject="Seller question")
+    OwnerRequest.objects.unscoped("t").filter(pk=old.pk).update(
+        created_at=timezone.now() - datetime.timedelta(days=10)
+    )
+    buyer = make_member()
+    with system_access("t"):
+        buyer_person = Person.objects.get(user=buyer)
+    community.transfer_lot(
+        lot=w["lot"], new_owners=[buyer_person], transfer_date=days_ago(2), actor=SYSTEM
+    )
+    newer = services.submit_request(
+        lot=w["lot"],
+        request_type="general",
+        subject="Buyer question",
+        description="y",
+        actor=buyer,
+    )
+    seller = w["owner"]
+    assert not policy.can(seller, "request.view_own")
+    client.force_login(seller)
+    # No separate My requests: the list sends them to My history.
+    response = client.get(reverse("requests") + "?mine=1")
+    assert response.status_code == 302 and response["Location"] == reverse("my_history")
+    page = client.get(reverse("my_history")).content.decode()
+    assert "Seller question" in page and reverse("request_detail", args=[old.pk]) in page
+    assert "Buyer question" not in page
+    detail = client.get(reverse("request_detail", args=[old.pk]))
+    assert detail.status_code == 200
+    assert client.get(reverse("request_detail", args=[newer.pk])).status_code == 404
+    with pytest.raises(threads.ThreadError):
+        threads.post("request", old, body="Still broken", actor=seller)
+
+
+def test_a_former_owner_who_owns_another_home_keeps_my_requests(client, w):
+    """Owners of another home still have My requests; My history shows only
+    the old home's requests from their time."""
+    seller = w["owner"]
+    community.record_ownership(
+        person=Person.objects.unscoped("t").get(user=seller),
+        lot=w["other"],
+        start_date=days_ago(20),
+        actor=SYSTEM,
+    )
+    old = _submit(w, subject="Old home question")
+    OwnerRequest.objects.unscoped("t").filter(pk=old.pk).update(
+        created_at=timezone.now() - datetime.timedelta(days=10)
+    )
+    buyer = make_member()
+    community.transfer_lot(
+        lot=w["lot"],
+        new_owners=[Person.objects.unscoped("t").get(user=buyer)],
+        transfer_date=days_ago(2),
+        actor=SYSTEM,
+    )
+    services.submit_request(
+        lot=w["other"],
+        request_type="general",
+        subject="New home question",
+        description="y",
+        actor=seller,
+    )
+    client.force_login(seller)
+    assert client.get(reverse("requests") + "?mine=1").status_code == 200
+    page = client.get(reverse("my_history")).content.decode()
+    assert "Old home question" in page and "New home question" not in page

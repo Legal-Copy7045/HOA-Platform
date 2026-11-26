@@ -51,7 +51,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Reading
     "lot.view_own": ACCOUNT_VIEWERS,
     "lot.view_all": frozenset({BOARD, AUDITOR, MANAGER}),
-    # Homeowner view: see the portal as one lot's owner sees it (read-only).
+    # Preview as owner: see the portal as one lot's owner sees it (read-only).
     "portal.preview_as_owner": frozenset({BOARD, MANAGER}),
     # Sign-in page picture (no owner data): board, or a sysadmin for operations.
     "branding.manage": frozenset({BOARD, SYSADMIN}),
@@ -116,7 +116,8 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Owner requests: owners, authorized contacts and tenants raise them
     # (view-only contacts and former owners cannot).
     "request.submit": frozenset({OWNER, AUTHORIZED, TENANT}),
-    "request.view_own": RESIDENTS | {FORMER_OWNER},
+    # Former owners read their old requests inside My history (streamlining).
+    "request.view_own": RESIDENTS,
     "request.manage": frozenset({BOARD, MANAGER}),
     "followup.view": frozenset({BOARD, MANAGER}),
     "workorder.manage": frozenset({BOARD, MANAGER}),
@@ -169,6 +170,53 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "access_review.record": frozenset({BOARD}),
     # Clearing former owners' contact details under the retention rule.
     "retention.manage": frozenset({BOARD}),
+    # --- Meeting packets (M5) ---
+    # Assembling a packet is meeting preparation, like meeting.manage and
+    # document.manage, so the manager may build one (it approves nothing).
+    "meeting.packet_build": frozenset({BOARD, MANAGER}),
+    # --- Surveys (M5): informal, non-binding opinion surveys ---
+    # The survey's own audience setting narrows who sees and answers each one
+    # (owners only, or owners and account contacts including tenants).
+    "survey.view": COMMUNITY,
+    # View-only contacts see a residents survey (and shared results) but
+    # cannot answer: "sees, cannot act" (regression R2-005).
+    "survey.respond": frozenset({OWNER, AUTHORIZED, TENANT}),
+    "survey.manage": frozenset({BOARD}),
+    # --- Event RSVPs and volunteer sign-ups (rsvp) ---
+    # Residents who can see an event answer it (view-only contacts and former
+    # owners cannot); board or manager set it up; only the board sees names.
+    "event.rsvp": frozenset({OWNER, AUTHORIZED, TENANT}),
+    "event.rsvp_manage": frozenset({BOARD, MANAGER}),
+    "event.rsvp_names": frozenset({BOARD}),
+    # --- Reserve plan (reserves) ---
+    # The board, manager and auditor see the plan; changing or adopting it
+    # is a board decision. Owners see the adopted plan's summary only.
+    "reserves.view": frozenset({BOARD, AUDITOR, MANAGER}),
+    "reserves.manage": frozenset({BOARD}),
+    "reserves.view_summary": ACCOUNT_VIEWERS | {BOARD, MANAGER, AUDITOR},
+    # --- Bank feed (bankfeeds, optional feature "bank_feeds") ---
+    # Seeing the bank lines: finance readers. Connecting a bank or ending a
+    # connection: the board only. Syncing, importing statement files and
+    # matching lines to the cash book: data entry (manager) or board.
+    "bank_feed.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "bank_feed.connect": frozenset({BOARD}),
+    "bank_feed.sync": frozenset({BOARD, MANAGER}),
+    "bank_feed.import": frozenset({BOARD, MANAGER}),
+    "bank_feed.match": frozenset({BOARD, MANAGER}),
+    # --- Online payments (D32-payments) ---
+    # Owners on the deed and authorized contacts pay their own account; never
+    # view-only contacts, tenants, former owners or (as such) the manager.
+    "payments.pay": frozenset({OWNER, AUTHORIZED}),
+    # Closing online-payment problems (mismatches, refunds, disputes): board.
+    "payments.manage": frozenset({BOARD}),
+    # --- Community streamlining (community builder) ---
+    # Board and committees: names, offices and committee members only (no
+    # contact details), for everyone who sees the community pages.
+    "board_committees.view": COMMUNITY,
+    # --- Minutes approval (fixgov, SEC-003) ---
+    # Uploading or attaching draft minutes is data entry (meeting.manage);
+    # recording that the board approved them is a board decision.
+    "minutes.adopt": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);
@@ -229,7 +277,7 @@ NO_ROLES = Roles()
 
 
 def _preview_roles(preview, on) -> Roles:
-    """Homeowner view (core.preview): the owner of one lot's permissions and
+    """Preview as owner (core.preview): the owner of one lot's permissions and
     scope, with the viewer's own person (no impersonation of the owner)."""
     from community.models import Ownership, Person
     from core.scoping import system_access

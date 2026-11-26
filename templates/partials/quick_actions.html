@@ -1,0 +1,1 @@
+{% load portal %}{% if actions %}<div class="actions-row quick-actions" role="group" aria-label="Quick actions">{% for a in actions %}<a class="btn secondary small" href="{{ a.url }}">{% icon a.icon %} {{ a.label }}</a>{% endfor %}</div>{% endif %}

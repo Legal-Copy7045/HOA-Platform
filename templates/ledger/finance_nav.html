@@ -1,5 +1,5 @@
-{% load finance_tags %}{% finance_tabs as tabs %}
+{% load finance_tags %}{% finance_tabs as tabs %}{% if tabs %}
 <nav class="subnav" aria-label="Finance">
   {% for t in tabs %}<a href="{{ t.url }}"{% if t.current %} aria-current="page"{% endif %}>{{ t.label }}</a>
   {% endfor %}
-</nav>
+</nav>{% endif %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Online payments · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="page-head"><div><h1>Online payments</h1><p class="subtitle">Payments made on Stripe's hosted page, confirmed by the portal asking Stripe (no webhooks).</p></div></div>
+  <section class="card" data-testid="payments-config">
+    <h2>Setup</h2>
+    {% if config.available %}
+      {% if not config.livemode %}<div class="alert warning" role="status"><div><strong>TEST MODE</strong> &mdash; Stripe test keys; no real money moves.</div></div>{% else %}<p><span class="status tone-success">Live</span></p>{% endif %}
+      <p class="small">Key: {% if config.restricted %}restricted key (recommended){% else %}<span class="status tone-warning">full secret key</span> &mdash; replace it with a restricted key (runbook){% endif %}.</p>
+    {% else %}<p><span class="status tone-neutral">Not available</span> {{ config.problem }}</p>{% endif %}
+    <p class="small">Credit card surcharge: {{ surcharge_bp }} hundredths of a percent. {{ disclosure }}</p>
+    <p class="small muted">Last check against Stripe: {% if reconciliation %}{{ reconciliation.ran_at|date:"M j, Y H:i" }} &mdash; {% if reconciliation.ok %}<span class="status tone-success">matches</span>{% else %}<span class="status tone-danger">{{ reconciliation.problems|length }} difference(s)</span>{% endif %}{% else %}not run yet{% endif %}</p>
+    {% if reconciliation and not reconciliation.ok %}<ul class="small">{% for p in reconciliation.problems %}<li>{{ p.code }}: {{ p.id }}</li>{% endfor %}</ul>{% endif %}
+  </section>
+  <section class="card"><h2>Needs the board</h2>
+    {% for a in open_alerts %}<div class="notice"><div><strong>{{ a.get_kind_display }}</strong>{% if a.lot %} &middot; lot {{ a.lot.number }}{% endif %}{% if a.amount_cents %} &middot; {{ a.amount_cents|cents }}{% endif %}</div><div class="small">{{ a.detail }}{% if a.stripe_ref %} <span class="muted">({{ a.stripe_ref }})</span>{% endif %}</div>
+      {% if can_manage and a.kind == "refund" %}<form method="post" action="{% url 'payment_alert_resolve' a.pk %}" class="inline-form" data-confirm="Record this refund on the lot's account? The owner's balance goes up by the payment's share; the surcharge share is booked by itself. For a full refund you can instead reverse the payment on the lot's account, which also reopens the charges it paid.">{% csrf_token %}<input type="hidden" name="record_refund" value="1"><button type="submit" class="small secondary">Record on the account</button></form>{% endif %}
+      {% if can_manage %}<form method="post" action="{% url 'payment_alert_resolve' a.pk %}" class="inline-form" data-confirm="Mark this as done? It leaves the board's list; the record stays.">{% csrf_token %}<label class="sr-only" for="note-{{ a.pk }}">What was done</label><input id="note-{{ a.pk }}" name="note" required placeholder="What was done"><button type="submit" class="small">Mark done</button></form>{% endif %}</div>
+    {% empty %}<p class="small muted">Nothing waiting.</p>{% endfor %}
+  </section>
+  <section class="card"><h2>Recent online payments</h2>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Lot</th><th>Method</th><th class="num">Payment</th><th class="num">Surcharge</th><th>Stripe reference</th><th><span class="sr-only">Receipt</span></th></tr></thead>
+    <tbody>{% for p in payments %}<tr><td class="nowrap">{{ p.recorded_at|date:"M j, Y" }}</td><td>{{ p.lot.number }}</td><td>{{ p.get_method_display }}{% if p.funding and p.funding != p.method %} <span class="small muted">({{ p.funding }})</span>{% endif %}</td><td class="num">{{ p.base_cents|cents }}</td><td class="num">{% if p.surcharge_cents %}{{ p.surcharge_cents|cents }}{% endif %}</td><td class="small">{{ p.payment_intent_id }}</td><td><a href="{% url 'payment_receipt' p.pk %}">Receipt</a></td></tr>
+    {% empty %}<tr><td colspan="7" class="muted">No online payments yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="card"><h2>Bank payments processing</h2>
+    {% for c in processing %}<p class="small">#{{ c.pk }} &middot; lot {{ c.lot.number }} &middot; {{ c.total_cents|cents }} &middot; started {{ c.created_at|date:"M j" }}</p>{% empty %}<p class="small muted">None.</p>{% endfor %}
+    <h3>Failed or not matched</h3>
+    {% for c in failed %}<p class="small">#{{ c.pk }} &middot; lot {{ c.lot.number }} &middot; {{ c.total_cents|cents }} &middot; {{ c.get_state_display }}</p>{% empty %}<p class="small muted">None.</p>{% endfor %}
+  </section>
+  <section class="card"><h2>Payouts to the bank</h2>
+    <div class="table-wrap"><table><thead><tr><th>Arrives</th><th>Payout</th><th class="num">Payments</th><th class="num">Refunds</th><th class="num">Fees</th><th class="num">Deposit</th></tr></thead>
+    <tbody>{% for p in payouts %}<tr><td class="nowrap">{{ p.arrival_date|short_date }}</td><td class="small">{{ p.payout_id }}{% if not p.adds_up %} <span class="status tone-danger">does not add up</span>{% endif %}</td><td class="num">{{ p.gross_cents|cents }}</td><td class="num">{{ p.refunds_cents|cents }}</td><td class="num">{{ p.fees_cents|cents }}</td><td class="num">{{ p.amount_cents|cents }}</td></tr>
+    {% empty %}<tr><td colspan="6" class="muted">No payouts yet.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+{% endblock %}

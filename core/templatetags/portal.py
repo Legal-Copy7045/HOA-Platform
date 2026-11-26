@@ -74,6 +74,7 @@ _TONES = {
         "resolved",
         "certified",
         "success",
+        "active",  # bank feed connection
     },
     "info": {"nominations"},
     "warning": {
@@ -100,6 +101,8 @@ _TONES = {
         "voting",
         "neighbors",
         "objected",
+        "needs_reauth",  # bank feed connection
+        "processing",
     },
     "danger": {
         "denied",
@@ -114,11 +117,22 @@ _TONES = {
         "declined",
         "failed",
         "failure",
+        "mismatch",
+        "unreachable",
     },
-    "neutral": {"void", "withdrawn", "cancelled", "revoked", "dropped", "unscanned"},
+    "neutral": {
+        "void",
+        "withdrawn",
+        "cancelled",
+        "revoked",
+        "dropped",
+        "unscanned",
+        "disconnected",
+    },
 }
 _LABELS = {
     "pending_approval": "Awaiting approval",
+    "needs_reauth": "Needs reconnecting",
     "in_review": "In review",
     "noticed": "Notice sent",
     "approved_with_conditions": "Approved with conditions",
@@ -288,6 +302,14 @@ def follow_up_form(context, kind, obj):
         "allowed": policy.can(user, perms[kind]),
         "csrf_token": context.get("csrf_token"),
     }
+
+
+@register.inclusion_tag("partials/quick_actions.html", takes_context=True)
+def quick_actions(context):
+    """Staff shortcuts (core.my_items.quick_actions), e.g. "Record checks"."""
+    from core.my_items import quick_actions as actions_for
+
+    return {"actions": actions_for(context["user"])}
 
 
 @register.filter

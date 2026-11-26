@@ -101,7 +101,7 @@ _SPECS = [
         "in_directory",
     ),
     _spec("export.own_data", "Downloaded own data"),
-    _spec("preview.owner_started", "Homeowner view started", "lot_id"),
+    _spec("preview.owner_started", "Preview as owner started", "lot_id"),
     _spec("account.number_set", "Account number set"),
     _spec("account.contact_added", "Account contact added", "person_id", "kind"),
     _spec("account.contact_ended", "Account contact ended", "person_id", "kind"),
@@ -188,7 +188,7 @@ _SPECS = [
         "branding.login_background_set", "Sign-in background uploaded", "variant", "width", "height"
     ),
     _spec("branding.login_background_removed", "Sign-in background removed", "variant"),
-    _spec("preview.owner_stopped", "Homeowner view ended", "lot_id"),
+    _spec("preview.owner_stopped", "Preview as owner ended", "lot_id"),
     _spec("announcement.published", "Announcement published", "audience", "urgent"),
     _spec("event.created", "Calendar event created", "audience"),
     _spec("event.cancelled", "Calendar event cancelled"),
@@ -311,6 +311,171 @@ _SPECS = [
     _spec("arc.edited", "ARC draft edited by the owner", "fields"),
     # --- Regression fixes: operations, ledger, notifications (fix_ops) ---
     _spec("contract.approval_given", "Contract approval given", "have", "need"),
+    # --- Meeting packets (M5) ---
+    _spec(
+        "meeting.packet_built",
+        "Meeting packet built",
+        "variant",
+        "document_id",
+        "version",
+        "attachments",
+        "skipped",
+    ),
+    _spec(
+        "meeting.packet_zip_downloaded",
+        "Meeting packet with attachments downloaded",
+        "variant",
+        "packet_id",
+        "files",
+        "skipped",
+    ),
+    # --- Surveys (M5) ---
+    _spec("survey.created", "Survey created", "audience", "anonymous"),
+    _spec("survey.edited", "Survey draft edited", "change"),
+    _spec("survey.opened", "Survey opened", "questions", "emailed"),
+    _spec("survey.closed", "Survey closed"),
+    _spec("survey.sharing_changed", "Survey results sharing changed", "share_results"),
+    _spec("survey.responded", "Survey answered", "anonymous"),
+    _spec("survey.exported", "Survey results exported (CSV)", "rows", "anonymous"),
+    # --- Event RSVPs and volunteer sign-ups (rsvp) ---
+    _spec(
+        "event.rsvp_settings_saved",
+        "RSVPs set up for a calendar event",
+        "enabled",
+        "cap",
+        "max_guests",
+        "remind",
+    ),
+    _spec("event.slot_added", "Volunteer slot added to a calendar event", "event_id", "capacity"),
+    _spec("event.slot_removed", "Volunteer slot removed from a calendar event", "event_id"),
+    _spec("event.reminders_sent", "Event reminder emails sent", "recipients"),
+    # --- Reserve plan (reserves) ---
+    _spec(
+        "reserves.component_saved",
+        "Reserve component saved",
+        "created",
+        "category",
+        "cost_cents",
+        "active",
+    ),
+    _spec(
+        "reserves.settings_saved",
+        "Reserve plan settings saved",
+        "annual_contribution_cents",
+        "inflation_bp",
+        "interest_bp",
+        "horizon_years",
+    ),
+    _spec(
+        "reserves.adopted",
+        "Reserve plan recorded as adopted",
+        "components",
+        "percent_funded",
+        "needed_contribution_cents",
+        "horizon_years",
+    ),
+    _spec("reserves.exported", "Reserve plan projection exported (CSV)", "rows", "start_year"),
+    # --- Bank feed (bankfeeds): ids and counts only, never descriptions ---
+    _spec("bank_feed.connected", "Bank account connected", "connection_id", "provider"),
+    _spec("bank_feed.disconnected", "Bank account disconnected", "connection_id"),
+    _spec("bank_feed.synced", "Bank feed synced", "connection_id", "new", "seen"),
+    _spec("bank_feed.sync_failed", "Bank feed sync failed", "connection_id", "status"),
+    _spec(
+        "bank_feed.imported",
+        "Bank statement file imported",
+        "connection_id",
+        "source",
+        "new",
+        "seen",
+        "skipped",
+    ),
+    _spec(
+        "bank_feed.match_confirmed",
+        "Bank line matched to the cash book",
+        "connection_id",
+        "kind",
+        "object_id",
+    ),
+    _spec("bank_feed.match_undone", "Bank line match undone", "kind", "object_id"),
+    # --- Online payments (payments, D32-payments) ---
+    _spec(
+        "payments.checkout_started",
+        "Online payment started (Stripe Checkout)",
+        "lot_id",
+        "checkout_id",
+        "method",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.recorded",
+        "Online payment confirmed by Stripe and recorded",
+        "lot_id",
+        "checkout_id",
+        "amount_cents",
+        "surcharge_cents",
+        "method",
+    ),
+    _spec(
+        "payments.mismatch",
+        "Stripe's record did not match; nothing recorded",
+        "checkout_id",
+        "code",
+    ),
+    _spec("payments.failed", "Online payment failed at Stripe", "checkout_id", "code"),
+    _spec("payments.returned", "Bank payment returned; payment reversed", "lot_id", "checkout_id"),
+    _spec("payments.refund_seen", "Refund seen at Stripe", "checkout_id", "amount_cents"),
+    _spec("payments.dispute_seen", "Dispute seen at Stripe", "checkout_id"),
+    _spec(
+        "payments.surcharge_refund_due",
+        "Surcharge paid with a non-credit card: board to refund it",
+        "checkout_id",
+        "amount_cents",
+    ),
+    _spec("payments.alert_resolved", "Online payment item closed", "alert_id", "kind"),
+    _spec("payments.reconciled", "Ledger compared with Stripe", "ok", "problems"),
+    _spec("payments.receipt_downloaded", "Payment receipt downloaded", "checkout_id"),
+    # Accounting fixes (D33-acctfix)
+    _spec(
+        "ledger.refund_recorded", "Online refund recorded on an account", "lot_id", "amount_cents"
+    ),
+    _spec(
+        "payments.refund_recorded",
+        "Board recorded a Stripe refund on the account",
+        "alert_id",
+        "amount_cents",
+    ),
+    # Minutes approval (fixgov, SEC-003)
+    _spec(
+        "meeting.minutes_approved",
+        "Board recorded the minutes as approved",
+        "document_id",
+        "version",
+    ),
+    # Money per ownership period (D34-fixmoney)
+    _spec(
+        "ledger.entries_moved",
+        "Entries moved to the ownership account they belong to",
+        "lot_id",
+        "count",
+        "from_accounts",
+        "to_accounts",
+    ),
+    _spec(
+        "payments.return_needs_board",
+        "Bank payment returned; board to reverse it (refund recorded)",
+        "lot_id",
+        "checkout_id",
+    ),
+    # Fixes from the verification run (fixres)
+    _spec(
+        "ledger.moves_checked", "Board checked entries moved between accounts", "lot_id", "count"
+    ),
+    _spec(
+        "payments.unreachable",
+        "Online payment Stripe cannot find: no longer checked",
+        "lot_id",
+        "checkout_id",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

@@ -537,9 +537,14 @@ OPEN_STATES = (RequestState.SUBMITTED, RequestState.IN_PROGRESS, RequestState.WA
 
 
 def _is_requester(obj, actor):
-    if actor is SYSTEM or obj.requested_by_id == actor.pk:
+    if actor is SYSTEM:
         return None
-    return "Only the person who raised this request can do that."
+    if obj.requested_by_id != actor.pk:
+        return "Only the person who raised this request can do that."
+    if not _may_raise_for(actor, obj.lot_id):
+        # Now view-only on that account, or a former owner: read-only.
+        return "You can read this request but no longer act on it."
+    return None
 
 
 def mark_request_responded(req: OwnerRequest) -> None:

@@ -1,6 +1,7 @@
 from django.urls import path, re_path
 
-from ledger import views
+from ledger import reserve_views, views
+from ledger.bankfeeds import views as bank_views
 
 urlpatterns = [
     path("budget/", views.owner_budget, name="owner_budget"),
@@ -30,6 +31,11 @@ urlpatterns = [
     path("finance/accounting/1099-<int:year>.csv", views.accounting_1099, name="accounting_1099"),
     path("finance/accounting/reconcile/", views.reconcile, name="reconcile"),
     path("finance/collections/<int:pk>/letter/", views.collection_letter, name="collection_letter"),
+    re_path(
+        r"^finance/collections/(?P<pk>[0-9]+)/reprint-(?P<kind>statement|first|second|final)\.pdf$",
+        views.collection_notice_pdf,
+        name="collection_notice_pdf",
+    ),
     path("finance/collections/", views.collections, name="collections"),
     path("finance/collections/<int:pk>/", views.collection_detail, name="collection_detail"),
     re_path(
@@ -39,6 +45,16 @@ urlpatterns = [
     ),
     path("finance/budgets/", views.budgets, name="budgets"),
     path("finance/budgets/<int:pk>/", views.budget_detail, name="budget_detail"),
+    # Reserve plan (reserves)
+    path("finance/reserves/", reserve_views.reserve_plan_page, name="reserve_plan"),
+    path(
+        "finance/reserves/component/<int:pk>/",
+        reserve_views.reserve_component,
+        name="reserve_component",
+    ),
+    path("finance/reserves/adopt/", reserve_views.reserve_adopt, name="reserve_adopt"),
+    path("finance/reserves/projection.csv", reserve_views.reserve_export, name="reserve_export"),
+    path("reserves/", reserve_views.reserve_summary, name="reserve_summary"),
     path("resale/", views.resales, name="resales"),
     path("resale/<int:pk>/", views.resale_detail, name="resale_detail"),
     re_path(
@@ -47,4 +63,19 @@ urlpatterns = [
         name="resale_action",
     ),
     path("resale/<int:pk>/certificate.pdf", views.resale_pdf, name="resale_pdf"),
+]
+
+# Bank feed (bankfeeds, optional feature "bank_feeds").
+urlpatterns += [
+    path("finance/accounting/bank/", bank_views.bank_feed, name="bank_feed"),
+    path("finance/accounting/bank/connect/", bank_views.bank_connect, name="bank_connect"),
+    path("finance/accounting/bank/add/", bank_views.bank_account_add, name="bank_account_add"),
+    path("finance/accounting/bank/import/", bank_views.bank_import, name="bank_import"),
+    path("finance/accounting/bank/match/", bank_views.bank_match, name="bank_match"),
+    path("finance/accounting/bank/<int:pk>/sync/", bank_views.bank_sync, name="bank_sync"),
+    path(
+        "finance/accounting/bank/<int:pk>/disconnect/",
+        bank_views.bank_disconnect,
+        name="bank_disconnect",
+    ),
 ]
