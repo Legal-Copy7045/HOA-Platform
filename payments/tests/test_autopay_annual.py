@@ -240,16 +240,194 @@ def test_the_year_is_drawn_down_month_by_month(client, aw, monkeypatch):
     assert calls[1]["headers"]["Idempotency-Key"].endswith(f"-annual-{day.year}-1")
 
 
-def test_annual_payers_are_never_charged_monthly(client, aw):
+def test_bridge_months_before_the_first_yearly_payment_are_paid_monthly(client, aw, monkeypatch):
     _limit(aw, 1_000_000)
-    other_month = _shift(aw["due"], 2)
-    _enrol(client, aw, "us_bank_account", month=other_month.month)
+    first_year = _shift(aw["due"], 2)
+    _enrol(client, aw, "us_bank_account", month=first_year.month)
+    account = _account(aw["lot"])
+    _fresh(client, aw["owner"])
+    page = client.get(reverse("autopay", args=[aw["lot"].pk])).content.decode()
+    assert (
+        f"Until your first yearly payment in {first_year:%B %Y}, each month is paid "
+        "automatically as usual."
+    ) in page
+    text = autopay.describe_for_statement(account)
+    assert text.startswith(f"This will be paid automatically on {_when(aw['due'])}")
     dues = _post(aw, aw["due"].year, aw["due"].month)
     autopay.run()
-    autopay.charge_due(aw["due"] + datetime.timedelta(days=3))
-    assert not _intent_posts(aw["fake"]) and allocation.charge_status(dues) == "open"
-    text = autopay.describe_for_statement(_account(aw["lot"]))
-    assert text.startswith("Your annual automatic payment of $") and _when(other_month) in text
+    autopay.run()
+    (call,) = _intent_posts(aw["fake"])
+    assert call["body"]["amount"] == str(MONTHLY)
+    assert call["headers"]["Idempotency-Key"] == f"autopay-{account.pk}-{aw['period']}-1"
+    assert allocation.charge_status(dues) == "paid"
+    second = _shift(aw["due"], 1)
+    monkeypatch.setattr(autopay, "_today", lambda: second)
+    bridge = _post(aw, second.year, second.month)
+    autopay.charge_due(second)
+    assert len(_intent_posts(aw["fake"])) == 2 and allocation.charge_status(bridge) == "paid"
+    monkeypatch.setattr(autopay, "_today", lambda: first_year)
+    yearly = _post(aw, first_year.year, first_year.month)
+    autopay.charge_due(first_year)
+    autopay.charge_due(first_year + datetime.timedelta(days=1))
+    calls = _intent_posts(aw["fake"])
+    assert len(calls) == 3 and calls[2]["body"]["amount"] == str(YEAR)
+    assert "-annual-" in calls[2]["headers"]["Idempotency-Key"]
+    assert allocation.charge_status(yearly) == "paid"
+    (annual,) = [a for a in _attempts() if a.schedule == "annual"]
+    assert (annual.covers_from, annual.covers_through) == (
+        f"{first_year:%Y-%m}",
+        f"{_shift(first_year, 11):%Y-%m}",
+    )
+
+
+def test_a_bridge_month_the_credit_covers_is_not_charged(client, aw):
+    _limit(aw, 1_000_000)
+    _clear_other_charges(aw, extra=MONTHLY)
+    _enrol(client, aw, "us_bank_account", month=_shift(aw["due"], 3).month)
+    dues = _post(aw, aw["due"].year, aw["due"].month)
+    autopay.run()
+    assert not _intent_posts(aw["fake"]) and allocation.charge_status(dues) == "paid"
+
+
+def test_an_annual_charge_never_includes_a_month_paid_monthly(client, aw):
+    _enrol(client, aw, "us_bank_account", schedule="monthly")
+    _post(aw, aw["due"].year, aw["due"].month)
+    aw["fake"].outcomes[_events()[0].payment_method_id] = ["processing"]
+    autopay.run()
+    (attempt,) = _attempts()
+    assert attempt.checkout.state == CheckoutState.PROCESSING
+    account = _account(aw["lot"])
+    _views, base = autopay.annual_amount(aw["lot"].pk, account.pk, aw["period"])
+    assert base == YEAR - MONTHLY  # the month in flight is not charged again
+
+
+def _on(monkeypatch, day):
+    monkeypatch.setattr(autopay, "_today", lambda: day)
+    return day
+
+
+def _switch(client, aw, month):
+    _fresh(client, aw["owner"])
+    response = client.post(
+        reverse("autopay_schedule", args=[aw["lot"].pk]),
+        {"schedule": "annual", "annual_month": str(month), "authorize": "1"},
+    )
+    assert response.status_code == 302
+
+
+def test_a_later_month_bridges_the_gap_after_the_prepaid_months(client, aw, monkeypatch):
+    _limit(aw, 1_000_000)
+    _clear_other_charges(aw)
+    _enrol(client, aw, "us_bank_account", month=1)
+    year = 2031
+    day = _on(monkeypatch, datetime.date(year, 1, 5))
+    _post(aw, year, 1)
+    autopay.charge_due(day)
+    (first,) = _intent_posts(aw["fake"])
+    assert first["body"]["amount"] == str(YEAR)
+    for month in range(2, 13):
+        _post(aw, year, month)
+    _switch(client, aw, 3)  # from January to March
+    account = _account(aw["lot"])
+    day = _on(monkeypatch, datetime.date(year, 3, 5))
+    autopay.charge_due(day)  # this year's yearly payment is made: nothing more
+    assert len(_intent_posts(aw["fake"])) == 1
+    assert autopay.bridge_text(account, autopay.state(account.pk)) == [
+        f"Your prepaid months end in December {year}. Until your next yearly payment in "
+        f"March {year + 1}, each month is paid automatically as usual."
+    ]
+    charges = {}
+    for month in (1, 2):
+        day = _on(monkeypatch, datetime.date(year + 1, month, 5))
+        charges[month] = _post(aw, year + 1, month)
+        autopay.charge_due(day)
+        autopay.charge_due(day + datetime.timedelta(days=1))
+    calls = _intent_posts(aw["fake"])
+    assert [c["body"]["amount"] for c in calls] == [str(YEAR), str(MONTHLY), str(MONTHLY)]
+    assert calls[1]["headers"]["Idempotency-Key"].endswith(f"-{year + 1}-01-1")
+    assert all(allocation.charge_status(c) == "paid" for c in charges.values())
+    day = _on(monkeypatch, datetime.date(year + 1, 3, 5))
+    march = _post(aw, year + 1, 3)
+    autopay.charge_due(day)
+    calls = _intent_posts(aw["fake"])
+    assert len(calls) == 4 and calls[3]["body"]["amount"] == str(YEAR)
+    assert calls[3]["headers"]["Idempotency-Key"].endswith(f"-annual-{year + 1}-1")
+    assert allocation.charge_status(march) == "paid"
+    latest = next(a for a in _attempts() if a.schedule == "annual" and a.period == f"{year + 1}")
+    assert (latest.covers_from, latest.covers_through) == (f"{year + 1}-03", f"{year + 2}-02")
+
+
+def test_an_earlier_month_buys_twelve_months_from_the_end_of_the_prepaid_months(
+    client, aw, monkeypatch
+):
+    _limit(aw, 1_000_000)
+    _clear_other_charges(aw)
+    _enrol(client, aw, "us_bank_account", month=12)
+    year = 2031
+    day = _on(monkeypatch, datetime.date(year, 12, 5))
+    _post(aw, year, 12)
+    autopay.charge_due(day)
+    assert len(_intent_posts(aw["fake"])) == 1
+    _switch(client, aw, 1)  # from December to January
+    account = _account(aw["lot"])
+    _on(monkeypatch, datetime.date(year, 12, 20))
+    assert autopay.bridge_text(account, autopay.state(account.pk)) == [
+        f"Your next yearly payment, in January {year + 1}, pays for the 12 months from "
+        f"December {year + 1}, the month after your prepaid months end."
+    ]
+    _fresh(client, aw["owner"])
+    page = client.get(reverse("autopay", args=[aw["lot"].pk])).content.decode()
+    assert f"pays for the 12 months from December {year + 1}" in page
+    day = _on(monkeypatch, datetime.date(year + 1, 1, 5))
+    january = _post(aw, year + 1, 1)
+    autopay.charge_due(day)
+    calls = _intent_posts(aw["fake"])
+    assert len(calls) == 2 and calls[1]["body"]["amount"] == str(YEAR)
+    assert allocation.charge_status(january) == "paid"  # from the first year's credit
+    latest = next(a for a in _attempts() if a.period == f"{year + 1}")
+    assert (latest.covers_from, latest.covers_through) == (f"{year + 1}-01", f"{year + 2}-11")
+    assert allocation.unapplied_credit(aw["lot"].pk, account=account.pk) == 22 * MONTHLY
+
+
+def test_back_to_monthly_uses_the_credit_and_never_charges_a_month_twice(client, aw, monkeypatch):
+    _limit(aw, 1_000_000)
+    _clear_other_charges(aw)
+    _enrol(client, aw, "us_bank_account", month=12)
+    aw["fake"].outcomes[_events()[0].payment_method_id] = ["processing"]
+    year = 2031
+    day = _on(monkeypatch, datetime.date(year, 12, 5))
+    autopay.charge_due(day)
+    (annual,) = _attempts()
+    assert annual.checkout.state == CheckoutState.PROCESSING
+    _fresh(client, aw["owner"])
+    client.post(
+        reverse("autopay_schedule", args=[aw["lot"].pk]),
+        {"schedule": "monthly", "authorize": "1"},
+    )
+    account = _account(aw["lot"])
+    assert autopay.state(account.pk).schedule == autopay.MONTHLY
+    # The yearly payment is still settling: its months are not charged monthly.
+    day = _on(monkeypatch, datetime.date(year + 1, 1, 5))
+    january = _post(aw, year + 1, 1)
+    autopay.charge_due(day)
+    assert len(_intent_posts(aw["fake"])) == 1
+    aw["fake"].settle_ach(annual.checkout.payment_intent_id)
+    autopay.poll_attempts(timezone.now() + datetime.timedelta(hours=7))
+    assert allocation.charge_status(january) == "paid"  # the credit, first
+    day = _on(monkeypatch, datetime.date(year + 1, 2, 5))
+    february = _post(aw, year + 1, 2)
+    autopay.charge_due(day)
+    assert len(_intent_posts(aw["fake"])) == 1 and allocation.charge_status(february) == "paid"
+    # After the year (and its credit) runs out, monthly charges carry on.
+    for month in range(3, 13):
+        _post(aw, year + 1, month)
+    assert allocation.unapplied_credit(aw["lot"].pk, account=account.pk) == 0
+    day = _on(monkeypatch, datetime.date(year + 2, 1, 5))
+    last = _post(aw, year + 2, 1)
+    autopay.charge_due(day)
+    calls = _intent_posts(aw["fake"])
+    assert len(calls) == 2 and calls[1]["body"]["amount"] == str(MONTHLY)
+    assert allocation.charge_status(last) == "paid"
 
 
 def test_switching_schedule_is_audited_and_takes_effect_from_the_next_charge(client, aw):
@@ -461,7 +639,7 @@ def test_switching_schedule_closes_a_waiting_review(client, aw):
         reverse("autopay_schedule", args=[aw["lot"].pk]),
         {"schedule": "monthly", "authorize": "1"},
     )
-    assert autopay_review.status(review) == autopay_review.EXPIRED
+    assert autopay_review.status(review) == autopay_review.CLOSED
     assert not [i for i in items_for(aw["board"]) if "Approve automatic" in i.title]
 
 

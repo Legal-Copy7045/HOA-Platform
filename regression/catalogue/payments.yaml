@@ -26,7 +26,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:payments/tests/test_autopay\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[autopay", "^manual:stripe test autopay"]
-- feature: "Automatic payments once a year and board review (D47): annual schedule charges the next 12 months less credit (surcharge on credit cards over the whole amount) once per account-year, drawn down month by month by open-item allocation, never also monthly; schedule change by payers only, audited; charges above $500 wait for a board member who does not pay for the home (never the manager), approve charges once, decline emails the payer, 14-day expiry; sale ends it and credit stays with the seller; feature off 404"
+- feature: "Automatic payments once a year and board review (D47): annual schedule charges the next 12 months less credit (surcharge on credit cards over the whole amount) once per account-year, drawn down month by month by open-item allocation; bridge months before the first yearly payment and after a change of month charged monthly, no month charged twice across schedules; schedule change by payers only, audited; charges above $500 wait for a board member who does not pay for the home (never the manager), approve charges once, decline emails the payer, 14-day expiry; sale ends it and credit stays with the seller; feature off 404"
   since: M5
   docs: docs/decisions.md
   match: ["^unit:payments/tests/test_autopay_annual\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[autopay_(schedule|review)\\]", "^manual:stripe test autopay annual"]

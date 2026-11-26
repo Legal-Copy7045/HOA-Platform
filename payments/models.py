@@ -364,6 +364,18 @@ class AutopaySetup(ScopedModel):
         return f"as{self.pk}"
 
 
+def twelve_months_start(row):
+    """The first of the twelve months an annual attempt or review buys."""
+    import datetime
+
+    if row.covers_through:
+        year, month = (int(x) for x in row.covers_through.split("-"))
+        index = year * 12 + month - 1 - 11
+        return datetime.date(index // 12, index % 12 + 1, 1)
+    year, month = (int(x) for x in (row.covers_from or f"{row.period}-01").split("-"))
+    return datetime.date(year, month, 1)
+
+
 class AutopayAttempt(ScopedAppendOnlyModel):
     """One automatic charge (try 1 on the due day, try 2 the one retry): of
     one month's assessment (schedule monthly, period "YYYY-MM"), or of the
@@ -386,8 +398,11 @@ class AutopayAttempt(ScopedAppendOnlyModel):
         max_length=8, choices=AutopaySchedule.choices, default=AutopaySchedule.MONTHLY
     )
     period = models.CharField(max_length=7)
-    # Annual: the first of the twelve months it pays ("YYYY-MM").
+    # Annual (D47): the months this charge pays for, "YYYY-MM" to "YYYY-MM":
+    # from the month it is charged to the end of the twelve months it buys
+    # (longer than twelve when it starts after earlier prepaid months end).
     covers_from = models.CharField(max_length=7, blank=True)
+    covers_through = models.CharField(max_length=7, blank=True)
     try_number = models.PositiveSmallIntegerField(default=1)
     checkout = models.OneToOneField(
         PendingCheckout, on_delete=models.PROTECT, related_name="autopay_attempt"
@@ -413,8 +428,7 @@ class AutopayAttempt(ScopedAppendOnlyModel):
         import datetime
 
         if self.schedule == AutopaySchedule.ANNUAL:
-            year, month = (int(x) for x in (self.covers_from or f"{self.period}-01").split("-"))
-            return f"twelve months from {datetime.date(year, month, 1):%B %Y}"
+            return f"twelve months from {twelve_months_start(self):%B %Y}"
         year, month = (int(x) for x in self.period.split("-"))
         return f"{datetime.date(year, month, 1):%B %Y}"
 
@@ -487,7 +501,8 @@ class AutopayReview(ScopedAppendOnlyModel):
     account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
     schedule = models.CharField(max_length=8, choices=AutopaySchedule.choices)
     period = models.CharField(max_length=7)  # as on AutopayAttempt
-    covers_from = models.CharField(max_length=7, blank=True)  # annual: first month
+    covers_from = models.CharField(max_length=7, blank=True)  # annual: as on AutopayAttempt
+    covers_through = models.CharField(max_length=7, blank=True)
     method = models.CharField(max_length=8, choices=Method.choices)
     base_cents = models.BigIntegerField()
     surcharge_cents = models.BigIntegerField(default=0)
@@ -510,6 +525,7 @@ class ReviewOutcome(models.TextChoices):
     APPROVED = "approved", "Approved"
     DECLINED = "declined", "Declined"
     EXPIRED = "expired", "Expired"
+    CLOSED = "closed", "Closed: the payer changed the schedule"
 
 
 class AutopayReviewDecision(ScopedAppendOnlyModel):

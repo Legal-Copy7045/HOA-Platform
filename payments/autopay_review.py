@@ -42,15 +42,17 @@ from payments.models import (
     AutopayReviewDecision,
     AutopaySchedule,
     ReviewOutcome,
+    twelve_months_start,
 )
 
 REVIEW_DAYS = 14
 APPROVED_CHARGE_DAYS = 30  # an approval not charged within this long is left alone
 WAITING = "waiting"
-APPROVED, DECLINED, EXPIRED = (
+APPROVED, DECLINED, EXPIRED, CLOSED = (
     ReviewOutcome.APPROVED.value,
     ReviewOutcome.DECLINED.value,
     ReviewOutcome.EXPIRED.value,
+    ReviewOutcome.CLOSED.value,
 )
 
 
@@ -68,8 +70,7 @@ def what_text(review: AutopayReview) -> str:
     from community.terms import term_text
 
     if review.schedule == AutopaySchedule.ANNUAL:
-        year, month = (int(x) for x in (review.covers_from or f"{review.period}-01").split("-"))
-        start = datetime.date(year, month, 1)
+        start = twelve_months_start(review)
         return term_text(f"the 12 months' {{terms}} from {start:%B %Y}")
     year, month = (int(x) for x in review.period.split("-"))
     return term_text(f"the {datetime.date(year, month, 1):%B %Y} {{term}}")
@@ -90,6 +91,7 @@ def hold(
     schedule: str,
     period: str,
     covers_from: str,
+    covers_through: str = "",
     method: str,
     base: int,
     surcharge: int,
@@ -108,6 +110,7 @@ def hold(
                 schedule=schedule,
                 period=period,
                 covers_from=covers_from if schedule == AutopaySchedule.ANNUAL else "",
+                covers_through=covers_through if schedule == AutopaySchedule.ANNUAL else "",
                 method=method,
                 base_cents=base,
                 surcharge_cents=surcharge,
@@ -268,12 +271,16 @@ def expire_due(now=None) -> int:
 
 @internal("autopay review close")
 def close_waiting(account, *, code: str) -> int:
-    """The payer changed the schedule or the payment method's schedule:
-    whatever waited under the old one is closed, nothing charged."""
+    """The payer changed the schedule (or the month): a yearly payment
+    waiting under the old one is closed, nothing charged. A month's charge
+    waiting for review stays: months are charged monthly under either
+    schedule unless a yearly payment holds them."""
     count = 0
-    for review in AutopayReview.objects.filter(account=account, decision__isnull=True):
+    for review in AutopayReview.objects.filter(
+        account=account, decision__isnull=True, schedule=AutopaySchedule.ANNUAL
+    ):
         try:
-            _decide(review, EXPIRED, reason="The payer changed the schedule.")
+            _decide(review, CLOSED, reason="The payer changed the schedule.")
         except ReviewError:
             continue
         _audit("payments.autopay_review_expired", review, code=code)

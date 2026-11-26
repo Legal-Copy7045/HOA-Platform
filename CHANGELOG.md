@@ -12,7 +12,9 @@ adds an entry here.
   year" and a month, and on that month's due day the next 12 months'
   assessments are paid in one payment, less any credit on the account. The
   money becomes prepaid credit that pays each month's assessment as it is
-  charged; nothing is charged monthly then. The set-up page and Stripe's page
+  charged. Months before the first yearly payment, or between the end of
+  the prepaid months and the next yearly payment after a change of month,
+  are paid automatically month by month; no month is ever charged twice. The set-up page and Stripe's page
   say which schedule and roughly what amount; the schedule can be changed on
   the automatic payments page and takes effect from the next charge.
 - Automatic payments above $500 (a new Community setting, surcharge

@@ -872,20 +872,106 @@ def _shift(year: int, month: int, months: int) -> tuple[int, int]:
     return index // 12, index % 12 + 1
 
 
+def _add(period: str, months: int) -> str:
+    year, month = (int(x) for x in period.split("-"))
+    return "{:04d}-{:02d}".format(*_shift(year, month, months))
+
+
+def periods_between(first: str, last: str) -> list[str]:
+    """ "YYYY-MM" periods from ``first`` to ``last``, both included."""
+    out = []
+    current = first
+    while current <= last:
+        out.append(current)
+        current = _add(current, 1)
+    return out
+
+
 def annual_periods(first: str) -> list[str]:
     """The twelve "YYYY-MM" periods an annual charge starting at ``first`` pays."""
-    year, month = (int(x) for x in first.split("-"))
-    return ["{:04d}-{:02d}".format(*_shift(year, month, i)) for i in range(ANNUAL_MONTHS)]
+    return periods_between(first, _add(first, ANNUAL_MONTHS - 1))
 
 
-def annual_amount(lot_id: int, account_id: int, first: str) -> tuple[list, int]:
-    """(open assessment charges among the twelve months, what an annual
-    charge from ``first`` costs): each of the twelve months' assessment at
-    its open amount when posted (0 once paid) or the monthly amount when not
-    posted yet, less any credit not yet applied (D47)."""
+_FAILED_STATES = (CheckoutState.FAILED, CheckoutState.MISMATCH)
+
+
+def _annual_attempts(account_id, *, since=None):
+    """Annual attempts that hold their months (D47): not failed, or failed
+    with the payment method in use now (a retry is pending, or automatic
+    payments paused: either way nothing else is charged for those months)."""
+    from django.db.models import Q
+
+    q = ~Q(checkout__state__in=_FAILED_STATES)
+    if since is not None:
+        q |= Q(created_at__gte=since)
+    return AutopayAttempt.objects.filter(account_id=account_id, schedule=ANNUAL).filter(q)
+
+
+@internal("autopay coverage")
+def covered_by_annual(account_id, period: str, st: State | None = None) -> bool:
+    """Whether ``period`` belongs to an annual charge (made, in flight, or
+    for an annual payer also held for, declined or expired at review), so
+    it is never charged monthly as well (D47)."""
+    from payments.models import AutopayReview, ReviewOutcome
+
+    st = st or state(account_id)
+    since = st.method.created_at if st.method else None
+    for a in _annual_attempts(account_id, since=since).values_list("covers_from", "covers_through"):
+        if a[0] and a[0] <= period <= (a[1] or _add(a[0], ANNUAL_MONTHS - 1)):
+            return True
+    if st.schedule != ANNUAL:
+        return False
+    for r in (
+        AutopayReview.objects.filter(account_id=account_id, schedule=ANNUAL)
+        .exclude(decision__outcome=ReviewOutcome.CLOSED)
+        .values_list("covers_from", "covers_through")
+    ):
+        if r[0] and r[0] <= period <= (r[1] or _add(r[0], ANNUAL_MONTHS - 1)):
+            return True
+    return False
+
+
+@internal("autopay coverage")
+def annual_coverage_end(account_id) -> str:
+    """The last month paid for by annual charges that went through or are
+    in flight ("" when none)."""
+    ends = [
+        t or _add(f, ANNUAL_MONTHS - 1)
+        for f, t in _annual_attempts(account_id).values_list("covers_from", "covers_through")
+        if f
+    ]
+    return max(ends) if ends else ""
+
+
+def annual_window(account_id, charge_period: str) -> tuple[str, str]:
+    """(from, through) of an annual charge made in ``charge_period``: twelve
+    months from that month, or, when earlier prepaid months run past it,
+    twelve months from the month after they end (D47)."""
+    end = annual_coverage_end(account_id)
+    start = max(charge_period, _add(end, 1)) if end else charge_period
+    return charge_period, _add(start, ANNUAL_MONTHS - 1)
+
+
+@internal("autopay monthly in flight")
+def _monthly_held(account_id) -> set[str]:
+    """Months a monthly automatic charge is paying (made or in flight)."""
+    return set(
+        AutopayAttempt.objects.filter(account_id=account_id, schedule=MONTHLY)
+        .exclude(checkout__state__in=_FAILED_STATES)
+        .values_list("period", flat=True)
+    )
+
+
+def annual_amount(lot_id: int, account_id: int, first: str, through: str = "") -> tuple[list, int]:
+    """(open assessment charges among the months, what an annual charge for
+    ``first``..``through`` costs; twelve months by default): each month's
+    assessment at its open amount when posted (0 once paid, or while a
+    monthly automatic charge pays it) or the monthly amount when not posted
+    yet, less any credit not yet applied (D47)."""
     from ledger import allocation
 
-    periods = annual_periods(first)
+    periods = periods_between(first, through or _add(first, ANNUAL_MONTHS - 1))
+    held = _monthly_held(account_id)
     monthly = _monthly_cents()
     posted: dict[str, int] = {}
     views = []
@@ -895,10 +981,11 @@ def annual_amount(lot_id: int, account_id: int, first: str) -> tuple[list, int]:
             continue
         if entry.reverses_id:
             continue
-        posted[entry.period] = posted.get(entry.period, 0) + view.open_cents
-        if view.open_cents > 0:
+        open_ = 0 if entry.period in held else view.open_cents
+        posted[entry.period] = posted.get(entry.period, 0) + open_
+        if open_ > 0:
             views.append(view)
-    need = sum(posted.get(p, monthly) for p in periods)
+    need = sum(0 if p in held else posted.get(p, monthly) for p in periods)
     credit = allocation.unapplied_credit(lot_id, account=account_id)
     views.sort(key=lambda v: (v.entry.period, v.entry.pk))
     return views, max(need - max(credit, 0), 0)
@@ -962,6 +1049,7 @@ def _charge(
     try_number: int,
     schedule: str = MONTHLY,
     covers_from: str = "",
+    covers_through: str = "",
 ) -> AutopayAttempt | None:
     """Charge once for this try: this month's assessment (monthly, period
     "YYYY-MM") or the next twelve months' (annual, period "YYYY", starting
@@ -985,7 +1073,7 @@ def _charge(
             _cancel(account, code="payer_left")
         return None
     if schedule == ANNUAL:
-        views, base = annual_amount(account.lot_id, account.pk, covers_from)
+        views, base = annual_amount(account.lot_id, account.pk, covers_from, covers_through)
         charge = views[0].entry if views else None
         charge_ids = [v.entry.pk for v in views]
         if base < flow.MIN_CENTS:
@@ -1005,6 +1093,7 @@ def _charge(
             schedule=schedule,
             period=period,
             covers_from=covers_from,
+            covers_through=covers_through,
             method=method,
             base=base,
             surcharge=surcharge,
@@ -1045,6 +1134,7 @@ def _charge(
                 schedule=schedule,
                 period=period,
                 covers_from=covers_from if schedule == ANNUAL else "",
+                covers_through=covers_through if schedule == ANNUAL else "",
                 try_number=try_number,
                 checkout=checkout,
                 payment_method_id=st.method.payment_method_id,
@@ -1088,7 +1178,7 @@ def intent_params(attempt: AutopayAttempt, event: AutopayEvent, lot_number: str)
     metadata = flow._metadata(checkout)
     metadata["autopay_attempt"] = str(attempt.pk)
     if attempt.schedule == ANNUAL:
-        what = f"HOA assessments, twelve months from {attempt.covers_from}"
+        what = f"HOA assessments, {attempt.period_text}"
     else:
         what = f"HOA assessment {attempt.period}"
     params: dict = {
@@ -1361,42 +1451,57 @@ def _enrolled_accounts():
 
 @internal("autopay run")
 def charge_due(today: datetime.date | None = None) -> int:
-    """On the due day (or within a week after, if a run was missed): charge
-    this month's assessment of every account paying monthly, and the next
-    twelve months' of every account paying once a year whose month it is."""
+    """On the due day (or within a week after, if a run was missed):
+
+    * once a year, in the payer's month: the annual charge (D47);
+    * every month, for everyone: this month's assessment, unless an annual
+      charge holds the month. For an annual payer that is a "bridge" month
+      before the first yearly payment, or between the end of earlier prepaid
+      months and the next yearly payment; credit is used first, so a month
+      the credit covers costs nothing. Each month is charged once, whatever
+      the schedule (monthly attempts per "YYYY-MM", annual per "YYYY")."""
     today = today or _today()
     due_day = _due_day()
+    window = datetime.timedelta(days=CHARGE_WINDOW_DAYS)
     count = 0
     for account in _enrolled_accounts():
         st = state(account.pk)
         if st.status != ON or st.method is None:
             continue
-        if st.schedule == ANNUAL:
-            if not st.annual_month:
-                continue
+        if st.schedule == ANNUAL and st.annual_month:
             due_on = datetime.date(today.year, st.annual_month, due_day)
-            period, covers_from = f"{due_on.year:04d}", _period(due_on)
-        else:
-            due_on = datetime.date(today.year, today.month, due_day)
-            period, covers_from = _period(due_on), ""
-        if not (due_on <= today <= due_on + datetime.timedelta(days=CHARGE_WINDOW_DAYS)):
+            since = st.schedule_since or st.since
+            if due_on <= today <= due_on + window and not (
+                since and timezone.localdate(since) > due_on
+            ):
+                first, through = annual_window(account.pk, _period(due_on))
+                if (
+                    _charge(
+                        account,
+                        st,
+                        f"{due_on.year:04d}",
+                        try_number=1,
+                        schedule=ANNUAL,
+                        covers_from=first,
+                        covers_through=through,
+                    )
+                    is not None
+                ):
+                    count += 1
+                st = state(account.pk)
+                if st.status != ON or st.method is None:
+                    continue
+        due_on = datetime.date(today.year, today.month, due_day)
+        if not (due_on <= today <= due_on + window):
             continue
-        # Set up (or this schedule chosen) after the due date: it starts with
-        # the next one (the payer pays what is already due themselves).
-        since = st.schedule_since or st.since
-        if since and timezone.localdate(since) > due_on:
+        # Set up after this month's due date: it starts next month (the
+        # payer pays what is already due themselves).
+        if st.since and timezone.localdate(st.since) > due_on:
             continue
-        if (
-            _charge(
-                account,
-                st,
-                period,
-                try_number=1,
-                schedule=st.schedule,
-                covers_from=covers_from,
-            )
-            is not None
-        ):
+        period = _period(due_on)
+        if covered_by_annual(account.pk, period, st):
+            continue
+        if _charge(account, st, period, try_number=1) is not None:
             count += 1
     return count
 
@@ -1418,7 +1523,13 @@ def retry_due(now=None) -> int:
             continue
         attempt = failure.attempt
         st = state(failure.account_id)
-        if st.status != ON or st.method is None or st.schedule != attempt.schedule:
+        if st.status != ON or st.method is None:
+            continue
+        if attempt.schedule == ANNUAL and st.schedule != ANNUAL:
+            continue
+        if attempt.schedule == MONTHLY and covered_by_annual(
+            attempt.account_id, attempt.period, st
+        ):
             continue
         if (
             _charge(
@@ -1428,6 +1539,7 @@ def retry_due(now=None) -> int:
                 try_number=2,
                 schedule=attempt.schedule,
                 covers_from=attempt.covers_from,
+                covers_through=attempt.covers_through,
             )
             is not None
         ):
@@ -1446,7 +1558,11 @@ def charge_approved(now=None) -> int:
     for review in autopay_review.approved_uncharged(now):
         account = review.account
         st = state(account.pk)
-        if st.status != ON or st.method is None or st.schedule != review.schedule:
+        if st.status != ON or st.method is None:
+            continue
+        if review.schedule == ANNUAL and st.schedule != ANNUAL:
+            continue
+        if review.schedule == MONTHLY and covered_by_annual(account.pk, review.period, st):
             continue
         if (
             _charge(
@@ -1456,6 +1572,7 @@ def charge_approved(now=None) -> int:
                 try_number=1,
                 schedule=review.schedule,
                 covers_from=review.covers_from,
+                covers_through=review.covers_through,
             )
             is not None
         ):
@@ -1600,21 +1717,41 @@ def run(now=None) -> int:
 def next_charge(account) -> tuple[datetime.date, int, int] | None:
     """(date, amount, surcharge) of the next automatic charge, or None when
     automatic payments are not on. The amount is 0 when credit covers it.
-    Annual: the next yearly charge and the twelve months' amount."""
+    Annual: the next yearly charge, or a monthly "bridge" charge before it."""
+    nxt = next_charge_kind(account)
+    return nxt[1:] if nxt else None
+
+
+@internal("autopay next date")
+def next_charge_kind(account) -> tuple[str, datetime.date, int, int] | None:
+    """(MONTHLY or ANNUAL, date, amount, surcharge) of the next charge."""
     st = state(account.pk)
     if st.status != ON or st.method is None:
         return None
-    if st.schedule == ANNUAL:
-        return _next_annual(account, st)
+    monthly = _next_monthly(account, st)
+    if st.schedule != ANNUAL:
+        return (MONTHLY, *monthly) if monthly else None
+    annual = _next_annual(account, st)
+    if monthly and (
+        annual is None or (_period(monthly[0]) < _period(annual[0]) and monthly[1] > 0)
+    ):
+        return (MONTHLY, *monthly)
+    return (ANNUAL, *annual) if annual else None
+
+
+def _next_monthly(account, st: State) -> tuple[datetime.date, int, int] | None:
+    """The next month's assessment that is charged monthly (not held by an
+    annual charge): this month's while it can still be charged, else the
+    first such month after."""
     today = _today()
     due_day = _due_day()
     due_on = datetime.date(today.year, today.month, due_day)
     period = _period(due_on)
-    since = st.schedule_since or st.since
     this_month = (
         today <= due_on + datetime.timedelta(days=CHARGE_WINDOW_DAYS)
-        and not (since and timezone.localdate(since) > due_on)
+        and not (st.since and timezone.localdate(st.since) > due_on)
         and not AutopayAttempt.objects.filter(account=account, period=period).exists()
+        and not covered_by_annual(account.pk, period, st)
     )
     if this_month:
         view, base = amount_for(account.lot_id, account.pk, period)
@@ -1626,10 +1763,14 @@ def next_charge(account) -> tuple[datetime.date, int, int] | None:
         if view is not None or not posted:
             when = max(due_on, today)
             return when, base, fees.surcharge(base, _surcharge_method(st.method))
-    year, month = _shift(due_on.year, due_on.month, 1)
-    when = datetime.date(year, month, due_day)
-    base = _monthly_after_credit(account, _monthly_cents())
-    return when, base, fees.surcharge(base, _surcharge_method(st.method))
+    for months in range(1, 25):
+        year, month = _shift(due_on.year, due_on.month, months)
+        when = datetime.date(year, month, due_day)
+        if covered_by_annual(account.pk, _period(when), st):
+            continue
+        base = _monthly_after_credit(account, _monthly_cents())
+        return when, base, fees.surcharge(base, _surcharge_method(st.method))
+    return None
 
 
 def next_annual_date(account, st: State) -> datetime.date | None:
@@ -1655,7 +1796,8 @@ def _next_annual(account, st: State) -> tuple[datetime.date, int, int] | None:
     when = next_annual_date(account, st)
     if when is None:
         return None
-    _views, base = annual_amount(account.lot_id, account.pk, _period(when))
+    first, through = annual_window(account.pk, _period(when))
+    _views, base = annual_amount(account.lot_id, account.pk, first, through)
     return when, base, fees.surcharge(base, _surcharge_method(st.method))
 
 
@@ -1765,12 +1907,14 @@ def describe_for_statement(account) -> str | None:
             f"Your automatic payment of {format_cents(review.total_cents)} is waiting for "
             "the board's review."
         )
-    nxt = next_charge(account)
+    nxt = next_charge_kind(account)
     if nxt is None:
         return None
-    when, base, surcharge = nxt
+    kind, when, base, surcharge = nxt
     if st.schedule == ANNUAL:
-        return _describe_annual(account, when, base, surcharge)
+        annual = _describe_annual(account, kind, when, base, surcharge)
+        if annual:
+            return annual
     if base <= 0:
         return (
             f"Your credit on account covers the assessment due {_date_text(when)}, so nothing "
@@ -1788,7 +1932,9 @@ def _waiting_review(account):
     return autopay_review.waiting_for(account.pk)
 
 
-def _describe_annual(account, when: datetime.date, base: int, surcharge: int) -> str:
+def _describe_annual(account, kind: str, when: datetime.date, base: int, surcharge: int):
+    """The annual sentences; None for a monthly bridge charge (the monthly
+    sentence then)."""
     from community.terms import term_text
 
     through = prepaid_through(account)
@@ -1799,6 +1945,8 @@ def _describe_annual(account, when: datetime.date, base: int, surcharge: int) ->
         return term_text(
             f"Your {{terms}} are prepaid through {through:%B %Y} by your annual automatic payment."
         )
+    if kind == MONTHLY:
+        return None
     if base <= 0:
         return term_text(
             "Your credit on account covers the next 12 months' {terms}, so nothing will be "
@@ -1844,7 +1992,45 @@ def for_payer(user, lot) -> dict | None:
         "review_text": _review_text(review),
         "next": nxt,
         "prepaid_through": prepaid_through(account) if st.schedule == ANNUAL else None,
+        "bridge_text": bridge_text(account, st) if st.status != OFF else [],
     }
+
+
+@internal("autopay bridge text")
+def bridge_text(account, st: State) -> list[str]:
+    """For an annual payer: how the months before the next yearly payment
+    are paid, and what the next yearly payment covers (D47)."""
+    if st.schedule != ANNUAL:
+        return []
+    when = next_annual_date(account, st)
+    if when is None:
+        return []
+    charge_period = _period(when)
+    end = annual_coverage_end(account.pk)
+    if not end:
+        return [
+            f"Until your first yearly payment in {when:%B %Y}, each month is paid "
+            "automatically as usual."
+        ]
+    out = []
+    if _add(end, 1) < charge_period:
+        out.append(
+            f"Your prepaid months end in {_month_text(end)}. Until your next yearly payment "
+            f"in {when:%B %Y}, each month is paid automatically as usual."
+        )
+    _first, through = annual_window(account.pk, charge_period)
+    start = _add(through, -(ANNUAL_MONTHS - 1))
+    if start > charge_period:
+        out.append(
+            f"Your next yearly payment, in {when:%B %Y}, pays for the 12 months from "
+            f"{_month_text(start)}, the month after your prepaid months end."
+        )
+    return out
+
+
+def _month_text(period: str) -> str:
+    year, month = (int(x) for x in period.split("-"))
+    return f"{datetime.date(year, month, 1):%B %Y}"
 
 
 def _review_text(review) -> str:

@@ -11,6 +11,7 @@
       <p><span class="status tone-success">On</span> Paying {{ info.schedule_text }} from your {{ info.label }}{% if info.since %}, since {{ info.since|date:"M j, Y" }}{% endif %}.</p>
       {% if info.review %}<p data-testid="autopay-review"><span class="status tone-warning">Waiting</span> {{ info.review_text }} Nothing is charged until a board member approves it; you are emailed if it is declined or not decided within 14 days.</p>
       {% elif info.description %}<p>{{ info.description }}</p>{% endif %}
+      {% for line in info.bridge_text %}<p data-testid="autopay-bridge">{{ line }}</p>{% endfor %}
     {% elif info.status == "paused" %}
       <p><span class="status tone-warning">Paused</span> A payment from your {{ info.label }} didn't go through, so nothing is charged automatically until you set up a payment method again below.</p>
       <p><a class="btn" href="{% url 'pay_online' lot.pk %}?all=1">{% icon "wallet" %} Pay now</a></p>

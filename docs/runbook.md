@@ -692,7 +692,9 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    board member never decides a payment for a home they pay for.
 6. Once a year (D47): the payer picks "Once a year" and a month; on that
    month's due day the next 12 months' assessments are charged at once, less
-   any credit, and the money is drawn down month by month as credit. At the
+   any credit, and the money is drawn down month by month as credit. Months
+   before the first yearly payment (or in a gap after changing the month)
+   are charged monthly as usual; no month is charged twice. At the
    default limit ($500) every yearly payment waits for the board's approval.
    No Stripe key rights change.
 
