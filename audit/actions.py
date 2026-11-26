@@ -310,6 +310,24 @@ _SPECS = [
     _spec("arc.edited", "ARC draft edited by the owner", "fields"),
     # --- Regression fixes: operations, ledger, notifications (fix_ops) ---
     _spec("contract.approval_given", "Contract approval given", "have", "need"),
+    # --- Meeting packets (M5) ---
+    _spec(
+        "meeting.packet_built",
+        "Meeting packet built",
+        "variant",
+        "document_id",
+        "version",
+        "attachments",
+        "skipped",
+    ),
+    _spec(
+        "meeting.packet_zip_downloaded",
+        "Meeting packet with attachments downloaded",
+        "variant",
+        "packet_id",
+        "files",
+        "skipped",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

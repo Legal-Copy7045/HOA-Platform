@@ -14,9 +14,27 @@ CHARS_PER_LINE = 88
 MONO_CHARS = 78  # Courier at 9pt across the text width
 
 
+# Typographic characters outside Latin-1 that WinAnsiEncoding can still show.
+_WINANSI = {"\u2013": "\x96", "\u2014": "\x97", "\u2018": "\x91", "\u2019": "\x92"}
+_WINANSI |= {"\u201c": "\x93", "\u201d": "\x94", "\u2022": "\x95", "\u2026": "\x85"}
+
+
 def _escape(text: str) -> str:
-    safe = "".join(c if 32 <= ord(c) < 256 and c not in "\x7f" else "?" for c in text)
+    text = "".join(_WINANSI.get(c, c) for c in text)
+    safe = "".join(
+        c if (32 <= ord(c) < 127 or 160 <= ord(c) < 256 or c in _WINANSI.values()) else "?"
+        for c in text
+    )
     return safe.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def plain(text: str) -> str:
+    """User-typed text for a paragraph: ``**`` never switches on bold (only
+    the portal marks data that way). Escaping happens in render() anyway."""
+    text = text or ""
+    while "**" in text:
+        text = text.replace("**", "* *")
+    return text
 
 
 def _lines(paragraphs: list[tuple[str, str]]) -> list[tuple[str, str]]:
