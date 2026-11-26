@@ -173,3 +173,7 @@
   check: "A real OFX or QFX download and a CSV download from the HOA's bank import into Bank feed (CSV after Match the columns), amounts and dates look right, importing the same file again adds nothing, a matching deposit is offered and once confirmed is ticked on Reconcile a statement with the ending balance filled in; the pages work at phone width."
   steps: "Download last month's activity as OFX/QFX and as CSV from the bank's website; Finance > Accounting > Bank feed; add an account for statement files; import each; confirm a suggested match; open Reconcile a statement for the month end; repeat on a phone."
   last: ""
+- key: stripe test payment
+  check: "With test keys on the POC and Online payments switched on: an owner pays one charge by credit card 4242 4242 4242 4242 (surcharge shown first, TEST MODE banner), by debit card 4000 0566 5566 5556 (no fee) and by a test bank account (processing, then paid next day); each shows on My account against the chosen charge, a receipt email and PDF arrive, and Finance -> Online payments shows the payment, the payout and 'matches'."
+  steps: "Follow docs/runbook.md 'Online payments (Stripe)' test-mode setup; sign in as a demo owner; Pay online three times; next day open Finance -> Online payments; on a phone check the pay page fits the screen."
+  last: ""

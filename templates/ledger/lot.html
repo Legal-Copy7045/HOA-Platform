@@ -21,6 +21,8 @@
     <div class="stat {% if balance > 0 %}tone-warning{% elif balance < 0 %}tone-success{% endif %}"><div class="label">Balance</div><div class="value">{{ balance|cents }}</div>{% if aging.credit %}<div class="hint">unapplied credit {{ aging.credit|cents }}</div>{% endif %}</div>
     {% for label, amount in aging_columns %}<div class="stat{% if amount and forloop.counter > 3 %} tone-danger{% endif %}"><div class="label">{{ label }}</div><div class="value">{{ amount|cents }}</div></div>{% endfor %}
   </div>
+  <section class="card">{% include "ledger/_open_charges.html" with open_charges=open_charges unapplied=aging.credit %}</section>
+  <h2>All entries</h2>
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Date</th><th>Entry</th><th class="num">Amount</th>{% if can_manage %}<th><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>
     <tbody>{% for e in entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}{% if e.reference %} <span class="muted">({{ e.reference }})</span>{% endif %}</td><td class="num">{{ e.amount_cents|cents }}</td>

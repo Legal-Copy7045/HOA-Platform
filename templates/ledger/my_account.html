@@ -3,6 +3,7 @@
 {% block title %}My account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>My account</h1><p class="subtitle">Dues are charged on the 1st of each month. Payments made in advance are kept as a credit and used up month by month.</p></div></div>
+  {% include "payments/_test_banner.html" %}
   {% for a in accounts %}
     <section class="card">
       <div class="card-head"><div><h2>Lot {{ a.lot.number }}</h2><div class="muted small">{{ a.lot.street_address }}</div></div>
@@ -12,6 +13,7 @@
           {% if a.statement.balance > 0 and a.due.due_on %}<div class="small" data-testid="due-by">{% if a.due.past_due %}<span class="status tone-danger">Past due since {{ a.due.due_on|date:"M j, Y" }}</span>{% else %}Due by {{ a.due.due_on|date:"M j, Y" }}{% endif %}</div>{% endif %}
         </div>
       </div>
+      {% include "ledger/_open_charges.html" with open_charges=a.open_charges open_before=a.open_before unapplied=a.unapplied %}
       <h3>Statement</h3>
       <div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>Description</th><th class="num">Charges</th><th class="num">Payments</th><th class="num">Balance</th></tr></thead>
@@ -25,10 +27,10 @@
         <thead><tr><th>Due</th><th>Description</th><th class="num">Amount</th></tr></thead>
         <tbody>{% for c in a.upcoming %}<tr><td class="nowrap">{{ c.due_on|date:"M j, Y" }}</td><td>{{ c.description }}{% if c.covered_by_credit %} <span class="badge tone-success">covered by credit</span>{% endif %}</td><td class="num">{{ c.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
       </table></div>{% endif %}
+      {% if a.online_receipts %}<h3>Online payments</h3>
+      <ul class="list small">{% for p in a.online_receipts %}<li><div class="grow">{{ p.recorded_at|date:"M j, Y" }} &middot; {{ p.total_cents|cents }} &middot; {{ p.get_method_display }}</div><a href="{% url 'payment_receipt' p.pk %}">{% icon "download" %} Receipt (PDF)</a></li>{% endfor %}</ul>{% endif %}
       <h3>How to pay</h3>
-      {% if online %}
-        {% if a.statement.balance > 0 %}<div class="small muted pay-options">{% for p in a.pay_options %}<div>{{ p.label }}: {{ a.statement.balance|cents }}{% if p.fee_cents %} + {{ p.fee_cents|cents }} convenience fee = <strong>{{ p.total_cents|cents }}</strong>{% else %} (no fee){% endif %}</div>{% endfor %}</div>{% endif %}
-      {% endif %}
+      {% if online and a.statement.balance > 0 and a.can_pay_online %}<div class="small pay-options" data-testid="pay-options">{% for p in a.pay_options %}<div>{{ p.label }}: {% if p.fee_cents %}{{ a.statement.balance|cents }} + {{ p.fee_cents|cents }} surcharge = <strong>{{ p.total_cents|cents }}</strong>{% else %}<strong>{{ p.total_cents|cents }}</strong>{% endif %}</div>{% endfor %}<p class="muted">{{ disclosure }}</p></div>{% endif %}
       <div class="pay-by-check" data-testid="pay-by-check">
         <p>{% if online %}Or pay by check. {% endif %}Make checks payable to <strong>{{ payable_to }}</strong>{% if remit_lines %} and mail them to:{% else %}.{% endif %}</p>
         {% if remit_lines %}<address>{% for line in remit_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% else %}<p class="small muted">Ask the board where to send checks.</p>{% endif %}
@@ -43,7 +45,7 @@
       <p class="small muted">To add or remove someone, ask the board.</p>{% endif %}
       <div class="form-actions">
         <a class="btn secondary" href="{% url 'my_statement_pdf' a.lot.pk %}">{% icon "download" %} Download statement (PDF)</a>
-        {% if online and a.statement.balance > 0 %}<button type="button" class="btn">Pay online</button>{% endif %}
+        {% if online and a.statement.balance > 0 and a.can_pay_online %}<a class="btn" href="{% url 'pay_online' a.lot.pk %}">{% icon "wallet" %} Pay online</a>{% endif %}
       </div>
     </section>
   {% endfor %}

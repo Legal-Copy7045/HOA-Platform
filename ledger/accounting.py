@@ -67,6 +67,10 @@ GL_LABELS = {
     "resale_fee": "Resale certificate fees",
     "other_charge": "Other owner charges",
     "credit": "Owner credits and adjustments",
+    # Online payments (D32-payments)
+    "stripe_clearing": "Stripe clearing (balance at Stripe)",
+    "card_surcharge": "Credit card surcharge income",
+    "processing_fees": "Payment processing fees",
 }
 
 
@@ -137,20 +141,25 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
             .select_related("invoice__vendor", "invoice__category")
             .order_by("paid_on", "id")
         )
+    from payments.services import journal_items, online_entry_ids
+
+    online = online_entry_ids()
     for e in entries:
         kind = e.reverses.kind if e.kind == EntryKind.REVERSAL and e.reverses else e.kind
         memo = f"Lot {e.lot.number}: {e.get_kind_display()}"
         ref = f"L{e.pk}"
         if kind == EntryKind.PAYMENT:
             # A payment is a negative entry: debit cash, credit receivables.
+            # Online payments sit at Stripe until the payout reaches the bank.
+            is_online = e.pk in online or e.reverses_id in online
             pair(
                 e.posted_on,
                 "Owner payments",
                 ref,
-                gl["cash"],
+                gl["stripe_clearing"] if is_online else gl["cash"],
                 gl["receivable"],
                 -e.amount_cents,
-                memo,
+                memo + (" (online)" if is_online else ""),
             )
         elif kind == EntryKind.CREDIT:
             pair(
@@ -165,6 +174,19 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
         else:
             income = gl.get(kind, gl["other_charge"])
             pair(e.posted_on, "Owner charges", ref, gl["receivable"], income, e.amount_cents, memo)
+    stripe = journal_items(start, end)
+    for day, ref, cents, lot_number in stripe["surcharges"]:
+        memo = f"Lot {lot_number}: credit card surcharge"
+        pair(day, "Online payments", ref, gl["stripe_clearing"], gl["card_surcharge"], cents, memo)
+    for day, ref, cents, lot_number in stripe["surcharge_refunds"]:
+        memo = f"Lot {lot_number}: surcharge refunded"
+        pair(day, "Online payments", ref, gl["card_surcharge"], gl["stripe_clearing"], cents, memo)
+    for day, ref, cents, kind in stripe["fees"]:
+        memo = f"Stripe fee ({kind})"
+        pair(day, "Online payments", ref, gl["processing_fees"], gl["stripe_clearing"], cents, memo)
+    for day, ref, cents, payout_id in stripe["payouts"]:
+        memo = f"Stripe payout {payout_id}"[:120]
+        pair(day, "Online payments", ref, gl["cash"], gl["stripe_clearing"], cents, memo)
     for p in payments:
         inv = p.invoice
         expense = f"{inv.category.code} {inv.category.name}".strip()
@@ -206,9 +228,12 @@ def undeposited_payments():
             .exclude(total=0)
             .values_list("entry_id", flat=True)
         )
+        from payments.services import online_entry_ids
+
         return list(
             LedgerEntry.objects.filter(kind=EntryKind.PAYMENT, reversed_by__isnull=True)
             .exclude(pk__in=list(deposited))
+            .exclude(pk__in=list(online_entry_ids()))
             .select_related("lot")
             .order_by("posted_on", "id")
         )

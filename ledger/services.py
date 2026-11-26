@@ -40,6 +40,12 @@ def _user(actor):
     return None if actor is SYSTEM else actor
 
 
+def _allocation():
+    from ledger import allocation
+
+    return allocation
+
+
 def _authorize(actor, action):
     if actor is not SYSTEM:
         require(actor, action)
@@ -247,25 +253,31 @@ def _duplicate_reference(lot, reference: str) -> bool:
     )
 
 
-@internal("ledger service")
-def record_payment(
-    *,
-    lot: Lot,
-    amount_cents: int,
-    received_on,
-    method: str = "check",
-    reference: str = "",
-    actor,
-    request=None,
-) -> LedgerEntry:
-    _authorize(actor, "ledger.manage")
-    if amount_cents <= 0:
-        raise LedgerError("A payment must be a positive amount.")
-    if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
-        raise LedgerError("Enter a check number or short reference, never an account number.")
-    if _duplicate_reference(lot, reference):
-        raise LedgerError(f"Payment {reference[:40]} for this home is already recorded.")
-    entry = LedgerEntry.objects.create(
+ONLINE_METHODS = frozenset({"online", "stripe"})
+
+
+def _check_apply_to(lot, apply_to) -> list[int]:
+    """Charge ids chosen for a payment: this lot's open charges only."""
+    if not apply_to:
+        return []
+    from ledger import allocation
+
+    open_ids = {c.entry.pk for c in allocation.open_charges(lot.pk)}
+    ids = []
+    for value in apply_to:
+        try:
+            charge_id = int(value)
+        except (TypeError, ValueError) as exc:
+            raise LedgerError("Choose charges from this home's open charges.") from exc
+        if charge_id not in open_ids:
+            raise LedgerError("Choose charges from this home's open charges.")
+        if charge_id not in ids:
+            ids.append(charge_id)
+    return ids
+
+
+def _post_payment(lot, *, amount_cents, received_on, method, reference, apply_to, actor):
+    entry = LedgerEntry(
         lot=lot,
         posted_on=received_on,
         kind=EntryKind.PAYMENT,
@@ -274,10 +286,80 @@ def record_payment(
         reference=reference[:40],
         posted_by=_user(actor),
     )
+    entry._apply_to = apply_to  # read by ledger.allocation when the entry posts
+    with transaction.atomic():
+        entry.save()
+    return entry
+
+
+@internal("ledger service")
+def record_payment(
+    *,
+    lot: Lot,
+    amount_cents: int,
+    received_on,
+    method: str = "check",
+    reference: str = "",
+    apply_to: list[int] | None = None,
+    actor,
+    request=None,
+) -> LedgerEntry:
+    """A payment received by check, cash, ACH... ``apply_to``: charges the
+    payer chose, in order; the rest follows the application rule.
+
+    Online (Stripe) payments are never entered here: only the Stripe sync
+    records them, from what Stripe itself reports (D32-payments)."""
+    _authorize(actor, "ledger.manage")
+    if (method or "").strip().lower() in ONLINE_METHODS:
+        raise LedgerError("Online payments are recorded automatically from Stripe.")
+    if amount_cents <= 0:
+        raise LedgerError("A payment must be a positive amount.")
+    if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
+        raise LedgerError("Enter a check number or short reference, never an account number.")
+    if _duplicate_reference(lot, reference):
+        raise LedgerError(f"Payment {reference[:40]} for this home is already recorded.")
+    entry = _post_payment(
+        lot,
+        amount_cents=amount_cents,
+        received_on=received_on,
+        method=method,
+        reference=reference,
+        apply_to=_check_apply_to(lot, apply_to),
+        actor=actor,
+    )
     record_event(
         "ledger.payment_recorded",
         actor=_user(actor),
         request=request,
+        target=entry,
+        metadata={"lot_id": lot.pk, "amount_cents": amount_cents},
+    )
+    return entry
+
+
+@internal("ledger service")
+def record_online_payment(
+    *, lot: Lot, amount_cents: int, received_on, payment_intent_id: str, apply_to, actor
+) -> LedgerEntry:
+    """Only for payments.sync, after Stripe confirmed the payment (actor is
+    SYSTEM; no form or view reaches this)."""
+    if actor is not SYSTEM:
+        raise PermissionError("Online payments are recorded only by the Stripe sync.")
+    if amount_cents <= 0 or not payment_intent_id:
+        raise LedgerError("An online payment needs an amount and its Stripe reference.")
+    open_ids = {c.entry.pk for c in _allocation().open_charges(lot.pk)}
+    entry = _post_payment(
+        lot,
+        amount_cents=amount_cents,
+        received_on=received_on,
+        method="online",
+        reference=payment_intent_id,
+        apply_to=[int(c) for c in (apply_to or []) if int(c) in open_ids],
+        actor=actor,
+    )
+    record_event(
+        "ledger.payment_recorded",
+        actor=None,
         target=entry,
         metadata={"lot_id": lot.pk, "amount_cents": amount_cents},
     )
@@ -461,23 +543,12 @@ def _bucket(age_days: int) -> str:
     return "over_90"
 
 
-@internal("ledger service")
 def _open_charges(lot_id: int, as_of: datetime.date) -> tuple[list[list], int]:
-    """Charges still unpaid on ``as_of`` as [posted_on, open_cents], oldest
-    first (credits pay the oldest charges first), and any credit left over."""
-    entries = list(LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of))
-    # A reversal cancels the entry it reverses (review D2): drop both, so a
-    # bounced payment brings back the original charges' ages and a reversed
-    # mistaken charge does not age as if paid down the oldest debt.
-    cancelled = {e.reverses_id for e in entries if e.reverses_id}
-    entries = [e for e in entries if e.pk not in cancelled and not e.reverses_id]
-    charges = sorted([e.posted_on, e.amount_cents] for e in entries if e.amount_cents > 0)
-    credit = -sum(e.amount_cents for e in entries if e.amount_cents < 0)
-    for charge in charges:
-        applied = min(credit, charge[1])
-        charge[1] -= applied
-        credit -= applied
-    return [c for c in charges if c[1] > 0], credit
+    """Charges still open on ``as_of`` as [posted_on, open_cents], oldest
+    first, and the credit not applied to any charge. Open amounts come from
+    the payment applications (open-item accounting, D32-payments): a payment
+    pays the charges it was applied to, a reversal reopens them."""
+    return _allocation().open_items_as_of(lot_id, as_of)
 
 
 def aging(lot_id: int, as_of: datetime.date | None = None) -> dict[str, int]:
@@ -509,8 +580,8 @@ def amount_due(lot_id: int, today: datetime.date | None = None) -> AmountDue:
     owed = balance(lot_id)
     if owed <= 0:
         return AmountDue(0, None, False)
-    charges, _credit = _open_charges(lot_id, datetime.date.max)
-    due_on = charges[0][0] if charges else today
+    open_ = _allocation().open_charges(lot_id)
+    due_on = min((c.due_on for c in open_), default=today)
     return AmountDue(owed, due_on, due_on < today)
 
 
@@ -1050,6 +1121,12 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
             "contains everything 68 Pa.C.S. § 5407 requires before it is relied upon.",
         ),
     ]
+    # The attached account: each open charge (D32-payments), on its own page
+    # so the certificate's wording above is unchanged.
+    from ledger.letters import open_charges_paragraphs
+
+    body += [("pagebreak", ""), ("heading", f"Account of lot {lot.number}")]
+    body += open_charges_paragraphs(lot)
     return pdf.render(body, title=f"Resale certificate {obj.pk}")
 
 

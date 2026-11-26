@@ -146,6 +146,7 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
     """The statement page; returns (paragraphs, amount due)."""
     profile = CommunityProfile.get()
     as_of = as_of or timezone.localdate()
+    owner_since = since
     since = since or datetime.date(2000, 1, 1)
     names, _salutation, address, account_number = _recipients(lot)
     with system_access("statement entries"):
@@ -193,6 +194,7 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
                 f"{format_cents(running):>12}",
             )
         )
+    paras += open_charges_paragraphs(lot, since=owner_since)
     remit = [line for line in (profile.remit_to or "").splitlines() if line.strip()] or [
         profile.legal_name
     ]
@@ -226,6 +228,40 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
         paras.append(("mono", line[:40].ljust(42) + (tips[i] if i < len(tips) else "")))
     paras.append(("small", f"Monthly dues are due on day {due_day} of each month."))
     return paras, balance
+
+
+def open_charges_paragraphs(lot: Lot, *, since=None) -> list[tuple[str, str]]:
+    """The open charges, each with its number, due date, original and open
+    amount (open-item accounting, D32-payments)."""
+    from ledger import allocation
+
+    rows = allocation.open_charges(lot.pk, since=since)
+    before = allocation.open_before(lot.pk, since) if since else 0
+    paras = [
+        ("normal", ""),
+        ("mono", "OPEN CHARGES"),
+        ("mono", f"{'NUMBER':<11}{'DESCRIPTION':<31}{'DUE':<12}{'ORIGINAL':>12}{'OPEN':>12}"),
+    ]
+    if before:
+        paras.append(
+            (
+                "mono",
+                f"{'':<11}{'From before your ownership':<31}{'':<12}{'':>12}"
+                f"{format_cents(before):>12}",
+            )
+        )
+    for c in rows:
+        title = c.title.replace(allocation.DASH, "-")[:30]
+        paras.append(
+            (
+                "mono",
+                f"{c.number:<11}{title:<31}{c.due_on:%Y-%m-%d}  "
+                f"{format_cents(c.original_cents):>12}{format_cents(c.open_cents):>12}",
+            )
+        )
+    if not rows and not before:
+        paras.append(("mono", f"{'':<11}None"))
+    return paras
 
 
 def _values(lot: Lot, balance: int) -> dict[str, str]:

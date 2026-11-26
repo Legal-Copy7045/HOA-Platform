@@ -12,6 +12,12 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Search | The search box at the top of the menu and its results page: finds announcements, documents, meetings, requests and more, grouped by area. Shows only what you can already open. | `core/search.py`, `<app>/search.py` |
 | My home | Your lot, the people on your account. | `my_lot` |
 | My account | Your dues statement and balance. The board's view of every lot is **Owner accounts**. | `ledger` |
+| Open charges | Each charge on an account (dues, late fees, other charges, resale fees) with what is still unpaid on it and the payments applied to it. | `ledger.allocation`, `PaymentApplication` |
+| Invoice 2026-0142 / Dues – March 2026 | A charge's number (year and sequence) and its name. | `ChargeNumber` |
+| Pay online | An owner or authorized contact pays chosen charges on Stripe's hosted page: bank account or debit card (no fee), or credit card (with the surcharge). | `pay_online`, `payments.checkout` |
+| Payment status | The page Stripe returns the payer to; the portal asks Stripe itself whether the payment went through. | `pay_return` |
+| Credit card surcharge | The fee on credit card payments only (never bank or debit), at most 3%. Not part of the account balance. | `payments.credit_card_surcharge_bp` |
+| Online payments | The board's page of Stripe payments, bank payments processing, problems to handle, payouts and the daily check against Stripe. | `online_payments`, `payments.sync` |
 | Account number | The number of one ownership period of a lot (changes when the lot is sold). Shown as plain text, not a badge. | `Account.number` |
 | Home improvement approvals (ARC) | Asking the Architectural Review Committee to approve an exterior change. The board's list is **Architectural review**. | `arc`, `ArcRequest` |
 | Neighbor acknowledgement | A neighbor confirms they have seen a project. It never decides the request. | "signoff" (`arc/signoffs.py`) |

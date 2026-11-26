@@ -102,6 +102,7 @@ _TONES = {
         "neighbors",
         "objected",
         "needs_reauth",  # bank feed connection
+        "processing",
     },
     "danger": {
         "denied",
@@ -116,6 +117,7 @@ _TONES = {
         "declined",
         "failed",
         "failure",
+        "mismatch",
     },
     "neutral": {
         "void",

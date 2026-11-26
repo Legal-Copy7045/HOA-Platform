@@ -79,9 +79,9 @@ GROUP_NOTES: dict[str, str] = {
         f"Declaration needs at least 67% of the votes, or more if it says so (§ 5219)."
     ),
     "Online payments": (
-        "The Act does not regulate how owners pay. Card networks cap card surcharges and require "
-        "them to be disclosed before payment; counsel should confirm the fee wording before "
-        "live payments. Bank transfer fees are not card surcharges."
+        "The Act does not regulate how owners pay. Card networks allow surcharges on credit "
+        "cards only, capped at 3% and disclosed before payment; bank and debit card payments "
+        "carry no fee. Counsel should confirm the wording before live payments."
     ),
     "Privacy": (
         "The Act does not say how long an association keeps owners' contact details. Records "
@@ -244,16 +244,23 @@ GUIDES: dict[str, Guide] = {
     ),
 }
 
-GUIDES["payments.card_fee_bp"] = Guide(
-    BOARD,
-    "Not covered by the Act. Card-network rules cap surcharges (commonly at the actual cost, "
-    "and no more than 3%) and require disclosure before payment.",
-    "295 (2.95%, the processor's card cost): Board resolution 2027-09, after counsel review.",
+GUIDES["ledger.assessments_before_fees"] = Guide(
+    DECLARATION,
+    "The Act does not say in what order an owner's payments pay their charges. Assessments, "
+    f"late charges, fines and interest are all part of the association's lien ({ACT} § 5302(a)(11) "
+    "and § 5315), so the Declaration or a board collection policy usually sets the order. "
+    "Oldest first is the common default; some policies pay dues before fees.",
+    "Off (oldest first): Board collection policy, resolution 2027-03. On if the Declaration "
+    "says payments apply to assessments first (e.g. Declaration §7.6).",
 )
-GUIDES["payments.bank_fee_cents"] = Guide(
+GUIDES["payments.credit_card_surcharge_bp"] = Guide(
     BOARD,
-    "Not covered by the Act.",
-    "$1.00 per bank transfer: Board resolution 2027-09.",
+    "Not covered by the Act. Card-network rules allow a surcharge on credit cards only (never "
+    "debit or prepaid), no more than the cost of acceptance and at most 3%, disclosed before "
+    "payment, after registering with Visa and Mastercard 30 days ahead. Counsel should confirm "
+    "the disclosure wording.",
+    "300 (3%, not more than the processor's credit card cost): Board resolution 2027-09, "
+    "after counsel review.",
 )
 
 GUIDES["retention.former_owner_contact_days"] = Guide(

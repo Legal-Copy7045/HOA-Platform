@@ -295,6 +295,7 @@ MEMBER_READS = {
                 "survey.respond",
                 "event.rsvp",
                 "reserves.view_summary",
+                "payments.pay",
             },
         ),
         (

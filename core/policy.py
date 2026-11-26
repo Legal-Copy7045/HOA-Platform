@@ -200,6 +200,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "bank_feed.sync": frozenset({BOARD, MANAGER}),
     "bank_feed.import": frozenset({BOARD, MANAGER}),
     "bank_feed.match": frozenset({BOARD, MANAGER}),
+    # --- Online payments (D32-payments) ---
+    # Owners on the deed and authorized contacts pay their own account; never
+    # view-only contacts, tenants, former owners or (as such) the manager.
+    "payments.pay": frozenset({OWNER, AUTHORIZED}),
+    # Closing online-payment problems (mismatches, refunds, disputes): board.
+    "payments.manage": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

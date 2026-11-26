@@ -220,6 +220,22 @@ FEATURES: list[Feature] = [
         },
         default=False,
     ),
+    # Online payments (D32-payments): also needs Stripe keys on the server.
+    _f(
+        "online_payments",
+        "Online payments",
+        "Owners pay by bank account, debit card or credit card on Stripe's hosted page "
+        "(needs Stripe keys on the server).",
+        {
+            "pay_online",
+            "pay_checkout",
+            "pay_return",
+            "payment_receipt",
+            "online_payments",
+            "payment_alert_resolve",
+        },
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"

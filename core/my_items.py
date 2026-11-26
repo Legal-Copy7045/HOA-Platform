@@ -456,6 +456,8 @@ def items_for(user) -> list[Item]:
                     nav="access_review",
                 )
             )
+    if can(user, "payments.manage"):
+        out.extend(_online_payment_items(user, roles))
     if can(user, "community.manage_rules"):
         from community.rules import rules_needing_attention
 
@@ -613,6 +615,44 @@ def items_for(user) -> list[Item]:
 
     states = features.states()  # one query, not one per item (optimization A9)
     return [i for i in out if features.path_enabled(i.url, states_=states)]
+
+
+def _online_payment_items(user, roles) -> list[Item]:
+    """Online payment problems for the board (D32-payments): mismatches,
+    returned bank payments, refunds and disputes to record, surcharges to
+    refund. Reconciliation differences go to the treasurer (or the whole
+    board while nobody holds that office)."""
+    from payments.models import AlertKind, PaymentAlert
+
+    alerts = list(
+        PaymentAlert.objects.for_user(user).filter(resolved_at__isnull=True).select_related("lot")
+    )
+    if not alerts:
+        return []
+    treasurer = "treasurer" in roles.offices
+    if not treasurer and any(a.kind == AlertKind.RECONCILIATION for a in alerts):
+        from community.models import OfficeHolding
+        from core.scoping import system_access
+
+        with system_access("treasurer exists"):
+            someone = OfficeHolding.objects.filter(office="treasurer").active().exists()
+        treasurer = not someone
+    out = []
+    for a in alerts:
+        if a.kind == AlertKind.RECONCILIATION and not treasurer:
+            continue
+        out.append(
+            Item(
+                "Finance",
+                a.get_kind_display() + (f" (lot {a.lot.number})" if a.lot_id else ""),
+                a.detail,
+                reverse("online_payments"),
+                "danger" if a.kind in (AlertKind.MISMATCH, AlertKind.RECONCILIATION) else "warning",
+                timezone.localdate(a.created_at),
+                nav="online_payments",
+            )
+        )
+    return out
 
 
 def oldest_unpaid_on(statement, since) -> datetime.date | None:

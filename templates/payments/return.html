@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Payment status · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'my_account' %}">My account</a> / Payment status</div>
+  <div class="page-head"><div><h1>Payment status</h1></div></div>
+  {% include "payments/_test_banner.html" %}
+  <section class="card" data-testid="payment-state">
+    {% if checkout.state == "paid" %}
+      <h2>Thank you, your payment was received</h2>
+      <p>{{ payment.base_cents|cents }} was paid on lot {{ checkout.lot.number }}{% if payment.surcharge_cents %}, plus a {{ payment.surcharge_cents|cents }} credit card surcharge{% endif %}. A receipt is on its way by email.</p>
+      <p class="small muted">Stripe reference {{ payment.payment_intent_id }}</p>
+      <a class="btn secondary" href="{% url 'payment_receipt' payment.pk %}">{% icon "download" %} Download receipt (PDF)</a>
+    {% elif checkout.state == "processing" %}
+      <h2>Your bank payment is processing</h2>
+      <p>Bank payments take a few business days. Your account shows the payment once your bank confirms it; we email you a receipt then.</p>
+    {% elif checkout.state == "mismatch" %}
+      <h2>We could not confirm this payment</h2>
+      <p role="alert">Stripe's record did not match this payment, so nothing was recorded yet. The board has been told and will check it. If you were charged, you do not need to pay again.</p>
+    {% elif checkout.state == "failed" %}
+      <h2>The payment did not go through</h2><p>Nothing was recorded. You can try again from My account.</p>
+    {% elif checkout.state == "expired" %}
+      <h2>This payment page has expired</h2><p>Nothing was charged. Start again from My account.</p>
+    {% else %}
+      <h2>Waiting for Stripe</h2><p>We have not heard from Stripe yet. Refresh this page in a minute; if you completed the payment, it shows here.</p>
+    {% endif %}
+    <p><a href="{% url 'my_account' %}">Back to My account</a></p>
+  </section>
+{% endblock %}

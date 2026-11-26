@@ -142,7 +142,10 @@ def test_statement_rows_keep_a_running_balance(w):
 
 def test_my_account_hides_pay_online_and_fees_when_payments_are_off(client, w):
     community.set_rule(
-        key="payments.card_fee_bp", value="300", citation="Board resolution", actor=SYSTEM
+        key="payments.credit_card_surcharge_bp",
+        value="300",
+        citation="Board resolution",
+        actor=SYSTEM,
     )
     services.post_charge(
         lot=w["lot"], kind="other_charge", amount_cents=10000, description="x", actor=w["board"]
@@ -150,21 +153,28 @@ def test_my_account_hides_pay_online_and_fees_when_payments_are_off(client, w):
     client.force_login(w["owner"])
     page = client.get(reverse("my_account")).content.decode()
     assert "Pay online" not in page
-    assert "convenience fee" not in page
+    assert "surcharge" not in page
 
 
 def test_my_account_shows_pay_online_and_fees_when_payments_work(client, w):
     community.set_rule(
-        key="payments.card_fee_bp", value="300", citation="Board resolution", actor=SYSTEM
+        key="payments.credit_card_surcharge_bp",
+        value="300",
+        citation="Board resolution",
+        actor=SYSTEM,
     )
     services.post_charge(
         lot=w["lot"], kind="other_charge", amount_cents=10000, description="x", actor=w["board"]
     )
     client.force_login(w["owner"])
-    with mock.patch("ledger.views.online_payments_enabled", return_value=True):
+    with (
+        mock.patch("ledger.views.online_payments_enabled", return_value=True),
+        mock.patch("ledger.views.payable_lot_ids", return_value=frozenset({w["lot"].pk})),
+    ):
         page = client.get(reverse("my_account")).content.decode()
-    assert "Pay online" in page and "disabled>Pay online" not in page
-    assert "convenience fee" in page and "$103.00" in page
+    assert "Pay online" in page and reverse("pay_online", args=[w["lot"].pk]) in page
+    assert "surcharge" in page and "$103.00" in page
+    assert "Bank account (no fee)" in page and "Debit card (no fee)" in page
 
 
 def test_my_account_says_who_to_pay_and_where_to_mail(client, w):
