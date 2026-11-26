@@ -128,7 +128,7 @@ MENUS = {
             "Records requests",
             "Board tasks",
             "People",
-            "Lots and owners",
+            "Homes and owners",
             "Invitations and sign-ups",
         ],
         "Maintenance": MAINTENANCE,
@@ -144,7 +144,7 @@ MENUS = {
             "Violations",
             "Records requests",
             "Board tasks",
-            "Lots and owners",
+            "Homes and owners",
         ],
         "Maintenance": MAINTENANCE,
         "Finance": FINANCE,
@@ -158,7 +158,7 @@ MENUS = {
     "auditor": {
         "": ["Dashboard"],
         "Community": COMMUNITY,
-        "Association": ["Architectural review", "Violations", "Lots and owners"],
+        "Association": ["Architectural review", "Violations", "Homes and owners"],
         "Maintenance": MAINTENANCE,
         "Finance": [f for f in FINANCE if f != "Resale certificates"],
         "Admin": ["Sysadmin activity", "Community settings"],
@@ -212,7 +212,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Records requests",
         "Board tasks",
         "People",
-        "Lots and owners",
+        "Homes and owners",
         "Invitations and sign-ups",
     ]
     assert sections["Maintenance"] == ["Work orders", "Vendors", "Contracts"]
@@ -410,10 +410,11 @@ def test_sysadmin_home_is_the_system_status_summary(client, board):
 
 
 def test_owner_dashboard_keeps_only_the_balance_tile(client, board):
-    owner = make_member(lots=[LotFactory()])
+    lot = LotFactory()
+    owner = make_member(lots=[lot])
     client.force_login(owner)
     page = client.get(reverse("home")).content.decode()
-    assert "account</div>" in page  # "Lot N account"
+    assert f'<div class="label">{lot.label}</div>' in page  # the balance tile
     for gone in ("Open votes", "waiting for your ballot", '<div class="hint">open</div>'):
         assert gone not in page, gone
 
@@ -440,8 +441,8 @@ def test_balance_todo_stays_visible_with_the_balance_tile(client, board):
     client.force_login(owner)
     page = client.get(reverse("home")).content.decode()
     todos = page.split('id="todos"')[1].split("</section>")[0]
-    assert f"$42.00 due on lot {lot.number}" in todos
-    assert f"Lot {lot.number} account" in page
+    assert f"$42.00 due for {lot.label}" in todos
+    assert f'<div class="label">{lot.label}</div>' in page
 
 
 def test_record_checks_quick_action_on_the_dashboard(client, board):

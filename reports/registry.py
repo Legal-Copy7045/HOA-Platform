@@ -71,16 +71,24 @@ def arc_report(start, end):
         if r:
             rows.append(
                 [
+                    r.lot.label,
                     timezone.localdate(e.created_at),
                     r.pk,
-                    r.lot.number,
                     r.title,
                     e.action,
                     r.get_state_display(),
                     r.review_due_on or "",
                 ]
             )
-    return ["Date", "Request", "Lot", "Project", "Action", "Current status", "Decision due"], rows
+    return [
+        "Address",
+        "Date",
+        "Request",
+        "Project",
+        "Action",
+        "Current status",
+        "Decision due",
+    ], rows
 
 
 @report(
@@ -102,15 +110,24 @@ def collections_report(start, end):
         if c:
             rows.append(
                 [
+                    c.lot.label,
                     timezone.localdate(e.created_at),
                     c.pk,
-                    c.lot.number,
                     e.action,
                     c.state,
                     money(balance(c.lot_id)),
+                    c.lot.number,
                 ]
             )
-    return ["Date", "Case", "Lot", "Step", "Current status", "Balance now"], rows
+    return [
+        "Address",
+        "Date",
+        "Case",
+        "Step",
+        "Current status",
+        "Balance now",
+        "Lot number",
+    ], rows
 
 
 @report(
@@ -160,14 +177,15 @@ def owner_transfers(start, end):
             )
             rows.append(
                 [
+                    o.lot.label,
                     o.start_date,
-                    o.lot.number,
                     o.person.display_name,
                     "; ".join(p.person.display_name for p in previous),
                     o.get_ownership_type_display(),
+                    o.lot.number,
                 ]
             )
-    return ["Date", "Lot", "New owner", "Previous owner(s)", "Type"], rows
+    return ["Address", "Date", "New owner", "Previous owner(s)", "Type", "Lot number"], rows
 
 
 @report(
@@ -217,9 +235,9 @@ def _violation_rows(start, end, photos: bool):
         if not v:
             continue
         row = [
+            v.lot.label,
             timezone.localdate(e.created_at),
             v.pk,
-            v.lot.number,
             v.get_category_display(),
             e.action,
             v.get_state_display(),
@@ -240,7 +258,7 @@ def _violation_rows(start, end, photos: bool):
 )
 def violations_report(start, end):
     return (
-        ["Date", "Violation", "Lot", "Category", "Step", "Current status", "Cure by"],
+        ["Address", "Date", "Violation", "Category", "Step", "Current status", "Cure by"],
         _violation_rows(start, end, photos=False),
     )
 
@@ -254,7 +272,16 @@ def violations_report(start, end):
 )
 def violations_photos(start, end):
     return (
-        ["Date", "Violation", "Lot", "Category", "Step", "Current status", "Cure by", "Photos"],
+        [
+            "Address",
+            "Date",
+            "Violation",
+            "Category",
+            "Step",
+            "Current status",
+            "Cure by",
+            "Photos",
+        ],
         _violation_rows(start, end, photos=True),
     )
 
@@ -304,7 +331,7 @@ def ar_aging(as_of):
 
     rows = []
     with system_access("report"):
-        for lot in Lot.objects.all():
+        for lot in sorted(Lot.objects.all(), key=lambda lot: lot.sort_key):
             bal = balance(lot.pk, as_of)
             if bal == 0:
                 continue
@@ -315,15 +342,16 @@ def ar_aging(as_of):
             )
             rows.append(
                 [
-                    lot.number,
+                    lot.label,
                     owners,
                     *(money(a[b]) for b in BUCKETS),
                     money(-a["credit"]),
                     money(bal),
+                    lot.number,
                 ]
             )
     labels = [BUCKET_LABELS[b] for b in BUCKETS]
-    return ["Lot", "Owner(s)", *labels, "Credit", "Balance"], rows
+    return ["Address", "Owner(s)", *labels, "Credit", "Balance", "Lot number"], rows
 
 
 def _budget(fiscal_year):

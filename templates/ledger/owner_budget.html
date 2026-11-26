@@ -11,7 +11,7 @@
       <div class="grid grid-3">
         <div class="stat"><div class="label">Income</div><div class="value">{{ summary.income|cents }}</div></div>
         <div class="stat"><div class="label">Expenses</div><div class="value">{{ summary.expense|cents }}</div></div>
-        <div class="stat"><div class="label">Monthly dues per lot</div><div class="value">{% if dues.0 %}{{ dues.0|cents }}{% else %}-{% endif %}</div>{% if dues.1 %}<div class="hint">{{ dues.1 }}</div>{% endif %}</div>
+        <div class="stat"><div class="label">Monthly dues per home</div><div class="value">{% if dues.0 %}{{ dues.0|cents }}{% else %}-{% endif %}</div>{% if dues.1 %}<div class="hint">{{ dues.1 }}</div>{% endif %}</div>
       </div>
       <div class="table-card"><div class="table-wrap"><table>
         <thead><tr><th>Line</th><th>Kind</th><th class="num">For the year</th></tr></thead>

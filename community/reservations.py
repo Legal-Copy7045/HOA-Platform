@@ -404,9 +404,7 @@ def schedule(user, *, days: int = 60, start=None) -> list[dict]:
         }
         if staff:
             person = getattr(r.requested_by, "person", None)
-            row["label"] = f"Lot {r.lot.number}" + (
-                f" · {person.display_name}" if person is not None else ""
-            )
+            row["label"] = r.lot.label + (f" · {person.display_name}" if person is not None else "")
             row["purpose"] = r.purpose
         out.append(row)
     return out

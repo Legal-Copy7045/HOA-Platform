@@ -42,7 +42,7 @@ def test_rows_show_access_and_flags():
     rows = access_review.rows()
 
     r = _row(rows, owner)
-    assert r.lots == [lot.number] and r.mfa and r.flags == []
+    assert r.lots == [lot.label] and r.mfa and r.flags == []
     r = _row(rows, board)
     assert r.board and r.offices == ["Treasurer"] and "inactive" in r.flags
     r = _row(rows, admin)

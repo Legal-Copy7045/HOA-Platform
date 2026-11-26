@@ -4,10 +4,10 @@
 {% block content %}
   <div class="crumbs"><a href="{% url 'signoffs_mine' %}">Neighbor acknowledgements</a> / {{ req.title|truncatechars:48 }}</div>
   <div class="page-head"><div><h1>Your neighbor's project</h1>
-    <p class="subtitle">{{ req.lot.street_address }} is asking the architectural committee to approve an exterior project. {{ asked_because }}</p></div></div>
+    <p class="subtitle">{{ req.lot.label }} is asking the architectural committee to approve an exterior project. {{ asked_because }}</p></div></div>
   {% if signoff.state == "pending" and can_answer and respond_by %}<div class="alert info">{% icon "clock" %}<span>Please respond by <strong>{{ respond_by|date:"M j, Y" }}</strong>.</span></div>{% endif %}
   <section class="card"><h2>{{ req.title }}</h2>
-    <dl class="kv small">{% if req.project_type %}<dt>Kind</dt><dd>{{ req.project_type }}</dd>{% endif %}{% if req.planned_start %}<dt>Planned start</dt><dd>{{ req.planned_start|date:"M j, Y" }}</dd>{% endif %}{% if req.location %}<dt>Where on the lot</dt><dd>{{ req.get_location_display }}{% if req.location_detail %}: {{ req.location_detail }}{% endif %}</dd>{% endif %}</dl>
+    <dl class="kv small">{% if req.project_type %}<dt>Kind</dt><dd>{{ req.project_type }}</dd>{% endif %}{% if req.planned_start %}<dt>Planned start</dt><dd>{{ req.planned_start|date:"M j, Y" }}</dd>{% endif %}{% if req.location %}<dt>Where on the property</dt><dd>{{ req.get_location_display }}{% if req.location_detail %}: {{ req.location_detail }}{% endif %}</dd>{% endif %}</dl>
     <div class="prose">{{ req.description|linebreaks }}</div></section>
   <section class="card"><h2>Plans and photos</h2>
     {% if files %}<ul class="list files">{% for f in files %}{% url 'signoff_file' signoff.pk f.pk as file_url %}<li>{% if f.thumbnail %}<a href="{{ file_url }}" class="thumb"><img src="{{ file_url }}?view=thumb" alt="" loading="lazy" width="56" height="56"></a>{% else %}{% icon "file" %}{% endif %}<a class="grow" href="{{ file_url }}">{{ f.original_filename }}</a></li>{% endfor %}</ul>{% else %}<p class="muted small">No files attached.</p>{% endif %}

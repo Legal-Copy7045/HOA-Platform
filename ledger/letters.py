@@ -32,7 +32,7 @@ PLACEHOLDERS = {
     "days": "The notice period from Community settings, in words and figures",
     "date": "Today's date",
     "account_number": "The account number",
-    "address": "The lot's street address",
+    "address": "The home's address, then its lot number in brackets",
     "contact": "The contact line from Community settings",
     "association": "The association's legal name",
 }
@@ -183,7 +183,7 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
     paras += [
         ("normal", ""),
         ("mono", f"{'DATE':<11}{'DESCRIPTION':<31}{'CHARGES':>12}{'PAYMENTS':>12}{'TOTAL':>12}"),
-        ("mono", f"{'':<11}{f'Property: {account_number} - {lot.street_address}'[:66]}"),
+        ("mono", f"{'':<11}{f'Property: {lot.legal_label}'[:66]}"),
         ("mono", f"{'':<11}{'-- Prior Balance --':<31}{'':>12}{'':>12}{format_cents(forward):>12}"),
     ]
     running = forward
@@ -221,7 +221,7 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
         ("mono", f"{names[:40]:<42}DUE DATE:        {due_label:>15}"),
         (
             "mono",
-            f"RE: {account_number} - {lot.street_address}"[:42].ljust(42)
+            f"RE: {account_number} - {lot.label}"[:42].ljust(42)
             + f"Account Number:  {account_number:>15}",
         ),
         ("mono", address.splitlines()[0][:42] if address else ""),
@@ -301,7 +301,7 @@ def _values(lot: Lot, past_due_cents: int) -> dict[str, str]:
         "days": _days_text(int(days)),
         "date": timezone.localdate().strftime("%B %-d, %Y"),
         "account_number": account_number,
-        "address": lot.street_address,
+        "address": lot.legal_label,
         "contact": profile.letter_contact or "the association's management office",
         "association": profile.legal_name,
     }
@@ -309,7 +309,7 @@ def _values(lot: Lot, past_due_cents: int) -> dict[str, str]:
 
 def statement_pdf(lot: Lot, *, since=None) -> bytes:
     paras, _balance = statement_paragraphs(lot, since=since)
-    return pdf.render(paras, title=f"Account statement lot {lot.number}")
+    return pdf.render(paras, title=f"Account statement {lot.legal_label}")
 
 
 def notice_pdf(lot: Lot, kind: str) -> bytes:
@@ -347,5 +347,5 @@ def notice_pdf(lot: Lot, kind: str) -> bytes:
     ]
     return pdf.render(
         [*letter, ("pagebreak", ""), *statement],
-        title=f"{tpl.get_kind_display()} lot {lot.number}",
+        title=f"{tpl.get_kind_display()} {lot.legal_label}",
     )

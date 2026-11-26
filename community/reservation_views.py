@@ -35,7 +35,7 @@ class ReservationForm(forms.Form):
     def __init__(self, *args, areas, lots, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["area"].choices = [(a.pk, a.name) for a, _rules in areas]
-        self.fields["lot"].choices = [(lot.pk, f"Lot {lot.number}") for lot in lots]
+        self.fields["lot"].choices = [(lot.pk, lot.label) for lot in lots]
 
 
 class AreaRulesForm(forms.Form):

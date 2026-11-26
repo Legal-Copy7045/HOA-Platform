@@ -27,14 +27,19 @@ class NewDocumentForm(forms.Form):
         help_text="Used only when no folder is chosen.",
     )
     lot = forms.ModelChoiceField(
-        queryset=Lot.objects.none(), required=False, help_text="Only for lot-specific documents."
+        queryset=Lot.objects.none(),
+        required=False,
+        label="Home",
+        help_text="Only for documents about one home.",
     )
     description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
     file = forms.FileField()
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["lot"].queryset = Lot.objects.for_user(user)
+        self.fields["lot"].queryset = Lot.objects.for_user(user).order_by(
+            "street_address", "number"
+        )
         self.fields["folder"].queryset = services.folders_for(user)
 
 

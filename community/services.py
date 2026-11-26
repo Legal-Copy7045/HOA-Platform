@@ -153,7 +153,7 @@ def record_ownership(
                 },
             )
     except IntegrityError as exc:
-        raise CommunityError("That person already owns this lot during that period.") from exc
+        raise CommunityError("That person already owns this home during that period.") from exc
     return ownership
 
 
@@ -1188,11 +1188,14 @@ def directory_entries():
                 {
                     "name": o.person.display_name,
                     "lot": o.lot.number,
+                    "address": o.lot.label,
                     "street_address": o.lot.street_address,
                     "email": o.person.email if p.directory_show_email else "",
                     "phone": p.phone if p.directory_show_phone else "",
+                    "_sort": o.lot.sort_key,
                 }
             )
+    entries.sort(key=lambda e: e.pop("_sort"))
     return entries
 
 
@@ -1333,7 +1336,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
         accounts = Account.objects.select_related("lot").order_by("lot__number", "-opened_on")
         if not include_dormant:
             accounts = accounts.filter(closed_on__isnull=True)
-        accounts = list(accounts)
+        accounts = sorted(accounts, key=lambda a: a.lot.sort_key)  # address order (D40)
         ownerships = list(
             Ownership.objects.filter(account__in=accounts).select_related("person", "account")
         )

@@ -106,14 +106,14 @@ def board_and_committees(request):
 
 @login_required
 def lot_list(request):
-    """Lots and owners: every lot with its current owners; the roster view
+    """Homes and owners: every lot with its current owners; the roster view
     adds each account's other people, contact details and balance (and the
     CSV export). The old Roster page redirects here."""
     policy.require(request.user, "lot.view_all")
     roster_view = request.GET.get("view") == "roster" and policy.can(request.user, "roster.view")
     if roster_view:
         return _roster(request)
-    lots = Lot.objects.for_user(request.user)
+    lots = sorted(Lot.objects.for_user(request.user), key=lambda lot: lot.sort_key)
     current = Ownership.objects.for_user(request.user).active().select_related("person")
     owners: dict[int, list] = {}
     for ownership in current:
@@ -173,7 +173,7 @@ def lot_transfer(request, pk):
         )
     except CommunityError as exc:
         return _failed(request, exc, back)
-    return _done(request, f"{lot} transferred.", back)
+    return _done(request, f"{lot.label}: transfer recorded.", back)
 
 
 @login_required
@@ -406,7 +406,7 @@ def _named(resets, viewer):
         .order_by("lot__number")
     )
     for o in ownerships:
-        lots.setdefault(o.person.user_id, []).append(str(o.lot.number))
+        lots.setdefault(o.person.user_id, []).append(o.lot.label)
     for r in out:
         r.subject_name = display_name(r.subject)
         r.subject_email = r.subject.email
@@ -636,7 +636,7 @@ def common_area_save(request):
 
 @login_required
 def roster(request):
-    """The old Roster page: now the roster view of Lots and owners."""
+    """The old Roster page: now the roster view of Homes and owners."""
     policy.require(request.user, "roster.view")
     query = request.GET.copy()
     query["view"] = "roster"
@@ -656,21 +656,20 @@ def _roster(request):
             request,
             "roster",
             [
-                "Account",
-                "Lot",
                 "Address",
+                "Account",
                 "Status",
                 "Owners",
                 "Other people",
                 "Emails",
                 "Phones",
                 "Balance",
+                "Lot number",
             ],
             (
                 [
+                    r["lot"].label,
                     r["account"].number,
-                    r["lot"].number,
-                    r["lot"].street_address,
                     r["account"].status_label,
                     "; ".join(p.display_name for p in r["owners"]),
                     "; ".join(
@@ -679,6 +678,7 @@ def _roster(request):
                     "; ".join(r["emails"]),
                     "; ".join(r["phones"]),
                     "" if r["balance_cents"] is None else format_cents(r["balance_cents"]),
+                    r["lot"].number,
                 ]
                 for r in rows
             ),

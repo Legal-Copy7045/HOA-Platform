@@ -55,7 +55,7 @@
       </header>
       <main id="main" class="content {% block content_class %}{% endblock %}">
         {% if request.owner_preview %}
-          <div class="preview-banner" role="status">{% icon "home" %}<span><strong>Preview as owner:</strong> you're seeing what the owner of lot {{ request.owner_preview.lot_number }} sees. Read-only; personal pages are still yours.</span>
+          <div class="preview-banner" role="status">{% icon "home" %}<span><strong>Preview as owner:</strong> you're seeing what the owner of {{ request.owner_preview.lot_label }} sees. Read-only; personal pages are still yours.</span>
             <form method="post" action="{% url 'owner_preview_stop' %}" class="inline">{% csrf_token %}<button type="submit" class="small">Exit the preview</button></form></div>
         {% endif %}
 {% else %}

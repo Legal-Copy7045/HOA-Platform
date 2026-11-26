@@ -147,7 +147,7 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "Requests",
-                    f"#{r.pk} {r.subject} (lot {r.lot.number})",
+                    f"#{r.pk} {r.subject} ({r.lot.label})",
                     f"{r.get_request_type_display()} · {who} · {detail}",
                     reverse("request_detail", args=[r.pk]),
                     tone,
@@ -253,8 +253,7 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "Approvals",
-                    f"Lot {ch.account.lot.number}: {ch.get_action_display().lower()}"
-                    " on the account",
+                    f"{ch.account.lot.label}: {ch.get_action_display().lower()} on the account",
                     "An owner asked for this change",
                     reverse("lot_detail", args=[ch.account.lot_id]) + "#accounts",
                     "warning",
@@ -313,7 +312,7 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "Violations",
-                    f"{x} (lot {x.lot.number})",
+                    f"{x} ({x.lot.label})",
                     f"Follow up due {short_date(x.follow_up_on)}",
                     reverse("violation_detail", args=[x.pk]),
                     _due_tone(x.follow_up_on, today),
@@ -324,7 +323,7 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "Violations",
-                    f"{x} (lot {x.lot.number})",
+                    f"{x} ({x.lot.label})",
                     "The owner responded",
                     reverse("violation_detail", args=[x.pk]),
                     "info",
@@ -357,7 +356,7 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "Collections",
-                    f"{c} (lot {c.lot.number})",
+                    f"{c} ({c.lot.label})",
                     f"Follow up due {short_date(c.follow_up_on)}",
                     reverse("collection_detail", args=[c.pk]),
                     _due_tone(c.follow_up_on, today),
@@ -457,7 +456,7 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "Approvals",
-                    f"Booking: {r.area.name} (lot {r.lot.number})",
+                    f"Booking: {r.area.name} ({r.lot.label})",
                     f"Confirm or decline · {timezone.localtime(r.starts_at):%b %-d, %-I:%M %p}",
                     reverse("reservation_detail", args=[r.pk]),
                     "warning",
@@ -494,7 +493,7 @@ def items_for(user) -> list[Item]:
             out.append(
                 Item(
                     "Finance",
-                    f"Lot {n.lot.number}: {n.count} entr{'y' if n.count == 1 else 'ies'}"
+                    f"{n.lot.label}: {n.count} entr{'y' if n.count == 1 else 'ies'}"
                     " moved to another account",
                     f"From account {n.from_accounts} to account {n.to_accounts} after an"
                     " ownership date changed. Check that none was placed on purpose, such as"
@@ -534,7 +533,24 @@ def items_for(user) -> list[Item]:
                 )
             )
     if can(user, "person.manage"):
-        from community.models import BoardSeat
+        from community.models import BoardSeat, Lot
+
+        # D40: every home is shown by its address, so one without is a gap.
+        blank = [lot for lot in Lot.objects.for_user(user) if not lot.has_address]
+        if blank:
+            out.append(
+                Item(
+                    "Setup",
+                    f"{len(blank)} home{' has' if len(blank) == 1 else 's have'}"
+                    " no address recorded",
+                    "Homes are shown by address. Missing: "
+                    + ", ".join(lot.label for lot in blank[:10])
+                    + (" and more" if len(blank) > 10 else ""),
+                    reverse("lot_list"),
+                    "warning",
+                    nav="lot_list",
+                )
+            )
 
         for seat in BoardSeat.objects.for_user(user).past_term_end().select_related("person"):
             out.append(
@@ -624,8 +640,7 @@ def items_for(user) -> list[Item]:
                 Item(
                     "My home",
                     f"Acknowledge: {so.arc_request.title}",
-                    f"Your neighbor at {so.arc_request.lot.street_address} asks you to review "
-                    "a project",
+                    f"Your neighbor at {so.arc_request.lot.label} asks you to review a project",
                     reverse("signoff_detail", args=[so.pk]),
                     "info",
                     # Counted on the owner's ARC page ("Asked of me" tab).
@@ -662,7 +677,7 @@ def items_for(user) -> list[Item]:
                         "My home",
                         f"Election: {election.title}",
                         "Your ballot is open"
-                        + (f" ({len(lots)} lots: one ballot each)" if len(lots) > 1 else ""),
+                        + (f" ({len(lots)} homes: one ballot each)" if len(lots) > 1 else ""),
                         reverse("election_detail", args=[election.pk]),
                         "info",
                         nav="voting",
@@ -724,7 +739,7 @@ def _online_payment_items(user, roles) -> list[Item]:
         out.append(
             Item(
                 "Finance",
-                a.get_kind_display() + (f" (lot {a.lot.number})" if a.lot_id else ""),
+                a.get_kind_display() + (f" ({a.lot.label})" if a.lot_id else ""),
                 a.detail,
                 reverse("online_payments"),
                 "danger" if a.kind in (AlertKind.MISMATCH, AlertKind.RECONCILIATION) else "warning",
@@ -760,7 +775,7 @@ def _balance_items(user, roles) -> list[Item]:
         out.append(
             Item(
                 "My home",
-                f"{format_cents(statement.balance)} due on lot {lot.number}",
+                f"{format_cents(statement.balance)} due for {lot.label}",
                 f"See your account and how to pay{when}",
                 reverse("my_account"),
                 "info" if upcoming else "warning",

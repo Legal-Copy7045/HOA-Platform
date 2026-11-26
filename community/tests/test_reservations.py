@@ -262,7 +262,7 @@ def test_owners_see_other_homes_only_as_booked(client, world):
     # The board sees who.
     client.force_login(world["board"])
     page = client.get(reverse("reservations")).content.decode()
-    assert "Lot B pavilion party" in page and f"Lot {world['lot_b'].number}" in page
+    assert "Lot B pavilion party" in page and world["lot_b"].label in page
 
 
 def test_owner_books_and_cancels_through_the_pages(client, world):

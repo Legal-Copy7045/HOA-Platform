@@ -109,7 +109,11 @@ def test_owner_asks_another_board_member_approves(client, w, django_capture_on_c
     )
     change = AccountChangeRequest.objects.for_user(w["owner"]).get()
     assert change.state == "pending"
-    assert any("Lot" in i.title for i in my_items.items_for(w["board2"]) if i.area == "Approvals")
+    assert any(
+        "on the account" in i.title
+        for i in my_items.items_for(w["board2"])
+        if i.area == "Approvals"
+    )
     client.force_login(w["board2"])
     client.post(reverse("account_change_decide", args=[change.pk, "approve"]))
     change.refresh_from_db()

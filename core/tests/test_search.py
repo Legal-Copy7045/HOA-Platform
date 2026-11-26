@@ -325,7 +325,7 @@ def test_manager_finds_board_side_records_but_not_people(w):
 
 def test_lots_are_found_by_number(w):
     assert [r.title for r in _found(w["board"], str(w["lot_b"].number), "lots")] == [
-        f"Lot {w['lot_b'].number}"
+        w["lot_b"].label
     ]
 
 

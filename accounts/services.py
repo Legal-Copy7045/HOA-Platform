@@ -340,7 +340,7 @@ def email_request_letters_pdf(rows) -> bytes:
             paras.append(("pagebreak", ""))
         paras += [
             ("heading", f"{settings.SITE_NAME}: the owners' portal"),
-            ("normal", f"To the owner of Lot {row['lot'].number}, {row['lot'].street_address}"),
+            ("normal", f"To the owner of {row['lot'].label}"),
             ("normal", f"Dear {row['person'].display_name},"),
             (
                 "normal",

@@ -89,11 +89,11 @@ HUBS = {
             "Kinds of home improvement project and what each must include.",
         ),
         (
-            "Lot neighbors",
+            "Home neighbors",
             "arc_neighbors",
             "map",
             "arc.configure",
-            "Which lots are asked to acknowledge a neighbor's project.",
+            "Which homes are asked to acknowledge a neighbor's project.",
         ),
         (
             "Letters and certificates",
@@ -196,7 +196,7 @@ SECTIONS = [
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
             ("Board tasks", "tasks", "list", "task.manage"),
             ("People", "people", "users", "person.manage"),
-            ("Lots and owners", "lot_list", "map", "lot.view_all"),
+            ("Homes and owners", "lot_list", "map", "lot.view_all"),
             ("Invitations and sign-ups", "invitations", "mail", "invite.send"),
         ],
     ),

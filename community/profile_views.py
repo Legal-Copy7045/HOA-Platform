@@ -22,7 +22,7 @@ class ProfileForm(djforms.Form):
     mailing_address = djforms.CharField(
         required=False,
         widget=djforms.Textarea(attrs={"rows": 3, **_described("mailing_address")}),
-        help_text="Only if different from your lot address.",
+        help_text="Only if different from your home address.",
     )
     electronic_notice_consent = djforms.BooleanField(
         required=False,
@@ -33,7 +33,7 @@ class ProfileForm(djforms.Form):
     )
     in_directory = djforms.BooleanField(
         required=False,
-        label="List me in the owner directory (name and lot)",
+        label="List me in the owner directory (name and address)",
         widget=djforms.CheckboxInput(attrs=_described("in_directory")),
         help_text="Leave this unticked to stay out of the directory.",
     )

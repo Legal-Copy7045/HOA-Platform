@@ -166,7 +166,7 @@ def _metadata(checkout: PendingCheckout) -> dict:
     return {k: v for k, v in values.items() if v}
 
 
-def session_params(checkout: PendingCheckout, lot_number: str) -> dict:
+def session_params(checkout: PendingCheckout, home: str) -> dict:
     """The Checkout Session we ask Stripe for (hosted page; no card or bank
     numbers ever reach the portal)."""
     base = settings.PORTAL_BASE_URL
@@ -176,7 +176,7 @@ def session_params(checkout: PendingCheckout, lot_number: str) -> dict:
             "price_data": {
                 "currency": "usd",
                 "unit_amount": checkout.base_cents,
-                "product_data": {"name": f"Payment on account, lot {lot_number}"},
+                "product_data": {"name": f"Payment on account, {home}"},
             },
         }
     ]
@@ -201,7 +201,7 @@ def session_params(checkout: PendingCheckout, lot_number: str) -> dict:
         "metadata": _metadata(checkout),
         "payment_intent_data": {
             "metadata": _metadata(checkout),
-            "description": f"HOA payment, lot {lot_number}",
+            "description": f"HOA payment, {home}",
         },
         "line_items": line_items,
         "success_url": base
@@ -270,7 +270,7 @@ def start(user, lot, *, method: str, charge_ids=None, amount_cents=None, request
     )
     try:
         session = stripe_api.create_checkout_session(
-            session_params(checkout, lot.number),
+            session_params(checkout, lot.label),
             idempotency_key=f"checkout-{checkout.pk}-{checkout.nonce[:24]}",
         )
     except stripe_api.StripeError as exc:
@@ -608,7 +608,7 @@ def _former_owner_check(payment: StripePayment, lot) -> None:
         lot_id=lot.pk,
         amount=payment.base_cents,
         ref=payment.payment_intent_id,
-        detail=f"Online payment of {format_cents(payment.base_cents)} on lot {lot.number} came "
+        detail=f"Online payment of {format_cents(payment.base_cents)} for {lot.label} came "
         "from the former owners after the sale; it is on their account. Refund any credit "
         "left to them.",
     )
@@ -625,7 +625,7 @@ def _safety_net(payment: StripePayment, lot) -> None:
             lot_id=lot.pk,
             amount=payment.surcharge_cents,
             ref=payment.payment_intent_id,
-            detail=f"Refund {format_cents(payment.surcharge_cents)} surcharge to lot {lot.number} "
+            detail=f"Refund {format_cents(payment.surcharge_cents)} surcharge for {lot.label} "
             f"({payment.funding} card) in the Stripe dashboard",
         )
         record_event(

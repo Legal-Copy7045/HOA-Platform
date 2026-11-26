@@ -10,7 +10,7 @@
     <form method="post" action="{% url 'requests' %}?mine=1" enctype="multipart/form-data">{% csrf_token %}
       {% include "partials/form_errors.html" %}
       {{ form.non_field_errors }}
-      {% if form.only_lot %}<div class="field"><span class="field-label">Home</span><p><strong>{{ form.only_lot.street_address|default:form.only_lot }}</strong></p></div>{% endif %}
+      {% if form.only_lot %}<div class="field"><span class="field-label">Home</span><p><strong>{{ form.only_lot.label }}</strong></p></div>{% endif %}
       {% for f in form.hidden_fields %}{{ f }}{% endfor %}
       {% if not form.only_lot %}{{ form.lot.as_field_group }}{% endif %}
       <fieldset class="choices{% if form.request_type.errors %} has-error{% endif %}" id="{{ form.request_type.auto_id }}"><legend class="field-label">What is it about?<span class="required-mark" aria-hidden="true">*</span></legend>
@@ -32,10 +32,10 @@
   <section class="card">
     {% if page.object_list %}
       <div class="table-wrap"><table>
-        <thead><tr>{% if staff %}<th>#</th>{% endif %}<th>Subject</th><th>Type</th>{% if staff %}<th>Lot</th><th>Assigned</th>{% endif %}<th>Respond by</th><th>Status</th></tr></thead>
+        <thead><tr>{% if staff %}<th>#</th>{% endif %}<th>Subject</th><th>Type</th>{% if staff %}<th>Home</th><th>Assigned</th>{% endif %}<th>Respond by</th><th>Status</th></tr></thead>
         <tbody>{% for r in page.object_list %}<tr>
           {% if staff %}<td>{{ r.pk }}</td>{% endif %}<td><a href="{% url 'request_detail' r.pk %}">{{ r.subject }}</a></td><td>{{ r.get_request_type_display }}</td>
-          {% if staff %}<td>{{ r.lot.number }}</td><td>{{ r.assignee.display_name|default:"—" }}</td>{% endif %}
+          {% if staff %}<td>{{ r.lot.label }}</td><td>{{ r.assignee.display_name|default:"—" }}</td>{% endif %}
           <td class="nowrap">{% if r.first_response_at %}<span class="muted small">answered</span>{% elif r.respond_by %}{{ r.respond_by|date:"M j, Y" }}{% if r.is_overdue %} <span class="badge tone-danger">overdue</span>{% endif %}{% else %}—{% endif %}</td>
           <td>{% status r.state r.get_state_display %}</td></tr>{% endfor %}</tbody>
       </table></div>

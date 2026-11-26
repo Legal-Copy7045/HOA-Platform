@@ -71,17 +71,16 @@ def panel_context(user, req: ArcRequest) -> dict:
 
 
 def _lot_choices(req) -> list[tuple[int, str]]:
-    """Every other lot as "136 Oak Creek Drive (Pat & Sam Example)": the
+    """Every other home as "136 Oak Creek Drive (Pat & Sam Example)": the
     address's first line and the owners on the deed (never tenants or emails)."""
     from core.scoping import system_access
 
     with system_access("neighbor lot choices"):
-        lots = list(Lot.objects.exclude(pk=req.lot_id).order_by("street_address", "number"))
+        lots = sorted(Lot.objects.exclude(pk=req.lot_id), key=lambda lot: lot.sort_key)
     names = signoffs.owner_names([lot.pk for lot in lots])
     out = []
     for lot in lots:
-        first = (lot.street_address or "").splitlines()[0] if lot.street_address else ""
-        label = first or f"Lot {lot.number}"
+        label = lot.label
         if names.get(lot.pk):
             label += f" ({names[lot.pk]})"
         out.append((lot.pk, label))
@@ -446,7 +445,7 @@ def neighbors_page(request):
                 changed.append(lot.number)
         messages.success(
             request,
-            f"Neighbors saved for {len(changed)} lot{'s' if len(changed) != 1 else ''}."
+            f"Neighbors saved for {len(changed)} home{'s' if len(changed) != 1 else ''}."
             if changed
             else "No changes to save.",
         )
@@ -457,7 +456,7 @@ def neighbors_page(request):
         if lot is None:
             raise Http404
         save(lot, *wanted(""))
-        messages.success(request, f"Neighbors of lot {lot.number} saved.")
+        messages.success(request, f"Neighbors of {lot.label} saved.")
         return redirect(f"{_neighbors_url()}#lot-{lot.number}")
     names = signoffs.owner_names([lot.pk for lot in lots])
     rows = []

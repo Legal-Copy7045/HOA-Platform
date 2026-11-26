@@ -12,10 +12,10 @@
           <div><label for="xs">From</label><input id="xs" type="date" name="start" value="{{ last_month_start|date:'Y-m-d' }}" required></div>
           <div><label for="xe">To</label><input id="xe" type="date" name="end" value="{{ today|date:'Y-m-d' }}" required></div>
           <button type="submit" class="secondary">{% icon "download" %} Download CSV</button></form>
-        <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by lot number only. Accounts come from the setup below.</p></section>
+        <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by address and lot number only, never by name. Accounts come from the setup below.</p></section>
       {% if can_manage %}<section class="card"><h2>Payments to deposit</h2>
         {% if undeposited %}<form method="post">{% csrf_token %}<input type="hidden" name="section" value="deposit">
-          <ul class="list">{% for e in undeposited %}<li><label class="grow"><input type="checkbox" name="entries" value="{{ e.pk }}" checked> {{ e.posted_on|date:"M j" }} · Lot {{ e.lot.number }}{% if e.reference %} · {{ e.reference }}{% endif %}</label><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
+          <ul class="list">{% for e in undeposited %}<li><label class="grow"><input type="checkbox" name="entries" value="{{ e.pk }}" checked> {{ e.posted_on|date:"M j" }} · {{ e.lot.label }}{% if e.reference %} · {{ e.reference }}{% endif %}</label><span>{{ e.amount_cents|cents }}</span></li>{% endfor %}</ul>
           <div class="inline-form"><div><label for="dd">Deposited on</label><input id="dd" type="date" name="deposited_on" value="{{ today|date:'Y-m-d' }}" required></div><div><label for="br">Bank reference</label><input id="br" name="bank_reference" maxlength="40" placeholder="Deposit slip number"></div><button type="submit">Record deposit</button></div>
         </form>{% else %}<p class="muted small">Every recorded payment is in a deposit.</p>{% endif %}</section>{% endif %}
       <section class="card"><h2>Deposits</h2>

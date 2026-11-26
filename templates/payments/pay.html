@@ -3,7 +3,7 @@
 {% block title %}Pay online · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'my_account' %}">My account</a> / Pay online</div>
-  <div class="page-head"><div><h1>Pay online</h1><p class="subtitle">Lot {{ lot.number }}, {{ lot.street_address }}. You pay on Stripe's secure page; the portal never sees your card or bank details.</p></div></div>
+  <div class="page-head"><div><h1>Pay online</h1><p class="subtitle">{{ lot.label }}. You pay on Stripe's secure page; the portal never sees your card or bank details.</p></div></div>
   {% include "payments/_test_banner.html" %}
   {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<div>{{ error }}</div></div>{% endif %}
   {% if not quote %}

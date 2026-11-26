@@ -6,7 +6,7 @@
   <div class="crumbs"><a href="{% url 'resales' %}">Resale certificates</a> / #{{ obj.pk }}</div>
   <div class="page-head">
     <div><h1>Resale certificate #{{ obj.pk }}</h1>
-      <div class="meta">{% status obj.state obj.get_state_display %}<span>Lot {{ obj.lot.number }}</span><span>Requested by {{ obj.requester_name }}</span>{% if obj.due_on %}<span>{% icon "clock" %}Due {{ obj.due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.fee_cents %}<span>Fee {{ obj.fee_cents|cents }}</span>{% endif %}</div></div>
+      <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.label }}</span><span class="lot-ref">{{ obj.lot.lot_ref }}</span><span>Requested by {{ obj.requester_name }}</span>{% if obj.due_on %}<span>{% icon "clock" %}Due {{ obj.due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.fee_cents %}<span>Fee {{ obj.fee_cents|cents }}</span>{% endif %}</div></div>
     {% if obj.state == "issued" or can_manage %}<div class="actions"><a class="btn secondary" href="{% url 'resale_pdf' obj.pk %}">{% icon "download" %} {% if obj.state == "issued" %}Certificate (PDF){% else %}Preview certificate{% endif %}</a></div>{% endif %}
   </div>
   {% if can_manage and obj.state != "issued" and obj.state != "cancelled" %}

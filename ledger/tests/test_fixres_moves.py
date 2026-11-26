@@ -125,7 +125,7 @@ def test_moves_give_the_board_an_item_and_mark_the_copies(client, w, books):
     )
     items = [i for i in my_items.items_for(w["board"]) if "moved to another account" in i.title]
     (item,) = items
-    assert item.title.startswith(f"Lot {w['lot'].number}: 2 entries")
+    assert item.title.startswith(f"{w['lot'].label}: 2 entries")
     assert seller_account.number in item.detail and item.url.endswith("#moved")
     # The board page lists them and marks the copies.
     client.force_login(w["board"])

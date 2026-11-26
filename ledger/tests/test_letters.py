@@ -12,6 +12,7 @@ from community import services as community
 from community.models import CommunityProfile, Role
 from community.tests.factories import LotFactory, make_member
 from core import pdf
+from core.tests.pdftext import pdf_text
 from ledger import letters, services
 from ledger.models import EntryKind, LetterKind
 
@@ -161,3 +162,17 @@ def test_resale_certificate_shows_application_data_in_bold(w):
 def test_unused_lot_without_owners_still_renders():
     lot = LotFactory()
     assert letters.statement_pdf(lot).startswith(b"%PDF")
+
+
+def test_formal_documents_show_the_address_with_the_lot_number(w):
+    """D40: statements, delinquency letters and the resale certificate name
+    the home as "<address> (Lot N)"."""
+    lot = w["lot"]
+    legal = f"{lot.street_address} (Lot {lot.number})"
+    assert lot.legal_label == legal
+    assert legal in pdf_text(letters.statement_pdf(lot))
+    for kind in (LetterKind.FIRST, LetterKind.SECOND, LetterKind.FINAL):
+        assert legal in pdf_text(letters.notice_pdf(lot, kind)), kind
+    req = services.request_resale(lot=lot, requester_name="Seller", actor=w["owner"])
+    text = pdf_text(services.resale_certificate(req))
+    assert f"with respect to {legal}" in text and f"Account of {legal}" in text

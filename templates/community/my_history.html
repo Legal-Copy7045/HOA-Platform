@@ -2,11 +2,11 @@
 {% load portal %}
 {% block title %}My history · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>My history</h1><p class="subtitle">Your records from the time you owned a lot here. Read-only: nothing here can be changed, and nothing from after your sale is shown.</p></div></div>
+  <div class="page-head"><div><h1>My history</h1><p class="subtitle">Your records from the time you owned a home here. Read-only: nothing here can be changed, and nothing from after your sale is shown.</p></div></div>
   {% for p in periods %}
     <section class="card">
-      <div class="card-head"><div><h2>{% if p.lot %}Lot {{ p.lot.number }}{% else %}Former lot{% endif %}{% if p.account %} · account {{ p.account.number }}{% endif %}</h2>
-        <div class="muted small">{% if p.lot %}{{ p.lot.street_address }} · {% endif %}{{ p.start|date:"M j, Y" }} – {{ p.end|date:"M j, Y" }}</div></div>
+      <div class="card-head"><div><h2>{% if p.lot %}{{ p.lot.label }}{% else %}Former home{% endif %}{% if p.account %} · account {{ p.account.number }}{% endif %}</h2>
+        <div class="muted small">{% if p.lot %}<span class="lot-ref">{{ p.lot.lot_ref }}</span> · {% endif %}{{ p.start|date:"M j, Y" }} – {{ p.end|date:"M j, Y" }}</div></div>
         <div class="balance"><div class="small muted">Balance when you sold</div><div class="amount-big">{{ p.sold_balance|cents }}</div>
           {% if p.credit_owed %}<div class="small" data-testid="credit-owed">Credit owed to you: <strong>{{ p.credit_owed|cents }}</strong>. The board refunds it; ask them if you have not heard.</div>{% endif %}</div></div>
       <div class="table-wrap"><table>

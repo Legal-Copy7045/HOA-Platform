@@ -51,7 +51,7 @@ def _not_recused(obj, actor):
 
 
 def _lot_owner(obj, actor):
-    return None if owns_lot(actor, obj) else "Only an owner of this lot can do this."
+    return None if owns_lot(actor, obj) else "Only an owner of this home can do this."
 
 
 def _may_complete(obj, actor):
@@ -340,7 +340,7 @@ def create_request(
 ) -> ArcRequest:
     require(actor, "arc.submit")
     if lot.pk not in roles_for(actor).owned_lot_ids:
-        raise ArcError("You can only apply for a lot you own.")
+        raise ArcError("You can only apply for a home you own.")
     fields = _clean_request_fields(
         title=title,
         description=description,
@@ -392,7 +392,7 @@ def edit_request(req: ArcRequest, *, actor, request=None, **changes) -> ArcReque
         if req.state != ArcState.DRAFT:
             raise ArcError("Only a draft can be edited. Withdraw it and start again if needed.")
         if not owns_lot(actor, req):
-            raise ArcError("Only an owner of this lot can edit the request.")
+            raise ArcError("Only an owner of this home can edit the request.")
         current = {f: getattr(req, f) for f in EDITABLE_FIELDS}
         fields = _clean_request_fields(**{**current, **changes})
         changed = [f for f in EDITABLE_FIELDS if fields[f] != current[f]]
@@ -452,7 +452,7 @@ def add_owner_files(req: ArcRequest, uploads, *, actor, request, label: str = ""
         if req.state != ArcState.DRAFT:
             raise ArcError("The owner can add files only while the request is a draft.")
         if not owns_lot(actor, req):
-            raise ArcError("Only an owner of this lot can add files to the request.")
+            raise ArcError("Only an owner of this home can add files to the request.")
         added = attachments.attach_many(request, req, uploads, actor=actor, label=label)
         if added and _ask_neighbors_again(req):
             messages.info(
@@ -478,7 +478,7 @@ def set_affected_lots(req: ArcRequest, lots, *, actor, request=None) -> None:
     with transaction.atomic(), system_access("set affected lots"):
         req = ArcRequest.objects.select_for_update().get(pk=req.pk)
         if req.state not in AFFECTED_LOTS_STATES:
-            raise ArcError("Affected lots can be changed only while the request is open.")
+            raise ArcError("Affected homes can be changed only while the request is open.")
         if is_recused(actor, req):
             raise ArcError("You are recused from this request.")
         current = set(req.affected_lots.values_list("pk", flat=True))
@@ -486,7 +486,7 @@ def set_affected_lots(req: ArcRequest, lots, *, actor, request=None) -> None:
         removed = current - wanted
         if removed and req.state != ArcState.SUBMITTED:
             raise ArcError(
-                "Once review has started, affected lots can only be added. "
+                "Once review has started, affected homes can only be added. "
                 "Ask the board if one was added by mistake."
             )
         req.affected_lots.set(wanted)
@@ -668,7 +668,7 @@ def decision_letter(req: ArcRequest, decision: Decision) -> bytes:
         ("normal", decision.decided_at.strftime("%B %-d, %Y")),
         ("normal", ""),
         ("normal", f"To: {applicant.display_name}"),
-        ("normal", f"Lot {lot.number}, {lot.street_address}"),
+        ("normal", lot.legal_label),
         ("normal", ""),
         ("heading", f"Re: {req.title} (request #{req.pk})"),
         ("normal", ""),

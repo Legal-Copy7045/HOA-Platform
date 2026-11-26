@@ -24,7 +24,7 @@ class ComplianceError(ValueError):
 def _lot_owner(obj, actor):
     if actor is not SYSTEM and obj.lot_id in roles_for(actor).owned_lot_ids:
         return None
-    return "Only an owner of this lot can respond."
+    return "Only an owner of this home can respond."
 
 
 def _set_cure_by(obj, actor):
@@ -98,7 +98,7 @@ VIOLATION = Workflow(
             S.CLOSED,
             "violation.manage",
             "Close",
-            confirm="Close this record? It stays in the lot's history.",
+            confirm="Close this record? It stays in the home's history.",
         ),
     ],
 )
@@ -165,7 +165,7 @@ def notice_letter(v: Violation) -> bytes:
         ("normal", "Notice of covenant violation"),
         ("normal", ""),
         ("normal", timezone.localdate().strftime("%B %-d, %Y")),
-        ("normal", f"Lot {lot.number}, {lot.street_address}"),
+        ("normal", lot.legal_label),
         ("normal", ""),
         ("heading", v.get_category_display()),
         ("normal", f"Observed on {v.observed_on:%B %-d, %Y}:"),

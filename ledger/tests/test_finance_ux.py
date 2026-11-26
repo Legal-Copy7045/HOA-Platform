@@ -319,7 +319,7 @@ def test_board_and_manager_can_open_record_payments(client, w, who):
     client.force_login(w[who])
     page = client.get(reverse("record_payments"))
     assert page.status_code == 200
-    assert b"10 Oak Lane (Lot" in page.content
+    assert b">10 Oak Lane</option>" in page.content and b"(Lot" not in page.content
 
 
 @pytest.mark.parametrize("who", ["owner", "auditor"])
@@ -471,7 +471,7 @@ def test_dues_form_uses_a_month_picker_and_previews_the_charge(client, w):
     assert 'type="month"' in page
     nxt = (TODAY.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
     assert f'value="{nxt:%Y-%m}"' in page
-    assert "Will charge <strong>2 lots $75.00 each</strong>" in page
+    assert "Will charge <strong>2 homes $75.00 each</strong>" in page
 
 
 def test_posting_dues_from_the_month_picker(client, w):

@@ -1,7 +1,7 @@
 """UX review: board settings pages - dollars shown back and a confirmation
 for big dues changes, "needs attention" rules first, a counted confirmation
 before reminding invitees, a named confirmation before switching a feature
-off, and "Save all" on Lot neighbors."""
+off, and "Save all" on Home neighbors."""
 
 import datetime
 from unittest import mock
@@ -149,7 +149,7 @@ def test_switching_on_needs_no_confirmation(client, board):
     assert "Switch off FAQ?" not in page
 
 
-# --- Lot neighbors: Save all --------------------------------------------------------------------
+# --- Home neighbors: Save all --------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -173,7 +173,7 @@ def test_neighbors_save_all_saves_only_changed_rows(client, board, lots):
     data[f"others_{d.number}"] = f"{a.number}, {b.number}"
     before = AuditEvent.objects.filter(action="arc.neighbors_set").count()
     response = client.post(reverse("arc_neighbors"), data, follow=True)
-    assert b"Neighbors saved for 2 lots." in response.content
+    assert b"Neighbors saved for 2 homes." in response.content
     assert AuditEvent.objects.filter(action="arc.neighbors_set").count() == before + 2
     assert signoffs.neighbor_sides(c)["left"] == d
     assert sorted(x.pk for x in signoffs.neighbor_sides(d)["other"]) == sorted([a.pk, b.pk])

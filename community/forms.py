@@ -37,13 +37,15 @@ class OwnershipForm(forms.Form):
 
 
 class LotOwnershipForm(forms.Form):
-    lot = forms.ModelChoiceField(queryset=Lot.objects.none())
+    lot = forms.ModelChoiceField(queryset=Lot.objects.none(), label="Home")
     ownership_type = forms.ChoiceField(choices=OwnershipType.choices)
     start_date = forms.DateField(widget=DateInput, initial=today)
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["lot"].queryset = Lot.objects.for_user(user)
+        self.fields["lot"].queryset = Lot.objects.for_user(user).order_by(
+            "street_address", "number"
+        )
 
 
 class EndDateForm(forms.Form):

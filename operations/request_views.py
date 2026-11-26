@@ -30,8 +30,7 @@ TYPE_HELP = {
 
 def _address(lot) -> str:
     """Owners know their street address, not their lot number."""
-    first = (lot.street_address or "").splitlines()[0].strip() if lot.street_address else ""
-    return first or str(lot)
+    return lot.label
 
 
 class RequestForm(forms.Form):
@@ -96,13 +95,22 @@ def requests_list(request):
         return csv_response(
             request,
             "owner-requests",
-            ["Number", "Subject", "Type", "Lot", "Assigned", "Respond by", "Answered", "Status"],
+            [
+                "Address",
+                "Number",
+                "Subject",
+                "Type",
+                "Assigned",
+                "Respond by",
+                "Answered",
+                "Status",
+            ],
             (
                 [
+                    r.lot.label,
                     r.pk,
                     r.subject,
                     r.get_request_type_display(),
-                    r.lot.number,
                     r.assignee.display_name if r.assignee else "",
                     r.respond_by or "",
                     timezone.localdate(r.first_response_at) if r.first_response_at else "",
