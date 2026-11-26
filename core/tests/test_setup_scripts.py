@@ -33,7 +33,7 @@ def test_check_teller_reports_what_is_missing(settings):
     settings.TELLER_ENVIRONMENT = "development"
     settings.TELLER_CERTIFICATE_B64 = ""
     settings.TELLER_PRIVATE_KEY_B64 = ""
-    settings.BANK_FEED_TOKEN_KEY = ""
+    settings.BANK_FEED_TOKEN_KEY = ""  # nosec B105  # empty: "not set"
     with pytest.raises(CommandError) as err:
         call_command("check_teller")
     message = str(err.value)
