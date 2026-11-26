@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      actions: read  # the action reads its own workflow run (required in private repositories)
       security-events: write  # upload the results
     strategy:
       fail-fast: false

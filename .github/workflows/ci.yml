@@ -151,6 +151,9 @@ jobs:
             trivy image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
               --format table "$image" >> trivy-infra.txt 2>&1 || echo "(scan failed)" >> trivy-infra.txt
           done
+      - name: Portal image report (in the log)
+        if: always()
+        run: cat trivy-portal.txt 2>/dev/null || echo "no report"
       - name: Summary
         if: always()
         run: |
@@ -205,7 +208,8 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          python - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          # The same list in the log and in the step summary.
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
           import json, pathlib
           path = pathlib.Path("regression/out/page.json")
           if not path.exists():
