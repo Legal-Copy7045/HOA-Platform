@@ -82,6 +82,32 @@ def online_payments_enabled(request=None) -> bool:
     return features.enabled("online_payments", request) and config().available
 
 
+def fee_summary() -> str:
+    """The fee rule in one line for printed statements (D40): bank and
+    debit free, credit cards at the configured surcharge."""
+    bp = surcharge_bp()
+    if not bp:
+        return "No fee for any online payment."
+    return f"Bank transfer or debit card: no fee. Credit card: {percent_text(bp)} surcharge."
+
+
+def statement_pay_url(lot) -> str:
+    """The address behind a printed statement's "Pay online" QR code (D40),
+    or "" when online payments are not usable or the site address is unknown.
+
+    A plain address of a signed-in page: no token, account number or
+    personal data. ``home`` only picks which of the reader's own homes to
+    open (``views.pay_start``): anyone else who scans it signs in and then
+    sees their own account, never this one."""
+    from django.conf import settings
+    from django.urls import reverse
+
+    base = (getattr(settings, "PORTAL_BASE_URL", "") or "").rstrip("/")
+    if not base.startswith(("https://", "http://")) or not online_payments_enabled():
+        return ""
+    return f"{base}{reverse('pay_start')}?home={int(lot.pk)}"
+
+
 # --- For the accounting export and deposits (ledger.accounting) ----------------------------
 
 

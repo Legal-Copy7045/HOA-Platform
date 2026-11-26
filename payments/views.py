@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -56,6 +57,26 @@ def _context(request, lot, *, error="", q=None, chosen=None, amount=""):
         "disclosure": fees.disclosure(),
         "surcharge_bp": fees.surcharge_bp(),
     }
+
+
+@login_required
+def pay_start(request):
+    """Where a printed statement's QR code leads (D40): the ways to pay for
+    the reader's own home, every open charge included. ``?home=`` is only a
+    hint: it is followed when the signed-in login may pay for that home, and
+    otherwise ignored, so a scanned statement never opens anyone else's
+    account. With several homes and no usable hint, My account lists them."""
+    _available_or_404()
+    payable = flow.payable_lot_ids(request.user)
+    hint = request.GET.get("home", "")
+    lot_id = None
+    if hint.isascii() and hint.isdigit() and len(hint) <= 9 and int(hint) in payable:
+        lot_id = int(hint)
+    elif len(payable) == 1:
+        lot_id = next(iter(payable))
+    if lot_id is None:
+        return redirect("my_account")
+    return redirect(reverse("pay_online", args=[lot_id]) + "?all=1")
 
 
 @login_required

@@ -227,6 +227,7 @@ FEATURES: list[Feature] = [
         "Owners pay by bank account, debit card or credit card on Stripe's hosted page "
         "(needs Stripe keys on the server).",
         {
+            "pay_start",
             "pay_online",
             "pay_checkout",
             "pay_return",
