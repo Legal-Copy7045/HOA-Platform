@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Records requests · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="page-head"><div><h1>Records requests</h1><p class="subtitle">{% if mine %}Pennsylvania law lets owners inspect the association's records. Ask here and follow your request to its due date.{% else %}Owners may ask to inspect association records. Requests and responses are tracked with their due dates.{% endif %}</p></div>
     {% if can_submit and user|can:"records_request.manage" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'records_requests' %}">All requests (board)</a>{% else %}<a class="btn secondary" href="{% url 'records_requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
   <div class="table-card"><div class="table-wrap"><table>

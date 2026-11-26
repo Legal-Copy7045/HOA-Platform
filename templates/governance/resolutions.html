@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Resolutions and policies · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="page-head"><div><h1>Resolutions and policies</h1><p class="subtitle">Adopted records are permanent. A change is recorded as a new resolution that supersedes the old one.</p></div></div>
   <div class="filters"><a href="?"{% if not show_all %} aria-current="true"{% endif %}>In force</a><a href="?all=1"{% if show_all %} aria-current="true"{% endif %}>All, including superseded</a></div>
   {% for r in rows %}

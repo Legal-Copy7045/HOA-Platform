@@ -4,7 +4,8 @@ the views enforce. Roles are computed once per request here.
 Rarely used pages live on hub pages (HUBS) instead of the sidebar: the hub's
 entry is shown when at least one of its pages is open to the user (and its
 feature is on), counts the hub's waiting items, and is marked current on any
-of its pages. Labels match the pages' <h1> (docs/glossary.md).
+of its pages. A hub with only one page open to the user links straight to it.
+Labels match the pages' <h1> (docs/glossary.md).
 """
 
 from __future__ import annotations
@@ -16,13 +17,15 @@ from core.my_items import MY_ITEMS_PERMISSIONS
 
 # Hub pages: url name -> [(label, url name, icon, permission, description)].
 HUBS = {
+    # The Voting page itself lists votes, elections and surveys; these entries
+    # decide who sees "Voting" and mark it current on their detail pages.
     "voting": [
         (
-            "Votes and polls",
+            "Votes",
             "votes",
             "vote",
             "vote.view",
-            "Formal votes of the owners and informal polls.",
+            "Formal, binding votes of the owners.",
         ),
         (
             "Elections",
@@ -36,7 +39,7 @@ HUBS = {
             "surveys",
             "list",
             "survey.view",
-            "Informal surveys from the board to hear your views.",
+            "Informal surveys and polls from the board to hear your views.",
         ),
     ],
     "community_info": [
@@ -46,6 +49,14 @@ HUBS = {
             "info",
             "announcement.view",
             "Quick answers about living here.",
+        ),
+        (
+            "Board and committees",
+            "board_and_committees",
+            "users",
+            # Every resident (owner decision 2026-11-26): the COMMUNITY audience.
+            "announcement.view",
+            "Who is on the board, their offices, and the committees.",
         ),
         (
             "Owner directory",
@@ -59,14 +70,7 @@ HUBS = {
             "committees",
             "users",
             "committee.view",
-            "Committee members, topics, tasks and files.",
-        ),
-        (
-            "Reserve plan summary",
-            "reserve_summary",
-            "chart",
-            "reserves.view_summary",
-            "How well the reserve fund covers future replacements, and what is due next.",
+            "Your committees' members, topics, tasks and files.",
         ),
     ],
     "settings_hub": [
@@ -99,11 +103,11 @@ HUBS = {
             "Wording of collection letters and resale certificates, and where to send checks.",
         ),
         (
-            "Compliance calendar",
-            "compliance",
+            "Common area booking rules",
+            "reservation_settings",
             "calendar",
-            "compliance.manage",
-            "Filings and renewals the association must not miss.",
+            "reservation.configure",
+            "The common areas, which of them can be booked, and their rules.",
         ),
         (
             "Branding",
@@ -120,31 +124,30 @@ HUBS = {
             "Switch optional parts of the portal on or off.",
         ),
         (
-            "Access review",
-            "access_review",
-            "shield",
-            "access_review.record",
-            "Every login's access, reviewed by the board each quarter.",
-        ),
-        (
             "Contact retention",
             "retention",
             "clock",
             "retention.manage",
             "Former owners' contact details cleared after the retention period.",
         ),
-        (
-            "Common area booking rules",
-            "reservation_settings",
-            "calendar",
-            "reservation.configure",
-            "Which common areas can be booked, and their rules.",
-        ),
     ],
+}
+# Hubs whose own page is where every child lands (votes, elections and
+# surveys all open the Voting list), so a single child keeps the hub's label.
+HUB_KEEPS_LABEL = {"voting"}
+
+# Pages reached from a sidebar entry's page rather than from the sidebar: the
+# entry is marked current on them and counts their waiting items.
+SUBPAGES = {
+    "arc_list?mine=1": ["signoffs_mine"],
+    "people": ["access_review"],
+    "tasks": ["compliance"],
 }
 
 # (label, url name, icon, permission or tuple of alternatives; None = everyone).
 # A hub's own entry takes its visibility from its pages (permission HUB).
+# The owner side ("My home") and the board side ("Association" onwards) stay
+# separate sections: ending a board seat removes only the board side.
 HUB = "hub"
 SECTIONS = [
     (
@@ -155,15 +158,16 @@ SECTIONS = [
         ],
     ),
     (
-        "Homeowner",
+        "My home",
         [
             ("My home", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
-            ("Home improvement approvals (ARC)", "arc_list?mine=1", "pencil", "arc.submit"),
-            ("Neighbor acknowledgements", "signoffs_mine", "check-circle", "arc.submit"),
+            ("My home improvement requests (ARC)", "arc_list?mine=1", "pencil", "arc.submit"),
             ("Notices about my home", "violations?mine=1", "flag", "lot.view_own"),
-            ("My requests", "requests?mine=1", "mail", "request.view_own"),
-            ("Records requests", "records_requests?mine=1", "inbox", "records_request.submit"),
+            # Residents (incl. view-only contacts and tenants); former owners
+            # see their requests inside My history instead.
+            ("My requests", "requests?mine=1", "mail", ("lot.view_own", "request.submit")),
+            ("My records requests", "records_requests?mine=1", "inbox", "records_request.submit"),
             ("My history", "my_history", "clock", "history.view_own"),
         ],
     ),
@@ -172,31 +176,34 @@ SECTIONS = [
         [
             ("Announcements", "announcements", "megaphone", "announcement.view"),
             ("Calendar", "calendar", "calendar", "calendar.view"),
-            ("Documents", "documents", "folder", "document.view_owner"),
             ("Meetings", "meetings", "book", "meeting.view"),
             ("Voting", "voting", "vote", HUB),
+            ("Documents", "documents", "folder", "document.view_owner"),
             ("Resolutions and policies", "resolutions", "file", "resolution.view"),
-            ("Budget", "owner_budget", "chart", "budget.view_owner"),
+            ("Budget and reserves", "owner_budget", "chart", "budget.view_owner"),
             ("Community info", "community_info", "info", HUB),
             ("Common area bookings", "reservations", "calendar", "reservation.view"),
         ],
     ),
     (
-        "Board",
+        "Association",
         [
-            ("Board overview", "board_home", "sliders", ("person.manage", "task.manage")),
             ("Owner requests", "requests", "mail", "request.manage"),
-            ("Approvals", "approvals", "check-circle", "role.sysadmin.approve"),
-            ("Written consents", "consents", "file", "resolution.record"),
-            ("People", "people", "users", "person.manage"),
-            ("Onboarding", "onboarding", "mail", "invite.send"),
-            ("Lots", "lot_list", "map", "lot.view_all"),
-            ("Roster", "roster", "list", "roster.view"),
             ("Architectural review", "arc_list", "pencil", "arc.view_all"),
             ("Violations", "violations", "flag", "violation.view_all"),
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
             ("Board tasks", "tasks", "list", "task.manage"),
-            ("Urgent texts", "urgent_notice", "megaphone", "sms.send_urgent"),
+            ("People", "people", "users", "person.manage"),
+            ("Lots and owners", "lot_list", "map", "lot.view_all"),
+            ("Invitations and sign-ups", "invitations", "mail", "invite.send"),
+        ],
+    ),
+    (
+        "Maintenance",
+        [
+            ("Work orders", "work_orders", "wrench", "finance.view"),
+            ("Vendors", "vendors", "users", "finance.view"),
+            ("Contracts", "contracts", "file", "finance.view"),
         ],
     ),
     (
@@ -204,14 +211,11 @@ SECTIONS = [
         [
             ("Owner accounts", "ledger_home", "wallet", "finance.view"),
             ("Invoices", "invoices", "receipt", "finance.view"),
-            ("Contracts", "contracts", "file", "finance.view"),
-            ("Work orders", "work_orders", "wrench", "finance.view"),
-            ("Vendors", "vendors", "users", "finance.view"),
+            ("Collections", "collections", "dollar", "finance.view"),
             ("Budgets", "budgets", "chart", "finance.view"),
             ("Reserve plan", "reserve_plan", "chart", "reserves.view"),
-            ("Collections", "collections", "dollar", "finance.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
-            ("Online payments", "online_payments", "wallet", "finance.view"),
+            ("Online payments", "online_payments", "wallet", "payments.manage"),
             ("Resale certificates", "resales", "file", "resale.manage"),
             ("Reports", "reports", "chart", "reports.view"),
         ],
@@ -220,7 +224,8 @@ SECTIONS = [
         "Admin",
         [
             ("System status", "system_status", "activity", "system.view_status"),
-            ("Invitations", "invitations", "mail", "invite.resend"),
+            # Sysadmins re-send and revoke; the board has it under Association.
+            ("Invitations and sign-ups", "invitations", "mail", "invite.resend"),
             ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
             ("Settings", "settings_hub", "sliders", HUB),
         ],
@@ -228,7 +233,7 @@ SECTIONS = [
 ]
 # Sections open by default; the others open when the current page is inside
 # (and the browser remembers what the person last chose, static/js/app.js).
-OPEN_BY_DEFAULT = {"Homeowner", "Community"}
+OPEN_BY_DEFAULT = {"My home", "Community"}
 
 ROLE_LABELS = {
     policy.OWNER: "Owner",
@@ -256,12 +261,15 @@ def _url(name: str) -> str | None:
 
 
 def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[dict]:
-    """The pages of a hub this person may open, with their features on."""
+    """The pages of a hub this person may open, with their features on. A page
+    whose URL does not exist (yet) is skipped."""
     if groups is None:
         groups = policy.roles_for(request.user).groups
     out = []
     for label, name, icon, permission, description in HUBS[hub]:
-        if not allowed(groups, permission) or not features.url_name_enabled(name, request):
+        if not allowed(groups, permission):
+            continue
+        if not features.url_name_enabled(name.partition("?")[0], request):
             continue
         url = _url(name)
         if url:
@@ -276,6 +284,32 @@ def _matches(url: str, path: str, here_mine: bool) -> bool:
     if base == "/":
         return path == "/"
     return path.startswith(base) and (("mine=1" in query) == here_mine)
+
+
+def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict, list] | None:
+    """One sidebar entry and the pages it stands for, or None if hidden."""
+    if permission == HUB:
+        children = hub_links(request, name, groups)
+        if not children:
+            return None
+    else:
+        if not allowed(groups, permission):
+            return None
+        children = [{"name": n, "url": u} for n in SUBPAGES.get(name, []) if (u := _url(n))]
+    if not features.url_name_enabled(name.partition("?")[0], request):
+        return None
+    url = _url(name)
+    if url is None:
+        return None
+    if permission == HUB and len(children) == 1:
+        # One page behind the hub: go straight there (a tenant's Voting is
+        # Surveys; a sysadmin's Settings is Branding).
+        url = children[0]["url"]
+        if name not in HUB_KEEPS_LABEL:
+            label, icon = children[0]["label"], children[0]["icon"]
+    count = counts.get(name, 0) + sum(counts.get(c["name"], 0) for c in children)
+    item = {"label": label, "url": url, "icon": icon, "current": False, "count": count}
+    return item, children
 
 
 def build(request) -> dict:
@@ -297,28 +331,12 @@ def build(request) -> dict:
         for label, name, icon, permission in items:
             if name in seen:
                 continue
-            if permission == HUB:
-                children = hub_links(request, name, roles.groups)
-                if not children:
-                    continue
-            else:
-                children = []
-                if not allowed(roles.groups, permission):
-                    continue
-            if not features.url_name_enabled(name.partition("?")[0], request):
-                continue
-            url = _url(name)
-            if url is None:
+            found = _item(request, roles.groups, label, name, icon, permission, counts)
+            if found is None:
                 continue
             seen.add(name)
-            item = {
-                "label": label,
-                "url": url,
-                "icon": icon,
-                "current": False,
-                "count": counts.get(name, 0) + sum(counts.get(c["name"], 0) for c in children),
-            }
-            for candidate in [url] + [c["url"] for c in children]:
+            item, children = found
+            for candidate in [item["url"]] + [c["url"] for c in children]:
                 base = candidate.partition("?")[0]
                 if _matches(candidate, path, here_mine) and len(base) > len(best[0]):
                     best = (base, item, len(sections))
@@ -327,7 +345,7 @@ def build(request) -> dict:
             sections.append(
                 {
                     "title": title,
-                    "key": title.lower(),
+                    "key": title.lower().replace(" ", "-"),
                     "items": visible,
                     "open": title in OPEN_BY_DEFAULT,
                     "count": sum(i["count"] for i in visible),

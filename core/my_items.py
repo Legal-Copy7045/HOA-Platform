@@ -1,5 +1,5 @@
 """My items: one queue of everything waiting on the signed-in person, with a
-count per area for the board home. Each item links to the page where the
+count per area for the top of the My items page. Each item links to the page where the
 real workflow step is taken (approve, decide, reply...), not just a comment.
 
 Items come from each area's own scoped queries, so nobody sees an item for
@@ -481,9 +481,24 @@ def items_for(user) -> list[Item]:
                     "Fewer than two people with two-step sign-in can act",
                     f"{len(thin)} action{'' if len(thin) == 1 else 's'}: invite another"
                     " board member",
-                    reverse("board_home"),
+                    reverse("my_items") + "#coverage",
                     "warning",
-                    nav="board_home",
+                    nav="my_items",
+                )
+            )
+    if can(user, "person.manage"):
+        from community.models import BoardSeat
+
+        for seat in BoardSeat.objects.for_user(user).past_term_end().select_related("person"):
+            out.append(
+                Item(
+                    "Setup",
+                    f"{seat.person.display_name}'s board term has ended",
+                    f"The term was due to end on {short_date(seat.term_end)}. If a successor"
+                    " has been elected, end this seat.",
+                    reverse("person_detail", args=[seat.person_id]),
+                    "warning",
+                    nav="people",
                 )
             )
 
@@ -709,7 +724,7 @@ def _balance_items(user, roles) -> list[Item]:
 
 
 def counts(items: list[Item]) -> list[dict]:
-    """Per-area counts (with overdue counts) for the board home."""
+    """Per-area counts (with overdue counts) for the My items page."""
     by_area: dict[str, dict] = {}
     for it in items:
         row = by_area.setdefault(it.area, {"area": it.area, "count": 0, "overdue": 0})
@@ -721,7 +736,7 @@ def counts(items: list[Item]) -> list[dict]:
 
 def items_for_request(request) -> list[Item]:
     """items_for(request.user), computed once per request: the sidebar counts
-    and the page itself (dashboard, My items, Board overview) share it.
+    and the page itself (dashboard, My items) share it.
 
     Not cached across requests: a count must drop the moment the step is
     taken, and the items come from many apps' records, so there is no single

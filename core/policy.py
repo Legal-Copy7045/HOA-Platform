@@ -51,7 +51,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Reading
     "lot.view_own": ACCOUNT_VIEWERS,
     "lot.view_all": frozenset({BOARD, AUDITOR, MANAGER}),
-    # Homeowner view: see the portal as one lot's owner sees it (read-only).
+    # Preview as owner: see the portal as one lot's owner sees it (read-only).
     "portal.preview_as_owner": frozenset({BOARD, MANAGER}),
     # Sign-in page picture (no owner data): board, or a sysadmin for operations.
     "branding.manage": frozenset({BOARD, SYSADMIN}),
@@ -266,7 +266,7 @@ NO_ROLES = Roles()
 
 
 def _preview_roles(preview, on) -> Roles:
-    """Homeowner view (core.preview): the owner of one lot's permissions and
+    """Preview as owner (core.preview): the owner of one lot's permissions and
     scope, with the viewer's own person (no impersonation of the owner)."""
     from community.models import Ownership, Person
     from core.scoping import system_access

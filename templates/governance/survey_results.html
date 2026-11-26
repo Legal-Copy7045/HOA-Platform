@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Survey results · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="crumbs"><a href="{% url 'surveys' %}">Surveys</a> / <a href="{% url 'survey_detail' survey.pk %}">{{ survey.title|truncatechars:40 }}</a> / Results</div>
   <div class="page-head"><div><h1>Survey results</h1><p class="subtitle">{{ survey.title }}{% if survey.phase != "closed" %} (results so far){% endif %}</p>
     <div class="meta">{% status survey.phase survey.phase_label %}<span>{% icon "users" %}{{ results.responses }} response{{ results.responses|pluralize }}{% if can_manage %} of {{ results.audience }} asked{% endif %}</span>{% if survey.anonymous %}<span>{% icon "lock" %}Anonymous</span>{% endif %}</div></div>

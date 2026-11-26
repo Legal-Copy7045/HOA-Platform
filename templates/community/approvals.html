@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Approvals · {{ SITE_NAME }}{% endblock %}
+{% block title %}Second approvals · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Approvals</h1><p class="subtitle">These need a second board member: whoever started a request cannot approve it.</p></div></div>
+  <div class="page-head"><div><h1>Second approvals</h1><p class="subtitle">These need a second board member: whoever started a request cannot approve it.</p></div></div>
   <section class="card"><h2>Proposed board seats</h2>
     {% if seat_proposals %}<ul class="list">{% for n in seat_proposals %}<li><div class="todo-icon tone-warning">{% icon "users" %}</div>
       <div class="grow"><div class="title">{{ n.person.display_name }}</div><div class="small muted">{{ n.get_seat_type_display }} · term from {{ n.term_start|date:"M j, Y" }}{% if n.citation %} · {{ n.citation }}{% endif %}</div></div>

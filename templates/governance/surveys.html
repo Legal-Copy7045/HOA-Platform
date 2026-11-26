@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Surveys · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="page-head"><div><h1>Surveys</h1><p class="subtitle">Short surveys from the board to hear your views. They are informal: not a vote, and nothing is decided by them.</p></div></div>
   <section class="card">
     {% if rows %}<ul class="list">{% for row in rows %}{% with s=row.survey %}

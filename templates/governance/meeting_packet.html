@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Meeting packet · {{ m.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="crumbs"><a href="{% url 'meetings' %}">Meetings</a> / <a href="{% url 'meeting_detail' m.pk %}">{{ m.title }}</a></div>
   <div class="page-head"><div><h1>Meeting packet</h1>
     <p class="subtitle">{{ m.title }} · {{ m.starts_at|date:"l F j, Y g:i A" }}</p></div></div>

@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}{{ m.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="crumbs"><a href="{% url 'meetings' %}">Meetings</a> / {{ m.starts_at|date:"M j, Y" }}</div>
   <div class="page-head"><div><h1>{{ m.title }}</h1>
     <div class="meta">{% status m.status %}<span>{{ m.get_kind_display }}</span><span>{% icon "calendar" %}{{ m.starts_at|date:"l F j, Y g:i A" }}</span>{% if m.location %}<span>{% icon "pin" %}{{ m.location }}</span>{% endif %}</div></div>

@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Votes · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="page-head"><div><h1>Votes and polls</h1><p class="subtitle">Informal polls are one per owner. Formal votes are one per lot.</p></div></div>
   <section class="card">
     {% if rows %}<ul class="list">{% for v in rows %}<li><div class="todo-icon">{% icon "vote" %}</div><div class="grow"><a class="title" href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a><div class="small muted">{{ v.get_kind_display }}{% if v.closes_at %} · closes {{ v.closes_at|short_date }}{% endif %}</div></div>{% status v.status v.get_status_display %}</li>{% endfor %}</ul>

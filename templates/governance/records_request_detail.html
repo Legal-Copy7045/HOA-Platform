@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Records request #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="crumbs"><a href="{% url 'records_requests' %}">Records requests</a> / #{{ obj.pk }}</div>
   <div class="page-head"><div><h1>Records request #{{ obj.pk }}</h1><div class="meta">{% status obj.state obj.get_state_display %}{% if obj.due_on %}<span>{% icon "clock" %}Response due {{ obj.due_on|date:"M j, Y" }}</span>{% endif %}</div></div></div>
   <section class="card prose">{{ obj.description|linebreaks }}</section>

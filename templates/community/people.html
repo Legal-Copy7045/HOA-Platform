@@ -3,6 +3,12 @@
 {% block title %}People · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>People</h1><p class="subtitle">Owners, board members and committee members. A person can exist before they have a login.</p></div></div>
+  {% if access_review %}
+    <section class="card" id="access-review-panel"><div class="card-head"><h2>{% icon "shield" %} Access review</h2><a class="small" href="{% url 'access_review' %}">Review every login's access</a></div>
+      <p class="small {% if access_review.due %}tone-warning{% else %}muted{% endif %}">{% if access_review.last_on %}Last reviewed {{ access_review.last_on|date:"M j, Y" }}.{% else %}Not reviewed yet.{% endif %}
+        {% if access_review.due %}A review is due: the board checks every login's access each quarter.{% else %}The next review is due within 90 days of the last one.{% endif %}</p>
+    </section>
+  {% endif %}
   <div class="table-card"><div class="table-wrap"><table>
     <thead><tr><th>Name</th><th>Login</th></tr></thead>
     <tbody>{% for p in people %}<tr><td><a href="{% url 'person_detail' p.pk %}">{{ p.display_name }}</a></td><td>{% if p.user_id %}<span class="status tone-success">Active</span>{% else %}<span class="status tone-neutral">Not yet</span>{% endif %}</td></tr>

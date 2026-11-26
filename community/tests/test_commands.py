@@ -227,7 +227,7 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
         run("seed_demo_operations")
     client.force_login(make_member(board=True))
     for name in (
-        "board_home",
+        "my_items",
         "community_settings",
         "ledger_home",
         "collections",

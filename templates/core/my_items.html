@@ -2,12 +2,21 @@
 {% load portal %}
 {% block title %}My items · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>My items</h1><p class="subtitle">Everything waiting on you, overdue first. Each item opens the page where you take the step.</p></div></div>
+  <div class="page-head"><div><h1>My items</h1><p class="subtitle">Everything waiting on you, overdue first. Each item opens the page where you take the step.</p></div>
+    {# TODO(merge): replace with {% quick_actions %} (finance builder). #}{% if can_record_checks %}<div class="actions"><a class="btn secondary" href="{% url 'record_payments' %}">{% icon "receipt" %} Record checks</a></div>{% endif %}</div>
+  {% if thin %}
+    <div class="alert warning" id="coverage">{% icon "alert" %}<div><strong>{{ thin|length }} action{{ thin|length|pluralize }} can be done by fewer than two people with two-step sign-in.</strong>
+      Every action should be possible for at least two people, so nothing stalls if someone is away. Invite another board member from their page under <a href="{% url 'people' %}">People</a>.
+      <details class="coverage"><summary>Show which</summary><ul class="small">{% for action, n in thin.items %}<li>{{ action|humanize_action }} <span class="muted">({{ n }})</span></li>{% endfor %}</ul></details></div></div>
+  {% endif %}
+  {% for a in alerts %}{% if "#coverage" not in a.url %}
+    <div class="alert warning">{% icon a.icon %}<span><strong>{{ a.title }}.</strong> {{ a.detail }} <a href="{{ a.url }}">Open</a></span></div>
+  {% endif %}{% endfor %}
   {% if counts %}<div class="grid grid-4">{% for c in counts %}<a class="stat {% if c.overdue %}tone-danger{% endif %}" href="#area-{{ forloop.counter }}"><div class="label">{{ c.area }}</div><div class="value">{{ c.count }}</div><div class="hint">{% if c.overdue %}{{ c.overdue }} overdue{% else %}waiting{% endif %}</div></a>{% endfor %}</div>{% endif %}
   {% regroup items by area as areas %}
   {% for group in areas %}
     <section class="card" id="area-{{ forloop.counter }}"><h2>{{ group.grouper }}</h2>
       <ul class="list">{% for t in group.list %}{% include "partials/todo.html" %}{% endfor %}</ul>
     </section>
-  {% empty %}{% include "partials/empty.html" with icon="check-circle" title="Nothing waiting on you" text="New requests, approvals and follow-ups will appear here." %}{% endfor %}
+  {% empty %}{% if not alerts %}{% include "partials/empty.html" with icon="check-circle" title="Nothing waiting on you" text="New requests, approvals and follow-ups will appear here." %}{% endif %}{% endfor %}
 {% endblock %}
