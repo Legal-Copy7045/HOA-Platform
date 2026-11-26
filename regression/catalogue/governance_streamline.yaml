@@ -1,0 +1,21 @@
+# Governance streamlining (owner-approved 2026-11-26): one Voting page, polls are
+# surveys, written consents on Resolutions and policies, meetings on the calendar,
+# the meeting page as the hub.
+- feature: "One Voting page: open/past and type filters, board New vote/election/survey, old list URLs redirect, forms re-render on refusal"
+  since: M5
+  match: ["^unit:governance/tests/test_streamline.py::test_(old_list_urls|voting_urls|tenant_redirect|one_list|type_filter|board_gets_new|refused_vote_form|only_the_board_creates|board_creates_an_election)", "^unit:core/tests/test_url_matrix.py::test_old_voting_lists"]
+- feature: "No new informal polls (surveys instead); old informal polls readable under Past; votes only for coming owners' meetings"
+  since: M5
+  match: ["^unit:governance/tests/test_streamline.py::test_(vote_form_offers|service_refuses_new_informal|vote_can_belong)"]
+- feature: "Give a proxy on Voting for coming owners' meetings (owners only)"
+  since: M5
+  match: ["^unit:governance/tests/test_streamline.py::test_give_a_proxy"]
+- feature: "Written consents on Resolutions and policies: board-only section and form, list URL redirects, signatures kept apart from resolutions"
+  since: M5
+  match: ["^unit:governance/tests/test_streamline.py::test_(consents_list|board_adopts|owners_never_see_consents|consents_switched_off)"]
+- feature: "Meetings create and cancel their calendar event; executive sessions never on the calendar; calendar sends meeting events to the meeting page"
+  since: M5
+  match: ["^unit:governance/tests/test_streamline.py::test_(meetings_put|executive_sessions_never|cancelling_a_meeting|calendar_sends|only_meeting_managers)"]
+- feature: "Meeting page hub: linked votes, elections and resolutions; record a resolution prefilled; upload minutes through the documents service (executive minutes board only); notice marks the recurring deadline done"
+  since: M5
+  match: ["^unit:governance/tests/test_streamline.py::test_(meeting_page_lists|record_resolution_prefills|executive_meeting_is_not|board_uploads_minutes|executive_session_minutes|minutes_upload_without|owners_cannot_upload|notice_marks|notice_without)"]

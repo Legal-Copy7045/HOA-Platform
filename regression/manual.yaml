@@ -177,3 +177,7 @@
   check: "With test keys on the POC and Online payments switched on: an owner pays one charge by credit card 4242 4242 4242 4242 (surcharge shown first, TEST MODE banner), by debit card 4000 0566 5566 5556 (no fee) and by a test bank account (processing, then paid next day); each shows on My account against the chosen charge, a receipt email and PDF arrive, and Finance -> Online payments shows the payment, the payout and 'matches'."
   steps: "Follow docs/runbook.md 'Online payments (Stripe)' test-mode setup; sign in as a demo owner; Pay online three times; next day open Finance -> Online payments; on a phone check the pay page fits the screen."
   last: ""
+- key: voting page at phone width
+  check: "The Voting page's Open/Past and type filters, the New vote/election/survey panels and Give a proxy read well at phone width, and an existing POC's old annual-meeting calendar entry (seeded before meetings made their own) is not shown twice."
+  steps: "On a phone, open Voting as an owner and as a board member; open each New panel; open Calendar and check the annual meeting appears once (cancel the old hand-made entry if there are two)."
+  last: ""

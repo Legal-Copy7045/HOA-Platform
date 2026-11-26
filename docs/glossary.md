@@ -30,13 +30,15 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Version 2 | A document's second upload. | `DocumentVersion.number` |
 | My requests | Questions and requests to the board. The board's list is **Owner requests**. | `operations.OwnerRequest` |
 | Records requests | An owner's request to inspect association records (Pennsylvania law). | `governance.RecordsRequest` |
-| Voting | One page for **Votes and polls**, **Elections** and **Surveys**. | `voting` |
-| Votes and polls | Formal votes (binding, one ballot per lot) and informal polls (one per owner). | `Vote` |
+| Voting | One list of **Votes**, **Elections** and **Surveys**, filtered by open or past and by type. Board members start new ones here (New vote, New election, New survey). Owners also find **Give a proxy** for coming owners' meetings. The old addresses of the three lists lead here. | `voting` |
+| Votes | Formal votes of the owners: binding, one ballot per lot, with the quorum and pass rules (and citations) fixed when the vote opens. Informal polls made before November 26, 2026 stay readable under Past; a new poll is a survey with one question. | `Vote` |
 | Elections | Board elections: nominations, ballots, results. | `Election` |
 | Surveys | Informal multi-question surveys from the board (not a vote). Anonymous ones keep answers apart from who responded. | `Survey` |
 | Survey results | Totals for each question; written answers are seen by the board only. Owners see totals after it closes, if the board shares them. | `survey_results` |
 | Proxy | Someone you choose to vote for your lot at a meeting. Holders are picked by name (board members) or by address (owners). | `Proxy` |
-| Resolutions and policies | Board resolutions and the policies in force. | `Resolution` |
+| Resolutions and policies | Board resolutions and the policies in force. The board also adopts a resolution by written consent here and sees those **Waiting for signatures**. | `Resolution` |
+| Adopt by written consent | A board decision without a meeting: every serving board member must approve in writing; one decline and it is not adopted. The signatures are kept as their own records; once adopted it is recorded as a resolution. | `ConsentRequest`, `consents` (redirects to Resolutions and policies) |
+| Meeting page | Everything about one meeting: agenda, notice, minutes (uploaded here), packet, the votes, elections and resolutions that belong to it, quorum and proxies. Meetings put themselves on the calendar and come off it when cancelled; executive sessions never appear there. | `meeting_detail` |
 | Meeting packet | One PDF for a meeting: cover, agenda, minutes, financial totals and an attachment index, with a .zip of the attachments. The **Board packet** (marked "Confidential – board only") adds receivables and open-item counts; the **Owner packet** never has delinquency, violation or collection details. | `governance/packets.py`, `MeetingPacket` |
 | Community info | One page for **Frequently asked questions**, the **Owner directory**, **Committees** and the **Reserve plan summary**. | `community_info` |
 | Reserve plan | The board's in-house reserve study: the things the association will one day replace (component, cost today, useful life, years left), a year-by-year projection of the reserve fund, percent funded and the contribution needed. Finance menu. | `reserve_plan`, `ledger/reserves.py` |
