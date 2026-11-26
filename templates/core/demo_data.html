@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Demo data · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Demo data</h1>
+    <p class="subtitle">This portal is a demo or test copy, so it can be filled with fictional data. Reseeding replaces everything in the portal with one of the datasets below; the server's own agent does it (decision D53).</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'server_tasks' %}">{% icon "clock" %} Server tasks</a></div></div>
+
+  {% include "partials/form_errors.html" %}
+  {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
+  {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> The server's agent has not reported in the last few minutes. A reseed waits until it is back.</span></div>{% endif %}
+  {% if current %}<section class="card" id="current-task"><h2>Now</h2>
+    <p><strong>{{ current.label }}</strong>{% if current.task.dataset %} ({{ labels|get_item:current.task.dataset|default:current.task.dataset }}){% endif %} · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email }} {{ current.task.requested_at|timesince }} ago.</p>
+    <p class="small muted">During a reseed the portal is unavailable for about a minute; then sign in again with your own login.</p></section>{% endif %}
+
+  <section class="card" id="current-data"><h2>What the portal holds now</h2>
+    <p>{% if last_seed %}Seeded {{ last_seed.seeded_at|date:"M j, Y g:i A" }} with <strong>{{ labels|get_item:last_seed.dataset|default:last_seed.dataset }}</strong>.{% else %}Not seeded from a dataset (or seeded before this was recorded).{% endif %}</p>
+  </section>
+
+  <section class="card" id="datasets"><h2>Datasets</h2>
+    <div class="alert warning" role="note">{% icon "alert" %}<span>{{ confirm_text }}</span></div>
+    <ul class="list">{% for d in datasets %}<li>
+      <div class="grow"><div class="title">{{ d.label }}</div><div class="small muted">{{ d.description }}</div>
+        <form method="post" class="inline" data-confirm="{{ confirm_text }}">{% csrf_token %}
+          <input type="hidden" name="dataset" value="{{ d.name }}">
+          {% with bound=form.data.dataset %}<label for="{% if bound == d.name or not bound and forloop.first %}id_confirm{% else %}confirm-{{ d.name }}{% endif %}" class="small">Type {{ word }} to confirm</label>
+          <input type="text" name="confirm" id="{% if bound == d.name or not bound and forloop.first %}id_confirm{% else %}confirm-{{ d.name }}{% endif %}" maxlength="20" autocomplete="off" spellcheck="false" required pattern="{{ word }}"{% if bound == d.name and form.confirm.errors %} aria-invalid="true"{% endif %}>{% endwith %}
+          <button type="submit" class="danger small"{% if current %} disabled title="Another task is waiting or running"{% endif %}>Reseed with this dataset</button>
+        </form></div>
+    </li>{% endfor %}</ul>
+  </section>
+
+  <h2>Recent reseeds</h2>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Dataset</th><th>Asked by</th><th>When</th><th>State</th><th>Result</th></tr></thead>
+    <tbody>{% for row in reseeds %}<tr>
+      <td>{{ labels|get_item:row.task.dataset|default:row.task.dataset }}</td>
+      <td>{{ row.task.requested_by.email }}</td>
+      <td class="nowrap">{{ row.task.requested_at|date:"M j, Y g:i A" }}</td>
+      <td>{% status row.task.state row.task.get_state_display %}</td>
+      <td class="small">{{ row.summary }}</td>
+    </tr>{% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="clock" title="No reseeds yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

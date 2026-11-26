@@ -182,6 +182,13 @@ def _bank_feed():
     return True, "Synced in the last 3 days"
 
 
+def _demo_data():
+    """Only shown if demo seeding is on where it must never be (D53)."""
+    if settings.SEED_DEMO_ALLOWED and settings.DEPLOYMENT_STAGE == "production":
+        return False, "Demo data loading is switched on in production: switch it off now"
+    return None
+
+
 def _payments():
     from payments.sync import health
 
@@ -251,6 +258,7 @@ CHECKS = [
     ("memory", "Server memory", _memory),
     ("bank_feed", "Bank feed", _bank_feed),
     ("payments", "Online payments", _payments),
+    ("demo_data", "Demo data", _demo_data),
 ]
 
 

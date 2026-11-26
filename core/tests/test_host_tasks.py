@@ -47,7 +47,10 @@ def test_every_kind_has_wording_and_offsite_tasks_wait_for_offsite(settings):
     assert "restore_drill_offsite" not in kinds and "offsite_lock_check" not in kinds
     assert {"backup", "restore_drill", "harden_host", "health_check"} <= kinds
     settings.BACKUP_S3_BUCKET = "backups"
-    assert {spec.kind for spec in host_tasks.offered()} == set(HostTask.Kind.values)
+    # The demo reseed only where demo data is allowed (D53, test_demo_reseed.py).
+    assert {spec.kind for spec in host_tasks.offered()} == set(HostTask.Kind.values) - {
+        "reseed_demo"
+    }
 
 
 def test_sysadmin_starts_a_backup_and_it_is_audited(client, admin):

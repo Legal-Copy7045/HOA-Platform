@@ -28,7 +28,10 @@ psql_run() {
   local sql
   sql="$(cat)"
   { printf 'ARGS:'; printf ' [%s]' "$@"; printf '\nSQL: %s\n' "$sql"; } >>"$APP_DIR/psql.log"
-  case "$sql" in *"RETURNING id, kind"*) printf '%s\n' "$CLAIM" ;; esac
+  case "$sql" in
+    *"RETURNING id, kind"*) printf '%s\n' "$CLAIM" ;;
+    *"SELECT dataset FROM core_hosttask"*) printf '%s\n' "${DATASET:-}" ;;
+  esac
   return 0
 }
 process_host_task
@@ -68,6 +71,12 @@ def vm(tmp_path):
         "exit 3\n",
     )
     _script(poc / "harden-host.sh", f'echo "harden-host.sh $*" >> "{log}"\nsleep 20\n')
+    _script(
+        poc / "reseed-demo.sh",
+        f'echo "reseed-demo.sh $*" >> "{log}"\n'
+        'echo "==> Taking a backup first"\n'
+        'echo "Reseeded with the $1 dataset. Kept 1 real login(s) and 2 server task record(s)."\n',
+    )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _script(
@@ -77,14 +86,17 @@ def vm(tmp_path):
         '  *"health_check --alert"*)\n'
         '    printf "OK    Database: fine\\nFAIL  Backups: old\\n"; exit 1 ;;\n'
         '  *check_offsite_lock*) echo "Locked: the bucket refused to delete a backup file." ;;\n'
+        "  *--list-datasets*) printf 'oak_creek\\nfresh_start\\n' ;;\n"
         "esac\n"
         "exit 0\n",
     )
     return tmp_path
 
 
-def _run(vm: Path, claim: str, limit: str = "") -> tuple[subprocess.CompletedProcess, str]:
-    env = {"PATH": f"{vm}/bin:/usr/bin:/bin", "CLAIM": claim}
+def _run(
+    vm: Path, claim: str, limit: str = "", dataset: str = ""
+) -> tuple[subprocess.CompletedProcess, str]:
+    env = {"PATH": f"{vm}/bin:/usr/bin:/bin", "CLAIM": claim, "DATASET": dataset}
     if limit:
         env["HOST_TASK_LIMIT"] = limit
     result = subprocess.run(  # noqa: S603  # nosec B603
@@ -233,9 +245,9 @@ def test_a_strange_id_stops_the_agent(vm):
 
 
 def test_the_case_statement_is_the_only_mapping():
-    assert TASKS.count("TASK_CMD=(") == 7  # the reset plus one per kind
+    assert TASKS.count("TASK_CMD=(") == 8  # the reset plus one per kind
     body = TASKS.split("host_task_command() {", 1)[1].split("\n}\n", 1)[0]
-    assert body.count("TASK_CMD=(") == 7 and "*)\n      return 1 ;;" in body
+    assert body.count("TASK_CMD=(") == 8 and "*)\n      return 1 ;;" in body
     from core.models import HostTask
 
     mapped = set(re.findall(r"^    ([a-z_]+)\)$", body, re.M))
@@ -269,3 +281,135 @@ def test_agent_runs_tasks_after_the_update_logic_and_survives_a_missing_table():
     limits = [int(n) for n in re.findall(r"TASK_MINUTES=(\d+);", TASKS)]
     assert limits and max(limits) < 30
     assert "TimeoutStartSec=30min" in (POC / "start-portal.sh").read_text()
+
+
+# --- Demo reseed (D53) --------------------------------------------------------------------
+
+RESEED = (POC / "reseed-demo.sh").read_text()
+
+
+@needs_bash
+@pytest.mark.parametrize("dataset", ["fresh_start", "oak_creek"])
+def test_reseed_runs_the_fixed_script_with_the_dataset_as_one_argument(vm, dataset):
+    result, psql = _run(vm, "21|reseed_demo", dataset=dataset)
+    assert result.returncode == 0, result.stderr
+    assert _read(vm, "ran.log") == f"reseed-demo.sh {dataset}\n"
+    finish = _finish(psql)
+    assert "[state=succeeded]" in finish
+    assert f"[summary=Reseeded with the {dataset} dataset." in finish
+    # The dataset was read back through a psql variable, by id only.
+    assert "ARGS: [-v] [id=21]\nSQL: SELECT dataset FROM core_hosttask" in psql
+    # And checked against the portal's own list.
+    assert "manage.py seed_demo --list-datasets" in _read(vm, "docker.log")
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    "dataset",
+    [
+        "",
+        "Fresh_start",
+        "fresh-start",
+        "fresh_start; touch pwned",
+        "$(touch pwned)",
+        "../etc",
+        "a" * 41,
+        "unknown_set",  # well formed, but not a dataset this portal has
+    ],
+)
+def test_reseed_with_a_bad_or_unknown_dataset_is_refused_and_nothing_runs(vm, dataset):
+    result, psql = _run(vm, "22|reseed_demo", dataset=dataset)
+    assert result.returncode == 0, result.stderr
+    assert _read(vm, "ran.log") == ""
+    assert not (vm / "pwned").exists() and not Path("pwned").exists()
+    finish = _finish(psql)
+    assert "[state=refused]" in finish
+    assert "[summary=Refused: not a demo dataset this portal has.]" in finish
+
+
+def test_reseed_case_entry_is_a_fixed_command():
+    assert (
+        "    reseed_demo)\n      TASK_MINUTES=25; TASK_NEEDS_DATASET=1; "
+        'TASK_CMD=(bash "$APP_DIR/infra/poc/reseed-demo.sh") ;;'
+    ) in TASKS
+    # The dataset is appended as one quoted array element, after the checks.
+    assert 'TASK_CMD+=("$TASK_DATASET")' in TASKS
+    process = TASKS.split("process_host_task() {", 1)[1]
+    assert process.index("host_task_dataset") < process.index('TASK_CMD+=("$TASK_DATASET")')
+    assert process.index('TASK_CMD+=("$TASK_DATASET")') < process.index('"${TASK_CMD[@]}"')
+    check = TASKS.split("host_task_dataset() {", 1)[1].split("\n}\n", 1)[0]
+    assert '[[ "$value" =~ ^[a-z_]{1,40}$ ]] || return 1' in check
+    assert 'grep -Fxq -- "$value"' in check and "--list-datasets" in check
+
+
+def test_reseed_script_guards_and_order():
+    """Stage and flag guard first, backup before anything changes, logins
+    saved before the database is emptied, put back before seeding."""
+    order = [
+        'demo_dataset_ok "$DATASET"',
+        'reseed_allowed "$(env_value DEPLOYMENT_STAGE)" "$(env_value SEED_DEMO_ALLOWED)" || exit 1',
+        "seed_demo --list-datasets",
+        'bash "$APP_DIR/infra/poc/backup.sh" \\\n'
+        '  || { echo "The backup failed: nothing was changed."',
+        "manage_owner keep_logins export --out -",
+        '"${COMPOSE[@]}" stop web worker',
+        "DROP SCHEMA public CASCADE;",
+        '"${COMPOSE[@]}" run --rm -T --no-deps migrate >/dev/null',
+        "manage_owner apply_db_grants",
+        "manage_owner keep_logins import --in -",
+        'manage_owner seed_demo --dataset "$DATASET"',
+        "manage_owner clean_demo_files",
+        '"${COMPOSE[@]}" start web worker >/dev/null\necho "Reseeded',
+    ]
+    positions = [RESEED.index(step) for step in order]
+    assert positions == sorted(positions), order
+    # Owner credentials only through the one-shot migrate service and psql.
+    assert 'manage_owner() { "${COMPOSE[@]}" run --rm -T --no-deps migrate manage "$@"; }' in RESEED
+    assert "exec -T web python manage.py keep_logins" not in RESEED
+    # The saved logins: a root-only temporary directory, shredded on every exit.
+    assert 'KEEP_DIR="$(mktemp -d /root/hoa-keep-logins.XXXXXX)"' in RESEED
+    assert 'chmod 700 "$KEEP_DIR"' in RESEED and "umask 077" in RESEED
+    assert "trap finish EXIT" in RESEED and 'shred -u "$KEEP"' in RESEED
+    # The site comes back even when a step fails or the time limit stops it.
+    assert "trap 'exit 143' TERM INT" in RESEED
+    finish = RESEED.split("finish() {", 1)[1].split("\n}\n", 1)[0]
+    assert '"${COMPOSE[@]}" start web worker' in finish
+    # The app role gets its schema access back; values only as psql variables.
+    assert (
+        'psql_owner -v app="$APP_USER"' in RESEED
+        and 'GRANT USAGE ON SCHEMA public TO :"app";' in RESEED
+    )
+    assert '-c "$' not in RESEED and "eval " not in RESEED and "bash -c" not in RESEED
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    ("stage", "flag", "ok"),
+    [
+        ("poc", "true", True),
+        ("poc", "TRUE", True),
+        ("poc", "false", False),
+        ("poc", "", False),
+        ("production", "true", False),
+        ("", "true", False),
+        ("local", "true", False),
+    ],
+)
+def test_reseed_runs_only_on_the_poc_with_demo_data_on(stage, flag, ok):
+    from core.tests.test_infra_scripts import _lib
+
+    result = _lib('reseed_allowed "$1" "$2"', stage, flag)
+    assert (result.returncode == 0) is ok
+    if not ok:
+        assert "DEPLOYMENT_STAGE=poc and SEED_DEMO_ALLOWED=true" in result.stderr
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    ("name", "ok"),
+    [("fresh_start", True), ("oak_creek", True), ("x;y", False), ("A", False), ("", False)],
+)
+def test_reseed_script_accepts_plain_dataset_names_only(name, ok):
+    from core.tests.test_infra_scripts import _lib
+
+    assert (_lib('demo_dataset_ok "$1"', name).returncode == 0) is ok

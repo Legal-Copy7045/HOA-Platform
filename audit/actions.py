@@ -578,8 +578,12 @@ _SPECS = [
         "checkout_id",
     ),
     # Server tasks (hosttasks, D35)
-    _spec("system.task_requested", "Server task requested", "kind"),
-    _spec("system.task_finished", "Server task finished on the VM", "kind", "state"),
+    _spec("system.task_requested", "Server task requested", "kind", "dataset"),
+    _spec("system.task_finished", "Server task finished on the VM", "kind", "state", "dataset"),
+    # Demo datasets and reseeding the POC (D53)
+    _spec("system.demo_seeded", "Fictional demo data loaded", "dataset"),
+    _spec("system.logins_kept", "Real logins restored after a demo reseed", "count", "tasks"),
+    _spec("system.demo_files_cleaned", "Files of the replaced demo data removed", "count"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

@@ -131,8 +131,26 @@ HUBS = {
             "retention.manage",
             "Former owners' contact details cleared after the retention period.",
         ),
+        (
+            "Demo data",
+            "demo_data",
+            "leaf",
+            "system.run_task",
+            "Replace everything with a fictional demo dataset (demo and test portals only).",
+        ),
     ],
 }
+
+
+def _demo_data_allowed() -> bool:
+    from core import demo_reseed
+
+    return demo_reseed.allowed()
+
+
+# Hub pages that exist only on some deployments: listed only while the check
+# passes (the page itself answers 404 otherwise). Demo data: D53.
+ONLY_WHEN = {"demo_data": _demo_data_allowed}
 # Hubs whose own page is where every child lands (votes, elections and
 # surveys all open the Voting list), so a single child keeps the hub's label
 # and links to the hub's own page filtered by this query parameter (the
@@ -283,6 +301,8 @@ def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[d
         if not allowed(groups, permission):
             continue
         if not features.url_name_enabled(name.partition("?")[0], request):
+            continue
+        if name in ONLY_WHEN and not ONLY_WHEN[name]():
             continue
         url = _url(name)
         if url:

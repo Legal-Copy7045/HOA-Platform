@@ -219,6 +219,7 @@ PROTECTED = {
     "sysadmin_activity": ("GET", None),
     "system_status": ("GET", None),
     "server_tasks": ("GET", None),
+    "demo_data": ("POST", None),  # 404 unless demo data is allowed; sysadmins only (D53)
     "community_settings": ("GET", None),
     "community_rule_save": ("POST", None),
     "community_profile_save": ("POST", None),
