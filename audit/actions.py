@@ -476,6 +476,9 @@ _SPECS = [
         "lot_id",
         "checkout_id",
     ),
+    # Server tasks (hosttasks, D35)
+    _spec("system.task_requested", "Server task requested", "kind"),
+    _spec("system.task_finished", "Server task finished on the VM", "kind", "state"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

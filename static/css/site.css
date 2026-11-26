@@ -501,3 +501,6 @@ fieldset.choices legend { padding: 0; margin-bottom: .4rem; }
 .search-results .title { overflow-wrap: anywhere; }
 /* Reserve plan: years whose ending balance is below zero (also labeled in text). */
 tr.below-zero th, tr.below-zero td { background: var(--danger-bg); }
+
+/* Server tasks (hosttasks): the agent's output tail wraps on a phone. */
+.task-output { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; margin: .4rem 0 0; }
