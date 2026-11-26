@@ -172,6 +172,8 @@ _SPECS = [
     _spec("system.health_check_cleared", "Health check cleared", "check"),
     _spec("system.check_updates", "Checked for portal updates"),
     _spec("system.install_update", "Portal update requested"),
+    _spec("system.schedule_update", "Portal update scheduled for tonight", "at"),
+    _spec("system.cancel_schedule", "Scheduled portal update cancelled"),
     _spec("backup.files_exported", "File store exported (backup)", "count"),
     _spec("backup.files_imported", "File store imported (restore)", "count", "overwrite"),
     _spec("feature.switched", "Feature switched on or off", "feature", "enabled"),

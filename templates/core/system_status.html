@@ -10,6 +10,7 @@
   <div class="grid grid-4 stack-sm">
     <div class="stat {% if update and update.s.state == 'failed' %}tone-danger{% elif update and update.s.behind %}tone-warning{% else %}tone-success{% endif %}"><div class="label">Version</div><div class="value small-value">{{ version }}</div><div class="hint">Build {{ build }}</div>
       <div class="hint">{% if not update %}Update checks start once the VM's update agent is installed (run update-portal.sh once).
+        {% elif update.s.state == "scheduled" %}Update scheduled for {{ update.s.scheduled_for|date:"g:i A" }} on {{ update.s.scheduled_for|date:"M j" }}{% if update.s.latest_version %} (version {{ update.s.latest_version }} or newer){% endif %}.
         {% elif update.s.state == "requested" %}Update requested; starting within a minute.
         {% elif update.s.state == "running" %}Updating now… refresh in a few minutes.
         {% elif update.s.state == "failed" %}Last update failed{% if update.s.message %}: {{ update.s.message }}{% endif %}.
@@ -20,7 +21,8 @@
       {% if update and update.changes and update.s.behind %}<details class="hint"><summary>What's new</summary><ul>{% for c in update.changes %}<li>{{ c }}</li>{% endfor %}</ul></details>{% endif %}
       <div class="inline-form">
         <form method="post">{% csrf_token %}<input type="hidden" name="action" value="check_updates"><button type="submit" class="secondary small">Check now</button></form>
-        {% if update and update.s.behind and update.s.state != "requested" and update.s.state != "running" %}<form method="post" data-confirm="Install the update now? The portal restarts; it may be unavailable for a few seconds.">{% csrf_token %}<input type="hidden" name="action" value="install_update"><button type="submit" class="small">Install update</button></form>{% endif %}
+        {% if update and update.s.behind and update.s.state != "requested" and update.s.state != "running" %}<form method="post" data-confirm="Install the update now? The portal restarts; it may be unavailable for a few seconds.">{% csrf_token %}<input type="hidden" name="action" value="install_update"><button type="submit" class="small">Install now</button></form>
+        {% if update.s.state != "scheduled" %}<form method="post" data-confirm="Install the update at {{ nightly_hour_label }} tonight, when nobody is likely to be using the portal? You can cancel it until then.">{% csrf_token %}<input type="hidden" name="action" value="schedule_update"><button type="submit" class="secondary small">Install tonight at {{ nightly_hour_label }}</button></form>{% else %}<form method="post" data-confirm="Cancel tonight's update? Nothing is installed until someone asks again.">{% csrf_token %}<input type="hidden" name="action" value="cancel_schedule"><button type="submit" class="secondary small">Cancel tonight's update</button></form>{% endif %}{% endif %}
       </div></div>
     <div class="stat {% if pending_migrations %}tone-danger{% else %}tone-success{% endif %}"><div class="label">Unapplied migrations</div><div class="value">{{ pending_migrations }}</div></div>
     <div class="stat"><div class="label">Background jobs</div><div class="value small-value">{% for status, n in jobs %}{{ status }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}None{% endfor %}</div>

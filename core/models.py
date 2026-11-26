@@ -98,8 +98,11 @@ class UpdateStatus(models.Model):
     check_requested_at = models.DateTimeField(null=True, blank=True)
     state = models.CharField(
         max_length=12, default="idle"
-    )  # idle requested running succeeded failed
+    )  # idle scheduled requested running succeeded failed
     state_changed_at = models.DateTimeField(null=True, blank=True)
+    # "Install tonight": the agent turns a scheduled update into a request at
+    # this time (D38). Nullable, so the agent's INSERT never has to name it.
+    scheduled_for = models.DateTimeField(null=True, blank=True)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
