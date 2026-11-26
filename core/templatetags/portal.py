@@ -100,6 +100,7 @@ _TONES = {
         "voting",
         "neighbors",
         "objected",
+        "processing",
     },
     "danger": {
         "denied",
@@ -114,6 +115,7 @@ _TONES = {
         "declined",
         "failed",
         "failure",
+        "mismatch",
     },
     "neutral": {"void", "withdrawn", "cancelled", "revoked", "dropped", "unscanned"},
 }

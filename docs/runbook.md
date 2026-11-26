@@ -423,3 +423,141 @@ After loading the register, Board > Onboarding shows who has signed up. Use
 "Invite everyone not yet invited", then "Remind" a few days later. Owners with
 no email get a printable letter asking for one; invitations only ever go to
 the email on the owner's record.
+
+## Online payments (Stripe)
+
+Decision D32-payments. Owners (and authorized contacts) pay chosen charges on
+Stripe's hosted Checkout page: **bank account (no fee)**, **debit card (no
+fee)** or **credit card (+ surcharge, at most 3%)**. The portal never sees a
+card or bank number, has **no webhook** (no anonymous endpoint, D24) and learns
+about payments only by asking Stripe with its key:
+
+- when the owner returns to the Payment status page (a hint to check now),
+- every 15 minutes for checkouts started in the last 24 hours,
+- daily for bank payments still processing, refunds, disputes and returned
+  bank payments on payments of the last 120 days, the Stripe balance and
+  payouts, and then the reconciliation (ledger versus Stripe).
+
+A payment is recorded only when the session and PaymentIntent fetched from
+Stripe match the checkout this signed-in person started (its id and random
+nonce in the metadata, the lot, account and person, amount and currency,
+test or live mode, status succeeded and the charge captured). Anything else
+records nothing, is audited (`payments.mismatch`) and shows on the board's My
+items.
+
+### 1. Test mode (now)
+
+1. Create a Stripe account for testing (any email the board controls). Stay
+   in **Test mode** (the toggle in the dashboard).
+2. Developers -> API keys -> **Create restricted key**, named "HOA portal",
+   with ONLY these rights (everything else None):
+   - Checkout Sessions: **Write**
+   - PaymentIntents: Read
+   - Charges: Read
+   - Balance transactions (Balance): Read
+   - Payouts: Read
+   - Disputes: Read
+   - Refunds: **Read** (never Write)
+
+   No refund, customer, product, payout or transfer write rights and no
+   account settings. With this key a stolen secret can only create checkouts
+   that pay the HOA. (Because the key cannot refund, a surcharge taken from a
+   debit card by mistake becomes a board My item "Refund $X surcharge to lot
+   N (debit card)"; refund it in the Stripe dashboard and the portal closes
+   the item when it sees the refund.)
+3. On the VM, put the key in `.env` (hidden prompt; never paste a key into a
+   chat, ticket or the repository):
+
+   ```bash
+   sudo bash /opt/hoa-portal/infra/poc/set-stripe-key.sh
+   ```
+
+4. Admin -> Features: switch on **Online payments**. Community settings:
+   check **Credit card surcharge** (default 300 = 3%) and give it its
+   citation (board resolution).
+5. Finance -> Online payments shows "TEST MODE"; owners' pay pages carry a
+   TEST MODE banner. Try it as a demo owner (Pay online on My account):
+   - Credit card: `4242 4242 4242 4242`, any future date, any CVC. The
+     surcharge line shows on Stripe's page.
+   - Debit card: `4000 0566 5566 5556` (Visa debit). No fee. On the credit
+     card session Stripe refuses it (funding filter); on the debit session it
+     is accepted.
+   - Bank account: in Stripe's Financial Connections test screen choose the
+     **Test Institution** and a "Success" account, or enter routing
+     `110000000` and account `000123456789`. It shows "processing" and is
+     recorded when Stripe reports it succeeded (the daily poll; the next
+     morning). Account `000111111116` fails. Stripe's docs list more test
+     numbers (returns and disputes).
+
+What Stripe's API offers (checked against Stripe's changelog, Nov 2026; the
+portal pins API version `2026-08-26.dahlia`):
+
+- `payment_method_options[card][restrictions][funding_types_blocked]`
+  (values `credit`, `debit`, `prepaid`; added in 2026-08-26.dahlia) keeps a
+  credit card session to credit cards and the debit session to debit cards.
+  Cards whose funding type is unknown can still get through; the safety net
+  after payment reads the charge's `payment_method_details.card.funding`.
+- `wallet_options[link][display]=never` hides Link on both card sessions.
+  Apple Pay and Google Pay cannot be switched off per session on hosted
+  Checkout (only for the whole account in Settings -> Payment methods). A
+  wallet payment is a card payment and reports the underlying card's
+  funding, so the same safety net applies. If the board wants no wallets,
+  turn them off in that Stripe setting.
+- Stripe's API version 2026-09-30 removes `payment_method_types` from
+  Checkout Sessions (replaced by allowed/excluded payment method types).
+  Before moving the pinned version, change `payments/checkout.py`.
+- Bank payments use `us_bank_account` with `verification_method=automatic`:
+  instant verification through Stripe Financial Connections where the bank
+  supports it, micro-deposits otherwise (1-2 business days for the owner).
+- Costs (confirm on stripe.com/pricing before go-live; the HOA pays all of
+  them except the credit card surcharge): cards about 2.9% + 30 cents; ACH
+  Direct Debit 0.8% capped at $5; Financial Connections verification may
+  carry its own small fee; disputes $15 each; failed/returned ACH $4.
+
+### 2. Securing the HOA's Stripe account
+
+- Hardware security key (passkey) two-step sign-in for every Stripe user.
+- At most two Administrators (the treasurer and one other board member);
+  everyone else View only. No management company admin.
+- Turn on Stripe email alerts for changes to the payout bank account and for
+  new team members.
+- Payout schedule: daily (smaller deposits, easier to match).
+- Radar: keep the default rules on.
+
+### 3. What the board does
+
+- **My items** shows: payments that did not match (check them in Stripe's
+  dashboard), returned bank payments (already reversed on the account),
+  refunds made in Stripe (record them on the lot's account: reverse or
+  adjust), disputes (answer in Stripe), surcharges to refund, and, for the
+  treasurer, differences found by the daily reconciliation.
+- **Finance -> Online payments**: recent payments, bank payments processing,
+  failures, payouts (gross payments, refunds, fees and the net deposit) and
+  the last reconciliation. Close an item with "Mark done" and a note.
+- The accounting export books online payments to **Stripe clearing**, the
+  surcharge to **credit card surcharge income**, Stripe's fees to **payment
+  processing fees**, and each payout from Stripe clearing to the bank, so the
+  books balance. Online payments never go into deposit batches.
+- The health check **Online payments** fails when the daily reconciliation
+  finds a ledger payment Stripe does not have, a Stripe charge the ledger
+  does not have after 24 hours, or a payout that does not add up; the board
+  and sysadmins get an email (no personal data).
+
+### 4. Go-live checklist (before live keys)
+
+1. The HOA's own Stripe account, opened in the association's legal name with
+   its EIN, the HOA's operating bank account for payouts, and the account
+   security above.
+2. Card-network surcharge registration: tell Visa and Mastercard (through
+   Stripe's surcharging guide/acquirer) at least **30 days before**
+   surcharging, and check state rules (Pennsylvania allows surcharges).
+3. Counsel approves the disclosure wording ("A 3% surcharge applies to
+   credit card payments; no surcharge on debit cards or bank payments. The
+   surcharge is not greater than our cost of accepting credit cards.") and
+   the receipt, and the board records the surcharge rule with its citation.
+4. A restore-and-migrate drill (CLAUDE.md) and one real end-to-end payment
+   of each kind in test mode on the production server's settings.
+5. Live restricted key with the same rights, entered with the same hidden
+   prompt, and `DEPLOYMENT_STAGE=production` plus `PAYMENTS_LIVE_ALLOWED=true`
+   in the production `.env`. The portal refuses live keys without both, and
+   refuses test keys in production.

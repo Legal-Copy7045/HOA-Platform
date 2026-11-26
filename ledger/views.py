@@ -29,7 +29,9 @@ from ledger.models import (
     ResaleRequest,
 )
 from operations.models import ExpenseCategory
-from payments.services import online_payments_enabled, payment_options
+from payments.checkout import payable_lot_ids
+from payments.providers import config as payments_config
+from payments.services import disclosure, online_payments_enabled, payment_options
 
 
 def _date(**kw):
@@ -104,12 +106,23 @@ def _ownership_start(user, lot_id):
     return policy.roles_for(user).lot_since.get(lot_id)
 
 
+def _online_receipts(user, lot_id, since):
+    """Online payments on this account in the viewer's own time (receipts)."""
+    from payments.models import StripePayment
+
+    rows = StripePayment.objects.for_user(user).filter(lot_id=lot_id)
+    if since:
+        rows = rows.filter(recorded_at__date__gte=since)
+    return list(rows[:12])
+
+
 @login_required
 def my_account(request):
     from community.models import CommunityProfile
 
     policy.require(request.user, "ledger.view_own")
-    online = online_payments_enabled()
+    online = online_payments_enabled(request)
+    payable = payable_lot_ids(request.user) if online else frozenset()
     accounts = []
     for lot in Lot.objects.for_user(request.user).filter(
         pk__in=policy.roles_for(request.user).account_lot_ids
@@ -127,6 +140,8 @@ def my_account(request):
                 "due": services.amount_due(lot.pk),
                 "upcoming": services.upcoming_charges(statement.balance, lot_id=lot.pk),
                 "pay_options": payment_options(statement.balance) if online else [],
+                "can_pay_online": lot.pk in payable,
+                "online_receipts": _online_receipts(request.user, lot.pk, since),
                 **my_account_people(request.user, lot.pk),
             }
         )
@@ -137,6 +152,8 @@ def my_account(request):
         {
             "accounts": accounts,
             "online": online,
+            "test_mode": online and not payments_config().livemode,
+            "disclosure": disclosure() if online else "",
             "payable_to": profile.legal_name,
             "remit_lines": [line for line in profile.remit_to.splitlines() if line.strip()],
         },

@@ -224,6 +224,22 @@ class Command(BaseCommand):
                     reference="4001",
                     actor=b1,
                 )
+        # Open-item accounting (D32-payments): an invoice partly paid and directed.
+        gate = ledger.post_charge(
+            lot=lots[3],
+            kind="other_charge",
+            amount_cents=6000,
+            description="Gate remote replacement (demo)",
+            actor=b1,
+        )
+        ledger.record_payment(
+            lot=lots[3],
+            amount_cents=2500,
+            received_on=t,
+            reference="5001",
+            apply_to=[gate.pk],
+            actor=b1,
+        )
         ledger.open_case(lot=lots[27], actor=b1)
 
         comms.publish_announcement(

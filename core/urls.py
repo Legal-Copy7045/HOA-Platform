@@ -55,6 +55,7 @@ urlpatterns = [
     path("", include("arc.urls")),
     path("", include("compliance.urls")),
     path("", include("ledger.urls")),
+    path("", include("payments.urls")),
     path("", include("reports.urls")),
 ]
 

@@ -1,0 +1,13 @@
+# Open-item accounting and Stripe online payments (D32-payments). `match` runs over "<stage>:<check>".
+- feature: "Open-item accounting: payments applied to specific charges (append-only applications, charge numbers, application-order rule, directed payments, prepayment drawdown, reversals reopen charges, history rebuilt with balances unchanged)"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_allocation\\.py::test_"]
+- feature: "Credit card surcharge only (bank and debit no fee), capped at 3%, disclosed before paying"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:payments/tests/test_fees\\.py::test_", "^unit:ledger/tests/test_finance_ux\\.py::test_my_account_(hides|shows)_pay_online"]
+- feature: "Stripe hosted Checkout in test mode: pull-only confirmation (no webhook), bound PendingCheckout, every-field verification, mode-safe keys, ACH processing and returns, refunds and disputes as board items, surcharge safety net without refund rights, receipts, payouts and three-way reconciliation"
+  since: M5
+  docs: docs/runbook.md
+  match: ["^unit:payments/tests/test_stripe\\.py::test_", "^manual:stripe test payment"]

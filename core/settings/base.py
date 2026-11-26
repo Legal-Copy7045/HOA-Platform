@@ -300,8 +300,17 @@ FILE_UPLOAD_HANDLERS = [
 # Decision D21: late fees may be posted (by the board, or automatically when
 # the late_fee.auto_apply rule is on). This stays as an emergency off switch.
 LEDGER_LATE_FEES_ENABLED = env.bool("LEDGER_LATE_FEES_ENABLED", default=True)
-# Online payments: "none" (placeholder) or "stripe" (hosted Checkout, later).
+# Online payments (D32-payments): "none" or "stripe" (hosted Checkout; the app
+# never sees card or bank numbers). The key lives only in the server's .env:
+# a Stripe restricted key (rk_...) with read-only rights except Checkout
+# Sessions. Test keys are refused in production; live keys only in
+# production with PAYMENTS_LIVE_ALLOWED=true (payments/providers.py).
 PAYMENTS_PROVIDER = env("PAYMENTS_PROVIDER", default="none")
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
+PAYMENTS_LIVE_ALLOWED = env.bool("PAYMENTS_LIVE_ALLOWED", default=False)
+# Where this server runs: "local", "poc" or "production" (production
+# settings default to "production").
+DEPLOYMENT_STAGE = env("DEPLOYMENT_STAGE", default="local")
 
 # --- Installable app: push notifications (Milestone 4) ---------------------------------
 # Web Push (VAPID) keys: base64url, as printed by `manage.py generate_vapid_keys`.

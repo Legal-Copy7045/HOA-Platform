@@ -196,6 +196,7 @@ SECTIONS = [
             ("Budgets", "budgets", "chart", "finance.view"),
             ("Collections", "collections", "dollar", "finance.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
+            ("Online payments", "online_payments", "wallet", "finance.view"),
             ("Resale certificates", "resales", "file", "resale.manage"),
             ("Reports", "reports", "chart", "reports.view"),
         ],

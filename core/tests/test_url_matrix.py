@@ -269,6 +269,13 @@ PROTECTED = {
     "access_review_record": ("POST", None),
     "retention": ("GET", None),
     "retention_run": ("POST", None),
+    # Online payments (D32-payments; the feature is switched on in world()).
+    "pay_online": ("GET", "lot_id_b"),
+    "pay_checkout": ("POST", "lot_id_b"),
+    "pay_return": ("GET", "checkout_b"),
+    "payment_receipt": ("GET", "payment_b"),
+    "online_payments": ("GET", None),
+    "payment_alert_resolve": ("POST", "alert_b"),
 }
 
 
@@ -494,7 +501,52 @@ def world():
             actor=owner_b,
         )
         reservations.approve(reservation_b, actor=board)
+        # Online payments: owner B's checkout, payment and a board item on it.
+        import secrets
+
+        from core.scoping import system_access
+        from payments.models import PaymentAlert, PendingCheckout, StripePayment
+
+        FeatureSetting.objects.create(key="online_payments", enabled=True)
+        with system_access("t"):
+            checkout_b = PendingCheckout.objects.create(
+                nonce=secrets.token_hex(32),
+                lot=lot_b,
+                account=account_b,
+                person=person_b,
+                user=owner_b,
+                method="bank",
+                base_cents=5000,
+                total_cents=5000,
+                expires_at=timezone.now() + timedelta(hours=24),
+                session_id="cs_test_matrixb",
+                state="paid",
+            )
+            entry_b = ledger.record_online_payment(
+                lot=lot_b,
+                amount_cents=5000,
+                received_on=timezone.localdate(),
+                payment_intent_id="pi_test_matrixb",
+                apply_to=[],
+                actor=SYSTEM,
+            )
+            payment_b = StripePayment.objects.create(
+                checkout=checkout_b,
+                lot=lot_b,
+                entry=entry_b,
+                payment_intent_id="pi_test_matrixb",
+                charge_id="py_test_matrixb",
+                method="bank",
+                funding="bank",
+                base_cents=5000,
+            )
+            alert_b = PaymentAlert.objects.create(
+                kind="refund", key="re_test_matrixb", lot=lot_b, detail="Lot B refund"
+            )
     targets = {
+        "checkout_b": checkout_b.pk,
+        "payment_b": payment_b.pk,
+        "alert_b": alert_b.pk,
         "reservation_b": reservation_b.pk,
         "area": area.pk,
         "account_b": account_b.pk,
@@ -615,7 +667,7 @@ def _url(name, key, targets):
         kwargs["action"] = "submit"
     elif name == "invoice_file":
         kwargs["file_id"] = targets["invoice_file"]
-    elif name == "my_statement_pdf":
+    elif name == "my_statement_pdf" or name in ("pay_online", "pay_checkout"):
         kwargs = {"lot_id": targets["lot_id_b"]}
     elif name == "lot_ledger_action":
         kwargs["action"] = "credit"

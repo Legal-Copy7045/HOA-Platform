@@ -18,6 +18,7 @@ TABS = (
     ("Vendors", "vendors", "/finance/vendors", None, "work_orders"),
     ("Budgets", "budgets", "/finance/budgets", None, None),
     ("Accounting", "accounting", "/finance/accounting", None, None),
+    ("Online payments", "online_payments", "/finance/online-payments", None, "online_payments"),
     ("Collections", "collections", "/finance/collections", None, None),
     ("Letters", "letters_settings", "/finance/letters", "letters.manage", None),
     ("Resale", "resales", "/resale", "resale.request", "resale"),

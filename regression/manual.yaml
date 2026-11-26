@@ -139,3 +139,7 @@
   check: "setup-offsite-backups.sh reports 'Locked'; the bucket shows the backup files under backups/; deleting one in the Cloudflare dashboard is refused; System status Backups shows the off-site age and 'lock verified'; restore-drill.sh --from-offsite passes."
   steps: "Follow docs/runbook.md 'Off-site backups that cannot be deleted'; then try deleting a backups/ object in the R2 dashboard; open System status; run the off-site drill."
   last: ""
+- key: stripe test payment
+  check: "With test keys on the POC and Online payments switched on: an owner pays one charge by credit card 4242 4242 4242 4242 (surcharge shown first, TEST MODE banner), by debit card 4000 0566 5566 5556 (no fee) and by a test bank account (processing, then paid next day); each shows on My account against the chosen charge, a receipt email and PDF arrive, and Finance -> Online payments shows the payment, the payout and 'matches'."
+  steps: "Follow docs/runbook.md 'Online payments (Stripe)' test-mode setup; sign in as a demo owner; Pay online three times; next day open Finance -> Online payments; on a phone check the pay page fits the screen."
+  last: ""

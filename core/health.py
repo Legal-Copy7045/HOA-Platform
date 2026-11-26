@@ -153,6 +153,12 @@ def _backups():
     return True, f"Last backup {local} h ago; off-site {remote} h ago, {locked}"
 
 
+def _payments():
+    from payments.sync import health
+
+    return health()
+
+
 CHECKS = [
     ("database", "Database", _database),
     ("worker", "Background worker", _worker),
@@ -162,6 +168,7 @@ CHECKS = [
     ("errors", "Server errors", _errors),
     ("email", "Outgoing email", _email),
     ("backups", "Backups", _backups),
+    ("payments", "Online payments", _payments),
 ]
 
 

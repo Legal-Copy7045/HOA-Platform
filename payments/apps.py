@@ -3,4 +3,4 @@ from django.apps import AppConfig
 
 class PaymentsConfig(AppConfig):
     name = "payments"
-    verbose_name = "Online payments (placeholder)"
+    verbose_name = "Online payments (Stripe hosted Checkout)"

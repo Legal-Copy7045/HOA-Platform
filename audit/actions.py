@@ -310,6 +310,43 @@ _SPECS = [
     _spec("arc.edited", "ARC draft edited by the owner", "fields"),
     # --- Regression fixes: operations, ledger, notifications (fix_ops) ---
     _spec("contract.approval_given", "Contract approval given", "have", "need"),
+    # --- Online payments (payments, D32-payments) ---
+    _spec(
+        "payments.checkout_started",
+        "Online payment started (Stripe Checkout)",
+        "lot_id",
+        "checkout_id",
+        "method",
+        "amount_cents",
+    ),
+    _spec(
+        "payments.recorded",
+        "Online payment confirmed by Stripe and recorded",
+        "lot_id",
+        "checkout_id",
+        "amount_cents",
+        "surcharge_cents",
+        "method",
+    ),
+    _spec(
+        "payments.mismatch",
+        "Stripe's record did not match; nothing recorded",
+        "checkout_id",
+        "code",
+    ),
+    _spec("payments.failed", "Online payment failed at Stripe", "checkout_id", "code"),
+    _spec("payments.returned", "Bank payment returned; payment reversed", "lot_id", "checkout_id"),
+    _spec("payments.refund_seen", "Refund seen at Stripe", "checkout_id", "amount_cents"),
+    _spec("payments.dispute_seen", "Dispute seen at Stripe", "checkout_id"),
+    _spec(
+        "payments.surcharge_refund_due",
+        "Surcharge paid with a non-credit card: board to refund it",
+        "checkout_id",
+        "amount_cents",
+    ),
+    _spec("payments.alert_resolved", "Online payment item closed", "alert_id", "kind"),
+    _spec("payments.reconciled", "Ledger compared with Stripe", "ok", "problems"),
+    _spec("payments.receipt_downloaded", "Payment receipt downloaded", "checkout_id"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

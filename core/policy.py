@@ -169,6 +169,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "access_review.record": frozenset({BOARD}),
     # Clearing former owners' contact details under the retention rule.
     "retention.manage": frozenset({BOARD}),
+    # --- Online payments (D32-payments) ---
+    # Owners on the deed and authorized contacts pay their own account; never
+    # view-only contacts, tenants, former owners or (as such) the manager.
+    "payments.pay": frozenset({OWNER, AUTHORIZED}),
+    # Closing online-payment problems (mismatches, refunds, disputes): board.
+    "payments.manage": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);
