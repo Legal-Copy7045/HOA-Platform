@@ -47,3 +47,6 @@
 - feature: "Duplicate check numbers: a reversed (bounced) payment does not block depositing the same check again; Record payments and the single payment form on the lot ledger follow the same rule (BUG-006)"
   since: M4
   match: ["^unit:ledger/tests/test_finance_ux.py::test_(record_payments_accepts_a_bounced_check|single_payment_form_follows)"]
+- feature: "Owner photos of the fix: the 10-photo allowance is checked inside the same locked transaction as the overall file cap, so parallel uploads cannot pass it or use up the board's room for evidence (R2-006)"
+  since: M4
+  match: ["^unit:compliance/tests/test_owner_notices.py::test_(owner_allowance_holds_under_parallel|label_allowance_is_checked)"]

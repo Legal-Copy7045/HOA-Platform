@@ -23,8 +23,18 @@ def _owner_key(obj) -> tuple[str, str]:
 
 
 def attach(
-    obj, uploaded, *, actor, label: str = "", allowed: set[str] | None = None, request=None
+    obj,
+    uploaded,
+    *,
+    actor,
+    label: str = "",
+    allowed: set[str] | None = None,
+    request=None,
+    label_max: int | None = None,
 ) -> Attachment:
+    """``label_max``: most files with this label the object may hold (e.g. an
+    owner's own allowance), checked under the same lock as the overall cap so
+    parallel uploads cannot pass it (review R2-006)."""
     try:
         kind = check_upload(uploaded, allowed=allowed or IMAGES_AND_PDF)
     except UploadRejected as exc:
@@ -55,6 +65,13 @@ def attach(
             raise DocumentError(
                 "This item already has the maximum number of files. Ask the board if you need more."
             )
+        if label_max is not None and attachments_for(obj).filter(label=label[:200]).count() >= (
+            label_max
+        ):
+            raise DocumentError(
+                f"No more files like this can be added (limit {label_max}). Send the board a"
+                " message if there's more to show."
+            )
         attachment.file.save("upload", uploaded, save=False)
         attachment.save()
     record_event(
@@ -71,7 +88,14 @@ MAX_FILES_PER_UPLOAD = 10
 
 
 def attach_many(
-    request, obj, uploads, *, actor, label: str = "", allowed: set[str] | None = None
+    request,
+    obj,
+    uploads,
+    *,
+    actor,
+    label: str = "",
+    allowed: set[str] | None = None,
+    label_max: int | None = None,
 ) -> int:
     """Attach several files chosen at once (``<input type=file multiple>``).
     The caller has already checked who may add files to ``obj``. Each file is
@@ -86,7 +110,15 @@ def attach_many(
         uploads = uploads[:MAX_FILES_PER_UPLOAD]
     for uploaded in uploads:
         try:
-            attach(obj, uploaded, actor=actor, label=label, allowed=allowed, request=request)
+            attach(
+                obj,
+                uploaded,
+                actor=actor,
+                label=label,
+                allowed=allowed,
+                request=request,
+                label_max=label_max,
+            )
         except DocumentError as exc:
             name = safe_filename(uploaded.name or "file", "x").rsplit(".", 1)[0][:80]
             problems.append(f"{name}: {exc}")
