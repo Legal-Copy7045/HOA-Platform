@@ -27,6 +27,10 @@
       <p><a class="btn secondary small" href="{% url 'paper_mail_test' %}?kind=envelope">Test envelope (PDF)</a></p>
       <p><a class="btn secondary small" href="{% url 'paper_mail_test' %}?kind=labels">Test label sheet (PDF)</a></p>
       <p class="small muted">Barcode: {% if current.barcode_on %}on (Mailer ID ending {{ current.mailer_id|slice:"-3:" }}){% else %}off{% endif %}.</p>
-    </section></aside>
+    </section>
+    {% if usps %}<section class="card" data-testid="usps-setup"><h3>USPS tracking</h3>
+      <p class="small">{% if usps.state == "failing" %}{% icon "alert" %} {% endif %}{{ usps.text }}</p>
+      <p class="small muted">Scans of barcoded letters are read from USPS Informed Visibility every 4 hours for 30 days after mailing. The USPS login is entered on the server only, never on these pages.{% if not current.barcode_on %} Switch on the tracking barcode above first.{% endif %}</p>
+    </section>{% endif %}</aside>
   </div>
 {% endblock %}

@@ -100,6 +100,11 @@ TELLER_ENVIRONMENT=development
 TELLER_CERTIFICATE_B64=
 TELLER_PRIVATE_KEY_B64=
 
+# USPS tracking (optional; sudo bash infra/poc/set-usps.sh fills these in).
+USPS_IV_ENVIRONMENT=cat
+USPS_IV_USERNAME=
+USPS_IV_PASSWORD=
+
 TUNNEL_TOKEN=${TUNNEL_TOKEN}
 ENV
 chmod 600 .env

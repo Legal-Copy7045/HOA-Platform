@@ -242,6 +242,12 @@ def _demo_data():
     return None
 
 
+def _usps_tracking():
+    from comms.usps_tracking import health
+
+    return health()
+
+
 def _payments():
     from payments.sync import health
 
@@ -321,6 +327,7 @@ CHECKS = [
     ("payments", "Online payments", _payments),
     ("assessment_posting", "Monthly assessment posting", _assessment_posting),
     ("demo_data", "Demo data", _demo_data),
+    ("usps_tracking", "USPS tracking", _usps_tracking),
 ]
 
 

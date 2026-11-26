@@ -465,6 +465,14 @@ def test_no_field_accepts_keys_or_secrets(client, board):
     assert "sudo bash infra/poc/set-stripe-key.sh" in html
 
 
+def test_server_step_shows_usps_setup_and_features_lists_usps_tracking(client, board):
+    html = client.get(step_url("server")).content.decode()
+    assert "USPS tracking" in html
+    assert "sudo bash infra/poc/set-usps.sh" in html  # not set up in tests
+    html = client.get(step_url("features")).content.decode()
+    assert 'name="feature__usps_tracking"' in html
+
+
 def test_posted_secrets_are_ignored(client, board, settings):
     fake = "sk_test_" + "x" * 8  # synthetic, never a real key
     settings.STRIPE_SECRET_KEY = None

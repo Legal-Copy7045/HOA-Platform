@@ -293,6 +293,17 @@ _SPECS = [
     _spec("mailing.printed", "Paper mailing printed", "format", "letters", "pages", "barcode"),
     _spec("mailing.mailed", "Paper mailing marked mailed", "kind", "letters", "homes"),
     _spec("mailing.settings_changed", "Paper mail settings changed", "window", "barcode"),
+    # USPS tracking (D60): counts only, never a barcode, address or name.
+    _spec(
+        "usps.polled",
+        "USPS scans read",
+        "queried",
+        "new_scans",
+        "not_found",
+        "not_ours",
+        "outcome",
+    ),
+    _spec("mailpiece.checked", "Letter with no USPS scan checked", "mailing_id"),
     _spec("meeting.status_changed", "Meeting held or cancelled", "status"),
     _spec("meeting.minutes_attached", "Minutes attached to meeting", "document_id"),
     _spec("meeting.attendance", "Attendance recorded", "person_id", "present"),

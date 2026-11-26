@@ -25,6 +25,11 @@ urlpatterns = [
         name="paper_mail_labels",
     ),
     path("paper-mail/<int:pk>/mailed/", papermail_views.paper_mail_mark, name="paper_mail_mark"),
+    path(
+        "paper-mail/<int:pk>/checked/",
+        papermail_views.paper_mail_piece_checked,
+        name="paper_mail_piece_checked",
+    ),
     path("announcements/", views.announcements, name="announcements"),
     path("announcements/<int:pk>/", views.announcement_detail, name="announcement_detail"),
     path("calendar/", views.calendar, name="calendar"),

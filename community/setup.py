@@ -179,7 +179,8 @@ STEPS: list[Step] = [
     Step(
         "server",
         "Server and email",
-        "Outgoing email, backups, the off-site copy and the payment and bank keys. These "
+        "Outgoing email, backups, the off-site copy, the payment and bank keys and the USPS "
+        "tracking login. These "
         "are done on the server by a sysadmin; this step shows where things stand.",
         kind=SERVER,
     ),
