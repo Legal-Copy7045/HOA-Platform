@@ -3,6 +3,7 @@ import datetime
 import pytest
 from django.core.exceptions import PermissionDenied
 from django.urls import reverse
+from django.utils import timezone
 
 from community import services as community
 from community.models import Ownership, Person, Role
@@ -211,7 +212,7 @@ def test_owner_requests_resale_only_for_own_lot(w):
 
 def test_bounced_payment_restores_the_age_of_the_old_charge(w):
     """D2: the reversal was aged as a new charge dated today."""
-    old = datetime.date.today() - datetime.timedelta(days=120)
+    old = timezone.localdate() - datetime.timedelta(days=120)
     services.post_charge(
         lot=w["lot"],
         kind="other_charge",
@@ -230,7 +231,7 @@ def test_bounced_payment_restores_the_age_of_the_old_charge(w):
 
 
 def test_reversed_mistaken_charge_does_not_pay_down_old_debt(w):
-    old = datetime.date.today() - datetime.timedelta(days=120)
+    old = timezone.localdate() - datetime.timedelta(days=120)
     services.post_charge(
         lot=w["lot"],
         kind="other_charge",

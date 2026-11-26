@@ -5,7 +5,7 @@
   <div class="page-head"><div><h1>System status</h1><p class="subtitle">System health only. Sysadmins do not see owner data (decision D9).</p></div></div>
   {% if thin %}<div class="alert warning">{% icon "alert" %}<span>Actions fewer than two people with MFA can perform: {% for a, n in thin.items %}{{ a|humanize_action }} ({{ n }}){% if not forloop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}
   <section class="card"><h2>Health checks</h2>
-    <ul class="list">{% for r in health %}<li><div class="todo-icon tone-{% if r.ok %}success{% else %}danger{% endif %}">{% if r.ok %}{% icon "check" %}{% else %}{% icon "alert" %}{% endif %}</div><div class="grow"><div class="title">{{ r.label }}</div><div class="small muted">{{ r.detail }}</div></div></li>{% endfor %}</ul>
+    <ul class="list">{% for r in health %}<li><div class="todo-icon tone-{% if r.ok %}success{% else %}danger{% endif %}">{% if r.ok %}{% icon "check" %}{% else %}{% icon "alert" %}{% endif %}</div><div class="grow"><div class="title">{{ r.label }}</div><div class="small muted">{{ r.detail }}</div></div>{% if not r.ok and r.key in clearable %}<form method="post" data-confirm="Clear this check? Do it once the cause is fixed; it fails again if the problem comes back.">{% csrf_token %}<input type="hidden" name="action" value="clear_check"><input type="hidden" name="check" value="{{ r.key }}"><button type="submit" class="secondary small">Clear</button></form>{% endif %}</li>{% endfor %}</ul>
     <p class="small muted">Sysadmins are emailed when a check starts failing, every {{ 6 }} hours while it fails, and when it recovers.</p></section>
   <div class="grid grid-4">
     <div class="stat {% if update and update.s.state == 'failed' %}tone-danger{% elif update and update.s.behind %}tone-warning{% else %}tone-success{% endif %}"><div class="label">Version</div><div class="value small-value">{{ version }}</div>
@@ -28,7 +28,8 @@
     <div class="stat {% if email_redirect %}tone-warning{% endif %}"><div class="label">Email redirect (POC)</div><div class="value small-value">{% if email_redirect %}On{% else %}Off{% endif %}</div>{% if email_redirect %}<div class="hint">All mail goes to one inbox</div>{% endif %}
       <form method="post" class="hint">{% csrf_token %}<input type="hidden" name="action" value="test_email"><button type="submit" class="secondary small">Send me a test email</button></form></div>
     <div class="stat {% if not update.host or update.host_problem %}tone-warning{% else %}tone-success{% endif %}"><div class="label">Host security</div>
-      {% if update.host %}<ul class="hint">{% for label, state, ok in update.host %}<li>{{ label }}: {% if ok %}on{% else %}<strong>{{ state }}</strong>{% endif %}</li>{% endfor %}</ul>
+      {% if update.host %}<div class="value small-value">{% if update.host_problem %}Needs attention{% else %}All on{% endif %}</div>
+        <ul class="stat-list">{% for label, state, ok in update.host %}<li><span>{{ label }}</span><span class="status {% if ok %}tone-success{% else %}tone-warning{% endif %}">{% if ok %}On{% else %}{{ state|capfirst }}{% endif %}</span></li>{% endfor %}</ul>
       {% else %}<div class="value small-value">Not set up</div><div class="hint">Run infra/poc/harden-host.sh once on the VM (see the runbook, Host security).</div>{% endif %}</div>
     <div class="stat {% if scanner == 'none' %}tone-warning{% endif %}"><div class="label">Malware scanning</div><div class="value small-value">{% if scanner == 'none' %}Off{% else %}{{ scanner }}{% endif %}</div><div class="hint">{% if scanner == 'none' %}Uploads are not scanned{% elif require_clean_scan %}Only clean files download{% else %}Unscanned files still download{% endif %}</div></div>
   </div>

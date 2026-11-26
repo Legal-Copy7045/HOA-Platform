@@ -6,6 +6,7 @@ import re
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 
 from audit.models import AuditEvent
 from comms import services as comms
@@ -105,7 +106,7 @@ def test_date_range_filter(client, w):
     )
     compliance.report(lot=w["lot_a"], category="trash", description="New", actor=w["board"])
     client.force_login(w["board"])
-    since = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
+    since = (timezone.localdate() - datetime.timedelta(days=7)).isoformat()
     page = client.get(reverse("violations"), {"from": since, "show": "all"}).content.decode()
     assert len(re.findall(r'href="/violations/\d+/"', page)) == 1
 

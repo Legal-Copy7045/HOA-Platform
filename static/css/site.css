@@ -360,6 +360,9 @@ ul.links a:hover { text-decoration: underline; }
 button.block, .btn.block { width: 100%; justify-content: center; }
 .code-card .secret { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 2rem; letter-spacing: .15em; text-align: center; padding: 1rem; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 10px; }
 .stat .small-value { font-size: 1.05rem; line-height: 1.4; }
+.stat-list { list-style: none; margin: .5rem 0 0; padding: 0; font-size: .85rem; }
+.stat-list li > span:first-child { color: var(--ink-2); }
+.stat-list li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .3rem 0; border-top: 1px solid var(--line-2); }
 @media (max-width: 640px) { .amount-big { font-size: 1.5rem; } .card-head { flex-wrap: wrap; } }
 details.coverage summary { cursor: pointer; font-weight: 600; }
 details.coverage ul { columns: 2; column-gap: 2rem; }

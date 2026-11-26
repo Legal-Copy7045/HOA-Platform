@@ -10,6 +10,7 @@ import pytest
 from django.core import mail
 from django.core.exceptions import PermissionDenied
 from django.urls import reverse
+from django.utils import timezone
 
 from audit.models import AuditEvent
 from community import services as community
@@ -24,7 +25,7 @@ from operations.models import ExpenseCategory, Invoice, InvoicePayment, Vendor
 
 pytestmark = pytest.mark.django_db
 D = datetime.date
-TODAY = datetime.date.today()
+TODAY = timezone.localdate()
 
 
 @pytest.fixture

@@ -7,6 +7,7 @@ from unittest import mock
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 
 from audit.models import AuditEvent
 from community import services as community
@@ -19,7 +20,7 @@ from ledger.models import DepositBatch, EntryKind, LedgerEntry
 
 pytestmark = pytest.mark.django_db
 D = datetime.date
-TODAY = datetime.date.today()
+TODAY = timezone.localdate()
 
 
 @pytest.fixture
