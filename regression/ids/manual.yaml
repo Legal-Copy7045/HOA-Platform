@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-077
+# highest issued: MAN-078
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -77,3 +77,4 @@ MAN-074: "server tasks on the VM"
 MAN-075: "waiting files clear after a scanner restart"
 MAN-076: "restore drill heartbeat"
 MAN-077: "dependabot compose pull request"
+MAN-078: "accept an invitation on a phone and a laptop"

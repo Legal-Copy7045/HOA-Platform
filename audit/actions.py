@@ -70,6 +70,10 @@ _SPECS = [
     _spec("auth.logout", "Signed out"),
     _spec("auth.login_failed", "Failed sign-in"),
     _spec("auth.lockout", "Sign-in locked out after repeated failures"),
+    # D59: a login with no passkey or app was signed out (no setup window here).
+    _spec(
+        "auth.setup_window_closed", "Signed out: no passkey or app and no setup window", "reason"
+    ),
     _spec("mfa.authenticator_added", "Authenticator added", "type"),
     _spec("mfa.authenticator_removed", "Authenticator removed", "type"),
     _spec("mfa.recovery_codes_regenerated", "Recovery codes regenerated", "type"),
@@ -77,11 +81,12 @@ _SPECS = [
     _spec("password.reset", "Password reset by email link"),
     # invitations (step 6)
     _spec("person.login_linked", "Login linked to a person", "person_id", "user_id"),
-    _spec("invite.created", "Invitation created", "person_id"),
+    # setup_again: a new setup link for a login that never enrolled (D59).
+    _spec("invite.created", "Invitation created", "person_id", "setup_again"),
     _spec("invite.resent", "Invitation re-sent", "person_id"),
     _spec("invite.revoked", "Invitation revoked", "person_id"),
     _spec("invite.sent", "Invitation email sent", "person_id", "send_count"),
-    _spec("invite.accepted", "Invitation accepted", "person_id"),
+    _spec("invite.accepted", "Invitation accepted", "person_id", "setup_again"),
     # two-person flows (step 7)
     _spec("role.sysadmin_nominated", "Sysadmin nominated", "person_id"),
     _spec("role.sysadmin_approved", "Sysadmin nomination approved", "person_id"),

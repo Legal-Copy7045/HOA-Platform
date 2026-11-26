@@ -6,6 +6,20 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.27.0 — 2026-11-26
+
+- Someone who accepted their invitation but closed the browser before adding
+  a passkey or app is no longer stuck. The board sees them on Sign-ups as
+  "Signed in, no passkey or app yet" and in My items after a week, and can
+  send a new setup link to the address on record. Anyone who ever had a
+  passkey or app still needs the two-board-member sign-in reset.
+- The "Your setup link expired" page says what happened and what to do next.
+- An invitation link stops working as soon as the person's email on record
+  changes.
+- Being signed out for having no passkey or app is recorded in the audit
+  log. New tests check that every page in the portal sends a login without
+  a passkey or app to setup (D59).
+
 ## 0.26.0 — 2026-11-26
 
 Hardening after an external review (D57).

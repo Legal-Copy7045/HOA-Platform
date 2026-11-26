@@ -30,6 +30,81 @@ class InvitationError(ValueError):
     """Safe to show to the user."""
 
 
+# A login stuck without a passkey or app for this long shows on the board's
+# My items (D59).
+STUCK_WITHOUT_AUTHENTICATOR_DAYS = 7
+
+
+def setup_again_refusal(person: Person) -> str | None:
+    """Why a person who already has a login cannot be sent a new setup link,
+    or None when they can (D59).
+
+    Only a login that has *never* had a passkey or authenticator app: the
+    first setup link was the only thing that let them in, and a new one is no
+    weaker. Anyone who ever enrolled, or went through an assisted reset, needs
+    the two-board-member reset instead (D5): one board member and the mailbox
+    must never be enough to replace a lost authenticator.
+    """
+    from accounts.auth import has_strong_authenticator
+    from accounts.models import MfaReset
+    from audit.models import AuditEvent
+
+    with system_access("setup link check"):
+        user = User.objects.filter(pk=person.user_id).first()
+        if user is None:
+            return "This person has no login yet: send an ordinary invitation."
+        if not user.is_active:
+            return "This login is switched off."
+        if has_strong_authenticator(user):
+            return "This person already has a passkey or authenticator app."
+        if (
+            MfaReset.objects.unscoped("setup link check").filter(subject=user).exists()
+            or AuditEvent.objects.filter(action="mfa.authenticator_added", actor=user).exists()
+        ):
+            return (
+                "This login has had a passkey or app before. Start a sign-in reset "
+                "instead (two board members)."
+            )
+        if normalize_email_address(person.email or "") != user.email:
+            return (
+                "The login's email differs from the person's record. Start a sign-in "
+                "reset instead (two board members)."
+            )
+    return None
+
+
+def stuck_logins(older_than_days: int = STUCK_WITHOUT_AUTHENTICATOR_DAYS) -> list[Person]:
+    """People whose login has had no passkey or app for ``older_than_days``,
+    with no open setup link or reset waiting (board only: the caller checks)."""
+    from allauth.mfa.models import Authenticator
+
+    from accounts.models import MfaReset
+
+    cutoff = timezone.now() - timedelta(days=older_than_days)
+    with system_access("stuck logins"):
+        enrolled = Authenticator.objects.filter(
+            type__in=[Authenticator.Type.TOTP, Authenticator.Type.WEBAUTHN]
+        ).values("user_id")
+        # An open setup link, or one accepted within the period, is still in hand.
+        open_links = (
+            Invitation.objects.pending() | Invitation.objects.filter(accepted_at__gt=cutoff)
+        ).values("person_id")
+        open_resets = (
+            MfaReset.objects.unscoped("stuck logins")
+            .filter(cancelled_at__isnull=True, code_used_at__isnull=True)
+            .values("subject_id")
+        )
+        return list(
+            Person.objects.filter(
+                user__isnull=False, user__is_active=True, user__date_joined__lte=cutoff
+            )
+            .exclude(user_id__in=enrolled)
+            .exclude(pk__in=open_links)
+            .exclude(user_id__in=open_resets)
+            .order_by("display_name")
+        )
+
+
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -59,9 +134,13 @@ def create_invitation(
     email = normalize_email_address(person.email or "")
     if not email:
         raise InvitationError("Add an email address to this person's record before inviting them.")
-    if person.user_id is not None:
-        raise InvitationError("This person already has a login.")
-    if User.objects.filter(email=email).exists():
+    setup_again = person.user_id is not None
+    if setup_again:
+        # D59: a new setup link, only for a login that never finished setting up.
+        refusal = setup_again_refusal(person)
+        if refusal:
+            raise InvitationError(refusal)
+    elif User.objects.filter(email=email).exists():
         raise InvitationError("That email address already belongs to a login.")
     now = timezone.now()
     with transaction.atomic(), system_access("create_invitation"):
@@ -80,7 +159,7 @@ def create_invitation(
             actor=_actor_user(actor),
             request=request,
             target=invitation,
-            metadata={"person_id": person.pk},
+            metadata={"person_id": person.pk, "setup_again": setup_again},
             channel=Channel.WEB if request else Channel.CLI,
         )
         if send_email:
@@ -175,6 +254,11 @@ def _matches_record(invitation: Invitation) -> bool:
     return bool(on_file) and invitation.email == on_file
 
 
+def matches_record(invitation: Invitation) -> bool:
+    """Still addressed to the email on the person's record (not changed since)."""
+    return _matches_record(invitation)
+
+
 def token_hash(token: str) -> str:
     return _hash(token)
 
@@ -192,14 +276,29 @@ def accept_invitation(invitation: Invitation, *, password: str, request=None) ->
         invitation = Invitation.objects.select_for_update().get(pk=invitation.pk)
         if invitation.status != "pending" or not _matches_record(invitation):
             raise InvitationError("This invitation is no longer valid.")
-        if User.objects.filter(email=invitation.email).exists():
-            raise InvitationError("That email address already belongs to a login.")
-        user = User(email=invitation.email)
-        validate_password(password, user)
-        user.set_password(password)
-        user.save()
-        EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
-        community.link_login(invitation.person, user, actor=SYSTEM, request=request)
+        person = Person.objects.select_for_update().get(pk=invitation.person_id)
+        setup_again = person.user_id is not None
+        if setup_again:
+            # D59: a new setup link for a login that never finished setting
+            # up. Checked again here: the login may have enrolled, or been
+            # through a reset, since the link was sent.
+            if setup_again_refusal(person):
+                raise InvitationError("This invitation is no longer valid.")
+            user = User.objects.select_for_update().get(pk=person.user_id)
+            validate_password(password, user)
+            user.set_password(password)
+            # Any other half-finished session of this login ends now.
+            user.session_generation += 1
+            user.save(update_fields=["password", "session_generation"])
+        else:
+            if User.objects.filter(email=invitation.email).exists():
+                raise InvitationError("That email address already belongs to a login.")
+            user = User(email=invitation.email)
+            validate_password(password, user)
+            user.set_password(password)
+            user.save()
+            EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+            community.link_login(person, user, actor=SYSTEM, request=request)
         invitation.accepted_at = timezone.now()
         invitation.accepted_user = user
         invitation.token_hash = ""  # nosec B105 - clearing a hash, not a secret
@@ -209,7 +308,7 @@ def accept_invitation(invitation: Invitation, *, password: str, request=None) ->
             actor=user,
             request=request,
             target=invitation,
-            metadata={"person_id": invitation.person_id},
+            metadata={"person_id": invitation.person_id, "setup_again": setup_again},
         )
     return user
 
@@ -256,6 +355,13 @@ def onboarding_rows() -> list[dict]:
         latest = {}
         for inv in Invitation.objects.order_by("created_at"):
             latest[inv.person_id] = inv
+        from allauth.mfa.models import Authenticator
+
+        enrolled = set(
+            Authenticator.objects.filter(
+                type__in=[Authenticator.Type.TOTP, Authenticator.Type.WEBAUTHN]
+            ).values_list("user_id", flat=True)
+        )
         rows, seen = [], set()
         for o in owners:
             person = o.person
@@ -263,7 +369,11 @@ def onboarding_rows() -> list[dict]:
                 continue
             seen.add(person.pk)
             inv = latest.get(person.pk)
-            if person.user_id:
+            if person.user_id and person.user_id not in enrolled:
+                # D59: signed in once but never added a passkey or app, so
+                # they cannot get back in. Not "signed up".
+                status = "no_authenticator"
+            elif person.user_id:
                 status = "signed_up"
             elif not person.email:
                 status = "no_email"
@@ -281,6 +391,7 @@ def onboarding_rows() -> list[dict]:
 
 ONBOARDING_LABELS = {
     "signed_up": "Signed up",
+    "no_authenticator": "Signed in, no passkey or app yet",
     "invited": "Invitation sent",
     "expired": "Invitation expired",
     "not_invited": "Not invited yet",

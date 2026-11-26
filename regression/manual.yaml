@@ -14,7 +14,7 @@
   steps: "Invite a test person; check the message headers for dkim=pass; accept; add a passkey within the hour."
   last: "not done yet (POC redirects mail to one inbox)"
 - key: enrollment window expiry
-  check: "An invited person who closes the browser before adding a passkey or app is shown 'Your account isn't set up yet' next time and needs a new invitation."
+  check: "An invited person who closes the browser before adding a passkey or app is shown 'Your setup link expired' next time and needs a new setup link from the board (D59)."
   steps: "Accept an invitation, close the browser without enrolling; sign in again with the password."
   last: "not done yet"
 - key: assisted reset end to end
@@ -305,4 +305,8 @@
 - key: dependabot compose pull request
   check: "Dependabot opens a pull request for a newer cloudflared, ClamAV, SeaweedFS, Mailpit or Postgres 16 image that changes the tag and digest in the compose file, and CI (docker, image-scan, pages) runs on it; after the merge, System status Install updates the VM and no hoa-cloudflared-update timer remains."
   steps: "GitHub, Pull requests, filter author dependabot; check the checks; after installing, systemctl list-timers on the VM."
+  last: ""
+- key: accept an invitation on a phone and a laptop
+  check: "An invitation accepted on a phone with a passkey, and another on a laptop with an authenticator app, both end with recovery codes and then the dashboard. Closing the browser midway (before the passkey or app) shows 'Your setup link expired' at the next sign-in; the board sees 'Signed in, no passkey or app yet' on Sign-ups, sends a new setup link, and the person finishes setting up from it."
+  steps: "Board: invite two demo people. Person 1 on a phone: open the link, choose a password, Use this phone's fingerprint or face, save recovery codes. Person 2 on a laptop: open the link, choose a password, Use an authenticator app instead, scan the QR code, save codes. Person 3: open the link, choose a password, close the browser; sign in again; board: Homes and owners, Sign-ups, Send a new setup link; person 3 opens the new link and finishes."
   last: ""
