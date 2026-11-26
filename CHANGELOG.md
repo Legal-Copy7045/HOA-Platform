@@ -6,6 +6,19 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.31.0 — 2026-11-26
+
+- Can't sign in? The sign-in page now has one help link instead of two. It
+  asks what's wrong and takes you to the right step: forgot your password
+  (the emailed reset, as before); lost your phone, passkey or app (type a
+  recovery code or use another device, otherwise recover your sign-in after
+  the waiting period); setup link expired or never finished (ask the board
+  for a new setup link, which shows on the board's My items); no access to
+  your email (the board helps, with who to contact); locked out (how long to
+  wait, from the settings in effect, then Try again). None of these pages
+  says whether an account exists. Old links to the password reset and
+  account recovery still work.
+
 ## 0.30.0 — 2026-11-26
 
 - Votes and elections are timeboxed (D61): opening one needs an opening and

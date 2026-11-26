@@ -747,11 +747,13 @@ def test_audit_metadata_is_allowlisted_and_has_no_contact_details(client, locked
 
 
 def test_signin_help_explains_recovery_and_the_board_reset(client):
-    page = client.get(reverse("signin_help")).content.decode()
-    assert "I've lost my phone and recovery codes" in page
-    assert reverse("recovery_request") in page
+    """D62: Can't sign in?, lost phone, no recovery code or other device."""
+    page = client.get(reverse("signin_help_device")).content.decode()
+    assert "recovery code" in page and "another device" in page
+    response = client.get(reverse("signin_help_device"), {"have": "no"})
+    assert response["Location"] == reverse("recovery_request")
+    page = client.get(reverse("recovery_request")).content.decode()
     assert "48 hours" in page and "two board members" in page
-    assert "recovery codes" in page and "another device" in page
 
 
 def test_recovery_request_page_is_a_sign_in_step(client):

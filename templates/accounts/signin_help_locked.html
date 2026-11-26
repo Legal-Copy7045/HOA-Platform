@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load portal signin %}
+{% block title %}Too many attempts · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% signin_contact as contact %}
+  <h1>Too many attempts</h1>
+  <p>For your security, sign-in pauses after too many wrong tries. Nothing is wrong with your account, and nothing is lost: it starts working again by itself.</p>
+  <div class="alert warning">{% icon "clock" %}<span>After {{ pauses.limit }} wrong passwords in a row for one email, sign-in with that email is paused for <strong>{{ pauses.wait }}</strong>. Wait that long, then try again.</span></div>
+  <ul class="small">
+    {% for line in pauses.others %}<li>{{ line }}</li>{% endfor %}
+    <li>An emailed sign-in code stops working after {{ pauses.code_attempts }} wrong tries: ask for a new one.</li>
+  </ul>
+  <p>Have a passkey? "Sign in with a passkey" works even while sign-in with a password is paused.</p>
+  <p class="small muted">Not sure of your password? Don't keep guessing: go back and choose "I forgot my password". If you think someone else is trying to get into your account, tell the board{% if contact %}: {{ contact }}{% endif %}.</p>
+  <div class="form-actions"><a class="btn block" href="{% url 'account_login' %}">Try again</a></div>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'signin_help' %}">Back</a></div>
+{% endblock %}

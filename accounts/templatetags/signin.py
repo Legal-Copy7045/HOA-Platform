@@ -50,3 +50,42 @@ def enrollment_window() -> str:
     from django.conf import settings
 
     return duration_words(datetime.timedelta(seconds=settings.MFA_ENROLLMENT_WINDOW_SECONDS))
+
+
+def login_pauses() -> dict:
+    """The sign-in pauses in plain words, from the settings in effect (D62).
+
+    ``wait``: the django-axes pause after ``AXES_FAILURE_LIMIT`` wrong
+    passwords for one email from one connection (``AXES_COOLOFF_HOURS``).
+    ``others``: allauth's ``login_failed`` limits, per connection and per
+    email address (``ACCOUNT_RATE_LIMITS``). ``code_attempts``: wrong
+    emailed sign-in codes before a new one is needed.
+    """
+    from allauth.account import app_settings as allauth_settings
+    from allauth.core.internal.ratelimit import parse_rates
+    from axes.helpers import get_cool_off
+    from django.conf import settings
+
+    try:
+        rates = parse_rates(allauth_settings.RATE_LIMITS.get("login_failed"))
+    except ValueError:
+        rates = []
+    others = []
+    for rate in rates:
+        span = duration_words(datetime.timedelta(seconds=rate.duration))
+        if rate.per == "ip":
+            others.append(
+                f"{rate.amount} failed sign-ins from one phone or computer within {span} "
+                f"pause it for up to {span}."
+            )
+        elif rate.per == "key":
+            others.append(
+                f"{rate.amount} failed sign-ins for one email address within {span} "
+                f"pause that address for up to {span}."
+            )
+    return {
+        "limit": settings.AXES_FAILURE_LIMIT,
+        "wait": duration_words(get_cool_off()),
+        "others": others,
+        "code_attempts": settings.ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS,
+    }

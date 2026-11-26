@@ -17,3 +17,13 @@ def send_recovery_link(user_id: int) -> str:
     from accounts.recovery import send_link
 
     return send_link(user_id)
+
+
+@app.task(queue="default", retry=0)
+def record_setup_link_request(user_id: int) -> str:
+    """Can't sign in? "Ask the board" (D62): only a login id (0 for an unknown
+    address) travels through the queue; whether the board is told is decided
+    here, so the page answers the same way whatever the address."""
+    from accounts.setup_requests import record_request
+
+    return record_request(user_id)

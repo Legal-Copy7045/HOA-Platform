@@ -157,19 +157,27 @@ SPF, DKIM and DMARC (`p=reject`) are already published for the domain.
 Revoking: any one board member ends the role on the person's page; the
 board is emailed.
 
-## Lost sign-in (D58)
+## Lost sign-in (D58, D62)
+
+Everything starts from **Can't sign in?** on the sign-in page (D62). It asks
+what's wrong ("I forgot my password", "I lost my phone, or my passkey or
+authenticator app isn't working", "My setup link expired, or I never
+finished setting up", "I can't get into my email any more", "It says I'm
+locked out or there were too many attempts") and opens the right step below.
+Tell people to start there.
 
 ### For an owner, account contact or tenant
 
-1. **Forgot the password only:** "Forgot your password?" on the sign-in page.
+1. **Forgot the password only:** Can't sign in?, "I forgot my password".
    Open the emailed link within an hour, enter the code from the authenticator
    app (or use the passkey, or one recovery code), then choose a new password.
    The reset never signs you in; sign in with the new password as usual.
-2. **Lost the phone or passkey:** sign in with the password and type one of
-   the recovery codes instead of the 6-digit code, or use a passkey on another
-   device. Then add a new passkey or app on Sign-in and security.
-3. **Lost the phone and the recovery codes:** Sign-in help, "I've lost my
-   phone and recovery codes", enter your email, open the link (within an
+2. **Lost the phone or passkey:** Can't sign in?, "I lost my phone ...",
+   "Yes": sign in with the password and type one of the recovery codes
+   instead of the 6-digit code, or use a passkey on another device. Then add
+   a new passkey or app on Sign-in and security.
+3. **Lost the phone and the recovery codes:** Can't sign in?, "I lost my
+   phone ...", "No", enter your email, open the link (within an
    hour) and confirm. The recovery waits 48 hours (Community settings, "Sign-in
    and security"). You get an email at every address on file and a text if you
    get our texts. After the wait, ask again on the same page; open the new
@@ -180,8 +188,26 @@ board is emailed.
 4. **Didn't ask for it?** Sign in normally with your passkey or app: that
    cancels it. Or open the link in the email ("Account recovery" page) and
    press Cancel, or call the board.
+5. **Setup link expired or never finished:** Can't sign in?, "My setup link
+   expired ...", enter your email and press "Ask the board". The page says
+   the same whatever you type; the board gets a My items entry only if the
+   address belongs to a login that never added a passkey or app.
+6. **No access to the email any more:** Can't sign in?, "I can't get into my
+   email any more" explains it and names the sign-in help contact (Community
+   settings). Only the board can help: the assisted reset below, after
+   updating the email on the person's record.
+7. **Locked out:** Can't sign in?, "It says I'm locked out ..." states the
+   wait from the settings (`AXES_FAILURE_LIMIT`, `AXES_COOLOFF_HOURS`, default
+   5 wrong passwords and 30 minutes; allauth's per-connection and per-address
+   limits), then "Try again".
 
 ### For the board
+
+**"<person> asked for a new setup link"** on My items (D62) comes from
+Can't sign in?. Check it is really them (phone or in person) before opening
+their page and pressing Send a new setup link; it goes to the email on their
+record. The entry clears once a link is sent, if they set up a passkey or
+app, or after 14 days. Nobody was emailed about it.
 
 1. Every recovery request shows on My items ("Account recovery requested for
    ..."), and each board member gets an email. If the person says they did not

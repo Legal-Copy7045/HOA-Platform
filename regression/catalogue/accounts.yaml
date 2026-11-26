@@ -43,3 +43,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:accounts/tests/test_recovery.py::test_(the_lock|lock_|banner|directory_and|board_sees)"]
+- feature: "Can't sign in? (D62): one help link on the sign-in page; a guided page asks what's wrong and routes to the password reset, a recovery code or other device, account recovery, Ask the board for a new setup link (neutral, rate-limited, My items entry only for a login that never enrolled), board-assisted help without email, and the configured lockout wait; nothing reveals whether an account exists; old URLs still work"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:accounts/tests/test_cant_sign_in.py::test_", "^unit:core/tests/test_url_matrix.py::test_signin_help_pages_", "^manual:can't sign in on a phone"]

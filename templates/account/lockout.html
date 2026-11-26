@@ -6,5 +6,5 @@
   <h1>Too many sign-in attempts</h1>
   <div class="alert warning">{% icon "clock" %}<span>For your security, sign-in is paused for a while. Please try again in {{ wait }}, or sign in with a passkey if you have one set up.</span></div>
   <p class="muted">If you think someone else is trying to get into your account, tell the board{% if contact %}: {{ contact }}{% endif %}.</p>
-  <p><a href="{% url 'signin_help' %}">Forgot password or lost my phone?</a></p>
+  <p><a href="{% url 'signin_help' %}">Can't sign in?</a></p>
 {% endblock %}
