@@ -4,7 +4,7 @@ download the .zip from the meeting page."""
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponse
+from django.http import Http404, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from core import policy
@@ -109,11 +109,12 @@ def meeting_packet_zip(request, pk, packet_id):
     if packet is None:
         raise Http404
     try:
-        data, filename = packets.packet_zip(packet, user=request.user, request=request)
-    except packets.PacketError as exc:
+        stream, filename = packets.packet_zip(packet, user=request.user, request=request)
+    except packets.PacketError as exc:  # includes PacketBusy (rate limit)
         messages.error(request, str(exc))
         return redirect("meeting_detail", pk=meeting.pk)
-    response = HttpResponse(data, content_type="application/zip")
+    # Streamed chunk by chunk (SEC-002): the archive is never held in memory.
+    response = StreamingHttpResponse(stream, content_type="application/zip")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"

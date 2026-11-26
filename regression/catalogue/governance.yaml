@@ -59,7 +59,7 @@
 - feature: "Regression 3 fixes (ARC and voting): files added to a returned ARC draft ask the neighbors again; neighbors see acknowledgements only from their own ownership and while the request is open; a proxy holder who sold cannot vote with it and is not counted; a buyer is not told the seller's election ballot was theirs; malformed ballot values get a message; the last passkey or authenticator app cannot be removed"
   since: M4
   match: ["^unit:arc/tests/test_owner_ux.py::test_(files_added_to_a_returned|owner_file_service)", "^unit:arc/tests/test_signoffs.py::test_(a_buyer_of_the_neighboring|answered_acknowledgements_leave)", "^unit:governance/tests/test_elections.py::test_(a_proxy_holder_who_sells|a_buyer_is_not_told)", "^unit:governance/tests/test_governance.py::test_ballot_with_malformed", "^unit:core/tests/test_security_review.py::test_the_only_(passkey|authenticator_app)"]
-- feature: "Meeting packets: board and owner variants (PDF from core/pdf.py saved as a document version), attachment index, .zip with only scan-passing files, sanitized entry names, owner packet with nothing confidential, audited builds and downloads"
+- feature: "Meeting packets: board and owner variants (PDF from core/pdf.py saved as a document version), attachment index, .zip with only scan-passing files, sanitized entry names, .zip streamed with bounded memory and limited per person (one at a time, a cap per 15 minutes), owner packet with nothing confidential, audited builds and downloads"
   since: M5
   docs: docs/decisions.md
   match: ["^unit:governance/tests/test_packets.py::test_", "^manual:meeting packet"]

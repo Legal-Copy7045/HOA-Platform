@@ -110,7 +110,8 @@ def _pdf_of(packet) -> bytes:
 def _zip(client, packet):
     response = client.get(reverse("meeting_packet_zip", args=[packet.meeting_id, packet.pk]))
     assert response.status_code == 200, response.status_code
-    return zipfile.ZipFile(io.BytesIO(response.content))
+    assert response.streaming  # never built in memory (SEC-002)
+    return zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content)))
 
 
 # --- Who may build ----------------------------------------------------------------------
@@ -362,6 +363,98 @@ def test_zip_entry_names_are_sanitized(client, world):
     # Whatever is stored, the entry ends in the extension of the validated type.
     forged = DocumentVersion(original_filename="../../run.exe", content_type="application/pdf")
     assert packets._zip_name(3, forged) == "03-run.pdf"
+
+
+def test_zip_is_streamed_with_bounded_memory(client, world, monkeypatch):
+    """SEC-002: the .zip goes out chunk by chunk; the builder never holds the
+    whole archive (each piece and the sink's peak stay near one chunk)."""
+    import os
+
+    monkeypatch.setattr(packets, "ZIP_CHUNK_BYTES", 16 * 1024)
+    big = [
+        documents.create_document(
+            title=f"Scan {n}",
+            category="other",
+            visibility="owners",
+            file=pdf_upload(f"scan{n}.pdf", b"%PDF-1.7\n" + os.urandom(300 * 1024) + b"\n%%EOF\n"),
+            actor=world["board"],
+        )
+        for n in range(3)
+    ]
+    packet = packets.build_packet(
+        world["meeting"],
+        variant="owner",
+        attachment_ids=[d.pk for d in big],
+        actor=world["board"],
+    )
+    seen = {}
+    real = packets.PacketZipStream.__init__
+
+    def spy(self, *args, **kwargs):
+        real(self, *args, **kwargs)
+        seen["stream"] = self
+
+    monkeypatch.setattr(packets.PacketZipStream, "__init__", spy)
+    client.force_login(world["owner"])
+    response = client.get(reverse("meeting_packet_zip", args=[world["meeting"].pk, packet.pk]))
+    from django.http import StreamingHttpResponse
+
+    assert isinstance(response, StreamingHttpResponse)
+    assert not hasattr(response, "content") or response.streaming
+    pieces = list(response.streaming_content)
+    total = sum(len(p) for p in pieces)
+    assert total > 900 * 1024 and len(pieces) > 40
+    limit = 64 * 1024  # one 16 KiB chunk plus zip headers and compressor output
+    assert max(len(p) for p in pieces) < limit
+    assert seen["stream"].sink.most_held < limit
+    archive = zipfile.ZipFile(io.BytesIO(b"".join(pieces)))
+    assert archive.testzip() is None
+    assert len([n for n in archive.namelist() if n.endswith("scan0.pdf")]) == 1
+
+
+def test_zip_downloads_are_rate_limited_per_person(client, world, monkeypatch):
+    packet = packets.build_packet(world["meeting"], variant="owner", actor=world["board"])
+    url = reverse("meeting_packet_zip", args=[world["meeting"].pk, packet.pk])
+    client.force_login(world["owner"])
+
+    # One at a time: while a download is still streaming, a second is refused.
+    first = client.get(url)
+    assert first.status_code == 200
+    second = client.get(url)
+    assert second.status_code == 302 and second["Location"].endswith(
+        reverse("meeting_detail", args=[world["meeting"].pk])
+    )
+    # Someone else is not held up by this person's download.
+    client2 = type(client)()
+    client2.force_login(world["board"])
+    other = client2.get(url)
+    assert other.status_code == 200
+    b"".join(other.streaming_content)
+    # Finishing the first frees the slot (the test client closes it at the end).
+    b"".join(first.streaming_content)
+    again = client.get(url)
+    assert again.status_code == 200
+    b"".join(again.streaming_content)
+
+    # A window cap, counted from the audit log across processes.
+    monkeypatch.setattr(packets, "ZIP_RATE_LIMIT", 3)
+    third = client.get(url)
+    b"".join(third.streaming_content)
+    mine = AuditEvent.objects.filter(action="meeting.packet_zip_downloaded", actor=world["owner"])
+    assert mine.count() == 3
+    refused = client.get(url, follow=True)
+    assert b"several packets in the last few minutes" in refused.content
+    assert mine.count() == 3  # a refused download is not a download
+
+
+def test_zip_slot_is_freed_even_if_never_read(world):
+    packet = packets.build_packet(world["meeting"], variant="owner", actor=world["board"])
+    stream, _ = packets.packet_zip(packet, user=world["owner"])
+    with pytest.raises(packets.PacketBusy):
+        packets.packet_zip(packet, user=world["owner"])
+    stream.close()  # what Django does when the response ends
+    stream2, _ = packets.packet_zip(packet, user=world["owner"])
+    stream2.close()
 
 
 def test_attachments_are_never_parsed(world):
