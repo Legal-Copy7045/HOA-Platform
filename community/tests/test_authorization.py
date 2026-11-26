@@ -268,6 +268,7 @@ MEMBER_READS = {
     "resolution.view",
     "vote.view",
     "reservation.view",
+    "survey.view",  # Surveys (M5); each survey's audience narrows it further
 }
 
 
@@ -291,6 +292,7 @@ MEMBER_READS = {
                 "budget.view_owner",
                 "sms.opt_in",
                 "reservation.request",
+                "survey.respond",
             },
         ),
         (
