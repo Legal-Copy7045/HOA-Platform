@@ -648,6 +648,8 @@ class MeetingPacketItem(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"packet {self.packet_id} item {self.position}"
+
+
 # --- Surveys (informal, non-binding; M5) ------------------------------------------------
 
 from core.append_only import ScopedAppendOnlyModel  # noqa: E402
