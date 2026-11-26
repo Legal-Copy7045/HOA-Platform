@@ -269,7 +269,9 @@ def test_former_owner_has_history_not_my_requests(client, board):
 def test_tenant_voting_goes_straight_to_surveys(client, board):
     tenant = role_users(board)["tenant"]
     item = entry(client, tenant, "Voting")
-    assert item["url"] == reverse("surveys")
+    # Straight to the filtered Voting list, not the old /surveys/ redirect.
+    assert item["url"] == reverse("voting") + "?type=surveys"
+    assert client.get(item["url"]).status_code == 200
 
 
 def test_sysadmin_settings_goes_straight_to_branding(client):
