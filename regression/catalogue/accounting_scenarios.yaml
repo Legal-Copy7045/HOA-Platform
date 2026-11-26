@@ -12,3 +12,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:ledger/tests/test_acctfix\\.py::test_", "^unit:payments/tests/test_acctfix_payments\\.py::test_", "^unit:ledger/tests/test_ledger\\.py::test_new_owner_starts_clean"]
+- feature: "Money per ownership period (D34-fixmoney): a sale recorded with an earlier date moves the buyer's entries to the buyer's account (reversal + copy, never edited), late fees follow their dues, online payments stay on the payer's account dated when Stripe says they succeeded, receipts only for that account, safe poller (return with refund, never expire unanswered checkouts), migration 0017 re-dates re-applications by their reversal, dashboard due date and Pay button match My account and the payment page, no empty Stripe metadata, former owner's periods each with their own account"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_fixmoney\\.py::test_", "^unit:payments/tests/test_fixmoney_payments\\.py::test_"]
