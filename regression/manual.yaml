@@ -209,3 +209,11 @@
   check: "On the POC VM, Admin > Server tasks > Take a backup now completes within a few minutes and the history row shows Done with a summary like 'Backup 2026-11-26T1830Z, 5.3M, copied off-site' whose stamp matches the newest folder in /var/backups/hoa-portal; a second request while it runs is refused; Restore drill finishes Done; a board member sees the history without Start buttons; the page fits a phone screen."
   steps: "Sign in as a sysadmin; open Admin > Server tasks; press Take a backup now; refresh after a minute or two; compare the stamp with `sudo ls /var/backups/hoa-portal`; press Start on Restore drill and wait; sign in as a demo board member and open Server tasks; repeat on a phone."
   last: ""
+- key: official notices step on a phone
+  check: "A new owner who accepts an invitation, adds a passkey or app and presses I've saved them lands on Official notices; both buttons fit a phone screen; choosing post shows the mailing address and a link to My profile; Skip for now leaves 'Choose how to get official notices' in My items."
+  steps: "Invite a demo owner; accept on a phone; enroll; save codes; try each choice (reset with a second demo owner); check My items after skipping."
+  last: ""
+- key: how we reach you on a phone
+  check: "On a phone, My profile's How we reach you sections stack with full-width buttons; ticking 'Receive text alerts' shows the number field; choosing 'A different address' shows the address fields."
+  steps: "Open My profile on a phone as a demo owner; add an email and a phone; tick and untick text alerts; switch the mailing address choice."
+  last: ""

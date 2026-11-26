@@ -63,3 +63,9 @@
 - feature: "Retention of former owners' contact details: rule with PA guidance, daily task, board preview and run, append-only run record, records never touched"
   since: M4
   match: ["^unit:community/tests/test_retention"]
+- feature: "Official notices step after sign-up (D40): only after MFA, owners on the deed only, email or post with no default, wording version recorded and audited, skip leaves a My items to-do, answered people never asked again, board counts per home"
+  since: M5
+  match: ["^unit:community/tests/test_notice_consent", "^manual:official notices step on a phone"]
+- feature: "How we reach you on My profile (D40): notices choice, extra emails with notices only after choosing email, typed phones, one structured mailing address for post read first by letters, old addresses flagged with a to-do, cross-person 404s"
+  since: M5
+  match: ["^unit:community/tests/test_how_we_reach_you", "^manual:how we reach you on a phone"]
