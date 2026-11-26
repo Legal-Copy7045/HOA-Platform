@@ -50,3 +50,6 @@
 - feature: "Owner photos of the fix: the 10-photo allowance is checked inside the same locked transaction as the overall file cap, so parallel uploads cannot pass it or use up the board's room for evidence (R2-006)"
   since: M4
   match: ["^unit:compliance/tests/test_owner_notices.py::test_(owner_allowance_holds_under_parallel|label_allowance_is_checked)"]
+- feature: "Requests and request photos only for owned, authorized-contact and tenant lots: a view-only contact never raises requests or adds photos on that home, even when they own another (R2-009)"
+  since: M4
+  match: ["^unit:operations/tests/test_requests.py::test_(owner_who_is_view_only_elsewhere|view_only_contact_cannot_add_request_photos|authorized_contact_and_tenant_still_raise)"]

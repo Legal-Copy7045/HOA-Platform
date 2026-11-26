@@ -383,3 +383,63 @@ def test_invoice_approval_is_in_my_items_for_others_only(w):
     services.INVOICE.apply(invoice, "submit", actor=w["board"])
     assert not [i for i in my_items.items_for(w["board"]) if i.area == "Approvals"]
     assert [i for i in my_items.items_for(w["board2"]) if i.area == "Approvals"]
+
+
+# --- R2-009: view-only contacts never act, even when they own another home -------
+
+
+def _add_contact(user, lot, kind):
+    with system_access("test"):
+        person = Person.objects.get(user=user)
+        account = Account.objects.get(lot=lot, closed_on__isnull=True)
+    community.add_account_contact(account, person=person, kind=kind, actor=SYSTEM)
+
+
+def _png(name="p.png"):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    return SimpleUploadedFile(name, b"\x89PNG\r\n\x1a\nnot really a png", content_type="image/png")
+
+
+def test_owner_who_is_view_only_elsewhere_cannot_raise_there(client, w):
+    viewer = w["other_owner"]  # owns "other"; view-only contact on "lot"
+    _add_contact(viewer, w["lot"], "view_only")
+    assert policy.can(viewer, "request.submit")  # because they own their own home
+    with pytest.raises(services.OperationsError):
+        _submit(w, user=viewer)
+    assert [lot.pk for lot in services.request_lots(viewer)] == [w["other"].pk]
+    # Their own home still works.
+    services.submit_request(
+        lot=w["other"], request_type="general", subject="Mine", description="y", actor=viewer
+    )
+    # Through the page as well.
+    client.force_login(viewer)
+    client.post(
+        reverse("requests") + "?mine=1",
+        {"lot": w["lot"].pk, "request_type": "general", "subject": "Sneaky", "description": "y"},
+    )
+    assert not OwnerRequest.objects.unscoped("t").filter(subject="Sneaky").exists()
+
+
+def test_view_only_contact_cannot_add_request_photos(client, w):
+    from documents.attachments import attachments_for
+
+    viewer = w["other_owner"]
+    req = _submit(w)
+    # A request in their name on the view-only home (e.g. from an earlier role).
+    OwnerRequest.objects.unscoped("t").filter(pk=req.pk).update(requested_by=viewer)
+    req.refresh_from_db()
+    _add_contact(viewer, w["lot"], "view_only")
+    assert not services.can_add_request_photos(viewer, req)
+    client.force_login(viewer)
+    response = client.post(reverse("request_attach", args=[req.pk]), {"photos": [_png()]})
+    assert response.status_code in (403, 404)
+    assert not attachments_for(req).exists()
+
+
+def test_authorized_contact_and_tenant_still_raise_for_the_lot(w):
+    authorized = w["other_owner"]
+    _add_contact(authorized, w["lot"], "authorized")
+    assert _submit(w, user=authorized, subject="By authorized").lot_id == w["lot"].pk
+    tenant = _contact(w["lot"], "tenant")
+    assert _submit(w, user=tenant, subject="By tenant").lot_id == w["lot"].pk

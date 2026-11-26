@@ -467,20 +467,26 @@ from operations.models import (  # noqa: E402
 MAX_OPEN_REQUESTS = 20
 
 
-def _may_raise_for(actor, lot_id: int) -> bool:
+def _raise_lot_ids(actor) -> frozenset[int]:
+    """Lots this person may raise requests (and add photos) for: owned lots,
+    authorized-contact lots and tenancies. Never a view-only contact's lot,
+    even when they own another home (review R2-009)."""
     from core.policy import roles_for
 
     roles = roles_for(actor)
-    return lot_id in roles.account_lot_ids or lot_id in roles.tenant_lot_ids
+    return roles.owned_lot_ids | roles.authorized_lot_ids | roles.tenant_lot_ids
+
+
+def _may_raise_for(actor, lot_id: int) -> bool:
+    return lot_id in _raise_lot_ids(actor)
 
 
 def request_lots(actor):
-    """Lots this person may raise a request for (their account or tenancy)."""
+    """Lots this person may raise a request for (owned, authorized contact or
+    tenancy)."""
     from community.services import lots_by_ids
-    from core.policy import roles_for
 
-    roles = roles_for(actor)
-    return lots_by_ids(roles.account_lot_ids | roles.tenant_lot_ids)
+    return lots_by_ids(_raise_lot_ids(actor))
 
 
 def submit_request(
