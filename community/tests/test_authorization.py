@@ -308,6 +308,7 @@ MEMBER_READS = {
                 "committee.view_all",
                 "roster.view",
                 "budget.view_owner",
+                "bank_feed.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

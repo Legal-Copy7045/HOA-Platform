@@ -40,3 +40,11 @@ def courtesy_reminders(timestamp: int) -> int:
     from ledger.accounting import send_courtesy_reminders
 
     return send_courtesy_reminders()
+
+
+@app.periodic(cron="53 10 * * *")  # daily; only with the "bank_feeds" feature on
+@app.task(queue="maintenance", queueing_lock="bank_feed_sync")
+def bank_feed_sync(timestamp: int) -> int:
+    from ledger.bankfeeds.services import sync_all
+
+    return sync_all()

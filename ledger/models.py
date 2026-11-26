@@ -418,3 +418,139 @@ class CollectionLetter(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"{self.kind} letter"
+
+
+# --- Bank feed (optional feature "bank_feeds", D32-bankfeeds) ---------------------------
+# Lines mirrored from the HOA's bank (Teller, or a statement file). Never full
+# account or routing numbers: the last four digits only.
+
+
+class BankProvider(models.TextChoices):
+    FILE = "file", "Statement files"
+    TELLER = "teller", "Teller"
+
+
+class BankConnectionStatus(models.TextChoices):
+    ACTIVE = "active", "Connected"
+    NEEDS_REAUTH = "needs_reauth", "Needs reconnecting"
+    DISCONNECTED = "disconnected", "Disconnected"
+
+
+class BankConnection(models.Model):
+    """One bank account the portal reads. Disconnecting deletes the access
+    token and keeps the account's imported lines."""
+
+    provider = models.CharField(max_length=10, choices=BankProvider.choices)
+    display_name = models.CharField(max_length=80)
+    institution_name = models.CharField(max_length=80, blank=True)
+    account_last_four = models.CharField(max_length=4, blank=True)
+    # Teller's own opaque ids ("acc_...", "enr_..."), not bank numbers.
+    external_account_id = models.CharField(max_length=64, blank=True)
+    enrollment_id = models.CharField(max_length=64, blank=True)
+    # Fernet token from BANK_FEED_TOKEN_KEY; empty once disconnected.
+    token_encrypted = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=14, choices=BankConnectionStatus.choices, default=BankConnectionStatus.ACTIVE
+    )
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_error_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    disconnected_at = models.DateTimeField(null=True, blank=True)
+    disconnected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["display_name", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(account_last_four__regex=r"^[0-9]{0,4}$"),
+                name="bank_connection_last_four_only",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"bank connection #{self.pk}"
+
+    @property
+    def label(self) -> str:
+        tail = f" ··{self.account_last_four}" if self.account_last_four else ""
+        return f"{self.display_name}{tail}"
+
+
+class BankTransactionSource(models.TextChoices):
+    TELLER = "teller", "Teller"
+    OFX = "ofx", "OFX/QFX file"
+    CSV = "csv", "CSV file"
+
+
+class BankTransaction(AppendOnlyModel):
+    """A line from the bank: positive amounts are money in. Mirrors the bank,
+    so never corrected here; re-imports are skipped by the bank's own id."""
+
+    connection = models.ForeignKey(
+        BankConnection, on_delete=models.PROTECT, related_name="transactions"
+    )
+    bank_id = models.CharField(max_length=255)
+    posted_on = models.DateField()
+    amount_cents = models.BigIntegerField()
+    description = models.CharField(max_length=200, blank=True)
+    kind = models.CharField(max_length=40, blank=True)
+    source = models.CharField(max_length=8, choices=BankTransactionSource.choices)
+    imported_at = models.DateTimeField(default=timezone.now)
+    imported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-posted_on", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["connection", "bank_id"], name="bank_transaction_once_per_connection"
+            )
+        ]
+        indexes = [models.Index(fields=["posted_on", "amount_cents"])]
+
+    def __str__(self) -> str:
+        return f"bank line #{self.pk}"
+
+
+class BankBalance(AppendOnlyModel):
+    """The bank's ledger balance on a date, as reported by the feed or file."""
+
+    connection = models.ForeignKey(BankConnection, on_delete=models.PROTECT, related_name="+")
+    as_of = models.DateField()
+    balance_cents = models.BigIntegerField()
+    source = models.CharField(max_length=8, choices=BankTransactionSource.choices)
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-as_of", "-id"]
+
+    def __str__(self) -> str:
+        return f"bank balance {self.as_of}"
+
+
+class BankMatch(AppendOnlyModel):
+    """A bank line confirmed as one cash-book item (deposit, vendor payment or
+    returned payment). Undoing is a new row pointing at the match it undoes."""
+
+    transaction = models.ForeignKey(BankTransaction, on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(
+        max_length=8,
+        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
+    )
+    object_id = models.PositiveBigIntegerField()
+    undoes = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="undone_by"
+    )
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    confirmed_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return f"bank match #{self.pk}"

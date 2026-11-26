@@ -161,6 +161,22 @@ FEATURES: list[Feature] = [
         {"sms_start", "sms_verify", "urgent_notice"},
         default=False,
     ),
+    # Bank feed (bankfeeds, D32-bankfeeds): Teller's free tier or statement files.
+    _f(
+        "bank_feeds",
+        "Bank feed",
+        "Bank lines from Teller (free tier) or statement files, matched for reconciliation.",
+        {
+            "bank_feed",
+            "bank_connect",
+            "bank_sync",
+            "bank_disconnect",
+            "bank_import",
+            "bank_account_add",
+            "bank_match",
+        },
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"

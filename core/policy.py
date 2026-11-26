@@ -169,6 +169,15 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "access_review.record": frozenset({BOARD}),
     # Clearing former owners' contact details under the retention rule.
     "retention.manage": frozenset({BOARD}),
+    # --- Bank feed (bankfeeds, optional feature "bank_feeds") ---
+    # Seeing the bank lines: finance readers. Connecting a bank or ending a
+    # connection: the board only. Syncing, importing statement files and
+    # matching lines to the cash book: data entry (manager) or board.
+    "bank_feed.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "bank_feed.connect": frozenset({BOARD}),
+    "bank_feed.sync": frozenset({BOARD, MANAGER}),
+    "bank_feed.import": frozenset({BOARD, MANAGER}),
+    "bank_feed.match": frozenset({BOARD, MANAGER}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

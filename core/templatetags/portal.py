@@ -74,6 +74,7 @@ _TONES = {
         "resolved",
         "certified",
         "success",
+        "active",  # bank feed connection
     },
     "info": {"nominations"},
     "warning": {
@@ -100,6 +101,7 @@ _TONES = {
         "voting",
         "neighbors",
         "objected",
+        "needs_reauth",  # bank feed connection
     },
     "danger": {
         "denied",
@@ -115,10 +117,19 @@ _TONES = {
         "failed",
         "failure",
     },
-    "neutral": {"void", "withdrawn", "cancelled", "revoked", "dropped", "unscanned"},
+    "neutral": {
+        "void",
+        "withdrawn",
+        "cancelled",
+        "revoked",
+        "dropped",
+        "unscanned",
+        "disconnected",
+    },
 }
 _LABELS = {
     "pending_approval": "Awaiting approval",
+    "needs_reauth": "Needs reconnecting",
     "in_review": "In review",
     "noticed": "Notice sent",
     "approved_with_conditions": "Approved with conditions",

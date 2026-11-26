@@ -269,6 +269,14 @@ PROTECTED = {
     "access_review_record": ("POST", None),
     "retention": ("GET", None),
     "retention_run": ("POST", None),
+    # Bank feed (bankfeeds; the feature is switched on in world()).
+    "bank_feed": ("GET", None),
+    "bank_connect": ("GET", None),
+    "bank_account_add": ("POST", None),
+    "bank_import": ("POST", None),
+    "bank_match": ("POST", None),
+    "bank_sync": ("POST", "bank_connection"),
+    "bank_disconnect": ("POST", "bank_connection"),
 }
 
 
@@ -300,7 +308,7 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        for key in ("push", "sms"):  # off by default; their pages are checked here
+        for key in ("push", "sms", "bank_feeds"):  # off by default; pages checked here
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
@@ -494,7 +502,11 @@ def world():
             actor=owner_b,
         )
         reservations.approve(reservation_b, actor=board)
+        from ledger.bankfeeds import services as bank_feed
+
+        bank_connection = bank_feed.add_file_account(display_name="Operating", actor=board)
     targets = {
+        "bank_connection": bank_connection.pk,
         "reservation_b": reservation_b.pk,
         "area": area.pk,
         "account_b": account_b.pk,

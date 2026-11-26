@@ -1,6 +1,7 @@
 from django.urls import path, re_path
 
 from ledger import views
+from ledger.bankfeeds import views as bank_views
 
 urlpatterns = [
     path("budget/", views.owner_budget, name="owner_budget"),
@@ -47,4 +48,19 @@ urlpatterns = [
         name="resale_action",
     ),
     path("resale/<int:pk>/certificate.pdf", views.resale_pdf, name="resale_pdf"),
+]
+
+# Bank feed (bankfeeds, optional feature "bank_feeds").
+urlpatterns += [
+    path("finance/accounting/bank/", bank_views.bank_feed, name="bank_feed"),
+    path("finance/accounting/bank/connect/", bank_views.bank_connect, name="bank_connect"),
+    path("finance/accounting/bank/add/", bank_views.bank_account_add, name="bank_account_add"),
+    path("finance/accounting/bank/import/", bank_views.bank_import, name="bank_import"),
+    path("finance/accounting/bank/match/", bank_views.bank_match, name="bank_match"),
+    path("finance/accounting/bank/<int:pk>/sync/", bank_views.bank_sync, name="bank_sync"),
+    path(
+        "finance/accounting/bank/<int:pk>/disconnect/",
+        bank_views.bank_disconnect,
+        name="bank_disconnect",
+    ),
 ]
