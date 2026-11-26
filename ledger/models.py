@@ -26,6 +26,9 @@ class EntryKind(models.TextChoices):
     PAYMENT = "payment", "Payment received"
     CREDIT = "credit", "Credit / adjustment"
     REVERSAL = "reversal", "Reversal"
+    # Part of an online payment the board refunded at Stripe, recorded on the
+    # account (positive: the owner has that money back). D33-acctfix-5.
+    REFUND = "refund", "Payment refunded"
 
 
 CHARGE_KINDS = {
@@ -33,6 +36,7 @@ CHARGE_KINDS = {
     EntryKind.LATE_FEE,
     EntryKind.OTHER_CHARGE,
     EntryKind.RESALE_FEE,
+    EntryKind.REFUND,
 }
 
 

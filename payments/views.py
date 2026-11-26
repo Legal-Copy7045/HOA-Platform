@@ -19,6 +19,7 @@ from documents.attachments import pdf_response
 from payments import checkout as flow
 from payments import services as fees
 from payments.models import (
+    AlertKind,
     CheckoutState,
     PaymentAlert,
     PendingCheckout,
@@ -216,6 +217,17 @@ def payment_alert_resolve(request, pk):
     alert = get_object_or_404(
         PaymentAlert.objects.for_user(request.user), pk=pk, resolved_at__isnull=True
     )
+    if request.POST.get("record_refund") and alert.kind == AlertKind.REFUND:
+        from ledger.services import LedgerError
+        from payments.services import record_refund
+
+        try:
+            record_refund(alert, actor=request.user, request=request)
+        except LedgerError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, "Refund recorded on the account.")
+        return redirect("online_payments")
     note = " ".join((request.POST.get("note") or "").split())[:300]
     if not note:
         messages.error(request, "Say what was done (for example: refund recorded on the account).")

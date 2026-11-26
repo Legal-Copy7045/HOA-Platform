@@ -485,6 +485,60 @@ def post_credit(
     return entry
 
 
+def _recorded_refunds(payment: LedgerEntry):
+    """Refunds recorded against an online payment that still stand (a
+    recorded refund carries the payment's Stripe reference)."""
+    return LedgerEntry.objects.unscoped("recorded refunds").filter(
+        lot_id=payment.lot_id,
+        kind=EntryKind.REFUND,
+        reference=payment.reference,
+        reversed_by__isnull=True,
+    )
+
+
+@internal("ledger service")
+def record_online_refund(
+    *, payment: LedgerEntry, amount_cents: int, refund_id: str, actor, request=None
+) -> LedgerEntry:
+    """Record on the account the part of an online payment refunded at Stripe
+    (the payment's share, without the surcharge: D33-acctfix-5). Only for
+    payments.services.record_refund, from a refund Stripe reported. The owner
+    has the money back, so the account goes up by it; the journal books it
+    against Stripe clearing. A full refund may instead reverse the payment,
+    which also reopens the charges it paid."""
+    _authorize(actor, "ledger.manage")
+    if payment.kind != EntryKind.PAYMENT or not payment.reference or amount_cents <= 0:
+        raise LedgerError("Only part of an online payment can be recorded as refunded.")
+    description = f"Refund at Stripe {refund_id}"[:200]
+    with transaction.atomic():
+        LedgerEntry.objects.unscoped("refund").select_for_update().get(pk=payment.pk)
+        if LedgerEntry.objects.unscoped("refund").filter(reverses=payment).exists():
+            raise LedgerError("This payment was reversed; that already records the refund.")
+        refunds = _recorded_refunds(payment)
+        if refunds.filter(description=description).exists():
+            raise LedgerError("This refund is already recorded on the account.")
+        already = refunds.aggregate(s=Sum("amount_cents"))["s"] or 0
+        if already + amount_cents > -payment.amount_cents:
+            raise LedgerError("The refunds would be more than the payment.")
+        entry = LedgerEntry.objects.create(
+            lot_id=payment.lot_id,
+            posted_on=timezone.localdate(),
+            kind=EntryKind.REFUND,
+            amount_cents=amount_cents,
+            description=description,
+            reference=payment.reference,
+            posted_by=_user(actor),
+        )
+    record_event(
+        "ledger.refund_recorded",
+        actor=_user(actor),
+        request=request,
+        target=entry,
+        metadata={"lot_id": payment.lot_id, "amount_cents": amount_cents},
+    )
+    return entry
+
+
 @internal("ledger service")
 def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> LedgerEntry:
     """Corrections are new, opposite entries (CLAUDE.md rule 5)."""
@@ -493,6 +547,11 @@ def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> Le
         raise LedgerError("Give the reason for the reversal.")
     if entry.kind == EntryKind.REVERSAL:
         raise LedgerError("A reversal cannot itself be reversed; post a new entry instead.")
+    if entry.kind == EntryKind.PAYMENT and entry.reference and _recorded_refunds(entry).exists():
+        raise LedgerError(
+            "Part of this payment is recorded as refunded; reverse that refund entry first, "
+            "or the refund would count twice."
+        )
     try:
         with transaction.atomic():
             reversal = LedgerEntry.objects.create(

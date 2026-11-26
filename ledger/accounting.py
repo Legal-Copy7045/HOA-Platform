@@ -162,6 +162,18 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
                 -e.amount_cents,
                 memo + (" (online)" if is_online else ""),
             )
+        elif kind == EntryKind.REFUND:
+            # Part of an online payment refunded at Stripe (D33-acctfix-5):
+            # the owner owes it again; the money left Stripe clearing.
+            pair(
+                e.posted_on,
+                "Owner payments",
+                ref,
+                gl["receivable"],
+                gl["stripe_clearing"],
+                e.amount_cents,
+                memo + " (online)",
+            )
         elif kind == EntryKind.CREDIT:
             pair(
                 e.posted_on,

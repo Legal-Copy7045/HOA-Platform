@@ -307,12 +307,6 @@ def test_credit_card_on_a_no_fee_session_is_absorbed(client, w, books):
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: a full refund of a credit card payment leaves the surcharge as income; "
-    "Stripe clearing in the journal no longer matches Stripe (journal_items only books "
-    "surcharge refunds for the debit-card safety net)",
-)
 def test_full_refund_of_a_surcharged_payment_keeps_stripe_clearing_true(client, w, books):
     checkout = _start(client, w, "credit")
     _pi, ch_id = w["fake"].pay(checkout.session_id, funding="credit")
