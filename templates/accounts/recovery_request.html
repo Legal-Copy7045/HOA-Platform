@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Recover your sign-in · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>Recover your sign-in</h1>
+  <p>For homeowners, account contacts and tenants who lost their phone or passkey <strong>and</strong> their recovery codes.</p>
+  <ol class="small">
+    <li>Enter your email. If your account can be recovered this way, we email you a link (it works once, for an hour).</li>
+    <li>Open it and confirm. Your recovery then waits <strong>{{ wait }} hours</strong>. You, every email address we have for you, your phone (if you get our texts) and the board are told at once, and anyone can cancel it.</li>
+    <li>After the wait, ask here for a new link and open it on the phone or computer you'll use. Your old passkeys, app and codes are removed and you set up a new one.</li>
+    <li>For {{ lock }} hours afterwards you can't vote, give a proxy, change your contact details or notice choices, or set up automatic payments.</li>
+  </ol>
+  <p class="small muted">Board members, officers and the association's staff can't use this: two board members reset your sign-in instead.</p>
+  <form method="post" novalidate>{% csrf_token %}
+    <div class="field{% if form.email.errors %} has-error{% endif %}">
+      <label for="id_email">Your email address</label>
+      <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" autocomplete="email" maxlength="254" required{% if form.email.errors %} aria-invalid="true" aria-describedby="id_email_errors"{% endif %}>
+      {% if form.email.errors %}<ul class="errorlist" id="id_email_errors" role="alert">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+    <div class="form-actions"><button type="submit" class="block">Email me a link</button></div>
+  </form>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'signin_help' %}">Back to sign-in help</a></div>
+{% endblock %}

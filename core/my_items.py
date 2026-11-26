@@ -77,6 +77,8 @@ AREA_NAV = {
     "Vendors": "vendors",
     "Setup": "community_settings",
     "Paper mail": "paper_mail",
+    # Not in the sidebar: counted only in My items' own total.
+    "Sign-in and security": "",
 }
 
 AREA_ICONS = {
@@ -100,6 +102,7 @@ AREA_ICONS = {
     "Tasks": "list",
     "Setup": "sliders",
     "Paper mail": "mail",
+    "Sign-in and security": "key",
 }
 
 # Each group is named after the menu entry its items open (WT-006).
@@ -123,6 +126,7 @@ AREAS = [
     "People",
     "Paper mail",
     "Setup",
+    "Sign-in and security",
 ]
 
 
@@ -791,6 +795,9 @@ def items_for(user) -> list[Item]:
     if can(user, "ledger.view_own"):
         out.extend(_balance_items(user, roles))
     out.extend(_contact_items(user, roles))
+    out.extend(_signin_items(user))
+    if can(user, "account_recovery.cancel"):
+        out.extend(_recovery_items(user))
     # An automatic payment that didn't go through (D46).
     if can(user, "payments.pay"):
         from payments.autopay import payer_items
@@ -862,6 +869,88 @@ def _online_payment_items(user, roles) -> list[Item]:
                 "danger" if a.kind in (AlertKind.MISMATCH, AlertKind.RECONCILIATION) else "warning",
                 timezone.localdate(a.created_at),
                 nav="online_payments",
+            )
+        )
+    return out
+
+
+def _signin_items(user) -> list[Item]:
+    """D58: make lockouts rare. Once a passkey or app is set up: a second
+    strong way to sign in (two passkeys, or a passkey and the app), and new
+    recovery codes when two or fewer are left."""
+    from allauth.mfa.models import Authenticator
+
+    rows = list(Authenticator.objects.filter(user=user).only("type", "data"))
+    passkeys = sum(1 for a in rows if a.type == Authenticator.Type.WEBAUTHN)
+    totp = any(a.type == Authenticator.Type.TOTP for a in rows)
+    strong = passkeys + (1 if totp else 0)
+    if strong == 0:
+        return []
+    out = []
+    if strong < 2:
+        out.append(
+            Item(
+                "Sign-in and security",
+                "Add a backup sign-in method",
+                "A second passkey (on another phone or computer) or an authenticator app, so "
+                "losing one device never locks you out",
+                reverse("mfa_index"),
+                "info",
+            )
+        )
+    codes = next((a for a in rows if a.type == Authenticator.Type.RECOVERY_CODES), None)
+    if codes is not None:
+        left = len(codes.wrap().get_unused_codes())
+        if left <= 2:
+            out.append(
+                Item(
+                    "Sign-in and security",
+                    "Make new recovery codes",
+                    f"{left} recovery code{'' if left == 1 else 's'} left. New codes replace "
+                    "the old ones",
+                    reverse("mfa_generate_recovery_codes"),
+                    "warning",
+                )
+            )
+    return out
+
+
+def _recovery_items(user) -> list[Item]:
+    """D58: self-service account recoveries the board should know about:
+    waiting ones (with Cancel on their page), and completed ones for a week."""
+    from accounts.recovery import board_items_queryset, when
+    from community.services import person_and_homes
+
+    out = []
+    for row in board_items_queryset():
+        name, homes = person_and_homes(row.subject)
+        who = f"{name} ({', '.join(homes)})" if homes else name
+        url = reverse("recovery_board", args=[row.pk])
+        if row.completed_at:
+            out.append(
+                Item(
+                    "People",
+                    f"{name} recovered their sign-in; review if unexpected",
+                    f"Recovered {when(row.completed_at)} after the waiting period",
+                    url,
+                    "info",
+                    nav="people",
+                    icon="key",
+                )
+            )
+            continue
+        out.append(
+            Item(
+                "People",
+                f"Account recovery requested for {who}",
+                f"Can be finished from {when(row.ready_at)}. Cancel it if it looks wrong",
+                url,
+                "warning",
+                timezone.localdate(row.ready_at),
+                nav="people",
+                icon="key",
+                action_label="Review or cancel",
+                action_url=url,
             )
         )
     return out

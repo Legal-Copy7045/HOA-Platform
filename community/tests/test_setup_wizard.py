@@ -216,7 +216,7 @@ def test_rule_notes_are_kept(client, board):
 def test_each_rule_shows_its_pa_guidance_and_citation_field(client, board):
     from community.pa_law import guide
 
-    for key in ("charge", "late_fees", "arc", "violations", "privacy", "notices"):
+    for key in ("charge", "late_fees", "arc", "violations", "privacy", "signin", "notices"):
         html = client.get(step_url(key)).content.decode()
         for spec in setup.rules_for(key):
             slug = spec.key.replace(".", "-")
@@ -354,6 +354,7 @@ def test_every_rule_lands_in_exactly_one_step():
     assert "late_fee.cents" in {s.key for s in assigned["late_fees"]}
     assert "payments.credit_card_surcharge_bp" in {s.key for s in assigned["payments"]}
     assert "notices.electronic_consent_required" in {s.key for s in assigned["notices"]}
+    assert {s.key for s in assigned["signin"]} == {"recovery.wait_hours", "recovery.lock_hours"}
 
 
 def test_a_new_rule_shows_up_in_its_groups_step(client, board):

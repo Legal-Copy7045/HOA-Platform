@@ -27,3 +27,19 @@
   since: M4
   docs: docs/decisions.md
   match: ["^unit:accounts/tests/test_enrollment_review", "^manual:(accept an invitation on a phone and a laptop|enrollment window expiry)"]
+- feature: "Forgot password (D58): emailed single-use link, then the passkey, app or a recovery code, then a new password; never signs in; 'Your password was changed' to every address"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:accounts/tests/test_lockout_prevention.py::test_(reset|new_password|wrong_code|app_code|a_recovery_code|account_without|login_page)"]
+- feature: "Fewer lockouts (D58): My items asks for a backup sign-in method and new recovery codes; recovery codes shown once with a printable page and a text file, audited"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:accounts/tests/test_lockout_prevention.py::test_(one_strong|two_strong|no_backup|two_or_fewer|backup_item|codes_are|download_and)", "^manual:recovery codes print"]
+- feature: "Self-service account recovery for ordinary logins (D58): neutral form, single-use links, wait from the board setting (never under 48 h), alerts to every email, the text number and the board, cancel by the person, the board or a normal sign-in, finish only in the link's browser session, old authenticators removed; staff roles never"
+  since: M5
+  docs: docs/runbook.md
+  match: ["^unit:accounts/tests/test_recovery.py::test_", "^manual:recover an owner account on a phone end to end"]
+- feature: "Post-recovery lock (D58): votes, ballots, surveys, proxies, contact, notice, text and mailing changes, autopay and account change requests refused in the services until the lock ends; banner; board review item for seven days"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:accounts/tests/test_recovery.py::test_(the_lock|lock_|banner|directory_and|board_sees)"]

@@ -275,6 +275,7 @@ def cast_election_ballot(
     except (TypeError, ValueError) as exc:
         raise ElectionError("Choose from the candidates on the ballot.") from exc
     _refuse_read_only(actor)  # a former owner's login changes nothing (BUG-002)
+    _refuse_if_locked(actor, "election ballot")
     with transaction.atomic():
         locked = Election.objects.select_for_update().get(pk=election.pk)
         if locked.state != ElectionState.VOTING:
@@ -395,8 +396,16 @@ def certify(election: Election, *, actor, request=None) -> dict:
 # --- Proxies ------------------------------------------------------------------------------
 
 
+def _refuse_if_locked(actor, what: str) -> None:
+    """D58: no ballots or proxies for a while after a self-service recovery."""
+    from accounts.recovery import refuse_if_locked
+
+    refuse_if_locked(actor, what, ElectionError)
+
+
 def grant_proxy(meeting: Meeting, *, lot: Lot, holder: Person, actor, request=None) -> Proxy:
     require(actor, "vote.cast")
+    _refuse_if_locked(actor, "proxy")
     roles = policy.roles_for(actor)
     if lot.pk not in roles.owned_lot_ids:
         raise PermissionDenied("proxy")
@@ -443,6 +452,7 @@ def revoke_proxy(proxy: Proxy, *, actor, request=None) -> None:
     roles = policy.roles_for(actor)
     if proxy.lot_id not in roles.owned_lot_ids and not can(actor, "meeting.manage"):
         raise PermissionDenied("proxy")
+    _refuse_if_locked(actor, "proxy")
     with system_access("revoke proxy"):
         Proxy.objects.filter(pk=proxy.pk, revoked_at__isnull=True).update(revoked_at=timezone.now())
     record_event(

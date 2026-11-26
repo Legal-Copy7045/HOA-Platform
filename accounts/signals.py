@@ -33,6 +33,22 @@ def _logged_in(sender, request, user, **kwargs):
         target=user,
         metadata={"method": _method(request, user)},
     )
+    if request is not None and _used_authenticator(request, user):
+        # D58: signing in with the existing passkey or app proves the person
+        # still has it, so a pending self-service recovery is cancelled.
+        from accounts.recovery import cancel_on_sign_in
+
+        cancel_on_sign_in(user, request=request)
+
+
+def _used_authenticator(request, user) -> bool:
+    try:
+        from allauth.account.internal.flows.login import get_authentication_records
+
+        records = get_authentication_records(request, user)
+    except Exception:
+        return False
+    return any(r.get("method") == "mfa" for r in records)
 
 
 @receiver(user_logged_out, dispatch_uid="audit_logout")

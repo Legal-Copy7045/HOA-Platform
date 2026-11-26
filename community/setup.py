@@ -154,6 +154,14 @@ STEPS: list[Step] = [
         links=(("Contact retention", "retention", "retention.manage"),),
     ),
     Step(
+        "signin",
+        "Sign-in and security",
+        "How long a self-service account recovery waits before the person can finish it, "
+        "and how long votes, proxies, contact details and automatic payments stay locked "
+        "afterwards (D58). Staff roles always use the two-board-member reset.",
+        groups=("Sign-in and security",),
+    ),
+    Step(
         "features",
         "Features",
         "Every optional part of the portal, on or off. A switched-off feature leaves the "

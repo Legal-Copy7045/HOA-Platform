@@ -27,6 +27,7 @@ class RuleSpec:
     group: str = "General"
     help: str = ""
     maximum: int | None = None  # a hard upper limit (card-network caps)
+    minimum: int | None = None  # a hard lower limit (security floors, D58)
 
     # Labels and help may name the monthly charge with {term}/{Terms}
     # placeholders (community/terms.py, D42); people always see these.
@@ -283,6 +284,35 @@ REGISTRY: dict[str, RuleSpec] = {
             "Former owners and contacts: phone, mailing address, extra contact methods and "
             "directory choices are cleared; names and records are kept. 0 means never.",
         ),
+        # D58: self-service account recovery. Board security policy; the
+        # floors are enforced here and again where the values are read.
+        RuleSpec(
+            "recovery.wait_hours",
+            "Hours an account recovery waits before the person can finish it",
+            INT,
+            "48",
+            "Sign-in and security",
+            "Owners and residents who lost their phone and recovery codes can recover their "
+            "sign-in themselves after this wait; they, the board and every address on file "
+            "are told at once and anyone can cancel. At least 48, at most 336 (14 days). A "
+            "change applies to recoveries started afterwards.",
+            maximum=336,
+            minimum=48,
+        ),
+        RuleSpec(
+            "recovery.lock_hours",
+            "Hours after a recovery before votes, proxies, contact details and automatic "
+            "payments can be changed",
+            INT,
+            "48",
+            "Sign-in and security",
+            "For this long after a self-service recovery the account cannot vote, give a "
+            "proxy, change email, phone, mailing address, notice or text choices, set up "
+            "automatic payments or ask for account changes. At least 24, at most 336 (14 "
+            "days). A change applies to recoveries started afterwards.",
+            maximum=336,
+            minimum=24,
+        ),
         *[
             RuleSpec(
                 f"request.sla_days.{key}",
@@ -339,6 +369,8 @@ def validate_value(key: str, raw: str) -> str:
             if spec.kind == BASIS_POINTS:
                 raise ValueError(f"{spec.shown_label}: at most {bp_display(spec.maximum)}%.")
             raise ValueError(f"{spec.shown_label}: at most {spec.maximum}.")
+        if spec.minimum is not None and int(raw) < spec.minimum:
+            raise ValueError(f"{spec.shown_label}: at least {spec.minimum}.")
     if spec.kind == BOOL and raw.lower() not in ("true", "false", "yes", "no", "1", "0"):
         raise ValueError(f"{spec.shown_label}: enter yes or no.")
     if spec.kind == TEXT:

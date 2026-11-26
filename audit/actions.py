@@ -79,6 +79,47 @@ _SPECS = [
     _spec("mfa.recovery_codes_regenerated", "Recovery codes regenerated", "type"),
     _spec("password.changed", "Password changed or set"),
     _spec("password.reset", "Password reset by email link"),
+    # D58: the emailed reset link still needs the passkey, app or a recovery code.
+    _spec(
+        "password.reset_verified", "Password reset: passkey, app or recovery code checked", "type"
+    ),
+    _spec("password.reset_verify_failed", "Password reset: wrong code for the second step"),
+    _spec("mfa.recovery_codes_viewed", "Recovery codes shown, printed or downloaded", "how"),
+    # D58: self-service account recovery with a waiting period. Ids and states
+    # only: never an email address or phone number.
+    _spec("account_recovery.link_sent", "Account recovery link emailed", "user_id", "purpose"),
+    _spec(
+        "account_recovery.link_refused",
+        "Account recovery link not sent",
+        "user_id",
+        "reason",
+    ),
+    _spec(
+        "account_recovery.started",
+        "Account recovery requested (waiting period started)",
+        "recovery_id",
+        "user_id",
+        "wait_hours",
+        "lock_hours",
+        "emails",
+        "sms",
+        "board",
+    ),
+    _spec(
+        "account_recovery.cancelled",
+        "Account recovery cancelled",
+        "recovery_id",
+        "user_id",
+        "by",
+    ),
+    _spec(
+        "account_recovery.completed",
+        "Account recovery completed: old sign-in methods removed",
+        "recovery_id",
+        "user_id",
+        "removed",
+        "lock_hours",
+    ),
     # invitations (step 6)
     _spec("person.login_linked", "Login linked to a person", "person_id", "user_id"),
     # setup_again: a new setup link for a login that never enrolled (D59).

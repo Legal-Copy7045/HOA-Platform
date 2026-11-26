@@ -141,7 +141,13 @@ def account_setup_done(request):
 @require_GET
 def signin_help(request):
     """Forgot password or lost my phone: one of the sign-in steps, so no sign-in needed."""
-    return render(request, "accounts/signin_help.html")
+    from accounts import recovery
+
+    return render(
+        request,
+        "accounts/signin_help.html",
+        {"recovery_wait": recovery.wait_hours(), "recovery_lock": recovery.lock_hours()},
+    )
 
 
 # --- Bulk onboarding (Milestone 4) ---------------------------------------------------

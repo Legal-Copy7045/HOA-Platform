@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load portal signin %}
+{% block title %}Account recovery · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>This recovery link can't be used</h1>
+  {% if signed_in %}<p class="muted">You're already signed in, so you don't need to recover your account. Sign-in and security lets you add a new passkey or app.</p>
+  {% elif message %}<p class="muted">{{ message }}</p>
+  {% else %}<p class="muted">It may have expired (links work for an hour), already been used, or the recovery was cancelled. You can ask for a new link on the sign-in help page.</p>{% endif %}
+  {% signin_contact as contact %}<p class="small muted">{% if contact %}Need help? Contact {{ contact }}.{% else %}Need help? Contact a board member.{% endif %}</p>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'signin_help' %}">Sign-in help</a></div>
+{% endblock %}

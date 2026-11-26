@@ -41,12 +41,15 @@ def setup_again_refusal(person: Person) -> str | None:
 
     Only a login that has *never* had a passkey or authenticator app: the
     first setup link was the only thing that let them in, and a new one is no
-    weaker. Anyone who ever enrolled, or went through an assisted reset, needs
-    the two-board-member reset instead (D5): one board member and the mailbox
-    must never be enough to replace a lost authenticator.
+    weaker. Anyone who ever enrolled, went through an assisted reset, or has
+    any self-service account recovery on record (D58, open, finished,
+    cancelled or expired), needs the two-board-member reset instead (D5): one
+    board member and the mailbox must never be enough to replace a lost
+    authenticator, and the two repair paths never overlap.
     """
     from accounts.auth import has_strong_authenticator
     from accounts.models import MfaReset
+    from accounts.recovery import has_recovery_on_record
     from audit.models import AuditEvent
 
     with system_access("setup link check"):
@@ -59,6 +62,7 @@ def setup_again_refusal(person: Person) -> str | None:
             return "This person already has a passkey or authenticator app."
         if (
             MfaReset.objects.unscoped("setup link check").filter(subject=user).exists()
+            or has_recovery_on_record(user)
             or AuditEvent.objects.filter(action="mfa.authenticator_added", actor=user).exists()
         ):
             return (

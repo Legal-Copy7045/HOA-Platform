@@ -157,10 +157,51 @@ SPF, DKIM and DMARC (`p=reject`) are already published for the domain.
 Revoking: any one board member ends the role on the person's page; the
 board is emailed.
 
+## Lost sign-in (D58)
+
+### For an owner, account contact or tenant
+
+1. **Forgot the password only:** "Forgot your password?" on the sign-in page.
+   Open the emailed link within an hour, enter the code from the authenticator
+   app (or use the passkey, or one recovery code), then choose a new password.
+   The reset never signs you in; sign in with the new password as usual.
+2. **Lost the phone or passkey:** sign in with the password and type one of
+   the recovery codes instead of the 6-digit code, or use a passkey on another
+   device. Then add a new passkey or app on Sign-in and security.
+3. **Lost the phone and the recovery codes:** Sign-in help, "I've lost my
+   phone and recovery codes", enter your email, open the link (within an
+   hour) and confirm. The recovery waits 48 hours (Community settings, "Sign-in
+   and security"). You get an email at every address on file and a text if you
+   get our texts. After the wait, ask again on the same page; open the new
+   link on the phone or computer you will use, press "Remove the old ones and
+   continue", add a passkey or app right away and save the new recovery codes.
+   For 48 hours afterwards you cannot vote, give a proxy, change contact
+   details, notice or text choices, or set up automatic payments.
+4. **Didn't ask for it?** Sign in normally with your passkey or app: that
+   cancels it. Or open the link in the email ("Account recovery" page) and
+   press Cancel, or call the board.
+
+### For the board
+
+1. Every recovery request shows on My items ("Account recovery requested for
+   ..."), and each board member gets an email. If the person says they did not
+   ask, or anything looks wrong, open it and press **Cancel the recovery**.
+2. After a recovery completes, My items shows "... recovered their sign-in;
+   review if unexpected" for seven days. If it was not them, start an assisted
+   reset (below) with a second board member and talk to the person.
+3. Board members, officers, the manager, sysadmins, auditors and ARC reviewers
+   (and anyone who was one in the last 30 days) cannot use self-service
+   recovery: they always get the assisted reset below. The form never says so
+   to the person asking (it answers every address the same way).
+4. The waiting period and the lock are Community settings ("Sign-in and
+   security"): at least 48 hours to wait and 24 hours of lock, at most 14
+   days each, with a citation (board security policy). A change applies to
+   requests started afterwards.
+
 ## Lost authenticator (assisted reset, two board members)
 
-1. The person contacts the board by phone or in person. There is no
-   self-service path, by design.
+1. The person contacts the board by phone or in person. This is the only
+   path for staff roles and is open to everyone (D58).
 2. Board member A confirms identity (in person, or by calling the number on
    file), then Board -> People -> person -> "Start a sign-in reset", choosing
    how identity was confirmed.

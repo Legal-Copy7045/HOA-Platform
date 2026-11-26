@@ -79,6 +79,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "invite.revoke": frozenset({BOARD, SYSADMIN}),
     "mfa_reset.start": frozenset({BOARD}),
     "mfa_reset.approve": frozenset({BOARD}),
+    # Self-service account recovery (D58): any board member may cancel one
+    # that looks wrong; the person cancels their own from a signed-in page.
+    "account_recovery.cancel": frozenset({BOARD}),
     # Communications
     "announcement.view": COMMUNITY,
     "announcement.publish": frozenset({BOARD, MANAGER}),

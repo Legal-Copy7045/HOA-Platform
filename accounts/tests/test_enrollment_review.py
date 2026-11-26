@@ -18,7 +18,7 @@ from django.utils import timezone
 
 from accounts import enrollment, services
 from accounts.middleware import ALLOWED_URL_NAMES, EXPIRED_ALLOWED_URL_NAMES
-from accounts.models import Invitation, MfaReset, User, VerificationMethod
+from accounts.models import AccountRecovery, Invitation, MfaReset, User, VerificationMethod
 from accounts.tests.helpers import PASSWORD, totp_code
 from audit.models import AuditEvent
 from audit.services import record_event
@@ -120,10 +120,11 @@ def test_the_pages_open_without_an_authenticator_are_the_reviewed_ones():
     assert EXPIRED_ALLOWED_URL_NAMES == REVIEWED_EXPIRED_PAGES
     allauth_mfa = {n for n in _all_names() if n.startswith("mfa_")}
     # Every "mfa_" page is allauth's own (or our subclass of it), about the
-    # signed-in login's authenticators only.
+    # signed-in login's authenticators only. `accounts.recovery_codes` (D58)
+    # shows, prints or downloads the signed-in login's own recovery codes.
     for name in allauth_mfa:
         assert resolve(_path_for(name)).func.__module__.startswith(
-            ("allauth.mfa", "accounts.mfa_views")
+            ("allauth.mfa", "accounts.mfa_views", "accounts.recovery_codes")
         ), name
 
 
@@ -313,7 +314,10 @@ def test_the_old_link_dies_when_a_new_setup_link_is_sent(stuck, board):
     assert Client().get(reverse("invite_landing", args=[first])).status_code == 404
 
 
-@pytest.mark.parametrize("why", ["enrolled", "had_one", "reset", "email", "inactive"])
+@pytest.mark.parametrize(
+    "why",
+    ["enrolled", "had_one", "reset", "recovery", "recovery_cancelled", "email", "inactive"],
+)
 def test_no_setup_link_where_a_reset_is_needed(stuck, board, why):
     user = stuck.user
     if why == "enrolled":
@@ -327,6 +331,19 @@ def test_no_setup_link_where_a_reset_is_needed(stuck, board, why):
                 verification_method=VerificationMethod.IN_PERSON,
                 started_by=board,
                 request_expires_at=timezone.now() + datetime.timedelta(days=1),
+            )
+    elif why in ("recovery", "recovery_cancelled"):
+        # Any self-service account recovery on record (D58), open or not,
+        # counts as a reset: the two repair paths never overlap.
+        now = timezone.now()
+        with system_access("t"):
+            AccountRecovery.objects.create(
+                subject=user,
+                wait_hours=48,
+                lock_hours=48,
+                ready_at=now + datetime.timedelta(hours=48),
+                expires_at=now + datetime.timedelta(hours=72),
+                cancelled_at=now if why == "recovery_cancelled" else None,
             )
     elif why == "email":
         with system_access("t"):
