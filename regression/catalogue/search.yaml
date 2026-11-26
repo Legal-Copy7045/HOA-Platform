@@ -1,0 +1,7 @@
+# Portal search (core.search, <app>/search.py). `match` runs over "<stage>:<check>".
+- feature: "Portal search: one box in the menu, results grouped by area with counts, at most 10 per area newest first, escaped and highlighted snippets, too-short and too-long states, no-store, query never logged or audited"
+  since: M5
+  match: ["^unit:core/tests/test_search.py::test_", "^unit:core/tests/test_url_matrix.py::test_(search_never_shows_board_only_content|board_search_finds_the_same_records)", "^manual:search on a phone"]
+- feature: "Search never reveals what the person cannot open: every provider uses its list page's permission and scoped queryset (owner era, recusal, internal notes, tenants, view-only contacts, former owners on My history); switched-off features leave search"
+  since: M5
+  match: ["^unit:core/tests/test_search.py::test_(owner_a|owner_b|recused|view_only|tenant|former_owner|directory|switched_off|every_provider)"]

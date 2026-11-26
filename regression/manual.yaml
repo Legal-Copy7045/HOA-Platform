@@ -139,3 +139,7 @@
   check: "setup-offsite-backups.sh reports 'Locked'; the bucket shows the backup files under backups/; deleting one in the Cloudflare dashboard is refused; System status Backups shows the off-site age and 'lock verified'; restore-drill.sh --from-offsite passes."
   steps: "Follow docs/runbook.md 'Off-site backups that cannot be deleted'; then try deleting a backups/ object in the R2 dashboard; open System status; run the off-site drill."
   last: ""
+- key: search on a phone
+  check: "On a phone the search icon in the top bar opens Search; results are grouped by area with counts, matches are highlighted, nothing runs off the screen, and a one-letter search shows the 'at least 2 characters' message."
+  steps: "Sign in as a demo owner on a phone; tap the search icon; search a street name, then 'a'; then on a computer use the box at the top of the menu."
+  last: ""
