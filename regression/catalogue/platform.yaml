@@ -74,3 +74,6 @@
 - feature: "Falco apt key trusted only with Falco's published fingerprint; mismatch stops the script; only the pinned key goes into the keyring (R2-009)"
   since: M5
   match: ["^unit:core/tests/test_infra_scripts.py::test_falco_key_is_pinned"]
+- feature: "Server tasks (D36): sysadmins start backups, restore drills and other host tasks from a fixed allowlist; one at a time; the board sees the history; audited; the VM agent maps the kind in one case statement and writes back through psql variables"
+  since: M5
+  match: ["^unit:core/tests/test_host_tasks", "^manual:server tasks on the VM"]

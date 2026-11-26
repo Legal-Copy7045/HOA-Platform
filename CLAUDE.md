@@ -144,6 +144,7 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 - Event RSVPs and volunteer sign-ups (event page `calendar/<pk>/`): `comms/rsvp.py` (board/manager set cap, guests, deadline, reminder; owners/authorized/tenants answer; slots locked with `select_for_update`; owners see counts only, names and CSV `event.rsvp_names` board only; hourly `comms.tasks.event_reminders` via `send_update`)
 - Quarterly access review (board only, append-only `accounts.AccessReview`, My items after 90 days): `accounts/access_review.py`; contact-details retention for people who left (rule `retention.former_owner_contact_days`, nightly task, board preview at Admin → Contact retention): `community/retention.py`
 - Updates without a terminal: System status → Check now / Install update (sysadmin); the VM's `infra/poc/portal-agent.sh` timer does the work (D25)
+- Server tasks (D36, Admin → Server tasks, `server_tasks`): sysadmins start `backup`, `restore_drill`, `restore_drill_offsite`, `offsite_lock_check`, `harden_host`, `health_check` (`core/host_tasks.py`, `system.run_task`; board sees history with `system.view_tasks`); the web app only inserts a `core.HostTask` row, the VM agent maps the kind in `infra/poc/host-tasks.sh`'s `case` to a fixed command and writes back through psql variables; `manage.py record_host_tasks` audits results. A new reusable host operation is added there, not as a script people run
 - File storage on the POC: local SeaweedFS (`COMPOSE_PROFILES=local-store`) or Cloudflare R2; switch with `sudo bash infra/poc/move-files-to-r2.sh`
 - POC VM: see `infra/poc/README.md` and `docs/runbook.md`; update in one step with `sudo bash infra/poc/update-portal.sh`; test outgoing mail with `sudo bash infra/poc/test-email.sh [address]`
 
@@ -157,6 +158,7 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 
 ## Deployment targets
 
+- Reusable host operations are started in the portal (Admin → Server tasks) and run by the VM agent from a fixed allowlist (D36). OS-level scripts are only for one-time setup (`provision-vm.sh`, the first `harden-host.sh` run) and steps that take secrets typed by a person (`setup-offsite-backups.sh`, `set-stripe-key.sh`, `move-files-to-r2.sh`): secrets never pass through the web app.
 - POC: a Proxmox VM on an isolated VLAN, exposed only through a Cloudflare Tunnel (cloudflared in compose, web publishes no port), with a dev subdomain behind Cloudflare Access. No LAN access mode.
 - Production: managed host or hardened VPS, behind Cloudflare, with the HOA owning all accounts.
 - A full restore-and-migrate drill to a scratch environment must be done before any real data or live payments.

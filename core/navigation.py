@@ -226,6 +226,8 @@ SECTIONS = [
         "Admin",
         [
             ("System status", "system_status", "activity", "system.view_status"),
+            # Backups, restore drills and other host tasks (D36); the board sees the history.
+            ("Server tasks", "server_tasks", "clock", "system.view_tasks"),
             # Sysadmins re-send and revoke; the board has it under Association.
             ("Invitations and sign-ups", "invitations", "mail", "invite.resend"),
             ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),

@@ -211,6 +211,7 @@ PROTECTED = {
     "reset_decide": ("POST", "reset"),
     "sysadmin_activity": ("GET", None),
     "system_status": ("GET", None),
+    "server_tasks": ("GET", None),
     "community_settings": ("GET", None),
     "community_rule_save": ("POST", None),
     "community_profile_save": ("POST", None),
@@ -845,14 +846,18 @@ def test_owner_sees_own_lot_detail(client, world):
         (
             "auditor",
             ["lot_list", "sysadmin_activity"],
-            ["board_home", "people", "system_status", "invitations", "approvals"],
+            ["board_home", "people", "system_status", "server_tasks", "invitations", "approvals"],
         ),
         (
             "sysadmin",
-            ["system_status", "invitations"],
+            ["system_status", "server_tasks", "invitations"],
             ["lot_list", "board_home", "people", "sysadmin_activity", "my_lot"],
         ),
-        ("arc", [], ["lot_list", "board_home", "people", "system_status", "my_lot"]),
+        (
+            "arc",
+            [],
+            ["lot_list", "board_home", "people", "system_status", "server_tasks", "my_lot"],
+        ),
     ],
 )
 def test_role_page_access(client, world, who, allowed, denied):
@@ -876,6 +881,7 @@ def test_board_pages_load(client, world):
         "invitations",
         "lot_list",
         "sysadmin_activity",
+        "server_tasks",
     ):
         assert client.get(reverse(name)).status_code == 200, name
     for key, name in (("person", "person_detail"), ("lot", "lot_detail")):
