@@ -224,7 +224,8 @@ def test_login_page_has_labels_and_the_passkey_first(client):
     assert page.index('id="passkey_login"') < page.index('id="id_login"')
     assert "Sign in with a passkey" in page
     assert "You'll still need your authenticator app or passkey." in page
-    assert reverse("signin_help") in page and "Forgot password or lost my phone?" in page
+    assert reverse("signin_help") in page and "Lost your phone?" in page
+    assert reverse("account_reset_password") in page and "Forgot your password?" in page
     assert "placeholder=" not in page
 
 

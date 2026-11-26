@@ -34,6 +34,7 @@ SETUP_URL_NAMES = frozenset(
 STEP_LABELS = {
     "invite": ("Choose a password", "Add a passkey or app", "Save recovery codes"),
     "reset": ("Enter your code", "Add a passkey or app", "Save recovery codes"),
+    "recovery": ("Confirm recovery", "Add a passkey or app", "Save recovery codes"),
 }
 
 

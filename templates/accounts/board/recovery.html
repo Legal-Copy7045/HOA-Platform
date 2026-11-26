@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Account recovery · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'my_items' %}">My items</a> / Account recovery</div>
+  <div class="page-head"><div><h1>Account recovery</h1><p class="subtitle">{{ name }}{% if homes %} · {{ homes|join:", " }}{% endif %}</p></div></div>
+  <section class="card">
+    <dl class="facts">
+      <dt>Asked</dt><dd>{{ started }}</dd>
+      <dt>Can be finished from</dt><dd>{{ ready }} (a {{ row.wait_hours }}-hour wait)</dd>
+      <dt>Status</dt><dd>{% if row.status == "waiting" %}Waiting{% elif row.status == "ready" %}Ready to finish{% elif row.status == "completed" %}Completed; changes locked until {{ lock_until }}{% elif row.status == "cancelled" %}Cancelled{% else %}Expired{% endif %}</dd>
+    </dl>
+    <p class="small muted">The person lost their phone or passkey and their recovery codes. They, every email address on file and their text number (if they get texts) were told. If this looks wrong, for example they say they didn't ask, cancel it and talk to them.</p>
+    {% if row.is_open %}
+      <form method="post" data-confirm="Cancel this recovery? The person is told by email; their sign-in stays as it is.">{% csrf_token %}<div class="form-actions"><button type="submit" class="danger">Cancel the recovery</button></div></form>
+    {% elif row.status == "completed" %}
+      <p class="small">If it was not them, start an assisted reset from their page on People with a second board member.</p>
+    {% endif %}
+  </section>
+{% endblock %}

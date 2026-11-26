@@ -516,6 +516,9 @@ def submit_response(survey: Survey, *, answers: dict, actor, request=None) -> No
     of submitted values. Once submitted nothing can change."""
     require(actor, "survey.respond")
     _refuse_read_only(actor)  # a former owner's login changes nothing
+    from accounts.recovery import refuse_if_locked
+
+    refuse_if_locked(actor, "survey answer", SurveyError)  # D58
     person_id = _person_id(actor)
     if person_id is None:
         raise SurveyError("Your login is not linked to a person in the community register.")

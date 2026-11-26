@@ -210,7 +210,12 @@ ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
 ACCOUNT_RATE_LIMITS = {
     # D6: per-email ceiling regardless of IP; axes handles email+IP below.
     "login_failed": "10/m/ip,20/h/key",
+    # D58: "lost my phone and recovery codes" form, per client and per address.
+    "account_recovery": "10/h/ip,3/h/key",
 }
+# D58: emailed password reset links work once (the token changes with the
+# password) and only for an hour. The link still needs the passkey or app.
+PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT_SECONDS", default=3600)
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]

@@ -725,7 +725,10 @@ def cast_ballot(
     vote: Vote, *, option_id: int, lot_id: int | None = None, actor, request=None
 ) -> Ballot:
     require(actor, "vote.cast")
+    from accounts.recovery import refuse_if_locked
     from core import policy
+
+    refuse_if_locked(actor, "vote", GovernanceError)  # D58
 
     try:
         with transaction.atomic():

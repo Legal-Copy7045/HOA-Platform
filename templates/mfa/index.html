@@ -49,7 +49,9 @@
       {% if authenticators.recovery_codes %}
         {% with unused=authenticators.recovery_codes.get_unused_codes|length %}
         <p class="muted small">{{ unused }} unused code{{ unused|pluralize }} left. Each one signs you in once if you lose your phone or passkey.</p>
-        <div class="form-actions">{% if unused %}<a class="btn secondary" href="{% url 'mfa_view_recovery_codes' %}">Show codes</a>{% endif %}<a class="btn secondary" href="{% url 'mfa_generate_recovery_codes' %}">Make new codes</a></div>
+        {% if unused <= 2 %}<p class="small"><span class="badge tone-warning">Few left</span> Make new codes so a lost phone never locks you out.</p>{% endif %}
+        <div class="form-actions"><a class="btn secondary" href="{% url 'mfa_generate_recovery_codes' %}">Make new codes</a></div>
+        <p class="small muted">Codes are shown only once, when they are made. Print or download them then.</p>
         {% endwith %}
       {% else %}<p class="muted small">None yet.</p>{% if is_mfa_enabled %}<div class="form-actions"><a class="btn secondary" href="{% url 'mfa_generate_recovery_codes' %}">Make recovery codes</a></div>{% endif %}{% endif %}
     </section>
@@ -58,6 +60,7 @@
       <div class="form-actions"><a class="btn secondary" href="{% url 'account_change_password' %}">Change password</a></div>
     </section>
   </div>
-  <p class="small muted">Lost every passkey and your phone? Two board members can reset your sign-in. <a href="{% url 'signin_help' %}">How sign-in help works</a></p>
+  <p class="small"><strong>Keep a backup:</strong> two passkeys (say, your phone and your computer), or a passkey and an authenticator app, so losing one device never locks you out.</p>
+  <p class="small muted">Lost your phone and your recovery codes? Homeowners and residents can recover their sign-in after a waiting period; board members and staff ask two board members for a reset. <a href="{% url 'signin_help' %}">How sign-in help works</a></p>
 {% endif %}
 {% endblock content %}

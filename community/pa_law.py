@@ -95,6 +95,11 @@ GROUP_NOTES: dict[str, str] = {
         "(15 Pa.C.S.); have counsel confirm the consent wording and which notices it covers. "
         "Owners who have not agreed get paper notices."
     ),
+    "Sign-in and security": (
+        "Not set by the Act; a board security policy. The Act does not regulate how owners "
+        "sign in. The waiting period and the lock afterwards protect votes, notices and "
+        "payments if someone else gets into an owner's email."
+    ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
@@ -302,6 +307,23 @@ GUIDES["retention.former_owner_contact_days"] = Guide(
     "Not covered by the Act. Only contact details are cleared: ledger, ARC, violation, vote "
     f"and audit records stay, as the association must keep its records ({ACT} § 5316).",
     "730 days (two years after leaving): Board privacy policy, resolution 2027-11.",
+)
+
+GUIDES["recovery.wait_hours"] = Guide(
+    BOARD,
+    "Not set by the Act; a board security policy. While the request waits, the person, every "
+    "email address on file, their verified text number and the board are told, and any of "
+    "them can cancel it. The portal never allows less than 48 hours.",
+    "48 hours: Board security policy (sign-in recovery), resolution 2026-12.",
+)
+
+GUIDES["recovery.lock_hours"] = Guide(
+    BOARD,
+    "Not set by the Act; a board security policy. Votes and ballots stay the owner's own "
+    f"(the association keeps ballots and records, {ACT} § 5316), so a recently recovered "
+    "sign-in cannot cast or change them, give a proxy, or change where notices go until the "
+    "lock ends. The portal never allows less than 24 hours.",
+    "48 hours: Board security policy (sign-in recovery), resolution 2026-12.",
 )
 
 for _key in ("general", "billing", "maintenance", "common_area"):

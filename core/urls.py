@@ -2,7 +2,7 @@ from django.conf import settings
 from django.http import Http404
 from django.urls import include, path, re_path
 
-from accounts import mfa_views
+from accounts import mfa_views, password_reset, recovery_codes
 from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
 from core import hub_views, preview
@@ -48,6 +48,28 @@ urlpatterns = [
         "accounts/2fa/webauthn/keys/<int:pk>/remove/",
         mfa_views.remove_passkey,
         name="mfa_remove_webauthn",
+    ),
+    # D58: the reset link still needs the passkey, app or a recovery code.
+    re_path(
+        r"^accounts/password/reset/key/(?P<uidb36>[0-9A-Za-z]+)-(?P<key>.+)/$",
+        password_reset.password_reset_from_key,
+        name="account_reset_password_from_key",
+    ),
+    # D58: recovery codes are shown once, then printed or downloaded from there.
+    path(
+        "accounts/2fa/recovery-codes/",
+        recovery_codes.view_codes,
+        name="mfa_view_recovery_codes",
+    ),
+    path(
+        "accounts/2fa/recovery-codes/download/",
+        recovery_codes.download_codes,
+        name="mfa_download_recovery_codes",
+    ),
+    path(
+        "accounts/2fa/recovery-codes/print/",
+        recovery_codes.print_codes,
+        name="mfa_print_recovery_codes",
     ),
     path("accounts/", include("allauth.urls")),
     path("", include("accounts.urls")),

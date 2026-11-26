@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Print recovery codes · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <h1>{{ SITE_NAME }}: recovery codes</h1>
+  <p>Each code signs you in once in place of your phone or passkey. Keep this page with your important papers. Making new codes stops these from working.</p>
+  <ul class="recovery-codes" aria-label="Recovery codes">{% for code in unused_codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+  <p class="small">Printed {% now "F j, Y" %}. Lost these and your phone? Use Sign-in help on the sign-in page.</p>
+  <div class="form-actions no-print">
+    <button type="button" data-print>Print</button>
+    <a class="btn secondary" href="{% url 'mfa_view_recovery_codes' %}">Back</a>
+  </div>
+{% endblock %}

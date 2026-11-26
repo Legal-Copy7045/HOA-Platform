@@ -23,6 +23,11 @@ def navigation(request):
     with system_access("sidebar display name"):
         person = Person.objects.filter(user=request.user).only("display_name").first()
     data["display_name"] = person.display_name if person else request.user.email
+    # D58: while the lock after a self-service recovery lasts, every page says so.
+    from accounts.recovery import locked_until, when
+
+    until = locked_until(request.user)
+    data["recovery_locked_until"] = when(until) if until else ""
     return {"nav": data}
 
 

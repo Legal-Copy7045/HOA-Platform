@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from accounts import access_review, board_views, views
+from accounts import access_review, board_views, recovery_views, views
 
 urlpatterns = [
     path("invite/accept/", views.invite_accept, name="invite_accept"),
@@ -10,6 +10,20 @@ urlpatterns = [
     path("account/setup-expired/", views.account_setup_expired, name="account_setup_expired"),
     path("account/setup/done/", views.account_setup_done, name="account_setup_done"),
     path("sign-in-help/", views.signin_help, name="signin_help"),
+    # Self-service account recovery (D58): sign-in steps, then signed-in pages.
+    path("sign-in-help/recover/", recovery_views.recovery_request, name="recovery_request"),
+    path(
+        "sign-in-help/recover/continue/",
+        recovery_views.recovery_continue,
+        name="recovery_continue",
+    ),
+    path("sign-in-help/recover/<str:token>/", recovery_views.recovery_link, name="recovery_link"),
+    path(
+        "account/recovery/",
+        recovery_views.account_recovery_status,
+        name="account_recovery_status",
+    ),
+    path("board/recoveries/<int:pk>/", recovery_views.recovery_board, name="recovery_board"),
     path("board/invitations/", board_views.invitations, name="invitations"),
     path("board/people/<int:pk>/invite/", board_views.invite_person, name="invite_person"),
     re_path(

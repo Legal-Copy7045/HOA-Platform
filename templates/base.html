@@ -54,6 +54,9 @@
         <a class="topbar-search" href="{% url 'search' %}">{% icon "search" %}<span class="sr-only">Search</span></a>
       </header>
       <main id="main" class="content {% block content_class %}{% endblock %}">
+        {% if nav.recovery_locked_until %}
+          <div class="alert warning recovery-lock" role="status">{% icon "lock" %}<span><strong>Your sign-in was recently recovered.</strong> For your security, voting, proxies, contact details, notice and text choices, automatic payments and account change requests are available again on {{ nav.recovery_locked_until }}. <a href="{% url 'account_recovery_status' %}">Why?</a></span></div>
+        {% endif %}
         {% if request.owner_preview %}
           <div class="preview-banner" role="status">{% icon "home" %}<span><strong>Preview as owner:</strong> you're seeing what the owner of {{ request.owner_preview.lot_label }} sees. Read-only; personal pages are still yours.</span>
             <form method="post" action="{% url 'owner_preview_stop' %}" class="inline">{% csrf_token %}<button type="submit" class="small">Exit the preview</button></form></div>

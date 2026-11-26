@@ -191,7 +191,9 @@ def build(user, request=None) -> dict:
     if roles.groups == {policy.SYSADMIN}:  # sysadmin-only login: operations first
         data["system"] = system_panel()
     data["quick"] = quick_actions(user, roles)
-    if not items:
+    # A sign-in to-do (backup method, new recovery codes, D58) is the
+    # login's own, not role work: the role shortcuts still show beside it.
+    if not [i for i in items if i.area != "Sign-in and security"]:
         data["shortcuts"] = role_shortcuts(user, roles, request)
     from comms.models import Announcement, AnnouncementRead
     from comms.services import upcoming, with_page_urls
