@@ -402,11 +402,6 @@ def test_statement_and_resale_certificate_list_the_open_charges_and_total(w, boo
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: delinquency notices state the whole balance as the 'delinquency', "
-    "including charges not yet past due (notice_pdf uses balance, the case letter past_due)",
-)
 def test_delinquency_notice_states_only_the_past_due_amount(w, books):
     _dues(2026, 9)
     _charge(w, 1000, "Posted today", TODAY)

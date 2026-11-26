@@ -162,7 +162,7 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
     due_day = min(rule("dues.due_day") or 1, 28)
     past_due = balance > 0 and any(e.kind in CHARGE_KINDS and e.posted_on < as_of for e in entries)
     due_label = "Past Due" if past_due else ("Now" if balance > 0 else "-")
-    message = fill(template(LetterKind.STATEMENT).body, _values(lot, balance))
+    message = fill(template(LetterKind.STATEMENT).body, _values(lot, _past_due(lot, as_of)))
     paras = [
         *_letterhead(profile),
         ("normal", ""),
@@ -264,14 +264,24 @@ def open_charges_paragraphs(lot: Lot, *, since=None) -> list[tuple[str, str]]:
     return paras
 
 
-def _values(lot: Lot, balance: int) -> dict[str, str]:
+def _past_due(lot: Lot, on=None) -> int:
+    from ledger.services import past_due
+
+    return past_due(lot.pk, on)
+
+
+def _values(lot: Lot, past_due_cents: int) -> dict[str, str]:
+    """Placeholder values. ``{amount}`` is always the amount past due, never
+    the whole balance: charges not yet due are not a delinquency
+    (D33-acctfix-4). The attached statement shows the full balance under
+    "Pay this amount"."""
     profile = CommunityProfile.get()
     names, salutation, _address, account_number = _recipients(lot)
     days = rule("collections.notice_days") or 10
     return {
         "owner_names": names,
         "salutation": salutation,
-        "amount": format_cents(max(balance, 0)),
+        "amount": format_cents(max(past_due_cents, 0)),
         "days": _days_text(int(days)),
         "date": timezone.localdate().strftime("%B %-d, %Y"),
         "account_number": account_number,
@@ -291,8 +301,8 @@ def notice_pdf(lot: Lot, kind: str) -> bytes:
     if kind not in (LetterKind.FIRST, LetterKind.SECOND, LetterKind.FINAL):
         raise ValueError("Unknown notice.")
     profile = CommunityProfile.get()
-    statement, balance = statement_paragraphs(lot)
-    values = _values(lot, balance)
+    statement, _balance = statement_paragraphs(lot)
+    values = _values(lot, _past_due(lot))
     tpl = template(kind)
     names, salutation, address, _account = _recipients(lot)
     letter = [

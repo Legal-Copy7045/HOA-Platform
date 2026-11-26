@@ -19,7 +19,6 @@ from core.policy import SYSTEM, require
 from core.scoping import internal, system_access
 from core.workflow import Transition, Workflow
 from ledger.models import (
-    CHARGE_KINDS,
     Budget,
     BudgetLine,
     BudgetStatus,
@@ -63,18 +62,18 @@ def balance(lot_id: int, as_of: datetime.date | None = None) -> int:
 
 
 def past_due(lot_id: int, today: datetime.date | None = None) -> int:
-    """What is actually overdue: charges dated before today, less every
-    payment and credit so far. Assessments auto-posted for a due date later
-    this month do not count yet (BUG-006)."""
-    from django.db.models import Q
-
+    """What is actually overdue on ``today``: the open amounts of charges
+    due before that day (open-item accounting, as the charges stood then).
+    A charge due today or later, such as dues posted ahead for a later due
+    date, does not count yet (BUG-006). Every delinquency notice and letter
+    states this amount, never the whole balance (D33-acctfix-4)."""
     today = today or timezone.localdate()
-    qs = (
-        LedgerEntry.objects.unscoped("past due")
-        .filter(lot_id=lot_id, posted_on__lte=today)
-        .filter(~Q(kind__in=CHARGE_KINDS) | Q(posted_on__lt=today))
+    state = _allocation().state_as_of(lot_id, today)
+    return sum(
+        cents
+        for pk, cents in state.open.items()
+        if cents > 0 and state.entries[pk].posted_on < today
     )
-    return max(qs.aggregate(s=Sum("amount_cents"))["s"] or 0, 0)
 
 
 @internal("ledger service")

@@ -137,3 +137,61 @@ def test_dues_paid_after_the_check_date_still_count_as_open_then(w):
     _pay(w, 4500, D(2026, 10, 25), reference="13")
     assert _late_lots(D(2026, 10, 20)) == {w["lot"].pk: 4500}
     assert _late_lots(D(2026, 10, 26)) == {}
+
+
+# --- 4. Delinquency notices state the past-due amount ------------------------------------------
+
+
+def _notice_text(fn, *args, **kw):
+    from unittest import mock
+
+    from ledger import letters
+
+    rendered = []
+    with mock.patch.object(letters.pdf, "render", side_effect=lambda p, **k: rendered.append(p)):
+        fn(*args, **kw)
+    return "\n".join(t for _s, t in rendered[0])
+
+
+def test_every_notice_path_states_only_the_past_due_amount(w):
+    from ledger import letters
+    from ledger.models import LetterKind
+
+    _charge(w, 4500, TODAY - datetime.timedelta(days=40), "Old dues")
+    _charge(w, 1000, TODAY, "Not yet due")
+    _charge(w, 2000, TODAY + datetime.timedelta(days=3), "Due later")
+    assert services.past_due(w["lot"].pk) == 4500 and services.balance(w["lot"].pk) == 7500
+    for kind in (LetterKind.FIRST, LetterKind.SECOND, LetterKind.FINAL):
+        text = _notice_text(letters.notice_pdf, w["lot"], kind)
+        assert "delinquency of $45.00" in text and "$55.00" in text  # balance as of today
+    text = _notice_text(services.generate_notice, w["lot"], "first", actor=w["board"])
+    assert "delinquency of $45.00" in text
+
+
+def test_statement_message_amount_placeholder_is_the_past_due_amount(w):
+    from ledger import letters
+    from ledger.models import LetterKind
+
+    services.save_letter_template(
+        LetterKind.STATEMENT,
+        subject="",
+        body="Past due: {amount}.",
+        certified=False,
+        actor=w["board"],
+    )
+    _charge(w, 4500, TODAY - datetime.timedelta(days=40), "Old dues")
+    _charge(w, 1000, TODAY, "Not yet due")
+    paras, balance = letters.statement_paragraphs(w["lot"])
+    assert balance == 5500 and "Past due: $45.00." in "\n".join(t for _s, t in paras)
+
+
+def test_past_due_follows_the_open_charges_not_the_netted_balance(w):
+    """A payment the owner directed to a charge not yet due leaves the older
+    charge open, so it is still past due."""
+    old = _charge(w, 3000, D(2026, 9, 5), "Fine")
+    later = _charge(w, 3000, TODAY + datetime.timedelta(days=5), "Due later")
+    _pay(w, 3000, TODAY, reference="40", apply_to=[later.pk])
+    assert services.balance(w["lot"].pk) == 3000
+    assert allocation.charge_status(old) == "open" and services.past_due(w["lot"].pk) == 3000
+    assert services.past_due(w["lot"].pk, D(2026, 9, 5)) == 0  # due that day: not yet late
+    assert services.past_due(w["lot"].pk, D(2026, 9, 6)) == 3000
