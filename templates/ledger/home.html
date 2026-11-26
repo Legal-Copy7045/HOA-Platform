@@ -12,16 +12,16 @@
   </div>
   {% if can_manage %}
     <section class="card">
-      <h2>Post monthly dues</h2>
+      <h2>Post the monthly {% term "term" %}</h2>
       {% if dues_cents %}
       <form method="post" class="inline-form" data-confirm="Charge {{ dues_lots }} homes {{ dues_cents|cents }} each for the month you chose? Homes already charged for that month are skipped.">{% csrf_token %}
         <div><label for="dperiod">Month to charge <span class="required-mark" aria-hidden="true">*</span></label><input id="dperiod" name="period" type="month" value="{{ default_period }}" required></div>
         <button type="submit">Post to every home</button>
       </form>
       <p class="small" data-testid="dues-preview">Will charge <strong>{{ dues_lots }} home{{ dues_lots|pluralize }} {{ dues_cents|cents }} each</strong> ({{ dues_total|cents }} in all).</p>
-      <p class="muted small">Uses the monthly dues rule. A home already charged for that month is skipped, so posting twice is safe.</p>
+      <p class="muted small">Uses the monthly {% term "term" %} amount from Community settings. A home already charged for that month is skipped, so posting twice is safe.</p>
       {% else %}
-      <p class="muted small">No monthly dues amount is set. Set it in <a href="{% url 'community_settings' %}">Community settings</a> first.</p>
+      <p class="muted small">No monthly {% term "term" %} amount is set. Set it in <a href="{% url 'community_settings' %}">Community settings</a> first.</p>
       {% endif %}
     </section>
   {% endif %}
@@ -32,7 +32,7 @@
         <p class="small">Late fee {{ late_fee.0|cents }}{% if late_fee.1 %} ({{ late_fee.1 }}){% endif %}. Automatic posting is <strong>{% if late_auto %}on{% else %}off{% endif %}</strong>{% if not late_auto %}: the board reviews this list and posts{% endif %}.</p>
         {% if late %}<ul class="list">{% for r in late %}<li><a class="grow" href="{% url 'lot_ledger' r.lot.pk %}">{{ r.lot.label }}</a><span class="small muted">late from {{ r.late_from|date:"M j" }}</span><span class="num">{{ r.balance_cents|cents }}</span></li>{% endfor %}</ul>
           {% if can_post_late_fees %}<form method="post" data-confirm="Post a late fee to each of these {{ late|length }} homes? Each home is charged at most once a month.">{% csrf_token %}<input type="hidden" name="action" value="late_fees"><button type="submit">Post late fees ({{ late|length }})</button></form>{% else %}<p class="small muted">A board member posts the fees.</p>{% endif %}
-        {% else %}<p class="muted small">Nobody is late for this month's dues.</p>{% endif %}
+        {% else %}<p class="muted small">Nobody is late for this month's {% term "term" %}.</p>{% endif %}
       {% endif %}
     </section>
   {% endif %}

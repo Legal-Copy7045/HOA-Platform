@@ -553,6 +553,6 @@ def test_charges_numbers_and_titles_are_stable_through_payments(w, books):
     _pay(w, 4500, D(2026, 3, 3))
     (paid,) = allocation.charges(w["lot"].pk, open_only=False)
     assert paid.entry.pk == mar.pk and paid.number == number and paid.status == "paid"
-    assert paid.title == f"Dues {DASH} March 2026" and paid.payments[0].amount_cents == 4500
+    assert paid.title == f"Assessment {DASH} March 2026" and paid.payments[0].amount_cents == 4500
     assert days_ago(0) == TODAY
     _check(books)

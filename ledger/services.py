@@ -15,6 +15,7 @@ from django.utils import timezone
 from audit.services import record_event
 from community.models import CommunityProfile, Lot
 from community.rules import rule, rule_with_citation
+from community.terms import charge_term, term_text
 from core import pdf
 from core.money import format_cents
 from core.policy import SYSTEM, require
@@ -199,6 +200,7 @@ def upcoming_charges(
                 reversed_by__isnull=True,
             ).values_list("period", flat=True)
         )
+    term = charge_term()
     out = []
     while len(out) < months:
         if month > 12:
@@ -209,7 +211,7 @@ def upcoming_charges(
             out.append(
                 UpcomingCharge(
                     datetime.date(year, month, day),
-                    f"Monthly dues {_period(year, month)}",
+                    term.monthly_title(datetime.date(year, month, 1)),
                     amount,
                     covered,
                 )
@@ -225,14 +227,20 @@ def _period(year: int, month: int) -> str:
 @internal("ledger service")
 def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> int:
     _authorize(actor, "ledger.manage")
-    amount, citation = rule_with_citation("dues.monthly_cents")
+    amount = rule("dues.monthly_cents")
+    term = charge_term()
     if not amount:
         raise LedgerError(
-            "Set the monthly dues amount (with its citation) in Community settings first."
+            term_text(
+                "Set the monthly {term} amount (with its citation) in Community settings first.",
+                term,
+            )
         )
     day = min(rule("dues.due_day") or 1, 28)
     posted_on = datetime.date(year, month, day)
     period = _period(year, month)
+    # One name for the monthly charge (WT-003, D42): "Assessment - December 2026".
+    description = term.monthly_title(posted_on)
     created = 0
     with system_access("post assessments"):
         lots = list(Lot.objects.all())
@@ -245,8 +253,7 @@ def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> i
                     kind=EntryKind.ASSESSMENT,
                     amount_cents=amount,
                     period=period,
-                    description=f"Assessment {posted_on:%B %Y}"
-                    + (f" ({citation})" if citation else ""),
+                    description=description,
                     posted_by=_user(actor),
                 )
             created += 1
@@ -258,6 +265,12 @@ def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> i
         request=request,
         metadata={"period": period, "lots": created, "amount_cents": amount},
     )
+    # The monthly statement emails (D42): queued after commit, by the
+    # automatic posting and the board's button alike; each account at most
+    # once a month (ledger.StatementEmail), so a second posting sends nothing.
+    from ledger.tasks import send_statement_emails
+
+    transaction.on_commit(lambda: send_statement_emails.defer(year=year, month=month))
     return created
 
 
@@ -499,7 +512,7 @@ def post_charge(
 ) -> LedgerEntry:
     _authorize(actor, "ledger.manage")
     if kind not in (EntryKind.OTHER_CHARGE, EntryKind.LATE_FEE, EntryKind.RESALE_FEE):
-        raise LedgerError("Use the assessment posting for dues.")
+        raise LedgerError(term_text("Use the monthly {term} posting for the {term}."))
     if kind == EntryKind.LATE_FEE:
         _authorize(actor, "late_fee.post")  # a board decision, not the manager's
         if not settings.LEDGER_LATE_FEES_ENABLED:
@@ -1682,11 +1695,14 @@ def send_budget_notice(budget: Budget, *, stage: str, actor, request=None) -> di
             f"expenses {format_cents(summary['expense'])}.\n\nSee the details:\n{link}\n"
         )
     else:
-        subject = f"[{settings.SITE_NAME}] Adopted budget and dues for {budget}"
+        term = charge_term().variants()
+        subject = f"[{settings.SITE_NAME}] Adopted budget and {term['term']} for {budget}"
         body = (
             f"The board adopted the {budget} on {budget.adopted_on:%B %-d, %Y}.\n"
             + (
-                f"Monthly dues: {format_cents(dues)}" + (f" ({cite})" if cite else "") + "\n"
+                f"Monthly {term['term']}: {format_cents(dues)}"
+                + (f" ({cite})" if cite else "")
+                + "\n"
                 if dues
                 else ""
             )

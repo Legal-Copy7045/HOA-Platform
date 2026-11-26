@@ -95,6 +95,15 @@ GROUP_NOTES: dict[str, str] = {
 }
 
 GUIDES: dict[str, Guide] = {
+    # D42: the Act's own word is the fallback; most declarations use it too.
+    "charge.term": Guide(
+        DECLARATION,
+        f"The Act calls the owners' regular share of the common expenses an assessment "
+        f"({ACT} § 5302(a)(2), § 5314). The portal uses your covenants' word everywhere.",
+        "Assessment: Declaration §6.1 (or Dues, if that is the word your covenants use).",
+        fallback="Assessment",
+        fallback_citation=f"{ACT} § 5302(a)(2) (the Act's word)",
+    ),
     "dues.monthly_cents": Guide(
         BOARD,
         f"Set by the board's adopted budget ({ACT} § 5302(a)), divided among lots by the "
@@ -249,7 +258,7 @@ GUIDES["ledger.assessments_before_fees"] = Guide(
     "The Act does not say in what order an owner's payments pay their charges. Assessments, "
     f"late charges, fines and interest are all part of the association's lien ({ACT} § 5302(a)(11) "
     "and § 5315), so the Declaration or a board collection policy usually sets the order. "
-    "Oldest first is the common default; some policies pay dues before fees.",
+    "Oldest first is the common default; some policies pay assessments before fees.",
     "Off (oldest first): Board collection policy, resolution 2027-03. On if the Declaration "
     "says payments apply to assessments first (e.g. Declaration §7.6).",
 )

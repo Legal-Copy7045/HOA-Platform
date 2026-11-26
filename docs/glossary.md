@@ -17,9 +17,11 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Preview as owner | A board member or manager sees the portal as one home's owner does, read-only and logged. Started from the home's page. | `core/preview.py` |
 | Search | The search box at the top of the menu and its results page: finds announcements, documents, meetings, requests and more, grouped by area. Shows only what you can already open. | `core/search.py`, `<app>/search.py` |
 | My home | Your home (its address as the title, the plat lot number small beneath), the people on your account. | `my_lot` |
-| My account | Your dues statement and balance. The board's view of every home is **Owner accounts**; one home's page is its **Home account**. | `ledger` |
-| Open charges | Each charge on an account (dues, late fees, other charges, resale fees) with what is still unpaid on it and the payments applied to it. | `ledger.allocation`, `PaymentApplication` |
-| Invoice 2026-0142 / Dues – March 2026 | A charge's number (year and sequence) and its name. | `ChargeNumber` |
+| Assessment | The regular monthly charge, named as the covenants name it: a Community settings value ("What the regular monthly charge is called", with its citation; default Assessment, the Act's word). Pages, emails, letters and new charges use it; the code still says "dues". | `charge.term`, `community/terms.py`, `{% term %}` |
+| Monthly statement email | Sent when the month's assessment is posted, to owners and authorized or view-only contacts who leave it ticked on My profile: amount due, what to do, links, the statement PDF. | `ledger/statement_email.py`, `StatementEmail` |
+| My account | Your statement and balance. The board's view of every home is **Owner accounts**; one home's page is its **Home account**. | `ledger` |
+| Open charges | Each charge on an account (assessments, late fees, other charges, resale fees) with what is still unpaid on it and the payments applied to it. | `ledger.allocation`, `PaymentApplication` |
+| Invoice 2026-0142 / Assessment – March 2026 | A charge's number (year and sequence) and its name. | `ChargeNumber` |
 | Pay online | An owner or authorized contact pays chosen charges on Stripe's hosted page: bank account or debit card (no fee), or credit card (with the surcharge). | `pay_online`, `payments.checkout` |
 | Payment status | The page Stripe returns the payer to; the portal asks Stripe itself whether the payment went through. | `pay_return` |
 | Credit card surcharge | The fee on credit card payments only (never bank or debit), at most 3%. Not part of the account balance. | `payments.credit_card_surcharge_bp` |
@@ -49,7 +51,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Community info | One page for **Frequently asked questions**, **Board and committees**, the **Owner directory** and (for committee members) **Committees**. With only one of these open to you, the menu goes straight to it. | `community_info` |
 | Reserve plan | The board's in-house reserve study: the things the association will one day replace (component, cost today, useful life, years left), a year-by-year projection of the reserve fund, percent funded and the contribution needed. Finance menu. | `reserve_plan`, `ledger/reserves.py` |
 | Record as adopted | The board fixes the current reserve plan's figures as adopted on a date ("reserve plan adopted Nov 26, 2026"); kept unchanged. | `ReserveStudySnapshot` |
-| Budget and reserves | What owners see of the money plan: the budget (income, expenses, dues per home) and the adopted reserve plan's summary (percent funded, adopted date, next major items; no board notes). The year is in the subtitle. The old Reserve plan summary page redirects here. | `owner_budget` (`reserve_summary` redirects) |
+| Budget and reserves | What owners see of the money plan: the budget (income, expenses, the monthly assessment per home) and the adopted reserve plan's summary (percent funded, adopted date, next major items; no board notes). The year is in the subtitle. The old Reserve plan summary page redirects here. | `owner_budget` (`reserve_summary` redirects) |
 | Percent funded | The reserve balance compared with the fully funded balance (each component's cost times the share of its life already used). | `percent_funded` |
 | Settings | One page for rarely used set-up pages: Community settings, ARC request types, Home neighbors, Letters and certificates, Common area booking rules, Branding, Features, Contact retention. With only one open to you, the menu goes straight to it. | `settings_hub` |
 | Contact retention | Former owners' contact details cleared after the retention period. | `retention` |

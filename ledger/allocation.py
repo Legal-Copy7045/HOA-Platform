@@ -489,13 +489,16 @@ DASH = "\N{EN DASH}"
 
 
 def charge_title(entry) -> str:
-    """What owners call a charge: "Dues - March 2026", or its description."""
+    """What owners call a charge: "Assessment - March 2026" (the board's word,
+    D42), or its description."""
     period = entry.period or ""
     month = ""
     if len(period) == 7 and period[4] == "-" and period[5:].isdigit():
         month = f"{MONTHS[int(period[5:]) - 1]} {period[:4]}"
     if entry.kind == "assessment" and month:
-        return f"Dues {DASH} {month}"
+        from community.terms import charge_term
+
+        return f"{charge_term().variants()['Term']} {DASH} {month}"
     if entry.kind == "late_fee" and month:
         return f"Late fee {DASH} {month}"
     if entry.kind == "resale_fee":

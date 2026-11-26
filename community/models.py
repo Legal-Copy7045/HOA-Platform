@@ -599,6 +599,9 @@ class ContactProfile(ScopedModel):
     # Routine updates (replies, discussions, sign-off requests): at once or in
     # a weekly digest (Milestone 4). Legal notices are always sent at once.
     weekly_digest = models.BooleanField(default=False)
+    # The monthly statement by email when the month's charge posts (D42):
+    # on unless the person unticks it (owner ruling); amount due and the PDF.
+    statement_emails = models.BooleanField(default=True, db_default=True)
     # Urgent text messages (Milestone 4): opt-in, and only to a number the
     # owner proved by entering a texted code. Never shown in the directory.
     sms_number = models.CharField(max_length=20, blank=True)

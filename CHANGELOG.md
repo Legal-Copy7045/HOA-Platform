@@ -6,6 +6,19 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.11.0 — 2026-11-26
+
+- The monthly charge is called what the covenants call it: "Assessment" by
+  default, or the board's word from Community settings ("What the regular
+  monthly charge is called", with its citation). Pages, emails, letters, rule
+  labels and new charges use it; every new monthly charge reads
+  "Assessment – December 2026". Charges already posted keep their wording (D42).
+- A statement by email when the month's assessment is posted: the amount due,
+  the pay-by date (or "nothing to pay" / covered by prepaid credit), links to My
+  account and Pay online, and the statement PDF attached. On by default for
+  owners and authorized or view-only contacts; untick it on My profile to stop.
+  Sent once per account per month, never to tenants or former owners.
+
 ## 0.10.0 — 2026-11-26
 
 - My home → "Ask to add someone" asks for the person's email, which they sign

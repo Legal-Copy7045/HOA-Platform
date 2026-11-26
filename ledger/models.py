@@ -472,6 +472,29 @@ class CourtesyReminder(ScopedAppendOnlyModel):
         return f"courtesy reminder {self.period}"
 
 
+class StatementEmail(ScopedAppendOnlyModel):
+    """The monthly statement emailed for one account and month (D42): one
+    row per account per month, so a re-run or a second posting never sends
+    it twice. Counts only; no addresses."""
+
+    scope_lot_path = "account__lot"
+
+    account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
+    period = models.CharField(max_length=7)  # YYYY-MM
+    recipients = models.PositiveIntegerField(default=0)
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["account", "period"], name="statement_email_once_per_month"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"statement email {self.period}"
+
+
 class CollectionLetter(ScopedAppendOnlyModel):
     """A delinquency notice generated for a collection case (printed and
     mailed by the board; nothing is sent from the portal)."""

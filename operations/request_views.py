@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from comms import threads
 from community.models import CommonArea, Person
 from community.services import staff_people
+from community.terms import term_text
 from core import policy
 from core.lists import paginate
 from core.workflow import WorkflowError
@@ -22,7 +23,7 @@ from operations.models import OPEN_REQUEST_STATES, OwnerRequest, RequestType
 # One line each, so owners know which to pick.
 TYPE_HELP = {
     RequestType.GENERAL: "A question about the rules, the community or this website.",
-    RequestType.BILLING: "Your dues, a charge or a payment on your account.",
+    RequestType.BILLING: "Your {term}, a charge or a payment on your account.",
     RequestType.MAINTENANCE: "Something that needs fixing, such as a streetlight, sign or drain.",
     RequestType.COMMON_AREA: "A problem in a shared space, such as damage, misuse or a hazard.",
 }
@@ -57,7 +58,8 @@ class RequestForm(forms.Form):
             self.fields["lot"].initial = str(self.only_lot.pk)
         self.fields["common_area"].queryset = CommonArea.objects.filter(active=True)
         self.type_help = [
-            (value, label, TYPE_HELP.get(value, "")) for value, label in RequestType.choices
+            (value, label, term_text(TYPE_HELP.get(value, "")))
+            for value, label in RequestType.choices
         ]
 
 

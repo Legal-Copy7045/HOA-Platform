@@ -48,3 +48,12 @@ def bank_feed_sync(timestamp: int) -> int:
     from ledger.bankfeeds.services import sync_all
 
     return sync_all()
+
+
+@app.task(queue="email")
+def send_statement_emails(year: int, month: int) -> int:
+    """Queued when the month's charge is posted (D42); each account's
+    statement goes out at most once a month, so re-runs are harmless."""
+    from ledger.statement_email import send_monthly_statements
+
+    return send_monthly_statements(year=year, month=month)["emails"]
