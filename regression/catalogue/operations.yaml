@@ -38,3 +38,18 @@
 - feature: "Money tools: balanced journal CSV export (owners by lot only, formula-injection safe), deposit batches with void, bank reconciliation with outstanding items, 1099 worksheet at the threshold rule, courtesy reminders (off until set, once a month), collections letter sequence first/second/final with referral left to the board"
   since: M4
   match: ["^unit:ledger/tests/test_money_tools"]
+- feature: "Contract pre-approval follows the invoice two-approver rule: a cap at or above invoice.dual_approval_cents needs two different board approvals (never the entrant, never a manager), recorded append-only and fixed when entered; a one-approval contract pre-approves only invoices below the threshold (SEC-002)"
+  since: M4
+  match: ["^unit:operations/tests/test_contracts.py::test_(contract_at_or_above_threshold|entrant_approval_never|required_approvals_fixed|contract_approvals_are_append_only|one_approval_contract|board_approves_contract)"]
+- feature: "My account upcoming charges skip months whose dues are already posted (no double counting); prepaid owners see future months listed unpaid and the credit drawn down only as each month posts (owner ruling 2026-11-26); a charge posted ahead shows 'due by' in My items (BUG-005)"
+  since: M4
+  match: ["^unit:ledger/tests/test_ledger.py::test_(dues_posted_early|reversed_early_assessment|owner_ruling_prepaid|my_items_says_due_by)"]
+- feature: "Duplicate check numbers: a reversed (bounced) payment does not block depositing the same check again; Record payments and the single payment form on the lot ledger follow the same rule (BUG-006)"
+  since: M4
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(record_payments_accepts_a_bounced_check|single_payment_form_follows)"]
+- feature: "Owner photos of the fix: the 10-photo allowance is checked inside the same locked transaction as the overall file cap, so parallel uploads cannot pass it or use up the board's room for evidence (R2-006)"
+  since: M4
+  match: ["^unit:compliance/tests/test_owner_notices.py::test_(owner_allowance_holds_under_parallel|label_allowance_is_checked)"]
+- feature: "Requests and request photos only for owned, authorized-contact and tenant lots: a view-only contact never raises requests or adds photos on that home, even when they own another (R2-009)"
+  since: M4
+  match: ["^unit:operations/tests/test_requests.py::test_(owner_who_is_view_only_elsewhere|view_only_contact_cannot_add_request_photos|authorized_contact_and_tenant_still_raise)"]

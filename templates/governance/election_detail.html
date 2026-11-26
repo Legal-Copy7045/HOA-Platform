@@ -14,6 +14,8 @@
     {% if recorded %}<section class="card" id="ballot-recorded"><h2>Your ballot</h2>
       <ul class="list">{% for r in recorded %}<li class="voted">{% icon "check-circle" %}<span class="grow">Lot {{ r.lot.number }}: your ballot was recorded.</span></li>{% endfor %}</ul>
       <p class="small muted">Choices are stored apart from names, so nobody can see how a lot voted.</p></section>{% endif %}
+    {% if cast_before_me %}<section class="card" id="ballot-before"><h2>Ballots before you owned the home</h2>
+      <ul class="list">{% for r in cast_before_me %}<li>{% icon "info" %}<span class="grow">Lot {{ r.lot.number }}: a ballot was already cast for this home before you owned it. Each home has one ballot.</span></li>{% endfor %}</ul></section>{% endif %}
     {% if my_lots %}<section class="card" id="ballot"><h2>{% if recorded %}Another ballot to cast{% else %}Your ballot{% endif %}</h2>
       <form method="post" action="{% url 'election_action' e.pk 'ballot' %}" data-confirm-ballot>{% csrf_token %}
       {% if my_lots|length > 1 %}

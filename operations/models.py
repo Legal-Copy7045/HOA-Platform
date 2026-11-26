@@ -145,6 +145,11 @@ class Contract(models.Model):
     citation = models.CharField(max_length=200)
     state = models.CharField(max_length=12, default="draft")
     state_changed_at = models.DateTimeField(default=timezone.now)
+    # Board approvals it needs before it pre-approves anything: the invoice
+    # rule applied to its cap (two at or above invoice.dual_approval_cents),
+    # fixed when it is entered (review SEC-002). Null on contracts entered
+    # before the rule; worked out from the rule when they are approved.
+    required_approvals = models.PositiveSmallIntegerField(null=True, blank=True)
     entered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -249,6 +254,31 @@ class InvoiceApproval(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"approval #{self.pk}"
+
+
+class ContractApproval(AppendOnlyModel):
+    """One board member's approval of a contract (review SEC-002). Never
+    edited; the approver never the person who entered it."""
+
+    contract = models.ForeignKey(Contract, on_delete=models.PROTECT, related_name="approvals")
+    approver = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    # The cap the approver saw.
+    amount_cap_cents = models.PositiveBigIntegerField()
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["contract", "approver"], name="contract_approval_once_per_person"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"contract approval #{self.pk}"
 
 
 class PaymentMethod(models.TextChoices):

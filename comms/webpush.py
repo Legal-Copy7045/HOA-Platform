@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import socket
 import struct
 import time
 import urllib.error
@@ -172,5 +173,11 @@ def post(endpoint: str, body: bytes, *, authorization: str, ttl: int = 86400) ->
             return PushResult(ok=200 <= response.status < 300, status=response.status)
     except urllib.error.HTTPError as exc:
         return PushResult(ok=False, gone=exc.code in (404, 410), status=exc.code)
-    except (urllib.error.URLError, TimeoutError, OSError):
+    except urllib.error.URLError as exc:
+        # A push host that does not exist will not come back: drop it (R2-007).
+        # A temporary lookup failure (EAI_AGAIN) only counts as a failure.
+        reason = exc.reason
+        no_such_host = isinstance(reason, socket.gaierror) and reason.errno == socket.EAI_NONAME
+        return PushResult(ok=False, gone=no_such_host)
+    except (TimeoutError, OSError):
         return PushResult(ok=False)

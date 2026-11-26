@@ -416,3 +416,106 @@ def test_a_broken_server_key_never_deletes_subscriptions(client, w, push_on, set
     counts = push.deliver([w["owner"].pk], title="Hello", path="/")
     assert counts["removed"] == 0
     assert PushSubscription.objects.unscoped("t").filter(user=w["owner"]).count() == 1
+
+
+# --- Limits (review R2-007) --------------------------------------------------------------
+
+
+def _endpoint(n):
+    return f"https://fcm.googleapis.com/fcm/send/device-{n}"
+
+
+def test_a_login_keeps_at_most_ten_devices_dropping_the_oldest(client, w, push_on):
+    client.force_login(w["owner"])
+    for n in range(push.MAX_DEVICES_PER_LOGIN + 2):
+        assert _subscribe(client, _endpoint(n)).status_code == 200
+    mine = PushSubscription.objects.for_user(w["owner"])
+    assert mine.count() == push.MAX_DEVICES_PER_LOGIN
+    kept = set(mine.values_list("endpoint", flat=True))
+    assert _endpoint(0) not in kept and _endpoint(1) not in kept
+    assert _endpoint(push.MAX_DEVICES_PER_LOGIN + 1) in kept
+    # Another login's devices are untouched by the cap.
+    other = Client()
+    other.force_login(w["other"])
+    assert _subscribe(other, "https://fcm.googleapis.com/fcm/send/other").status_code == 200
+    assert PushSubscription.objects.for_user(w["other"]).count() == 1
+    assert PushSubscription.objects.for_user(w["owner"]).count() == push.MAX_DEVICES_PER_LOGIN
+
+
+def test_adding_devices_is_rate_limited_even_after_removing_them(client, w, push_on):
+    client.force_login(w["owner"])
+    for n in range(push.MAX_SUBSCRIBES_PER_HOUR):
+        assert _subscribe(client, _endpoint(n)).status_code == 200
+        client.post(reverse("push_unsubscribe"))
+    response = _subscribe(client, _endpoint(999))
+    assert response.status_code == 400 and "Too many" in response.json()["error"]
+    assert not PushSubscription.objects.for_user(w["owner"]).exists()
+    # The limit is per login.
+    other = Client()
+    other.force_login(w["other"])
+    assert _subscribe(other, _endpoint(1000)).status_code == 200
+
+
+def test_a_device_is_removed_after_repeated_failures(client, w, push_on):
+    client.force_login(w["owner"])
+    _subscribe(client)
+    with mock.patch("comms.push.sender", return_value=FakeSender(500)):
+        for _ in range(push.MAX_FAILURES - 1):
+            push.deliver([w["owner"].pk], title="Update", path="/my-items/")
+    assert PushSubscription.objects.unscoped("t").get().failures == push.MAX_FAILURES - 1
+    with mock.patch("comms.push.sender", return_value=FakeSender(201)):
+        push.deliver([w["owner"].pk], title="Update", path="/my-items/")
+    assert PushSubscription.objects.unscoped("t").get().failures == 0  # a success resets
+    with mock.patch("comms.push.sender", return_value=FakeSender(500)):
+        for _ in range(push.MAX_FAILURES):
+            counts = push.deliver([w["owner"].pk], title="Update", path="/my-items/")
+    assert counts["removed"] == 1
+    assert not PushSubscription.objects.unscoped("t").exists()
+
+
+def test_a_push_host_that_does_not_exist_is_gone_but_a_lookup_hiccup_is_not():
+    import socket
+    import urllib.error
+
+    def fail_with(errno):
+        opener = mock.Mock()
+        opener.open.side_effect = urllib.error.URLError(socket.gaierror(errno, "lookup"))
+        with mock.patch("urllib.request.build_opener", return_value=opener):
+            return webpush.post(ENDPOINT, b"x", authorization="vapid t=x, k=y")
+
+    assert fail_with(socket.EAI_NONAME).gone is True
+    assert fail_with(socket.EAI_AGAIN).gone is False
+
+
+def test_push_runs_on_its_own_queue_one_job_at_a_time_and_the_worker_takes_it():
+    from comms.tasks import send_push, send_urgent_sms
+
+    assert send_push.queue == "push" and send_push.lock == "push"
+    assert send_urgent_sms.queue == "email"
+    entrypoint = Path("docker/entrypoint.sh").read_text()
+    worker_line = next(line for line in entrypoint.splitlines() if "procrastinate worker" in line)
+    # No --queues filter: the worker takes every queue, push included, and runs
+    # more than one job at once, so push can never hold the only slot.
+    assert "--queues" not in worker_line
+    assert '--concurrency "${WORKER_CONCURRENCY:-2}"' in worker_line
+
+
+# --- R2-008: turning push off always works ----------------------------------------
+
+
+def test_push_can_be_turned_off_while_the_feature_is_off(client, w, push_on):
+    client.force_login(w["owner"])
+    _subscribe(client)
+    client.force_login(w["other"])
+    _subscribe(client, ENDPOINT + "-other")
+    FeatureSetting.objects.filter(key="push").update(enabled=False)
+    client.force_login(w["owner"])
+    page = client.get(reverse("my_profile")).content.decode()
+    assert "switched off for the community" in page
+    assert reverse("push_unsubscribe") in page and "Turn off on all my devices" in page
+    assert _subscribe(client, ENDPOINT + "-new").status_code == 404  # no new sign-ups
+    response = client.post(reverse("push_unsubscribe"))
+    assert response.status_code == 302
+    assert PushSubscription.objects.for_user(w["owner"]).count() == 0
+    assert PushSubscription.objects.for_user(w["other"]).count() == 1
+    assert reverse("push_unsubscribe") not in client.get(reverse("my_profile")).content.decode()

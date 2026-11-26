@@ -291,6 +291,53 @@ def test_record_payments_refuses_a_check_already_recorded(client, w):
     assert len(_entries(w["lot"])) == 1
 
 
+# --- BUG-006: a bounced (reversed) check may be deposited again ------------------
+
+
+def test_record_payments_accepts_a_bounced_check_presented_again(client, w):
+    bounced = services.record_payment(
+        lot=w["lot"], amount_cents=7500, received_on=TODAY, reference="1042", actor=w["board"]
+    )
+    services.reverse_entry(bounced, reason="Check returned", actor=w["board"])
+    client.force_login(w["manager"])
+    response = client.post(
+        reverse("record_payments"), {"rows": "1", **_row(0, w["lot"], "75.00", "1042")}
+    )
+    assert response.status_code == 302
+    assert "already recorded" not in response.content.decode()
+    assert len(_entries(w["lot"])) == 3  # payment, reversal, payment again
+
+
+def test_single_payment_form_follows_the_same_duplicate_rule(client, w):
+    first = services.record_payment(
+        lot=w["lot"], amount_cents=7500, received_on=TODAY, reference="1042", actor=w["board"]
+    )
+    with pytest.raises(services.LedgerError, match="already recorded"):
+        services.record_payment(
+            lot=w["lot"], amount_cents=7500, received_on=TODAY, reference="1042", actor=w["board"]
+        )
+    # The same check number on another home is a different check.
+    services.record_payment(
+        lot=w["lot_b"], amount_cents=7500, received_on=TODAY, reference="1042", actor=w["board"]
+    )
+    services.reverse_entry(first, reason="Check returned", actor=w["board"])
+    again = services.record_payment(
+        lot=w["lot"], amount_cents=7500, received_on=TODAY, reference="1042", actor=w["board"]
+    )
+    assert again.amount_cents == -7500
+    client.force_login(w["board"])
+    client.post(
+        reverse("lot_ledger_action", args=[w["lot"].pk, "payment"]),
+        {
+            "amount_cents": "75.00",
+            "received_on": TODAY.isoformat(),
+            "method": "check",
+            "reference": "1042",
+        },
+    )
+    assert len(_entries(w["lot"])) == 3  # the duplicate from the form was refused
+
+
 def test_record_payments_needs_at_least_one_row(client, w):
     client.force_login(w["manager"])
     response = client.post(reverse("record_payments"), {"rows": "2"})

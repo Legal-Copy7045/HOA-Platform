@@ -223,6 +223,63 @@ def test_portal_neighbor_answers_others_cannot(client, w, django_capture_on_comm
         response.delete()
 
 
+def test_a_buyer_of_the_neighboring_lot_sees_nothing_the_seller_was_asked(
+    client, w, django_capture_on_commit_callbacks
+):
+    """Review SEC-001: owner era for acknowledgements, as for other ARC records."""
+    import datetime
+
+    from django.utils import timezone
+
+    from community.models import Ownership
+    from documents.attachments import attachments_for
+
+    _send(w, django_capture_on_commit_callbacks)
+    with system_access("t"):
+        signoff = SignoffRequest.objects.get(lot=w["portal_lot"])
+        SignoffRequest.objects.filter(pk=signoff.pk).update(
+            sent_at=timezone.now() - datetime.timedelta(days=30)
+        )
+    signoffs.respond(
+        signoff, position="approved", signer_name="Nina", channel="portal", actor=w["neighbor"]
+    )
+    plans = attachments_for(w["req"]).get(original_filename="plans.pdf")
+    # The neighbor sells; the buyer (also a board member) owns from today.
+    community.end_ownership(
+        Ownership.objects.unscoped("t").get(lot=w["portal_lot"]),
+        end_date=timezone.localdate(),
+        actor=SYSTEM,
+    )
+    buyer = make_member(board=True)
+    community.record_ownership(
+        person=Person.objects.unscoped("t").get(user=buyer),
+        lot=w["portal_lot"],
+        start_date=timezone.localdate(),
+        actor=SYSTEM,
+    )
+    client.force_login(buyer)
+    assert b"Rear fence" not in client.get(reverse("signoffs_mine")).content
+    assert client.get(reverse("signoff_detail", args=[signoff.pk])).status_code == 404
+    assert client.get(reverse("signoff_file", args=[signoff.pk, plans.pk])).status_code == 404
+
+
+def test_answered_acknowledgements_leave_the_neighbors_view_once_the_request_closes(
+    client, w, django_capture_on_commit_callbacks
+):
+    """Review SEC-001: answered rows follow the open-request rule too."""
+    _send(w, django_capture_on_commit_callbacks)
+    with system_access("t"):
+        signoff = SignoffRequest.objects.get(lot=w["portal_lot"])
+    signoffs.respond(
+        signoff, position="approved", signer_name="Nina", channel="portal", actor=w["neighbor"]
+    )
+    client.force_login(w["neighbor"])
+    assert client.get(reverse("signoff_detail", args=[signoff.pk])).status_code == 200
+    arc.ArcRequest.objects.unscoped("t").filter(pk=w["req"].pk).update(state="withdrawn")
+    assert client.get(reverse("signoff_detail", args=[signoff.pk])).status_code == 404
+    assert b"Rear fence" not in client.get(reverse("signoffs_mine")).content
+
+
 def test_applicant_sees_answers_on_their_request(client, w, django_capture_on_commit_callbacks):
     _send(w, django_capture_on_commit_callbacks)
     with system_access("t"):

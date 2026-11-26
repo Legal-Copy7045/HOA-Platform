@@ -11,7 +11,7 @@ connections from the internet or other VLANs.
 2. **Create the VM** (Proxmox host, web UI -> node -> Shell):
 
    ```bash
-   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/claude/ecstatic-bell-cnrpzi/infra/poc/create-vm.sh
+   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/main/infra/poc/create-vm.sh
    ```
 
    ```bash
@@ -26,7 +26,7 @@ connections from the internet or other VLANs.
 3. **Provision the VM** (VM -> Console -> **xterm.js**, which supports paste; log in as `hoa`):
 
    ```bash
-   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/claude/ecstatic-bell-cnrpzi/infra/poc/provision-vm.sh
+   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/main/infra/poc/provision-vm.sh
    ```
 
    ```bash
@@ -84,6 +84,12 @@ then `sudo hoa-update`.
 ```bash
 sudo bash /opt/hoa-portal/infra/poc/update-portal.sh
 ```
+
+The "Install update" button on System status installs only when the VM's
+checkout is on `main` (decision D25: main receives only CI-tested merges).
+On any other branch it refuses and says why; set `ALLOW_BRANCH=<branch>` in
+`.env` only for a deliberate test. Move an older VM to main once with
+`git -C /opt/hoa-portal checkout main` (as the hoa user), then update.
 
 Migrations run automatically. If the POC was seeded before Milestone 2, add
 the demo data for the new modules once:

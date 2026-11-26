@@ -23,6 +23,7 @@ import datetime
 from dataclasses import dataclass, field
 
 from django.core.exceptions import PermissionDenied
+from django.utils import timezone
 
 OWNER = "owner"
 BOARD = "board"
@@ -203,6 +204,9 @@ class Roles:
     # (lot_id, since) for account contacts: the account's opening date.
     contact_since: tuple[tuple[int, datetime.date], ...] = ()
     tenant_lot_ids: frozenset[int] = frozenset()
+    # Lots where this person is an authorized contact (may act for the
+    # account); view-only contacts are in account_lot_ids but not here.
+    authorized_lot_ids: frozenset[int] = frozenset()
     # The login these roles belong to (None in the homeowner view).
     user_id: int | None = None
     committee_ids: frozenset[int] = frozenset()
@@ -239,7 +243,7 @@ def _preview_roles(preview, on) -> Roles:
             .active(on)
             .values_list("start_date", flat=True)
         )
-    since = min(starts) if starts else (on or datetime.date.today())
+    since = min(starts) if starts else (on or timezone.localdate())
     return Roles(
         frozenset({OWNER}),
         frozenset({preview.lot_id}),
@@ -272,7 +276,7 @@ def roles_for(user, on: datetime.date | None = None) -> Roles:
     if on is not None:
         return _compute_roles(user, on)
     cached = getattr(user, "_roles_cache", None)
-    generation = (_ROLES_GENERATION[0], datetime.date.today())
+    generation = (_ROLES_GENERATION[0], timezone.localdate())
     if cached is not None and cached[0] == generation:
         return cached[1]
     roles = _compute_roles(user, None)
@@ -327,6 +331,7 @@ def _compute_roles(user, on) -> Roles:
         account_lot_ids=lots | frozenset(contacts["account"]),
         contact_since=tuple(sorted(contact_since.items())),
         tenant_lot_ids=frozenset(contacts["tenant"]),
+        authorized_lot_ids=frozenset(contacts["authorized"]),
         former_periods=tuple(sorted(former["periods"])),
         former_account_ids=frozenset(former["accounts"]),
         user_id=user.pk,
@@ -373,7 +378,7 @@ def _former_ownerships(person, current_lots, on) -> dict:
     """Ended ownerships of lots this person no longer sees: read-only history."""
     from community.models import Ownership
 
-    on = on or datetime.date.today()
+    on = on or timezone.localdate()
     periods, accounts = set(), set()
     for lot_id, start, end, account_id in Ownership.objects.filter(
         person=person, end_date__isnull=False, end_date__lte=on

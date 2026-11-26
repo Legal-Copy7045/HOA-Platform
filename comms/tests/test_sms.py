@@ -418,3 +418,34 @@ def test_default_provider_sends_nothing(settings):
     assert not sms.provider().available
     with pytest.raises(sms.SmsNotConfigured):
         sms.provider().send("+12155550123", "Hello")
+
+
+# --- R2-008: turning texts off always works ---------------------------------------
+
+
+def test_number_can_be_removed_while_texts_are_switched_off(client, w, fake, sms_on):
+    _opt_in(w["owner"], "215-555-0123", fake)
+    FeatureSetting.objects.filter(key="sms").update(enabled=False)
+    client.force_login(w["owner"])
+    page = client.get(reverse("my_profile")).content.decode()
+    assert "switched off for the community" in page
+    assert reverse("sms_stop") in page and "Stop texts and remove my number" in page
+    assert reverse("sms_start") not in page  # no new sign-ups while off
+    assert client.post(reverse("sms_start"), {"number": "215-555-0199"}).status_code == 404
+    response = client.post(reverse("sms_stop"))
+    assert response.status_code == 302
+    profile = _profile(w["owner"])
+    assert profile.sms_number == "" and not profile.sms_opt_in
+    assert AuditEvent.objects.filter(action="sms.opted_out").exists()
+    # Nothing stored: the panel is gone.
+    assert reverse("sms_stop") not in client.get(reverse("my_profile")).content.decode()
+
+
+def test_stop_texts_only_touches_my_own_number(client, w, fake, sms_on):
+    _opt_in(w["owner"], "215-555-0123", fake)
+    _opt_in(w["other"], "215-555-0124", fake)
+    FeatureSetting.objects.filter(key="sms").update(enabled=False)
+    client.force_login(w["owner"])
+    client.post(reverse("sms_stop"))
+    assert _profile(w["other"]).sms_number != ""
+    assert _profile(w["owner"]).sms_number == ""

@@ -314,3 +314,11 @@ Note on 8: with the layer cache the VM rebuilds a code-only change in well under
 ## D28. Retention clears current contact details; the change history persists (2026-11-25)
 
 The retention rule (two years after someone's last ownership or contact role ends) clears the current phone, mailing address, extra contact methods and directory choices. The owner decided the change history persists: earlier values remain in the model history tables, which are part of the audit trail (D8), and no purge command exists. The retention page says so. Also accepted as proposed: managers may confirm and decline common-area bookings (a booking is not a governance decision); photo thumbnails are logged as downloads but marked `view: thumbnail`; the sign-in help contact field stays empty unless filled with an association contact; adding a passkey also enables passkey-only sign-in (a passkey is itself strong authentication); the neighbor response period (`arc.signoff_respond_days`) is set by the board, suggested 14 days.
+
+## D29. POC files stay on the local store (2026-11-26)
+
+The owner decided to keep the POC's uploaded files on the local SeaweedFS store for now rather than move them to Cloudflare R2. Nothing changes on the VM. `infra/poc/move-files-to-r2.sh` stays available for a later move; production still plans R2 (CLAUDE.md stack).
+
+## D30. Prepaid owners: future months show unpaid, prepayment drawn down monthly (2026-11-26)
+
+The owner ruled that a prepaid owner's future months are listed as not yet paid, and the prepayment is drawn down as each month's dues post (the existing drawdown). The regression finding BUG-005 is fixed only for its other half: a month whose dues were posted early is not also counted as an upcoming charge.

@@ -326,3 +326,36 @@ def test_editing_a_returned_draft_asks_the_neighbors_again(w):
     services.edit_request(w["req"], description="Now 6 ft and white", actor=w["owner"])
     rows = SignoffRequest.objects.unscoped("t").filter(arc_request=w["req"])
     assert all(r.state == "pending" and r.sent_at is None for r in rows)
+
+
+def test_files_added_to_a_returned_draft_ask_the_neighbors_again(client, w):
+    """Reviews BUG-001, SEC-003, R2-001: new plans count like a text edit."""
+    from arc.models import SignoffRequest, SignoffState
+
+    req = w["req"]
+    signoffs.add_signoff_lot(req, LotFactory(), actor=w["owner"])
+    SignoffRequest.objects.unscoped("t").filter(arc_request=req).update(
+        state=SignoffState.APPROVED, sent_at=timezone.now()
+    )
+    services.ARC.apply(req, "submit", actor=w["owner"])
+    manager = make_member(roles=[Role.MANAGER])
+    services.ARC.apply(req, "return_incomplete", actor=manager, note="Add the site plan")
+    req.refresh_from_db()
+    assert req.state == ArcState.DRAFT
+
+    client.force_login(w["owner"])
+    client.post(reverse("arc_attach", args=[req.pk]), {"file": [pdf("site-plan.pdf")]})
+    assert attachments_for(req).count() == 1
+    rows = SignoffRequest.objects.unscoped("t").filter(arc_request=req)
+    assert rows and all(r.state == SignoffState.PENDING and r.sent_at is None for r in rows)
+    with pytest.raises(services.WorkflowError, match="acknowledgements first"):
+        services.ARC.apply(req, "submit", actor=w["owner"])
+
+
+def test_owner_file_service_refuses_other_owners_and_non_drafts(w):
+    with pytest.raises(services.ArcError):
+        services.add_owner_files(w["req"], [png()], actor=w["stranger"], request=None)
+    services.ARC.apply(w["req"], "submit", actor=w["owner"])
+    with pytest.raises(services.ArcError, match="draft"):
+        services.add_owner_files(w["req"], [png()], actor=w["owner"], request=None)
+    assert not attachments_for(w["req"]).exists()

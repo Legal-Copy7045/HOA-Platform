@@ -25,6 +25,13 @@ from governance.models import (
 )
 
 
+def _form_id(value) -> int:
+    """A record id from a form field; anything else (letters, a huge number)
+    is 0, which the service refuses with a message, never a 500 (BUG-007)."""
+    value = (value or "").strip()
+    return int(value) if value.isascii() and value.isdigit() and len(value) <= 9 else 0
+
+
 def _flash(request, fn, ok: str):
     try:
         result = fn()
@@ -268,7 +275,7 @@ def voting(request):
     elections. Each half follows its own feature switch."""
     from core import features
     from governance import elections as election_services
-    from governance.models import Election, ElectionParticipation
+    from governance.models import Election
 
     policy.require(request.user, "vote.view")
     show_votes = features.enabled("votes", request)
@@ -277,7 +284,6 @@ def voting(request):
         raise Http404
     user = request.user
     can_manage = policy.can(user, "vote.manage")
-    roles = policy.roles_for(user)
     vote_rows, election_rows = [], []
     if show_votes:
         rows = Vote.objects.all()
@@ -291,11 +297,8 @@ def voting(request):
                 {
                     "election": e,
                     "can_vote": bool(election_services.lots_actor_may_vote_for(e, user)),
-                    "voted": ElectionParticipation.objects.filter(
-                        election=e, lot_id__in=roles.owned_lot_ids
-                    ).exists()
-                    if roles.owned_lot_ids
-                    else False,
+                    # Only ballots cast since this person owns the lot (R2-010).
+                    "voted": bool(election_services.my_lots_participation(e, user)[0]),
                 }
             )
     return render(
@@ -409,8 +412,8 @@ def vote_action(request, pk, action):
             request,
             lambda: services.cast_ballot(
                 vote,
-                option_id=int(request.POST.get("option") or 0),
-                lot_id=int(lot) if lot else None,
+                option_id=_form_id(request.POST.get("option")),
+                lot_id=_form_id(lot) if lot else None,
                 actor=request.user,
                 request=request,
             ),

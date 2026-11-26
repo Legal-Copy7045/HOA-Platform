@@ -39,7 +39,10 @@ def weekly_digest(timestamp: int) -> int:
     return send_digests()
 
 
-@app.task(queue="email", retry=2)
+# Its own queue, and one push job at a time (lock), so slow or unreachable push
+# services never hold up email: the worker runs more than one job at once
+# (docker/entrypoint.sh) and push can take only one of those slots (R2-007).
+@app.task(queue="push", lock="push", retry=2)
 def send_push(user_ids: list[int], title: str, path: str) -> dict:
     """Push a title and a portal path to these logins' devices."""
     from comms.push import deliver

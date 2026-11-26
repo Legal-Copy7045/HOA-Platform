@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Hardens the POC VM and installs Docker. Run INSIDE the VM, from its Proxmox
 # console, as the "hoa" user with sudo:
-#   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/claude/ecstatic-bell-cnrpzi/infra/poc/provision-vm.sh
+#   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/main/infra/poc/provision-vm.sh
 #   less provision-vm.sh          # read it first
 #   sudo bash provision-vm.sh
 #
@@ -18,7 +18,7 @@ set -euo pipefail
 trap 'echo "ERROR: ${BASH_SOURCE[0]} stopped at line $LINENO (exit $?). Nothing after that line ran." >&2' ERR
 
 REPO_URL="${REPO_URL:-https://github.com/Legal-Copy7045/HOA-Platform.git}"
-BRANCH="${BRANCH:-claude/ecstatic-bell-cnrpzi}"
+BRANCH="${BRANCH:-main}"
 APP_DIR="${APP_DIR:-/opt/hoa-portal}"
 APP_USER="${APP_USER:-hoa}"
 # Optional: allow SSH from one admin address/range, e.g. ADMIN_CIDR=192.168.1.20/32
@@ -31,7 +31,7 @@ export DEBIAN_FRONTEND=noninteractive
 say "Installing updates and base packages"
 apt-get update -q
 apt-get -y -q upgrade
-apt-get -y -q install ca-certificates curl git ufw unattended-upgrades qemu-guest-agent
+apt-get -y -q install ca-certificates curl git python3 ufw unattended-upgrades qemu-guest-agent
 systemctl enable --now qemu-guest-agent >/dev/null 2>&1 || true
 
 say "Enabling network time sync (authenticator-app codes depend on an accurate clock)"

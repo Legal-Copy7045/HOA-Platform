@@ -247,6 +247,65 @@ def test_selling_the_lot_ends_the_proxy(w):
     assert elections.quorum_status(w["meeting"])["by_proxy"] == 0
 
 
+def test_a_proxy_holder_who_sells_can_no_longer_vote_with_it(client, w):
+    """Review BUG-002: the holder half of the proxy rule."""
+    from community.models import Ownership
+
+    a, _b, c, d = w["owners"]
+    election = _ready(w, a)
+    lot_d = elections.lots_actor_may_vote_for(election, d)[0]["lot"]
+    elections.grant_proxy(w["meeting"], lot=lot_d, holder=_person(c), actor=d)
+    gov.record_attendance(w["meeting"], _person(c), actor=w["board"])
+    assert elections.quorum_status(w["meeting"])["by_proxy"] == 1
+    with system_access("t"):
+        ownership = Ownership.objects.active().get(person=_person(c))
+    community.end_ownership(ownership, end_date=timezone.localdate(), actor=w["board"])
+    # c is now a read-only former owner: the proxy is neither usable nor counted.
+    assert elections.lots_actor_may_vote_for(election, c) == []
+    assert elections.quorum_status(w["meeting"])["by_proxy"] == 0
+    candidate = elections.ballot_candidates(election).first()
+    with pytest.raises((elections.ElectionError, PermissionDenied)):
+        elections.cast_election_ballot(
+            election, lot_id=lot_d.pk, candidate_ids=[candidate.pk], actor=c
+        )
+    with system_access("t"):
+        assert not ElectionParticipation.objects.filter(election=election).exists()
+
+
+def test_a_buyer_is_not_told_the_sellers_election_ballot_was_theirs(client, w):
+    """Reviews BUG-004, R2-010: only ballots cast in the viewer's ownership."""
+    from community.models import Ownership
+
+    a, _b, c, _d = w["owners"]
+    election = _ready(w, a)
+    lot_c = elections.lots_actor_may_vote_for(election, c)[0]["lot"]
+    # The seller's ballot two days ago (written directly to set its date).
+    ElectionParticipation.objects.create(
+        election=election,
+        lot=lot_c,
+        cast_by=c,
+        cast_at=timezone.now() - datetime.timedelta(days=2),
+    )
+    client.force_login(c)
+    page = client.get(reverse("election_detail", args=[election.pk])).content.decode()
+    assert f"Lot {lot_c.number}: your ballot was recorded" in page
+    assert "Your ballot was recorded" in client.get(reverse("voting")).content.decode()
+
+    with system_access("t"):
+        ownership = Ownership.objects.active().get(lot=lot_c)
+    community.end_ownership(ownership, end_date=timezone.localdate(), actor=w["board"])
+    buyer = make_member()
+    community.record_ownership(
+        person=_person(buyer), lot=lot_c, start_date=timezone.localdate(), actor=w["board"]
+    )
+    assert elections.my_lots_participation(election, buyer)[0] == []
+    client.force_login(buyer)
+    page = client.get(reverse("election_detail", args=[election.pk])).content.decode()
+    assert "your ballot was recorded" not in page
+    assert "a ballot was already cast for this home before you owned it" in page
+    assert "Your ballot was recorded" not in client.get(reverse("voting")).content.decode()
+
+
 def test_bad_form_values_are_refused_not_500(w):
     a, _b, c, _ = w["owners"]
     election = _ready(w, a)

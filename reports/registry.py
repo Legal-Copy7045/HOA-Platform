@@ -4,12 +4,12 @@ integer cents and formatted for display/CSV by the view."""
 
 from __future__ import annotations
 
-import datetime
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from django.db.models import Count, Sum
+from django.utils import timezone
 
 from core.money import format_cents
 from core.scoping import system_access
@@ -71,7 +71,7 @@ def arc_report(start, end):
         if r:
             rows.append(
                 [
-                    e.created_at.date(),
+                    timezone.localdate(e.created_at),
                     r.pk,
                     r.lot.number,
                     r.title,
@@ -102,7 +102,7 @@ def collections_report(start, end):
         if c:
             rows.append(
                 [
-                    e.created_at.date(),
+                    timezone.localdate(e.created_at),
                     c.pk,
                     c.lot.number,
                     e.action,
@@ -217,7 +217,7 @@ def _violation_rows(start, end, photos: bool):
         if not v:
             continue
         row = [
-            e.created_at.date(),
+            timezone.localdate(e.created_at),
             v.pk,
             v.lot.number,
             v.get_category_display(),
@@ -276,7 +276,7 @@ def work_orders_report(start, end):
         if w:
             rows.append(
                 [
-                    e.created_at.date(),
+                    timezone.localdate(e.created_at),
                     f"WO-{w.pk}",
                     w.title,
                     w.common_area.name if w.common_area else "",
@@ -380,5 +380,5 @@ def grouped():
 
 
 def default_range():
-    today = datetime.date.today()
+    today = timezone.localdate()
     return today.replace(month=1, day=1), today

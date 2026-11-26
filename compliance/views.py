@@ -174,6 +174,13 @@ OWNER_FIX_LABEL = "Owner photo of the fix"
 OWNER_FIX_PHOTOS_MAX = 10
 
 
+def _owner_photo_room(v) -> int:
+    """Photos the owner may still add (a first, unlocked look for the message;
+    attach() enforces the allowance under the lock)."""
+    used = attachments.attachments_for(v).filter(label=OWNER_FIX_LABEL).count()
+    return max(OWNER_FIX_PHOTOS_MAX - used, 0)
+
+
 @login_required
 @require_POST
 def violation_photo(request, pk):
@@ -193,8 +200,7 @@ def violation_photo(request, pk):
         if by_owner:
             # Owners have their own allowance, so their photos can never use
             # up the board's room for evidence (review R2-003).
-            used = attachments.attachments_for(v).filter(label=OWNER_FIX_LABEL).count()
-            room = max(OWNER_FIX_PHOTOS_MAX - used, 0)
+            room = _owner_photo_room(v)
         if room == 0:
             messages.error(
                 request,
@@ -202,8 +208,15 @@ def violation_photo(request, pk):
                 " if there's more to show.",
             )
         else:
+            # The allowance is enforced again under the upload lock, so
+            # parallel uploads cannot pass it (review R2-006).
             attachments.attach_many(
-                request, v, uploads[:room] if room else uploads, actor=request.user, label=label
+                request,
+                v,
+                uploads[:room] if room else uploads,
+                actor=request.user,
+                label=label,
+                label_max=OWNER_FIX_PHOTOS_MAX if by_owner else None,
             )
     return redirect("violation_detail", pk=v.pk)
 

@@ -3,6 +3,19 @@
 One entry per full run (newest first): date, commit, totals, failing check IDs,
 finding IDs, report link. No real names, hosts or addresses.
 
+## 2026-11-26 — after fixing the 23 findings
+
+- Commit: 3d40fcc. Stages only (verification of the fixes): ci 11 pass; unit 1529 pass; page 878 pass; manual 34. Failing: none.
+- Fixed: BUG-001..007, SEC-001..004, R2-001..012 (BUG-008 fixed earlier), each with tests; owner rulings D30 (prepaid display) applied to BUG-005.
+
+## 2026-11-26 — first run with the standing security audit
+
+- Commit: 7ef4c17 (run on 29f89cb/cdf21b8 code; the date fix 7ef4c17 came after). Totals: 2334 pass, 2 fail, 28 manual, 2 skip (stale ID removed; live HTTPS not reachable from the cloud session).
+- Stages: ci 11 pass; unit 1441 pass, 2 fail; page 878 pass; live 4 pass, 1 skip; manual 28. Postgres stopped once in the cloud session; unit and page re-run.
+- Failing: UNIT-1071, UNIT-310 (UTC dates in the Eastern evening) — fixed after the run at the owner's request (7ef4c17, BUG-008).
+- Findings (24, none high): BUG-001..008, SEC-001..004, R2-001..012. Medium: BUG-001/SEC-003/R2-001 (new plans on a returned ARC draft keep neighbors' answers), BUG-002 (proxy holder who sold can vote), BUG-003/R2-002 (restore drill uses a live R2 bucket), SEC-001 (buyer sees a neighbor lot's old acknowledgements), SEC-002 (contract pre-approval bypasses two-approver invoices), BUG-008 (fixed). bandit and pip-audit clean.
+- Report: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 3)
+
 ## 2026-11-25 (late) — UX/UI build and the last Milestone 4 features
 
 - Commit: f6339b1. Totals: 2336 pass, 0 fail, 28 manual, 26 skip (25 retired IDs removed after the run; the POC is not reachable from the cloud session).

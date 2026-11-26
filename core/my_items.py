@@ -528,8 +528,9 @@ def items_for(user) -> list[Item]:
     if can(user, "arc.submit") and roles.owned_lot_ids:
         from arc.models import NEIGHBOR_VISIBLE_STATES, SignoffRequest
 
+        # The owner side (SEC-001), also for a board member who owns a lot.
         for so in (
-            SignoffRequest.objects.for_user(user)
+            own_records(SignoffRequest.objects.for_user(user), user)
             .filter(
                 lot_id__in=roles.owned_lot_ids,
                 state="pending",
@@ -631,14 +632,17 @@ def _balance_items(user, roles) -> list[Item]:
         if statement.balance <= 0:
             continue
         oldest = oldest_unpaid_on(statement, since)
-        when = f" · due since {short_date(oldest)}" if oldest else ""
+        # A charge posted ahead of its month is due by that date, not overdue
+        # since it (review BUG-005).
+        upcoming = oldest is not None and oldest > timezone.localdate()
+        when = f" · due {'by' if upcoming else 'since'} {short_date(oldest)}" if oldest else ""
         out.append(
             Item(
                 "My home",
                 f"{format_cents(statement.balance)} due on lot {lot.number}",
                 f"See your account and how to pay{when}",
                 reverse("my_account"),
-                "warning",
+                "info" if upcoming else "warning",
                 oldest,
                 nav="my_account",
                 icon="wallet",

@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from comms import webpush
@@ -26,6 +28,12 @@ from comms.models import PushSubscription
 logger = logging.getLogger(__name__)
 
 TITLE_MAX = 80
+# Review R2-007: a login keeps at most this many devices (the oldest go),
+# may save only so many in an hour, and a device is removed after this many
+# failed sends in a row.
+MAX_DEVICES_PER_LOGIN = 10
+MAX_SUBSCRIBES_PER_HOUR = 20
+MAX_FAILURES = 5
 
 
 class PushError(ValueError):
@@ -61,15 +69,41 @@ def subscribe(*, user, endpoint: str, p256dh: str, auth: str, request=None) -> P
             raise ValueError
     except (ValueError, TypeError):
         raise PushError("The browser sent incomplete notification keys.") from None
+    if _recent_subscribes(user) >= MAX_SUBSCRIBES_PER_HOUR:
+        raise PushError("Too many devices were added in the last hour. Please try again later.")
     with transaction.atomic():
         sub, created = PushSubscription.objects.unscoped(
             "push: one row per endpoint"
         ).update_or_create(
             endpoint=endpoint,
-            defaults={"user": user, "p256dh": p256dh.strip(), "auth": auth.strip()},
+            defaults={
+                "user": user,
+                "p256dh": p256dh.strip(),
+                "auth": auth.strip(),
+                "failures": 0,
+            },
         )
         _audit("push.subscribed", actor=user, request=request, metadata={"new": created})
+        _drop_oldest_devices(user)
     return sub
+
+
+def _recent_subscribes(user) -> int:
+    """Devices this login saved in the last hour (from the audit log, so
+    removing and re-adding does not reset the count)."""
+    from audit.services import count_recent_events
+
+    return count_recent_events("push.subscribed", actor=user, since=timedelta(hours=1))
+
+
+def _drop_oldest_devices(user) -> None:
+    rows = PushSubscription.objects.unscoped("push: device cap")
+    keep = list(
+        rows.filter(user=user)
+        .order_by("-created_at", "-id")
+        .values_list("pk", flat=True)[:MAX_DEVICES_PER_LOGIN]
+    )
+    rows.filter(user=user).exclude(pk__in=keep).delete()
 
 
 def unsubscribe(*, user, endpoint: str = "", everywhere: bool = False, request=None) -> int:
@@ -164,15 +198,15 @@ def deliver(user_ids, *, title: str, path: str) -> dict[str, int]:
             result = out.send(sub, payload)
         except ValueError:  # malformed keys stored by an old browser
             result = webpush.PushResult(ok=False, gone=True)
+        rows = PushSubscription.objects.unscoped("push: deliver result").filter(pk=sub.pk)
         if result.ok:
             counts["sent"] += 1
-            PushSubscription.objects.unscoped("push: sent").filter(pk=sub.pk).update(
-                last_sent_at=timezone.now()
-            )
-        elif result.gone:
+            rows.update(last_sent_at=timezone.now(), failures=0)
+        elif result.gone or sub.failures + 1 >= MAX_FAILURES:
             counts["removed"] += 1
-            PushSubscription.objects.unscoped("push: gone").filter(pk=sub.pk).delete()
+            rows.delete()
         else:
             counts["failed"] += 1
+            rows.update(failures=F("failures") + 1)
     logger.info("push.delivered", extra=counts)
     return counts

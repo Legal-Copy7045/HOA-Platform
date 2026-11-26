@@ -182,7 +182,7 @@ def work_orders(request):
                     w.get_priority_display(),
                     w.state,
                     w.due_on or "",
-                    w.created_at.date(),
+                    timezone.localdate(w.created_at),
                 ]
                 for w in rows
             ),
@@ -428,10 +428,22 @@ def contract_detail(request, pk):
             "obj": contract,
             "status": services.contract_status(contract),
             "invoices": contract.invoices.order_by("-invoice_date"),
-            "actions": services.CONTRACT.available(contract, request.user),
+            "actions": [
+                t
+                for t in services.CONTRACT.available(contract, request.user)
+                if t.action != "approve"
+            ],
             "history": services.CONTRACT.history(contract),
             "action_url_name": "contract_action",
             "can_manage": policy.can(request.user, "contract.manage"),
+            "approvals": contract.approvals.select_related("approver"),
+            "needed": services.contract_approvals_required(contract),
+            "can_approve": (
+                contract.state == "draft"
+                and policy.can(request.user, "invoice.approve")
+                and contract.entered_by_id != request.user.pk
+                and request.user.pk not in services.contract_approvers(contract)
+            ),
         },
     )
 
@@ -441,11 +453,16 @@ def contract_detail(request, pk):
 def contract_action(request, pk, action):
     contract = get_object_or_404(Contract, pk=pk)
     try:
-        if action not in services.CONTRACT.transitions:
+        note = request.POST.get("note", "")
+        if action == "approve":
+            # Approvals are records (review SEC-002), so they go through the service.
+            services.approve_contract(contract, note=note, actor=request.user, request=request)
+        elif action in services.CONTRACT.transitions:
+            services.CONTRACT.apply(
+                contract, action, actor=request.user, note=note, request=request
+            )
+        else:
             raise WorkflowError("Unknown action.")
-        services.CONTRACT.apply(
-            contract, action, actor=request.user, note=request.POST.get("note", ""), request=request
-        )
-    except WorkflowError as exc:
+    except (WorkflowError, services.OperationsError) as exc:
         messages.error(request, str(exc))
     return redirect("contract_detail", pk=contract.pk)

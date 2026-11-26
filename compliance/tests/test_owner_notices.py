@@ -99,3 +99,37 @@ def test_owner_photos_have_their_own_allowance(client, w):
         client.post(reverse("violation_photo", args=[w["v"].pk]), {"file": png(f"f{i}.png")})
     owner_photos = attachments_for(w["v"]).filter(label="Owner photo of the fix").count()
     assert owner_photos == OWNER_FIX_PHOTOS_MAX
+
+
+def test_owner_allowance_holds_under_parallel_uploads(client, w, monkeypatch):
+    """Review R2-006: uploads sent at the same moment each see the allowance
+    unused; the allowance is checked again under the upload lock."""
+    from compliance import views
+    from documents.attachments import attach
+
+    for i in range(views.OWNER_FIX_PHOTOS_MAX):
+        attach(w["v"], png(f"a{i}.png"), actor=w["owner"], label=views.OWNER_FIX_LABEL)
+    # A request that read the count before the others committed.
+    monkeypatch.setattr(views, "_owner_photo_room", lambda v: views.OWNER_FIX_PHOTOS_MAX)
+    client.force_login(w["owner"])
+    client.post(
+        reverse("violation_photo", args=[w["v"].pk]),
+        {"file": [png(f"b{i}.png") for i in range(5)]},
+    )
+    owner_photos = attachments_for(w["v"]).filter(label=views.OWNER_FIX_LABEL).count()
+    assert owner_photos == views.OWNER_FIX_PHOTOS_MAX
+    # The board's evidence photos still fit.
+    client.force_login(w["board"])
+    client.post(reverse("violation_photo", args=[w["v"].pk]), {"file": [png("evidence.png")]})
+    assert attachments_for(w["v"]).count() == views.OWNER_FIX_PHOTOS_MAX + 1
+
+
+def test_label_allowance_is_checked_inside_attach(w):
+    from documents.attachments import attach
+    from documents.services import DocumentError
+
+    attach(w["v"], png("one.png"), actor=w["owner"], label="Kind", label_max=1)
+    with pytest.raises(DocumentError, match="No more files like this"):
+        attach(w["v"], png("two.png"), actor=w["owner"], label="Kind", label_max=1)
+    # Other labels are not limited by it.
+    attach(w["v"], png("three.png"), actor=w["board"], label="Evidence")
