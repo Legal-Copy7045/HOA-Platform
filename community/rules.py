@@ -238,6 +238,15 @@ REGISTRY: dict[str, RuleSpec] = {
             "On: new owners choose email or post when they sign up, and owners who have not "
             "answered see a to-do. Official notices are always emailed only to owners who "
             "agreed; everyone else gets paper. Turning this off only stops asking.",
+        # Automatic payments (D46): a safety ceiling, not a fee.
+        RuleSpec(
+            "payments.autopay_ceiling_percent",
+            "Automatic payment ceiling, as a percent of the monthly {term} (300 = three months)",
+            INT,
+            "300",
+            "Online payments",
+            "An automatic payment above this is not charged; the board gets an item instead. "
+            "Automatic payments only ever pay the month's assessment.",
         ),
         RuleSpec(
             "retention.former_owner_contact_days",

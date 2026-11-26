@@ -6,6 +6,20 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.15.0 — 2026-11-26
+
+- Automatic payments (optional feature, off by default; needs Online
+  payments): owners and authorized contacts can have each monthly assessment
+  paid on its due day from a bank account (no fee) or a card (credit cards
+  with the surcharge), saved on Stripe's page. Credit on the account is used
+  first; late fees and other charges are never paid automatically. A payment
+  that doesn't go through is emailed and shown as a to-do, soft declines are
+  retried once after three days, and automatic payments pause after a hard
+  decline or a second failure. Turn it off any time on My account; it ends
+  when the home is sold. The board sees statuses and failures on Online
+  payments (D46). Stripe test mode only until the HOA's own Stripe
+  account is set up.
+
 ## 0.14.0 — 2026-11-26
 
 - The health alert email now says what the server errors were, in plain

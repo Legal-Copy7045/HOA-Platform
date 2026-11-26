@@ -704,6 +704,11 @@ def items_for(user) -> list[Item]:
     if can(user, "ledger.view_own"):
         out.extend(_balance_items(user, roles))
     out.extend(_contact_items(user, roles))
+    # An automatic payment that didn't go through (D46).
+    if can(user, "payments.pay"):
+        from payments.autopay import payer_items
+
+        out.extend(payer_items(user))
 
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))

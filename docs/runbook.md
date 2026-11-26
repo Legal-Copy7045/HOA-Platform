@@ -584,16 +584,23 @@ items.
 2. Developers -> API keys -> **Create restricted key**, named "HOA portal",
    with ONLY these rights (everything else None):
    - Checkout Sessions: **Write**
-   - PaymentIntents: Read
+   - PaymentIntents: Read (**Write** once Automatic payments are used: it
+     creates the monthly off-session charge)
    - Charges: Read
    - Balance transactions (Balance): Read
    - Payouts: Read
    - Disputes: Read
    - Refunds: **Read** (never Write)
+   - For Automatic payments only (D46): Customers: **Write** (one
+     Customer per ownership account, metadata ids only); SetupIntents: Read
+     (the saved card or bank account and its debit authorization);
+     PaymentMethods: **Write** (to detach a payment method when a payer turns
+     automatic payments off, replaces the method, or the home is sold).
 
-   No refund, customer, product, payout or transfer write rights and no
-   account settings. With this key a stolen secret can only create checkouts
-   that pay the HOA. (Because the key cannot refund, a surcharge taken from a
+   No refund, product, payout or transfer write rights and no account
+   settings. With this key a stolen secret can only create checkouts and
+   charges that pay the HOA (charges only to payment methods payers saved
+   for automatic payments), never send money out. (Because the key cannot refund, a surcharge taken from a
    debit card by mistake becomes a board My item "Refund $X surcharge to lot
    N (debit card)"; refund it in the Stripe dashboard and the portal closes
    the item when it sees the refund.)
@@ -645,6 +652,38 @@ portal pins API version `2026-08-26.dahlia`):
   them except the credit card surcharge): cards about 2.9% + 30 cents; ACH
   Direct Debit 0.8% capped at $5; Financial Connections verification may
   carry its own small fee; disputes $15 each; failed/returned ACH $4.
+
+### Automatic payments (D46)
+
+Built and tested in test mode; live use needs the HOA's own Stripe account
+(the same go-live checklist below).
+
+1. Give the restricted key the extra rights above (Customers Write,
+   SetupIntents Read, PaymentIntents Write, PaymentMethods Write). Without
+   them, setting up fails with a message and nothing is saved; without
+   PaymentMethods Write, turning off still stops the charges but the card
+   stays on the Customer at Stripe (the audit log shows
+   `payments.autopay_detach_failed`; detach it in the dashboard).
+2. Admin -> Features: switch on **Automatic payments** (Online payments must
+   be on too). Community settings: **Automatic payment ceiling** (default 300
+   = three months of dues) with its citation; the due day (`dues.due_day`) is
+   when the charge is made.
+3. As a demo owner: My account -> Pay assessments automatically (asks for
+   the password again) -> bank account or card -> Stripe's setup page. Test
+   card `4242 4242 4242 4242` (credit, surcharge), `4000 0566 5566 5556`
+   (debit, no fee), `4000 0000 0000 9995` (declines with insufficient funds:
+   one retry three days later, then paused), `4000 0027 6000 3184` (needs
+   authentication: paused at once, the owner pays by hand). Bank: the Test
+   Institution, as for Pay online.
+4. What it charges: on the due day, site time (the hourly task acts from the
+   due day for a week), the open amount of that month's assessment only,
+   after any credit on the account, plus the credit card surcharge on a
+   credit card. Never late fees or other charges. It is recorded only when
+   Stripe says the charge succeeded (cards at once, bank debits after a few
+   business days).
+5. The board sees every account's status and recent failures on Finance ->
+   Online payments ("Automatic payments"). An amount over the ceiling is not
+   charged: a My item "Automatic payment held back".
 
 ### 2. Securing the HOA's Stripe account
 
