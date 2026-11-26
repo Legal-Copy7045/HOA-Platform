@@ -38,3 +38,6 @@
 - feature: "Money tools: balanced journal CSV export (owners by lot only, formula-injection safe), deposit batches with void, bank reconciliation with outstanding items, 1099 worksheet at the threshold rule, courtesy reminders (off until set, once a month), collections letter sequence first/second/final with referral left to the board"
   since: M4
   match: ["^unit:ledger/tests/test_money_tools"]
+- feature: "Contract pre-approval follows the invoice two-approver rule: a cap at or above invoice.dual_approval_cents needs two different board approvals (never the entrant, never a manager), recorded append-only and fixed when entered; a one-approval contract pre-approves only invoices below the threshold (SEC-002)"
+  since: M4
+  match: ["^unit:operations/tests/test_contracts.py::test_(contract_at_or_above_threshold|entrant_approval_never|required_approvals_fixed|contract_approvals_are_append_only|one_approval_contract|board_approves_contract)"]
