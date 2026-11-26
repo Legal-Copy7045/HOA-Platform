@@ -8,7 +8,7 @@
 # GitHub whether the branch has newer commits and records the answer in the
 # portal's database. When "Install update" is pressed, it runs
 # update-portal.sh and records the outcome. Then it runs the oldest server
-# task requested on Admin -> Server tasks (a backup, a restore drill...; D35)
+# task requested on Admin -> Server tasks (a backup, a restore drill...; D36)
 # from the fixed list in host-tasks.sh. The web app itself never gets
 # any access to this machine: it can only write the request row, and this
 # script decides what to do with it. Nothing typed on the website reaches
@@ -125,7 +125,7 @@ elif [ "$DUE" = "t" ]; then
   check
 fi
 
-# Server tasks (D35). Not in the same run as an update (which restarts the
+# Server tasks (D36). Not in the same run as an update (which restarts the
 # portal and can use most of the service's time limit): next minute instead.
 # Before the migration that adds them, process_host_task does nothing.
 if [ "$UPDATED" -eq 0 ]; then

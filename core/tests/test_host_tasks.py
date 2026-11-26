@@ -1,4 +1,4 @@
-"""Server tasks (Admin -> Server tasks, decision D35): who may start and see
+"""Server tasks (Admin -> Server tasks, decision D36): who may start and see
 them, one at a time, audit, the page, and the agent's SQL against the real
 table. The agent's bash side is in test_host_tasks_agent.py."""
 

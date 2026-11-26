@@ -220,7 +220,7 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Uploading or attaching draft minutes is data entry (meeting.manage);
     # recording that the board approved them is a board decision.
     "minutes.adopt": frozenset({BOARD}),
-    # --- Server tasks (hosttasks, D35) ---
+    # --- Server tasks (hosttasks, D36) ---
     # Starting a backup, restore drill or other host task: sysadmins only.
     # The board sees the history (who asked, when, the outcome); no owner data.
     "system.run_task": frozenset({SYSADMIN}),

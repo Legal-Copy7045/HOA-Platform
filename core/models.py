@@ -115,7 +115,7 @@ class UpdateStatus(models.Model):
 
 
 class HostTask(models.Model):
-    """A server task requested on Admin -> Server tasks (decision D35): a
+    """A server task requested on Admin -> Server tasks (decision D36): a
     backup, a restore drill, a lock check... The web app only inserts the
     request; the VM agent (infra/poc/portal-agent.sh) claims it, runs the
     fixed command for its kind and writes back the state and a short summary.

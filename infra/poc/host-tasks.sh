@@ -1,4 +1,4 @@
-# Server tasks (Admin -> Server tasks in the portal, decision D35). Sourced
+# Server tasks (Admin -> Server tasks in the portal, decision D36). Sourced
 # by portal-agent.sh, never run on its own. Needs APP_DIR, the COMPOSE array
 # and psql_run (SQL on stdin, values as psql variables).
 #
