@@ -174,10 +174,13 @@ def test_unticking_on_my_profile(client, w):
     page = client.get(reverse("my_profile")).content.decode()
     assert "Email me a statement when the monthly assessment is charged" in page
     assert "Untick to stop these emails." in page
-    client.post(reverse("my_profile"), {"phone": "", "mailing_address": ""})
+    client.post(reverse("my_profile"), {"section": "prefs", "weekly_digest": "now"})
     with system_access("t"):
         assert ContactProfile.objects.get(person=_person(w["owner"])).statement_emails is False
-    client.post(reverse("my_profile"), {"statement_emails": "on"})
+    client.post(
+        reverse("my_profile"),
+        {"section": "prefs", "weekly_digest": "now", "statement_emails": "on"},
+    )
     with system_access("t"):
         assert ContactProfile.objects.get(person=_person(w["owner"])).statement_emails is True
 
