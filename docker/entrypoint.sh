@@ -27,7 +27,9 @@ case "${1:-web}" in
     ;;
   worker)
     python manage.py check_db_role
-    exec python manage.py procrastinate worker
+    # Every queue (email, push, maintenance, default). Two jobs at once, and
+    # push jobs share one lock, so a slow push never holds up email (R2-007).
+    exec python manage.py procrastinate worker --concurrency "${WORKER_CONCURRENCY:-2}"
     ;;
   migrate)
     # Cache table first, so the post-migrate runtime grants cover it too.
