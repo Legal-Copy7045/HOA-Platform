@@ -368,3 +368,30 @@ def needs_attention(conn: BankConnection) -> bool:
     if conn.last_synced_at is None:
         return timezone.now() - conn.created_at > datetime.timedelta(days=STALE_DAYS)
     return timezone.now() - conn.last_synced_at > datetime.timedelta(days=STALE_DAYS)
+
+
+# --- For the online-payments reconciliation (payments.sync) --------------------------------
+
+
+def deposits_between(
+    start: datetime.date, end: datetime.date
+) -> list[tuple[int, datetime.date, int]]:
+    """Money in (id, posted date, cents) on every connected account between
+    ``start`` and ``end``, for matching Stripe payouts to the bank."""
+    from ledger.models import BankTransaction
+
+    return list(
+        BankTransaction.objects.filter(posted_on__gte=start, posted_on__lte=end, amount_cents__gt=0)
+        .order_by("posted_on", "id")
+        .values_list("id", "posted_on", "amount_cents")
+    )
+
+
+def lines_through() -> datetime.date | None:
+    """The newest posted date the bank feed holds, so callers only compare
+    dates the bank has actually reported."""
+    from django.db.models import Max
+
+    from ledger.models import BankTransaction
+
+    return BankTransaction.objects.aggregate(m=Max("posted_on"))["m"]

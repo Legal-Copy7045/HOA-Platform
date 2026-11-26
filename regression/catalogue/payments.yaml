@@ -11,3 +11,7 @@
   since: M5
   docs: docs/runbook.md
   match: ["^unit:payments/tests/test_stripe\\.py::test_", "^manual:stripe test payment"]
+- feature: "Three-way reconciliation check (c): each Stripe payout appears as a bank-feed deposit of its exact net amount within 3 days, one bank line per payout, judged only where the feed has data"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:payments/tests/test_payout_bank_match\\.py::test_"]

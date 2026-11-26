@@ -331,12 +331,52 @@ def payouts_for_matching(start: datetime.date, end: datetime.date) -> list[dict]
 # --- Three-way reconciliation ---------------------------------------------------------------
 
 
+PAYOUT_BANK_DAYS = 3  # a payout lands within this many days of its arrival date
+
+
 def check_payouts_against_bank(payouts: list[StripePayout]) -> list[dict]:
-    """Hook (c) of the reconciliation: each paid-out payout against the bank
-    deposits seen in the bank feed. Returns problems as {"code", "id"}.
-    Wired to the bank feed at merge (ledger bank feeds); until then there is
-    nothing to compare with."""
-    return []
+    """Check (c) of the reconciliation: every paid-out payout must appear as a
+    deposit of exactly its net amount in the bank feed, within
+    PAYOUT_BANK_DAYS of its arrival date. Only dates the bank feed already
+    covers are judged (no feed, or not imported that far yet: nothing to
+    say). Each bank line matches one payout at most. Returns problems as
+    {"code", "id"}."""
+    from ledger.bankfeeds import services as bank
+
+    through = bank.lines_through()
+    if through is None:
+        return []
+    due = sorted(
+        (
+            p
+            for p in payouts
+            if p.status == "paid"
+            and p.arrival_date + datetime.timedelta(days=PAYOUT_BANK_DAYS) <= through
+        ),
+        key=lambda p: (p.arrival_date, p.id),
+    )
+    if not due:
+        return []
+    window = datetime.timedelta(days=PAYOUT_BANK_DAYS)
+    deposits = bank.deposits_between(due[0].arrival_date - window, due[-1].arrival_date + window)
+    used: set[int] = set()
+    problems = []
+    for p in due:
+        match = next(
+            (
+                line_id
+                for line_id, posted_on, cents in deposits
+                if line_id not in used
+                and cents == p.amount_cents
+                and abs((posted_on - p.arrival_date).days) <= PAYOUT_BANK_DAYS
+            ),
+            None,
+        )
+        if match is None:
+            problems.append({"code": "payout_not_in_bank", "id": p.payout_id})
+        else:
+            used.add(match)
+    return problems
 
 
 @internal("payments reconcile")
