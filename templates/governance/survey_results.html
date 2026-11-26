@@ -8,6 +8,7 @@
     {% if can_manage %}<div class="actions"><a class="btn secondary" href="{% url 'survey_export' survey.pk %}">{% icon "download" %} Download CSV</a></div>{% endif %}
   </div>
   <div class="alert info">{% icon "info" %}<span>An informal survey: these are opinions, not a vote.{% if not can_manage %} Written answers are seen by the board only.{% endif %}</span></div>
+  {% if results.pending %}<p class="muted small">{{ results.pending }} anonymous response{{ results.pending|pluralize }} {{ results.pending|pluralize:"is,are" }} waiting to be mixed with others before {{ results.pending|pluralize:"it appears,they appear" }} here, so no one can tell whose answers are whose. Every response is included once the survey closes.</p>{% endif %}
   {% for row in results.rows %}{% with q=row.question %}
     <section class="card"><div class="card-head"><h2>{{ forloop.counter }}. {{ q.prompt }}</h2><span class="small muted">{{ row.answered }} answered</span></div>
       {% if q.kind == "rating" %}<p><strong>Average: {% if row.average is not None %}{{ row.average }} of 5{% else %}no ratings yet{% endif %}</strong></p>{% endif %}

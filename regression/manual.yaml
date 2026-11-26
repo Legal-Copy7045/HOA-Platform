@@ -290,3 +290,7 @@
   check: "Print a test letter and a test envelope from Paper mail settings at actual size: folded in thirds, the letter's address (and the return address for double-window envelopes) shows fully in a #10 window envelope; the envelope's return address and recipient block print where expected; a label test sheet lines up with Avery 5160 labels. With a test Mailer ID the barcode prints sharp inside the window."
   steps: "As a demo board member or manager open Settings > Paper mail settings; print the test letter, envelope and label sheet; adjust the inches and print again until aligned; then print a real demo mailing's first letter."
   last: ""
+- key: secret choices mixed on the server
+  check: "On the POC, a secret test vote's ballots show as \"waiting to be mixed\" on the vote page while fewer than ten are pooled, the worker writes them once ten wait (five stay behind), and closing the vote counts every ballot with nothing left waiting (D56)."
+  steps: "Open a secret demo vote, cast ballots from demo owners, check the vote page as the board after each; cast ten or more and wait a minute for the worker; close the vote and check the counts equal the ballots cast."
+  last: ""

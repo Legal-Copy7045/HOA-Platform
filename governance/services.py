@@ -695,6 +695,11 @@ def close_vote(vote: Vote, *, actor, request=None) -> Vote:
         if locked.status != VoteStatus.OPEN:
             raise GovernanceError("Only an open vote can be closed.")
         Vote.objects.filter(pk=vote.pk).update(status=VoteStatus.CLOSED, closed_at=timezone.now())
+        if locked.secret:
+            # Every pooled choice is written before anyone sees results (D56).
+            from governance import mixing
+
+            mixing.flush(mixing.VOTE, locked.pk, final=True)
     record_event(
         "vote.closed", actor=None if actor is SYSTEM else actor, request=request, target=vote
     )
@@ -782,8 +787,12 @@ def cast_ballot(
                 cast_by=actor,
             )
             if vote.secret:
-                # Stored apart from the ballot, with nothing that links them.
-                SecretChoice.objects.create(vote=vote, option=option)
+                # Into the mixing pool, with nothing that links it to the
+                # ballot; written to SecretChoice later, shuffled, in another
+                # transaction (D56).
+                from governance import mixing
+
+                mixing.pool_vote_choice(vote, option.pk)
     except IntegrityError as exc:
         raise GovernanceError("A ballot was already cast for this home.") from exc
     # Secret ballots: the audit trail records that a ballot was cast, not the choice.
@@ -798,7 +807,18 @@ def cast_ballot(
 
 
 def results(vote: Vote) -> dict:
+    """Counts per option. On a secret vote, choices still in the mixing pool
+    (D56) are not in the rows while voting is open; ``pending`` says how
+    many, and the outcome waits for them. Once the vote is closed (or past
+    its closing time) anything pooled is written first, so final results
+    always count every ballot."""
     source = SecretChoice if vote.secret else Ballot
+    pending = 0
+    if vote.secret:
+        from governance import mixing
+
+        mixing.settle_if_final(mixing.VOTE, vote)
+        pending = mixing.pending_count(mixing.VOTE, vote.pk)
     counts = dict(
         source.objects.filter(vote=vote)
         .values_list("option")
@@ -815,7 +835,7 @@ def results(vote: Vote) -> dict:
         for o in vote.options.all()
     ]
     outcome = None
-    if vote.kind == VoteKind.FORMAL and vote.eligible_lots:
+    if vote.kind == VoteKind.FORMAL and vote.eligible_lots and not pending:
         turnout = round(100 * total / vote.eligible_lots, 1)
         # Exact integer comparisons, never rounded percentages (review D4).
         quorum_met = total * 100 >= (vote.quorum_percent or 0) * vote.eligible_lots
@@ -835,7 +855,7 @@ def results(vote: Vote) -> dict:
             "leading": leader["option"].label if leader else ("tie" if len(leaders) > 1 else None),
             "meets_threshold": passed,
         }
-    return {"rows": rows, "total": total, "outcome": outcome}
+    return {"rows": rows, "total": total, "outcome": outcome, "pending": pending}
 
 
 def can_see_voters(vote: Vote, user) -> bool:

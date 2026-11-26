@@ -34,6 +34,19 @@ def register_append_only_table(table: str) -> None:
     _APPEND_ONLY_TABLES.add(table)
 
 
+# Staging tables the app role may insert into, read and delete from, but never
+# update: the secret-choice mixing pool (D56). Rows are moved out and deleted.
+_INSERT_DELETE_ONLY_TABLES: set[str] = {"governance_pendingsecretchoice"}
+
+
+def register_insert_delete_only_table(table: str) -> None:
+    _INSERT_DELETE_ONLY_TABLES.add(table)
+
+
+def insert_delete_only_tables() -> frozenset[str]:
+    return frozenset(_INSERT_DELETE_ONLY_TABLES)
+
+
 def append_only_tables() -> frozenset[str]:
     """Every concrete AppendOnlyModel table, plus any registered explicitly."""
     from django.apps import apps
@@ -69,6 +82,20 @@ def apply_runtime_grants(using: str = "default") -> bool:
     for table in sorted(protected):
         statements.append(
             sql.SQL("REVOKE UPDATE, DELETE, TRUNCATE ON TABLE {} FROM {}").format(
+                sql.Identifier(table), role_id
+            )
+        )
+    staging = insert_delete_only_tables() - protected
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()"
+            " AND tablename = ANY(%s)",
+            [sorted(staging)],
+        )
+        existing = {row[0] for row in cursor.fetchall()}
+    for table in sorted(staging & existing):
+        statements.append(
+            sql.SQL("REVOKE UPDATE, TRUNCATE ON TABLE {} FROM {}").format(
                 sql.Identifier(table), role_id
             )
         )
