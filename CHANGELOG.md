@@ -6,6 +6,27 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.27.0 — 2026-11-26
+
+- Forgot your password? The sign-in page links straight to it. The emailed
+  link (valid an hour, works once) still asks for your passkey, authenticator
+  app or a recovery code before you choose a new password, never signs you in
+  by itself, and every address on file is told "Your password was changed".
+- Fewer lockouts: My items asks you to add a backup sign-in method (a second
+  passkey, or a passkey and an app) and to make new recovery codes when two or
+  fewer are left. Recovery codes are shown once, with a printable page and a
+  text-file download.
+- Lost your phone and your recovery codes? Homeowners, account contacts and
+  tenants can recover their sign-in themselves from Sign-in help: a 48-hour
+  wait, alerts to every email address on file, your phone (if you get texts)
+  and the board, Cancel for you and the board (signing in normally cancels it
+  too), then a new passkey or app. For 48 hours afterwards votes, proxies,
+  contact details, notice and text choices, automatic payments and account
+  change requests are locked, with a banner saying until when. Board members,
+  officers and staff keep the two-board-member reset.
+- The waiting period and the lock are Community settings ("Sign-in and
+  security"): at least 48 and 24 hours, at most 14 days.
+
 ## 0.18.0 — 2026-11-26
 
 - Phones: every button and link is at least a thumb's size, buttons wrap

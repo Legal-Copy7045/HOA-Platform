@@ -82,8 +82,8 @@
   steps: "Invite a test person; open the link on an iPhone and an Android phone; finish all three steps; confirm the home page then shows the menu."
   last: ""
 - key: recovery codes print
-  check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer)."
-  steps: "During setup or from Sign-in and security > Show codes, press Print and look at the print preview."
+  check: "On the recovery codes step, Print shows only the codes and the heading (no buttons, step bar or footer); the Printable page prints the same; Download saves recovery-codes.txt; opening the codes again in another browser shows them hidden (shown once, D58)."
+  steps: "During setup (or after Make new codes), press Print, then Printable page and Download; then open Sign-in and security in a private window."
   last: ""
 - key: install the app
   check: "The portal installs to a phone home screen and a desktop, opens standalone with the leaf icon, still asks for sign-in, and shows no cached page after signing out."
@@ -264,4 +264,8 @@
 - key: phone tab bar
   check: "On a phone every signed-in page has a bottom bar (owners: Dashboard, My account, Voting, Menu; board, manager and ARC: Dashboard, My items, Search, Menu) that never covers a page's last button, shows waiting counts, and whose Menu opens the drawer; it is absent on a desktop and in print."
   steps: "Sign in as a demo owner and a board member on an iPhone and an Android phone; scroll to the bottom of a long page (My account, Owner accounts); open Menu from the bar; print a page."
+  last: ""
+- key: recover an owner account on a phone end to end
+  check: "As a demo owner on a phone: Sign-in help, 'I've lost my phone and recovery codes', the email arrives (and at the other addresses on file, and a text if opted in), the link opens the confirm page, the board gets the email and the My items entry with Cancel; signing in with the old passkey cancels it; a second request left to wait lets the owner finish from a new link on the phone, add a passkey, save the new codes and see the lock banner; voting and My profile changes are refused with the date; after the lock they work. A board member's address gets no email and the same page."
+  steps: "POC with fictional data and a demo owner with a test mailbox. To skip the 48 hours, move the request's ready_at back in a scratch database only, never on real data."
   last: ""
