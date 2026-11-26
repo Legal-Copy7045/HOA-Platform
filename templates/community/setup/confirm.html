@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Please confirm · Community setup · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'setup_home' %}">Community setup</a> / Confirm</div>
+  <div class="page-head"><div><h1>Please confirm</h1><p class="subtitle">Nothing has been saved yet.</p></div></div>
+  <section class="card">
+    {% if dues %}
+      <div class="alert warning" role="alert">{% icon "alert" %}<span>The monthly {% term "term" %} would go {% if dues.up %}up{% else %}down{% endif %} by {{ dues.percent }}%: from <strong>{{ dues.old|cents }}</strong> to <strong>{{ dues.new|cents }} per month</strong>.</span></div>
+      <p>Every home is charged the new amount from the next {% term "term" %} posting, and owners see it under Upcoming charges at once. Check the amount was typed in dollars and that the change was adopted as the Declaration and the Act require (a budget ratified by the owners or a recorded board decision).</p>
+    {% endif %}
+    {% for w in warnings %}<div class="alert warning" role="alert">{% icon "alert" %}<span>{{ w }}</span></div>{% endfor %}
+    <form method="post" action="{{ back_url }}">{% csrf_token %}
+      {% for name, value in post %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+      <input type="hidden" name="confirm" value="yes">
+      <div class="form-actions">
+        <button type="submit">Yes, save and continue</button>
+        <a class="btn secondary" href="{{ back_url }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

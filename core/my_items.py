@@ -505,7 +505,24 @@ def items_for(user) -> list[Item]:
                 )
             )
     if can(user, "community.manage_rules"):
+        from community import setup
         from community.rules import rules_needing_attention
+
+        # The setup wizard (D51) until a run is finished, and while a rerun is open.
+        if setup.needs_finishing():
+            left = setup.steps_left(setup.current_run())
+            out.append(
+                Item(
+                    "Setup",
+                    f"Finish community setup ({left} step{'' if left == 1 else 's'} left)"
+                    if left
+                    else "Finish community setup (review and finish)",
+                    "Community setup",
+                    reverse("setup_home"),
+                    "warning",
+                    nav="settings_hub",
+                )
+            )
 
         missing = len(rules_needing_attention())
         if missing:

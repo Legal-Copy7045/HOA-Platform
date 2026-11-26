@@ -580,6 +580,11 @@ _SPECS = [
     # Server tasks (hosttasks, D35)
     _spec("system.task_requested", "Server task requested", "kind"),
     _spec("system.task_finished", "Server task finished on the VM", "kind", "state"),
+    # Community setup wizard (D51): step key and run number only.
+    _spec("setup.run_started", "Community setup started", "run"),
+    _spec("setup.step_completed", "Community setup step completed", "step", "run"),
+    _spec("setup.step_skipped", "Community setup step skipped", "step", "run"),
+    _spec("setup.run_finished", "Community setup finished", "run"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}
