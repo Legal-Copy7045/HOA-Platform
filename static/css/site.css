@@ -469,6 +469,7 @@ details.menu-details > .panel-body br { display: none; }
 .todo-link:hover .title { color: var(--green-700); text-decoration: underline; }
 .todo-link .todo-detail { display: block; }
 .todo-link .todo-arrow { color: var(--muted); }
+.list > li.todo .todo-action { flex: none; }
 /* ---------- Homeowner ARC, requests and notices (UX review) ---------- */
 .checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
 .checklist > li { display: flex; gap: .75rem; align-items: flex-start; padding: .75rem 0; border-top: 1px solid var(--line-2); }

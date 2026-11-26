@@ -59,13 +59,31 @@ def _context(request, lot, *, error="", q=None, chosen=None, amount=""):
 
 @login_required
 def pay_online(request, lot_id):
-    """Step 1: choose the charges (or an amount). Step 2 (POST): the three
-    ways to pay, each with its exact fee and total."""
+    """The ways to pay, each with its exact fee and total. Opened plainly (or
+    with ?all=1 from the dashboard's "Pay $X"), it quotes every open charge
+    so the payer chooses the method first; ?choose=1 ("Pay only some
+    charges") shows the charge list and the typed-amount box, posted back
+    here for the quote. The query string only picks the step: which charges
+    and how much are always worked out again on the server."""
     policy.require(request.user, "payments.pay")
     _available_or_404()
     lot = _lot_for_payer(request, lot_id)
     if request.method != "POST":
-        return render(request, "payments/pay.html", _context(request, lot))
+        ctx = _context(request, lot)
+        if request.GET.get("choose"):
+            return render(request, "payments/pay.html", ctx)
+        everything = [c.entry.pk for c in ctx["open_charges"]]
+        try:
+            q = flow.quote(request.user, lot, charge_ids=everything)
+        except flow.PaymentError as exc:
+            # Nothing open, or below the smallest payment: the choice form
+            # says why and still offers a typed amount.
+            ctx["error"] = str(exc) if ctx["due_cents"] <= 0 or everything else ""
+            return render(request, "payments/pay.html", ctx)
+        ctx = _context(request, lot, q=q, chosen=q.charge_ids)
+        ctx["base_text"] = format_cents(q.base_cents)
+        ctx["paying_all"] = True
+        return render(request, "payments/pay.html", ctx)
     chosen = request.POST.getlist("charge")
     raw_amount = (request.POST.get("amount") or "").strip()
     amount = None

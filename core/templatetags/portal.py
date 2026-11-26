@@ -303,6 +303,14 @@ def follow_up_form(context, kind, obj):
     }
 
 
+@register.inclusion_tag("partials/quick_actions.html", takes_context=True)
+def quick_actions(context):
+    """Staff shortcuts (core.my_items.quick_actions), e.g. "Record checks"."""
+    from core.my_items import quick_actions as actions_for
+
+    return {"actions": actions_for(context["user"])}
+
+
 @register.filter
 def get_item(mapping, key):
     """{{ dict|get_item:key }} for dictionaries keyed by a variable."""

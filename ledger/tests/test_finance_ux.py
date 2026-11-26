@@ -636,3 +636,25 @@ def test_invoice_file_is_shown_above_the_approval_buttons(client, w):
     assert "Your approval" in page
     assert page.index("Invoice file") < page.index("Your approval")
     assert "Ask for the invoice before approving." in page
+
+
+# --- Record checks quick action (streamlining) --------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("who", "shown"), [("board", True), ("manager", True), ("auditor", False), ("owner", False)]
+)
+def test_record_checks_quick_action_is_for_board_and_manager(w, who, shown):
+    from django.template import Context, Template
+
+    from core import my_items
+
+    actions = my_items.quick_actions(w[who])
+    html = Template("{% load portal %}{% quick_actions %}").render(Context({"user": w[who]}))
+    if shown:
+        assert actions == [
+            {"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"}
+        ]
+        assert f'href="{reverse("record_payments")}"' in html and "Record checks" in html
+    else:
+        assert actions == [] and html.strip() == ""

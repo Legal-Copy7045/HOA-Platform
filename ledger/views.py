@@ -874,7 +874,7 @@ def lot_notice_pdf(request, pk, kind):
     messages.info(
         request,
         "Delinquency letters are sent from the collection case. "
-        "Use \"Open collection case\" on this page first.",
+        'Use "Open collection case" on this page first.',
     )
     return redirect("lot_ledger", pk=lot.pk)
 

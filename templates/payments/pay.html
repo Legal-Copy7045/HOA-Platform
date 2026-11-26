@@ -20,6 +20,7 @@
   {% else %}
   <section class="card">
     <h2>Choose how to pay {{ base_text }}</h2>
+    {% if paying_all %}<p class="small" data-testid="paying-all">This pays everything open on your account{% if open_charges|length > 1 %} ({{ open_charges|length }} charges){% endif %}. <a href="{% url 'pay_online' lot.pk %}?choose=1">Pay only some charges</a></p>{% endif %}
     <p class="small" data-testid="surcharge-disclosure">{{ disclosure }}</p>
     <div class="grid grid-3 pay-methods">
     {% for o in quote.options %}
@@ -35,7 +36,7 @@
     {% endfor %}
     </div>
     <p class="small muted">Bank payments take a few business days to clear; your account shows them once your bank confirms. If a debit card is charged a surcharge by mistake, the board refunds it.</p>
-    <p><a href="{% url 'pay_online' lot.pk %}">Change what to pay</a></p>
+    {% if not paying_all %}<p><a href="{% url 'pay_online' lot.pk %}?choose=1">Change what to pay</a></p>{% endif %}
   </section>
   {% endif %}
 {% endblock %}

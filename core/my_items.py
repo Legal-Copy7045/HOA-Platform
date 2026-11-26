@@ -32,6 +32,9 @@ class Item:
     nav: str = ""
     # Icon in lists; defaults from the area (UX review: one icon per area).
     icon: str = ""
+    # An optional shortcut shown beside the item (e.g. "Pay $150.00").
+    action_label: str = ""
+    action_url: str = ""
 
     def __post_init__(self):
         if not self.nav:
@@ -683,6 +686,7 @@ def _balance_items(user, roles) -> list[Item]:
     from ledger.services import owner_statement
 
     out = []
+    payable = _payable_online(user)
     for lot in Lot.objects.for_user(user).filter(pk__in=roles.account_lot_ids).order_by("number"):
         since = roles.lot_since.get(lot.pk)
         statement = owner_statement(lot.pk, since)
@@ -703,8 +707,36 @@ def _balance_items(user, roles) -> list[Item]:
                 oldest,
                 nav="my_account",
                 icon="wallet",
+                # Straight to the ways to pay, every open charge included
+                # (the payment page works the amounts out again itself).
+                action_label=f"Pay {format_cents(statement.balance)}" if lot.pk in payable else "",
+                action_url=(
+                    reverse("pay_online", args=[lot.pk]) + "?all=1" if lot.pk in payable else ""
+                ),
             )
         )
+    return out
+
+
+def _payable_online(user) -> frozenset[int]:
+    """Lots this person can pay online now (feature on, provider set up)."""
+    if not policy.can(user, "payments.pay"):
+        return frozenset()
+    from payments.checkout import payable_lot_ids
+    from payments.services import online_payments_enabled
+
+    if not online_payments_enabled():
+        return frozenset()
+    return payable_lot_ids(user)
+
+
+def quick_actions(user) -> list[dict]:
+    """Shortcuts for staff on My items and the dashboard (rendered with
+    {% quick_actions %}). Each one is a link to a page that checks the same
+    permission itself."""
+    out = []
+    if policy.can(user, "ledger.manage"):
+        out.append({"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"})
     return out
 
 
