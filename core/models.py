@@ -88,6 +88,10 @@ class UpdateStatus(models.Model):
     branch = models.CharField(max_length=100, blank=True)
     running_commit = models.CharField(max_length=40, blank=True)
     latest_commit = models.CharField(max_length=40, blank=True)
+    # The release number (VERSION) on GitHub's copy of the branch (D37).
+    # A database default, so the agent's INSERT works before and after this
+    # column exists (an update pulls the agent before migrating).
+    latest_version = models.CharField(max_length=20, blank=True, default="", db_default="")
     behind = models.PositiveIntegerField(default=0)
     changes = models.TextField(blank=True)  # commit subjects, newest first
     checked_at = models.DateTimeField(null=True, blank=True)
@@ -112,3 +116,64 @@ class UpdateStatus(models.Model):
     def get(cls) -> UpdateStatus:
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class HostTask(models.Model):
+    """A server task requested on Admin -> Server tasks (decision D36): a
+    backup, a restore drill, a lock check... The web app only inserts the
+    request; the VM agent (infra/poc/portal-agent.sh) claims it, runs the
+    fixed command for its kind and writes back the state and a short summary.
+    Rows are kept as the history; at most one is requested or running."""
+
+    class Kind(models.TextChoices):
+        BACKUP = "backup", "Take a backup"
+        RESTORE_DRILL = "restore_drill", "Restore drill"
+        RESTORE_DRILL_OFFSITE = "restore_drill_offsite", "Restore drill from the off-site copy"
+        OFFSITE_LOCK_CHECK = "offsite_lock_check", "Check the off-site lock"
+        HARDEN_HOST = "harden_host", "Re-apply host security"
+        HEALTH_CHECK = "health_check", "Run the health checks"
+
+    class State(models.TextChoices):
+        REQUESTED = "requested", "Waiting for the server"
+        RUNNING = "running", "Running"
+        SUCCEEDED = "succeeded", "Done"
+        FAILED = "failed", "Failed"
+        REFUSED = "refused", "Refused"
+
+    ACTIVE = (State.REQUESTED, State.RUNNING)
+
+    kind = models.CharField(max_length=30, choices=Kind.choices)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    requested_at = models.DateTimeField(default=timezone.now)
+    state = models.CharField(max_length=10, choices=State.choices, default=State.REQUESTED)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    # Written by the agent: printable ASCII only, capped (infra/poc/host-tasks.sh).
+    summary = models.CharField(max_length=500, blank=True)
+    output_tail = models.TextField(blank=True)  # at most 40 lines of 200 characters
+    # Set by `manage.py record_host_tasks` once the result is in the audit log.
+    audited_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-requested_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                models.Value(1),
+                condition=models.Q(state__in=["requested", "running"]),
+                name="core_hosttask_one_active",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    state__in=["requested", "running", "succeeded", "failed", "refused"]
+                ),
+                name="core_hosttask_state_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"server task #{self.pk} ({self.kind}, {self.state})"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Server task history is kept.")

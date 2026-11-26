@@ -148,7 +148,8 @@ echo "==> Checking the restored copy"
 "${SCRATCH[@]}" run --rm -T --no-deps web python manage.py check_storage
 "${SCRATCH[@]}" run --rm -T --no-deps web python manage.py data_status
 echo
-# The version label is not covered by the keyed checksum: show letters and
-# digits only, so a tampered label cannot send anything to the terminal.
-VERSION="$(head -c 40 "$SRC/APP_VERSION" 2>/dev/null | tr -cd 'a-z0-9' | cut -c1-12)"
+# The version label is not covered by the keyed checksum: show letters,
+# digits, dots and dashes only, so a tampered label cannot send anything to
+# the terminal.
+VERSION="$(head -c 40 "$SRC/APP_VERSION" 2>/dev/null | tr -cd 'a-z0-9.-' | cut -c1-32)"
 echo "Restore drill passed for $SRC (made at ${STAMP:-unknown}, version ${VERSION:-unknown})."

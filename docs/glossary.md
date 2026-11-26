@@ -50,6 +50,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Percent funded | The reserve balance compared with the fully funded balance (each component's cost times the share of its life already used). | `percent_funded` |
 | Settings | One page for rarely used set-up pages: Community settings, ARC request types, Lot neighbors, Letters and certificates, Common area booking rules, Branding, Features, Contact retention. With only one open to you, the menu goes straight to it. | `settings_hub` |
 | Contact retention | Former owners' contact details cleared after the retention period. | `retention` |
+| Server tasks | Admin page where a sysadmin starts a backup, a restore drill, the off-site lock check, re-applying host security or the health checks; the server's own agent runs them from a fixed list. The board sees the history. | `server_tasks`, `core/host_tasks.py`, `infra/poc/host-tasks.sh` |
 | Access review | The board's quarterly check of every login's access, on the People page. | `access_review` |
 | Lots and owners | Every lot with its current owners; the "Accounts, contacts and balances" view adds each account's other people, contact details and balance, with the CSV export (was Roster). | `lot_list` (`roster` redirects) |
 | Invitations and sign-ups | Who has signed up, lot by lot, with "Invite everyone not yet invited" and reminders (board), and every invitation with re-send and revoke (board or sysadmin). Was Onboarding and Invitations. | `invitations` (`onboarding` redirects) |

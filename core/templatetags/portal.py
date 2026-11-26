@@ -75,6 +75,7 @@ _TONES = {
         "certified",
         "success",
         "active",  # bank feed connection
+        "succeeded",  # server task
     },
     "info": {"nominations"},
     "warning": {
@@ -103,6 +104,8 @@ _TONES = {
         "objected",
         "needs_reauth",  # bank feed connection
         "processing",
+        "requested",  # server task
+        "running",  # server task
     },
     "danger": {
         "denied",
@@ -119,6 +122,7 @@ _TONES = {
         "failure",
         "mismatch",
         "unreachable",
+        "refused",  # server task
     },
     "neutral": {
         "void",

@@ -320,7 +320,18 @@ MEMBER_READS = {
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
-        ("sysadmin", {"system.view_status", "invite.resend", "invite.revoke", "branding.manage"}),
+        (
+            "sysadmin",
+            {
+                "system.view_status",
+                "invite.resend",
+                "invite.revoke",
+                "branding.manage",
+                # Server tasks (D35)
+                "system.run_task",
+                "system.view_tasks",
+            },
+        ),
         # Former owners read their old requests inside My history.
         ("former", {"history.view_own"}),
     ],

@@ -170,6 +170,12 @@ def _clear_check(request):
     return redirect("system_status")
 
 
+def _task_busy() -> bool:
+    from core import host_tasks
+
+    return host_tasks.current() is not None
+
+
 @login_required
 def system_status(request):
     """Operations view for sysadmins: health only, no owner data (decision D9)."""
@@ -201,7 +207,8 @@ def system_status(request):
         request,
         "core/system_status.html",
         {
-            "version": settings.APP_VERSION,
+            "version": settings.APP_RELEASE,
+            "build": settings.APP_VERSION,
             "pending_migrations": len(pending),
             "jobs": jobs,
             "failed_jobs": failed_jobs,
@@ -210,6 +217,8 @@ def system_status(request):
             "health": run_checks(),
             "clearable": health_clearable,
             "update": _update_status(),
+            "can_run_task": policy.can(request.user, "system.run_task"),
+            "task_busy": _task_busy(),
             "scanner": settings.DOCUMENT_SCANNER,
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
         },

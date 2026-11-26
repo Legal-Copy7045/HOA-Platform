@@ -9,6 +9,7 @@ from core import hub_views, preview
 from core.followups import set_follow_up
 from core.my_items_views import my_items_page
 from core.search_views import search_page
+from core.server_task_views import server_tasks
 from core.views import export_my_data, feature_settings, healthz, home, system_status
 
 
@@ -20,6 +21,7 @@ urlpatterns = [
     path("healthz", healthz, name="healthz"),
     path("", home, name="home"),
     path("ops/status/", system_status, name="system_status"),
+    path("ops/tasks/", server_tasks, name="server_tasks"),
     path("account/profile/", my_profile, name="my_profile"),
     path("account/export/", export_my_data, name="export_my_data"),
     path("directory/", directory, name="directory"),

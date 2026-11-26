@@ -205,3 +205,7 @@
   check: "After a sale recorded with an earlier date on a lot with entries posted in the buyer's time, My items shows 'Lot N: K entries moved to another account' with both account numbers; the lot's account page lists them under 'Entries moved between accounts', each moved copy reads 'Moved from account N on <date>' (also on the buyer's My account and statement PDF); Mark checked removes the item; the list and the table fit a phone screen."
   steps: "Finance > Owner accounts > a demo lot: post a charge and a check dated last week; Lots > Transfer to a demo person with a date before them; open My items, the lot's account page and the buyer's My account; download the buyer's statement; press Mark checked; repeat on a phone."
   last: ""
+- key: server tasks on the VM
+  check: "On the POC VM, Admin > Server tasks > Take a backup now completes within a few minutes and the history row shows Done with a summary like 'Backup 2026-11-26T1830Z, 5.3M, copied off-site' whose stamp matches the newest folder in /var/backups/hoa-portal; a second request while it runs is refused; Restore drill finishes Done; a board member sees the history without Start buttons; the page fits a phone screen."
+  steps: "Sign in as a sysadmin; open Admin > Server tasks; press Take a backup now; refresh after a minute or two; compare the stamp with `sudo ls /var/backups/hoa-portal`; press Start on Restore drill and wait; sign in as a demo board member and open Server tasks; repeat on a phone."
+  last: ""

@@ -133,7 +133,7 @@ MENUS = {
         ],
         "Maintenance": MAINTENANCE,
         "Finance": FINANCE,
-        "Admin": ["Sysadmin activity", "Settings"],
+        "Admin": ["Server tasks", "Sysadmin activity", "Settings"],
     },
     "manager": {
         "": ["Dashboard", "My items"],
@@ -165,7 +165,7 @@ MENUS = {
     },
     "sysadmin": {
         "": ["Dashboard"],
-        "Admin": ["System status", "Invitations and sign-ups", "Branding"],
+        "Admin": ["System status", "Server tasks", "Invitations and sign-ups", "Branding"],
     },
 }
 
@@ -226,7 +226,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Resale certificates",
         "Reports",
     ]
-    assert sections["Admin"] == ["Sysadmin activity", "Settings"]
+    assert sections["Admin"] == ["Server tasks", "Sysadmin activity", "Settings"]
     everything = [label for labels in sections.values() for label in labels]
     for gone in (
         "Board overview",
@@ -277,7 +277,12 @@ def test_tenant_voting_goes_straight_to_surveys(client, board):
 def test_sysadmin_settings_goes_straight_to_branding(client):
     sysadmin = make_member(roles=[Role.SYSADMIN])
     sections = menu(client, sysadmin)
-    assert sections["Admin"] == ["System status", "Invitations and sign-ups", "Branding"]
+    assert sections["Admin"] == [
+        "System status",
+        "Server tasks",
+        "Invitations and sign-ups",
+        "Branding",
+    ]
     item = entry(client, sysadmin, "Branding")
     assert item["url"] == reverse("branding_settings")
     assert entry(client, sysadmin, "Branding", reverse("branding_settings"))["current"]
