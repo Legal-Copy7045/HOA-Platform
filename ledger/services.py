@@ -228,6 +228,25 @@ def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> i
 _ACCOUNT_NUMBER = re.compile(r"\d{9,}")
 
 
+def _duplicate_reference(lot, reference: str) -> bool:
+    """A payment with this check number or reference is already on this home's
+    ledger and still stands. A reversed payment (a bounced check) does not
+    count, so the same check can be deposited again (review BUG-006). Both
+    payment entry paths use this, so they agree."""
+    if not reference:
+        return False
+    return (
+        LedgerEntry.objects.unscoped("duplicate check")
+        .filter(
+            lot=lot,
+            kind=EntryKind.PAYMENT,
+            reference=reference[:40],
+            reversed_by__isnull=True,
+        )
+        .exists()
+    )
+
+
 @internal("ledger service")
 def record_payment(
     *,
@@ -244,6 +263,8 @@ def record_payment(
         raise LedgerError("A payment must be a positive amount.")
     if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
         raise LedgerError("Enter a check number or short reference, never an account number.")
+    if _duplicate_reference(lot, reference):
+        raise LedgerError(f"Payment {reference[:40]} for this home is already recorded.")
     entry = LedgerEntry.objects.create(
         lot=lot,
         posted_on=received_on,
@@ -281,11 +302,7 @@ def check_payment(p: BatchPayment, *, today: datetime.date | None = None) -> lis
         errors.append("The date received cannot be in the future.")
     if _ACCOUNT_NUMBER.search(p.reference.replace(" ", "").replace("-", "")):
         errors.append("Enter a check number, never an account number.")
-    elif p.reference and (
-        LedgerEntry.objects.unscoped("duplicate check")
-        .filter(lot=p.lot, kind=EntryKind.PAYMENT, reference=p.reference[:40])
-        .exists()
-    ):
+    elif _duplicate_reference(p.lot, p.reference):
         errors.append(f"Check {p.reference} for this home is already recorded.")
     return errors
 

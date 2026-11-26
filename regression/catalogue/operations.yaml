@@ -44,3 +44,6 @@
 - feature: "My account upcoming charges skip months whose dues are already posted (no double counting); prepaid owners see future months listed unpaid and the credit drawn down only as each month posts (owner ruling 2026-11-26); a charge posted ahead shows 'due by' in My items (BUG-005)"
   since: M4
   match: ["^unit:ledger/tests/test_ledger.py::test_(dues_posted_early|reversed_early_assessment|owner_ruling_prepaid|my_items_says_due_by)"]
+- feature: "Duplicate check numbers: a reversed (bounced) payment does not block depositing the same check again; Record payments and the single payment form on the lot ledger follow the same rule (BUG-006)"
+  since: M4
+  match: ["^unit:ledger/tests/test_finance_ux.py::test_(record_payments_accepts_a_bounced_check|single_payment_form_follows)"]
