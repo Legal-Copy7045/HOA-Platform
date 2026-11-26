@@ -1,8 +1,9 @@
 # Stable check IDs for the live stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: LIVE-005
+# highest issued: LIVE-006
 LIVE-001: "site reachable over HTTPS"
 LIVE-002: "DNS record is proxied through Cloudflare"
 LIVE-003: "minimum TLS 1.2 or higher"
 LIVE-004: "tunnel healthy"
 LIVE-005: "Access application covers the host"
+LIVE-006: "live host configured"
