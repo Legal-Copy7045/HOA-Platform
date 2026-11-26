@@ -28,6 +28,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Elections | Board elections: nominations, ballots, results. | `Election` |
 | Proxy | Someone you choose to vote for your lot at a meeting. Holders are picked by name (board members) or by address (owners). | `Proxy` |
 | Resolutions and policies | Board resolutions and the policies in force. | `Resolution` |
+| Meeting packet | One PDF for a meeting: cover, agenda, minutes, financial totals and an attachment index, with a .zip of the attachments. The **Board packet** (marked "Confidential – board only") adds receivables and open-item counts; the **Owner packet** never has delinquency, violation or collection details. | `governance/packets.py`, `MeetingPacket` |
 | Community info | One page for **Frequently asked questions**, the **Owner directory** and **Committees**. | `community_info` |
 | Settings | One page for rarely used set-up pages: Community settings, ARC request types, Lot neighbors, Letters and certificates, Compliance calendar, Branding, Features. | `settings_hub` |
 | Passkeys and security | Your sign-in methods (passkey, authenticator app, recovery codes). | allauth MFA |

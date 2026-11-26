@@ -445,3 +445,37 @@ class Command(BaseCommand):
             actor=b1,
             file=SimpleUploadedFile("declaration.pdf", declaration),
         )
+
+        # Meeting packets (M5): last month's board meeting with minutes, and
+        # both packets for this month's.
+        from governance import packets
+
+        october = governance.create_meeting(
+            title="Last month's board meeting (demo)",
+            kind="board",
+            starts_at=timezone.now() - datetime.timedelta(days=30),
+            agenda="1. Minutes\n2. Pond",
+            actor=b1,
+        )
+        governance.set_meeting_status(october, "held", actor=b1)
+        minutes = documents.create_document(
+            title="Board meeting minutes (demo)",
+            category="minutes",
+            visibility="owners",
+            actor=b1,
+            file=SimpleUploadedFile(
+                "minutes.pdf",
+                pdf.render([("heading", "Minutes (FICTIONAL DEMO)"), ("normal", "Placeholder.")]),
+            ),
+        )
+        governance.attach_minutes(october, minutes, actor=b1)
+        november = governance.create_meeting(
+            title="Board meeting (demo)",
+            kind="board",
+            starts_at=timezone.now() + datetime.timedelta(days=10),
+            agenda="1. Call to order\n2. Approve last month's minutes\n3. Treasurer's report"
+            "\n4. Pond outlet (demo)",
+            actor=b1,
+        )
+        packets.build_packet(november, variant="board", minutes_id=minutes.pk, actor=b1)
+        packets.build_packet(november, variant="owner", actor=b1)
