@@ -33,6 +33,8 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Notices about my home | Covenant or rule notices sent to an owner. The board's list is **Violations**. | `compliance`, `Violation` |
 | Fix by | The date an owner should fix a notice by. | `cure_by` |
 | Official notices | The formal notices the association must send every owner on the deed (meeting, budget and assessment notices, delinquency letters, others the Declaration or law requires), by email to those who agreed, by post to everyone else. Not the same as **Notices about my home**. | `notice_choice`, `community/notices.py` |
+| Paper mail | The board's and manager's page for official notices by post: who gets paper (owners on the deed who have not agreed to email), new mailings, printing letters, envelopes and labels, and marking them mailed. **Paper mail settings** (on Settings) holds where the address prints for window envelopes and the USPS tracking barcode. | `paper_mail`, `comms/papermail.py` |
+| Mailing | One paper mailing: its wording, who it goes to (one letter per home and mailing address), when it was mailed. Kept permanently. | `comms.Mailing` |
 | How we reach you | The card on My profile with the official notices choice, emails, phones (and opt-in text alerts) and the one mailing address for post. | `my_profile` |
 | Mailing address for post | Where paper notices and letters go: the home's address or one address the person enters. "Address on file (please check)" is one typed before the separate fields existed. | `ContactProfile.mail_*`, `postal_address` |
 | Text alerts | Optional texts about urgent community matters, only after ticking the box and entering a texted code. | `comms/sms.py` |

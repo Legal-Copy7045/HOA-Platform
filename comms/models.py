@@ -374,3 +374,185 @@ class VolunteerSignup(ScopedModel):
 
     def __str__(self) -> str:
         return f"signup #{self.pk}"
+
+
+# --- Paper mail (D55) ----------------------------------------------------------------
+
+from core.append_only import ScopedAppendOnlyModel  # noqa: E402
+
+
+class WindowStyle(models.TextChoices):
+    SINGLE = "single", "Single window (recipient only)"
+    DOUBLE = "double", "Double window (our return address and the recipient)"
+
+
+class PaperMailSettings(models.Model):
+    """Where the address block sits on a letter for a #10 window envelope,
+    small shifts for the envelope and label printer, and the USPS
+    Intelligent Mail barcode settings. One row; inches, two decimals."""
+
+    window = models.CharField(max_length=8, choices=WindowStyle.choices, default="single")
+    address_left_in = models.DecimalField(max_digits=4, decimal_places=2, default="1.00")
+    address_top_in = models.DecimalField(max_digits=4, decimal_places=2, default="2.13")
+    return_left_in = models.DecimalField(max_digits=4, decimal_places=2, default="0.50")
+    return_top_in = models.DecimalField(max_digits=4, decimal_places=2, default="0.63")
+    envelope_shift_x_in = models.DecimalField(max_digits=4, decimal_places=2, default="0.00")
+    envelope_shift_y_in = models.DecimalField(max_digits=4, decimal_places=2, default="0.00")
+    label_shift_x_in = models.DecimalField(max_digits=4, decimal_places=2, default="0.00")
+    label_shift_y_in = models.DecimalField(max_digits=4, decimal_places=2, default="0.00")
+    duplex = models.BooleanField(default=False)
+    # Intelligent Mail barcode (USPS-B-3200): off until a Mailer ID is entered.
+    imb_enabled = models.BooleanField(default=False)
+    mailer_id = models.CharField(max_length=9, blank=True)
+    barcode_id = models.CharField(max_length=2, default="00")
+    service_type = models.CharField(max_length=3, default="310")
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+
+    def __str__(self) -> str:
+        return "Paper mail settings"
+
+    @classmethod
+    def get(cls) -> "PaperMailSettings":
+        found, _ = cls.objects.get_or_create(pk=1)
+        return found
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Paper mail settings are changed, not deleted.")
+
+    @property
+    def barcode_on(self) -> bool:
+        return bool(self.imb_enabled and len(self.mailer_id) in (6, 9) and self.mailer_id.isdigit())
+
+
+class MailingKind(models.TextChoices):
+    MEETING = "meeting", "Meeting notice"
+    BUDGET = "budget", "Budget notice"
+    LETTER = "letter", "Letter"
+    TEMPLATE = "template", "Letter from Letters and certificates"
+
+
+class MailingAudience(models.TextChoices):
+    PAPER = "paper", "Owners who get paper"
+    ALL = "all", "Every owner"
+
+
+class Mailing(ScopedAppendOnlyModel):
+    """One paper mailing: the wording with its {placeholders}, who it goes
+    to (homes and the owners named on each letter, by id), and what it was
+    made from. Append-only; the letters, envelopes and labels are made from
+    it on demand and never stored."""
+
+    kind = models.CharField(max_length=10, choices=MailingKind.choices)
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    audience = models.CharField(max_length=8, choices=MailingAudience.choices)
+    only_lot_id = models.PositiveBigIntegerField(null=True, blank=True)
+    meeting_id = models.PositiveBigIntegerField(null=True, blank=True)
+    budget_id = models.PositiveBigIntegerField(null=True, blank=True)
+    budget_stage = models.CharField(max_length=10, blank=True)
+    template_kind = models.CharField(max_length=10, blank=True)
+    # Meeting or budget facts as they were when the mailing was made.
+    shared_values = models.JSONField(default=dict, blank=True)
+    # [{"lot": id, "people": [person ids]}], one entry per letter.
+    groups = models.JSONField(default=list)
+    homes_count = models.PositiveIntegerField()
+    letters_count = models.PositiveIntegerField()
+    consent_version = models.CharField(max_length=20, blank=True)
+    letter_date = models.DateField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["meeting_id"])]
+
+    def __str__(self) -> str:
+        return f"Mailing #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        # Board and manager pages only (mail.print); never owners' rows.
+        return queryset.none()
+
+
+class MailingEventKind(models.TextChoices):
+    MAILED = "mailed", "Mailed"
+    DISCARDED = "discarded", "Not sent"
+
+
+class MailingEvent(ScopedAppendOnlyModel):
+    """Mailed on a date, or not sent after all: once per mailing."""
+
+    mailing = models.ForeignKey(Mailing, on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(max_length=10, choices=MailingEventKind.choices)
+    mailed_on = models.DateField(null=True, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["recorded_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["mailing"], name="mailing_event_once"),
+            models.CheckConstraint(
+                condition=models.Q(kind="discarded") | models.Q(mailed_on__isnull=False),
+                name="mailing_event_mailed_has_date",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Mailing event #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.none()
+
+
+class ImbSerial(models.Model):
+    """The next Intelligent Mail serial number for one Mailer ID. Taken
+    under select_for_update, so no two mailpieces share a number."""
+
+    mailer_id = models.CharField(max_length=9, unique=True)
+    next_serial = models.PositiveBigIntegerField(default=1)
+
+    def __str__(self) -> str:
+        return "Intelligent Mail serial counter"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Serial counters are kept.")
+
+
+class MailPiece(ScopedAppendOnlyModel):
+    """One barcoded mailpiece of a mailing (one per letter): its serial
+    number and the ZIP routing used, so a USPS scan can be matched to the
+    home. Reprints reuse the same numbers."""
+
+    mailing = models.ForeignKey(Mailing, on_delete=models.PROTECT, related_name="+")
+    group = models.PositiveIntegerField()  # index into Mailing.groups
+    lot_id = models.PositiveBigIntegerField()
+    mailer_id = models.CharField(max_length=9)
+    serial = models.PositiveBigIntegerField()
+    tracking = models.CharField(max_length=20)
+    routing = models.CharField(max_length=11, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["mailing", "group"]
+        constraints = [
+            models.UniqueConstraint(fields=["mailer_id", "serial"], name="mailpiece_serial_unique"),
+            models.UniqueConstraint(fields=["mailing", "group"], name="mailpiece_once_per_letter"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Mailpiece #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.none()

@@ -31,6 +31,7 @@ from ledger.models import (
     EntryKind,
     IncomeSource,
     LedgerEntry,
+    LetterKind,
     LineKind,
     ResaleRequest,
 )
@@ -1726,6 +1727,82 @@ def send_budget_notice(budget: Budget, *, stage: str, actor, request=None) -> di
         metadata={"stage": stage, "emailed": len(emails), "paper": len(paper)},
     )
     return {"emailed": len(emails), "paper": paper}
+
+
+def budget_notice_values(budget: Budget, stage: str) -> dict:
+    """The budget notice's facts and default wording for a paper copy (D55),
+    the same figures as the notice email. The caller checks ``mail.print``."""
+    if stage not in ("proposed", "adopted"):
+        raise LedgerError("Unknown notice.")
+    if stage == "adopted" and budget.status != BudgetStatus.ADOPTED:
+        raise LedgerError("Adopt the budget first.")
+    summary = budget_summary(budget)
+    dues, cite = rule_with_citation("dues.monthly_cents")
+    term = charge_term().variants()
+    values = {
+        "budget": str(budget),
+        "budget_income": format_cents(summary["income"]),
+        "budget_expense": format_cents(summary["expense"]),
+        "monthly_amount": (format_cents(dues) + (f" ({cite})" if cite else "")) if dues else "",
+        "budget_link": settings.PORTAL_BASE_URL + reverse("owner_budget"),
+        "adopted_on": (
+            f"{budget.adopted_on:%B} {budget.adopted_on.day}, {budget.adopted_on.year}"
+            if budget.adopted_on
+            else ""
+        ),
+    }
+    if stage == "proposed":
+        subject = "Proposed budget for {budget}"
+        body = (
+            "The board has proposed the {budget}: income {budget_income}, expenses "
+            "{budget_expense}.\n\nThe details are on the owners' portal (sign-in required): "
+            "{budget_link}\n\nIf you have questions, please contact {contact}."
+        )
+    else:
+        subject = f"Adopted budget and {term['term']} for {{budget}}"
+        body = (
+            "The board adopted the {budget} on {adopted_on}.\n\n"
+            + (f"Monthly {term['term']}: {{monthly_amount}}\n\n" if dues else "")
+            + "The details are on the owners' portal (sign-in required): {budget_link}\n\n"
+            "If you have questions, please contact {contact}."
+        )
+    return {"values": values, "subject": subject, "body": body}
+
+
+def paper_letter_templates() -> list[tuple[str, str]]:
+    """Letters and certificates wording that can be mailed as a paper
+    mailing (D55): the delinquency notices, (kind, name)."""
+    return [
+        (k, LetterKind(k).label) for k in (LetterKind.FIRST, LetterKind.SECOND, LetterKind.FINAL)
+    ]
+
+
+def paper_letter_template(kind: str) -> dict:
+    from ledger import letters
+
+    if kind not in dict(paper_letter_templates()):
+        raise LedgerError("Unknown letter.")
+    tpl = letters.template(kind)
+    return {"subject": tpl.subject, "body": tpl.body}
+
+
+def paper_letter_certified(kind: str) -> bool:
+    """Is this wording sent certified and regular mail?"""
+    from ledger import letters
+
+    return kind in dict(paper_letter_templates()) and bool(letters.template(kind).certified)
+
+
+def paper_letter_values(lot: Lot) -> dict:
+    """{amount} and {days} for one home's delinquency wording (D55): the
+    amount past due on the current account and the notice period."""
+    from ledger import letters
+
+    days = rule("collections.notice_days") or 10
+    return {
+        "amount": format_cents(max(past_due(lot.pk, None, account=CURRENT), 0)),
+        "days": letters._days_text(int(days)),
+    }
 
 
 def owner_visible_budget():

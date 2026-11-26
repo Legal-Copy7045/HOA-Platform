@@ -180,6 +180,34 @@ def _notice_where(meeting: Meeting) -> str:
     return meeting.location or "see the portal"
 
 
+def meeting_notice_values(meeting: Meeting) -> dict:
+    """The meeting's facts for a paper notice (D55): the same title, time,
+    place and join link as the notice email (D49 amended), the portal link
+    for the agenda, and default wording. Executive sessions are never
+    noticed to owners. The caller has fetched the meeting through its
+    scoping and checked ``mail.print``."""
+    if meeting.kind == MeetingKind.EXECUTIVE:
+        raise GovernanceError("Executive sessions are not noticed to owners.")
+    when = timezone.localtime(meeting.starts_at)
+    values = {
+        "meeting_title": single_line(meeting.title),
+        "meeting_kind": meeting.get_kind_display().lower(),
+        "meeting_when": f"{when:%A, %B} {when.day}, {when.year} at {when:%-I:%M %p}",
+        "meeting_where": _notice_where(meeting),
+        "join_link": meeting.join_url or "",
+        "agenda_link": settings.PORTAL_BASE_URL + reverse("meeting_detail", args=[meeting.pk]),
+    }
+    subject = "Notice of {meeting_kind}: {meeting_title}"
+    body = (
+        "The {association} gives notice of a {meeting_kind}.\n\n"
+        "{meeting_title}\nWhen: {meeting_when}\nWhere: {meeting_where}\n\n"
+        "The agenda and details are on the owners' portal (sign-in required): "
+        "{agenda_link}\n\n"
+        "If you have questions, please contact {contact}."
+    )
+    return {"values": values, "subject": subject, "body": body}
+
+
 def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
     """Email owners who consented to electronic notice; list those who need paper."""
     require(actor, "meeting.manage")

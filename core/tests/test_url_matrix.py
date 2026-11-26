@@ -343,6 +343,16 @@ PROTECTED = {
     "autopay_start": ("POST", "lot_id_b"),
     "autopay_cancel": ("POST", "lot_id_b"),
     "autopay_return": ("GET", "autopay_setup_b"),
+    # Paper mail (D55): board and manager only; owners get 403 everywhere.
+    "paper_mail": ("GET", None),
+    "paper_mail_new": ("POST", None),
+    "paper_mail_settings": ("POST", None),
+    "paper_mail_test": ("GET", None),
+    "paper_mail_detail": ("GET", "mailing"),
+    "paper_mail_letters": ("GET", "mailing"),
+    "paper_mail_envelopes": ("GET", "mailing"),
+    "paper_mail_labels": ("GET", "mailing"),
+    "paper_mail_mark": ("POST", "mailing"),
 }
 
 
@@ -688,7 +698,17 @@ def world():
                 session_id="cs_test_matrixautopayb",
                 expires_at=timezone.now() + timedelta(hours=24),
             )
+        from comms import papermail
+
+        mailing = papermail.create_mailing(
+            actor=board,
+            defaults=papermail.source_defaults(),
+            subject="Paper letter",
+            body="Hello {owner_names}",
+            everyone=True,
+        )
     targets = {
+        "mailing": mailing.pk,
         "checkout_b": checkout_b.pk,
         "payment_b": payment_b.pk,
         "alert_b": alert_b.pk,

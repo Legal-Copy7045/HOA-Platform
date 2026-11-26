@@ -104,6 +104,13 @@ HUBS = {
             "Wording of collection letters and resale certificates, and where to send checks.",
         ),
         (
+            "Paper mail settings",
+            "paper_mail_settings",
+            "mail",
+            "mail.print",
+            "Where the address prints for window envelopes, and the USPS tracking barcode.",
+        ),
+        (
             "Common area booking rules",
             "reservation_settings",
             "calendar",
@@ -207,6 +214,8 @@ SECTIONS = [
             ("People", "people", "users", "person.manage"),
             ("Homes and owners", "lot_list", "map", "lot.view_all"),
             ("Invitations and sign-ups", "invitations", "mail", "invite.send"),
+            # Letters, envelopes and labels for owners who get paper (D55).
+            ("Paper mail", "paper_mail", "mail", "mail.print"),
         ],
     ),
     (

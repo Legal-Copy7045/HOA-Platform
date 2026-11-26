@@ -69,6 +69,7 @@ AREA_NAV = {
     "Tasks": "tasks",
     "Vendors": "vendors",
     "Setup": "community_settings",
+    "Paper mail": "paper_mail",
 }
 
 AREA_ICONS = {
@@ -86,6 +87,7 @@ AREA_ICONS = {
     "Compliance": "calendar",
     "Tasks": "list",
     "Setup": "sliders",
+    "Paper mail": "mail",
 }
 
 AREAS = [
@@ -101,6 +103,7 @@ AREAS = [
     "Records requests",
     "Compliance",
     "Tasks",
+    "Paper mail",
     "Setup",
 ]
 
@@ -701,6 +704,9 @@ def items_for(user) -> list[Item]:
                     icon="list",
                 )
             )
+    # Paper mail (D55): mailings prepared but not marked as mailed.
+    if can(user, "mail.print"):
+        out.extend(_paper_mail_items())
     if can(user, "ledger.view_own"):
         out.extend(_balance_items(user, roles))
     out.extend(_contact_items(user, roles))
@@ -716,6 +722,30 @@ def items_for(user) -> list[Item]:
 
     states = features.states()  # one query, not one per item (optimization A9)
     return [i for i in out if features.path_enabled(i.url, states_=states)]
+
+
+def _paper_mail_items() -> list[Item]:
+    from comms import papermail
+
+    mailings = papermail.open_mailings()
+    titles = papermail.meeting_titles({m.meeting_id for m in mailings if m.meeting_id})
+    out = []
+    for m in mailings:
+        if m.meeting_id and m.meeting_id in titles:
+            title = f"Paper notices for {titles[m.meeting_id]} not marked as mailed"
+        else:
+            title = f"Paper mail “{m.subject}” not marked as mailed"
+        out.append(
+            Item(
+                "Paper mail",
+                title,
+                f"{m.letters_count} letter{'s' if m.letters_count != 1 else ''} "
+                f"prepared {short_date(timezone.localdate(m.created_at))}",
+                reverse("paper_mail_detail", args=[m.pk]),
+                "warning",
+            )
+        )
+    return out
 
 
 def _online_payment_items(user, roles) -> list[Item]:

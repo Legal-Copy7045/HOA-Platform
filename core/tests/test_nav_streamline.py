@@ -129,6 +129,7 @@ MENUS = {
             "People",
             "Homes and owners",
             "Invitations and sign-ups",
+            "Paper mail",
         ],
         "Maintenance": MAINTENANCE,
         "Finance": FINANCE,
@@ -144,10 +145,12 @@ MENUS = {
             "Records requests",
             "Board tasks",
             "Homes and owners",
+            "Paper mail",
         ],
         "Maintenance": MAINTENANCE,
         "Finance": FINANCE,
-        "Admin": ["Community settings"],  # its one Settings page
+        # Community settings and Paper mail settings (D55).
+        "Admin": ["Settings"],
     },
     "arc_reviewer": {
         "": ["Dashboard", "My items"],
@@ -213,6 +216,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "People",
         "Homes and owners",
         "Invitations and sign-ups",
+        "Paper mail",
     ]
     assert sections["Maintenance"] == ["Work orders", "Vendors", "Contracts"]
     assert sections["Finance"] == [

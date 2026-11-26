@@ -178,6 +178,10 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Assembling a packet is meeting preparation, like meeting.manage and
     # document.manage, so the manager may build one (it approves nothing).
     "meeting.packet_build": frozenset({BOARD, MANAGER}),
+    # --- Paper mail (D55) ---
+    # Preparing, printing and marking letters mailed is data entry; it
+    # decides nothing (who gets paper follows each owner's own choice).
+    "mail.print": frozenset({BOARD, MANAGER}),
     # --- Surveys (M5): informal, non-binding opinion surveys ---
     # The survey's own audience setting narrows who sees and answers each one
     # (owners only, or owners and account contacts including tenants).

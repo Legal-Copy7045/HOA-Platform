@@ -30,6 +30,7 @@
       <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'first' %}">{% icon "download" %} First notice + statement</a></li>
       <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'second' %}">{% icon "download" %} Second notice + statement (certified)</a></li>
       <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'final' %}">{% icon "download" %} Final notice + statement (certified)</a></li></ul>{% endif %}
-      <p class="small muted">Printed and mailed by the board. Wording: Finance, Letters.</p></section></aside>
+      <p class="small muted">Printed and mailed by the board. Wording: Finance, Letters.</p>
+      {% if user|can:"mail.print" %}<p class="small"><a href="{% url 'paper_mail_new' %}?template=first&amp;home={{ obj.lot_id }}&amp;everyone=1">{% icon "mail" %} Envelope or label for this home (Paper mail)</a></p>{% endif %}</section></aside>
   </div>
 {% endblock %}

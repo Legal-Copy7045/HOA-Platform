@@ -241,3 +241,7 @@
   check: "On a phone the meeting page's Board actions panel starts closed below the agenda, opens with one tap, and shows only the steps that apply (send notice first; Mark held disabled with its reason until the meeting starts; minutes after Mark held)."
   steps: "As a demo board member open a coming and a past demo meeting on a phone."
   last: ""
+- key: paper mail window alignment
+  check: "Print a test letter and a test envelope from Paper mail settings at actual size: folded in thirds, the letter's address (and the return address for double-window envelopes) shows fully in a #10 window envelope; the envelope's return address and recipient block print where expected; a label test sheet lines up with Avery 5160 labels. With a test Mailer ID the barcode prints sharp inside the window."
+  steps: "As a demo board member or manager open Settings > Paper mail settings; print the test letter, envelope and label sheet; adjust the inches and print again until aligned; then print a real demo mailing's first letter."
+  last: ""
