@@ -30,3 +30,6 @@
 - feature: "harden-host.sh re-run keeps a Falco keyring holding exactly the pinned key without reaching falco.org; first install still downloads and checks (R2-006)"
   since: M5
   match: ["^unit:core/tests/test_infra_scripts\\.py::test_falco_rerun_keeps_the_pinned_keyring"]
+- feature: "D35: the board moves a payment or credit to another account of the lot (Move to account; board only, reason required, reversal + copy, audited; not across lots; never a charge)"
+  since: M5
+  match: ["^unit:ledger/tests/test_fixmoney\\.py::test_(board_moves|only_the_board)"]

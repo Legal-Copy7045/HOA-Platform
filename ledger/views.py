@@ -326,6 +326,8 @@ def lot_ledger(request, pk):
             "aging": (aging := services.aging(lot.pk)),
             "aging_columns": services.aging_columns(aging),
             "can_manage": policy.can(request.user, "ledger.manage"),
+            "can_reassign": policy.can(request.user, "ledger.reassign") and len(lot_accounts) > 1,
+            "lot_accounts": lot_accounts,
             "open_charges": open_charges,
             # Former owners' accounts with money still owed either way.
             "former_accounts": [a for a in lot_accounts if not a.is_active and a.balance_cents],
@@ -390,6 +392,25 @@ def lot_ledger_action(request, pk, action):
                 entry, reason=request.POST.get("reason", ""), actor=actor, request=request
             ),
             "Reversal posted.",
+        )
+    elif action == "reassign":
+        entry = get_object_or_404(
+            LedgerEntry.objects.for_user(actor), pk=request.POST.get("entry"), lot=lot
+        )
+        try:
+            account_id = int(request.POST.get("account") or 0)
+        except ValueError:
+            account_id = 0
+        _flash(
+            request,
+            lambda: services.reassign_entry(
+                entry,
+                account_id=account_id,
+                reason=request.POST.get("reason", ""),
+                actor=actor,
+                request=request,
+            ),
+            "Moved. The original is reversed on its old account and a copy is on the chosen one.",
         )
     elif action == "movechecked":
         from ledger.models import EntryMoveNotice

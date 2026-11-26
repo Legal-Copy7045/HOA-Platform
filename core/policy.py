@@ -140,6 +140,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "committee.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
     "committee.manage": frozenset({BOARD}),
     "ledger.manage": frozenset({BOARD, MANAGER}),
+    # Moving a payment or credit to another ownership account of the lot
+    # decides whose money it is: a board decision, not data entry.
+    "ledger.reassign": frozenset({BOARD}),
     # Charging a late fee is a board decision (the manager prepares the list).
     "late_fee.post": frozenset({BOARD}),
     # Letter wording, letterhead and resale certificate facts: the board.

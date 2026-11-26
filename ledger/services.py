@@ -770,6 +770,80 @@ def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[Ledg
     return out
 
 
+REASSIGNABLE = {EntryKind.PAYMENT, EntryKind.CREDIT}
+
+
+def reassign_entry(
+    entry: LedgerEntry, *, account_id: int, reason: str, actor, request=None
+) -> LedgerEntry:
+    """The board moves a payment or credit to another ownership account of
+    the same lot (owner decision 2026-11-26), e.g. a seller's settlement
+    check that a backdated sale moved to the buyer. Like every move it never
+    changes an amount: a reversal on the old account and a copy on the
+    chosen one (``moved_from``), applied there by the application rule. A
+    later change of ownership dates leaves it where the board put it
+    (``accounts.moves_after_change`` only moves entries the date rule
+    placed). Returns the copy."""
+    from community.models import Account
+    from ledger import allocation
+
+    _authorize(actor, "ledger.reassign")
+    reason = reason.strip()
+    if not reason:
+        raise LedgerError("Give the reason for moving it.")
+    if entry.kind not in REASSIGNABLE:
+        raise LedgerError("Only a payment or a credit can be moved to another account.")
+    # Authorized above (board only); the entry came from the caller's scoped
+    # lookup, and the target account must belong to the same lot.
+    with transaction.atomic(), system_access("board moves an entry to another account"):
+        list(Lot.objects.select_for_update().filter(pk=entry.lot_id).values_list("pk"))
+        entry = LedgerEntry.objects.unscoped("reassign").select_for_update().get(pk=entry.pk)
+        if LedgerEntry.objects.unscoped("reassign").filter(reverses=entry).exists():
+            raise LedgerError("This entry was already reversed or moved.")
+        target = Account.objects.filter(pk=account_id, lot_id=entry.lot_id).first()
+        if target is None:
+            raise LedgerError("Choose one of this lot's accounts.")
+        if target.pk == entry.account_id:
+            raise LedgerError("It is already on that account.")
+        numbers = dict(Account.objects.filter(lot_id=entry.lot_id).values_list("pk", "number"))
+        LedgerEntry.objects.create(
+            lot_id=entry.lot_id,
+            posted_on=entry.posted_on,
+            kind=EntryKind.REVERSAL,
+            amount_cents=-entry.amount_cents,
+            reverses=entry,
+            description=f"Moved to account {target.number}: #{entry.pk} ({reason})"[:200],
+            posted_by=_user(actor),
+        )
+        copy = LedgerEntry(
+            lot_id=entry.lot_id,
+            account_id=target.pk,
+            posted_on=entry.posted_on,
+            kind=entry.kind,
+            amount_cents=entry.amount_cents,
+            description=entry.description,
+            reference=entry.reference,
+            period=entry.period,
+            moved_from=entry,
+            posted_by=_user(actor),
+        )
+        copy._defer_allocation = True
+        copy.save()
+        allocation.post_moved(entry.lot_id, [(copy, [])])
+        record_event(
+            "ledger.entry_reassigned",
+            actor=_user(actor),
+            request=request,
+            metadata={
+                "lot_id": entry.lot_id,
+                "entry_id": entry.pk,
+                "from_account": str(numbers.get(entry.account_id, "")),
+                "to_account": str(target.number),
+            },
+        )
+    return copy
+
+
 @internal("ledger service")
 def moved_notes(entries) -> dict[int, str]:
     """For the moved copies among ``entries``: "Moved from account N on

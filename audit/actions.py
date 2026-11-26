@@ -453,6 +453,14 @@ _SPECS = [
     ),
     # Money per ownership period (D34-fixmoney)
     _spec(
+        "ledger.entry_reassigned",
+        "Payment or credit moved to another account by the board",
+        "lot_id",
+        "entry_id",
+        "from_account",
+        "to_account",
+    ),
+    _spec(
         "ledger.entries_moved",
         "Entries moved to the ownership account they belong to",
         "lot_id",
