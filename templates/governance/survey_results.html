@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Survey results · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "governance/gov_nav.html" %}
+  <div class="crumbs"><a href="{% url 'surveys' %}">Surveys</a> / <a href="{% url 'survey_detail' survey.pk %}">{{ survey.title|truncatechars:40 }}</a> / Results</div>
+  <div class="page-head"><div><h1>Survey results</h1><p class="subtitle">{{ survey.title }}{% if survey.phase != "closed" %} (results so far){% endif %}</p>
+    <div class="meta">{% status survey.phase survey.phase_label %}<span>{% icon "users" %}{{ results.responses }} response{{ results.responses|pluralize }}{% if can_manage %} of {{ results.audience }} asked{% endif %}</span>{% if survey.anonymous %}<span>{% icon "lock" %}Anonymous</span>{% endif %}</div></div>
+    {% if can_manage %}<div class="actions"><a class="btn secondary" href="{% url 'survey_export' survey.pk %}">{% icon "download" %} Download CSV</a></div>{% endif %}
+  </div>
+  <div class="alert info">{% icon "info" %}<span>An informal survey: these are opinions, not a vote.{% if not can_manage %} Written answers are seen by the board only.{% endif %}</span></div>
+  {% for row in results.rows %}{% with q=row.question %}
+    <section class="card"><div class="card-head"><h2>{{ forloop.counter }}. {{ q.prompt }}</h2><span class="small muted">{{ row.answered }} answered</span></div>
+      {% if q.kind == "rating" %}<p><strong>Average: {% if row.average is not None %}{{ row.average }} of 5{% else %}no ratings yet{% endif %}</strong></p>{% endif %}
+      {% if row.choices %}{% for c in row.choices %}<div class="bar-row"><div class="bar-label"><span>{{ c.label }}</span><span class="muted">{{ c.count }} · {{ c.percent }}%</span></div><meter class="bar" min="0" max="100" value="{{ c.percent }}">{{ c.percent }}%</meter></div>{% endfor %}
+        {% if q.kind == "multiple" %}<p class="small muted">People could pick more than one, so the percentages can add up to more than 100.</p>{% endif %}
+      {% elif q.kind == "text" %}
+        {% if can_manage %}{% if row.texts %}<ul class="list">{% for t in row.texts %}<li><div class="grow">{{ t.text|linebreaksbr }}{% if t.author %}<div class="small muted">{{ t.author }}</div>{% endif %}</div></li>{% endfor %}</ul>{% else %}<p class="muted">No written answers.</p>{% endif %}
+        {% else %}<p class="muted small">Written answers are seen by the board only.</p>{% endif %}
+      {% endif %}
+    </section>
+  {% endwith %}{% endfor %}
+{% endblock %}

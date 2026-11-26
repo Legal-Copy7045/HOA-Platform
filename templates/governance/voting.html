@@ -3,7 +3,7 @@
 {% block title %}Voting · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "governance/gov_nav.html" %}
-  <div class="page-head"><div><h1>Voting</h1><p class="subtitle">Votes and polls of the owners, and board elections. Open ballots are listed first.</p></div></div>
+  <div class="page-head"><div><h1>Voting</h1><p class="subtitle">Votes, polls, board elections and surveys. Open ones are listed first.</p></div></div>
   {% if show_votes %}
   <section class="card">
     <div class="card-head"><h2>Votes and polls</h2><a class="small" href="{% url 'votes' %}">All votes and polls</a></div>
@@ -26,6 +26,18 @@
         {% status e.state e.get_state_display %}</li>
     {% endwith %}{% endfor %}</ul>
     {% else %}{% include "partials/empty.html" with icon="users" title="No elections yet" %}{% endif %}
+  </section>
+  {% endif %}
+  {% if show_surveys %}
+  <section class="card">
+    <div class="card-head"><h2>Surveys</h2><a class="small" href="{% url 'surveys' %}">All surveys</a></div>
+    {% if survey_rows %}<ul class="list">{% for row in survey_rows %}{% with s=row.survey %}
+      <li><div class="todo-icon">{% icon "list" %}</div>
+        <div class="grow"><a class="title" href="{% url 'survey_detail' s.pk %}">{{ s.title }}</a>
+          <div class="small muted">Closes {{ s.closes_on|short_date }}{% if row.responded %} · You answered{% elif s.phase == "open" %} · Waiting for your answer{% endif %}</div></div>
+        {% status s.phase s.phase_label %}</li>
+    {% endwith %}{% endfor %}</ul>
+    {% else %}<p class="muted">No open surveys. <a href="{% url 'surveys' %}">Past surveys</a></p>{% endif %}
   </section>
   {% endif %}
   {% if user|can:"vote.cast" %}<p class="small muted">Can't attend a meeting where owners vote? Open the meeting from <a href="{% url 'meetings' %}">Meetings</a> and give a proxy.</p>{% endif %}

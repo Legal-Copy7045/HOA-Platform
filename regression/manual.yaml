@@ -143,3 +143,7 @@
   check: "The board packet PDF opens in a PDF reader with the cover, agenda, minutes note, financial totals, the open-items page marked Confidential – board only, and the attachment index; the .zip opens and holds the PDF and the listed attachments; the owner packet shows on the meeting page for an owner and has no receivables, violations or collections."
   steps: "As a board member open a meeting, Build packet, build both variants with an attachment; open both PDFs and the .zip; sign in as an owner and open the meeting page and the owner packet."
   last: ""
+- key: survey answering on a phone
+  check: "An owner answers a survey with every kind of question on a phone, and the board sees the results and downloads the CSV (anonymous survey: no names in it)."
+  steps: "Board: Voting > Surveys, create a draft with one question of each kind, open it with email on; owner: open the emailed link, answer at phone width; board: Results, Download CSV."
+  last: ""

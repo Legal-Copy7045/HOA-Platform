@@ -587,6 +587,23 @@ def items_for(user) -> list[Item]:
                         icon="vote",
                     )
                 )
+    # --- Surveys (M5): open surveys this person is asked to answer ---
+    if can(user, "survey.respond"):
+        from governance import surveys
+
+        for survey in surveys.waiting_for(user):
+            out.append(
+                Item(
+                    "My home",
+                    f"Survey: {survey.title}",
+                    f"Survey waiting for your answer · closes {short_date(survey.closes_on)}",
+                    reverse("survey_detail", args=[survey.pk]),
+                    "info",
+                    survey.closes_on,
+                    nav="voting",
+                    icon="list",
+                )
+            )
     if can(user, "ledger.view_own"):
         out.extend(_balance_items(user, roles))
 

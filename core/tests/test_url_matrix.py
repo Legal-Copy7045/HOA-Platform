@@ -84,6 +84,7 @@ BOARD_ONLY_MARKERS = (
     b"Lot B pond",
     b"Lot B nephew",
     b"Lot B pavilion party",
+    b"Draft survey: special assessment",
 )
 # Pages any member may open; tests check board-only content never shows to owners.
 MEMBER_PAGES = {
@@ -108,6 +109,8 @@ MEMBER_PAGES = {
     # Navigation and UX review (ux_nav): hub pages.
     "voting",
     "community_info",
+    # Surveys (M5): the list shows only surveys for the viewer's audience.
+    "surveys",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -211,6 +214,12 @@ PROTECTED = {
     "records_request_action": ("POST", "records_request_b"),
     "vote_detail": ("GET", "draft_vote"),
     "vote_action": ("POST", "draft_vote"),
+    # Surveys (M5): a draft is invisible to owners; board steps are refused.
+    "survey_detail": ("GET", "draft_survey"),
+    "survey_action": ("POST", "draft_survey"),
+    "survey_question_action": ("POST", "draft_survey_question"),
+    "survey_results": ("GET", "draft_survey"),
+    "survey_export": ("GET", "draft_survey"),
     "arc_detail": ("GET", "arc_b"),
     "arc_edit": ("POST", "arc_b"),
     "arc_action": ("POST", "arc_b"),
@@ -381,6 +390,17 @@ def world():
         draft_vote = governance.create_vote(
             title="Draft: special assessment", kind="informal", options=["Yes", "No"], actor=board
         )
+        from governance import surveys as gov_surveys
+
+        draft_survey = gov_surveys.create_survey(
+            title="Draft survey: special assessment",
+            opens_on=timezone.localdate(),
+            closes_on=timezone.localdate() + timedelta(days=7),
+            actor=board,
+        )
+        draft_survey_question = gov_surveys.add_question(
+            draft_survey, kind="text", prompt="Thoughts?", actor=board
+        )
         from arc import services as arc
         from documents.attachments import attach
 
@@ -547,6 +567,8 @@ def world():
         "board_packet": board_packet.pk,
         "records_request_b": records_request_b.pk,
         "draft_vote": draft_vote.pk,
+        "draft_survey": draft_survey.pk,
+        "draft_survey_question": draft_survey_question.pk,
         "arc_b": arc_b.pk,
         "arc_b_file": arc_b_file.pk,
         "violation_b": violation_b.pk,
@@ -590,8 +612,10 @@ def _url(name, key, targets):
         kwargs["action"] = "notice"
     elif name == "records_request_action":
         kwargs["action"] = "withdraw"
-    elif name == "vote_action":
+    elif name == "vote_action" or name == "survey_action":
         kwargs["action"] = "open"
+    elif name == "survey_question_action":
+        kwargs["action"] = "remove"
     elif name == "arc_action":
         kwargs["action"] = "withdraw"
     elif name == "arc_decide":

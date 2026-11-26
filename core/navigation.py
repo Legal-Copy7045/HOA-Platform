@@ -31,6 +31,13 @@ HUBS = {
             "vote.view",
             "Board elections: nominations, candidates, ballots and proxies.",
         ),
+        (
+            "Surveys",
+            "surveys",
+            "list",
+            "survey.view",
+            "Informal surveys from the board to hear your views.",
+        ),
     ],
     "community_info": [
         (

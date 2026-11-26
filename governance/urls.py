@@ -3,6 +3,7 @@ from django.urls import path, re_path
 from governance import committee_views as cv
 from governance import election_views as ev
 from governance import packet_views as pv
+from governance import survey_views as sv
 from governance import views
 
 urlpatterns = [
@@ -57,6 +58,20 @@ urlpatterns = [
         name="records_request_action",
     ),
     path("voting/", views.voting, name="voting"),
+    path("surveys/", sv.survey_list, name="surveys"),
+    path("surveys/<int:pk>/", sv.survey_detail, name="survey_detail"),
+    path("surveys/<int:pk>/results/", sv.survey_results, name="survey_results"),
+    path("surveys/<int:pk>/export/", sv.survey_export, name="survey_export"),
+    re_path(
+        r"^surveys/(?P<pk>[0-9]+)/do/(?P<action>settings|question|open|close|share|unshare)/$",
+        sv.survey_action,
+        name="survey_action",
+    ),
+    re_path(
+        r"^surveys/questions/(?P<pk>[0-9]+)/(?P<action>edit|up|down|remove)/$",
+        sv.survey_question_action,
+        name="survey_question_action",
+    ),
     path("votes/", views.votes, name="votes"),
     path("ballot/<str:token>/", views.ballot_link, name="ballot_link"),
     path("votes/<int:pk>/", views.vote_detail, name="vote_detail"),
