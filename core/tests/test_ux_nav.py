@@ -164,8 +164,13 @@ def test_feature_switches_still_gate_hubs_and_voting(client, w):
     features.set_feature("faq", False, actor=w["board"])
     features.set_feature("directory", False, actor=w["board"])
     features.set_feature("reserves", False, actor=w["board"])
-    assert "Community info" not in labels(client.get(reverse("home")))
-    assert client.get(reverse("community_info")).status_code == 404
+    # Board and committees has no switch (every resident sees who serves), so
+    # Community info keeps one page and the menu links straight to it.
+    menu = labels(client.get(reverse("home")))
+    assert "Community info" not in menu and "Board and committees" in menu
+    assert (
+        "Owner directory" not in client.get(reverse("community_info"), follow=True).content.decode()
+    )
 
 
 def test_permissions_unchanged_owner_still_refused_board_pages(client, w):

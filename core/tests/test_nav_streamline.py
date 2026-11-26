@@ -297,11 +297,12 @@ def test_hub_with_several_pages_links_to_the_hub(client, board):
 def test_subpages_mark_their_entry_current(client, board):
     cases = [
         ("access_review", "People"),
-        ("compliance", "Board tasks"),
+        ("tasks", "Board tasks"),
         ("signoffs_mine", "My home improvement requests (ARC)"),
     ]
     for name, label in cases:
-        assert entry(client, board, label, reverse(name))["current"], name
+        url = reverse(name) + ("?tab=deadlines" if name == "tasks" else "")
+        assert entry(client, board, label, url)["current"], name
 
 
 # --- Board overview folded into My items ----------------------------------------------------

@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Directory · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Directory</h1><p class="subtitle">Owners who chose to be listed, the board, and the community's committees.</p></div>
+  <div class="page-head"><div><h1>Owner directory</h1><p class="subtitle">Owners who chose to be listed, the board, and the community's committees.</p></div>
     <div class="actions"><a class="btn secondary" href="{% url 'my_profile' %}">{% icon "user" %} Change my listing</a></div></div>
   <nav class="subnav" aria-label="Directory">
     <a href="?tab=owners"{% if tab == "owners" %} aria-current="page"{% endif %}>Owners</a>
