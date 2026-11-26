@@ -371,6 +371,17 @@ TELLER_ENVIRONMENT = env("TELLER_ENVIRONMENT", default="sandbox")
 TELLER_CERTIFICATE_B64 = env("TELLER_CERTIFICATE_B64", default="")
 TELLER_PRIVATE_KEY_B64 = env("TELLER_PRIVATE_KEY_B64", default="")
 
+# --- USPS tracking: Informed Visibility scans (optional feature "usps_tracking", D60) ----
+# The HOA's Business Customer Gateway login, put into the server's .env by
+# infra/poc/set-usps.sh (never through the web app). "cat" is USPS's test
+# environment, "production" the real one. The hosts default to USPS's own for
+# that environment; overrides must be *.usps.com names (comms/usps_iv.py).
+USPS_IV_ENVIRONMENT = env("USPS_IV_ENVIRONMENT", default="cat")
+USPS_IV_USERNAME = env("USPS_IV_USERNAME", default="")
+USPS_IV_PASSWORD = env("USPS_IV_PASSWORD", default="")
+USPS_IV_API_HOST = env("USPS_IV_API_HOST", default="")
+USPS_IV_AUTH_HOST = env("USPS_IV_AUTH_HOST", default="")
+
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).
 EMAIL_BACKEND = "core.email.RedirectingBackend"

@@ -248,6 +248,16 @@ FEATURES: list[Feature] = [
         {"autopay", "autopay_start", "autopay_return", "autopay_cancel"},
         default=False,
     ),
+    # USPS tracking of paper mail (D60): also needs the USPS login on the
+    # server (infra/poc/set-usps.sh) and the tracking barcode on.
+    _f(
+        "usps_tracking",
+        "USPS tracking",
+        "Reads USPS scans of barcoded paper mail a few times a day and flags letters with no "
+        "scan after 5 days (needs a USPS login on the server).",
+        {"paper_mail_piece_checked"},
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"

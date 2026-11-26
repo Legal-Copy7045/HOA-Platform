@@ -93,6 +93,12 @@ x-app-env: &app-env
   TELLER_ENVIRONMENT: ${TELLER_ENVIRONMENT:-sandbox}
   TELLER_CERTIFICATE_B64: ${TELLER_CERTIFICATE_B64:-}
   TELLER_PRIVATE_KEY_B64: ${TELLER_PRIVATE_KEY_B64:-}
+  # USPS tracking (optional feature "usps_tracking"; infra/poc/set-usps.sh).
+  USPS_IV_ENVIRONMENT: ${USPS_IV_ENVIRONMENT:-cat}
+  USPS_IV_USERNAME: ${USPS_IV_USERNAME:-}
+  USPS_IV_PASSWORD: ${USPS_IV_PASSWORD:-}
+  USPS_IV_API_HOST: ${USPS_IV_API_HOST:-}
+  USPS_IV_AUTH_HOST: ${USPS_IV_AUTH_HOST:-}
 
 # Container logs rotate (10 MB x 3 per service) so they never fill the disk.
 x-logging: &logging

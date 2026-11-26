@@ -182,6 +182,12 @@ def _bank_feed():
     return True, "Synced in the last 3 days"
 
 
+def _usps_tracking():
+    from comms.usps_tracking import health
+
+    return health()
+
+
 def _payments():
     from payments.sync import health
 
@@ -251,6 +257,7 @@ CHECKS = [
     ("memory", "Server memory", _memory),
     ("bank_feed", "Bank feed", _bank_feed),
     ("payments", "Online payments", _payments),
+    ("usps_tracking", "USPS tracking", _usps_tracking),
 ]
 
 

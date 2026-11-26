@@ -436,9 +436,17 @@ def meeting_status(meeting) -> dict:
         }
     mailed = [(m, events[m.pk]) for m in mailings if m.pk in events and events[m.pk].mailed_on]
     open_ = [m for m in mailings if m.pk not in events]
+    sorted_count = None
+    if mailed:
+        from comms import usps_tracking
+
+        if usps_tracking.feature_on():
+            sorted_count = usps_tracking.sorted_count(mailed[0][0])
     return {
         "paper_mailed": mailed[0] if mailed else None,
         "paper_open": open_[0] if open_ else None,
+        # USPS tracking (D60): letters sorted for delivery, None when off.
+        "paper_sorted": sorted_count,
     }
 
 

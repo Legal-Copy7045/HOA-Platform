@@ -745,6 +745,29 @@ def _paper_mail_items() -> list[Item]:
                 "warning",
             )
         )
+    out.extend(_usps_missing_items())
+    return out
+
+
+def _usps_missing_items() -> list[Item]:
+    """USPS tracking (D60): one entry per barcoded letter with no scan 5 days
+    after it was mailed, until the board marks the address checked."""
+    from comms import usps_tracking
+
+    if not usps_tracking.active():
+        return []
+    out = []
+    for row in usps_tracking.missing_pieces():
+        place = row["lot"].label if row["lot"] is not None else "a home"
+        out.append(
+            Item(
+                "Paper mail",
+                f"Paper notice to {place} has no USPS scan after 5 days — check the address",
+                f"Mailed {short_date(row['mailed_on'])}",
+                reverse("paper_mail_detail", args=[row["piece"].mailing_id]) + "#tracking",
+                "warning",
+            )
+        )
     return out
 
 

@@ -67,3 +67,12 @@ def send_urgent_sms(notice_id: int) -> dict:
     from comms.sms import deliver_urgent_notice
 
     return deliver_urgent_notice(notice_id)
+
+
+@app.periodic(cron="41 */4 * * *")  # every 4 hours; only with "usps_tracking" on and set up
+@app.task(queue="maintenance", queueing_lock="usps_tracking")
+def usps_tracking(timestamp: int) -> dict:
+    """Read new USPS scans of barcoded paper mail (D60): pull only."""
+    from comms.usps_tracking import poll
+
+    return poll()
