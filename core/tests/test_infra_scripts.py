@@ -392,3 +392,12 @@ def test_agent_checks_the_branch_before_installing_and_vm_defaults_to_main():
     refuse = agent.index('branch_allowed "$BRANCH" "$(env_value ALLOW_BRANCH)"')
     assert refuse < agent.index('update-portal.sh" >>')
     assert 'BRANCH="${BRANCH:-main}"' in Path(POC, "provision-vm.sh").read_text()
+
+
+def test_root_scripts_read_the_version_from_the_app_users_checkout():
+    # Run as root from systemd (no HOME), plain git refuses a checkout owned by
+    # the app user and the version showed "unknown".
+    for name in ("start-portal.sh", "backup.sh"):
+        text = (POC / name).read_text()
+        assert "rev-parse --short HEAD" in text
+        assert 'git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse' in text

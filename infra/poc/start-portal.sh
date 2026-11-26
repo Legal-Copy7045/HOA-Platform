@@ -61,8 +61,10 @@ sed -i 's/^DOCUMENT_REQUIRE_CLEAN_SCAN=false/DOCUMENT_REQUIRE_CLEAN_SCAN=true/' 
 add_setting DOCUMENT_REQUIRE_CLEAN_SCAN true
 sed -i 's/^LEDGER_LATE_FEES_ENABLED=false/LEDGER_LATE_FEES_ENABLED=true/' .env
 
-# Show the deployed commit on the sysadmin status page.
-export APP_VERSION="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+# Show the deployed commit on the sysadmin status page. The checkout belongs to
+# the app user; safe.directory lets root read it even without its own git
+# config (the update agent runs from systemd with no HOME).
+export APP_VERSION="$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 # Base images are refreshed weekly (or with --pull), not on every update:
 # a moved base image would otherwise force a full rebuild each time.
