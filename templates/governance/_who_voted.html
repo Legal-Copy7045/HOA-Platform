@@ -1,0 +1,7 @@
+{% load portal %}
+{% if turnout_staff and turnout and turnout.unit == "homes" %}
+  <section class="card" id="who-voted"><div class="card-head"><h3>Who has voted</h3>{% if who_voted_url %}<a class="btn secondary small" href="{{ who_voted_url }}">{% icon "download" %} Download CSV</a>{% endif %}</div>
+    {% if who_voted %}<ul class="list">{% for row in who_voted %}<li><span class="grow">{{ row.lot.label }}</span>{% if row.by_proxy %}<span class="small muted">by proxy</span>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted small">No home has voted yet.</p>{% endif %}
+    <p class="small muted">Which homes have voted is not secret; how they voted is never shown here.</p>
+  </section>
+{% endif %}

@@ -338,12 +338,16 @@ class Command(BaseCommand):
             actor=b1,
         )
         gov_surveys.open_survey(poll, actor=b1)
-        # A formal vote for the annual meeting, still a draft.
+        # A formal vote for the annual meeting, still a draft, with its
+        # voting window planned (D61): the board opens it from its page.
+        vote_opens = timezone.now() + datetime.timedelta(days=1)
         governance.create_vote(
             title="Adopt the updated pet rules (demo)",
             kind="formal",
             options=["Yes", "No"],
             meeting=annual_meeting,
+            opens_at=vote_opens,
+            closes_at=vote_opens + datetime.timedelta(days=14),
             actor=b1,
         )
         # An anonymous survey (M5), open for two weeks, with two answers.

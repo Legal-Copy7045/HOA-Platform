@@ -34,6 +34,31 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def new_link(target: Vote | Election, person_id: int) -> str:
+    """A fresh personal link for one person (only its hash is stored)."""
+    is_vote = isinstance(target, Vote)
+    token = secrets.token_urlsafe(32)
+    with transaction.atomic(), system_access("ballot link"):
+        BallotLink.objects.create(
+            person_id=person_id,
+            vote=target if is_vote else None,
+            election=None if is_vote else target,
+            token_hash=_hash(token),
+        )
+    return settings.PORTAL_BASE_URL + reverse("ballot_link", args=[token])
+
+
+def _window_text(target) -> str:
+    from governance import window
+
+    opens_at, closes_at = window.window(target)
+    if not closes_at:
+        return ""
+    if opens_at and opens_at > timezone.now():
+        return f"Voting opens {window.when(opens_at)} and closes {window.when(closes_at)}.\n\n"
+    return f"Vote by {window.when(closes_at)}: voting closes then by itself.\n\n"
+
+
 def issue(target: Vote | Election) -> int:
     """Email every current owner with an active login a personal link."""
     is_vote = isinstance(target, Vote)
@@ -51,21 +76,14 @@ def issue(target: Vote | Election) -> int:
             user = person.user
             if user is None or not user.is_active or not user.email:
                 continue
-            token = secrets.token_urlsafe(32)
-            with transaction.atomic():
-                BallotLink.objects.create(
-                    person=person,
-                    vote=target if is_vote else None,
-                    election=None if is_vote else target,
-                    token_hash=_hash(token),
-                )
-            link = settings.PORTAL_BASE_URL + reverse("ballot_link", args=[token])
+            link = new_link(target, person.pk)
             # Never into the weekly digest: the link is personal and single-use.
             send_now(
                 {user.email},
                 subject=f"[{settings.SITE_NAME}] Voting is open: {title}"[:200],
                 body=(
                     f"Voting is open: {title}.\n\n"
+                    f"{_window_text(target)}"
                     "This link is for you alone. Sign in to the portal to cast your ballot; "
                     "you will be asked to confirm it is you before it is recorded. "
                     "The link works once and cannot be used by anyone else, so please do "

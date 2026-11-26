@@ -19,3 +19,24 @@ def sweep_secret_choices(timestamp: int) -> int:
     from governance import mixing
 
     return mixing.sweep()
+
+
+@app.periodic(cron="*/5 * * * *")  # every five minutes
+@app.task(queue="maintenance", queueing_lock="close_due_votes")
+def close_due_votes(timestamp: int) -> int:
+    """Close every vote, election and survey whose deadline has passed,
+    through the normal close services as SYSTEM (D61): pooled secret
+    choices are written and the results become final."""
+    from governance import window
+
+    return window.close_due()
+
+
+@app.periodic(cron="*/15 * * * *")  # every fifteen minutes
+@app.task(queue="maintenance", queueing_lock="vote_deadline_reminders")
+def vote_deadline_reminders(timestamp: int) -> int:
+    """About 48 hours before a formal vote or an election closes, remind the
+    owners of homes that have not voted, once (D61)."""
+    from governance import window
+
+    return window.send_reminders()

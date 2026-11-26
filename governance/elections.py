@@ -181,18 +181,39 @@ def ballot_candidates(election: Election):
     ).select_related("person")
 
 
-def open_voting(election: Election, *, actor, request=None) -> Election:
+def open_voting(
+    election: Election, *, opens_at=None, closes_at=None, actor, request=None
+) -> Election:
+    """Close nominations and open voting for a window: an opening time (now
+    or later) and a closing time at least ``vote.min_open_days`` after it
+    (D61). Voting closes by itself at the closing time."""
+    from governance import window
+
     require(actor, "vote.manage")
     if election.state != ElectionState.NOMINATIONS:
         raise ElectionError("Voting can only be opened once, after nominations.")
     if not ballot_candidates(election).exists():
         raise ElectionError("No candidate has accepted a nomination yet.")
+    now = timezone.now()
+    try:
+        start = window.check_window(opens_at, closes_at, now=now)
+    except window.WindowError as exc:
+        raise ElectionError(str(exc)) from exc
     with system_access("eligible lots"):
         eligible = Lot.objects.count()
     Election.objects.filter(pk=election.pk).update(
-        state=ElectionState.VOTING, eligible_lots=eligible
+        state=ElectionState.VOTING,
+        eligible_lots=eligible,
+        voting_opens_at=start,
+        voting_closes_at=closes_at,
     )
-    record_event("election.voting_opened", actor=actor, request=request, target=election)
+    record_event(
+        "election.voting_opened",
+        actor=actor,
+        request=request,
+        target=election,
+        metadata={"open_days": (closes_at - start).days},
+    )
     election.refresh_from_db()
     from governance import ballot_links
 
@@ -200,18 +221,49 @@ def open_voting(election: Election, *, actor, request=None) -> Election:
     return election
 
 
-def close_voting(election: Election, *, actor, request=None) -> Election:
-    require(actor, "vote.manage")
+def close_voting(
+    election: Election, *, actor, reason: str = "", at_deadline: bool = False, request=None
+) -> Election:
+    """Close voting. SYSTEM closes at the deadline (the periodic task, D61);
+    the board closes before the deadline only when the rule
+    ``vote.allow_early_close`` is on, with a reason."""
+    from governance import window
+
+    if actor is not policy.SYSTEM:
+        require(actor, "vote.manage")
+        at_deadline = False
     with transaction.atomic():
         locked = Election.objects.select_for_update().get(pk=election.pk)
         if locked.state != ElectionState.VOTING:
             raise ElectionError("Voting is not open.")
-        Election.objects.filter(pk=election.pk).update(state=ElectionState.CLOSED)
+        if at_deadline:
+            how = "deadline"
+            if not window.past_deadline(locked):
+                raise ElectionError("The deadline has not passed.")
+        elif actor is policy.SYSTEM:
+            how = "system"
+        else:
+            try:
+                how = window.require_early_close(locked, reason)
+            except window.WindowError as exc:
+                raise ElectionError(str(exc)) from exc
+        Election.objects.filter(pk=election.pk).update(
+            state=ElectionState.CLOSED,
+            voting_closed_at=timezone.now(),
+            closed_at_deadline=how == "deadline",
+            early_close_reason=window.clean_reason(reason) if how == "early" else "",
+        )
         # Every pooled ballot is written before the count (D56).
         from governance import mixing
 
         mixing.flush(mixing.ELECTION, locked.pk, final=True)
-    record_event("election.voting_closed", actor=actor, request=request, target=election)
+    record_event(
+        "election.voting_closed",
+        actor=None if actor is policy.SYSTEM else actor,
+        request=request,
+        target=election,
+        metadata={"how": how},
+    )
     election.refresh_from_db()
     return election
 
@@ -219,7 +271,9 @@ def close_voting(election: Election, *, actor, request=None) -> Election:
 def lots_actor_may_vote_for(election: Election, actor) -> list[dict]:
     """Lots this person can still cast an election ballot for: their own, and
     lots whose live proxy for the election's meeting names them."""
-    if election.state != ElectionState.VOTING:
+    from governance import window
+
+    if not window.casting_open(election):
         return []
     roles = policy.roles_for(actor)
     out = {}
@@ -279,6 +333,10 @@ def cast_election_ballot(
         locked = Election.objects.select_for_update().get(pk=election.pk)
         if locked.state != ElectionState.VOTING:
             raise ElectionError("Voting is not open.")
+        from governance import window
+
+        if not window.casting_open(locked):
+            raise ElectionError("Voting is not open at this time (see the voting window).")
         allowed = {row["lot"].pk: row["by_proxy"] for row in lots_actor_may_vote_for(locked, actor)}
         if lot_id not in allowed:
             raise ElectionError("You cannot cast a ballot for that home (or it has voted).")

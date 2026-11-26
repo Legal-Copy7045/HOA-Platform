@@ -268,6 +268,31 @@ GUIDES: dict[str, Guide] = {
     ),
 }
 
+# D61: the voting window. The Act sets no voting period for ballots outside a
+# meeting, so no statutory fallback: the default is a board choice.
+GUIDES["vote.min_open_days"] = Guide(
+    BYLAWS,
+    "The Act does not set how long owners must have to vote when ballots are cast outside "
+    f"a meeting; the meeting notice period ({ACT} § 5308) applies to votes taken at a "
+    "meeting. The Bylaws (or the Nonprofit Corporation Law, 15 Pa.C.S., for votes by "
+    "ballot) may set a period: have counsel confirm it.",
+    "7 days: Bylaws voting article, or Board resolution adopting electronic voting.",
+)
+GUIDES["vote.allow_early_close"] = Guide(
+    BYLAWS,
+    "Not covered by the Act. Owners rely on the deadline they were given; closing early "
+    "can cut off owners who planned to vote later, so most associations do not allow it "
+    "unless the Bylaws or the ballot itself says voting ends once a set number vote.",
+    "Off: voting runs to the announced deadline (Bylaws voting article).",
+)
+GUIDES["vote.show_turnout_to_owners"] = Guide(
+    BOARD,
+    f"Not covered by the Act. Who voted is part of the association's records ({ACT} "
+    "§ 5316) but how a home voted on a secret ballot never is. Showing the running turnout "
+    "can encourage voting; some boards prefer to report it only with the result.",
+    "Off: turnout is reported with the result (Board resolution on elections).",
+)
+
 GUIDES["ledger.assessments_before_fees"] = Guide(
     DECLARATION,
     "The Act does not say in what order an owner's payments pay their charges. Assessments, "

@@ -77,13 +77,20 @@ FEATURES: list[Feature] = [
         "votes",
         "Votes",
         "Formal (binding) votes of the owners. Polls are surveys.",
-        {"votes", "vote_detail", "vote_action"},
+        {"votes", "vote_detail", "vote_action", "vote_who_voted_csv"},
     ),
     _f(
         "elections",
         "Elections and proxies",
         "Board elections, nominations, proxies.",
-        {"elections", "election_detail", "election_action", "proxy_grant", "proxy_revoke"},
+        {
+            "elections",
+            "election_detail",
+            "election_action",
+            "election_who_voted_csv",
+            "proxy_grant",
+            "proxy_revoke",
+        },
     ),
     # --- Surveys (M5) ---
     _f(

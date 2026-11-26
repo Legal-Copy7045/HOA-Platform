@@ -15,6 +15,7 @@ from core.scoping import system_access
 from governance import elections
 from governance import services as gov
 from governance.models import BallotLink
+from governance.tests.helpers import close_early, window_kw
 
 pytestmark = pytest.mark.django_db
 
@@ -31,7 +32,7 @@ def w(django_capture_on_commit_callbacks):
     election = elections.create_election(title="2027 election", seats=1, actor=board)
     elections.nominate(election, person=_person(a), actor=a)
     with django_capture_on_commit_callbacks(execute=True):
-        elections.open_voting(election, actor=board)
+        elections.open_voting(election, actor=board, **window_kw())
     return {"board": board, "a": a, "b": b, "e": election}
 
 
@@ -64,7 +65,7 @@ def test_link_needs_sign_in_and_only_works_for_its_owner_once(client, w):
 
 def test_link_stops_when_voting_closes(client, w):
     token = _token_for(w["a"])
-    elections.close_voting(w["e"], actor=w["board"])
+    close_early(w["e"], w["board"])
     client.force_login(w["a"])
     assert client.get(reverse("ballot_link", args=[token])).status_code == 404
 
@@ -111,5 +112,5 @@ def test_formal_votes_also_send_personal_links(w, django_capture_on_commit_callb
     )
     mail.outbox.clear()
     with django_capture_on_commit_callbacks(execute=True):
-        gov.open_vote(vote, actor=w["board"])
+        gov.open_vote(vote, actor=w["board"], **window_kw())
     assert len(mail.outbox) == 2 and "/ballot/" in mail.outbox[0].body

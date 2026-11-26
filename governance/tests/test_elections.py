@@ -18,6 +18,7 @@ from governance.models import (
     ElectionParticipation,
     Resolution,
 )
+from governance.tests.helpers import close_early, window_kw
 
 pytestmark = pytest.mark.django_db
 
@@ -50,7 +51,7 @@ def _ready(w, *candidates):
     """Nominate and accept the given owners, then open voting."""
     for user in candidates:
         elections.nominate(w["e"], person=_person(user), actor=user)  # self-nomination accepts
-    return elections.open_voting(w["e"], actor=w["board"])
+    return elections.open_voting(w["e"], actor=w["board"], **window_kw())
 
 
 def test_nominees_must_accept_before_the_ballot(w):
@@ -122,7 +123,7 @@ def test_certify_by_a_non_candidate_proposes_the_seat(w):
         elections.cast_election_ballot(
             election, lot_id=lot.pk, candidate_ids=[cand_a.pk], actor=voter
         )
-    elections.close_voting(election, actor=w["board"])
+    close_early(election, w["board"])
     result = elections.certify(election, actor=w["board"])
     assert [r["elected"] for r in result["rows"]] == [True, False]
     with system_access("t"):
@@ -142,8 +143,8 @@ def test_a_candidate_cannot_certify(w):
         )
     elections.nominate(w["e"], person=_person(candidate_board), actor=candidate_board)
     elections.nominate(w["e"], person=_person(other), actor=other)
-    elections.open_voting(w["e"], actor=w["board"])
-    elections.close_voting(w["e"], actor=w["board"])
+    elections.open_voting(w["e"], actor=w["board"], **window_kw())
+    close_early(w["e"], w["board"])
     with pytest.raises(elections.ElectionError):
         elections.certify(w["e"], actor=candidate_board)
 
@@ -158,7 +159,7 @@ def test_tie_for_the_last_seat_elects_nobody_for_it(w):
             election, lot_id=lot.pk, candidate_ids=[cands[_person(target).pk].pk], actor=voter
         )
     assert elections.tally(election)["pending"] == 2  # in the mixing pool while open (D56)
-    elections.close_voting(election, actor=w["board"])
+    close_early(election, w["board"])
     result = elections.tally(election)
     assert result["tie_for_last"] and not any(r["elected"] for r in result["rows"])
 

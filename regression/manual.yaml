@@ -281,3 +281,7 @@
   check: "On the POC, a secret test vote's ballots show as \"waiting to be mixed\" on the vote page while fewer than ten are pooled, the worker writes them once ten wait (five stay behind), and closing the vote counts every ballot with nothing left waiting (D56)."
   steps: "Open a secret demo vote, cast ballots from demo owners, check the vote page as the board after each; cast ten or more and wait a minute for the worker; close the vote and check the counts equal the ballots cast."
   last: ""
+- key: vote closes by itself at the deadline
+  check: "On the POC, a test formal vote opened with a closing time a week out (the shortest period) shows 'Vote by ...' on the Voting list, its page and My items; the board sees 'N of M homes have voted', the quorum so far and Who has voted (addresses only) while no per-option counts show to anyone; about 48 hours before the close a demo owner who has not voted receives a reminder email with a personal link that opens their ballot after sign-in; extending once with a reason emails owners the new deadline; within five minutes of the deadline the worker closes the vote and the results appear with 'Closed automatically at the deadline' (D61)."
+  steps: "Sign in as a demo board member; create and open a formal vote (to test quickly, set the shortest voting period to 0 days in Community settings first and restore it after); cast a ballot as one demo owner; check the board's page and an owner's page; extend once; wait for the reminder and the deadline (watch the mail catcher); check the results."
+  last: ""

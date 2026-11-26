@@ -441,10 +441,11 @@ def test_results_visibility_rules(w, client):
     client.force_login(w["owner_b"])
     assert client.get(url).status_code == 404  # still open
     client.force_login(w["board"])
-    page = client.get(url)
-    # Still in the mixing pool while open (D56): counted, not yet shown.
-    assert page.status_code == 200 and b"Secret pond complaint" not in page.content
-    assert b"1 anonymous response is waiting to be mixed" in page.content
+    # No running tallies while open, not even for the board (D61).
+    assert client.get(url).status_code == 404
+    detail = client.get(reverse("survey_detail", args=[survey.pk])).content
+    assert b"1 of" in detail and b"people have responded" in detail
+    assert b"Secret pond complaint" not in detail
     surveys.close_survey(survey, actor=w["board"])
     page = client.get(url)
     assert page.status_code == 200 and b"Secret pond complaint" in page.content
@@ -469,6 +470,10 @@ def test_export_is_audited_and_anonymous_safe(w, client):
     named = _survey(w)
     surveys.open_survey(named, actor=w["board"])
     _answer(named, w["owner_a"])
+    client.force_login(w["board"])
+    # While open the answers would be a running tally (D61): not yet.
+    assert client.get(reverse("survey_export", args=[named.pk])).status_code == 302
+    surveys.close_survey(named, actor=w["board"])
     name = _person(w["owner_a"]).display_name.encode()
 
     client.force_login(w["owner_a"])
@@ -571,6 +576,9 @@ def test_board_builds_a_draft_through_the_pages(w, client):
     assert survey.status == "open"
     client.post(reverse("survey_question_action", args=[first.pk, "remove"]))
     assert survey.questions.count() == 2  # frozen
+    # Results wait for the close (D61).
+    assert client.get(reverse("survey_results", args=[survey.pk])).status_code == 404
+    client.post(reverse("survey_action", args=[survey.pk, "close"]))
     assert client.get(reverse("survey_results", args=[survey.pk])).status_code == 200
 
 
