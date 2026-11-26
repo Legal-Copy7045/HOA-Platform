@@ -593,3 +593,58 @@ class BallotLink(ScopedModel):
 
     def __str__(self) -> str:
         return f"ballot link #{self.pk}"
+
+
+# --- Meeting packets (M5) -------------------------------------------------------------
+
+
+class PacketVariant(models.TextChoices):
+    BOARD = "board", "Board packet"
+    OWNER = "owner", "Owner packet"
+
+
+class MeetingPacket(AppendOnlyModel):
+    """One build of a meeting packet. The PDF itself is a version of a library
+    document (immutable, scanned and access-controlled like any document);
+    this row records which version, who built it and what was attached."""
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.PROTECT, related_name="packets")
+    variant = models.CharField(max_length=8, choices=PacketVariant.choices)
+    document = models.ForeignKey("documents.Document", on_delete=models.PROTECT, related_name="+")
+    version = models.ForeignKey(
+        "documents.DocumentVersion", on_delete=models.PROTECT, related_name="+"
+    )
+    built_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    built_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-built_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.get_variant_display()} for meeting {self.meeting_id}"
+
+
+class MeetingPacketItem(AppendOnlyModel):
+    """An attachment listed in a packet's index: the exact document version,
+    and whether it passed the malware-scan rule when the packet was built."""
+
+    packet = models.ForeignKey(MeetingPacket, on_delete=models.PROTECT, related_name="items")
+    position = models.PositiveSmallIntegerField()
+    document = models.ForeignKey("documents.Document", on_delete=models.PROTECT, related_name="+")
+    version = models.ForeignKey(
+        "documents.DocumentVersion", on_delete=models.PROTECT, related_name="+"
+    )
+    role = models.CharField(max_length=16, default="attachment")  # attachment | minutes
+    included = models.BooleanField()
+    skipped_reason = models.CharField(max_length=120, blank=True)
+
+    class Meta:
+        ordering = ["position"]
+        constraints = [
+            models.UniqueConstraint(fields=["packet", "position"], name="packet_item_position")
+        ]
+
+    def __str__(self) -> str:
+        return f"packet {self.packet_id} item {self.position}"

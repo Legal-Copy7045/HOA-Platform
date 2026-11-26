@@ -269,6 +269,10 @@ PROTECTED = {
     "access_review_record": ("POST", None),
     "retention": ("GET", None),
     "retention_run": ("POST", None),
+    # Meeting packets (M5): the build page is for builders; the board packet's
+    # .zip lives on a meeting owners can see, and must still refuse them.
+    "meeting_packet": ("GET", "executive_meeting"),
+    "meeting_packet_zip": ("GET", "board_packet"),
 }
 
 
@@ -359,6 +363,17 @@ def world():
             kind="executive",
             starts_at=timezone.now() + timedelta(days=5),
             actor=board,
+        )
+        from governance import packets
+
+        packet_meeting = governance.create_meeting(
+            title="Open board meeting",
+            kind="board",
+            starts_at=timezone.now() + timedelta(days=6),
+            actor=board,
+        )
+        board_packet = packets.build_packet(
+            packet_meeting, variant="board", attachment_ids=[board_document.pk], actor=board
         )
         records_request_b = governance.submit_records_request(
             description="Lot B wants the 2019 audit", actor=owner_b
@@ -528,6 +543,8 @@ def world():
         "board_document": board_document.pk,
         "lot_b_document": lot_b_document.pk,
         "executive_meeting": executive_meeting.pk,
+        "packet_meeting": packet_meeting.pk,
+        "board_packet": board_packet.pk,
         "records_request_b": records_request_b.pk,
         "draft_vote": draft_vote.pk,
         "arc_b": arc_b.pk,
@@ -633,6 +650,8 @@ def _url(name, key, targets):
         kwargs = {"key": "ar_aging"}
     elif name == "reservation_action":
         kwargs["action"] = "cancel"
+    elif name == "meeting_packet_zip":
+        kwargs = {"pk": targets["packet_meeting"], "packet_id": targets["board_packet"]}
     return reverse(name, kwargs=kwargs)
 
 

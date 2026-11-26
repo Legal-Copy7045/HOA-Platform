@@ -23,6 +23,7 @@ from governance.models import (
     Vote,
     VoteKind,
 )
+from governance.packets import visible_packets
 
 
 def _form_id(value) -> int:
@@ -110,6 +111,8 @@ def meeting_detail(request, pk):
             "minutes_choices": minutes_choices,
             "attendance": meeting.attendance.select_related("person") if can_manage else [],
             "short_days": services.notice_shortfall_days(meeting) if can_manage else None,
+            "packets": visible_packets(request.user, meeting),
+            "can_build_packet": policy.can(request.user, "meeting.packet_build"),
             **meeting_extras(request.user, meeting),
         },
     )

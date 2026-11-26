@@ -169,6 +169,10 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "access_review.record": frozenset({BOARD}),
     # Clearing former owners' contact details under the retention rule.
     "retention.manage": frozenset({BOARD}),
+    # --- Meeting packets (M5) ---
+    # Assembling a packet is meeting preparation, like meeting.manage and
+    # document.manage, so the manager may build one (it approves nothing).
+    "meeting.packet_build": frozenset({BOARD, MANAGER}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

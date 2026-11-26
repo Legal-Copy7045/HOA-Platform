@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Meeting packet · {{ m.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "governance/gov_nav.html" %}
+  <div class="crumbs"><a href="{% url 'meetings' %}">Meetings</a> / <a href="{% url 'meeting_detail' m.pk %}">{{ m.title }}</a></div>
+  <div class="page-head"><div><h1>Meeting packet</h1>
+    <p class="subtitle">{{ m.title }} · {{ m.starts_at|date:"l F j, Y g:i A" }}</p></div></div>
+  <section class="card prose">
+    <p>One PDF with a cover page, the agenda, the minutes, a financial summary (totals only) and an index of the attachments you choose. It is saved in Documents as a new version each time you build it; attachments are bundled in a separate .zip download, never copied into the PDF.</p>
+    <ul>
+      <li><strong>Board packet</strong>: board, manager and auditor only. Adds draft minutes for approval, receivables aging and open-item counts, marked “Confidential – board only”.</li>
+      {% if m.kind != "executive" %}<li><strong>Owner packet</strong>: every owner can open it from the meeting page as soon as it is built. It never includes delinquency, violation or collection details.</li>{% else %}<li>Executive sessions get a board packet only.</li>{% endif %}
+    </ul>
+  </section>
+  {% for variant, label, form in forms %}
+    <details class="panel"{% if open_variant == variant or not open_variant and forloop.first %} open{% endif %} id="build-{{ variant }}"><summary>Build the {{ label|lower }}</summary><div class="panel-body">
+      <form method="post" class="form-grid" data-confirm="{% if variant == 'owner' %}Build and publish the owner packet? Owners can open it from the meeting page right away.{% else %}Build the board packet? It is saved in Documents for the board, manager and auditor only.{% endif %}">{% csrf_token %}
+        {% include "partials/form_errors.html" %}
+        <input type="hidden" name="variant" value="{{ variant }}">
+        {{ form }}
+        {% if not form.fields.attachments.queryset.exists %}<p class="help">No documents to attach yet. Upload them in Documents first.</p>{% endif %}
+        <div class="form-actions"><button type="submit">Build {{ label|lower }}</button></div>
+      </form>
+    </div></details>
+  {% endfor %}
+  <section class="card"><h2>Built packets</h2>
+    {% if history %}<ul class="list">{% for p in history %}<li>
+      <div class="grow"><strong>{{ p.get_variant_display }}</strong>{% if p.variant == "board" %} <span class="badge tone-warning">Confidential – board only</span>{% endif %}
+        <div class="small muted">Version {{ p.version.number }} · built {{ p.built_at|short_date }} · {{ p.items.all|length }} attachment{{ p.items.all|length|pluralize }}</div></div>
+      <a class="btn secondary small" href="{% url 'document_version_download' p.document_id p.version.number %}">PDF</a>
+      <a class="btn secondary small" href="{% url 'meeting_packet_zip' m.pk p.pk %}">.zip</a>
+    </li>{% endfor %}</ul>
+    {% else %}{% include "partials/empty.html" with icon="file" title="No packet built yet" %}{% endif %}
+  </section>
+{% endblock %}
