@@ -3,7 +3,7 @@
   since: M4
   docs: docs/glossary.md
   match: ["^unit:core/tests/test_ux_nav.py::test_(owner_menu|rarely_used|settings_hub|hub_entry|voting_entry|feature_switches|permissions_unchanged)", "^unit:core/tests/test_dashboard_nav", "^unit:core/tests/test_features.py::test_switched_off", "^manual:sidebar groups on a phone"]
-- feature: "One list of what's waiting: dashboard to-dos, My items, Board overview counts and sidebar bubbles (built once per request)"
+- feature: "One list of what's waiting: dashboard to-dos, My items and sidebar bubbles (built once per request)"
   since: M4
   match: ["^unit:core/tests/test_ux_nav.py::test_(nav_items_built_once|dashboard|balance_todo|oldest_unpaid|my_items_uses|badge_text)", "^unit:core/tests/test_nav_counts"]
 - feature: "Votes, elections and proxies for owners: ballot cards with a choice limit and confirmation, 'you voted' notes, proxies by address, per-lot ballots"
@@ -13,3 +13,13 @@
   since: M4
   docs: docs/glossary.md
   match: ["^unit:core/tests/test_ux_nav.py::test_(error_messages|workflow_buttons|every_state|short_date|owner_visible_jargon|records_requests|css_|menu_script|nav_labels_match)", "^manual:(keyboard and screen reader menu|print a page with values)"]
+- feature: "Streamlined menu (2026-11-26): sections My home / Community / Association / Maintenance / Finance / Admin, one sidebar per role, hubs with one page go straight to it, no per-area tab bars, Online payments only for the board"
+  since: M5
+  docs: docs/glossary.md
+  match: ["^unit:core/tests/test_nav_streamline.py::test_(sections_are_renamed|sidebar_for_every_role|board_menu|online_payments|former_owner|tenant_voting|sysadmin_settings|a_hub_with_one|hub_with_several|subpages)", "^unit:ledger/tests/test_finance_ux.py::test_(every_finance_page|finance_tabs|manager_does_not)", "^manual:streamlined menu per role"]
+- feature: "Board overview folded into My items: two-person coverage warning, past-term seats and missing rule citations on top; Record checks; Second approvals"
+  since: M5
+  match: ["^unit:core/tests/test_nav_streamline.py::test_(board_overview|two_person_coverage|coverage_warning|past_term|my_items_offers|second_approvals|people_page)"]
+- feature: "Dashboards: sysadmin-only home is the System status summary; owner balance tile with Pay button; Record checks quick action; Preview as owner"
+  since: M5
+  match: ["^unit:core/tests/test_nav_streamline.py::test_(sysadmin_home|owner_dashboard|pay_button|record_checks|preview_as_owner)", "^unit:core/tests/test_owner_preview"]

@@ -177,3 +177,7 @@
   check: "With test keys on the POC and Online payments switched on: an owner pays one charge by credit card 4242 4242 4242 4242 (surcharge shown first, TEST MODE banner), by debit card 4000 0566 5566 5556 (no fee) and by a test bank account (processing, then paid next day); each shows on My account against the chosen charge, a receipt email and PDF arrive, and Finance -> Online payments shows the payment, the payout and 'matches'."
   steps: "Follow docs/runbook.md 'Online payments (Stripe)' test-mode setup; sign in as a demo owner; Pay online three times; next day open Finance -> Online payments; on a phone check the pay page fits the screen."
   last: ""
+- key: streamlined menu per role
+  check: "On a phone and a desktop, the sidebar shows My home / Community / Association / Maintenance / Finance / Admin with only the entries for the role (owner, tenant, board, manager, sysadmin); a tenant's Voting opens Surveys; a sysadmin's Admin shows Branding directly; no second tab bar under meetings, voting or Finance pages other than Owner accounts / Collections / Accounting / Reports; My items starts with the set-up warnings."
+  steps: "Sign in on the POC as a demo owner, a demo tenant, a board member, the manager and the sysadmin; open each section; on the board login open My items and People (Access review panel); start Preview as owner from a lot's page and exit."
+  last: ""
