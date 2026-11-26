@@ -29,6 +29,13 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Once a year (automatic payments) | The annual schedule: one payment for the next 12 months' assessments less any credit, which then pays each month's assessment as it is charged (prepaid credit). | annual autopay, `AutopaySchedule.ANNUAL` |
 | Waiting for the board's review | An automatic payment above the review limit ($500 by default) that is not charged until a board member who does not pay for that home approves it; declined or not decided in 14 days, nothing is charged. | `AutopayReview`, `payments.autopay_review_cents` |
 | Online payments | The board's page of Stripe payments, bank payments processing, problems to handle, payouts and the daily check against Stripe. | `online_payments`, `payments.sync` |
+| Disbursements | The board's page of money paid back to owners: surplus distributions and owner refunds, each proposed, approved by other board members, then paid by statement credit or check. Finance menu. | `disbursements`, `ledger/disbursements.py` |
+| Disbursement | One proposal to pay money back: its homes, amounts and how each is paid; approved or declined by board members other than the one who proposed it. | `DisbursementBatch`, `DisbursementLine` |
+| Surplus distribution | Surplus (for example reserves above the adopted plan's target) returned to every home with an owner, split equally per home, by statement credit or check, under a board resolution (68 Pa.C.S. § 5313). | `disbursement.surplus_equal_shares` |
+| Owner refund | One account's credit paid back by check, usually to a former owner after a sale. Never more than the account's credit. | `DisbursementKind.REFUND` |
+| Statement credit | A credit on an owner's account that pays the next charges ("Surplus distribution credit – 2026"). | `credit` entry |
+| Check register | The list of checks a disbursement needs (payee, mailing address, amount, memo, check number), as CSV or PDF, for writing the checks in the bank's bill pay or the accounting package. | `disbursement_register` |
+| Check printing | Where each field prints on the association's pre-printed check stock, with an alignment test page. | `check_print_settings` |
 | Account number | The number of one ownership period of a home (changes when the home is sold). Shown as plain text, not a badge. | `Account.number` |
 | My home improvement requests (ARC) | Asking the Architectural Review Committee to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |
 | Neighbor acknowledgement | A neighbor confirms they have seen a project. It never decides the request. | "signoff" (`arc/signoffs.py`) |

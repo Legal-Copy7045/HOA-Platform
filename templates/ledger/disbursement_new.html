@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{% if kind == "refund" %}Propose a refund{% else %}Propose a surplus distribution{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'disbursements' %}">Disbursements</a> / New</div>
+  {% if kind == "refund" %}
+    <div class="page-head"><div><h1>Propose a refund</h1>
+      <p class="subtitle">{{ account.lot.label }} · account {{ account.number }} ({{ account.status_label|lower }}). Credit on the account: <strong>{{ defaults.credit_cents|cents }}</strong>{% if defaults.available_cents != defaults.credit_cents %}, of which {{ defaults.available_cents|cents }} is not already in a proposed refund{% endif %}.</p></div></div>
+    <section class="card">
+      {% include "partials/form_errors.html" %}
+      <p class="small muted">{% if defaults.former %}This account is closed, so the refund is paid by check to the former owner.{% else %}Paid by check. To keep the credit on the account instead, there is nothing to do: it pays the next charges.{% endif %} Nothing is posted until another board member approves; the refund entry posts when the check is recorded as issued, with its number.</p>
+      <form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="kind" value="refund"><input type="hidden" name="account" value="{{ account.pk }}">{{ form }}<div class="form-actions"><button type="submit">Propose refund</button></div></form>
+    </section>
+  {% else %}
+    <div class="page-head"><div><h1>Propose a surplus distribution</h1>
+      <p class="subtitle">The total is split across every home with an owner today. Each home's share is a statement credit (it pays the next charges) unless you tick it to be paid by check.</p></div></div>
+    {% if surplus %}<div class="alert info">{% icon "info" %}<span>Reserves are {{ surplus.above_cents|cents }} above the adopted plan's target.</span></div>{% endif %}
+    <div class="alert warning">{% icon "alert" %}<span>Under 68 Pa.C.S. § 5313, unless the Declaration says otherwise, surplus is paid to owners in proportion to their share of the common expenses or credited against future assessments. Counsel should confirm what the Declaration says and whether reserve funds count as surplus. Split rule: {% if equal_rule.0 is False %}not equal per home{% else %}equal per home{% endif %}{% if equal_rule.1 %} ({{ equal_rule.1 }}){% else %} (no citation recorded in Community settings){% endif %}.</span></div>
+    <section class="card">
+      {% include "partials/form_errors.html" %}
+      <form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="kind" value="surplus">{{ form }}
+        <div class="form-actions"><button type="submit" name="action" value="preview" class="secondary">Show the split</button>{% if preview %}<button type="submit" name="action" value="propose">Propose this distribution</button>{% endif %}</div>
+      </form>
+    </section>
+    {% if preview %}<h2>The split</h2>
+      <p class="small muted">Equal shares; the cents that do not divide evenly go one each to the first homes in address order. Total {{ preview_total|cents }} across {{ preview|length }} homes.</p>
+      <div class="table-card"><div class="table-wrap"><table>
+        <thead><tr><th scope="col">Home</th><th scope="col">Account</th><th scope="col">Paid by</th><th scope="col">Payee and address</th><th scope="col" class="num">Amount</th></tr></thead>
+        <tbody>{% for p in preview %}<tr><td>{{ p.lot.label }}</td><td>{{ p.account.number }}</td><td>{% if p.method == "check" %}Check{% else %}Statement credit{% endif %}</td><td class="small">{% if p.method == "check" %}{{ p.payee_name }}{% if p.mail_to %}<br>{{ p.mail_to|linebreaksbr }}{% else %}<br><span class="status tone-danger">No mailing address</span>{% endif %}{% endif %}</td><td class="num">{{ p.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
+      </table></div></div>
+    {% endif %}
+  {% endif %}
+{% endblock %}

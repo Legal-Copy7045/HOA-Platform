@@ -521,6 +521,7 @@ def my_history(request):
     policy.require(request.user, "history.view_own")
     from arc.models import ArcRequest
     from compliance.models import Violation
+    from ledger.disbursements import checks_for_account
     from ledger.letters import balance_questions
     from ledger.models import ResaleRequest
     from ledger.services import statement_rows
@@ -531,6 +532,9 @@ def my_history(request):
         period = _former_period(roles, lot_id, start, end)
         period["index"] = index
         period["rows"] = statement_rows(period["statement"])
+        # Refund checks written to them for this period (D52).
+        account = period["account"]
+        period["checks"] = checks_for_account(account.pk if account else None)
         periods.append(period)
     from django.db.models import Q
 

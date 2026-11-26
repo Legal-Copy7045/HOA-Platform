@@ -1,0 +1,31 @@
+# Disbursements (D52): surplus distributions and owner refunds, by statement credit or check.
+- feature: "Surplus split: equal per home by rule with citation, largest remainder in address order, deterministic; refused when the rule is off; amounts in words for checks"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(largest_remainder|surplus_split|amount_in_words)"]
+- feature: "Proposing: board or manager; surplus needs a board resolution; owner refund never more than the account's credit (less refunds already proposed); former owner needs a mailing address; nothing posts on proposal"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(surplus_needs|proposing_posts|owners_cannot_propose|refund_is_never|refund_to_a_former)"]
+- feature: "Approval: never the proposer or the manager; second approver at disbursement.second_approval_cents (fixed at proposal); refund recipients cannot approve; surplus recipients may, then two needed and recorded; decline needs a reason; credit re-checked at approval; statement credits only to open accounts"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(the_proposer|the_manager|one_approval|second_approval|recipients_may|an_owner_of_the_refunded|declining|refund_credit_is_checked|statement_credit_only)"]
+- feature: "Checks: refund entry posts when issued (credit re-checked), unique digits-only numbers, no issue before approval, void (board) reverses and reopens the credit, cleared checks cannot be voided, surplus checks change no owner account"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(refund_posts|issue_checks_rechecks|check_numbers|checks_cannot|void_reverses|cleared_checks|surplus_check_changes)"]
+- feature: "Disbursement records append-only (model, trigger, runtime role) and audited with allowlisted metadata (no names or addresses)"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(records_are_append_only|runtime_role_cannot_change_disbursement|audit_metadata)"]
+- feature: "Accounting: Disbursements journal lines balance (surplus fund, receivables, bank; voids and moved credits), outstanding checks in the bank reconciliation, voided checks leave the cash book, bank feed suggests clearing by amount and check number"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(journal_lines|a_surplus_credit_moved|issued_checks_are_outstanding|voided_checks_leave|bank_feed_suggests)"]
+- feature: "Prompts: reserves above the adopted plan's target (page and My items), sale with credit gives a refund item, checks to write and uncashed checks after 90 days"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(reserves_above|no_prompt|sale_with_credit|refund_item_goes|approved_checks_to_write)"]
+- feature: "Owner pages: statement credit on My account, refund check in a former owner's My history, nobody sees another account's; every disbursement page refused to owners and 404 with the feature off; pages and forms work end to end"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(owner_sees|former_owner_sees|owners_get_no|feature_off|board_pages_load|surplus_form)", "^unit:core/tests/test_url_matrix.py::test_.*(disbursement|check_print|check_alignment)"]
+- feature: "Check register CSV (formula-safe, audited) and PDF; checks on pre-printed stock and the alignment test escape hostile text; print positions saved with limits"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(check_pdf_escapes|register_csv|print_settings)", "^manual:check stock alignment"]
+- feature: "PA guidance for disbursements cites 68 Pa.C.S. § 5313 (surplus funds) and asks counsel to confirm"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_pa_guidance"]

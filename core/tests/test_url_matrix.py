@@ -352,6 +352,15 @@ PROTECTED = {
     # D47: the payer's schedule change and the board's review decision.
     "autopay_schedule": ("POST", "lot_id_b"),
     "autopay_review": ("POST", "autopay_review_b"),
+    # Disbursements (D52): board, manager and auditor pages only.
+    "disbursements": ("GET", None),
+    "disbursement_new": ("GET", None),
+    "disbursement_detail": ("GET", "disbursement"),
+    "disbursement_action": ("POST", "disbursement"),
+    "disbursement_register": ("GET", "disbursement"),
+    "disbursement_checks_pdf": ("GET", "disbursement"),
+    "check_print_settings": ("GET", None),
+    "check_alignment_pdf": ("GET", None),
 }
 
 
@@ -711,7 +720,13 @@ def world():
                 limit_cents=50_000,
                 expires_at=timezone.now() + timedelta(days=14),
             )
+    from ledger import disbursements
+
+    disbursement = disbursements.propose_surplus(
+        total_cents=4400, year=2026, resolution_ref="Resolution 2026-14", actor=board
+    )
     targets = {
+        "disbursement": disbursement.pk,
         "checkout_b": checkout_b.pk,
         "payment_b": payment_b.pk,
         "alert_b": alert_b.pk,
@@ -883,6 +898,8 @@ def _url(name, key, targets):
         kwargs["action"] = "join"
     elif name == "setup_step":
         kwargs["step"] = "charge"
+    elif name == "disbursement_action":
+        kwargs["action"] = "approve"
     return reverse(name, kwargs=kwargs)
 
 

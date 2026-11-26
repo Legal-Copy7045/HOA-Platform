@@ -202,6 +202,8 @@ def my_account(request):
                 # (WT-001): contacts see a line saying so, not a link to a 403.
                 "is_owner": lot.pk in roles.owned_lot_ids,
                 "online_receipts": _online_receipts(request.user, lot.pk, since),
+                # Checks the association wrote to this account's owners (D52).
+                "checks_to_you": _checks_to_you(lot.pk),
                 # Automatic payments (D46): payers only, feature on.
                 "autopay": autopay_for_payer(request.user, lot) if online else None,
                 **my_account_people(request.user, lot.pk),
@@ -222,6 +224,12 @@ def my_account(request):
             "remit_lines": [line for line in profile.remit_to.splitlines() if line.strip()],
         },
     )
+
+
+def _checks_to_you(lot_id: int) -> list[dict]:
+    from ledger import disbursements
+
+    return disbursements.checks_for_account(ledger_accounts.current_account_id(lot_id))
 
 
 @login_required
@@ -1266,6 +1274,7 @@ def reconcile(request):
                 cleared_payment_ids=request.POST.getlist("payments"),
                 cleared_returned_ids=request.POST.getlist("returned"),
                 cleared_payout_ids=request.POST.getlist("payouts"),
+                cleared_check_ids=request.POST.getlist("checks"),
                 note=request.POST.get("note", ""),
                 actor=request.user,
                 request=request,
@@ -1303,7 +1312,7 @@ def _bank_feed_for_statement(request, statement_date) -> dict:
     from ledger.bankfeeds import matching
     from ledger.bankfeeds import services as bank
 
-    empty = {"ticked": {k: set() for k in ("deposit", "payment", "returned", "payout")}}
+    empty = {"ticked": {k: set() for k in ("deposit", "payment", "returned", "payout", "check")}}
     if not statement_date or not bank.feature_on(request):
         return empty
     accounts = list(bank.connections())

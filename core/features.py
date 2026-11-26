@@ -238,6 +238,23 @@ FEATURES: list[Feature] = [
         },
         default=False,
     ),
+    # Disbursements (D52): surplus distributions and refunds of owners' credit.
+    _f(
+        "disbursements",
+        "Disbursements",
+        "Money paid back to owners: surplus distributions and refunds of a former owner's "
+        "credit, by statement credit or check, with board approval.",
+        {
+            "disbursements",
+            "disbursement_new",
+            "disbursement_detail",
+            "disbursement_action",
+            "disbursement_register",
+            "disbursement_checks_pdf",
+            "check_print_settings",
+            "check_alignment_pdf",
+        },
+    ),
     # Automatic payments of the monthly assessment (D46): also needs
     # "online_payments" on and Stripe keys on the server.
     _f(

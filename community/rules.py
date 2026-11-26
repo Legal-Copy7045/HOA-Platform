@@ -253,6 +253,27 @@ REGISTRY: dict[str, RuleSpec] = {
             "An automatic payment (monthly or once a year, surcharge included) above this is "
             "not charged until a board member approves it; the payer sees that it is waiting.",
         ),
+        # Disbursements (D52): money paid back to owners.
+        RuleSpec(
+            "disbursement.surplus_equal_shares",
+            "Split a surplus distribution equally per home",
+            BOOL,
+            "true",
+            "Disbursements",
+            "On: every home with an owner gets the same share (the remainder cent by cent in "
+            "address order), as for an equal monthly {term}. Off if the Declaration allocates "
+            "common expenses unequally: the portal then does not split a surplus.",
+        ),
+        RuleSpec(
+            "disbursement.second_approval_cents",
+            "Disbursement total needing a second board approval",
+            CENTS,
+            "50000",
+            "Disbursements",
+            "At or over this, two board members other than the one who proposed it must "
+            "approve. A surplus distribution approved by an owner who receives part of it "
+            "always needs two.",
+        ),
         RuleSpec(
             "retention.former_owner_contact_days",
             "Days after someone leaves before their contact details are cleared",

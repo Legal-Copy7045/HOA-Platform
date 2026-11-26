@@ -755,6 +755,21 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    in the production `.env`. The portal refuses live keys without both, and
    refuses test keys in production.
 
+## Disbursements and checks (D52)
+
+Finance → Disbursements pays money back to owners: a **surplus distribution** to every home, or an **owner refund** of one account's credit (usually a former owner's, after a sale: My items shows "Refund $X to the former owner of <address>").
+
+1. **Propose** (board or manager). Surplus: the total, the year, the board resolution (choose it, or type its reference), and any homes to pay by check instead of a statement credit; "Show the split" first. Refund: open it from My items or the "Credit owed to former owners" list; check the payee and type the former owner's forwarding address.
+2. **Approve** (a board member other than the proposer; two at or over the rule's amount; a surplus approved by a recipient needs two). Statement credits post on the final approval.
+3. **Write the checks.** Either download the **check register** (CSV or PDF) and write the checks in the bank's bill pay or the accounting package, or print them on the association's **pre-printed check stock** ("Print on check stock"). Then "Mark as issued" with the first check number and the date on the checks: the numbers go to the homes in the order listed. A refund is posted on the owner's account at this point.
+4. **Clear or void.** "Mark cleared" when the bank statement shows the check (the page suggests the bank feed line with the same amount and check number); the bank reconciliation lists issued checks as outstanding until then. "Void" (board) reverses a refund so the credit is back on the account and a new check can be written.
+
+**Check stock alignment** (Disbursements → Check printing): print the alignment test page on plain paper at 100% (turn off "fit to page"), hold it over a blank check against the light, and adjust each field's position (hundredths of an inch from the top-left corner of the page; "Move everything" shifts all fields for a printer that feeds a little off). Print one real check on a voided blank before a batch. The portal never needs, and never stores, the bank's account or routing numbers: they are already on the stock.
+
+**Uncashed checks.** After 90 days an uncashed check is a My item. Pennsylvania's unclaimed property law applies to checks that stay uncashed: after the dormancy period the money must be reported and paid to the PA Treasury instead of being kept or re-credited. The treasurer should confirm the dormancy period and the reporting steps (and counsel the wording of any letter) before voiding or reissuing. Voiding restores the owner's credit on the account; the board then follows the Treasury's reporting process for it.
+
+**For counsel before the first surplus distribution:** 68 Pa.C.S. § 5313 (surplus funds) applies unless the Declaration provides otherwise; confirm what the Declaration says, whether reserve funds may be treated as surplus, and record the citation on the rule in Community settings.
+
 ## Server tasks (D36)
 
 Reusable host operations are started in the portal, not in a terminal:

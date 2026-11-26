@@ -274,3 +274,7 @@
   steps: "Sign in as a demo board member on a phone; open Settings > Community setup; walk each step (skip one, go Back once); type 'forty' as the amount; save; switch Violations off and cancel; finish on the review; change one rule on Community settings; Run setup again and open its step; try VoiceOver or TalkBack on one rule step."
   last: ""
 
+- key: check stock alignment
+  check: "Disbursements > Check printing > Alignment test prints on plain paper at 100% with the quarter-inch grid and a sample check; held over a blank check of the association's stock, the date, payee, amount, amount in words, memo and window-envelope address sit on their lines after adjusting the positions; a real refund check printed on a voided blank lines up, its address shows through a #10 window envelope, and the amount in words matches the figures."
+  steps: "Sign in as a demo board member; open Finance > Disbursements > Check printing; download the alignment test and print at 100% (no fit to page); compare against a blank check; adjust and save; propose and approve a demo refund; Print on check stock; print on a voided blank; fold into a window envelope."
+  last: ""

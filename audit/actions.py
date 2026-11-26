@@ -618,6 +618,72 @@ _SPECS = [
     _spec(
         "ledger.moves_checked", "Board checked entries moved between accounts", "lot_id", "count"
     ),
+    # Disbursements (D52): ids, kinds, counts and amounts; never names or addresses.
+    _spec(
+        "disbursement.proposed",
+        "Disbursement proposed",
+        "batch_id",
+        "kind",
+        "lines",
+        "amount_cents",
+        "need",
+    ),
+    _spec(
+        "disbursement.approval_given",
+        "Disbursement approval given",
+        "batch_id",
+        "have",
+        "need",
+        "recipient",
+    ),
+    _spec(
+        "disbursement.approved",
+        "Disbursement approved",
+        "batch_id",
+        "kind",
+        "lines",
+        "credits",
+        "amount_cents",
+    ),
+    _spec("disbursement.declined", "Disbursement declined", "batch_id"),
+    _spec(
+        "disbursement.credit_posted",
+        "Disbursement statement credit posted",
+        "batch_id",
+        "line_id",
+        "lot_id",
+        "amount_cents",
+    ),
+    _spec(
+        "disbursement.check_issued",
+        "Disbursement check recorded as issued",
+        "batch_id",
+        "line_id",
+        "check_id",
+        "lot_id",
+        "amount_cents",
+    ),
+    _spec(
+        "disbursement.check_cleared",
+        "Disbursement check cleared",
+        "check_id",
+        "lot_id",
+        "amount_cents",
+        "bank_line",
+    ),
+    _spec(
+        "disbursement.check_voided",
+        "Disbursement check voided",
+        "check_id",
+        "lot_id",
+        "amount_cents",
+        "reversal_id",
+    ),
+    _spec(
+        "disbursement.register_exported", "Check register downloaded", "batch_id", "rows", "format"
+    ),
+    _spec("disbursement.checks_printed", "Checks printed for check stock", "batch_id", "count"),
+    _spec("disbursement.print_settings_saved", "Check printing positions saved"),
     _spec(
         "payments.unreachable",
         "Online payment Stripe cannot find: no longer checked",

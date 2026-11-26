@@ -18,6 +18,7 @@
       {% if p.account %}<div class="form-actions"><a class="btn secondary" href="{% url 'my_history_statement_pdf' p.index %}">{% icon "download" %} Download statement (PDF)</a></div>{% endif %}
       {% if p.sold_balance or p.credit_owed %}<div class="small" data-testid="balance-questions"><p><strong>Questions about this balance?</strong> {% if questions.contact %}Contact the association: {{ questions.contact }}.{% else %}Write to the board at the address below.{% endif %}</p>
         {% if questions.remit_lines %}<p>Checks payable to <strong>{{ questions.payable_to }}</strong>, mailed to:</p><address>{% for line in questions.remit_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>{% endif %}</div>{% endif %}
+      {% include "ledger/_checks_to_you.html" with checks=p.checks show_address=True %}
     </section>
   {% empty %}{% include "partials/empty.html" with icon="clock" title="No past ownership" text="There are no earlier ownership periods on your record." %}{% endfor %}
   <div class="grid grid-2">

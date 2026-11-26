@@ -74,6 +74,8 @@ GL_LABELS = {
     "stripe_clearing": "Stripe clearing (balance at Stripe)",
     "card_surcharge": "Credit card surcharge income",
     "processing_fees": "Payment processing fees",
+    # Disbursements (D52)
+    "surplus_fund": "Surplus distributions paid from (reserve or surplus fund)",
 }
 
 
@@ -242,11 +244,40 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
     from payments.services import journal_items, online_entry_ids
 
     online = online_entry_ids()
+    from ledger import disbursements
+
+    paid_out = disbursements.journal_roles()
     for e in entries:
         kind = e.reverses.kind if e.kind == EntryKind.REVERSAL and e.reverses else e.kind
         memo = f"{e.lot.label}: {e.get_kind_display()}"
         ref = f"L{e.pk}"
-        if kind == EntryKind.PAYMENT:
+        role = paid_out.get(e.pk) or paid_out.get(e.reverses_id)
+        if role == disbursements.SURPLUS_CREDIT:
+            # Surplus returned as a statement credit (D52): out of the fund,
+            # owners owe that much less.
+            pair(
+                e.posted_on,
+                "Disbursements",
+                ref,
+                gl["surplus_fund"],
+                gl["receivable"],
+                -e.amount_cents,
+                f"{e.lot.label}: surplus distribution credit",
+                e.lot,
+            )
+        elif role == disbursements.REFUND_CHECK:
+            # An owner's credit refunded by check (D52); a void reverses it.
+            pair(
+                e.posted_on,
+                "Disbursements",
+                ref,
+                gl["receivable"],
+                gl["cash"],
+                e.amount_cents,
+                f"{e.lot.label}: credit refunded by check",
+                e.lot,
+            )
+        elif kind == EntryKind.PAYMENT:
             # A payment is a negative entry: debit cash, credit receivables.
             # Online payments sit at Stripe until the payout reaches the bank.
             is_online = e.pk in online or e.reverses_id in online
@@ -327,6 +358,9 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
     for day, ref, cents, payout_id in stripe["payouts"]:
         memo = f"Stripe payout {payout_id}"[:120]
         pair(day, "Online payments", ref, gl["cash"], gl["stripe_clearing"], cents, memo)
+    # Surplus distribution checks post no owner entry: fund to bank (D52).
+    for day, ref, cents, lot, memo in disbursements.surplus_check_journal(start, end):
+        pair(day, "Disbursements", ref, gl["surplus_fund"], gl["cash"], cents, memo, lot)
     for p in payments:
         inv = p.invoice
         expense = f"{inv.category.code} {inv.category.name}".strip()
@@ -534,7 +568,10 @@ def book_balance(as_of: datetime.date) -> int:
     )
     returned = sum(e.amount_cents for e in _returned_items(since, as_of))
     payouts = sum(p.amount_cents for p in _payouts(since, as_of))
-    return setup.opening_cash_cents + deposits + payouts - paid - returned
+    from ledger import disbursements
+
+    checks = disbursements.book_cents(since, as_of)  # owner checks (D52)
+    return setup.opening_cash_cents + deposits + payouts - paid - returned - checks
 
 
 def uncleared(as_of: datetime.date) -> dict:
@@ -559,7 +596,16 @@ def uncleared(as_of: datetime.date) -> dict:
     returned = [e for e in _returned_items(since, as_of) if e.pk not in _cleared_ids("returned")]
     cleared_payouts = _cleared_ids("payout")
     payouts = [p for p in _payouts(since, as_of) if p.pk not in cleared_payouts]
-    return {"deposits": deposits, "payments": payments, "returned": returned, "payouts": payouts}
+    from ledger import disbursements
+
+    return {
+        "deposits": deposits,
+        "payments": payments,
+        "returned": returned,
+        "payouts": payouts,
+        # Checks to owners (D52), outstanding until they clear.
+        "checks": disbursements.outstanding_checks(since, as_of),
+    }
 
 
 def reconcile(
@@ -570,6 +616,7 @@ def reconcile(
     cleared_payment_ids,
     cleared_returned_ids=(),
     cleared_payout_ids=None,
+    cleared_check_ids=None,
     note: str = "",
     actor,
     request=None,
@@ -580,7 +627,10 @@ def reconcile(
     ``cleared_payout_ids``: the Stripe payouts ticked. Left out (None), the
     payouts Stripe reports as paid (arrived at the bank) clear and any
     others stay outstanding; the reconciliation page always sends the
-    board's ticks."""
+    board's ticks.
+
+    ``cleared_check_ids``: the owner checks ticked (D52). Left out (None),
+    checks recorded as cleared on or before the statement date clear."""
     require(actor, "accounting.manage")
     with transaction.atomic():
         AccountingSetup.objects.select_for_update().get(pk=AccountingSetup.get().pk)
@@ -589,6 +639,13 @@ def reconcile(
         payments = {p.pk: p for p in open_items["payments"]}
         returned = {e.pk: e for e in open_items["returned"]}
         payouts = {p.pk: p for p in open_items["payouts"]}
+        checks = {c.pk: c for c in open_items["checks"]}
+        if cleared_check_ids is None:
+            ck_ids = {
+                k for k, c in checks.items() if c.cleared_on and c.cleared_on <= statement_date
+            }
+        else:
+            ck_ids = {int(i) for i in cleared_check_ids}
         dep_ids = {int(i) for i in cleared_deposit_ids}
         pay_ids = {int(i) for i in cleared_payment_ids}
         ret_ids = {int(i) for i in cleared_returned_ids}
@@ -601,12 +658,14 @@ def reconcile(
             and pay_ids <= set(payments)
             and ret_ids <= set(returned)
             and po_ids <= set(payouts)
+            and ck_ids <= set(checks)
         ):
             raise AccountingError("Some ticked items are not open on this date.")
         outstanding_dep = sum(d.total_cents for k, d in deposits.items() if k not in dep_ids)
         outstanding_dep += sum(p.amount_cents for k, p in payouts.items() if k not in po_ids)
         outstanding_pay = sum(p.amount_cents for k, p in payments.items() if k not in pay_ids)
         outstanding_pay += sum(e.amount_cents for k, e in returned.items() if k not in ret_ids)
+        outstanding_pay += sum(c.amount_cents for k, c in checks.items() if k not in ck_ids)
         book = book_balance(statement_date)
         adjusted_bank = statement_balance_cents + outstanding_dep - outstanding_pay
         rec = BankReconciliation.objects.create(
@@ -646,6 +705,10 @@ def reconcile(
                 kind="payout",
                 object_id=k,
                 amount_cents=payouts[k].amount_cents,
+            )
+        for k in ck_ids:
+            ReconciledItem.objects.create(
+                reconciliation=rec, kind="check", object_id=k, amount_cents=checks[k].amount_cents
             )
     record_event(
         "accounting.reconciled",

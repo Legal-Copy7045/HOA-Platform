@@ -337,6 +337,8 @@ ONLINE_GL = {
     "card_surcharge": "4300 Credit card surcharge income",
     "processing_fees": "6150 Payment processing fees",
 }
+# Disbursements (D52): where a surplus distribution is paid from.
+DISBURSEMENT_GL = {"surplus_fund": "3100 Reserve and surplus fund"}
 
 
 class AccountingSetup(models.Model):
@@ -369,7 +371,7 @@ class AccountingSetup(models.Model):
             k.strip(): v.strip()
             for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
         }
-        return {**defaults, **ONLINE_GL, **out}
+        return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **out}
 
 
 class DepositBatch(AppendOnlyModel):
@@ -413,6 +415,8 @@ CASH_ITEM_KINDS = [
     ("payment", "Payment"),
     ("returned", "Returned item"),
     ("payout", "Stripe payout"),
+    # A disbursement check to an owner or former owner (D52).
+    ("check", "Owner check"),
 ]
 
 
@@ -893,3 +897,240 @@ class AssessmentPostingCheck(models.Model):
 
     def __str__(self) -> str:
         return self.period
+
+
+# --- Disbursements (optional feature "disbursements", D52) ------------------------------
+# Money the association pays back to owners: a surplus distribution to every
+# home, or a refund of one account's credit (typically a seller's dormant
+# account after a sale). Every record is append-only: a batch is proposed
+# once with its lines, approvals and declines are separate rows, checks are
+# recorded when issued, and clearing or voiding a check is an event row. The
+# state of a batch, line or check is derived from those rows.
+
+
+class DisbursementKind(models.TextChoices):
+    SURPLUS = "surplus", "Surplus distribution"
+    REFUND = "refund", "Owner refund"
+
+
+class DisbursementMethod(models.TextChoices):
+    CREDIT = "credit", "Statement credit"
+    CHECK = "check", "Check"
+
+
+class DisbursementBatch(AppendOnlyModel):
+    """One proposal: its kind, total and the approvals it needs, fixed when
+    proposed (a later change of the threshold rule cannot lower them)."""
+
+    kind = models.CharField(max_length=8, choices=DisbursementKind.choices)
+    title = models.CharField(max_length=120)
+    total_cents = models.BigIntegerField()
+    note = models.TextField(blank=True)
+    # A surplus distribution needs the board's resolution: one recorded in
+    # the portal, or the reference of one adopted elsewhere.
+    resolution = models.ForeignKey(
+        "governance.Resolution", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    resolution_ref = models.CharField(max_length=120, blank=True)
+    required_approvals = models.PositiveSmallIntegerField()
+    second_approval_cents = models.BigIntegerField()
+    rule_citation = models.CharField(max_length=200, blank=True)
+    proposed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(total_cents__gt=0), name="disbursement_total_positive"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"disbursement #{self.pk}"
+
+
+class DisbursementLine(ScopedAppendOnlyModel):
+    """One home's share: the ownership account it goes to, the method, and
+    for a check the payee and mailing address as proposed."""
+
+    scope_lot_path = "lot"
+
+    batch = models.ForeignKey(DisbursementBatch, on_delete=models.PROTECT, related_name="lines")
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")
+    amount_cents = models.BigIntegerField()
+    method = models.CharField(max_length=8, choices=DisbursementMethod.choices)
+    payee_name = models.CharField(max_length=120, blank=True)
+    mail_to = models.CharField(max_length=300, blank=True)
+    # "structured", "home", "old" (community.services.postal_address) or
+    # "forwarding" when typed on the proposal.
+    address_source = models.CharField(max_length=12, blank=True)
+
+    class Meta:
+        ordering = ["batch", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount_cents__gt=0), name="disbursement_line_positive"
+            ),
+            models.UniqueConstraint(
+                fields=["batch", "account"], name="disbursement_line_once_per_account"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"disbursement line #{self.pk}"
+
+
+class DisbursementDecisionKind(models.TextChoices):
+    APPROVE = "approve", "Approved"
+    DECLINE = "decline", "Declined"
+
+
+class DisbursementDecision(AppendOnlyModel):
+    """A board member's approval or decline. ``is_recipient``: the approver
+    is an owner on one of the batch's accounts (allowed only for a surplus
+    distribution, which then needs two approvals)."""
+
+    batch = models.ForeignKey(DisbursementBatch, on_delete=models.PROTECT, related_name="decisions")
+    decision = models.CharField(max_length=8, choices=DisbursementDecisionKind.choices)
+    approver = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    is_recipient = models.BooleanField(default=False)
+    amount_cents = models.BigIntegerField()  # the total the approver saw
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["batch", "approver"], name="disbursement_decision_once_per_person"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"disbursement decision #{self.pk}"
+
+
+class DisbursementEntry(ScopedAppendOnlyModel):
+    """The ledger entry a line posted: a statement credit (on approval) or a
+    refund by check (on issue)."""
+
+    scope_lot_path = "line__lot"
+
+    line = models.ForeignKey(DisbursementLine, on_delete=models.PROTECT, related_name="entries")
+    entry = models.OneToOneField(LedgerEntry, on_delete=models.PROTECT, related_name="+")
+    check_record = models.ForeignKey(
+        "DisbursementCheck", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    def __str__(self) -> str:
+        return f"disbursement entry #{self.pk}"
+
+
+class DisbursementCheck(ScopedAppendOnlyModel):
+    """A check written for a line, recorded when issued (the number comes
+    from the pre-printed stock or the bank's bill pay). A voided check stays;
+    the line may then get a new check."""
+
+    scope_lot_path = "line__lot"
+
+    line = models.ForeignKey(DisbursementLine, on_delete=models.PROTECT, related_name="checks")
+    number = models.CharField(max_length=20)
+    issued_on = models.DateField()
+    amount_cents = models.BigIntegerField()
+    payee_name = models.CharField(max_length=120)
+    mail_to = models.CharField(max_length=300, blank=True)
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["issued_on", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["number"], name="disbursement_check_number_unique"),
+            models.CheckConstraint(
+                condition=models.Q(amount_cents__gt=0), name="disbursement_check_positive"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"check #{self.number}"
+
+
+class CheckEventKind(models.TextChoices):
+    CLEARED = "cleared", "Cleared"
+    VOIDED = "voided", "Voided"
+
+
+class DisbursementCheckEvent(ScopedAppendOnlyModel):
+    """A check cleared the bank or was voided (once each, never both)."""
+
+    scope_lot_path = "check_record__line__lot"
+
+    check_record = models.ForeignKey(
+        DisbursementCheck, on_delete=models.PROTECT, related_name="events"
+    )
+    kind = models.CharField(max_length=8, choices=CheckEventKind.choices)
+    on = models.DateField()
+    reason = models.CharField(max_length=200, blank=True)
+    bank_transaction = models.ForeignKey(
+        "BankTransaction", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    reversal = models.OneToOneField(
+        LedgerEntry, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["check_record"], name="disbursement_check_one_event")
+        ]
+
+    def __str__(self) -> str:
+        return f"check event #{self.pk}"
+
+
+class CheckPrintSettings(models.Model):
+    """Where each field prints on the association's pre-printed check stock,
+    in hundredths of an inch from the page's top-left corner (one check per
+    letter page, check at the top). ``nudge_*`` shifts everything, for a
+    printer that feeds slightly off."""
+
+    date_x = models.PositiveIntegerField(default=680)
+    date_y = models.PositiveIntegerField(default=75)
+    payee_x = models.PositiveIntegerField(default=110)
+    payee_y = models.PositiveIntegerField(default=135)
+    amount_x = models.PositiveIntegerField(default=700)
+    amount_y = models.PositiveIntegerField(default=135)
+    words_x = models.PositiveIntegerField(default=50)
+    words_y = models.PositiveIntegerField(default=170)
+    address_x = models.PositiveIntegerField(default=110)
+    address_y = models.PositiveIntegerField(default=205)
+    memo_x = models.PositiveIntegerField(default=90)
+    memo_y = models.PositiveIntegerField(default=290)
+    stub1_y = models.PositiveIntegerField(default=400)
+    stub2_y = models.PositiveIntegerField(default=750)
+    nudge_x = models.IntegerField(default=0)
+    nudge_y = models.IntegerField(default=0)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return "check print settings"
+
+    @classmethod
+    def get(cls) -> CheckPrintSettings:
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
