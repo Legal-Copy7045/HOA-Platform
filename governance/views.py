@@ -98,6 +98,25 @@ def meetings(request):
     )
 
 
+class ApproveMinutesForm(forms.Form):
+    approved_on = forms.DateField(
+        label="Approved on",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        help_text="The day the board approved them, usually at its next meeting.",
+    )
+    note = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Note",
+        help_text="Optional, e.g. which meeting approved them or with what corrections.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("auto_id", "approve_%s")
+        super().__init__(*args, **kwargs)
+        self.fields["approved_on"].initial = timezone.localdate()
+
+
 class MinutesUploadForm(forms.Form):
     file = forms.FileField(label="Minutes file", help_text="A PDF or Word file.")
     title = forms.CharField(
@@ -131,9 +150,16 @@ def _linked(request, meeting) -> dict:
     return out
 
 
-def _render_meeting(request, meeting, *, minutes_form=None, status=200):
+def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, status=200):
     user = request.user
     can_manage = policy.can(user, "meeting.manage")
+    approval = services.minutes_approval(meeting)
+    can_approve = (
+        policy.can(user, "minutes.adopt")
+        and meeting.minutes_document_id
+        and meeting.status == MeetingStatus.HELD
+        and approval is None
+    )
     can_upload = can_manage and policy.can(user, "document.manage")
     minutes_choices = (
         Document.objects.for_user(user).filter(category="minutes") if can_manage else []
@@ -152,6 +178,8 @@ def _render_meeting(request, meeting, *, minutes_form=None, status=200):
             "minutes_choices": minutes_choices,
             "minutes_form": minutes_form
             or (MinutesUploadForm() if can_upload and not meeting.minutes_document_id else None),
+            "minutes_approval": approval,
+            "approve_form": (approve_form or ApproveMinutesForm()) if can_approve else None,
             "deadlines": deadlines,
             "deadline_default": deadline_default,
             "can_record_resolution": policy.can(user, "resolution.record"),
@@ -231,6 +259,23 @@ def meeting_action(request, pk, action):
         ):
             return redirect("meeting_detail", pk=meeting.pk)
         return _render_meeting(request, meeting, minutes_form=form)
+    elif action == "approve_minutes":
+        policy.require(request.user, "minutes.adopt")
+        form = ApproveMinutesForm(request.POST)
+        if form.is_valid() and _saved(
+            request,
+            form,
+            lambda: services.approve_minutes(
+                meeting,
+                approved_on=form.cleaned_data["approved_on"],
+                note=form.cleaned_data["note"],
+                actor=request.user,
+                request=request,
+            ),
+            "Minutes marked approved. Owner packets now include them as approved minutes.",
+        ):
+            return redirect("meeting_detail", pk=meeting.pk)
+        return _render_meeting(request, meeting, approve_form=form)
     elif action == "minutes":
         doc = get_object_or_404(
             Document.objects.for_user(request.user), pk=_form_id(request.POST.get("document"))

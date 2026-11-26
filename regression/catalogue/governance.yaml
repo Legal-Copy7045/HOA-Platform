@@ -63,3 +63,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:governance/tests/test_packets.py::test_", "^manual:meeting packet"]
+- feature: "Minutes approval (SEC-003): manager attaches drafts, only the board marks minutes approved (append-only record of the version, audited); owner packets list only board-approved minutes; a corrected version needs a new approval"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:governance/tests/test_packets.py::test_(manager_attaches_drafts|minutes_approval_rules|runtime_role_cannot_change_minutes)"]

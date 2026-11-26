@@ -270,6 +270,80 @@ def upload_minutes(meeting, *, file, title="", actor, request=None):
     return document
 
 
+def minutes_approval(meeting):
+    """The board's approval of the meeting's minutes as they stand now (the
+    attached document's current version), or None while they are a draft. A
+    corrected version published after approval is a draft again."""
+    from governance.models import MinutesApproval
+
+    if not meeting.minutes_document_id:
+        return None
+    with system_access("minutes approval status"):
+        from documents.models import Document
+
+        current = (
+            Document.objects.filter(pk=meeting.minutes_document_id)
+            .values_list("current_version_id", flat=True)
+            .first()
+        )
+    if current is None:
+        return None
+    return (
+        MinutesApproval.objects.filter(
+            meeting=meeting, document_id=meeting.minutes_document_id, version_id=current
+        )
+        .select_related("recorded_by")
+        .first()
+    )
+
+
+def approve_minutes(meeting, *, approved_on=None, note="", actor, request=None):
+    """Record that the board approved the meeting's attached minutes (their
+    current version). A board decision: the manager may attach drafts but not
+    approve them (SEC-003). Append-only and audited."""
+    from governance.models import MinutesApproval
+
+    require(actor, "minutes.adopt")
+    approved_on = approved_on or timezone.localdate()
+    with transaction.atomic():
+        current = Meeting.objects.select_for_update().get(pk=meeting.pk)
+        if not current.minutes_document_id:
+            raise GovernanceError("Attach the minutes before marking them approved.")
+        if current.status != MeetingStatus.HELD:
+            raise GovernanceError("Only minutes of a held meeting can be approved.")
+        if approved_on > timezone.localdate():
+            raise GovernanceError("The approval date can't be in the future.")
+        if approved_on < timezone.localdate(current.starts_at):
+            raise GovernanceError("The approval date can't be before the meeting.")
+        with system_access("approve minutes"):
+            from documents.models import Document
+
+            document = Document.objects.select_related("current_version").get(
+                pk=current.minutes_document_id
+            )
+        version = document.current_version
+        if version is None:
+            raise GovernanceError("The minutes document has no file yet.")
+        if MinutesApproval.objects.filter(meeting=current, version=version).exists():
+            raise GovernanceError("These minutes are already marked approved.")
+        approval = MinutesApproval.objects.create(
+            meeting=current,
+            document=document,
+            version=version,
+            approved_on=approved_on,
+            note=single_line(note)[:200],
+            recorded_by=None if actor is SYSTEM else actor,
+        )
+    record_event(
+        "meeting.minutes_approved",
+        actor=None if actor is SYSTEM else actor,
+        request=request,
+        target=meeting,
+        metadata={"document_id": document.pk, "version": version.number},
+    )
+    return approval
+
+
 def record_attendance(meeting, person, *, present=True, by_proxy=False, actor, request=None):
     require(actor, "meeting.manage")
     Attendance.objects.update_or_create(

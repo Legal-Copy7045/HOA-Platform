@@ -65,6 +65,7 @@ def world():
         actor=board,
     )
     gov.attach_minutes(previous, minutes, actor=board)
+    gov.approve_minutes(previous, actor=board)
     meeting = gov.create_meeting(
         title="November board meeting",
         kind="board",
@@ -545,3 +546,128 @@ def test_page_refusal_shows_again_on_the_form(client, world):
     assert response.status_code == 200
     assert b'role="alert"' in response.content or b"errorlist" in response.content
     assert not MeetingPacket.objects.exists()
+
+
+# --- Minutes approval (SEC-003) ---------------------------------------------------------
+
+
+def _held_meeting_with_minutes(world, actor, title="December board meeting"):
+    held = gov.create_meeting(
+        title=title,
+        kind="board",
+        starts_at=timezone.now() - timedelta(days=3),
+        actor=world["board"],
+    )
+    gov.set_meeting_status(held, "held", actor=world["board"])
+    doc = gov.upload_minutes(held, file=pdf_upload("december.pdf"), actor=actor)
+    held.refresh_from_db()
+    return held, doc
+
+
+def _next_meeting(world):
+    return gov.create_meeting(
+        title="January board meeting",
+        kind="board",
+        starts_at=timezone.now() + timedelta(days=20),
+        actor=world["board"],
+    )
+
+
+def test_manager_attaches_drafts_but_only_the_board_approves(client, world):
+    manager = make_member(roles=[Role.MANAGER])
+    held, doc = _held_meeting_with_minutes(world, manager)
+    assert held.minutes_document_id == doc.pk  # data entry is allowed
+    assert gov.minutes_approval(held) is None
+    nxt = _next_meeting(world)
+    # Draft minutes are never presented to owners as approved.
+    assert packets.approved_minutes(nxt) is None
+    text = _text(_pdf_of(packets.build_packet(nxt, variant="owner", actor=manager)))
+    assert "Approved minutes" not in text
+    assert "No approved minutes" in text
+
+    for user in (manager, world["owner"], make_member(roles=[Role.AUDITOR])):
+        with pytest.raises(PermissionDenied):
+            gov.approve_minutes(held, actor=user)
+    client.force_login(manager)
+    url = reverse("meeting_action", args=[held.pk, "approve_minutes"])
+    page = client.get(reverse("meeting_detail", args=[held.pk]))
+    assert b"Draft minutes, not yet approved" in page.content
+    assert b"Mark minutes approved" not in page.content
+    assert client.post(url, {"approved_on": timezone.localdate().isoformat()}).status_code == 403
+    client.force_login(world["owner"])
+    assert client.post(url, {"approved_on": timezone.localdate().isoformat()}).status_code == 403
+    assert not AuditEvent.objects.filter(action="meeting.minutes_approved", target_id=str(held.pk))
+
+    # The board marks them approved on the page: recorded, audited, then shown.
+    client.force_login(world["board"])
+    page = client.get(reverse("meeting_detail", args=[held.pk]))
+    assert b"Mark minutes approved" in page.content
+    response = client.post(
+        url, {"approved_on": timezone.localdate().isoformat(), "note": "At the January meeting"}
+    )
+    assert response.status_code == 302
+    approval = gov.minutes_approval(held)
+    assert approval.version_id == doc.current_version_id
+    assert approval.recorded_by == world["board"] and approval.note == "At the January meeting"
+    event = AuditEvent.objects.filter(action="meeting.minutes_approved").latest("occurred_at")
+    assert event.metadata == {"document_id": doc.pk, "version": 1}
+    assert event.actor == world["board"] and event.target_id == str(held.pk)
+    assert packets.approved_minutes(nxt) == doc
+    text = _text(_pdf_of(packets.build_packet(nxt, variant="owner", actor=manager)))
+    assert "Approved minutes of December board meeting" in text
+    assert "approved by the board on" in text
+    client.force_login(world["owner"])
+    assert b"Minutes approved" in client.get(reverse("meeting_detail", args=[held.pk])).content
+
+
+def test_minutes_approval_rules_and_records(client, world):
+    from core.append_only import AppendOnlyError
+    from governance.models import MinutesApproval
+
+    held, doc = _held_meeting_with_minutes(world, world["board"])
+    today = timezone.localdate()
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(held, approved_on=today + timedelta(days=1), actor=world["board"])
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(held, approved_on=today - timedelta(days=30), actor=world["board"])
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(_next_meeting(world), actor=world["board"])  # nothing attached
+    approval = gov.approve_minutes(held, actor=world["board"])
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(held, actor=world["board"])  # once per version
+    with pytest.raises(AppendOnlyError):
+        approval.save()
+    with pytest.raises(AppendOnlyError):
+        MinutesApproval.objects.all().delete()
+
+    # A corrected version is a draft again until the board approves it.
+    documents.add_version(doc, file=pdf_upload("december-v2.pdf"), note="Fix", actor=world["board"])
+    held.refresh_from_db()
+    assert gov.minutes_approval(held) is None
+    assert packets.approved_minutes(_next_meeting(world)) is None
+    gov.approve_minutes(held, actor=world["board"])
+    assert gov.minutes_approval(held).version.number == 2
+
+    # A refused form comes back with what was typed.
+    other, _ = _held_meeting_with_minutes(world, world["board"], title="Special board meeting")
+    client.force_login(world["board"])
+    page = client.post(
+        reverse("meeting_action", args=[other.pk, "approve_minutes"]),
+        {"approved_on": "2001-01-01", "note": "Keep this note"},
+    )
+    assert page.status_code == 200
+    assert b"before the meeting" in page.content and b"Keep this note" in page.content
+    assert gov.minutes_approval(other) is None
+
+
+def test_runtime_role_cannot_change_minutes_approvals(world):
+    from django.db import DatabaseError, connection, transaction
+
+    held, _ = _held_meeting_with_minutes(world, world["board"])
+    approval = gov.approve_minutes(held, actor=world["board"])
+    for sql in (
+        "UPDATE governance_minutesapproval SET note = 'x' WHERE id = %s",
+        "DELETE FROM governance_minutesapproval WHERE id = %s",
+    ):
+        with pytest.raises(DatabaseError), transaction.atomic(), connection.cursor() as cur:
+            cur.execute(sql, [approval.pk])

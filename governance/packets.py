@@ -111,10 +111,13 @@ def previous_meeting(meeting: Meeting) -> Meeting | None:
 
 
 def approved_minutes(meeting: Meeting) -> Document | None:
-    """Minutes the board attached to the previous meeting (attaching them is
-    the record of adoption) when owners may see them."""
+    """The previous meeting's minutes when the board has marked their current
+    version approved (SEC-003: attaching is only a draft, and the manager may
+    attach) and owners may see them."""
+    from governance.services import minutes_approval
+
     previous = previous_meeting(meeting)
-    if previous is None or not previous.minutes_document_id:
+    if previous is None or minutes_approval(previous) is None:
         return None
     with system_access("packet: approved minutes"):
         doc = (
@@ -445,7 +448,11 @@ def _minutes_note(meeting, variant, minutes_doc) -> str:
             f"Draft minutes{of}: {title}, attachment 1 in the index. "
             "The board is asked to approve them."
         )
-    return f"Approved minutes{of}: {title}, attachment 1 in the index."
+    from governance.services import minutes_approval
+
+    approval = minutes_approval(previous) if previous else None
+    on = f" (approved by the board on {_day(approval.approved_on)})" if approval else ""
+    return f"Approved minutes{of}: {title}{on}, attachment 1 in the index."
 
 
 def build_packet(

@@ -40,7 +40,7 @@ urlpatterns = [
     path("meetings/", views.meetings, name="meetings"),
     path("meetings/<int:pk>/", views.meeting_detail, name="meeting_detail"),
     re_path(
-        r"^meetings/(?P<pk>[0-9]+)/(?P<action>notice|held|cancelled|minutes)/$",
+        r"^meetings/(?P<pk>[0-9]+)/(?P<action>notice|held|cancelled|minutes|approve_minutes)/$",
         views.meeting_action,
         name="meeting_action",
     ),

@@ -213,6 +213,10 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Board and committees: names, offices and committee members only (no
     # contact details), for everyone who sees the community pages.
     "board_committees.view": COMMUNITY,
+    # --- Minutes approval (fixgov, SEC-003) ---
+    # Uploading or attaching draft minutes is data entry (meeting.manage);
+    # recording that the board approved them is a board decision.
+    "minutes.adopt": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

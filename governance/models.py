@@ -665,6 +665,35 @@ class MeetingPacketItem(AppendOnlyModel):
         return f"packet {self.packet_id} item {self.position}"
 
 
+class MinutesApproval(AppendOnlyModel):
+    """The board's record that a meeting's minutes were approved (SEC-003):
+    the exact document version, the day of approval and who recorded it.
+    Attaching minutes (manager or board) is only a draft; owner packets
+    present minutes as approved only through this record. A corrected
+    version needs its own approval."""
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.PROTECT, related_name="minutes_approvals")
+    document = models.ForeignKey("documents.Document", on_delete=models.PROTECT, related_name="+")
+    version = models.ForeignKey(
+        "documents.DocumentVersion", on_delete=models.PROTECT, related_name="+"
+    )
+    approved_on = models.DateField()
+    note = models.CharField(max_length=200, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-recorded_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["meeting", "version"], name="minutes_approval_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"minutes approval for meeting {self.meeting_id}"
+
+
 # --- Surveys (informal, non-binding; M5) ------------------------------------------------
 
 from core.append_only import ScopedAppendOnlyModel  # noqa: E402

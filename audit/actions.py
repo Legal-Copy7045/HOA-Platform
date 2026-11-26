@@ -444,6 +444,13 @@ _SPECS = [
         "alert_id",
         "amount_cents",
     ),
+    # Minutes approval (fixgov, SEC-003)
+    _spec(
+        "meeting.minutes_approved",
+        "Board recorded the minutes as approved",
+        "document_id",
+        "version",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}
