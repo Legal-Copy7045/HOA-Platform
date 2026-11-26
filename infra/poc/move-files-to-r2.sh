@@ -9,8 +9,9 @@
 #   2. "Manage R2 API tokens" -> Create API token: permission "Object Read &
 #      Write", applied to that bucket only. Note the Access Key ID and the
 #      Secret Access Key (shown once), and your Account ID.
-# The script asks for those four values (the secret is not shown or logged),
-# copies every file across, checks the count, and keeps the old file store's
+# The script asks for those four values (the secret is not shown, logged or
+# put on any command line), copies every file across, checks that R2 then
+# holds as many files as the local store did, and keeps the old file store's
 # data volume untouched so you can go back (it just stops running).
 set -euo pipefail
 trap 'echo "ERROR: stopped at line $LINENO. Nothing was deleted; .env.before-r2 has the old settings." >&2' ERR
@@ -18,6 +19,8 @@ trap 'echo "ERROR: stopped at line $LINENO. Nothing was deleted; .env.before-r2 
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 APP_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
+# shellcheck source=infra/poc/lib.sh
+source "$APP_DIR/infra/poc/lib.sh"
 cd "$APP_DIR"
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
 
@@ -40,25 +43,18 @@ trap cleanup EXIT
 
 echo "==> Copying files out of the local file store"
 "${COMPOSE[@]}" exec -T web python manage.py export_files --out - 2>"$WORK/export.log" >"$WORK/files.tar"
-BEFORE="$(grep -oE '[0-9]+' "$WORK/export.log" | tail -1 || echo 0)"
+BEFORE="$(file_count Exported <"$WORK/export.log")" || { echo "export_files did not report a count." >&2; exit 1; }
 echo "    $BEFORE files"
 
 echo "==> Pointing the portal at R2"
 cp -p .env .env.before-r2
-set_env() {  # key value: replace or add, without echoing secrets
-  local key="$1" value="$2"
-  if grep -q "^${key}=" .env; then
-    awk -v k="$key" -v v="$value" 'BEGIN{FS=OFS="="} $1==k{print k"="v; next} {print}' .env > .env.new
-  else
-    cp .env .env.new; printf '%s=%s\n' "$key" "$value" >> .env.new
-  fi
-  chmod 600 .env.new; mv .env.new .env
-}
-set_env S3_ENDPOINT_URL "$ENDPOINT"
-set_env S3_BUCKET "$BUCKET"
-set_env S3_ACCESS_KEY_ID "$KEY_ID"
-set_env S3_SECRET_ACCESS_KEY "$SECRET"
-set_env S3_REGION auto
+# set_env (infra/poc/lib.sh) uses bash builtins only: the secret never reaches
+# another program's command line, and is written exactly as typed (R2-005).
+set_env .env S3_ENDPOINT_URL "$ENDPOINT"
+set_env .env S3_BUCKET "$BUCKET"
+set_env .env S3_ACCESS_KEY_ID "$KEY_ID"
+set_env .env S3_SECRET_ACCESS_KEY "$SECRET"
+set_env .env S3_REGION auto
 sed -i '/^COMPOSE_PROFILES=local-store$/d' .env
 unset SECRET
 
@@ -70,7 +66,19 @@ echo "==> Checking R2 can be written, read and deleted"
 "${COMPOSE[@]}" exec -T web python manage.py check_storage 2>&1 | grep -v '"level"'
 
 echo "==> Copying files into R2"
-"${COMPOSE[@]}" exec -T web python manage.py import_files --in - <"$WORK/files.tar" 2>&1 | grep -v '"level"'
+"${COMPOSE[@]}" exec -T web python manage.py import_files --in - <"$WORK/files.tar" >"$WORK/import.log" 2>&1
+IMPORTED="$(file_count Imported <"$WORK/import.log")" || { echo "import_files did not report a count." >&2; exit 1; }
+echo "    $IMPORTED files copied"
+
+echo "==> Counting the files now in R2"
+"${COMPOSE[@]}" exec -T web python manage.py export_files --out - 2>"$WORK/recount.log" >/dev/null
+IN_R2="$(file_count Exported <"$WORK/recount.log")" || { echo "Could not count the files in R2." >&2; exit 1; }
+if ! counts_match "$BEFORE" "$IN_R2" "Files in R2"; then
+  echo "Some files did not reach R2. Go back to the local store with" >&2
+  echo "  cp .env.before-r2 .env && sudo bash infra/poc/start-portal.sh" >&2
+  echo "then fix the cause and run this script again (files already in R2 are kept)." >&2
+  exit 1
+fi
 
 echo
 echo "Done. Files now live in R2 bucket '$BUCKET'."

@@ -191,8 +191,10 @@ class OwnLoginQuerySet(ScopedQuerySet):
 
 class PushSubscription(models.Model):
     """One browser or installed app that asked for push notifications.
-    Removed when the person turns it off or the push service says it is gone
-    (404/410). Holds only what the push service needs to reach the device."""
+    Removed when the person turns it off, when the push service says it is
+    gone (404/410) or cannot be found, or after several failures in a row
+    (review R2-007). Holds only what the push service needs to reach the
+    device."""
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     endpoint = models.URLField(max_length=1000, unique=True)
@@ -200,6 +202,8 @@ class PushSubscription(models.Model):
     auth = models.CharField(max_length=100)
     created_at = models.DateTimeField(default=timezone.now)
     last_sent_at = models.DateTimeField(null=True, blank=True)
+    # Failed sends since the last success; removed at push.MAX_FAILURES.
+    failures = models.PositiveSmallIntegerField(default=0)
 
     objects = OwnLoginQuerySet.as_manager()
 

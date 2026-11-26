@@ -308,6 +308,20 @@ It loads the newest backup into a throwaway copy, brings it up to the current
 code, checks the file store and prints the record counts. Do this before any
 real data goes in, and every few months after.
 
+The drill always uses its own empty file store, never the live one (even
+after the move to R2), and fails unless every file in the backup was
+restored. Before anything is decrypted it checks the backup's keyed checksum
+and prints when the backup was made; it refuses a backup whose checksum is
+missing, altered, or from a different backup. Backups made before
+stamped checksums (November 2026) restore only with `--allow-unsigned`, which
+prints a warning: use it only for a backup you know you made.
+
+To check a backup by hand before a real restore (for example one downloaded
+from the off-site bucket into a folder), run
+`python3 -I /opt/hoa-portal/infra/poc/backup_mac.py verify <folder> /root/hoa-backup.key`:
+it prints the time the backup was made, or refuses. Never put the key on a
+command line.
+
 ## Health alerts
 
 Install the 10-minute health check, which emails the sysadmins when the site,

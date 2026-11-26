@@ -55,3 +55,7 @@
 - feature: "Dates are Eastern local dates (America/New_York): no UTC .date() or server date.today() in product code"
   since: M4
   match: ["^unit:core/tests/test_local_dates"]
+- feature: "Deployment scripts (review R2): restore drill uses only its own empty file store and checks every file restored; backups carry a stamped keyed checksum with a derived key, never on a command line, required before restoring; move to R2 keeps the secret off command lines and compares counts; updates install only from main; every .env.example setting reaches the containers"
+  since: M4
+  docs: docs/runbook.md
+  match: ["^unit:core/tests/test_infra_scripts", "^manual:(nightly backup writes|restore drill uses|restore drill refuses|install update refuses|move files to R2|push and SMS settings)"]

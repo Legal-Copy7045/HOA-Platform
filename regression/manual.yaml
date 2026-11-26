@@ -37,6 +37,30 @@
   check: "The newest nightly backup restores into a throwaway copy and passes its checks."
   steps: "sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh"
   last: ""
+- key: nightly backup writes a stamped keyed checksum
+  check: "After a backup run, HMAC-SHA256 in the newest backup folder starts with 'format hoa-backup-mac-v2' and 'stamp <folder name>', and the key never shows in the process list."
+  steps: "sudo bash /opt/hoa-portal/infra/poc/backup.sh; sudo head -2 /var/backups/hoa-portal/<newest>/HMAC-SHA256; while it runs, in a second console: ps -eo args | grep -c \"$(sudo cat /root/hoa-backup.key | cut -c1-12)\" (expect 1, the grep itself); python3 -I /opt/hoa-portal/infra/poc/backup_mac.py verify <folder> /root/hoa-backup.key prints the stamp."
+  last: ""
+- key: restore drill uses its own file store
+  check: "With the portal on R2 (or the local store), the drill reports 'N of N files in the backup restored', passes, and the live bucket gains no objects and no healthcheck probe."
+  steps: "Note the live bucket's object count (Cloudflare dashboard or System status); sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh; confirm the counts line and 'Restore drill passed ... made at <stamp>'; the live count is unchanged."
+  last: ""
+- key: restore drill refuses a tampered or swapped backup
+  check: "The drill refuses before decrypting when a backup's checksum file is deleted, or when db.dump.enc is replaced by an older backup's copy, and restores an older-format backup only with --allow-unsigned (with a warning)."
+  steps: "sudo cp -a the newest backup folder to /root/drill-test/<same name>; delete HMAC-SHA256 there and run restore-drill.sh on it (expect refusal mentioning --allow-unsigned); restore the file, copy an older backup's db.dump.enc over it (expect 'fails its keyed checksum'); remove /root/drill-test afterwards."
+  last: ""
+- key: install update refuses a non-main branch
+  check: "With the VM's checkout on a branch other than main and no ALLOW_BRANCH in .env, Install update on System status ends as failed with 'updates install only from main'; on main it installs."
+  steps: "Only if the VM is still on the old feature branch: press Install update and read the message; then as hoa: git -C /opt/hoa-portal checkout main; press Install update again."
+  last: ""
+- key: move files to R2 compares counts
+  check: "move-files-to-r2.sh prints the exported count, the copied count, and 'Files in R2' matches before saying Done; ps during the run never shows the R2 secret."
+  steps: "Only when moving the POC to R2 (decision D29 keeps the local store for now): sudo bash /opt/hoa-portal/infra/poc/move-files-to-r2.sh; read the counts."
+  last: ""
+- key: push and SMS settings reach the containers
+  check: "VAPID_* and SMS_* filled in .env are seen by web and worker after a restart."
+  steps: "Fill VAPID keys from generate_vapid_keys into .env; sudo bash infra/poc/start-portal.sh; docker compose ... exec web python -c \"import os; print(bool(os.environ.get('VAPID_PUBLIC_KEY')))\" prints True; My profile offers 'Notifications on this device' once the board switches push on."
+  last: ""
 - key: health alert email arrives
   check: "Stopping the worker produces a health email to the sysadmins within 30 minutes, and a recovery email after restarting it."
   steps: "docker compose ... stop worker; wait; check inbox; docker compose ... start worker"

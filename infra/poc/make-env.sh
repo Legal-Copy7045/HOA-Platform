@@ -80,6 +80,19 @@ DOCUMENT_REQUIRE_CLEAN_SCAN=true
 OFFICERS_REQUIRE_BOARD_SEAT=true
 OFFICERS_REQUIRE_BOARD_SEAT_CITATION=
 
+# Installable app and alerts (optional; the board switches "push" and "sms"
+# on in Admin -> Features). Push keys: docker compose exec web python manage.py
+# generate_vapid_keys. Restart the portal after filling these in.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
+# PUSH_ALLOWED_HOSTS=   (unset = the usual browser push services)
+SMS_PROVIDER=none
+SMS_ACCOUNT_SID=
+SMS_AUTH_TOKEN=
+SMS_FROM=
+# SMS_API_BASE=https://api.twilio.com
+
 TUNNEL_TOKEN=${TUNNEL_TOKEN}
 ENV
 chmod 600 .env

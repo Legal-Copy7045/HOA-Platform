@@ -109,6 +109,14 @@ def record_event(
     return event
 
 
+def count_recent_events(action: str, *, actor, since: timedelta) -> int:
+    """How many ``action`` events this login caused within ``since`` (for
+    rate limits that must survive deleting and re-creating a record)."""
+    return AuditEvent.objects.filter(
+        action=action, actor=actor, occurred_at__gte=timezone.now() - since
+    ).count()
+
+
 def purge_expired_ip_addresses(now: datetime | None = None) -> int:
     """Delete IP rows older than the retention period, and audit the purge."""
     now = now or timezone.now()
