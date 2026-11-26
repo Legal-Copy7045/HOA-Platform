@@ -52,9 +52,7 @@ def system_panel() -> dict:
 
 def quick_actions(user, roles) -> list[dict]:
     out = []
-    # TODO(merge): the finance builder's {% quick_actions %} tag
-    # (core.my_items.quick_actions) renders "Record checks"; use it here and on
-    # My items, and drop this entry and can_record_checks.
+    # "Record checks" is also offered on My items ({% quick_actions %}).
     if _can(roles.groups, "ledger.manage"):
         out.append({"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"})
     if roles.groups & policy.ACCOUNT_VIEWERS:

@@ -3,7 +3,7 @@
 {% block title %}My items · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>My items</h1><p class="subtitle">Everything waiting on you, overdue first. Each item opens the page where you take the step.</p></div>
-    {# TODO(merge): replace with {% quick_actions %} (finance builder). #}{% if can_record_checks %}<div class="actions"><a class="btn secondary" href="{% url 'record_payments' %}">{% icon "receipt" %} Record checks</a></div>{% endif %}</div>
+    {% quick_actions %}</div>
   {% if thin %}
     <div class="alert warning" id="coverage">{% icon "alert" %}<div><strong>{{ thin|length }} action{{ thin|length|pluralize }} can be done by fewer than two people with two-step sign-in.</strong>
       Every action should be possible for at least two people, so nothing stalls if someone is away. Invite another board member from their page under <a href="{% url 'people' %}">People</a>.

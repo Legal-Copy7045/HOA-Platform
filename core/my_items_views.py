@@ -25,6 +25,5 @@ def my_items_page(request):
             "thin": policy.thinly_covered_actions()
             if policy.can(request.user, "community.manage_rules")
             else {},
-            "can_record_checks": policy.can(request.user, "ledger.manage"),
         },
     )
