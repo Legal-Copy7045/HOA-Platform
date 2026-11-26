@@ -19,6 +19,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from comms import push, sms
@@ -147,6 +148,11 @@ def push_unsubscribe(request):
 @login_required
 @require_POST
 def sms_start(request):
+    # Opt-in only (D44): the box is never pre-ticked, and a number alone
+    # (say, one added to the Phone list) never signs anyone up.
+    if request.POST.get("opt_in") != "on":
+        messages.error(request, "Tick \u201cReceive text alerts\u201d to sign up for texts.")
+        return redirect(reverse("my_profile") + "#texts")
     try:
         sms.start_verification(
             user=request.user, number=request.POST.get("number", ""), request=request
@@ -175,6 +181,11 @@ def sms_verify(request):
 @login_required
 @require_POST
 def sms_stop(request):
+    # The opted-in form keeps the box ticked: saving it still ticked changes
+    # nothing; unticking (or the plain stop button) turns texts off at once.
+    if request.POST.get("opt_in") == "on":
+        messages.info(request, "Text alerts stay on.")
+        return redirect(reverse("my_profile") + "#texts")
     sms.stop(user=request.user, request=request)
     messages.success(request, "Urgent texts are off. We removed your mobile number.")
     return redirect("my_profile")

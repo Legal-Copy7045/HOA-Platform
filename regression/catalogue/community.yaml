@@ -69,3 +69,9 @@
 - feature: "D41 owner requests: adding someone needs their email unless they don't use email (record only); approval invites them as the approving board member (a failed invitation keeps the approval and points the board to Invitations and sign-ups); deed changes (add owner joint/trust/entity, remove owner) with the deed date and the recorded deed (board and that account's owners only), never approved by the requester or the person added/removed, at least one owner kept, co-owner joins the running account with no ledger moves, sole/joint type follows (audited)"
   since: M4
   match: ["^unit:community/tests/test_account_change_owners", "^unit:core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data\\[account_change_"]
+- feature: "Official notices step after sign-up (D44): only after MFA, owners on the deed only, email or post with no default, wording version recorded and audited, skip leaves a My items to-do, answered people never asked again, board counts per home"
+  since: M5
+  match: ["^unit:community/tests/test_notice_consent", "^manual:official notices step on a phone"]
+- feature: "How we reach you on My profile (D44): notices choice, extra emails with notices only after choosing email, typed phones, one structured mailing address for post read first by letters, old addresses flagged with a to-do, cross-person 404s"
+  since: M5
+  match: ["^unit:community/tests/test_how_we_reach_you", "^manual:how we reach you on a phone"]

@@ -88,6 +88,13 @@ GROUP_NOTES: dict[str, str] = {
         f"the Act requires (financial records, minutes, ballots, {ACT} § 5316) are kept in "
         "full; contact details of people who have left are a board privacy policy."
     ),
+    "Notices": (
+        "Pennsylvania law generally lets an association give notice by electronic means to an "
+        "owner who has agreed to receive it that way. See the notice provisions of the Uniform "
+        f"Planned Community Act ({ACT} Chapter 54) and of the Nonprofit Corporation Law "
+        "(15 Pa.C.S.); have counsel confirm the consent wording and which notices it covers. "
+        "Owners who have not agreed get paper notices."
+    ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
@@ -270,6 +277,15 @@ GUIDES["payments.credit_card_surcharge_bp"] = Guide(
     "the disclosure wording.",
     "300 (3%, not more than the processor's credit card cost): Board resolution 2027-09, "
     "after counsel review.",
+)
+
+GUIDES["notices.electronic_consent_required"] = Guide(
+    BYLAWS,
+    "Pennsylvania law generally permits notice by electronic means to an owner who has "
+    f"consented to it (Uniform Planned Community Act, {ACT} Chapter 54, and the Nonprofit "
+    "Corporation Law, 15 Pa.C.S.: have counsel confirm the provisions and the wording). "
+    "Without consent, notices go by post.",
+    "On: owners choose email or post at sign-up; Bylaws notice article, as confirmed by counsel.",
 )
 
 GUIDES["retention.former_owner_contact_days"] = Guide(

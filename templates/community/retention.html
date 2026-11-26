@@ -11,7 +11,7 @@
     {% if due %}<div class="table-wrap"><table>
       <thead><tr><th>Person</th><th>Left on</th><th>Will clear</th></tr></thead>
       <tbody>{% for c in due %}<tr><td><a href="{% url 'person_detail' c.person.pk %}">{{ c.person.display_name }}</a></td><td class="nowrap">{{ c.left_on|date:"M j, Y" }}</td>
-        <td class="small">{% if c.profile %}{% if c.profile.phone %}phone; {% endif %}{% if c.profile.mailing_address %}mailing address; {% endif %}{% if c.profile.in_directory or c.profile.directory_show_email or c.profile.directory_show_phone %}directory listing; {% endif %}{% endif %}{% if c.methods %}{{ c.methods|length }} contact method{{ c.methods|length|pluralize }}{% endif %}</td></tr>{% endfor %}</tbody>
+        <td class="small">{% if c.profile %}{% if c.profile.phone %}phone; {% endif %}{% if c.profile.mailing_address or c.profile.mail_street %}mailing address; {% endif %}{% if c.profile.in_directory or c.profile.directory_show_email or c.profile.directory_show_phone %}directory listing; {% endif %}{% endif %}{% if c.methods %}{{ c.methods|length }} contact method{{ c.methods|length|pluralize }}{% endif %}</td></tr>{% endfor %}</tbody>
     </table></div>
     {% if days %}<form method="post" action="{% url 'retention_run' %}" class="inline" data-confirm="Clear these contact details now? This cannot be undone.">{% csrf_token %}<button type="submit" class="danger">Clear now</button></form>{% endif %}
     {% else %}{% include "partials/empty.html" with icon="check-circle" title="Nobody is due" %}{% endif %}

@@ -56,6 +56,8 @@ OWN_ACCOUNT = {
     "export_my_data",
     "owner_preview_stop",
     "contact_method_add",
+    # D44: the official notices step acts on the signed-in person only (no id).
+    "notice_choice",
     # Installable app and alerts (Milestone 4): the manifest and service
     # worker hold nothing personal; the rest act on the signed-in login only.
     "pwa_manifest",
@@ -190,6 +192,7 @@ PROTECTED = {
     "lot_account_contact_add": ("POST", "account_b"),
     "lot_account_contact_end": ("POST", "account_contact_b"),
     "contact_method_remove": ("POST", "contact_method_b"),
+    "contact_method_notices": ("POST", "contact_method_b"),
     "my_history": ("GET", None),
     "board_home": ("GET", None),
     "owner_preview_start": ("POST", None),

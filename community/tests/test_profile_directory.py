@@ -13,12 +13,16 @@ pytestmark = pytest.mark.django_db
 def test_owner_edits_own_profile_and_consent_is_timestamped(client):
     owner = make_member(lots=[LotFactory()])
     client.force_login(owner)
-    client.post(reverse("my_profile"), {"phone": "555-0100", "electronic_notice_consent": "on"})
+    client.post(
+        reverse("my_profile"),
+        {"section": "phone_add", "phone_type": "mobile", "number": "555-555-0100"},
+    )
+    client.post(reverse("my_profile"), {"section": "notices", "choice": "email"})
     from community.models import ContactProfile
 
     with system_access("t"):
         p = ContactProfile.objects.get(person__user=owner)
-    assert p.phone == "555-0100" and p.electronic_notice_consent and p.consent_changed_at
+    assert p.phone == "555-555-0100" and p.electronic_notice_consent and p.consent_changed_at
     event = AuditEvent.objects.get(action="profile.updated")
     assert event.metadata["consent_changed"] is True
     assert "555" not in str(event.metadata)

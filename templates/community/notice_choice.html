@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Official notices · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Official notices</h1></div></div>
+  <section class="card notice-step">
+    {% include "partials/form_errors.html" %}
+    {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
+    <h2>How would you like to get official notices?</h2>
+    <p>{{ notice_text.0 }} They include:</p>
+    <ul>{% for k in notice_kinds %}<li>{{ k }}</li>{% endfor %}</ul>
+    <p>{{ notice_text.1 }}</p>
+    <p>{{ notice_text.2 }}</p>
+    <form method="post" action="{% url 'notice_choice' %}">{% csrf_token %}
+      <div class="form-actions">
+        <button type="submit" name="choice" value="email">{{ yes_label }}</button>
+        <button type="submit" name="choice" value="post" class="secondary">{{ no_label }}</button>
+      </div>
+    </form>
+    <p class="small muted"><a href="{% url 'home' %}">Skip for now</a>: we'll keep sending notices by post, and remind you in My items until you choose.</p>
+  </section>
+{% endblock %}

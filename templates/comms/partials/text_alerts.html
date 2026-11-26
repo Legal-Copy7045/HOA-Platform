@@ -1,0 +1,40 @@
+{% load portal %}
+{% if sms_on %}
+<div class="text-alerts" id="texts">
+  <h4>Text alerts</h4>
+  <p class="small muted">Optional. The board texts only urgent community notices (a water main break, a road closure), with a link to sign in for details, never your balance or anything personal. Message and data rates may apply. Reply STOP, or untick the box here, to turn them off.</p>
+  {% if sms_number and sms_opted_in %}
+    <form method="post" action="{% url 'sms_stop' %}">{% csrf_token %}
+      <label class="choice" for="sms-opt-in"><input type="checkbox" id="sms-opt-in" name="opt_in" checked> Receive text alerts (urgent community notices only)</label>
+      <p class="small"><span class="badge tone-success">On</span> Texts go to your number {{ sms_number }}. Untick and save to stop them and remove the number.</p>
+      <div class="form-actions"><button type="submit" class="secondary">Save text alert choice</button></div>
+    </form>
+  {% elif not sms_ready %}
+    <p class="small">Text alerts aren't set up yet.</p>
+  {% else %}
+    {% if sms_pending %}
+      <form method="post" action="{% url 'sms_verify' %}">{% csrf_token %}
+        <p><label for="sms-code">Code we texted to your number ending in {{ sms_pending.number|slice:"-4:" }} <span class="required-mark" aria-hidden="true">*</span></label>
+          <input id="sms-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required aria-describedby="sms-code-help">
+          <span class="help" id="sms-code-help">6 digits. The code works for 10 minutes.</span></p>
+        <div class="form-actions"><button type="submit">Confirm</button></div>
+      </form>
+    {% endif %}
+    <form method="post" action="{% url 'sms_start' %}">{% csrf_token %}
+      <label class="choice" for="sms-opt-in"><input type="checkbox" id="sms-opt-in" name="opt_in"> Receive text alerts (urgent community notices only)</label>
+      <div data-show-if="opt_in=on">
+        <p><label for="sms-number">Mobile number <span class="required-mark" aria-hidden="true">*</span></label>
+          <input id="sms-number" type="tel" name="number" autocomplete="tel" maxlength="20" required aria-describedby="sms-number-help">
+          <span class="help" id="sms-number-help">We text a 6-digit code to confirm it. Texts start only after you enter the code.</span></p>
+        <div class="form-actions"><button type="submit" class="secondary">{% if sms_pending %}Send a new code{% else %}Send me a code{% endif %}</button></div>
+      </div>
+    </form>
+  {% endif %}
+</div>
+{% elif sms_number %}
+<div class="text-alerts" id="texts">
+  <h4>Text alerts</h4>
+  <p class="small">Texts are switched off for the community right now. Your mobile number {{ sms_number }} is still stored{% if sms_opted_in %}, and texts would go to it again if they are switched back on{% endif %}.</p>
+  <form method="post" action="{% url 'sms_stop' %}">{% csrf_token %}<button type="submit" class="secondary small">Stop texts and remove my number</button></form>
+</div>
+{% endif %}

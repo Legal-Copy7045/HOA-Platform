@@ -37,6 +37,13 @@
       </section>
     </div>
     <aside>
+      <section class="card" id="contact"><h3>How we reach them</h3>
+        <p class="small"><strong>Official notices:</strong> {% if contact.answered %}{% if contact.consent %}by email{% else %}by post{% endif %} (chosen {{ contact.profile.consent_changed_at|date:"M j, Y" }}{% if contact.profile.notice_consent_version %}, wording {{ contact.profile.notice_consent_version }}{% endif %}){% else %}not answered (post until they choose){% endif %}</p>
+        <p class="small"><strong>Mailing address for post:</strong><br>{% if contact.address %}{{ contact.address|linebreaksbr }}{% else %}<span class="muted">None on file</span>{% endif %}
+          {% if contact.source == "home" %}<br><span class="muted">(the home's address)</span>{% elif contact.source == "old" %}<br><span class="badge tone-warning">Address on file (please check)</span>{% endif %}</p>
+        {% if contact.emails %}<p class="small"><strong>Other emails:</strong></p><ul class="small">{% for m in contact.emails %}<li>{{ m.value }}{% if m.label %} ({{ m.label }}){% endif %}{% if m.notices %} <span class="badge tone-success">notices</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
+        {% if contact.phones %}<p class="small"><strong>Phones:</strong></p><ul class="small">{% for m in contact.phones %}<li>{{ m.value }} <span class="muted">{{ m.get_phone_type_display|default:"Phone" }}</span></li>{% endfor %}</ul>{% endif %}
+      </section>
       <section class="card"><h3>Login</h3>
         {% if person.user_id %}
           <p class="small">Has a login. MFA {% if has_mfa %}enrolled{% else %}<strong>not enrolled</strong>{% endif %}.</p>

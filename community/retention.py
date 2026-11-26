@@ -113,6 +113,7 @@ def _has_details(profile: ContactProfile) -> bool:
     return bool(
         profile.phone
         or profile.mailing_address
+        or profile.mail_street
         or profile.in_directory
         or profile.directory_show_email
         or profile.directory_show_phone
@@ -139,6 +140,10 @@ def run(*, actor, request=None, on: datetime.date | None = None) -> RetentionRun
                     profile = ContactProfile.objects.select_for_update().get(pk=c.profile.pk)
                     profile.phone = ""
                     profile.mailing_address = ""
+                    # The structured postal address (D44).
+                    profile.mail_to_home = None
+                    profile.mail_street = profile.mail_unit = profile.mail_city = ""
+                    profile.mail_state = profile.mail_zip = ""
                     profile.in_directory = False
                     profile.directory_show_email = False
                     profile.directory_show_phone = False

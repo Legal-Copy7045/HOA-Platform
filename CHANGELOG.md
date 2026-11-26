@@ -6,6 +6,27 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.13.0 — 2026-11-26
+
+- Sign-up asks owners how they want official notices: after setting up a
+  passkey or authenticator app, a one-time "Official notices" page offers
+  "Yes, email me official notices" or "No, keep sending them by post",
+  explaining that email saves the association postage and printing. Skipping
+  leaves a My items to-do, which owners who never answered also get. The
+  choice and the wording version are recorded and audited (D44).
+- Invitations and sign-ups shows how many homes get notices by email, by
+  paper, or have not answered, and the wording owners agree to.
+- My profile has one "How we reach you" card: official notices, emails (with
+  "Also send official notices here"), phones with Mobile/Home/Work, and one
+  mailing address for post ("Same as my home's address" or a different
+  address in separate fields). Addresses typed the old way show as "Address
+  on file (please check)" with a to-do. Letters use the new address first.
+- Text alerts are opt-in under Phone: off by default, a texted code still
+  required, unticking stops them at once. Adding a phone never signs you up.
+- Routine updates: "One email per update" or "A weekly summary, only sent in
+  weeks when there is something new". The summary skips updates you can no
+  longer open.
+
 ## 0.12.0 — 2026-11-26
 
 - Fixed: the installable-app update check (`/sw.js`) failed with a server

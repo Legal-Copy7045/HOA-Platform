@@ -109,15 +109,15 @@ def test_bad_numbers_are_refused(raw):
 def test_text_pages_are_off_until_the_board_switches_them_on(client, w, fake):
     client.force_login(w["owner"])
     assert client.post(reverse("sms_start"), {"number": "215-555-0123"}).status_code == 404
-    assert "Urgent text messages" not in client.get(reverse("my_profile")).content.decode()
+    assert "Receive text alerts" not in client.get(reverse("my_profile")).content.decode()
     assert fake.sent == []
 
 
 def test_owner_confirms_a_number_with_a_texted_code(client, w, fake, sms_on):
     client.force_login(w["owner"])
     page = client.get(reverse("my_profile")).content.decode()
-    assert "Urgent text messages" in page and "Text me a code" in page
-    response = client.post(reverse("sms_start"), {"number": "215-555-0123"})
+    assert "Receive text alerts" in page and "Send me a code" in page
+    response = client.post(reverse("sms_start"), {"opt_in": "on", "number": "215-555-0123"})
     assert response.status_code == 302
     ((to, body),) = fake.sent
     assert to == "+12155550123"
