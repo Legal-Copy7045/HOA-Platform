@@ -6,6 +6,25 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.9.0 — 2026-11-26
+
+- Homes are named by their address everywhere, not by lot number (D40): menus,
+  page titles, lists, forms, emails, My items, the dashboard, search results,
+  payments (Stripe line item and receipts) and the Preview as owner banner.
+  "Lots and owners" is now "Homes and owners", a lot's account page is the
+  "Home account", and "Lot neighbors" is "Home neighbors". Lists of homes are
+  in address order.
+- A home's title is its address, with the lot number as a small grey line
+  beneath it (My home, My account, Homes and owners, Home account, and the
+  headers of requests, violations, collection cases and resale certificates).
+- Formal documents name the home as "165 Imaginary Orchard Way (Lot 30)":
+  resale certificate, statements, delinquency letters, ARC decision letters,
+  violation notices and the printed neighbor acknowledgement form.
+- CSV exports start with an "Address" column; the roster, the accounting
+  journal, AR aging, the collections and owner transfer reports keep a
+  "Lot number" column at the end. The board can still search by lot number.
+- The board's My items warns about any home with no address recorded.
+
 ## 0.8.0 — 2026-11-26
 
 - System status shows malware scanning at a glance: answering or not, ClamAV

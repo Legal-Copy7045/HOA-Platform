@@ -48,7 +48,7 @@
 - feature: "Lot and owner register import (check, then commit; links the first officer by email); board members are homeowners first and keep it after leaving the board"
   since: M3
   match: ["^unit:community/tests/test_register_and_board_owners"]
-- feature: "Lots and owners roster view, was Board roster (current and previous accounts) with audited, formula-safe CSV export; list tools (status, dates, paging, export) on board lists; FAQ; dashboard welcome message"
+- feature: "Homes and owners roster view, was Board roster (current and previous accounts) with audited, formula-safe CSV export; list tools (status, dates, paging, export) on board lists; FAQ; dashboard welcome message"
   since: M3
   match: ["^unit:community/tests/test_roster_lists_faq"]
 - feature: "Board seats need a second board member in production (proposal, approval, withdraw; first seats exempt; off on the POC)"
@@ -63,3 +63,6 @@
 - feature: "Retention of former owners' contact details: rule with PA guidance, daily task, board preview and run, append-only run record, records never touched"
   since: M4
   match: ["^unit:community/tests/test_retention"]
+- feature: "Homes named by address, not lot number (D40): address as the title with the lot number as a muted subtitle, address-only lists, emails, My items, search and exports (Lot number column last in finance and register exports), formal documents as '<address> (Lot N)', board Setup item for homes without an address"
+  since: M5
+  match: ["^unit:core/tests/test_addresses", "^unit:ledger/tests/test_letters.py::test_formal_documents_show_the_address", "^unit:arc/tests/test_arc.py::test_decision_letter_names_the_address", "^unit:compliance/tests/test_violations.py::test_notice_letter_names_the_address", "^unit:arc/tests/test_signoffs.py::test_printable_form_names_homes"]
