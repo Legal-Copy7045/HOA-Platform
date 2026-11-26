@@ -21,6 +21,7 @@
         <span class="brand-mark"><svg aria-hidden="true"><use href="{% static 'img/icons.svg' %}#leaf"></use></svg></span>
         <span>{{ SITE_NAME }}<small>Owner portal</small></span>
       </a>
+      <form class="nav-search" method="get" action="{% url 'search' %}" role="search"><label for="nav-search-q" class="sr-only">Search the portal</label><input id="nav-search-q" type="search" name="q" placeholder="Search" maxlength="100" autocomplete="off" value="{% if request.resolver_match.url_name == 'search' %}{{ request.GET.q|truncatechars:100 }}{% endif %}"><button type="submit" aria-label="Search">{% icon "search" %}</button></form>
       <nav class="nav">
         {% for section in nav.sections %}
           {% if section.title %}
@@ -50,6 +51,7 @@
       <header class="topbar">
         <button type="button" class="menu-button" data-nav-toggle aria-controls="sidebar" aria-expanded="false">{% icon "menu" %}<span>Menu</span></button>
         <a class="brand" href="{% url 'home' %}"><span class="brand-mark"><svg aria-hidden="true"><use href="{% static 'img/icons.svg' %}#leaf"></use></svg></span><span>{{ SITE_NAME }}</span></a>
+        <a class="topbar-search" href="{% url 'search' %}">{% icon "search" %}<span class="sr-only">Search</span></a>
       </header>
       <main id="main" class="content {% block content_class %}{% endblock %}">
         {% if request.owner_preview %}
