@@ -37,7 +37,7 @@ services:
   # Malware scanning for every upload (decision D21). Signatures update
   # themselves; the first start downloads them (a few minutes, ~1.5 GB RAM).
   clamav:
-    image: clamav/clamav:1.4.7@sha256:ac15046e610610347c459afabea6683a52cd041c7a10adf5f050ebb05525d62d
+    image: clamav/clamav:1.5.5@sha256:64e30c0bf976198024deb3dc6d5cfe2485fb969c0f73549ba0fdb364b9469614
     restart: unless-stopped
     logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
     environment:
