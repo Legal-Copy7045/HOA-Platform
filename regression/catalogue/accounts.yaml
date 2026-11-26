@@ -23,3 +23,7 @@
 - feature: "Quarterly access review: every login with roles, seats, offices, last sign-in, MFA and flags; append-only review record by a board member; My items reminder after 90 days; board only"
   since: M4
   match: ["^unit:accounts/tests/test_access_review"]
+- feature: "Invitation and enrollment review (D59): every URL sends a login without a passkey or app to setup or signs it out; reviewed list of open pages; new setup link for logins that never enrolled (board only, Person's email, refused after any enrollment or reset); Sign-ups status and My items after 7 days; expired-link page; sign-out audited"
+  since: M4
+  docs: docs/decisions.md
+  match: ["^unit:accounts/tests/test_enrollment_review", "^manual:(accept an invitation on a phone and a laptop|enrollment window expiry)"]
