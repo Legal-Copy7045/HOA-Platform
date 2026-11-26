@@ -44,19 +44,24 @@ host_task_command() {
 
 # host_task_dataset <id>: set TASK_DATASET to the task's dataset if it is a
 # plain name ([a-z_], 1-40 characters) that the portal's seed_demo lists;
-# fail otherwise. The id is a number (checked by the caller).
+# fail otherwise. TASK_ATTACH is 1 only when the column is exactly true.
+# The id is a number (checked by the caller).
 host_task_dataset() {
-  local value names
+  local row value attach names
   TASK_DATASET=""
-  value="$(psql_run -v id="$1" <<'SQL'
-SELECT dataset FROM core_hosttask WHERE id = :'id'::bigint;
+  TASK_ATTACH=0
+  row="$(psql_run -v id="$1" <<'SQL'
+SELECT dataset, attach_requester FROM core_hosttask WHERE id = :'id'::bigint;
 SQL
 )" || return 1
+  IFS='|' read -r value attach <<<"$row"
   [[ "$value" =~ ^[a-z_]{1,40}$ ]] || return 1
   names="$("${COMPOSE[@]}" exec -T web python manage.py seed_demo --list-datasets 2>/dev/null)" \
     || return 1
   grep -Fxq -- "$value" <<<"$names" || return 1
   TASK_DATASET="$value"
+  [ "$attach" = "t" ] && TASK_ATTACH=1
+  return 0
 }
 
 # host_task_clean: printable ASCII only (no control or escape characters),
@@ -143,6 +148,8 @@ SQL
       return 0
     fi
     TASK_CMD+=("$TASK_DATASET")
+    # A fixed flag and the (numeric) task id: never text from the database.
+    if [ "$TASK_ATTACH" -eq 1 ]; then TASK_CMD+=(--attach-requester "$id"); fi
   fi
   out="$(mktemp)"
   chmod 600 "$out"

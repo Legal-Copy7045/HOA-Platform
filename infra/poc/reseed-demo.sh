@@ -7,6 +7,11 @@
 # script with it. By hand, on the VM:
 #
 #   sudo bash /opt/hoa-portal/infra/poc/reseed-demo.sh fresh_start
+#   sudo bash /opt/hoa-portal/infra/poc/reseed-demo.sh fresh_start --attach-requester <task id>
+#
+# --attach-requester (passed by the agent when the box on Demo data was
+# ticked): after seeding, the person who asked gets a board seat and a demo
+# home in the new data (demo_attach_requester; POC only).
 #
 # Steps, each stopping the reseed if it fails:
 #   1. refuse unless .env says DEPLOYMENT_STAGE=poc and SEED_DEMO_ALLOWED=true,
@@ -37,6 +42,12 @@ cd "$APP_DIR"
 DATASET="${1:-}"
 demo_dataset_ok "$DATASET" \
   || { echo "Refusing: a dataset name is lower-case letters and _ only." >&2; exit 1; }
+ATTACH_TASK=""
+if [ "$#" -gt 1 ]; then
+  [ "$#" -eq 3 ] && [ "$2" = "--attach-requester" ] && [[ "$3" =~ ^[0-9]{1,18}$ ]] \
+    || { echo "Refusing: usage: reseed-demo.sh <dataset> [--attach-requester <task id>]." >&2; exit 1; }
+  ATTACH_TASK="$3"
+fi
 
 env_value() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | tr -d '"'"'"; }
 reseed_allowed "$(env_value DEPLOYMENT_STAGE)" "$(env_value SEED_DEMO_ALLOWED)" || exit 1
@@ -111,10 +122,22 @@ shred -u "$KEEP" 2>/dev/null || rm -f "$KEEP"
 echo "==> Seeding the $DATASET dataset"
 manage_owner seed_demo --dataset "$DATASET"
 
+ATTACHED=""
+if [ -n "$ATTACH_TASK" ]; then
+  echo "==> Making the requester a board member and a demo home owner"
+  # The data and the logins are in by now: a refusal here is reported, not fatal.
+  if OUT="$(manage_owner demo_attach_requester --task "$ATTACH_TASK")"; then
+    ATTACHED=" $(tail -1 <<<"$OUT")"
+  else
+    ATTACHED=" Requester NOT attached (see the task log)."
+  fi
+  echo "   $ATTACHED"
+fi
+
 echo "==> Removing the replaced data's files"
 manage_owner clean_demo_files
 
 STOPPED=0
 echo "==> Starting the portal"
 "${COMPOSE[@]}" start web worker >/dev/null
-echo "Reseeded with the $DATASET dataset. $KEPT"
+echo "Reseeded with the $DATASET dataset. $KEPT$ATTACHED"

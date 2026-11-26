@@ -11,6 +11,9 @@
 - feature: "Reseed on the VM: agent checks the dataset ([a-z_] and the portal's list) and passes it as one argument to the fixed script; script refuses unless .env says poc and demo data on, backs up first, keeps real logins, empties and migrates, seeds, cleans old files, always restarts the site"
   since: M5
   match: ["^unit:core/tests/test_host_tasks_agent.py::test_reseed", "^unit:core/tests/test_host_tasks_agent.py::test_the_case_statement"]
+- feature: "After reseeding, the requester becomes a board member and joint owner of a demo home (box ticked by default, boolean on the task, fixed flag and numeric task id to the script, POC only, audited with ids; flag off attaches nothing)"
+  since: M5
+  match: ["^unit:community/tests/test_demo_attach.py::", "^unit:core/tests/test_demo_reseed.py::test_(the_box|only_a_reseed_can_carry)", "^unit:core/tests/test_host_tasks_agent.py::test_(attach_requester|reseed_script_accepts_only_the_flag)"]
 - feature: "keep_logins: real logins kept across a reseed with the same ids, password hash, MFA authenticators, email addresses, person, sysadmin role, server-task history and backup heartbeats; demo logins never exported; audited"
   since: M5
   match: ["^unit:accounts/tests/test_keep_logins.py::"]

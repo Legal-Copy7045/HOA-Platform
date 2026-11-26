@@ -23,6 +23,10 @@ DEMO_EMAIL_DOMAINS = ("example.com", "example.org", "example.net")
 NAME_PATTERN = re.compile(r"^[a-z_]{1,40}$")
 
 
+class DemoError(Exception):
+    """A demo-data step refused (shown to the person as is)."""
+
+
 @dataclass(frozen=True)
 class Dataset:
     name: str

@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-2794
+# highest issued: UNIT-2810
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -2780,3 +2780,19 @@ UNIT-2791: "core/tests/test_host_tasks_agent.py::test_reseed_script_accepts_plai
 UNIT-2792: "core/tests/test_host_tasks_agent.py::test_reseed_script_accepts_plain_dataset_names_only[x;y-False]"
 UNIT-2793: "core/tests/test_host_tasks_agent.py::test_reseed_script_accepts_plain_dataset_names_only[A-False]"
 UNIT-2794: "core/tests/test_host_tasks_agent.py::test_reseed_script_accepts_plain_dataset_names_only[-False]"
+UNIT-2795: "community/tests/test_demo_attach.py::test_requester_becomes_board_member_and_joint_owner_of_a_demo_home[fresh_start]"
+UNIT-2796: "community/tests/test_demo_attach.py::test_requester_becomes_board_member_and_joint_owner_of_a_demo_home[oak_creek]"
+UNIT-2797: "community/tests/test_demo_attach.py::test_skips_homes_that_already_have_two_owners"
+UNIT-2798: "community/tests/test_demo_attach.py::test_flag_off_attaches_nothing"
+UNIT-2799: "community/tests/test_demo_attach.py::test_refused_outside_the_poc[True-production]"
+UNIT-2800: "community/tests/test_demo_attach.py::test_refused_outside_the_poc[True-local]"
+UNIT-2801: "community/tests/test_demo_attach.py::test_refused_outside_the_poc[False-poc]"
+UNIT-2802: "community/tests/test_demo_attach.py::test_a_demo_login_is_never_attached"
+UNIT-2803: "core/tests/test_demo_reseed.py::test_the_box_is_ticked_by_default_and_stored_on_the_task"
+UNIT-2804: "core/tests/test_demo_reseed.py::test_the_box_off_is_stored_off"
+UNIT-2805: "core/tests/test_demo_reseed.py::test_only_a_reseed_can_carry_the_flag"
+UNIT-2806: "core/tests/test_host_tasks_agent.py::test_attach_requester_is_a_fixed_flag_with_the_task_id[t-fresh_start --attach-requester 23]"
+UNIT-2807: "core/tests/test_host_tasks_agent.py::test_attach_requester_is_a_fixed_flag_with_the_task_id[f-fresh_start]"
+UNIT-2808: "core/tests/test_host_tasks_agent.py::test_attach_requester_is_a_fixed_flag_with_the_task_id[-fresh_start]"
+UNIT-2809: "core/tests/test_host_tasks_agent.py::test_attach_requester_is_a_fixed_flag_with_the_task_id[true; touch pwned-fresh_start]"
+UNIT-2810: "core/tests/test_host_tasks_agent.py::test_reseed_script_accepts_only_the_flag_and_a_numeric_task_id"

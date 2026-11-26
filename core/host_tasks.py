@@ -146,7 +146,13 @@ def agent_ok(now=None) -> bool:
 
 
 def request_task(
-    actor, kind: str, *, request=None, dataset: str = "", confirmation: str = ""
+    actor,
+    kind: str,
+    *,
+    request=None,
+    dataset: str = "",
+    confirmation: str = "",
+    attach_requester: bool = False,
 ) -> HostTask:
     """Ask the VM agent to run one allowlisted task. Sysadmins only; one at a
     time. Audited (``system.task_requested`` with the kind, and the dataset
@@ -160,8 +166,9 @@ def request_task(
         raise HostTaskRefused("That task is not offered on this server.")
     if kind == Kind.RESEED_DEMO:
         demo_reseed.check_request(dataset, confirmation)
+        attach_requester = attach_requester is True
     else:
-        dataset = ""
+        dataset, attach_requester = "", False
     waiting = current()
     if waiting is not None:
         raise HostTaskRefused(
@@ -170,7 +177,12 @@ def request_task(
         )
     try:
         with transaction.atomic():
-            task = HostTask.objects.create(kind=kind, requested_by=actor, dataset=dataset)
+            task = HostTask.objects.create(
+                kind=kind,
+                requested_by=actor,
+                dataset=dataset,
+                attach_requester=attach_requester,
+            )
     except IntegrityError as exc:  # another request got in first
         raise HostTaskRefused(
             "Another server task is already waiting or running. Try again once it has finished."
@@ -178,6 +190,7 @@ def request_task(
     metadata = {"kind": kind}
     if dataset:
         metadata["dataset"] = dataset
+        metadata["attach_requester"] = attach_requester
     record_event("system.task_requested", actor=actor, request=request, metadata=metadata)
     return task
 

@@ -16,7 +16,10 @@ adds an entry here.
   everything with either dataset (type RESEED to confirm). The server takes
   a backup first, keeps real logins with their passkeys, app codes and
   sysadmin role, and is back in about a minute. The page does not exist on
-  a real deployment, and the server refuses it there too.
+  a real deployment, and the server refuses it there too. A box (ticked by
+  default) makes the person reseeding a board member and the owner of a
+  demo home in the new data, so one login keeps working as sysadmin, board
+  member and owner.
 - A loud warning (startup check and health check) if demo data loading were
   ever switched on in production.
 

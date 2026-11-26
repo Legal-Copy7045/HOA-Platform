@@ -183,6 +183,9 @@ class HostTask(models.Model):
     # registry by the portal and again by the agent; [a-z_] only (D53). The
     # agent may read this before the migration lands, hence the db_default.
     dataset = models.CharField(max_length=40, blank=True, default="", db_default="")
+    # reseed_demo only: afterwards give the requester a board seat and a demo
+    # home in the new data (demo_attach_requester, POC only).
+    attach_requester = models.BooleanField(default=False, db_default=False)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -213,6 +216,10 @@ class HostTask(models.Model):
             models.CheckConstraint(
                 condition=models.Q(dataset__regex=r"^[a-z_]{0,40}$"),
                 name="core_hosttask_dataset_plain",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(attach_requester=False) | models.Q(kind="reseed_demo"),
+                name="core_hosttask_attach_only_reseed",
             ),
         ]
 

@@ -775,9 +775,13 @@ Only on the POC (`DEPLOYMENT_STAGE=poc` and `SEED_DEMO_ALLOWED=true` in
    files and starts the portal (about a minute without the site, more for
    the backup). Sign in again with your own passkey or app: your login,
    authenticators, recovery codes, person and sysadmin role are kept, and so
-   are other non-demo logins and the server-task history. Your home, board
-   seat and any other role are not: `demo_make_me_owner` gives you a demo
-   home again, and on Fresh start a board member is needed to invite people.
+   are other non-demo logins and the server-task history. With "After
+   reseeding, make me a board member and the owner of a demo home in the new
+   data" ticked (the default), you also get a declarant-appointed board seat
+   from today and become joint owner of the first demo home with a single
+   owner; untick it to come back as sysadmin only (then
+   `demo_make_me_owner` gives you a home). Other kept logins get only their
+   login, person and sysadmin role.
 4. The result is on Server tasks (and Demo data). Full output:
    `/var/log/hoa-portal-tasks.log` on the VM.
 

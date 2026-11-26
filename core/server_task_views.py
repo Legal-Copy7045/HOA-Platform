@@ -84,6 +84,13 @@ def _update_summary():
 
 class ReseedForm(forms.Form):
     dataset = forms.ChoiceField(label="Dataset", choices=[(d.name, d.label) for d in demo.DATASETS])
+    attach_requester = forms.BooleanField(
+        label=(
+            "After reseeding, make me a board member and the owner of a demo home in the new data"
+        ),
+        required=False,
+        initial=True,
+    )
     confirm = forms.CharField(
         label=f"Type {host_tasks.RESEED_WORD} to confirm",
         max_length=20,
@@ -113,6 +120,7 @@ def demo_data(request):
                 request=request,
                 dataset=form.cleaned_data["dataset"],
                 confirmation=form.cleaned_data["confirm"],
+                attach_requester=form.cleaned_data["attach_requester"],
             )
         except host_tasks.HostTaskRefused as exc:
             form.add_error(None, str(exc))

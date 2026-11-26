@@ -163,7 +163,11 @@ def test_sysadmin_requests_a_reseed_and_it_is_audited(client, admin, poc):
     )
     event = AuditEvent.objects.get(action="system.task_requested")
     assert event.actor == admin
-    assert event.metadata == {"kind": "reseed_demo", "dataset": "fresh_start"}
+    assert event.metadata == {
+        "kind": "reseed_demo",
+        "dataset": "fresh_start",
+        "attach_requester": False,  # the box was not sent
+    }
     page = client.get(URL).content.decode()
     assert "Waiting for the server" in page and "disabled" in page
     # One task at a time.
@@ -256,12 +260,15 @@ def test_finished_reseed_is_audited_with_its_dataset(admin):
 def test_agent_reads_the_dataset_through_a_variable(admin):
     """The agent's SELECT, run against the real table."""
     agent = Path("infra/poc/host-tasks.sh").read_text()
-    sql = re.search(r"SELECT dataset FROM core_hosttask.*?;\n", agent, re.S).group(0)
+    sql = re.search(r"SELECT dataset, attach_requester FROM core_hosttask.*?;\n", agent, re.S)
+    sql = sql.group(0)
     assert re.findall(r":'(\w+)'", sql) == ["id"]
-    task = HostTask.objects.create(kind="reseed_demo", dataset="oak_creek", requested_by=admin)
+    task = HostTask.objects.create(
+        kind="reseed_demo", dataset="oak_creek", attach_requester=True, requested_by=admin
+    )
     with connection.cursor() as cur:
         cur.execute(re.sub(r":'(\w+)'", r"%(\1)s", sql), {"id": str(task.pk)})
-        assert cur.fetchall() == [("oak_creek",)]
+        assert cur.fetchall() == [("oak_creek", True)]
 
 
 # --- Production: always off, and loud if not ----------------------------------------------
@@ -327,3 +334,37 @@ def test_clean_demo_files_removes_only_unreferenced_files(settings):
     settings.SEED_DEMO_ALLOWED = False
     with pytest.raises(CommandError, match="SEED_DEMO_ALLOWED"):
         call_command("clean_demo_files")
+
+
+# --- After reseeding, make me a board member and a demo home owner ------------------------
+
+
+def test_the_box_is_ticked_by_default_and_stored_on_the_task(client, admin, poc):
+    client.force_login(admin)
+    page = client.get(URL).content.decode()
+    label = "After reseeding, make me a board member and the owner of a demo home in the new data"
+    assert page.count(f"checked> {label}") == 2
+    client.post(URL, {"dataset": "oak_creek", "confirm": "RESEED", "attach_requester": "on"})
+    task = HostTask.objects.get()
+    assert task.attach_requester is True
+    event = AuditEvent.objects.get(action="system.task_requested")
+    assert event.metadata["attach_requester"] is True
+
+
+def test_the_box_off_is_stored_off(client, admin, poc):
+    client.force_login(admin)
+    client.post(URL, {"dataset": "fresh_start", "confirm": "RESEED"})
+    assert HostTask.objects.get().attach_requester is False
+
+
+def test_only_a_reseed_can_carry_the_flag(admin, poc):
+    task = host_tasks.request_task(admin, "backup", attach_requester=True)
+    assert task.attach_requester is False
+    HostTask.objects.filter(pk=task.pk).update(state="succeeded")
+    # Only a real True counts (no truthy strings from elsewhere).
+    task = host_tasks.request_task(
+        admin, "reseed_demo", dataset="oak_creek", confirmation="RESEED", attach_requester="yes"
+    )
+    assert task.attach_requester is False
+    with pytest.raises(IntegrityError), transaction.atomic():
+        HostTask.objects.create(kind="backup", attach_requester=True, requested_by=admin)

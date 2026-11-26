@@ -25,6 +25,7 @@
           <input type="hidden" name="dataset" value="{{ d.name }}">
           {% with bound=form.data.dataset %}<label for="{% if bound == d.name or not bound and forloop.first %}id_confirm{% else %}confirm-{{ d.name }}{% endif %}" class="small">Type {{ word }} to confirm</label>
           <input type="text" name="confirm" id="{% if bound == d.name or not bound and forloop.first %}id_confirm{% else %}confirm-{{ d.name }}{% endif %}" maxlength="20" autocomplete="off" spellcheck="false" required pattern="{{ word }}"{% if bound == d.name and form.confirm.errors %} aria-invalid="true"{% endif %}>{% endwith %}
+          {% with bound=form.data.dataset %}<label class="checkbox small"><input type="checkbox" name="attach_requester" value="on"{% if not form.is_bound or bound != d.name or form.data.attach_requester %} checked{% endif %}> After reseeding, make me a board member and the owner of a demo home in the new data</label>{% endwith %}
           <button type="submit" class="danger small"{% if current %} disabled title="Another task is waiting or running"{% endif %}>Reseed with this dataset</button>
         </form></div>
     </li>{% endfor %}</ul>

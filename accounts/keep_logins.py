@@ -40,6 +40,7 @@ TASK_FIELDS = (
     "id",
     "kind",
     "dataset",
+    "attach_requester",
     "requested_by_id",
     "requested_at",
     "state",
@@ -229,6 +230,7 @@ def import_data(data: dict) -> tuple[int, int]:
             for f in ("requested_at", "started_at", "finished_at", "audited_at"):
                 values[f] = _dt(values[f])
             values["dataset"] = values["dataset"] or ""
+            values["attach_requester"] = values["attach_requester"] is True
             values["summary"] = values["summary"] or ""
             values["output_tail"] = values["output_tail"] or ""
             HostTask(**values).save(force_insert=True)

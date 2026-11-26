@@ -30,7 +30,8 @@ psql_run() {
   { printf 'ARGS:'; printf ' [%s]' "$@"; printf '\nSQL: %s\n' "$sql"; } >>"$APP_DIR/psql.log"
   case "$sql" in
     *"RETURNING id, kind"*) printf '%s\n' "$CLAIM" ;;
-    *"SELECT dataset FROM core_hosttask"*) printf '%s\n' "${DATASET:-}" ;;
+    *"SELECT dataset, attach_requester FROM core_hosttask"*)
+      printf '%s|%s\n' "${DATASET:-}" "${ATTACH:-f}" ;;
   esac
   return 0
 }
@@ -94,9 +95,14 @@ def vm(tmp_path):
 
 
 def _run(
-    vm: Path, claim: str, limit: str = "", dataset: str = ""
+    vm: Path, claim: str, limit: str = "", dataset: str = "", attach: str = "f"
 ) -> tuple[subprocess.CompletedProcess, str]:
-    env = {"PATH": f"{vm}/bin:/usr/bin:/bin", "CLAIM": claim, "DATASET": dataset}
+    env = {
+        "PATH": f"{vm}/bin:/usr/bin:/bin",
+        "CLAIM": claim,
+        "DATASET": dataset,
+        "ATTACH": attach,
+    }
     if limit:
         env["HOST_TASK_LIMIT"] = limit
     result = subprocess.run(  # noqa: S603  # nosec B603
@@ -298,7 +304,7 @@ def test_reseed_runs_the_fixed_script_with_the_dataset_as_one_argument(vm, datas
     assert "[state=succeeded]" in finish
     assert f"[summary=Reseeded with the {dataset} dataset." in finish
     # The dataset was read back through a psql variable, by id only.
-    assert "ARGS: [-v] [id=21]\nSQL: SELECT dataset FROM core_hosttask" in psql
+    assert "ARGS: [-v] [id=21]\nSQL: SELECT dataset, attach_requester FROM core_hosttask" in psql
     # And checked against the portal's own list.
     assert "manage.py seed_demo --list-datasets" in _read(vm, "docker.log")
 
@@ -358,6 +364,7 @@ def test_reseed_script_guards_and_order():
         "manage_owner apply_db_grants",
         "manage_owner keep_logins import --in -",
         'manage_owner seed_demo --dataset "$DATASET"',
+        'manage_owner demo_attach_requester --task "$ATTACH_TASK"',
         "manage_owner clean_demo_files",
         '"${COMPOSE[@]}" start web worker >/dev/null\necho "Reseeded',
     ]
@@ -413,3 +420,29 @@ def test_reseed_script_accepts_plain_dataset_names_only(name, ok):
     from core.tests.test_infra_scripts import _lib
 
     assert (_lib('demo_dataset_ok "$1"', name).returncode == 0) is ok
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    ("attach", "args"),
+    [
+        ("t", "fresh_start --attach-requester 23"),
+        ("f", "fresh_start"),
+        ("", "fresh_start"),
+        ("true; touch pwned", "fresh_start"),  # only exactly "t" counts
+    ],
+)
+def test_attach_requester_is_a_fixed_flag_with_the_task_id(vm, attach, args):
+    result, psql = _run(vm, "23|reseed_demo", dataset="fresh_start", attach=attach)
+    assert result.returncode == 0, result.stderr
+    assert _read(vm, "ran.log") == f"reseed-demo.sh {args}\n"
+    assert not (vm / "pwned").exists()
+    assert "[state=succeeded]" in _finish(psql)
+
+
+def test_reseed_script_accepts_only_the_flag_and_a_numeric_task_id():
+    usage = RESEED.split('ATTACH_TASK=""', 1)[1].split("\nfi\n", 1)[0]
+    assert (
+        '[ "$#" -eq 3 ] && [ "$2" = "--attach-requester" ] && [[ "$3" =~ ^[0-9]{1,18}$ ]]' in usage
+    )
+    assert 'if [ -n "$ATTACH_TASK" ]; then' in RESEED
