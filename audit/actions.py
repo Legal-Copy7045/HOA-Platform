@@ -310,6 +310,14 @@ _SPECS = [
     _spec("arc.edited", "ARC draft edited by the owner", "fields"),
     # --- Regression fixes: operations, ledger, notifications (fix_ops) ---
     _spec("contract.approval_given", "Contract approval given", "have", "need"),
+    # --- Surveys (M5) ---
+    _spec("survey.created", "Survey created", "audience", "anonymous"),
+    _spec("survey.edited", "Survey draft edited", "change"),
+    _spec("survey.opened", "Survey opened", "questions", "emailed"),
+    _spec("survey.closed", "Survey closed"),
+    _spec("survey.sharing_changed", "Survey results sharing changed", "share_results"),
+    _spec("survey.responded", "Survey answered", "anonymous"),
+    _spec("survey.exported", "Survey results exported (CSV)", "rows", "anonymous"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

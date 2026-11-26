@@ -169,6 +169,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "access_review.record": frozenset({BOARD}),
     # Clearing former owners' contact details under the retention rule.
     "retention.manage": frozenset({BOARD}),
+    # --- Surveys (M5): informal, non-binding opinion surveys ---
+    # The survey's own audience setting narrows who sees and answers each one
+    # (owners only, or owners and account contacts including tenants).
+    "survey.view": COMMUNITY,
+    "survey.respond": RESIDENTS,
+    "survey.manage": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);
