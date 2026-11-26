@@ -505,11 +505,6 @@ def test_payout_missing_from_the_bank_or_not_adding_up_fails_reconciliation(clie
     _check(books, synced=True)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: bank reconciliation ignores Stripe payouts (book_balance and the matching "
-    "candidates know deposits, vendor payments and returns only)",
-)
 def test_bank_reconciliation_counts_stripe_payouts(client, w, books):
     acc.save_setup(
         gl_accounts="",

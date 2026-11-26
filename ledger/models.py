@@ -344,6 +344,17 @@ class DepositItem(ScopedAppendOnlyModel):
         return f"deposit item #{self.pk}"
 
 
+# Cash-book items a bank statement clears. A "payout" is a Stripe payout
+# (payments.StripePayout) reaching the bank: online payments reach the bank
+# only that way, never in deposit batches (D33-acctfix-6).
+CASH_ITEM_KINDS = [
+    ("deposit", "Deposit"),
+    ("payment", "Payment"),
+    ("returned", "Returned item"),
+    ("payout", "Stripe payout"),
+]
+
+
 class BankReconciliation(AppendOnlyModel):
     """A month's bank statement matched to the cash book. Kept as recorded;
     a redo is a new reconciliation for the same date."""
@@ -373,10 +384,7 @@ class ReconciledItem(AppendOnlyModel):
     reconciliation = models.ForeignKey(
         BankReconciliation, on_delete=models.PROTECT, related_name="items"
     )
-    kind = models.CharField(
-        max_length=8,
-        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
-    )
+    kind = models.CharField(max_length=8, choices=CASH_ITEM_KINDS)
     object_id = models.PositiveBigIntegerField()
     amount_cents = models.BigIntegerField()
 
@@ -673,10 +681,7 @@ class BankMatch(AppendOnlyModel):
     returned payment). Undoing is a new row pointing at the match it undoes."""
 
     transaction = models.ForeignKey(BankTransaction, on_delete=models.PROTECT, related_name="+")
-    kind = models.CharField(
-        max_length=8,
-        choices=[("deposit", "Deposit"), ("payment", "Payment"), ("returned", "Returned item")],
-    )
+    kind = models.CharField(max_length=8, choices=CASH_ITEM_KINDS)
     object_id = models.PositiveBigIntegerField()
     undoes = models.OneToOneField(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="undone_by"

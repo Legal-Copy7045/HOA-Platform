@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import datetime
 import io
+from dataclasses import dataclass
 
 from django.conf import settings
 from django.db import transaction
@@ -326,9 +327,39 @@ def _returned_items(since, as_of):
         )
 
 
+@dataclass(frozen=True)
+class PayoutItem:
+    """A Stripe payout as a cash-book deposit: online payments reach the bank
+    only in payouts, never in deposit batches, so each payout counts once,
+    on its arrival date (D33-acctfix-6)."""
+
+    pk: int
+    payout_id: str
+    arrival_date: datetime.date
+    amount_cents: int
+    status: str
+
+    @property
+    def stripe_says_arrived(self) -> bool:
+        return self.status == "paid"
+
+
+def _payouts(since, as_of) -> list[PayoutItem]:
+    """Stripe payouts arriving after ``since`` through ``as_of``."""
+    from payments.sync import payouts_for_matching
+
+    if as_of <= since:
+        return []
+    return [
+        PayoutItem(p["id"], p["payout_id"], p["arrival_date"], p["amount_cents"], p["status"])
+        for p in payouts_for_matching(since + datetime.timedelta(days=1), as_of)
+        if p["status"] not in ("failed", "canceled")
+    ]
+
+
 def book_balance(as_of: datetime.date) -> int:
-    """Opening cash + deposits - vendor payments - bounced deposited
-    payments, through ``as_of``."""
+    """Opening cash + deposits + Stripe payouts - vendor payments - bounced
+    deposited payments, through ``as_of``."""
     from operations.models import InvoicePayment
 
     setup = AccountingSetup.get()
@@ -346,11 +377,13 @@ def book_balance(as_of: datetime.date) -> int:
         or 0
     )
     returned = sum(e.amount_cents for e in _returned_items(since, as_of))
-    return setup.opening_cash_cents + deposits - paid - returned
+    payouts = sum(p.amount_cents for p in _payouts(since, as_of))
+    return setup.opening_cash_cents + deposits + payouts - paid - returned
 
 
 def uncleared(as_of: datetime.date) -> dict:
-    """Deposits and vendor payments through ``as_of`` not yet on a statement."""
+    """Deposits, Stripe payouts and vendor payments through ``as_of`` not yet
+    on a statement."""
     from operations.models import InvoicePayment
 
     setup = AccountingSetup.get()
@@ -368,7 +401,9 @@ def uncleared(as_of: datetime.date) -> dict:
         if p.pk not in _cleared_ids("payment")
     ]
     returned = [e for e in _returned_items(since, as_of) if e.pk not in _cleared_ids("returned")]
-    return {"deposits": deposits, "payments": payments, "returned": returned}
+    cleared_payouts = _cleared_ids("payout")
+    payouts = [p for p in _payouts(since, as_of) if p.pk not in cleared_payouts]
+    return {"deposits": deposits, "payments": payments, "returned": returned, "payouts": payouts}
 
 
 def reconcile(
@@ -378,12 +413,18 @@ def reconcile(
     cleared_deposit_ids,
     cleared_payment_ids,
     cleared_returned_ids=(),
+    cleared_payout_ids=None,
     note: str = "",
     actor,
     request=None,
 ) -> BankReconciliation:
     """Record a statement: the ticked items clear; the rest are outstanding.
-    The difference should be zero; a non-zero one is recorded as found."""
+    The difference should be zero; a non-zero one is recorded as found.
+
+    ``cleared_payout_ids``: the Stripe payouts ticked. Left out (None), the
+    payouts Stripe reports as paid (arrived at the bank) clear and any
+    others stay outstanding; the reconciliation page always sends the
+    board's ticks."""
     require(actor, "accounting.manage")
     with transaction.atomic():
         AccountingSetup.objects.select_for_update().get(pk=AccountingSetup.get().pk)
@@ -391,12 +432,23 @@ def reconcile(
         deposits = {d.pk: d for d in open_items["deposits"]}
         payments = {p.pk: p for p in open_items["payments"]}
         returned = {e.pk: e for e in open_items["returned"]}
+        payouts = {p.pk: p for p in open_items["payouts"]}
         dep_ids = {int(i) for i in cleared_deposit_ids}
         pay_ids = {int(i) for i in cleared_payment_ids}
         ret_ids = {int(i) for i in cleared_returned_ids}
-        if not (dep_ids <= set(deposits) and pay_ids <= set(payments) and ret_ids <= set(returned)):
+        if cleared_payout_ids is None:
+            po_ids = {k for k, p in payouts.items() if p.stripe_says_arrived}
+        else:
+            po_ids = {int(i) for i in cleared_payout_ids}
+        if not (
+            dep_ids <= set(deposits)
+            and pay_ids <= set(payments)
+            and ret_ids <= set(returned)
+            and po_ids <= set(payouts)
+        ):
             raise AccountingError("Some ticked items are not open on this date.")
         outstanding_dep = sum(d.total_cents for k, d in deposits.items() if k not in dep_ids)
+        outstanding_dep += sum(p.amount_cents for k, p in payouts.items() if k not in po_ids)
         outstanding_pay = sum(p.amount_cents for k, p in payments.items() if k not in pay_ids)
         outstanding_pay += sum(e.amount_cents for k, e in returned.items() if k not in ret_ids)
         book = book_balance(statement_date)
@@ -431,6 +483,13 @@ def reconcile(
                 kind="payment",
                 object_id=k,
                 amount_cents=payments[k].amount_cents,
+            )
+        for k in po_ids:
+            ReconciledItem.objects.create(
+                reconciliation=rec,
+                kind="payout",
+                object_id=k,
+                amount_cents=payouts[k].amount_cents,
             )
     record_event(
         "accounting.reconciled",

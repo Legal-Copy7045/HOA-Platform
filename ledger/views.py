@@ -1001,6 +1001,7 @@ def reconcile(request):
                 cleared_deposit_ids=request.POST.getlist("deposits"),
                 cleared_payment_ids=request.POST.getlist("payments"),
                 cleared_returned_ids=request.POST.getlist("returned"),
+                cleared_payout_ids=request.POST.getlist("payouts"),
                 note=request.POST.get("note", ""),
                 actor=request.user,
                 request=request,
@@ -1038,7 +1039,7 @@ def _bank_feed_for_statement(request, statement_date) -> dict:
     from ledger.bankfeeds import matching
     from ledger.bankfeeds import services as bank
 
-    empty = {"ticked": {"deposit": set(), "payment": set(), "returned": set()}}
+    empty = {"ticked": {k: set() for k in ("deposit", "payment", "returned", "payout")}}
     if not statement_date or not bank.feature_on(request):
         return empty
     accounts = list(bank.connections())
