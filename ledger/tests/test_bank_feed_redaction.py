@@ -333,5 +333,11 @@ def test_connect_script_is_limited_to_tellers_connect_path_and_sends_no_referrer
     directives = page["Content-Security-Policy"].split(";")
     script_src = next(d for d in directives if d.strip().startswith("script-src")).split()
     assert [s for s in script_src if "teller.io" in s] == ["https://cdn.teller.io/connect/"]
+    # fixres SEC-004: frames and connections only Teller's two exact hosts.
+    for name in ("frame-src", "connect-src"):
+        sources = next(d for d in directives if d.strip().startswith(name)).split()[1:]
+        teller_sources = sorted(s for s in sources if "teller" in s)
+        assert teller_sources == ["https://api.teller.io", "https://cdn.teller.io"]
+        assert not any("*" in s for s in sources)
     tag = b'<script src="https://cdn.teller.io/connect/connect.js" referrerpolicy="no-referrer">'
     assert tag in page.content

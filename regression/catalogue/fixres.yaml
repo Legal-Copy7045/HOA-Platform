@@ -1,0 +1,32 @@
+# Fixes from the verification run (fixres, 2026-11-26).
+- feature: "Backdated ownership change in two steps (end with a past date, then add the buyer or Transfer) moves the buyer-period entries; entries the board put on the closed account after the closing stay; the lot is locked before the periods are read (BUG-001, BUG-007, D34-fixmoney-1)"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_fixres_moves\\.py::test_(ending_with_a_past_date|entry_posted_by_hand|account_periods_are_read_after_locking)"]
+- feature: "A moved payment stays applied to the moved copies of the charges it paid (BUG-002)"
+  since: M5
+  match: ["^unit:ledger/tests/test_fixres_moves\\.py::test_moved_check_stays_on_the_charge"]
+- feature: "Moved entries give the board a My items entry with the lot, count and accounts, listed on the lot account page with Mark checked (board only, audited); moved copies read 'Moved from account N on <date>' on board pages and owner statements (BUG-003, R2-003)"
+  since: M5
+  match: ["^unit:ledger/tests/test_fixres_moves\\.py::test_(moves_give_the_board|owner_of_another_lot_cannot_check)", "^manual:moved entries board check"]
+- feature: "Bank descriptions: dot/slash/comma-grouped numbers, 8+ digit runs without separators, long runs with cents and numbers at the length cap are masked (before the cut); real dates with separators and small amounts kept; migration ledger.0020 re-masks stored lines with a frozen copy that agrees with the importer (BUG-004, SEC-003, R2-004)"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feed_redaction\\.py::test_(first_migration|second_migration|a_number_at_the_length_cap|a_text_cut_upstream)"]
+- feature: "Teller Connect CSP: scripts only from cdn.teller.io/connect/, frames and connections only Teller's two exact hosts (SEC-004, D34-fixinfra-2)"
+  since: M5
+  match: ["^unit:ledger/tests/test_bank_feed_redaction\\.py::test_connect_script_is_limited"]
+- feature: "Open checkouts past their time are polled hourly then daily; one Stripe cannot find is marked 'Not found at Stripe' at the board item and no longer polled (BUG-005, D34-fixmoney-3)"
+  since: M5
+  match: ["^unit:payments/tests/test_fixmoney_payments\\.py::test_(open_checkout_past_its_time|checkout_stripe_cannot_find)"]
+- feature: "Mark minutes approved approves the version on the page; a version published meanwhile is refused with the form kept and the new version offered (BUG-006, SEC-001, R2-001)"
+  since: M5
+  match: ["^unit:governance/tests/test_packets\\.py::test_minutes_approval_is_for_the_version_on_the_page"]
+- feature: "Packet .zip slot renewed while the stream runs; a download stops after 30 minutes; a slow reader holds one slot only (SEC-002, R2-002)"
+  since: M5
+  match: ["^unit:governance/tests/test_packets\\.py::test_slow_reader_holds_one_slot"]
+- feature: "Off-site restore drill skips future-dated or malformed backup names and uses the newest valid one; signed stamp still must match (R2-005)"
+  since: M5
+  match: ["^unit:core/tests/test_infra_scripts\\.py::test_(offsite_drill_picks|restore_drill_uses_the_picker)"]
+- feature: "harden-host.sh re-run keeps a Falco keyring holding exactly the pinned key without reaching falco.org; first install still downloads and checks (R2-006)"
+  since: M5
+  match: ["^unit:core/tests/test_infra_scripts\\.py::test_falco_rerun_keeps_the_pinned_keyring"]

@@ -51,7 +51,13 @@ API_BASE = f"https://{API_HOST}"
 # residual risk and its limits are in D34-fixinfra-2 and docs/runbook.md.
 CONNECT_SCRIPT = "https://cdn.teller.io/connect/connect.js"
 # The connect page's Content-Security-Policy additions (that one view only).
-# Scripts only from Teller's /connect/ path, not the whole CDN host.
+# Scripts only from Teller's /connect/ path, not the whole CDN host. Frames
+# and connections stay at Teller's two exact hosts (no wildcard, no other
+# Teller host): which paths Connect's frame and requests use is not
+# published and could not be checked from the build environment, so a
+# path here could break the bank sign-in. A path in a source expression is
+# not a boundary anyway: after a redirect the browser checks only the host
+# (fixres SEC-004, D34-fixinfra-2).
 CONNECT_CSP = {
     "script-src": ["https://cdn.teller.io/connect/"],
     "frame-src": ["https://cdn.teller.io", "https://api.teller.io"],
