@@ -34,32 +34,12 @@ from payments.models import (
     StripeCustomer,
     StripePayment,
 )
+from payments.tests.conftest import DUE_DAY
 from payments.tests.test_stripe import KEY
 
 pytestmark = pytest.mark.django_db
 
 MONTHLY = 20_000
-DUE_DAY = 5
-
-
-def _next_due() -> datetime.date:
-    today = timezone.localdate()
-    year, month = (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
-    return datetime.date(year, month, DUE_DAY)
-
-
-@pytest.fixture
-def aw(w, monkeypatch):
-    """The two-lot world of test_stripe, with dues, the feature on, and the
-    calendar moved to next month's due day (enrolment always happens before
-    it)."""
-    board = w["board"]
-    community.set_rule(key="dues.monthly_cents", value="20000", citation="Decl. 8.1", actor=board)
-    community.set_rule(key="dues.due_day", value=str(DUE_DAY), citation="Decl. 8.2", actor=board)
-    FeatureSetting.objects.create(key="autopay", enabled=True)
-    due = _next_due()
-    monkeypatch.setattr(autopay, "_today", lambda: due)
-    return {**w, "due": due, "period": f"{due:%Y-%m}"}
 
 
 def _fresh(client, user):
@@ -500,22 +480,26 @@ def test_partial_credit_lowers_the_charge(client, aw):
     assert call["body"]["amount"] == "15000"
 
 
-def test_an_amount_over_the_ceiling_is_held_for_the_board(client, aw):
-    community.set_rule(
-        key="payments.autopay_ceiling_percent",
-        value="50",
-        citation="Res. 2027-12",
-        actor=aw["board"],
+def test_the_percent_ceiling_is_retired_for_a_dollar_review_limit(client, aw):
+    """D47: payments.autopay_ceiling_percent is replaced by
+    payments.autopay_review_cents ($500.00 by default, with its guidance)."""
+    from community.pa_law import guide
+    from community.rules import REGISTRY, RETIRED, rule
+
+    assert "payments.autopay_ceiling_percent" not in REGISTRY
+    assert "payments.autopay_ceiling_percent" in RETIRED
+    assert rule("payments.autopay_review_cents") == 50_000 == autopay.review_cents()
+    assert (
+        "Board resolution adopting automatic payments"
+        in guide("payments.autopay_review_cents").example
     )
+    # Below the limit nothing waits: the month is charged on the due day.
     _enrol(client, aw, "card")
     _post_dues(aw)
     autopay.run()
-    autopay.run()
-    assert not _intent_posts(aw["fake"])
+    assert len(_intent_posts(aw["fake"])) == 1
     with system_access("t"):
-        (alert,) = PaymentAlert.objects.filter(kind=AlertKind.AUTOPAY)
-    assert alert.amount_cents == MONTHLY and "ceiling" in alert.detail
-    assert AuditEvent.objects.filter(action="payments.autopay_held").count() == 1
+        assert not PaymentAlert.objects.filter(kind=AlertKind.AUTOPAY).exists()
 
 
 def test_set_up_after_the_due_date_starts_next_month(client, aw, monkeypatch):

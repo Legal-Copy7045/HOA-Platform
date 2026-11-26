@@ -3,33 +3,46 @@
 {% block title %}Pay assessments automatically · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'my_account' %}">My account</a> / Pay assessments automatically</div>
-  <div class="page-head"><div><h1>Pay assessments automatically</h1><p class="subtitle">{{ lot.label }}. Each monthly assessment is paid on its due day from a bank account or card you save on Stripe's secure page. Late fees and other charges are never paid automatically.</p></div></div>
+  <div class="page-head"><div><h1>Pay assessments automatically</h1><p class="subtitle">{{ lot.label }}. Each monthly {% term "term" %} is paid on its due day, or the next 12 months' {% term "terms" %} once a year, from a bank account or card you save on Stripe's secure page. Late fees and other charges are never paid automatically.</p></div></div>
   {% include "payments/_test_banner.html" %}
   <section class="card" data-testid="autopay-status">
     <h2>Now</h2>
     {% if info.status == "on" %}
-      <p><span class="status tone-success">On</span> Paying from your {{ info.label }}{% if info.since %}, since {{ info.since|date:"M j, Y" }}{% endif %}.</p>
-      {% if info.description %}<p>{{ info.description }}</p>{% endif %}
+      <p><span class="status tone-success">On</span> Paying {{ info.schedule_text }} from your {{ info.label }}{% if info.since %}, since {{ info.since|date:"M j, Y" }}{% endif %}.</p>
+      {% if info.review %}<p data-testid="autopay-review"><span class="status tone-warning">Waiting</span> {{ info.review_text }} Nothing is charged until a board member approves it; you are emailed if it is declined or not decided within 14 days.</p>
+      {% elif info.description %}<p>{{ info.description }}</p>{% endif %}
     {% elif info.status == "paused" %}
       <p><span class="status tone-warning">Paused</span> A payment from your {{ info.label }} didn't go through, so nothing is charged automatically until you set up a payment method again below.</p>
       <p><a class="btn" href="{% url 'pay_online' lot.pk %}?all=1">{% icon "wallet" %} Pay now</a></p>
     {% else %}
-      <p><span class="status tone-neutral">Off</span> Assessments are not paid automatically.</p>
+      <p><span class="status tone-neutral">Off</span> {% term "Terms" %} are not paid automatically.</p>
     {% endif %}
     {% if info.waiting %}<p class="small">A bank account is waiting to be verified (Stripe emails you about small test deposits). It is used once verified.</p>{% endif %}
     {% if info.status != "off" %}
       <form method="post" action="{% url 'autopay_cancel' lot.pk %}" data-confirm="Turn off automatic payments? Nothing more is charged automatically, and the saved payment method is removed at Stripe. You can pay by hand or set it up again any time.">{% csrf_token %}<button type="submit" class="secondary">Turn off automatic payments</button></form>
     {% endif %}
   </section>
+  {% if info.status != "off" %}
+  <section class="card" data-testid="autopay-schedule">
+    <h2>Schedule</h2>
+    <p class="small">Now: {{ info.schedule_text }}. A change takes effect from the next charge; a payment already made stands.</p>
+    <form method="post" action="{% url 'autopay_schedule' lot.pk %}">{% csrf_token %}
+      {% include "payments/_autopay_schedule_fields.html" with current=info.schedule %}
+      <label class="checkbox"><input type="checkbox" name="authorize" value="1" required> I authorize automatic payments on the schedule I chose, as described above.</label>
+      <div class="form-actions"><button type="submit" class="secondary">Change schedule</button></div>
+    </form>
+  </section>
+  {% endif %}
   <section class="card" data-testid="autopay-choose">
     <h2>{% if info.status == "off" %}Set up{% else %}Use a different bank account or card{% endif %}</h2>
-    <p class="small">The monthly assessment is {{ monthly_cents|cents }}. Credit already on your account is used first.</p>
+    <p class="small">The monthly {% term "term" %} is {{ monthly_cents|cents }}. Credit already on your account is used first.</p>
     <form method="post" action="{% url 'autopay_start' lot.pk %}">{% csrf_token %}
+      {% include "payments/_autopay_schedule_fields.html" with current=info.schedule %}
       <fieldset><legend>Pay from</legend>
         <label class="radio"><input type="radio" name="method" value="us_bank_account" required> Bank account (no fee)</label>
-        <label class="radio"><input type="radio" name="method" value="card"> Card{% if surcharge_bp %}: debit cards no fee; credit cards add the {{ surcharge_text }} surcharge{% if card_surcharge_cents %} ({{ card_surcharge_cents|cents }} each month){% endif %}{% else %} (no fee){% endif %}</label>
+        <label class="radio"><input type="radio" name="method" value="card"> Card{% if surcharge_bp %}: debit cards no fee; credit cards add the {{ surcharge_text }} surcharge{% if card_surcharge_cents %} ({{ card_surcharge_cents|cents }} each month, or {{ annual_card_surcharge_cents|cents }} on a yearly payment){% endif %}{% else %} (no fee){% endif %}</label>
       </fieldset>
-      <p class="small muted">{{ disclosure }} You enter your bank or card details on Stripe's page; the portal never sees them. For a bank account, Stripe asks you to authorize the monthly debits.</p>
+      <p class="small muted">{{ disclosure }} You enter your bank or card details on Stripe's page; the portal never sees them. For a bank account, Stripe asks you to authorize the debits on the schedule you chose.</p>
       <div class="form-actions"><button type="submit">{% icon "wallet" %} Continue to Stripe</button></div>
     </form>
   </section>

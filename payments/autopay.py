@@ -30,9 +30,23 @@ idempotency key of the same three, so re-runs never charge twice. The
 payment is recorded only when Stripe says the PaymentIntent succeeded, by the
 same verification and recording code as Pay online (``checkout.
 _from_payment_intent``); a bank payment stays "processing" and is asked
-about until it settles. An amount above the ceiling (rule
-``payments.autopay_ceiling_percent`` of the monthly dues) is not charged:
-the board gets an item.
+about until it settles.
+
+Once a year (D47). A payer may choose the annual schedule instead: on the
+due day of the month they choose, the next twelve monthly assessments are
+charged in one payment, less any credit already on the account. Nothing is
+charged monthly then. The payment is recorded like any other (applied to
+that month's assessment when it is already posted); the rest is credit that
+open-item allocation applies to each month's assessment as it posts, exactly
+as a prepayment (D30). One annual charge per account and year (period
+"YYYY", idempotency key ``autopay-<account>-annual-<year>-<try>``).
+
+Review (D47, replacing D46's percent ceiling). Any automatic charge whose
+total (surcharge included) is above rule ``payments.autopay_review_cents``
+is not charged: an ``AutopayReview`` waits for a board member who does not
+pay for that home (``payments.autopay_review``). Approved, it is charged on
+the next run; declined or not decided within 14 days, nothing is charged
+and the payers are told.
 
 Failures. A decline, a payment needing the cardholder's authentication or a
 failed bank debit is recorded (append-only), emailed to the payers and shown
@@ -66,6 +80,7 @@ from payments.models import (
     AutopayAttempt,
     AutopayEvent,
     AutopayEventKind,
+    AutopaySchedule,
     AutopaySetup,
     AutopayType,
     CheckoutState,
@@ -85,7 +100,9 @@ CHARGE_WINDOW_DAYS = 7  # a run missed on the due day still charges within a wee
 RECHECK_HOURS = 6  # a bank payment still processing is asked about this often
 AMBIGUOUS_MINUTES = 10  # Stripe did not answer: ask again after this long
 REPOST_HOURS = 20  # Stripe keeps idempotency keys at least 24 hours
-CEILING_RULE = "payments.autopay_ceiling_percent"
+REVIEW_RULE = "payments.autopay_review_cents"
+MONTHLY, ANNUAL = AutopaySchedule.MONTHLY.value, AutopaySchedule.ANNUAL.value
+ANNUAL_MONTHS = 12
 
 # Declines worth one more try a few days later. Anything else (expired, lost
 # or stolen card, closed or unauthorized bank account, a payment needing the
@@ -135,10 +152,38 @@ class State:
     method: AutopayEvent | None = None  # the enrolled/replaced row in use
     since: datetime.datetime | None = None  # when this enrolment began
     last_failure: AutopayEvent | None = None  # a failure since the method was set
+    schedule: str = MONTHLY  # D47: monthly or annual
+    annual_month: int | None = None  # annual: the month of the charge (1-12)
+    schedule_since: datetime.datetime | None = None  # when this schedule took effect
 
     @property
     def label(self) -> str:
         return method_label(self.method) if self.method else ""
+
+    @property
+    def schedule_text(self) -> str:
+        return schedule_text(self.schedule, self.annual_month)
+
+
+def month_name(month: int | None) -> str:
+    return datetime.date(2000, month, 1).strftime("%B") if month else ""
+
+
+def schedule_text(schedule: str, annual_month: int | None) -> str:
+    """ "monthly" or "once a year in January"."""
+    if schedule == ANNUAL:
+        return f"once a year in {month_name(annual_month)}"
+    return "monthly"
+
+
+def _apply_schedule(current: State, event: AutopayEvent) -> None:
+    """A row that sets the schedule (rows from before D47 carry none: monthly)."""
+    if not event.schedule:
+        return
+    month = event.annual_month if event.schedule == ANNUAL else None
+    if (event.schedule, month) != (current.schedule, current.annual_month):
+        current.schedule, current.annual_month = event.schedule, month
+        current.schedule_since = event.created_at
 
 
 def method_label(event: AutopayEvent) -> str:
@@ -164,9 +209,22 @@ def state(account_id) -> State:
     current = State(OFF)
     for event in AutopayEvent.objects.filter(account_id=account_id).order_by("created_at", "id"):
         if event.kind == AutopayEventKind.ENROLLED:
-            current = State(ON, event, event.created_at)
+            current = State(ON, event, event.created_at, schedule_since=event.created_at)
+            _apply_schedule(current, event)
+            current.schedule_since = event.created_at
         elif event.kind == AutopayEventKind.REPLACED:
-            current = State(ON, event, current.since or event.created_at)
+            previous = current
+            current = State(
+                ON,
+                event,
+                previous.since or event.created_at,
+                schedule=previous.schedule if previous.status != OFF else MONTHLY,
+                annual_month=previous.annual_month if previous.status != OFF else None,
+                schedule_since=previous.schedule_since or event.created_at,
+            )
+            _apply_schedule(current, event)
+        elif event.kind == AutopayEventKind.SCHEDULE and current.status != OFF:
+            _apply_schedule(current, event)
         elif event.kind == AutopayEventKind.CANCELLED:
             current = State(OFF)
         elif event.kind == AutopayEventKind.PAUSED and current.status != OFF:
@@ -228,10 +286,57 @@ def _customer(account, livemode: bool) -> str:
     return customer_id
 
 
+def _monthly_cents() -> int:
+    from community.rules import rule
+
+    return rule("dues.monthly_cents") or 0
+
+
+def _day_text(day: int) -> str:
+    suffix = "th" if 11 <= day % 100 <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
+def authorization_text(schedule: str, annual_month: int | None, method_type: str = "") -> str:
+    """What the payer authorizes, in one or two sentences, for the set-up
+    page, the schedule form and Stripe's page (D47): which schedule and
+    roughly what amount."""
+    from community.terms import term_text
+
+    monthly = _monthly_cents()
+    if schedule == ANNUAL:
+        text = term_text(
+            f"About {format_cents(monthly * ANNUAL_MONTHS)} once a year in "
+            f"{month_name(annual_month)} (on the {_day_text(_due_day())}), for the next "
+            f"{ANNUAL_MONTHS} months' {{terms}}, less any credit already on the account."
+        )
+    else:
+        text = term_text(
+            f"About {format_cents(monthly)} each month on the {_day_text(_due_day())}, for "
+            "that month's {term}, less any credit already on the account."
+        )
+    if method_type != AutopayType.BANK and fees.surcharge_bp():
+        text += (
+            f" Credit cards add the {fees.percent_text(fees.surcharge_bp())} surcharge to "
+            "the whole amount."
+        )
+    return text
+
+
 def session_params(setup: AutopaySetup, lot_number: str) -> dict:
     """The setup-mode Checkout Session: Stripe's hosted page collects the
-    payment method (and, for a bank account, the debit authorization)."""
+    payment method (and, for a bank account, the debit authorization). The
+    schedule and the rough amount are named in the set-up's description and
+    in the message Stripe shows by the button (D47)."""
+    from community.terms import term_text
+
     base = settings.PORTAL_BASE_URL
+    what = authorization_text(setup.schedule, setup.annual_month, setup.method_type)
+    plan = (
+        f"once a year in {month_name(setup.annual_month)}"
+        if setup.schedule == ANNUAL
+        else "monthly"
+    )
     back = base + reverse("autopay_return", args=[setup.pk])
     params: dict = {
         "mode": "setup",
@@ -241,7 +346,17 @@ def session_params(setup: AutopaySetup, lot_number: str) -> dict:
         "metadata": _metadata(setup),
         "setup_intent_data": {
             "metadata": _metadata(setup),
-            "description": f"Automatic HOA assessment payments, {lot_number}",
+            "description": term_text(
+                f"Automatic HOA {{term}} payments ({plan}), {lot_number}: {what}"
+            )[:500],
+        },
+        "custom_text": {
+            "submit": {
+                "message": (
+                    f"Automatic payments for {lot_number}, {plan}. {what} You can turn them "
+                    "off any time on My account."
+                )[:1200]
+            }
         },
         "payment_method_types": [setup.method_type],
         "success_url": back + "?session_id={CHECKOUT_SESSION_ID}",
@@ -260,7 +375,31 @@ def session_params(setup: AutopaySetup, lot_number: str) -> dict:
     return params
 
 
-def start_setup(user, lot, *, method_type: str, request=None) -> str:
+def clean_schedule(schedule: str, annual_month) -> tuple[str, int | None]:
+    """The schedule and month from a form, or AutopayError."""
+    schedule = schedule or MONTHLY
+    if schedule not in AutopaySchedule.values:
+        raise AutopayError("Choose monthly or once a year.")
+    if schedule == MONTHLY:
+        return MONTHLY, None
+    try:
+        month = int(annual_month)
+    except (TypeError, ValueError):
+        month = 0
+    if not 1 <= month <= 12:
+        raise AutopayError("Choose the month of the yearly payment.")
+    return ANNUAL, month
+
+
+def start_setup(
+    user,
+    lot,
+    *,
+    method_type: str,
+    schedule: str = MONTHLY,
+    annual_month=None,
+    request=None,
+) -> str:
     """Create the AutopaySetup and the Stripe session; returns the hosted
     page to send the payer to."""
     from community.services import _refuse_read_only
@@ -271,6 +410,7 @@ def start_setup(user, lot, *, method_type: str, request=None) -> str:
         raise AutopayError("Automatic payments are not available right now.")
     if method_type not in AutopayType.values:
         raise AutopayError("Choose a bank account or a card.")
+    schedule, annual_month = clean_schedule(schedule, annual_month)
     recent = AutopaySetup.objects.unscoped("rate limit").filter(
         user=user, created_at__gte=timezone.now() - datetime.timedelta(hours=1)
     )
@@ -293,6 +433,8 @@ def start_setup(user, lot, *, method_type: str, request=None) -> str:
         person=person,
         user=user,
         method_type=method_type,
+        schedule=schedule,
+        annual_month=annual_month,
         customer_id=customer_id,
         livemode=cfg.livemode,
         expires_at=timezone.now()
@@ -329,6 +471,7 @@ def start_setup(user, lot, *, method_type: str, request=None) -> str:
             "account_id": account.pk,
             "setup_id": setup.pk,
             "method": method_type,
+            "schedule": schedule,
         },
     )
     return url
@@ -530,9 +673,15 @@ def _enrol(setup: AutopaySetup, details: dict) -> AutopayEvent | None:
             person_id=locked.person_id,
             user_id=locked.user_id,
             customer_id=locked.customer_id,
+            schedule=locked.schedule or MONTHLY,
+            annual_month=locked.annual_month if locked.schedule == ANNUAL else None,
             **details,
         )
         _set_setup_state(setup, SetupState.DONE)
+        if before.schedule != (locked.schedule or MONTHLY) or (
+            before.annual_month != (locked.annual_month if locked.schedule == ANNUAL else None)
+        ):
+            _close_reviews_for_schedule(account, code="schedule_changed")
         record_event(
             "payments.autopay_enrolled",
             actor=locked.user,
@@ -543,6 +692,7 @@ def _enrol(setup: AutopaySetup, details: dict) -> AutopayEvent | None:
                 "setup_id": locked.pk,
                 "method": locked.method_type,
                 "replaced": replaced,
+                "schedule": locked.schedule or MONTHLY,
             },
         )
         old = before.method.payment_method_id if before.method else ""
@@ -618,6 +768,68 @@ def cancel(user, lot, *, request=None) -> None:
         _cancel(account, code="owner", user=user, request=request)
 
 
+def change_schedule(user, lot, *, schedule: str, annual_month=None, request=None) -> AutopayEvent:
+    """A payer switches between monthly and once a year (or the month of the
+    yearly payment). Audited; takes effect from the next charge: a charge
+    already made this month or year stands, and a review waiting for the
+    board under the old schedule is closed."""
+    from community.models import Person
+    from community.services import _refuse_read_only
+
+    _refuse_read_only(user)
+    flow.require_can_pay(user, lot)
+    if not autopay_enabled():
+        raise AutopayError("Automatic payments are not available right now.")
+    schedule, annual_month = clean_schedule(schedule, annual_month)
+    account = _current_account(lot.pk)
+    if account is None:
+        raise AutopayError("Automatic payments are not set up for this home.")
+    with transaction.atomic(), system_access("autopay schedule"):
+        _lock_account(account)
+        before = state(account.pk)
+        if before.status == OFF:
+            raise AutopayError("Automatic payments are not set up for this home.")
+        if (before.schedule, before.annual_month) == (schedule, annual_month):
+            raise AutopayError("That is already the schedule.")
+        event = AutopayEvent.objects.create(
+            lot_id=account.lot_id,
+            account=account,
+            kind=AutopayEventKind.SCHEDULE,
+            person_id=Person.objects.filter(user=user).values_list("pk", flat=True).first(),
+            user=user,
+            customer_id=before.method.customer_id if before.method else "",
+            payment_method_id=before.method.payment_method_id if before.method else "",
+            schedule=schedule,
+            annual_month=annual_month,
+        )
+        record_event(
+            "payments.autopay_schedule_changed",
+            actor=user,
+            request=request,
+            target=account,
+            metadata={
+                "lot_id": account.lot_id,
+                "account_id": account.pk,
+                "schedule": schedule,
+                "month": annual_month or 0,
+            },
+        )
+        _close_reviews_for_schedule(account, code="schedule_changed")
+    return event
+
+
+def _lock_account(account) -> None:
+    from community.models import Account
+
+    Account.objects.select_for_update().filter(pk=account.pk).first()
+
+
+def _close_reviews_for_schedule(account, *, code: str) -> None:
+    from payments import autopay_review
+
+    autopay_review.close_waiting(account, code=code)
+
+
 @internal("autopay ownership ended")
 def ownership_changed(lot_id: int) -> int:
     """Called when a lot's account periods change (a sale, an ownership
@@ -646,12 +858,50 @@ def _period(day: datetime.date) -> str:
     return f"{day.year:04d}-{day.month:02d}"
 
 
-def _ceiling_cents() -> int:
+def review_cents() -> int:
+    """Automatic charges above this (surcharge included) wait for the board
+    (rule payments.autopay_review_cents, D47)."""
     from community.rules import rule
 
-    monthly = rule("dues.monthly_cents") or 0
-    percent = rule(CEILING_RULE) or 0
-    return monthly * percent // 100
+    value = rule(REVIEW_RULE)
+    return 50_000 if value is None else value
+
+
+def _shift(year: int, month: int, months: int) -> tuple[int, int]:
+    index = year * 12 + (month - 1) + months
+    return index // 12, index % 12 + 1
+
+
+def annual_periods(first: str) -> list[str]:
+    """The twelve "YYYY-MM" periods an annual charge starting at ``first`` pays."""
+    year, month = (int(x) for x in first.split("-"))
+    return ["{:04d}-{:02d}".format(*_shift(year, month, i)) for i in range(ANNUAL_MONTHS)]
+
+
+def annual_amount(lot_id: int, account_id: int, first: str) -> tuple[list, int]:
+    """(open assessment charges among the twelve months, what an annual
+    charge from ``first`` costs): each of the twelve months' assessment at
+    its open amount when posted (0 once paid) or the monthly amount when not
+    posted yet, less any credit not yet applied (D47)."""
+    from ledger import allocation
+
+    periods = annual_periods(first)
+    monthly = _monthly_cents()
+    posted: dict[str, int] = {}
+    views = []
+    for view in allocation.charges(lot_id, open_only=False, account=account_id):
+        entry = view.entry
+        if entry.kind != "assessment" or entry.period not in periods or view.reversed:
+            continue
+        if entry.reverses_id:
+            continue
+        posted[entry.period] = posted.get(entry.period, 0) + view.open_cents
+        if view.open_cents > 0:
+            views.append(view)
+    need = sum(posted.get(p, monthly) for p in periods)
+    credit = allocation.unapplied_credit(lot_id, account=account_id)
+    views.sort(key=lambda v: (v.entry.period, v.entry.pk))
+    return views, max(need - max(credit, 0), 0)
 
 
 def _assessment(lot_id: int, account_id: int, period: str):
@@ -677,16 +927,17 @@ def amount_for(lot_id: int, account_id: int, period: str) -> tuple[object, int]:
     return view, max(view.open_cents - max(credit, 0), 0)
 
 
-def _hold_back(account, period: str, base: int, ceiling: int) -> None:
+def _grown(account, review, total: int) -> None:
+    """An approved amount grew before it was charged (the assessment amount
+    changed): nothing is charged, the board checks."""
     alert = flow._alert(
         AlertKind.AUTOPAY,
-        f"autopay-{account.pk}-{period}",
+        f"autopay-review-{review.pk}",
         lot_id=account.lot_id,
-        amount=base,
-        detail=f"Automatic payment of {format_cents(base)} for {period} on "
-        f"{account.lot.label} was not charged: it is above the ceiling of "
-        f"{format_cents(ceiling)}. Check the account and the monthly assessment "
-        "amount in Community settings.",
+        amount=total,
+        detail=f"Automatic payment for {account.lot.label} was not charged: it is now "
+        f"{format_cents(total)}, more than the {format_cents(review.total_cents)} the board "
+        "approved. Check the account and the monthly amount in Community settings.",
     )
     if alert is not None:
         record_event(
@@ -696,17 +947,28 @@ def _hold_back(account, period: str, base: int, ceiling: int) -> None:
             metadata={
                 "lot_id": account.lot_id,
                 "account_id": account.pk,
-                "amount_cents": base,
-                "period": period,
+                "amount_cents": total,
+                "period": review.period,
             },
         )
 
 
 @internal("autopay charge")
-def _charge(account, st: State, period: str, *, try_number: int) -> AutopayAttempt | None:
-    """Charge this month's assessment once for this try. Returns the attempt
-    (or None when there was nothing to do)."""
+def _charge(
+    account,
+    st: State,
+    period: str,
+    *,
+    try_number: int,
+    schedule: str = MONTHLY,
+    covers_from: str = "",
+) -> AutopayAttempt | None:
+    """Charge once for this try: this month's assessment (monthly, period
+    "YYYY-MM") or the next twelve months' (annual, period "YYYY", starting
+    at ``covers_from``). Returns the attempt (or None when there was nothing
+    to do, or the amount waits for the board's review)."""
     from community.models import Lot
+    from payments import autopay_review
 
     if AutopayAttempt.objects.filter(
         account=account, period=period, try_number=try_number
@@ -722,17 +984,43 @@ def _charge(account, st: State, period: str, *, try_number: int) -> AutopayAttem
         with transaction.atomic():
             _cancel(account, code="payer_left")
         return None
-    view, base = amount_for(account.lot_id, account.pk, period)
-    if view is None or base < flow.MIN_CENTS:
-        return None  # not posted yet, already paid, or covered by credit
-    ceiling = _ceiling_cents()
-    if base > ceiling:
-        _hold_back(account, period, base, ceiling)
-        return None
+    if schedule == ANNUAL:
+        views, base = annual_amount(account.lot_id, account.pk, covers_from)
+        charge = views[0].entry if views else None
+        charge_ids = [v.entry.pk for v in views]
+        if base < flow.MIN_CENTS:
+            return None  # credit already covers the year
+    else:
+        view, base = amount_for(account.lot_id, account.pk, period)
+        if view is None or base < flow.MIN_CENTS:
+            return None  # not posted yet, already paid, or covered by credit
+        charge, charge_ids = view.entry, [view.entry.pk]
     method = _surcharge_method(st.method)
     surcharge = fees.surcharge(base, method)
+    total = base + surcharge
+    limit = review_cents()
+    if total > limit:
+        review = autopay_review.hold(
+            account,
+            schedule=schedule,
+            period=period,
+            covers_from=covers_from,
+            method=method,
+            base=base,
+            surcharge=surcharge,
+            limit=limit,
+        )
+        if autopay_review.status(review) != autopay_review.APPROVED:
+            return None  # waiting for the board, declined or expired
+        if total > review.total_cents:
+            _grown(account, review, total)
+            return None
     cfg = config()
     lot = Lot.objects.get(pk=account.lot_id)
+    if schedule == ANNUAL:
+        key = f"autopay-{account.pk}-annual-{period}-{try_number}"
+    else:
+        key = f"autopay-{account.pk}-{period}-{try_number}"
     try:
         with transaction.atomic():
             checkout = PendingCheckout.objects.create(
@@ -742,23 +1030,25 @@ def _charge(account, st: State, period: str, *, try_number: int) -> AutopayAttem
                 person_id=st.method.person_id,
                 user=enroller,
                 method=method,
-                charge_ids=[view.entry.pk],
+                charge_ids=charge_ids,
                 base_cents=base,
                 surcharge_cents=surcharge,
                 surcharge_bp=fees.surcharge_bp() if method == Method.CREDIT else 0,
-                total_cents=base + surcharge,
+                total_cents=total,
                 livemode=cfg.livemode,
                 expires_at=timezone.now() + datetime.timedelta(days=30),
             )
             attempt = AutopayAttempt.objects.create(
                 lot=lot,
                 account=account,
-                charge=view.entry,
+                charge=charge,
+                schedule=schedule,
                 period=period,
+                covers_from=covers_from if schedule == ANNUAL else "",
                 try_number=try_number,
                 checkout=checkout,
                 payment_method_id=st.method.payment_method_id,
-                idempotency_key=f"autopay-{account.pk}-{period}-{try_number}",
+                idempotency_key=key,
             )
     except IntegrityError:
         return None  # another run got there first
@@ -774,6 +1064,7 @@ def _charge(account, st: State, period: str, *, try_number: int) -> AutopayAttem
             "try": try_number,
             "method": method,
             "amount_cents": checkout.total_cents,
+            "schedule": schedule,
         },
     )
     _submit(attempt)
@@ -796,6 +1087,10 @@ def intent_params(attempt: AutopayAttempt, event: AutopayEvent, lot_number: str)
     checkout = attempt.checkout
     metadata = flow._metadata(checkout)
     metadata["autopay_attempt"] = str(attempt.pk)
+    if attempt.schedule == ANNUAL:
+        what = f"HOA assessments, twelve months from {attempt.covers_from}"
+    else:
+        what = f"HOA assessment {attempt.period}"
     params: dict = {
         "amount": checkout.total_cents,
         "currency": "usd",
@@ -805,7 +1100,7 @@ def intent_params(attempt: AutopayAttempt, event: AutopayEvent, lot_number: str)
         "off_session": True,
         "confirm": True,
         "metadata": metadata,
-        "description": f"HOA assessment {attempt.period}, {lot_number} (automatic payment)",
+        "description": f"{what}, {lot_number} (automatic payment)",
     }
     if event.mandate_id:
         params["mandate"] = event.mandate_id
@@ -975,19 +1270,28 @@ def _failed(attempt: AutopayAttempt, code: str) -> None:
         _email_failure(attempt, checkout, retry=retry, paused=paused)
 
 
-def _payer_emails(attempt: AutopayAttempt) -> set[str]:
+def payer_emails(lot_id: int, user=None, account_id=None) -> set[str]:
+    """The home's owners on the deed with a sign-in, plus ``user`` (or the
+    person who set up the account's automatic payments)."""
     from community.models import Ownership
 
     with system_access("autopay emails"):
         emails = set(
             Ownership.objects.active()
-            .filter(lot_id=attempt.lot_id, person__user__isnull=False, person__user__is_active=True)
+            .filter(lot_id=lot_id, person__user__isnull=False, person__user__is_active=True)
             .values_list("person__user__email", flat=True)
         )
-        user = attempt.checkout.user
+        if user is None and account_id is not None:
+            st = state(account_id)
+            user = st.method.user if st.method else None
         if user is not None and user.is_active:
             emails.add(user.email)
     return emails
+
+
+def _payer_emails(attempt: AutopayAttempt) -> set[str]:
+    with system_access("autopay emails"):
+        return payer_emails(attempt.lot_id, attempt.checkout.user)
 
 
 def _email_failure(attempt, checkout, *, retry: bool, paused: bool) -> None:
@@ -1011,7 +1315,7 @@ def _email_failure(attempt, checkout, *, retry: bool, paused: bool) -> None:
         [
             f"Your automatic payment for {lot.label} didn't go through.",
             "",
-            f"  Assessment {attempt.period}: {format_cents(checkout.base_cents)}"
+            f"  {_attempt_what(attempt)}: {format_cents(checkout.base_cents)}"
             + (
                 f" (plus {format_cents(checkout.surcharge_cents)} credit card surcharge)"
                 if checkout.surcharge_cents
@@ -1032,6 +1336,14 @@ def _email_failure(attempt, checkout, *, retry: bool, paused: bool) -> None:
     )
 
 
+def _attempt_what(attempt: AutopayAttempt) -> str:
+    from community.terms import term_text
+
+    if attempt.schedule == ANNUAL:
+        return term_text(f"{{Terms}} for {attempt.period_text} (annual payment)")
+    return term_text(f"{{Term}} {attempt.period_text}")
+
+
 def _date_text(day: datetime.date) -> str:
     return f"{day:%B} {day.day}, {day.year}"
 
@@ -1050,22 +1362,41 @@ def _enrolled_accounts():
 @internal("autopay run")
 def charge_due(today: datetime.date | None = None) -> int:
     """On the due day (or within a week after, if a run was missed): charge
-    this month's assessment of every account with automatic payments on."""
+    this month's assessment of every account paying monthly, and the next
+    twelve months' of every account paying once a year whose month it is."""
     today = today or _today()
-    due_on = datetime.date(today.year, today.month, _due_day())
-    if not (due_on <= today <= due_on + datetime.timedelta(days=CHARGE_WINDOW_DAYS)):
-        return 0
-    period = _period(due_on)
+    due_day = _due_day()
     count = 0
     for account in _enrolled_accounts():
         st = state(account.pk)
         if st.status != ON or st.method is None:
             continue
-        # Set up after this month's due date: it starts next month (the
-        # payer pays what is already due themselves).
-        if st.since and timezone.localdate(st.since) > due_on:
+        if st.schedule == ANNUAL:
+            if not st.annual_month:
+                continue
+            due_on = datetime.date(today.year, st.annual_month, due_day)
+            period, covers_from = f"{due_on.year:04d}", _period(due_on)
+        else:
+            due_on = datetime.date(today.year, today.month, due_day)
+            period, covers_from = _period(due_on), ""
+        if not (due_on <= today <= due_on + datetime.timedelta(days=CHARGE_WINDOW_DAYS)):
             continue
-        if _charge(account, st, period, try_number=1) is not None:
+        # Set up (or this schedule chosen) after the due date: it starts with
+        # the next one (the payer pays what is already due themselves).
+        since = st.schedule_since or st.since
+        if since and timezone.localdate(since) > due_on:
+            continue
+        if (
+            _charge(
+                account,
+                st,
+                period,
+                try_number=1,
+                schedule=st.schedule,
+                covers_from=covers_from,
+            )
+            is not None
+        ):
             count += 1
     return count
 
@@ -1073,7 +1404,8 @@ def charge_due(today: datetime.date | None = None) -> int:
 @internal("autopay retries")
 def retry_due(now=None) -> int:
     """One more try, three days after a soft decline, while automatic
-    payments are still on and the assessment is still open."""
+    payments are still on (on the same schedule) and something is still
+    owed."""
     now = now or timezone.now()
     count = 0
     for failure in AutopayEvent.objects.filter(
@@ -1086,9 +1418,47 @@ def retry_due(now=None) -> int:
             continue
         attempt = failure.attempt
         st = state(failure.account_id)
-        if st.status != ON or st.method is None:
+        if st.status != ON or st.method is None or st.schedule != attempt.schedule:
             continue
-        if _charge(failure.account, st, attempt.period, try_number=2) is not None:
+        if (
+            _charge(
+                failure.account,
+                st,
+                attempt.period,
+                try_number=2,
+                schedule=attempt.schedule,
+                covers_from=attempt.covers_from,
+            )
+            is not None
+        ):
+            count += 1
+    return count
+
+
+@internal("autopay approved")
+def charge_approved(now=None) -> int:
+    """Charges the board approved (D47): charged on the next run, once (the
+    same attempt rows and idempotency keys as on the due day), while
+    automatic payments are still on with the same schedule."""
+    from payments import autopay_review
+
+    count = 0
+    for review in autopay_review.approved_uncharged(now):
+        account = review.account
+        st = state(account.pk)
+        if st.status != ON or st.method is None or st.schedule != review.schedule:
+            continue
+        if (
+            _charge(
+                account,
+                st,
+                review.period,
+                try_number=1,
+                schedule=review.schedule,
+                covers_from=review.covers_from,
+            )
+            is not None
+        ):
             count += 1
     return count
 
@@ -1213,8 +1583,12 @@ def run(now=None) -> int:
         return 0
     today = timezone.localdate(now) if now else _today()
     now = now or timezone.now()
+    from payments import autopay_review
+
     count = poll_attempts(now)
+    autopay_review.expire_due(now)
     count += charge_due(today)
+    count += charge_approved(now)
     count += retry_due(now)
     return count
 
@@ -1225,19 +1599,21 @@ def run(now=None) -> int:
 @internal("autopay next date")
 def next_charge(account) -> tuple[datetime.date, int, int] | None:
     """(date, amount, surcharge) of the next automatic charge, or None when
-    automatic payments are not on. The amount is 0 when credit covers it."""
-    from community.rules import rule
-
+    automatic payments are not on. The amount is 0 when credit covers it.
+    Annual: the next yearly charge and the twelve months' amount."""
     st = state(account.pk)
     if st.status != ON or st.method is None:
         return None
+    if st.schedule == ANNUAL:
+        return _next_annual(account, st)
     today = _today()
     due_day = _due_day()
     due_on = datetime.date(today.year, today.month, due_day)
     period = _period(due_on)
+    since = st.schedule_since or st.since
     this_month = (
         today <= due_on + datetime.timedelta(days=CHARGE_WINDOW_DAYS)
-        and not (st.since and timezone.localdate(st.since) > due_on)
+        and not (since and timezone.localdate(since) > due_on)
         and not AutopayAttempt.objects.filter(account=account, period=period).exists()
     )
     if this_month:
@@ -1246,14 +1622,72 @@ def next_charge(account) -> tuple[datetime.date, int, int] | None:
             view is not None or _posted(account, period)  # posted and already paid or covered
         )
         if not posted:
-            base = _monthly_after_credit(account, rule("dues.monthly_cents") or 0)
+            base = _monthly_after_credit(account, _monthly_cents())
         if view is not None or not posted:
             when = max(due_on, today)
             return when, base, fees.surcharge(base, _surcharge_method(st.method))
-    year, month = (due_on.year + 1, 1) if due_on.month == 12 else (due_on.year, due_on.month + 1)
+    year, month = _shift(due_on.year, due_on.month, 1)
     when = datetime.date(year, month, due_day)
-    base = _monthly_after_credit(account, rule("dues.monthly_cents") or 0)
+    base = _monthly_after_credit(account, _monthly_cents())
     return when, base, fees.surcharge(base, _surcharge_method(st.method))
+
+
+def next_annual_date(account, st: State) -> datetime.date | None:
+    """The due day of the payer's month: this year's while it can still be
+    charged (not charged yet, schedule chosen before it), else next year's."""
+    if not st.annual_month:
+        return None
+    today = _today()
+    due_day = _due_day()
+    due_on = datetime.date(today.year, st.annual_month, due_day)
+    since = st.schedule_since or st.since
+    usable = (
+        today <= due_on + datetime.timedelta(days=CHARGE_WINDOW_DAYS)
+        and not (since and timezone.localdate(since) > due_on)
+        and not AutopayAttempt.objects.filter(account=account, period=f"{due_on.year:04d}").exists()
+    )
+    if usable:
+        return max(due_on, today)
+    return datetime.date(today.year + 1, st.annual_month, due_day)
+
+
+def _next_annual(account, st: State) -> tuple[datetime.date, int, int] | None:
+    when = next_annual_date(account, st)
+    if when is None:
+        return None
+    _views, base = annual_amount(account.lot_id, account.pk, _period(when))
+    return when, base, fees.surcharge(base, _surcharge_method(st.method))
+
+
+@internal("autopay prepaid")
+def prepaid_through(account) -> datetime.date | None:
+    """The last month the account's money already pays for (posted
+    assessments all paid, then whole months of credit at today's amount),
+    or None when this month's assessment is not paid."""
+    from ledger import allocation
+
+    latest = None
+    for view in allocation.charges(account.lot_id, open_only=False, account=account.pk):
+        entry = view.entry
+        if entry.kind != "assessment" or view.reversed or entry.reverses_id or not entry.period:
+            continue
+        if view.open_cents > 0:
+            return None
+        if latest is None or entry.period > latest:
+            latest = entry.period
+    today = _today()
+    if latest is None:
+        year, month = _shift(today.year, today.month, -1)
+    else:
+        year, month = (int(x) for x in latest.split("-"))
+    monthly = _monthly_cents()
+    credit = allocation.unapplied_credit(account.lot_id, account=account.pk)
+    if monthly > 0 and credit > 0:
+        year, month = _shift(year, month, credit // monthly)
+    last = datetime.date(year, month, 1)
+    if last < today.replace(day=1):
+        return None
+    return last
 
 
 def _posted(account, period: str) -> bool:
@@ -1320,16 +1754,60 @@ def describe_for_statement(account) -> str | None:
             f"Your last automatic payment didn't go through; we will try again on "
             f"{_date_text(retry_on)} from your {st.label}."
         )
+    review = _waiting_review(account)
+    if review is not None:
+        if review.schedule == ANNUAL:
+            return (
+                f"Your annual automatic payment of {format_cents(review.total_cents)} is "
+                "waiting for the board's review."
+            )
+        return (
+            f"Your automatic payment of {format_cents(review.total_cents)} is waiting for "
+            "the board's review."
+        )
     nxt = next_charge(account)
     if nxt is None:
         return None
     when, base, surcharge = nxt
+    if st.schedule == ANNUAL:
+        return _describe_annual(account, when, base, surcharge)
     if base <= 0:
         return (
             f"Your credit on account covers the assessment due {_date_text(when)}, so nothing "
             "will be charged automatically then."
         )
     text = f"This will be paid automatically on {_date_text(when)} from your {st.label}"
+    if surcharge:
+        return text + f" (card surcharge {format_cents(surcharge)} included)."
+    return text + "."
+
+
+def _waiting_review(account):
+    from payments import autopay_review
+
+    return autopay_review.waiting_for(account.pk)
+
+
+def _describe_annual(account, when: datetime.date, base: int, surcharge: int) -> str:
+    from community.terms import term_text
+
+    through = prepaid_through(account)
+    paid_annually = AutopayAttempt.objects.filter(
+        account=account, schedule=ANNUAL, checkout__state=CheckoutState.PAID
+    ).exists()
+    if through is not None and paid_annually and through >= _today().replace(day=1):
+        return term_text(
+            f"Your {{terms}} are prepaid through {through:%B %Y} by your annual automatic payment."
+        )
+    if base <= 0:
+        return term_text(
+            "Your credit on account covers the next 12 months' {terms}, so nothing will be "
+            f"charged automatically on {_date_text(when)}."
+        )
+    text = (
+        f"Your annual automatic payment of {format_cents(base + surcharge)} is due on "
+        f"{_date_text(when)}"
+    )
     if surcharge:
         return text + f" (card surcharge {format_cents(surcharge)} included)."
     return text + "."
@@ -1349,15 +1827,40 @@ def for_payer(user, lot) -> dict | None:
         .order_by("-created_at")
         .first()
     )
+    review = _waiting_review(account) if st.status != OFF else None
+    nxt = next_charge(account) if st.status == ON else None
     return {
         "status": st.status,
         "label": st.label,
         "since": st.since,
+        "schedule": st.schedule,
+        "annual_month": st.annual_month,
+        "schedule_text": st.schedule_text,
         "description": describe_for_statement(account),
         "waiting": waiting,
         "retry_on": _retry_on(st) if st.status == ON else None,
         "failed": st.last_failure,
+        "review": review,
+        "review_text": _review_text(review),
+        "next": nxt,
+        "prepaid_through": prepaid_through(account) if st.schedule == ANNUAL else None,
     }
+
+
+def _review_text(review) -> str:
+    if review is None:
+        return ""
+    if review.schedule == ANNUAL:
+        return (
+            f"Your annual payment of {format_cents(review.total_cents)} is waiting for the "
+            "board's review."
+        )
+    from payments import autopay_review
+
+    return (
+        f"Your automatic payment of {format_cents(review.total_cents)} for "
+        f"{autopay_review.what_text(review)} is waiting for the board's review."
+    )
 
 
 @internal("autopay to-dos")
@@ -1380,10 +1883,18 @@ def payer_items(user) -> list:
         failure = st.last_failure
         if st.status == OFF or failure is None:
             continue
-        charge_open = bool(
-            failure.attempt
-            and allocation.charge_status(failure.attempt.charge) in ("open", "partial")
-        )
+        attempt = failure.attempt
+        if attempt is not None and attempt.charge_id is None:
+            # Annual, before any of the twelve months was posted: open while
+            # the account has an open assessment.
+            charge_open = any(
+                v.entry.kind == "assessment"
+                for v in allocation.open_charges(lot.pk, account=account.pk)
+            )
+        else:
+            charge_open = bool(
+                attempt and allocation.charge_status(attempt.charge) in ("open", "partial")
+            )
         if st.status == ON and not charge_open:
             continue
         retry_on = _retry_on(st) if st.status == ON else None
@@ -1426,6 +1937,7 @@ def board_summary(limit: int = 30) -> dict:
                 "account": account,
                 "status": st.status,
                 "method_type": st.method.get_method_type_display() if st.method else "",
+                "schedule": st.schedule_text,
                 "since": st.since,
                 "failures": AutopayEvent.objects.filter(
                     account=account, kind=AutopayEventKind.FAILED, created_at__gte=since

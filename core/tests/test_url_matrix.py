@@ -340,6 +340,9 @@ PROTECTED = {
     "autopay_start": ("POST", "lot_id_b"),
     "autopay_cancel": ("POST", "lot_id_b"),
     "autopay_return": ("GET", "autopay_setup_b"),
+    # D47: the payer's schedule change and the board's review decision.
+    "autopay_schedule": ("POST", "lot_id_b"),
+    "autopay_review": ("POST", "autopay_review_b"),
 }
 
 
@@ -682,11 +685,26 @@ def world():
                 session_id="cs_test_matrixautopayb",
                 expires_at=timezone.now() + timedelta(hours=24),
             )
+            from payments.models import AutopayReview
+
+            autopay_review_b = AutopayReview.objects.create(
+                lot=lot_b,
+                account=account_b,
+                schedule="annual",
+                period="2027",
+                covers_from="2027-01",
+                method="bank",
+                base_cents=240_000,
+                total_cents=240_000,
+                limit_cents=50_000,
+                expires_at=timezone.now() + timedelta(days=14),
+            )
     targets = {
         "checkout_b": checkout_b.pk,
         "payment_b": payment_b.pk,
         "alert_b": alert_b.pk,
         "autopay_setup_b": autopay_setup_b.pk,
+        "autopay_review_b": autopay_review_b.pk,
         "bank_connection": bank_connection.pk,
         "reservation_b": reservation_b.pk,
         "area": area.pk,
@@ -826,6 +844,7 @@ def _url(name, key, targets):
         "autopay",
         "autopay_start",
         "autopay_cancel",
+        "autopay_schedule",
     ):
         kwargs = {"lot_id": targets["lot_id_b"]}
     elif name == "lot_ledger_action":

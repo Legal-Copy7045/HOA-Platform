@@ -239,15 +239,16 @@ REGISTRY: dict[str, RuleSpec] = {
             "answered see a to-do. Official notices are always emailed only to owners who "
             "agreed; everyone else gets paper. Turning this off only stops asking.",
         ),
-        # Automatic payments (D46): a safety ceiling, not a fee.
+        # Automatic payments (D47, replacing D46's percent ceiling): a review
+        # limit, not a fee.
         RuleSpec(
-            "payments.autopay_ceiling_percent",
-            "Automatic payment ceiling, as a percent of the monthly {term} (300 = three months)",
-            INT,
-            "300",
+            "payments.autopay_review_cents",
+            "Automatic payments above this wait for the board's review",
+            CENTS,
+            "50000",
             "Online payments",
-            "An automatic payment above this is not charged; the board gets an item instead. "
-            "Automatic payments only ever pay the month's assessment.",
+            "An automatic payment (monthly or once a year, surcharge included) above this is "
+            "not charged until a board member approves it; the payer sees that it is waiting.",
         ),
         RuleSpec(
             "retention.former_owner_contact_days",
@@ -275,6 +276,16 @@ REGISTRY: dict[str, RuleSpec] = {
             )
         ],
     ]
+}
+
+
+# Keys no longer in use. A value the board recorded for one stays in the
+# database (rules are never deleted, their history is kept) but nothing reads
+# it and the settings page does not list it.
+RETIRED: dict[str, str] = {
+    "payments.autopay_ceiling_percent": (
+        "D47: replaced by payments.autopay_review_cents (a dollar limit with board review)."
+    ),
 }
 
 

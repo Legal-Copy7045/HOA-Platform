@@ -1,0 +1,8 @@
+{% load portal %}<fieldset><legend>How often</legend>
+  <label class="radio"><input type="radio" name="schedule" value="monthly"{% if current != "annual" %} checked{% endif %} required> Monthly: {{ monthly_authorization }}</label>
+  <label class="radio"><input type="radio" name="schedule" value="annual"{% if current == "annual" %} checked{% endif %}> Once a year: about {{ annual_cents|cents }} once a year in the month you choose, for the next 12 months' {% term "terms" %}, less any credit already on the account.{% if card_surcharge_cents %} Credit cards add the {{ surcharge_text }} surcharge to the whole amount.{% endif %}</label>
+  <label>Month of the yearly payment
+    <select name="annual_month">{% for number, name in months %}<option value="{{ number }}"{% if number == default_month %} selected{% endif %}>{{ name }}{% if number == month_now %} (this month){% endif %}</option>{% endfor %}</select>
+  </label>
+  <p class="small muted">Once a year: the yearly payment becomes credit on your account, and each month's {% term "term" %} is paid from it as it is charged. If the {% term "term" %} changes during the year, the credit simply runs out earlier or later; anything left after a sale stays with your account. Credit pays any other open charge first, in the association's usual order. Payments above {{ review_cents|cents }} wait for the board's review before they are charged.</p>
+</fieldset>

@@ -266,9 +266,14 @@ def _autopay_board(request) -> dict | None:
 
     if not features.enabled("autopay", request) or not policy.can(request.user, "payments.manage"):
         return None
-    from payments.autopay import board_summary
+    from payments import autopay_review
+    from payments.autopay import board_summary, review_cents
 
-    return board_summary()
+    return {
+        **board_summary(),
+        "reviews": autopay_review.board_list(request.user),
+        "review_cents": review_cents(),
+    }
 
 
 @login_required
@@ -349,6 +354,7 @@ def autopay(request, lot_id):
     if info is None:
         raise Http404
     monthly = rule("dues.monthly_cents") or 0
+    month_now = auto._today().month
     return render(
         request,
         "payments/autopay.html",
@@ -356,7 +362,19 @@ def autopay(request, lot_id):
             "lot": lot,
             "info": info,
             "monthly_cents": monthly,
+            "annual_cents": monthly * auto.ANNUAL_MONTHS,
             "card_surcharge_cents": fees.surcharge(monthly, fees.CREDIT),
+            "annual_card_surcharge_cents": fees.surcharge(
+                monthly * auto.ANNUAL_MONTHS, fees.CREDIT
+            ),
+            "months": [(m, auto.month_name(m)) for m in range(1, 13)],
+            "default_month": info.get("annual_month") or 1,
+            "month_now": month_now,
+            "monthly_authorization": auto.authorization_text(auto.MONTHLY, None),
+            "annual_authorization": auto.authorization_text(
+                auto.ANNUAL, info.get("annual_month") or 1
+            ),
+            "review_cents": auto.review_cents(),
             "surcharge_bp": fees.surcharge_bp(),
             "surcharge_text": fees.percent_text(fees.surcharge_bp()),
             "disclosure": fees.disclosure(),
@@ -379,7 +397,12 @@ def autopay_start(request, lot_id):
         return redirect("autopay", lot_id=lot.pk)
     try:
         url = auto.start_setup(
-            request.user, lot, method_type=request.POST.get("method", ""), request=request
+            request.user,
+            lot,
+            method_type=request.POST.get("method", ""),
+            schedule=request.POST.get("schedule", auto.MONTHLY),
+            annual_month=request.POST.get("annual_month"),
+            request=request,
         )
     except auto.AutopayError as exc:
         messages.error(request, str(exc))
@@ -391,6 +414,7 @@ def autopay_start(request, lot_id):
 def autopay_return(request, pk):
     """Where Stripe sends the payer back: only a hint to check now. The
     session id must be the one stored on this person's set-up."""
+    from community.terms import term_text
     from payments import autopay as auto
     from payments.models import AutopaySetup, SetupState
 
@@ -408,10 +432,21 @@ def autopay_return(request, pk):
         raise Http404
     state = auto.check_setup(setup)
     if state == SetupState.DONE:
-        messages.success(
-            request,
-            "Automatic payments are set up. Each monthly assessment is paid on its due day.",
-        )
+        if setup.schedule == auto.ANNUAL:
+            messages.success(
+                request,
+                term_text(
+                    "Automatic payments are set up: the next 12 months' {terms} are paid once "
+                    f"a year in {auto.month_name(setup.annual_month)}."
+                ),
+            )
+        else:
+            messages.success(
+                request,
+                term_text(
+                    "Automatic payments are set up. Each monthly {term} is paid on its due day."
+                ),
+            )
     elif state == SetupState.WAITING:
         messages.info(
             request,
@@ -441,3 +476,60 @@ def autopay_cancel(request, lot_id):
             request, "Automatic payments are off. Nothing more will be charged automatically."
         )
     return redirect("my_account")
+
+
+@login_required
+@_autopay_payer
+@reauthentication_required
+def autopay_schedule(request, lot_id):
+    """POST: the payer switches between monthly and once a year (D47).
+    Audited; takes effect from the next charge."""
+    from payments import autopay as auto
+
+    policy.require(request.user, "payments.pay")
+    lot = _autopay_lot(request, lot_id)
+    if request.method != "POST":
+        return redirect("autopay", lot_id=lot.pk)
+    if not request.POST.get("authorize"):
+        messages.error(request, "Tick the box to authorize the new schedule.")
+        return redirect("autopay", lot_id=lot.pk)
+    try:
+        auto.change_schedule(
+            request.user,
+            lot,
+            schedule=request.POST.get("schedule", ""),
+            annual_month=request.POST.get("annual_month"),
+            request=request,
+        )
+    except auto.AutopayError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Schedule changed. It takes effect from the next charge.")
+    return redirect("autopay", lot_id=lot.pk)
+
+
+@login_required
+@require_POST
+def autopay_review(request, pk):
+    """The board approves or declines an automatic payment above the review
+    limit (D47). Board only (payments.manage), never for a home the board
+    member pays for."""
+    from core import features
+    from payments import autopay_review as review
+
+    policy.require(request.user, "payments.manage")
+    if not features.enabled("autopay", request):
+        raise Http404
+    decision = request.POST.get("decision", "")
+    try:
+        if decision == "approve":
+            review.approve(request.user, pk, request=request)
+            messages.success(request, "Approved. It is charged on the next automatic run.")
+        elif decision == "decline":
+            review.decline(request.user, pk, reason=request.POST.get("reason", ""), request=request)
+            messages.success(request, "Declined. Nothing is charged; the owners are emailed.")
+        else:
+            messages.error(request, "Choose approve or decline.")
+    except review.ReviewError as exc:
+        messages.error(request, str(exc))
+    return redirect(reverse("online_payments") + "#autopay-reviews")
