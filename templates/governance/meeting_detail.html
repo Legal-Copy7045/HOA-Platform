@@ -5,7 +5,7 @@
   <div class="crumbs"><a href="{% url 'meetings' %}">Meetings</a> / {{ m.starts_at|date:"M j, Y" }}</div>
   <div class="page-head"><div><h1>{{ m.title }}</h1>
     <div class="meta">{% status m.status %}<span>{{ m.get_kind_display }}</span><span>{% icon "calendar" %}{{ m.starts_at|date:"l F j, Y g:i A" }}</span>{% if m.location %}<span>{% icon "pin" %}{{ m.location }}</span>{% endif %}</div></div>
-    {% if m.minutes_document %}<div class="actions"><a class="btn secondary" href="{% url 'document_detail' m.minutes_document_id %}">{% icon "file" %} Minutes</a></div>{% endif %}
+    {% if m.minutes_document %}<div class="actions">{% if minutes_approval %}<span class="badge tone-success">Minutes approved {{ minutes_approval.approved_on|short_date }}</span>{% else %}<span class="badge tone-warning">Draft minutes, not yet approved</span>{% endif %}<a class="btn secondary" href="{% url 'document_detail' m.minutes_document_id %}">{% icon "file" %} Minutes</a></div>{% endif %}
   </div>
   {% if short_days %}<div class="alert warning">{% icon "alert" %}<span>Notice sent now would be {{ short_days }} day{{ short_days|pluralize }} short of the governing rule.</span></div>{% endif %}
   <div class="split">
@@ -35,6 +35,10 @@
             <h4>Upload the minutes</h4>{% include "partials/form_errors.html" with form=minutes_form %}{{ minutes_form }}
             <p class="help">Saved in Documents under Meeting minutes{% if m.kind == "executive" %}, board only{% else %}, for all owners{% endif %}, and attached here.</p>
             <button type="submit" class="secondary small">Upload and attach</button></form>{% endif %}
+          {% if approve_form %}<form method="post" action="{% url 'meeting_action' m.pk 'approve_minutes' %}" class="stack" id="approve-minutes" data-confirm="Mark these minutes approved by the board? This is recorded permanently, and owner packets then list them as approved minutes. A corrected version later needs its own approval.">{% csrf_token %}
+            <h4>Mark minutes approved</h4>{% include "partials/form_errors.html" with form=approve_form %}{{ approve_form }}
+            <p class="help">Attached minutes are a draft until the board approves them.</p>
+            <button type="submit" class="secondary small">Mark minutes approved</button></form>{% elif minutes_approval and can_manage %}<p class="small muted">{% icon "check" %} Minutes approved {{ minutes_approval.approved_on|short_date }}{% if minutes_approval.note %}: {{ minutes_approval.note }}{% endif %}.</p>{% endif %}
           {% if minutes_choices and not m.minutes_document_id %}<details><summary class="small">Or attach minutes already in Documents</summary><form method="post" action="{% url 'meeting_action' m.pk 'minutes' %}">{% csrf_token %}<label for="doc">Minutes document</label><select id="doc" name="document">{% for d in minutes_choices %}<option value="{{ d.pk }}">{{ d.title }}</option>{% endfor %}</select><p class="help">From Documents, category Minutes.</p><button type="submit" class="secondary small">Attach</button></form></details>{% endif %}
         </section>
       {% endif %}

@@ -1,7 +1,7 @@
 # Surveys (M5): informal multi-question surveys next to polls and votes.
-- feature: "Surveys: board drafts questions (single, multiple with max picks, rating 1-5, short text); opening freezes the survey in the service and by database trigger; one response per person; audience (owners only, or with account contacts and tenants); former owners cannot answer"
+- feature: "Surveys: board drafts questions (single, multiple with max picks, rating 1-5, short text); opening freezes the survey in the service and by database trigger; one response per person; audience (owners only, or with account contacts and tenants); former owners cannot answer; view-only contacts read but cannot answer (R2-005)"
   since: M5
-  match: ["^unit:governance/tests/test_surveys.py::test_(draft_can_change|only_the_board_drafts|one_response_per_person|answers_are_checked|answers_only_while_open|audience_owners_only|former_owner_cannot_answer)"]
+  match: ["^unit:governance/tests/test_surveys.py::test_(draft_can_change|only_the_board_drafts|one_response_per_person|answers_are_checked|answers_only_while_open|audience_owners_only|former_owner_cannot_answer|view_only_contact_reads)"]
 - feature: "Surveys: anonymous answers stored with no person, time or sequential id, apart from the has-responded row (like secret ballots); named surveys link answers; responses append-only (model, trigger, runtime role)"
   since: M5
   match: ["^unit:governance/tests/test_surveys.py::test_(anonymous_answers|named_survey_links|submitted_answers_are_append_only|runtime_role_cannot)"]

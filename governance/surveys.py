@@ -26,7 +26,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import record_event
-from community.models import AccountContact, Ownership, Person
+from community.models import AccountContact, ContactKind, Ownership, Person
 from community.services import _refuse_read_only
 from core import policy
 from core.lists import safe_cell
@@ -68,13 +68,15 @@ def in_audience(survey: Survey, user) -> bool:
 
 
 def audience_people(survey: Survey) -> set[int]:
-    """Person ids of everyone the survey is for, today."""
+    """Person ids of everyone asked to answer the survey, today (view-only
+    contacts may read a residents survey but are not asked to answer)."""
     with system_access("survey audience"):
         people = set(Ownership.objects.active().values_list("person_id", flat=True))
         if survey.audience == SurveyAudience.RESIDENTS:
             people |= set(
                 AccountContact.objects.active()
                 .filter(account__closed_on__isnull=True)
+                .exclude(kind=ContactKind.VIEW_ONLY)
                 .values_list("person_id", flat=True)
             )
     return people

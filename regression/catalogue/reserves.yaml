@@ -14,3 +14,6 @@
 - feature: "Reserve plan CSV export (audited, formula-safe); adopted plan's suggested contribution on the budget page and its balance offered on Letters and certificates"
   since: M5
   match: ["^unit:ledger/tests/test_reserve_plan.py::test_(csv_export|budget_page|letters_page)"]
+- feature: "Reserve years left age from the year they were stated (BUG-007): due year holds when the plan's start year moves, edits show the aged figure, migration backfills the year, adopted snapshots keep their figures"
+  since: M5
+  match: ["^unit:ledger/tests/test_reserve_plan.py::test_(years_left_ages|years_left_is_stated|editing_an_old_figure|migration_backfills)"]

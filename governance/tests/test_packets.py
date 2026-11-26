@@ -65,6 +65,7 @@ def world():
         actor=board,
     )
     gov.attach_minutes(previous, minutes, actor=board)
+    gov.approve_minutes(previous, actor=board)
     meeting = gov.create_meeting(
         title="November board meeting",
         kind="board",
@@ -110,7 +111,8 @@ def _pdf_of(packet) -> bytes:
 def _zip(client, packet):
     response = client.get(reverse("meeting_packet_zip", args=[packet.meeting_id, packet.pk]))
     assert response.status_code == 200, response.status_code
-    return zipfile.ZipFile(io.BytesIO(response.content))
+    assert response.streaming  # never built in memory (SEC-002)
+    return zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content)))
 
 
 # --- Who may build ----------------------------------------------------------------------
@@ -364,6 +366,98 @@ def test_zip_entry_names_are_sanitized(client, world):
     assert packets._zip_name(3, forged) == "03-run.pdf"
 
 
+def test_zip_is_streamed_with_bounded_memory(client, world, monkeypatch):
+    """SEC-002: the .zip goes out chunk by chunk; the builder never holds the
+    whole archive (each piece and the sink's peak stay near one chunk)."""
+    import os
+
+    monkeypatch.setattr(packets, "ZIP_CHUNK_BYTES", 16 * 1024)
+    big = [
+        documents.create_document(
+            title=f"Scan {n}",
+            category="other",
+            visibility="owners",
+            file=pdf_upload(f"scan{n}.pdf", b"%PDF-1.7\n" + os.urandom(300 * 1024) + b"\n%%EOF\n"),
+            actor=world["board"],
+        )
+        for n in range(3)
+    ]
+    packet = packets.build_packet(
+        world["meeting"],
+        variant="owner",
+        attachment_ids=[d.pk for d in big],
+        actor=world["board"],
+    )
+    seen = {}
+    real = packets.PacketZipStream.__init__
+
+    def spy(self, *args, **kwargs):
+        real(self, *args, **kwargs)
+        seen["stream"] = self
+
+    monkeypatch.setattr(packets.PacketZipStream, "__init__", spy)
+    client.force_login(world["owner"])
+    response = client.get(reverse("meeting_packet_zip", args=[world["meeting"].pk, packet.pk]))
+    from django.http import StreamingHttpResponse
+
+    assert isinstance(response, StreamingHttpResponse)
+    assert not hasattr(response, "content") or response.streaming
+    pieces = list(response.streaming_content)
+    total = sum(len(p) for p in pieces)
+    assert total > 900 * 1024 and len(pieces) > 40
+    limit = 64 * 1024  # one 16 KiB chunk plus zip headers and compressor output
+    assert max(len(p) for p in pieces) < limit
+    assert seen["stream"].sink.most_held < limit
+    archive = zipfile.ZipFile(io.BytesIO(b"".join(pieces)))
+    assert archive.testzip() is None
+    assert len([n for n in archive.namelist() if n.endswith("scan0.pdf")]) == 1
+
+
+def test_zip_downloads_are_rate_limited_per_person(client, world, monkeypatch):
+    packet = packets.build_packet(world["meeting"], variant="owner", actor=world["board"])
+    url = reverse("meeting_packet_zip", args=[world["meeting"].pk, packet.pk])
+    client.force_login(world["owner"])
+
+    # One at a time: while a download is still streaming, a second is refused.
+    first = client.get(url)
+    assert first.status_code == 200
+    second = client.get(url)
+    assert second.status_code == 302 and second["Location"].endswith(
+        reverse("meeting_detail", args=[world["meeting"].pk])
+    )
+    # Someone else is not held up by this person's download.
+    client2 = type(client)()
+    client2.force_login(world["board"])
+    other = client2.get(url)
+    assert other.status_code == 200
+    b"".join(other.streaming_content)
+    # Finishing the first frees the slot (the test client closes it at the end).
+    b"".join(first.streaming_content)
+    again = client.get(url)
+    assert again.status_code == 200
+    b"".join(again.streaming_content)
+
+    # A window cap, counted from the audit log across processes.
+    monkeypatch.setattr(packets, "ZIP_RATE_LIMIT", 3)
+    third = client.get(url)
+    b"".join(third.streaming_content)
+    mine = AuditEvent.objects.filter(action="meeting.packet_zip_downloaded", actor=world["owner"])
+    assert mine.count() == 3
+    refused = client.get(url, follow=True)
+    assert b"several packets in the last few minutes" in refused.content
+    assert mine.count() == 3  # a refused download is not a download
+
+
+def test_zip_slot_is_freed_even_if_never_read(world):
+    packet = packets.build_packet(world["meeting"], variant="owner", actor=world["board"])
+    stream, _ = packets.packet_zip(packet, user=world["owner"])
+    with pytest.raises(packets.PacketBusy):
+        packets.packet_zip(packet, user=world["owner"])
+    stream.close()  # what Django does when the response ends
+    stream2, _ = packets.packet_zip(packet, user=world["owner"])
+    stream2.close()
+
+
 def test_attachments_are_never_parsed(world):
     with mock.patch("zipfile.ZipFile.__init__", side_effect=AssertionError("parsed")):
         packets.build_packet(
@@ -452,3 +546,128 @@ def test_page_refusal_shows_again_on_the_form(client, world):
     assert response.status_code == 200
     assert b'role="alert"' in response.content or b"errorlist" in response.content
     assert not MeetingPacket.objects.exists()
+
+
+# --- Minutes approval (SEC-003) ---------------------------------------------------------
+
+
+def _held_meeting_with_minutes(world, actor, title="December board meeting"):
+    held = gov.create_meeting(
+        title=title,
+        kind="board",
+        starts_at=timezone.now() - timedelta(days=3),
+        actor=world["board"],
+    )
+    gov.set_meeting_status(held, "held", actor=world["board"])
+    doc = gov.upload_minutes(held, file=pdf_upload("december.pdf"), actor=actor)
+    held.refresh_from_db()
+    return held, doc
+
+
+def _next_meeting(world):
+    return gov.create_meeting(
+        title="January board meeting",
+        kind="board",
+        starts_at=timezone.now() + timedelta(days=20),
+        actor=world["board"],
+    )
+
+
+def test_manager_attaches_drafts_but_only_the_board_approves(client, world):
+    manager = make_member(roles=[Role.MANAGER])
+    held, doc = _held_meeting_with_minutes(world, manager)
+    assert held.minutes_document_id == doc.pk  # data entry is allowed
+    assert gov.minutes_approval(held) is None
+    nxt = _next_meeting(world)
+    # Draft minutes are never presented to owners as approved.
+    assert packets.approved_minutes(nxt) is None
+    text = _text(_pdf_of(packets.build_packet(nxt, variant="owner", actor=manager)))
+    assert "Approved minutes" not in text
+    assert "No approved minutes" in text
+
+    for user in (manager, world["owner"], make_member(roles=[Role.AUDITOR])):
+        with pytest.raises(PermissionDenied):
+            gov.approve_minutes(held, actor=user)
+    client.force_login(manager)
+    url = reverse("meeting_action", args=[held.pk, "approve_minutes"])
+    page = client.get(reverse("meeting_detail", args=[held.pk]))
+    assert b"Draft minutes, not yet approved" in page.content
+    assert b"Mark minutes approved" not in page.content
+    assert client.post(url, {"approved_on": timezone.localdate().isoformat()}).status_code == 403
+    client.force_login(world["owner"])
+    assert client.post(url, {"approved_on": timezone.localdate().isoformat()}).status_code == 403
+    assert not AuditEvent.objects.filter(action="meeting.minutes_approved", target_id=str(held.pk))
+
+    # The board marks them approved on the page: recorded, audited, then shown.
+    client.force_login(world["board"])
+    page = client.get(reverse("meeting_detail", args=[held.pk]))
+    assert b"Mark minutes approved" in page.content
+    response = client.post(
+        url, {"approved_on": timezone.localdate().isoformat(), "note": "At the January meeting"}
+    )
+    assert response.status_code == 302
+    approval = gov.minutes_approval(held)
+    assert approval.version_id == doc.current_version_id
+    assert approval.recorded_by == world["board"] and approval.note == "At the January meeting"
+    event = AuditEvent.objects.filter(action="meeting.minutes_approved").latest("occurred_at")
+    assert event.metadata == {"document_id": doc.pk, "version": 1}
+    assert event.actor == world["board"] and event.target_id == str(held.pk)
+    assert packets.approved_minutes(nxt) == doc
+    text = _text(_pdf_of(packets.build_packet(nxt, variant="owner", actor=manager)))
+    assert "Approved minutes of December board meeting" in text
+    assert "approved by the board on" in text
+    client.force_login(world["owner"])
+    assert b"Minutes approved" in client.get(reverse("meeting_detail", args=[held.pk])).content
+
+
+def test_minutes_approval_rules_and_records(client, world):
+    from core.append_only import AppendOnlyError
+    from governance.models import MinutesApproval
+
+    held, doc = _held_meeting_with_minutes(world, world["board"])
+    today = timezone.localdate()
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(held, approved_on=today + timedelta(days=1), actor=world["board"])
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(held, approved_on=today - timedelta(days=30), actor=world["board"])
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(_next_meeting(world), actor=world["board"])  # nothing attached
+    approval = gov.approve_minutes(held, actor=world["board"])
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(held, actor=world["board"])  # once per version
+    with pytest.raises(AppendOnlyError):
+        approval.save()
+    with pytest.raises(AppendOnlyError):
+        MinutesApproval.objects.all().delete()
+
+    # A corrected version is a draft again until the board approves it.
+    documents.add_version(doc, file=pdf_upload("december-v2.pdf"), note="Fix", actor=world["board"])
+    held.refresh_from_db()
+    assert gov.minutes_approval(held) is None
+    assert packets.approved_minutes(_next_meeting(world)) is None
+    gov.approve_minutes(held, actor=world["board"])
+    assert gov.minutes_approval(held).version.number == 2
+
+    # A refused form comes back with what was typed.
+    other, _ = _held_meeting_with_minutes(world, world["board"], title="Special board meeting")
+    client.force_login(world["board"])
+    page = client.post(
+        reverse("meeting_action", args=[other.pk, "approve_minutes"]),
+        {"approved_on": "2001-01-01", "note": "Keep this note"},
+    )
+    assert page.status_code == 200
+    assert b"before the meeting" in page.content and b"Keep this note" in page.content
+    assert gov.minutes_approval(other) is None
+
+
+def test_runtime_role_cannot_change_minutes_approvals(world):
+    from django.db import DatabaseError, connection, transaction
+
+    held, _ = _held_meeting_with_minutes(world, world["board"])
+    approval = gov.approve_minutes(held, actor=world["board"])
+    for sql in (
+        "UPDATE governance_minutesapproval SET note = 'x' WHERE id = %s",
+        "DELETE FROM governance_minutesapproval WHERE id = %s",
+    ):
+        with pytest.raises(DatabaseError), transaction.atomic(), connection.cursor() as cur:
+            cur.execute(sql, [approval.pk])

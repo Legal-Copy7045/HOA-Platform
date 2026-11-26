@@ -100,7 +100,10 @@ class ComponentForm(forms.Form):
                 "quantity": c.quantity,
                 "replacement_cost_cents": format_cents(c.replacement_cost_cents).lstrip("$"),
                 "useful_life_years": c.useful_life_years,
-                "remaining_life_years": c.remaining_life_years,
+                # Aged to this year, so saving unchanged keeps the due year.
+                "remaining_life_years": (
+                    c.years_left_now if c.remaining_life_years is not None else None
+                ),
                 "last_replaced_year": c.last_replaced_year,
                 "notes": c.notes,
                 "active": c.active,

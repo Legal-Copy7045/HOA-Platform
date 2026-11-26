@@ -272,6 +272,38 @@ def test_audience_owners_only_excludes_tenants(w, client):
     assert surveys.has_responded(residents, w["tenant"]) == timezone.localdate()
 
 
+def test_view_only_contact_reads_but_cannot_answer(w, client):
+    """R2-005: view-only contacts "see, cannot act"."""
+    from django.core.exceptions import PermissionDenied
+
+    viewer = _contact_user(_account(w["lot_a"]), "view_only", "Vera Viewer")
+    authorized = _contact_user(_account(w["lot_a"]), "authorized", "Al Authorized")
+    survey = _survey(w, audience="residents", share=True)
+    surveys.open_survey(survey, actor=w["board"])
+    url = reverse("survey_detail", args=[survey.pk])
+
+    assert not surveys.can_respond(survey, viewer)
+    assert not surveys.waiting_for(viewer)
+    with pytest.raises(PermissionDenied):
+        _answer(survey, viewer)
+    assert _person(viewer).pk not in surveys.audience_people(survey)
+    client.force_login(viewer)
+    page = client.get(url)
+    assert page.status_code == 200
+    assert b"Send answers" not in page.content and b"not include answering" in page.content
+    data = {f"q{k}": v for k, v in _answers(survey).items()}
+    assert client.post(url, data).status_code == 403
+    assert surveys.has_responded(survey, viewer) is None
+
+    # The authorized contact on the same account still answers.
+    assert surveys.can_respond(survey, authorized)
+    _answer(survey, authorized)
+
+    # Shared results stay visible to the view-only contact once closed.
+    surveys.close_survey(survey, actor=w["board"])
+    assert client.get(reverse("survey_results", args=[survey.pk])).status_code == 200
+
+
 def test_former_owner_cannot_answer(w, client):
     survey = _survey(w)
     surveys.open_survey(survey, actor=w["board"])

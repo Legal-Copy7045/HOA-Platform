@@ -178,7 +178,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # The survey's own audience setting narrows who sees and answers each one
     # (owners only, or owners and account contacts including tenants).
     "survey.view": COMMUNITY,
-    "survey.respond": RESIDENTS,
+    # View-only contacts see a residents survey (and shared results) but
+    # cannot answer: "sees, cannot act" (regression R2-005).
+    "survey.respond": frozenset({OWNER, AUTHORIZED, TENANT}),
     "survey.manage": frozenset({BOARD}),
     # --- Event RSVPs and volunteer sign-ups (rsvp) ---
     # Residents who can see an event answer it (view-only contacts and former
@@ -211,6 +213,10 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # Board and committees: names, offices and committee members only (no
     # contact details), for everyone who sees the community pages.
     "board_committees.view": COMMUNITY,
+    # --- Minutes approval (fixgov, SEC-003) ---
+    # Uploading or attaching draft minutes is data entry (meeting.manage);
+    # recording that the board approved them is a board decision.
+    "minutes.adopt": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

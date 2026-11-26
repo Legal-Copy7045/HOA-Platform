@@ -23,7 +23,6 @@ download rules at that moment (others are listed as not included).
 from __future__ import annotations
 
 import datetime
-import io
 import zipfile
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -46,7 +45,7 @@ from governance.models import (
 )
 
 MAX_ATTACHMENTS = 20
-# The .zip is assembled in memory; beyond this the rest stay in Documents.
+# Bundled into one .zip at most; beyond this the rest stay in Documents.
 ZIP_MAX_BYTES = 150 * 1024 * 1024
 FOLDER_NAMES = {
     PacketVariant.OWNER: ("Meeting packets", Visibility.OWNERS),
@@ -112,10 +111,13 @@ def previous_meeting(meeting: Meeting) -> Meeting | None:
 
 
 def approved_minutes(meeting: Meeting) -> Document | None:
-    """Minutes the board attached to the previous meeting (attaching them is
-    the record of adoption) when owners may see them."""
+    """The previous meeting's minutes when the board has marked their current
+    version approved (SEC-003: attaching is only a draft, and the manager may
+    attach) and owners may see them."""
+    from governance.services import minutes_approval
+
     previous = previous_meeting(meeting)
-    if previous is None or not previous.minutes_document_id:
+    if previous is None or minutes_approval(previous) is None:
         return None
     with system_access("packet: approved minutes"):
         doc = (
@@ -446,7 +448,11 @@ def _minutes_note(meeting, variant, minutes_doc) -> str:
             f"Draft minutes{of}: {title}, attachment 1 in the index. "
             "The board is asked to approve them."
         )
-    return f"Approved minutes{of}: {title}, attachment 1 in the index."
+    from governance.services import minutes_approval
+
+    approval = minutes_approval(previous) if previous else None
+    on = f" (approved by the board on {_day(approval.approved_on)})" if approval else ""
+    return f"Approved minutes{of}: {title}{on}, attachment 1 in the index."
 
 
 def build_packet(
@@ -612,32 +618,147 @@ def _zip_name(position: int, version: DocumentVersion) -> str:
     return f"{position:02d}-{download_filename(version.original_filename, version.content_type)}"
 
 
-def packet_zip(packet: MeetingPacket, *, user, request=None) -> tuple[bytes, str]:
+# --- The .zip download (streamed) ----------------------------------------------------------
+# SEC-002 / R2-003: the archive is never held in memory or on the /tmp tmpfs
+# (which counts against the container's memory). It is written straight into
+# the response a chunk at a time (zipfile on an unseekable sink uses data
+# descriptors), so a download holds about one chunk plus the compressor's state.
+ZIP_CHUNK_BYTES = 256 * 1024
+# One .zip at a time per person, and at most this many per window (counted from
+# the audit log, so it holds across web processes).
+ZIP_RATE_LIMIT = 10
+ZIP_RATE_WINDOW = datetime.timedelta(minutes=15)
+ZIP_SLOT_SECONDS = 10 * 60  # a slot left behind by a dead process expires
+
+
+class PacketBusy(PacketError):
+    """Too many .zip downloads by this person right now (rate limit)."""
+
+
+def _slot_key(user) -> str:
+    return f"packet-zip-slot:{user.pk}"
+
+
+def _take_slot(user) -> bool:
+    from django.core.cache import cache
+
+    return cache.add(_slot_key(user), 1, timeout=ZIP_SLOT_SECONDS)
+
+
+def _free_slot(user) -> None:
+    from django.core.cache import cache
+
+    cache.delete(_slot_key(user))
+
+
+def _recent_downloads(user) -> int:
+    from audit.models import AuditEvent
+
+    since = timezone.now() - ZIP_RATE_WINDOW
+    return AuditEvent.objects.filter(
+        action="meeting.packet_zip_downloaded", actor=user, occurred_at__gte=since
+    ).count()
+
+
+class _Sink:
+    """Write-only target for ZipFile: keeps only what was written since the
+    last drain (no tell/seek, so zipfile streams with data descriptors)."""
+
+    def __init__(self):
+        self._parts: list[bytes] = []
+        self.held = 0
+        self.most_held = 0
+
+    def write(self, data) -> int:
+        self._parts.append(bytes(data))
+        self.held += len(data)
+        self.most_held = max(self.most_held, self.held)
+        return len(data)
+
+    def flush(self) -> None:
+        pass
+
+    def drain(self) -> bytes:
+        data = b"".join(self._parts)
+        self._parts.clear()
+        self.held = 0
+        return data
+
+
+class PacketZipStream:
+    """Iterator of the .zip's bytes for a StreamingHttpResponse. ``close()``
+    (called by Django when the response ends, even if never iterated) frees the
+    person's download slot."""
+
+    def __init__(self, entries, notice: str, stamp, user):
+        self._entries = entries
+        self._notice = notice
+        self._stamp = stamp
+        self._user = user
+        self.sink = _Sink()
+        self._gen = self._chunks()
+        self._closed = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> bytes:
+        return next(self._gen)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self._gen.close()
+        finally:
+            _free_slot(self._user)
+
+    def _chunks(self):
+        sink = self.sink
+        with zipfile.ZipFile(sink, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name, version in self._entries:
+                info = zipfile.ZipInfo(name, date_time=self._stamp)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                with version.file.open("rb") as src, archive.open(info, "w") as dst:
+                    while chunk := src.read(ZIP_CHUNK_BYTES):
+                        dst.write(chunk)
+                        if sink.held:
+                            yield sink.drain()
+                if sink.held:
+                    yield sink.drain()
+            if self._notice:
+                info = zipfile.ZipInfo("NOT-INCLUDED.txt", date_time=self._stamp)
+                archive.writestr(info, self._notice)
+        if sink.held:
+            yield sink.drain()
+
+
+def packet_zip(packet: MeetingPacket, *, user, request=None) -> tuple[PacketZipStream, str]:
     """The packet PDF plus every attachment that may be downloaded now by this
-    person. Entry names are generated (number + sanitized name ending in the
-    validated extension); file contents are copied, never opened."""
+    person, as a stream. Entry names are generated (number + sanitized name
+    ending in the validated extension); file contents are copied, never
+    opened. Raises PacketBusy when this person already has a download running
+    or has reached ZIP_RATE_LIMIT in the window."""
     from documents.services import downloadable
     from documents.validation import safe_filename
 
     if not downloadable(packet.version):
         raise PacketError("The packet can't be downloaded until it passes a malware scan.")
-    can_board = can(user, "document.view_board")
-    visible = set(Document.objects.for_user(user).values_list("pk", flat=True))
-    when = timezone.localdate(packet.meeting.starts_at)
-    stamp = timezone.localtime(packet.built_at).timetuple()[:6]
-    buffer = io.BytesIO()
-    included, skipped = [], []
-    total = packet.version.size
-    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-
-        def add(name: str, version: DocumentVersion) -> None:
-            info = zipfile.ZipInfo(name, date_time=stamp)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            with version.file.open("rb") as src, archive.open(info, "w") as dst:
-                while chunk := src.read(1024 * 1024):
-                    dst.write(chunk)
-
-        add(_zip_name(0, packet.version), packet.version)
+    if _recent_downloads(user) >= ZIP_RATE_LIMIT:
+        raise PacketBusy(
+            "You have downloaded several packets in the last few minutes. Please try again later."
+        )
+    if not _take_slot(user):
+        raise PacketBusy("Your other packet download is still running. Try again when it ends.")
+    try:
+        can_board = can(user, "document.view_board")
+        visible = set(Document.objects.for_user(user).values_list("pk", flat=True))
+        when = timezone.localdate(packet.meeting.starts_at)
+        stamp = timezone.localtime(packet.built_at).timetuple()[:6]
+        entries = [(_zip_name(0, packet.version), packet.version)]
+        included, skipped = [], []
+        total = packet.version.size
         for item in packet.items.select_related("document", "version"):
             reason = item.skipped_reason
             if not reason:
@@ -652,40 +773,45 @@ def packet_zip(packet: MeetingPacket, *, user, request=None) -> tuple[bytes, str
             if reason:
                 skipped.append((item.position, reason))
                 continue
-            add(_zip_name(item.position, item.version), item.version)
+            entries.append((_zip_name(item.position, item.version), item.version))
             total += item.version.size
             included.append(item)
+        notice = ""
         if skipped:
             lines = ["These attachments are listed in the index but not in this .zip:", ""]
             lines += [f"{pos}. Not included: {why}." for pos, why in skipped]
-            info = zipfile.ZipInfo("NOT-INCLUDED.txt", date_time=stamp)
-            archive.writestr(info, "\r\n".join(lines) + "\r\n")
-    for item in included:
+            notice = "\r\n".join(lines) + "\r\n"
+        for item in included:
+            record_event(
+                "document.downloaded",
+                request=request,
+                actor=user,
+                target=item.document,
+                metadata={"version": item.version.number},
+            )
         record_event(
-            "document.downloaded",
+            "meeting.packet_zip_downloaded",
             request=request,
             actor=user,
-            target=item.document,
-            metadata={"version": item.version.number},
+            target=packet.meeting,
+            metadata={
+                "variant": packet.variant,
+                "packet_id": packet.pk,
+                "files": len(included) + 1,
+                "skipped": len(skipped),
+            },
         )
-    record_event(
-        "meeting.packet_zip_downloaded",
-        request=request,
-        actor=user,
-        target=packet.meeting,
-        metadata={
-            "variant": packet.variant,
-            "packet_id": packet.pk,
-            "files": len(included) + 1,
-            "skipped": len(skipped),
-        },
-    )
+    except BaseException:
+        _free_slot(user)
+        raise
     filename = safe_filename(f"{packet.variant} packet {when:%Y-%m-%d}", "zip")
-    return buffer.getvalue(), filename
+    return PacketZipStream(entries, notice, stamp, user), filename
 
 
 __all__ = [
+    "PacketBusy",
     "PacketError",
+    "PacketZipStream",
     "attachment_choices",
     "build_packet",
     "minutes_choices",

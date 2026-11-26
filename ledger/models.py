@@ -482,6 +482,10 @@ class ReserveComponent(models.Model):
     replacement_cost_cents = models.BigIntegerField()
     useful_life_years = models.PositiveSmallIntegerField()
     remaining_life_years = models.PositiveSmallIntegerField(null=True, blank=True)
+    # The calendar year the "years left" figure was stated in (BUG-007), so
+    # it ages: 5 years left stated in 2026 means due in 2031, whatever year
+    # the plan starts in.
+    remaining_life_as_of = models.PositiveSmallIntegerField(null=True, blank=True)
     last_replaced_year = models.PositiveSmallIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True, help_text="Board only")
     active = models.BooleanField(default=True)
@@ -507,6 +511,11 @@ class ReserveComponent(models.Model):
                 | models.Q(last_replaced_year__isnull=False),
                 name="reserve_component_remaining_or_last_replaced",
             ),
+            models.CheckConstraint(
+                condition=models.Q(remaining_life_years__isnull=True)
+                | models.Q(remaining_life_as_of__isnull=False),
+                name="reserve_component_years_left_has_year",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -515,11 +524,22 @@ class ReserveComponent(models.Model):
     def delete(self, *args, **kwargs):
         raise PermissionError("Reserve components are switched off (not active), not deleted.")
 
-    def remaining_life(self, start_year: int) -> int:
-        """Years left at the start of ``start_year`` (0 = due that year)."""
+    def due_year(self) -> int:
+        """The calendar year it next comes due."""
         if self.remaining_life_years is not None:
-            return self.remaining_life_years
-        return max(0, self.last_replaced_year + self.useful_life_years - start_year)
+            as_of = self.remaining_life_as_of or timezone.localdate().year
+            return as_of + self.remaining_life_years
+        return self.last_replaced_year + self.useful_life_years
+
+    def remaining_life(self, start_year: int) -> int:
+        """Years left at the start of ``start_year`` (0 = due that year, or
+        overdue). "Years left" ages from the year it was stated (BUG-007)."""
+        return max(0, self.due_year() - start_year)
+
+    @property
+    def years_left_now(self) -> int:
+        """Years left counted from this calendar year (what the form shows)."""
+        return self.remaining_life(timezone.localdate().year)
 
 
 class ReservePlanSettings(models.Model):

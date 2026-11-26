@@ -133,8 +133,10 @@ HUBS = {
     ],
 }
 # Hubs whose own page is where every child lands (votes, elections and
-# surveys all open the Voting list), so a single child keeps the hub's label.
-HUB_KEEPS_LABEL = {"voting"}
+# surveys all open the Voting list), so a single child keeps the hub's label
+# and links to the hub's own page filtered by this query parameter (the
+# child's old URL is only a redirect there).
+HUB_KEEPS_LABEL = {"voting": "type"}
 
 # Pages reached from a sidebar entry's page rather than from the sidebar: the
 # entry is marked current on them and counts their waiting items.
@@ -304,8 +306,10 @@ def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict,
     if permission == HUB and len(children) == 1:
         # One page behind the hub: go straight there (a tenant's Voting is
         # Surveys; a sysadmin's Settings is Branding).
-        url = children[0]["url"]
-        if name not in HUB_KEEPS_LABEL:
+        if name in HUB_KEEPS_LABEL:
+            url = f"{url}?{HUB_KEEPS_LABEL[name]}={children[0]['name']}"
+        else:
+            url = children[0]["url"]
             label, icon = children[0]["label"], children[0]["icon"]
     count = counts.get(name, 0) + sum(counts.get(c["name"], 0) for c in children)
     item = {"label": label, "url": url, "icon": icon, "current": False, "count": count}
