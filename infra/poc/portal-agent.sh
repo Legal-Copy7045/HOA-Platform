@@ -48,6 +48,17 @@ VALUES (1, '', '', '', 0, '', 'idle', '') ON CONFLICT (id) DO NOTHING;
 UPDATE core_updatestatus SET agent_seen_at = now() WHERE id = 1;
 SQL
 
+# Host security services (infra/poc/harden-host.sh), for System status. Each
+# value is one word from systemctl, so the JSON needs no escaping.
+host_state() { systemctl is-active "$1" 2>/dev/null | head -1 | tr -cd 'a-z-'; }
+HOST_SECURITY="$(printf '{"falco":"%s","auditd":"%s","updates":"%s","integrity":"%s","alerts":"%s","livepatch":"%s"}' \
+  "$(host_state falco-modern-bpf.service)" "$(host_state auditd.service)" \
+  "$(host_state apt-daily-upgrade.timer)" "$(host_state hoa-integrity-check.timer)" \
+  "$(host_state hoa-host-alerts.timer)" "$(host_state snap.canonical-livepatch.canonical-livepatchd.service)")"
+psql_run -v hs="$HOST_SECURITY" >/dev/null <<'SQL'
+UPDATE core_updatestatus SET host_security = :'hs'::jsonb WHERE id = 1;
+SQL
+
 REPO_OWNER="$(stat -c %U "$APP_DIR")"
 g() { if [ "$REPO_OWNER" = "root" ]; then git -C "$APP_DIR" "$@"; else sudo -u "$REPO_OWNER" -H git -C "$APP_DIR" "$@"; fi; }
 BRANCH="$(g rev-parse --abbrev-ref HEAD)"

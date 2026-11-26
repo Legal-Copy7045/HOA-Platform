@@ -59,3 +59,6 @@
   since: M4
   docs: docs/runbook.md
   match: ["^unit:core/tests/test_infra_scripts", "^manual:(nightly backup writes|restore drill uses|restore drill refuses|install update refuses|move files to R2|push and SMS settings)"]
+- feature: "Host security (harden-host.sh): automatic security updates, auditd watches, nightly AIDE check, Falco runtime alerts emailed to sysadmins (host_alert, audited, capped); System status Host security card"
+  since: M4
+  match: ["^unit:core/tests/test_monitoring.py::test_(host_alert|status_page_shows_host_security|harden_script)"]

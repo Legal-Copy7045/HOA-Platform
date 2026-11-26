@@ -131,3 +131,7 @@
   check: "A signed-in neighbor sees the plans above the answer, large choice cards, and the comment becomes required when 'I object' is picked (before sending)."
   steps: "As the neighbor, open the emailed link on a phone; pick 'I object' and try to send with no comment; then pick 'no objection' and send."
   last: ""
+- key: host hardening on the VM
+  check: "After harden-host.sh, System status shows Host security with every line on; touching the .env sends an audit email the next morning; a shell opened inside the web container produces a Falco email within 10 minutes."
+  steps: "sudo bash infra/poc/harden-host.sh; open System status after a minute; sudo touch /opt/hoa-portal/.env; docker compose exec web sh -c 'echo hi' and wait 10 minutes; check the sysadmin inbox; next morning check for the audit email."
+  last: ""

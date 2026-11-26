@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-1544
+# highest issued: UNIT-1549
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -699,6 +699,11 @@ UNIT-1541: "operations/tests/test_contracts.py::test_board_approves_contract_thr
 UNIT-1542: "compliance/tests/test_owner_notices.py::test_owner_allowance_holds_under_parallel_uploads"
 UNIT-1543: "compliance/tests/test_owner_notices.py::test_label_allowance_is_checked_inside_attach"
 UNIT-1544: "core/tests/test_append_only_coverage.py::test_append_only_model_is_fully_protected[operations.ContractApproval]"
+UNIT-1545: "core/tests/test_monitoring.py::test_host_alert_goes_to_sysadmins_only_and_is_audited"
+UNIT-1546: "core/tests/test_monitoring.py::test_host_alert_refuses_empty_input_and_unknown_kinds"
+UNIT-1547: "core/tests/test_monitoring.py::test_status_page_shows_host_security"
+UNIT-1548: "core/tests/test_monitoring.py::test_harden_script_is_idempotent_and_keeps_secrets_off_argv"
+UNIT-1549: "core/tests/test_infra_scripts.py::test_scripts_parse[harden-host.sh]"
 UNIT-155: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[violation_action]"
 UNIT-156: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[violation_detail]"
 UNIT-157: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[violation_file]"

@@ -124,3 +124,73 @@ def test_agent_script_passes_values_as_psql_variables_only():
     text = Path("infra/poc/portal-agent.sh").read_text()
     assert ":'changes'" in text and "flock -n" in text
     assert '-c "$' not in text  # no SQL built from shell strings
+
+
+def test_host_alert_goes_to_sysadmins_only_and_is_audited(settings):
+    import io
+
+    from audit.models import AuditEvent
+
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    admin = make_member(roles=[Role.SYSADMIN])
+    make_member(board=True)
+    make_member()
+    stdin = io.StringIO("1 x WARNING: Terminal shell in container\x1b[31m\x07\n" + "x" * 20000)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("sys.stdin", stdin)
+        call_command("host_alert", "--kind", "falco", stdout=io.StringIO())
+    assert [m.to for m in mail.outbox] == [[admin.email]]
+    body = mail.outbox[0].body
+    assert "Terminal shell in container" in body and "\x1b" not in body and "\x07" not in body
+    assert len(body) < 8500  # capped
+    event = AuditEvent.objects.get(action="system.host_alert")
+    assert event.metadata == {"kind": "falco", "lines": 2, "sent": 1}
+
+
+def test_host_alert_refuses_empty_input_and_unknown_kinds():
+    import io
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("sys.stdin", io.StringIO(" \n\x00"))
+        with pytest.raises(CommandError):
+            call_command("host_alert", "--kind", "audit")
+        with pytest.raises(CommandError):
+            call_command("host_alert", "--kind", "anything")
+
+
+def test_status_page_shows_host_security(client):
+    from core.models import UpdateStatus
+
+    client.force_login(make_member(roles=[Role.SYSADMIN]))
+    status = UpdateStatus.objects.create(pk=1, agent_seen_at=timezone.now())
+    assert "Not set up" in client.get(reverse("system_status")).content.decode()
+    status.host_security = {
+        "falco": "active",
+        "auditd": "active",
+        "updates": "active",
+        "integrity": "active",
+        "alerts": "failed",
+        "livepatch": "<b>x</b>",
+    }
+    status.save()
+    page = client.get(reverse("system_status")).content.decode()
+    assert "Container monitoring (Falco): on" in page
+    assert "Alert emails: <strong>failed</strong>" in page
+    assert "<b>x</b>" not in page  # agent values are escaped
+
+
+def test_harden_script_is_idempotent_and_keeps_secrets_off_argv():
+    from pathlib import Path
+
+    text = Path("infra/poc/harden-host.sh").read_text()
+    assert "set -euo pipefail" in text and '"$(id -u)" -eq 0' in text
+    assert 'Automatic-Reboot "false"' in text
+    assert "modern_ebpf" in text and "falco-modern-bpf.service" in text
+    assert "host_alert --kind falco" in text and "alert integrity" in text and "alert audit" in text
+    assert "--checkpoint" in text  # audit events reported once
+    assert "/opt/hoa-portal" not in text.split("APP_DIR=", 1)[1].split("\n", 1)[0]
+    # The agent reports every unit the script installs.
+    agent = Path("infra/poc/portal-agent.sh").read_text()
+    for unit in ("falco-modern-bpf.service", "hoa-integrity-check.timer", "hoa-host-alerts.timer"):
+        assert unit in text and unit in agent
+    assert "PASSWORD" not in text and "SECRET" not in text
