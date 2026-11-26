@@ -33,8 +33,7 @@
               <div><button type="submit">{% icon "mail" %} Send notice to owners</button></div></form>{% endif %}
             <h4>{% if m.kind != "executive" and not m.notice_sent_at %}2. {% endif %}After the meeting</h4>
             <div class="wf-actions" data-testid="step-held">
-              {% if started %}<form method="post" action="{% url 'meeting_action' m.pk 'held' %}" class="wf-action" data-confirm="Mark this meeting held? You can then upload and approve its minutes.">{% csrf_token %}<button type="submit" class="secondary">Mark held</button></form>
-              {% else %}<div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="blocked-held">Mark held</button><p class="help" id="blocked-held">Possible once the meeting has started ({{ m.starts_at|date:"M j, g:i A" }}).</p></div>{% endif %}
+              <form method="post" action="{% url 'meeting_action' m.pk 'held' %}" class="wf-action" data-confirm="Mark this meeting held? You can then upload and approve its minutes.">{% csrf_token %}<button type="submit" class="secondary">Mark held</button></form>
               {% if not minutes_form.is_bound %}<div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="blocked-minutes">Upload the minutes</button><p class="help" id="blocked-minutes">After the meeting is marked held.</p></div>{% endif %}
               <form method="post" action="{% url 'meeting_action' m.pk 'cancelled' %}" class="wf-action" data-confirm="Cancel this meeting?{% if m.calendar_event_id %} It is taken off the community calendar.{% endif %} Owners already sent a notice are not told automatically: post an announcement.">{% csrf_token %}<button type="submit" class="danger">Cancel meeting</button></form>
             </div>

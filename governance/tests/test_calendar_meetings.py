@@ -237,7 +237,7 @@ def test_older_meetings_without_a_place_stay_readable(client, w):
 # --- The join link --------------------------------------------------------------------------
 
 
-def test_join_link_on_the_page_never_in_the_notice_email(client, w):
+def test_join_link_on_the_page_and_in_the_notice_email(client, w):
     m = meeting(w, kind="annual", title="Annual meeting", join_url=JOIN)
     client.force_login(w["owner"])
     html = page(client, reverse("meeting_detail", args=[m.pk]))
@@ -251,8 +251,8 @@ def test_join_link_on_the_page_never_in_the_notice_email(client, w):
     gov.send_notice(m, actor=w["board"])
     assert mail.outbox
     for message in mail.outbox:
-        assert JOIN not in message.body and "meet.example.com" not in message.body
-        assert "Clubhouse, or online (the link to join is on the meeting page)" in message.body
+        # Owner decision 2026-11-26: the notice carries the join link itself.
+        assert f"Clubhouse, or online: {JOIN}" in message.body
         assert reverse("meeting_detail", args=[m.pk]) in message.body
 
 
@@ -347,11 +347,10 @@ def test_steps_before_notice(client, w):
     client.force_login(w["board"])
     html = page(client, reverse("meeting_detail", args=[m.pk]))
     assert 'data-testid="step-notice"' in html
-    # Mark held waits for the meeting; minutes wait for Mark held.
-    assert (
-        'aria-describedby="blocked-held"' in html
-        and "Possible once the meeting has started" in html
-    )
+    # Mark held is available at any time (owner decision 2026-11-26);
+    # minutes wait for Mark held.
+    assert f'action="{reverse("meeting_action", args=[m.pk, "held"])}"' in html
+    assert 'aria-describedby="blocked-held"' not in html
     assert 'aria-describedby="blocked-minutes"' in html
     assert 'name="how" value="upload"' not in html
     assert html.index("step-notice") < html.index("step-held")

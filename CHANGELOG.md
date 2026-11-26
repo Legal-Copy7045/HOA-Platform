@@ -8,6 +8,8 @@ adds an entry here.
 
 ## 0.16.0 — 2026-11-26
 
+- Meeting notices now include the join link itself (owner decision), and the
+  board can mark a meeting held at any time.
 - Meetings are now part of the Calendar: one menu entry, with All /
   Meetings / Events and Past meetings (approved minutes are linked there).
   Board members and the manager schedule meetings with "New meeting" next

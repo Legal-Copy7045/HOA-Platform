@@ -282,7 +282,6 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
             "can_build_packet": policy.can(user, "meeting.packet_build"),
             "cal": _calendar_menu(meeting),
             "calendar_on": _calendar_on(request),
-            "started": meeting.starts_at <= timezone.now(),
             "can_upload_minutes": can_upload,
             **_linked(request, meeting),
             **meeting_extras(user, meeting),

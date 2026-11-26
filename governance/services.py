@@ -170,13 +170,13 @@ def notice_shortfall_days(meeting: Meeting, sent_at=None) -> int | None:
 
 
 def _notice_where(meeting: Meeting) -> str:
-    """Where, for the notice email. The join link itself never goes into an
-    email (D24, D49): people sign in to the meeting page to get it."""
-    online = "online (the link to join is on the meeting page)"
+    """Where, for the notice email. The join link is written out in the
+    email (owner decision 2026-11-26, D49 amended): a meeting link is not a
+    portal page, and whoever joins is visible in the meeting."""
     if meeting.location and meeting.join_url:
-        return f"{meeting.location}, or {online}"
+        return f"{meeting.location}, or online: {meeting.join_url}"
     if meeting.join_url:
-        return "Online (the link to join is on the meeting page)"
+        return f"Online: {meeting.join_url}"
     return meeting.location or "see the portal"
 
 
