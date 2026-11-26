@@ -175,9 +175,10 @@ def test_status_page_shows_host_security(client):
     }
     status.save()
     page = client.get(reverse("system_status")).content.decode()
-    assert "Container monitoring (Falco): on" in page
-    assert "Alert emails: <strong>failed</strong>" in page
-    assert "<b>x</b>" not in page  # agent values are escaped
+    assert "Needs attention" in page
+    assert '<span>Falco monitoring</span><span class="status tone-success">On</span>' in page
+    assert '<span>Alert emails</span><span class="status tone-warning">Failed</span>' in page
+    assert "<b>x</b>" not in page and "&lt;b&gt;x&lt;/b&gt;" in page  # agent values escaped
 
 
 def test_harden_script_is_idempotent_and_keeps_secrets_off_argv():
@@ -241,4 +242,4 @@ def test_status_page_names_failed_job_kinds_but_not_their_arguments(client):
     page = client.get(reverse("system_status")).content.decode()
     assert "Failed: send_digest (1)" in page
     assert "owner-b@example.com" not in page
-    assert 'tone-success"><div class="label">Host security' in page
+    assert 'tone-success"><div class="label">Host security' in page and "All on" in page

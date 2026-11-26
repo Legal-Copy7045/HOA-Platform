@@ -28,7 +28,8 @@
     <div class="stat {% if email_redirect %}tone-warning{% endif %}"><div class="label">Email redirect (POC)</div><div class="value small-value">{% if email_redirect %}On{% else %}Off{% endif %}</div>{% if email_redirect %}<div class="hint">All mail goes to one inbox</div>{% endif %}
       <form method="post" class="hint">{% csrf_token %}<input type="hidden" name="action" value="test_email"><button type="submit" class="secondary small">Send me a test email</button></form></div>
     <div class="stat {% if not update.host or update.host_problem %}tone-warning{% else %}tone-success{% endif %}"><div class="label">Host security</div>
-      {% if update.host %}<ul class="hint">{% for label, state, ok in update.host %}<li>{{ label }}: {% if ok %}on{% else %}<strong>{{ state }}</strong>{% endif %}</li>{% endfor %}</ul>
+      {% if update.host %}<div class="value small-value">{% if update.host_problem %}Needs attention{% else %}All on{% endif %}</div>
+        <ul class="stat-list">{% for label, state, ok in update.host %}<li><span>{{ label }}</span><span class="status {% if ok %}tone-success{% else %}tone-warning{% endif %}">{% if ok %}On{% else %}{{ state|capfirst }}{% endif %}</span></li>{% endfor %}</ul>
       {% else %}<div class="value small-value">Not set up</div><div class="hint">Run infra/poc/harden-host.sh once on the VM (see the runbook, Host security).</div>{% endif %}</div>
     <div class="stat {% if scanner == 'none' %}tone-warning{% endif %}"><div class="label">Malware scanning</div><div class="value small-value">{% if scanner == 'none' %}Off{% else %}{{ scanner }}{% endif %}</div><div class="hint">{% if scanner == 'none' %}Uploads are not scanned{% elif require_clean_scan %}Only clean files download{% else %}Unscanned files still download{% endif %}</div></div>
   </div>

@@ -56,11 +56,11 @@ def _update_status():
 
 # Host security services the VM agent reports (infra/poc/harden-host.sh).
 HOST_SECURITY_SERVICES = [
-    ("updates", "Automatic security updates"),
-    ("livepatch", "Kernel fixes without reboot (Livepatch)"),
-    ("auditd", "Audit log of sensitive files"),
-    ("integrity", "Nightly file-integrity check"),
-    ("falco", "Container monitoring (Falco)"),
+    ("updates", "Security updates"),
+    ("livepatch", "Livepatch"),
+    ("auditd", "Audit log"),
+    ("integrity", "File integrity check"),
+    ("falco", "Falco monitoring"),
     ("alerts", "Alert emails"),
 ]
 
