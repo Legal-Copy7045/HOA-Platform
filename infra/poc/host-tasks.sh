@@ -8,6 +8,11 @@
 # read from the database reaches a command line. Results go back through psql
 # variables. core/tests/test_host_tasks_agent.py runs these functions with a
 # fake docker, psql and scripts.
+#
+# One kind takes a value: reseed_demo (D53) needs the dataset name. It is read
+# back through a psql variable, must be lower-case letters and _ only, and
+# must be one the portal's own seed_demo lists; then it is passed as one
+# quoted argument to the fixed script, never inside a shell string.
 
 HOST_TASK_LOG="${HOST_TASK_LOG:-/var/log/hoa-portal-tasks.log}"
 
@@ -16,6 +21,7 @@ HOST_TASK_LOG="${HOST_TASK_LOG:-/var/log/hoa-portal-tasks.log}"
 host_task_command() {
   TASK_CMD=()
   TASK_MINUTES=0
+  TASK_NEEDS_DATASET=0
   case "$1" in
     backup)
       TASK_MINUTES=20; TASK_CMD=(bash "$APP_DIR/infra/poc/backup.sh") ;;
@@ -29,9 +35,33 @@ host_task_command() {
       TASK_MINUTES=25; TASK_CMD=(bash "$APP_DIR/infra/poc/harden-host.sh") ;;
     health_check)
       TASK_MINUTES=5; TASK_CMD=("${COMPOSE[@]}" exec -T web python manage.py health_check --alert) ;;
+    reseed_demo)
+      TASK_MINUTES=25; TASK_NEEDS_DATASET=1; TASK_CMD=(bash "$APP_DIR/infra/poc/reseed-demo.sh") ;;
     *)
       return 1 ;;
   esac
+}
+
+# host_task_dataset <id>: set TASK_DATASET to the task's dataset if it is a
+# plain name ([a-z_], 1-40 characters) that the portal's seed_demo lists;
+# fail otherwise. TASK_ATTACH is 1 only when the column is exactly true.
+# The id is a number (checked by the caller).
+host_task_dataset() {
+  local row value attach names
+  TASK_DATASET=""
+  TASK_ATTACH=0
+  row="$(psql_run -v id="$1" <<'SQL'
+SELECT dataset, attach_requester FROM core_hosttask WHERE id = :'id'::bigint;
+SQL
+)" || return 1
+  IFS='|' read -r value attach <<<"$row"
+  [[ "$value" =~ ^[a-z_]{1,40}$ ]] || return 1
+  names="$("${COMPOSE[@]}" exec -T web python manage.py seed_demo --list-datasets 2>/dev/null)" \
+    || return 1
+  grep -Fxq -- "$value" <<<"$names" || return 1
+  TASK_DATASET="$value"
+  [ "$attach" = "t" ] && TASK_ATTACH=1
+  return 0
 }
 
 # host_task_clean: printable ASCII only (no control or escape characters),
@@ -67,9 +97,12 @@ host_task_summary() {
   } | host_task_clean | head -1 | cut -c1-480 || true
 }
 
-# host_task_finish <id> <state> <summary> <tail>: record the outcome.
+# host_task_finish <id> <state> <summary> <tail>: record the outcome. A
+# reseed that failed half-way may have left no table to write to; the full
+# output is in $HOST_TASK_LOG either way.
 host_task_finish() {
-  psql_run -v id="$1" -v state="$2" -v summary="$3" -v tail="$4" >/dev/null <<'SQL'
+  psql_run -v id="$1" -v state="$2" -v summary="$3" -v tail="$4" >/dev/null <<'SQL' \
+    || echo "Could not record the result of server task #$1 (see $HOST_TASK_LOG)." >&2
 UPDATE core_hosttask
    SET state = :'state', finished_at = now(), summary = :'summary', output_tail = :'tail'
  WHERE id = :'id'::bigint AND state = 'running';
@@ -106,6 +139,17 @@ SQL
     host_task_finish "$id" refused "Refused: not a task this server runs." ""
     record_host_tasks
     return 0
+  fi
+  if [ "$TASK_NEEDS_DATASET" -eq 1 ]; then
+    if ! host_task_dataset "$id"; then
+      echo "=== $(date -u +%FT%TZ) server task #$id refused: dataset not on the list" >>"$HOST_TASK_LOG"
+      host_task_finish "$id" refused "Refused: not a demo dataset this portal has." ""
+      record_host_tasks
+      return 0
+    fi
+    TASK_CMD+=("$TASK_DATASET")
+    # A fixed flag and the (numeric) task id: never text from the database.
+    if [ "$TASK_ATTACH" -eq 1 ]; then TASK_CMD+=(--attach-requester "$id"); fi
   fi
   out="$(mktemp)"
   chmod 600 "$out"

@@ -13,3 +13,7 @@ django-allauth[mfa]
 django-axes
 Pillow
 segno
+# Register import (D54): reading and writing .xlsx, read-only, no macros.
+# defusedxml makes openpyxl parse the workbook's XML with entity expansion off.
+openpyxl
+defusedxml

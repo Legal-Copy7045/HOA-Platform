@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}New mailing · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'paper_mail' %}">Paper mail</a> / New mailing</div>
+  <div class="page-head"><div><h1>New mailing</h1><p class="subtitle">{{ kind_label }}{% if source %}: {{ source }}{% endif %}. Preview the first letter, then prepare the mailing and print it.</p></div></div>
+  <div class="split">
+    <section class="card">
+      <form method="post" class="stack" data-warn-unsaved="This letter">{% csrf_token %}
+        {% include "partials/form_errors.html" %}
+        {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+        {% for k, v in hidden.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        {{ form.as_div }}
+        <div class="form-actions"><button type="submit" name="step" value="preview" class="secondary">Preview</button><button type="submit" name="step" value="create" data-confirm="Prepare this mailing? It is recorded with who it goes to as of now; you print the letters on the next page.">Prepare mailing</button></div>
+      </form>
+    </section>
+    <div>
+      {% if preview %}<section class="card" id="preview"><h2>Preview</h2>
+        <p><strong>{{ preview.counts.letters }}</strong> letter{{ preview.counts.letters|pluralize }} to {{ preview.counts.homes }} home{{ preview.counts.homes|pluralize }}.{% if preview.counts.no_address %} <span class="badge tone-warning">{{ preview.counts.no_address }} without an address</span>{% endif %}</p>
+        {% if preview.first %}<div class="letter-preview prose" data-testid="letter-preview">
+          <p class="small">{% for line in preview.first.recipient %}{{ line }}<br>{% endfor %}</p>
+          <p>{{ preview.first.date }}</p><p><strong>RE: {{ preview.first.subject }}</strong></p>
+          <p>Dear {{ preview.first.salutation }}:</p>{{ preview.first.body|linebreaks }}
+          <p>Sincerely,<br>{% for line in preview.first.signature %}{{ line }}<br>{% endfor %}</p></div>
+        <details><summary class="small">Everyone it goes to</summary><ul class="small">{% for g in preview.groups %}<li>{{ g.lot.label }}: {{ g.owner_names }}</li>{% endfor %}</ul></details>
+        {% else %}<p class="muted small">Nobody to write to.</p>{% endif %}
+      </section>{% endif %}
+      <section class="card"><h3>Placeholders</h3><p class="small muted">Write these in the subject or letter; they are filled in for each letter.</p>
+        <dl class="kv small">{% for k, v in placeholders.items %}<dt>{{ "{" }}{{ k }}{{ "}" }}</dt><dd>{{ v }}</dd>{% endfor %}</dl></section>
+    </div>
+  </div>
+{% endblock %}

@@ -29,6 +29,9 @@
 - feature: "Secret ballots stored unlinkable: the ballot records who voted, the choice is a separate row with no voter, lot, time or sequential id; database refuses a linked secret ballot; formal votes binding (D21)"
   since: M3
   match: ["^unit:governance/tests/test_governance.py::test_(secret_ballot_choice|open_ballots_still)"]
+- feature: "Secret choice mixing pool (D56): secret votes, elections and anonymous surveys pool the choice with no person, lot, ballot or time; a separate transaction (after-commit task, hourly sweep, close) writes them shuffled with random ids, keeping K behind while open; no permanent choice row shares xmin with a participation; close and final results count every pooled choice; double voting and eligibility unchanged; runtime role may stage and flush (no UPDATE/TRUNCATE on the pool) and never rewrite choices; nothing logged or audited with the choice"
+  since: M5
+  match: ["^unit:governance/tests/test_secret_mixing"]
 - feature: "ARC neighbor sign-off: adjacency from the development plan, extra addresses, portal answers or single-use expiring links, plans shown (not signed forms), printable prefilled form, scanned forms read into proposals a person confirms (automatic only when switched on), recusal"
   since: M3
   match: ["^unit:arc/tests/test_signoffs"]

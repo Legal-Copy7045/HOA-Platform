@@ -113,6 +113,13 @@ HUBS = {
             "Wording of collection letters and resale certificates, and where to send checks.",
         ),
         (
+            "Paper mail settings",
+            "paper_mail_settings",
+            "mail",
+            "mail.print",
+            "Where the address prints for window envelopes, and the USPS tracking barcode.",
+        ),
+        (
             "Common area booking rules",
             "reservation_settings",
             "calendar",
@@ -140,8 +147,26 @@ HUBS = {
             "retention.manage",
             "Former owners' contact details cleared after the retention period.",
         ),
+        (
+            "Demo data",
+            "demo_data",
+            "leaf",
+            "system.run_task",
+            "Replace everything with a fictional demo dataset (demo and test portals only).",
+        ),
     ],
 }
+
+
+def _demo_data_allowed() -> bool:
+    from core import demo_reseed
+
+    return demo_reseed.allowed()
+
+
+# Hub pages that exist only on some deployments: listed only while the check
+# passes (the page itself answers 404 otherwise). Demo data: D53.
+ONLY_WHEN = {"demo_data": _demo_data_allowed}
 # Hubs whose own page is where every child lands (votes, elections and
 # surveys all open the Voting list), so a single child keeps the hub's label
 # and links to the hub's own page filtered by this query parameter (the
@@ -221,6 +246,8 @@ SECTIONS = [
             ("People", "people", "users", "person.manage"),
             # Sign-ups are a tab of it for the board (WT-002).
             ("Homes and owners", "lot_list", "map", "lot.view_all"),
+            # Letters, envelopes and labels for owners who get paper (D55).
+            ("Paper mail", "paper_mail", "mail", "mail.print"),
         ],
     ),
     (
@@ -334,6 +361,8 @@ def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[d
         if not allowed(groups, permission):
             continue
         if not features.url_name_enabled(name.partition("?")[0], request):
+            continue
+        if name in ONLY_WHEN and not ONLY_WHEN[name]():
             continue
         url = _url(name)
         if url:

@@ -202,3 +202,36 @@ def save_faq(
         metadata={"published": entry.published},
     )
     return entry
+
+
+# --- Paper mail (D55): what other apps may ask -----------------------------------------
+
+
+def paper_notice_status(meeting, user) -> dict:
+    """For the meeting page: how many homes need a paper notice and whether
+    a paper notice mailing was prepared or mailed. Empty unless ``user`` may
+    print paper mail (board and manager), and for executive sessions."""
+    from core.policy import can
+
+    if not can(user, "mail.print") or meeting.kind == "executive":
+        return {}
+    from comms import papermail
+
+    groups = papermail.who_gets_paper()
+    return {
+        "can_print_mail": True,
+        "paper_homes": len({g["lot"].pk for g in groups}),
+        **papermail.meeting_status(meeting),
+    }
+
+
+def paper_homes_count(user) -> int | None:
+    """Homes that get paper now, for hooks on other pages (None when
+    ``user`` may not print paper mail)."""
+    from core.policy import can
+
+    if not can(user, "mail.print"):
+        return None
+    from comms import papermail
+
+    return len({g["lot"].pk for g in papermail.who_gets_paper()})

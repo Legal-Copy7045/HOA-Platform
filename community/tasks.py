@@ -53,3 +53,13 @@ def contact_retention(timestamp: int) -> int:
 
     result = retention.run(actor=SYSTEM)
     return result.people if result is not None else 0
+
+
+@app.periodic(cron="53 3 * * *")  # daily, 03:53 server time
+@app.task(queue="maintenance", queueing_lock="register_import_files")
+def register_import_files(timestamp: int) -> int:
+    """Delete uploaded register files older than REGISTER_IMPORT_FILE_DAYS
+    (D54): they hold owners' names and emails. The import records stay."""
+    from community import register_import
+
+    return register_import.purge_old_files()

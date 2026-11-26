@@ -110,6 +110,79 @@ def record_person(
     return person
 
 
+def record_lot(
+    *, number: int, street_address: str, actor, request: HttpRequest | None = None
+) -> Lot:
+    """A new home on the register (the register import, D54). Lots are never
+    deleted; an existing number is refused."""
+    _authorize(actor, "ownership.manage")
+    street_address = " ".join((street_address or "").split())[:200]
+    if not 1 <= int(number) <= 9999:
+        raise CommunityError("A lot number is a whole number from 1 to 9999.")
+    if not street_address:
+        raise CommunityError("A home needs its street address.")
+    with transaction.atomic(), system_access("record_lot"):
+        if Lot.objects.filter(number=number).exists():
+            raise CommunityError("That lot number is already on the register.")
+        lot = Lot.objects.create(number=number, street_address=street_address)
+        _audit(
+            "lot.recorded", actor=actor, request=request, target=lot, metadata={"lot_id": lot.pk}
+        )
+    return lot
+
+
+def record_imported_contact(
+    person: Person,
+    *,
+    phone: str = "",
+    mailing: dict | None = None,
+    actor,
+    request: HttpRequest | None = None,
+) -> None:
+    """Contact details from the register import (D54) for a person the import
+    has just recorded: a phone on their Phone list, and a mailing address for
+    post when the register gives one. Never overwrites a choice the person
+    made: a mailing address is set only while they have none."""
+    from community.models import ContactProfile
+
+    _authorize(actor, "person.manage")
+    with transaction.atomic(), system_access("record imported contact"):
+        if phone:
+            phone = _valid_phone(phone.strip())
+            if not ContactMethod.objects.filter(
+                person=person, kind=ContactMethodKind.PHONE, value=phone
+            ).exists():
+                ContactMethod.objects.create(
+                    person=person, kind=ContactMethodKind.PHONE, value=phone[:300]
+                )
+                _sync_profile_phone(person.pk)
+                _audit(
+                    "contact.method_added",
+                    actor=actor,
+                    request=request,
+                    target=person,
+                    metadata={"kind": ContactMethodKind.PHONE},
+                )
+        if mailing:
+            profile = ContactProfile.objects.filter(person=person).first() or ContactProfile(
+                person=person
+            )
+            if profile.mail_to_home is None and not profile.mail_street:
+                profile.mail_to_home = False
+                profile.mail_street = mailing["street"][:200]
+                profile.mail_city = mailing["city"][:80]
+                profile.mail_state = mailing["state"]
+                profile.mail_zip = mailing["zip"]
+                profile.save()
+                _audit(
+                    "profile.updated",
+                    actor=actor,
+                    request=request,
+                    target=profile,
+                    metadata={"mailing": "other", "via": "register_import"},
+                )
+
+
 # --- Ownership ----------------------------------------------------------------
 
 
@@ -2116,6 +2189,107 @@ def owner_notice_recipients() -> tuple[list[str], list[Person]]:
         else:
             paper.append(person)
     return sorted(set(emails)), paper
+
+
+def _address_key(address: str) -> tuple[str, ...]:
+    """Two postal addresses are the same letter when they match line by line
+    ignoring case, spacing and punctuation at the ends."""
+    return tuple(
+        " ".join(line.split()).strip(" ,.").casefold()
+        for line in address.splitlines()
+        if line.strip()
+    )
+
+
+def _names(names: list[str]) -> str:
+    if len(names) <= 2:
+        return " & ".join(names)
+    return ", ".join(names[:-1]) + " & " + names[-1]
+
+
+def paper_mail_groups(*, everyone: bool = False, lot_id: int | None = None) -> list[dict]:
+    """Who gets a paper letter (D55): one letter per home and postal address.
+
+    Current owners on the deed only (tenants, contacts and former owners
+    never). Unless ``everyone``, an owner who agreed to official notices by
+    email and has an email address is left out, exactly as the notice emails
+    decide (governance.services.send_notice, owner_notice_recipients);
+    everyone else, including owners who withdrew their consent or never
+    answered, gets paper. Owners of one home who share a postal address are
+    named on one letter; a different address gets its own letter.
+    ``lot_id`` limits it to one home. Internal: the caller checks
+    ``mail.print``. Returns dicts with lot, people (ids), names, address."""
+    from community.models import ContactProfile
+
+    with system_access("paper mail recipients"):
+        ownerships = Ownership.objects.active().select_related("person", "person__user", "lot")
+        if lot_id is not None:
+            ownerships = ownerships.filter(lot_id=lot_id)
+        ownerships = list(ownerships.order_by("lot_id", "start_date", "pk"))
+        consent = set(
+            ContactProfile.objects.filter(electronic_notice_consent=True).values_list(
+                "person_id", flat=True
+            )
+        )
+    groups: dict[tuple, dict] = {}
+    seen: set[tuple[int, int]] = set()
+    for own in ownerships:
+        person, lot = own.person, own.lot
+        if (lot.pk, person.pk) in seen:
+            continue
+        seen.add((lot.pk, person.pk))
+        email = person.user.email if person.user_id else person.email
+        if not everyone and person.pk in consent and email:
+            continue
+        address, _source = postal_address(person, lot)
+        key = (lot.pk, _address_key(address))
+        group = groups.setdefault(
+            key, {"lot": lot, "people": [], "names": [], "address": address.strip()}
+        )
+        group["people"].append(person.pk)
+        group["names"].append(person.display_name)
+    out = list(groups.values())
+    out.sort(key=lambda g: (g["lot"].sort_key, g["names"]))
+    for g in out:
+        g["owner_names"] = _names(g["names"])
+    return out
+
+
+def paper_mail_letters(groups: list[dict]) -> list[dict]:
+    """The letters of a saved mailing, from its ``[{"lot", "people"}]``:
+    names and the postal address as they are now (the first person's
+    address), plus the home and its current account number. Internal."""
+    from community.models import Account
+
+    lot_ids = {int(g["lot"]) for g in groups}
+    person_ids = {int(p) for g in groups for p in g["people"]}
+    with system_access("paper mail letters"):
+        lots = {lot.pk: lot for lot in Lot.objects.filter(pk__in=lot_ids)}
+        people = {p.pk: p for p in Person.objects.filter(pk__in=person_ids)}
+        numbers = dict(
+            Account.objects.filter(lot_id__in=lot_ids, closed_on__isnull=True).values_list(
+                "lot_id", "number"
+            )
+        )
+    out = []
+    for index, g in enumerate(groups):
+        lot = lots.get(int(g["lot"]))
+        members = [people[int(p)] for p in g["people"] if int(p) in people]
+        if lot is None or not members:
+            continue
+        address, _source = postal_address(members[0], lot)
+        names = [p.display_name for p in members]
+        out.append(
+            {
+                "index": index,
+                "lot": lot,
+                "names": names,
+                "owner_names": _names(names),
+                "address": address.strip(),
+                "account_number": str(numbers.get(lot.pk) or ""),
+            }
+        )
+    return out
 
 
 # --- Letters and resale certificate settings (Milestone 4) ----------------------------

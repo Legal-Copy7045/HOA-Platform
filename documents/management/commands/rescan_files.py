@@ -34,7 +34,20 @@ class Command(BreakGlassCommand):
                 result, scanner = scan(fh)
             AttachmentScan.objects.create(attachment=attachment, result=result, scanner=scanner)
             counts[result] += 1
-        self.audit(actor, opts, target_id=f"{len(versions)}+{len(attachments)}")
+        # Register files still kept from an import (D54).
+        from community.models import RegisterImport, RegisterImportScan
+
+        registers = [
+            r for r in RegisterImport.objects.filter(file_removed_at__isnull=True) if r.has_file
+        ]
+        for record in registers:
+            with record.file.open("rb") as fh:
+                result, scanner = scan(fh)
+            RegisterImportScan.objects.create(
+                register_import=record, result=result, scanner=scanner
+            )
+            counts[result] += 1
+        self.audit(actor, opts, target_id=f"{len(versions)}+{len(attachments)}+{len(registers)}")
         self.stdout.write(", ".join(f"{k}: {v}" for k, v in counts.items()))
         if counts[ScanResult.INFECTED]:
             self.stdout.write("Infected files are now blocked from download.")

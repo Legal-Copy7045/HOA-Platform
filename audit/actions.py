@@ -125,8 +125,24 @@ _SPECS = [
     _spec("account.change_withdrawn", "Account change withdrawn", "action"),
     _spec("arc.project_type_saved", "ARC project type saved", "active"),
     _spec(
-        "register.imported", "Home and owner register imported", "lots", "owners", "people_created"
+        "register.imported",
+        "Home and owner register imported",
+        "lots",
+        "owners",
+        "people_created",
+        # D54 (portal import): counts only, never names, emails or addresses.
+        "lots_created",
+        "lots_left_alone",
+        "people_matched",
+        "rows",
     ),
+    # Register import in the portal (D54). Counts and scan results only.
+    _spec("lot.recorded", "Home added to the register", "lot_id"),
+    _spec("register.file_uploaded", "Register file uploaded", "kind", "scan", "size"),
+    _spec("register.upload_blocked", "Register file refused", "reason"),
+    _spec("register.file_rescanned", "Register file checked again", "scan"),
+    _spec("register.file_downloaded", "Register file downloaded", "kind"),
+    _spec("register.file_removed", "Register file removed", "reason"),
     _spec("contract.entered", "Contract entered", "amount_cap_cents", "schedule"),
     _spec("contract.ended", "Contract end date set", "ends_on"),
     _spec(
@@ -215,6 +231,19 @@ _SPECS = [
     _spec("document.viewed", "Document page viewed"),
     _spec("meeting.created", "Meeting scheduled", "kind"),
     _spec("meeting.noticed", "Meeting notice sent", "emailed", "paper", "short_days"),
+    # Paper mail (D55): counts only, never names or addresses.
+    _spec(
+        "mailing.created",
+        "Paper mailing prepared",
+        "kind",
+        "audience",
+        "letters",
+        "homes",
+        "consent_version",
+    ),
+    _spec("mailing.printed", "Paper mailing printed", "format", "letters", "pages", "barcode"),
+    _spec("mailing.mailed", "Paper mailing marked mailed", "kind", "letters", "homes"),
+    _spec("mailing.settings_changed", "Paper mail settings changed", "window", "barcode"),
     _spec("meeting.status_changed", "Meeting held or cancelled", "status"),
     _spec("meeting.minutes_attached", "Minutes attached to meeting", "document_id"),
     _spec("meeting.attendance", "Attendance recorded", "person_id", "present"),
@@ -691,8 +720,21 @@ _SPECS = [
         "checkout_id",
     ),
     # Server tasks (hosttasks, D35)
-    _spec("system.task_requested", "Server task requested", "kind"),
-    _spec("system.task_finished", "Server task finished on the VM", "kind", "state"),
+    _spec("system.task_requested", "Server task requested", "kind", "dataset", "attach_requester"),
+    _spec("system.task_finished", "Server task finished on the VM", "kind", "state", "dataset"),
+    # Demo datasets and reseeding the POC (D53)
+    _spec("system.demo_seeded", "Fictional demo data loaded", "dataset"),
+    _spec("system.logins_kept", "Real logins restored after a demo reseed", "count", "tasks"),
+    _spec(
+        "system.demo_requester_attached",
+        "Reseed requester given a board seat and a demo home",
+        "task_id",
+        "person_id",
+        "seat_id",
+        "ownership_id",
+        "lot_id",
+    ),
+    _spec("system.demo_files_cleaned", "Files of the replaced demo data removed", "count"),
     # Community setup wizard (D51): step key and run number only.
     _spec("setup.run_started", "Community setup started", "run"),
     _spec("setup.step_completed", "Community setup step completed", "step", "run"),

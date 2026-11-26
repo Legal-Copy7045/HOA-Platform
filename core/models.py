@@ -167,6 +167,7 @@ class HostTask(models.Model):
         OFFSITE_LOCK_CHECK = "offsite_lock_check", "Check the off-site lock"
         HARDEN_HOST = "harden_host", "Re-apply host security"
         HEALTH_CHECK = "health_check", "Run the health checks"
+        RESEED_DEMO = "reseed_demo", "Reseed with demo data"
 
     class State(models.TextChoices):
         REQUESTED = "requested", "Waiting for the server"
@@ -178,6 +179,13 @@ class HostTask(models.Model):
     ACTIVE = (State.REQUESTED, State.RUNNING)
 
     kind = models.CharField(max_length=30, choices=Kind.choices)
+    # reseed_demo only: the dataset (community/demo), checked against the
+    # registry by the portal and again by the agent; [a-z_] only (D53). The
+    # agent may read this before the migration lands, hence the db_default.
+    dataset = models.CharField(max_length=40, blank=True, default="", db_default="")
+    # reseed_demo only: afterwards give the requester a board seat and a demo
+    # home in the new data (demo_attach_requester, POC only).
+    attach_requester = models.BooleanField(default=False, db_default=False)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -205,6 +213,14 @@ class HostTask(models.Model):
                 ),
                 name="core_hosttask_state_valid",
             ),
+            models.CheckConstraint(
+                condition=models.Q(dataset__regex=r"^[a-z_]{0,40}$"),
+                name="core_hosttask_dataset_plain",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(attach_requester=False) | models.Q(kind="reseed_demo"),
+                name="core_hosttask_attach_only_reseed",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -212,3 +228,21 @@ class HostTask(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Server task history is kept.")
+
+
+class DemoSeed(models.Model):
+    """Which demo dataset was loaded, and when (``seed_demo``, decision D53).
+    Shown on Settings -> Demo data. A reseed replaces the whole database, so
+    the newest row is the data the portal holds now."""
+
+    dataset = models.CharField(max_length=40)
+    seeded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-seeded_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"demo seed #{self.pk} ({self.dataset})"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Demo seed records are kept.")

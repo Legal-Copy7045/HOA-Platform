@@ -9,7 +9,7 @@
     {% if roster_view %}<div class="actions">
       {% if include_dormant %}<a class="btn secondary" href="?view=roster">Current accounts only</a>{% else %}<a class="btn secondary" href="?view=roster&amp;previous=1">Include previous accounts</a>{% endif %}
       <a class="btn secondary" href="?view=roster&amp;export=csv{% if include_dormant %}&amp;previous=1{% endif %}">{% icon "download" %} Export CSV</a></div>
-    {% elif signups_view %}<div class="actions"><a class="btn secondary" href="{% url 'invitations' %}?letters=1">{% icon "download" %} Letters for owners without email ({{ counts.no_email }})</a></div>{% endif %}</div>
+    {% elif signups_view %}<div class="actions"><a class="btn secondary" href="{% url 'invitations' %}?letters=1">{% icon "download" %} Letters for owners without email ({{ counts.no_email }})</a></div>{% elif can_import %}<div class="actions"><a class="btn secondary" href="{% url 'register_import' %}">{% icon "plus" %} Import homes and owners</a></div>{% endif %}</div>
   {% if can_roster or can_signups %}<nav class="subnav" aria-label="Views" data-swap>
     <a href="{% url 'lot_list' %}#results"{% if not roster_view and not signups_view %} aria-current="page"{% endif %}>Homes</a>
     {% if can_roster %}<a href="{% url 'lot_list' %}?view=roster#results"{% if roster_view %} aria-current="page"{% endif %}>Accounts, contacts and balances</a>{% endif %}
@@ -68,7 +68,7 @@
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Address</th><th>Current owners</th></tr></thead>
     <tbody>{% for lot, owners in rows %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'lot_detail' lot.pk %}">{{ lot.label }}</a> <span class="lot-ref small">{{ lot.lot_ref }}</span></td><td>{% for p in owners %}{{ p.display_name }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="status tone-warning">None recorded</span>{% endfor %}</td></tr>
-    {% empty %}<tr><td colspan="2">{% if q %}{% include "partials/empty.html" with icon="search" title="No home matches" %}{% else %}{% include "partials/empty.html" with icon="map" title="No homes yet" text="Load the register first (import_register)." %}{% endif %}</td></tr>{% endfor %}</tbody>
+    {% empty %}<tr><td colspan="2">{% if q %}{% include "partials/empty.html" with icon="search" title="No home matches" %}{% else %}{% if can_import %}<div class="empty">{% icon "map" %}<p><strong>No homes yet</strong></p><p class="small">Start with the list of homes, their addresses and their owners.</p><p><a class="btn" href="{% url 'register_import' %}">Import homes and owners</a></p></div>{% else %}{% include "partials/empty.html" with icon="map" title="No homes yet" text="The board loads the list of homes and owners first." %}{% endif %}{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   {% endif %}
   </div>

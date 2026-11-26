@@ -157,6 +157,8 @@ def test_tie_for_the_last_seat_elects_nobody_for_it(w):
         elections.cast_election_ballot(
             election, lot_id=lot.pk, candidate_ids=[cands[_person(target).pk].pk], actor=voter
         )
+    assert elections.tally(election)["pending"] == 2  # in the mixing pool while open (D56)
+    elections.close_voting(election, actor=w["board"])
     result = elections.tally(election)
     assert result["tie_for_last"] and not any(r["elected"] for r in result["rows"])
 

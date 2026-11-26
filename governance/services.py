@@ -180,6 +180,34 @@ def _notice_where(meeting: Meeting) -> str:
     return meeting.location or "see the portal"
 
 
+def meeting_notice_values(meeting: Meeting) -> dict:
+    """The meeting's facts for a paper notice (D55): the same title, time,
+    place and join link as the notice email (D49 amended), the portal link
+    for the agenda, and default wording. Executive sessions are never
+    noticed to owners. The caller has fetched the meeting through its
+    scoping and checked ``mail.print``."""
+    if meeting.kind == MeetingKind.EXECUTIVE:
+        raise GovernanceError("Executive sessions are not noticed to owners.")
+    when = timezone.localtime(meeting.starts_at)
+    values = {
+        "meeting_title": single_line(meeting.title),
+        "meeting_kind": meeting.get_kind_display().lower(),
+        "meeting_when": f"{when:%A, %B} {when.day}, {when.year} at {when:%-I:%M %p}",
+        "meeting_where": _notice_where(meeting),
+        "join_link": meeting.join_url or "",
+        "agenda_link": settings.PORTAL_BASE_URL + reverse("meeting_detail", args=[meeting.pk]),
+    }
+    subject = "Notice of {meeting_kind}: {meeting_title}"
+    body = (
+        "The {association} gives notice of a {meeting_kind}.\n\n"
+        "{meeting_title}\nWhen: {meeting_when}\nWhere: {meeting_where}\n\n"
+        "The agenda and details are on the owners' portal (sign-in required): "
+        "{agenda_link}\n\n"
+        "If you have questions, please contact {contact}."
+    )
+    return {"values": values, "subject": subject, "body": body}
+
+
 def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
     """Email owners who consented to electronic notice; list those who need paper."""
     require(actor, "meeting.manage")
@@ -667,6 +695,11 @@ def close_vote(vote: Vote, *, actor, request=None) -> Vote:
         if locked.status != VoteStatus.OPEN:
             raise GovernanceError("Only an open vote can be closed.")
         Vote.objects.filter(pk=vote.pk).update(status=VoteStatus.CLOSED, closed_at=timezone.now())
+        if locked.secret:
+            # Every pooled choice is written before anyone sees results (D56).
+            from governance import mixing
+
+            mixing.flush(mixing.VOTE, locked.pk, final=True)
     record_event(
         "vote.closed", actor=None if actor is SYSTEM else actor, request=request, target=vote
     )
@@ -754,8 +787,12 @@ def cast_ballot(
                 cast_by=actor,
             )
             if vote.secret:
-                # Stored apart from the ballot, with nothing that links them.
-                SecretChoice.objects.create(vote=vote, option=option)
+                # Into the mixing pool, with nothing that links it to the
+                # ballot; written to SecretChoice later, shuffled, in another
+                # transaction (D56).
+                from governance import mixing
+
+                mixing.pool_vote_choice(vote, option.pk)
     except IntegrityError as exc:
         raise GovernanceError("A ballot was already cast for this home.") from exc
     # Secret ballots: the audit trail records that a ballot was cast, not the choice.
@@ -770,7 +807,18 @@ def cast_ballot(
 
 
 def results(vote: Vote) -> dict:
+    """Counts per option. On a secret vote, choices still in the mixing pool
+    (D56) are not in the rows while voting is open; ``pending`` says how
+    many, and the outcome waits for them. Once the vote is closed (or past
+    its closing time) anything pooled is written first, so final results
+    always count every ballot."""
     source = SecretChoice if vote.secret else Ballot
+    pending = 0
+    if vote.secret:
+        from governance import mixing
+
+        mixing.settle_if_final(mixing.VOTE, vote)
+        pending = mixing.pending_count(mixing.VOTE, vote.pk)
     counts = dict(
         source.objects.filter(vote=vote)
         .values_list("option")
@@ -787,7 +835,7 @@ def results(vote: Vote) -> dict:
         for o in vote.options.all()
     ]
     outcome = None
-    if vote.kind == VoteKind.FORMAL and vote.eligible_lots:
+    if vote.kind == VoteKind.FORMAL and vote.eligible_lots and not pending:
         turnout = round(100 * total / vote.eligible_lots, 1)
         # Exact integer comparisons, never rounded percentages (review D4).
         quorum_met = total * 100 >= (vote.quorum_percent or 0) * vote.eligible_lots
@@ -807,7 +855,7 @@ def results(vote: Vote) -> dict:
             "leading": leader["option"].label if leader else ("tie" if len(leaders) > 1 else None),
             "meets_threshold": passed,
         }
-    return {"rows": rows, "total": total, "outcome": outcome}
+    return {"rows": rows, "total": total, "outcome": outcome, "pending": pending}
 
 
 def can_see_voters(vote: Vote, user) -> bool:

@@ -6,6 +6,58 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.25.0 — 2026-11-26
+
+- Secret ballots, election ballots and anonymous survey answers can no
+  longer be matched to who cast them, even by someone reading the database
+  afterwards (D56). The choice waits in a mixing pool with no name on it and
+  is written later, shuffled with others, in a separate step. While a vote is
+  open the board's results say how many ballots are still "waiting to be
+  mixed"; closing the vote, election or survey counts every one of them.
+- Votes cast before this release keep the old layout (demo data only): run
+  real secret votes only on this release or later.
+
+## 0.24.0 — 2026-11-26
+
+- Paper mail (Association → Paper mail, board and manager): letters for
+  owners who get official notices by post, one per home and mailing
+  address, from a meeting notice, a budget notice, the Letters and
+  certificates wording or a blank letter, with placeholders and a preview.
+  One PDF of letters laid out for #10 window envelopes (single or double
+  window, positions adjustable with a test page), #10 envelopes, or a sheet
+  of 30 address labels. "Mark as mailed" is recorded and shown on the
+  meeting page; My items reminds until then.
+- Optional USPS tracking barcode (Intelligent Mail) on window letters and
+  envelopes, once a Mailer ID is entered on Paper mail settings.
+
+## 0.23.0 — 2026-11-26
+
+- Import homes and owners (Homes and owners → Import homes and owners, also
+  from Community setup): download an Excel or CSV template, fill in the
+  homes, addresses and owners, upload it, see what would change and any rows
+  to fix, then import. The file is checked for malware, kept privately for
+  the board and deleted after the import or after 30 days. Homes that
+  already have owners are left alone and importing the same file twice adds
+  nothing. The server command `import_register` now reads Excel files too
+  (D54).
+
+## 0.22.0 — 2026-11-26
+
+- A second demo dataset, "Fresh start": a community the declarant has just
+  handed over (44 homes and owners, a declarant-appointed board of three, a
+  sysadmin, a placeholder Declaration, nothing else yet). `seed_demo
+  --dataset fresh_start`; the full Oak Creek demo stays the default (D53).
+- Demo and test portals only: Settings → Demo data lets a sysadmin replace
+  everything with either dataset (type RESEED to confirm). The server takes
+  a backup first, keeps real logins with their passkeys, app codes and
+  sysadmin role, and is back in about a minute. The page does not exist on
+  a real deployment, and the server refuses it there too. A box (ticked by
+  default) makes the person reseeding a board member and the owner of a
+  demo home in the new data, so one login keeps working as sysadmin, board
+  member and owner.
+- A loud warning (startup check and health check) if demo data loading were
+  ever switched on in production.
+
 ## 0.21.0 — 2026-11-26
 
 - Disbursements (Finance, optional feature, on by default): the board can pay

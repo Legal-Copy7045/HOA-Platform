@@ -28,6 +28,32 @@ def _walk(storage, path=""):
         yield from _walk(storage, f"{path}/{d}" if path else d)
 
 
+def referenced_files() -> set[str]:
+    """Every storage key a FileField in the database points at."""
+    from django.apps import apps
+    from django.db import models
+
+    from core.scoping import system_access
+
+    keys: set[str] = set()
+    with system_access("list stored files"):
+        for model in apps.get_models():
+            for field in model._meta.concrete_fields:
+                if isinstance(field, models.FileField):
+                    values = model._base_manager.exclude(**{field.name: ""}).values_list(
+                        field.name, flat=True
+                    )
+                    keys.update(v for v in values if v)
+    return keys
+
+
+def unreferenced_files(storage=None) -> list[str]:
+    """Stored objects no record refers to (after a demo reseed, D53)."""
+    storage = storage or default_storage
+    keep = referenced_files()
+    return [key for key in _walk(storage) if key not in keep]
+
+
 def export_files(fileobj, storage=None) -> int:
     """Write every stored object to ``fileobj`` as a tar stream. Returns count."""
     storage = storage or default_storage

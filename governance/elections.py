@@ -207,6 +207,10 @@ def close_voting(election: Election, *, actor, request=None) -> Election:
         if locked.state != ElectionState.VOTING:
             raise ElectionError("Voting is not open.")
         Election.objects.filter(pk=election.pk).update(state=ElectionState.CLOSED)
+        # Every pooled ballot is written before the count (D56).
+        from governance import mixing
+
+        mixing.flush(mixing.ELECTION, locked.pk, final=True)
     record_event("election.voting_closed", actor=actor, request=request, target=election)
     election.refresh_from_db()
     return election
@@ -290,8 +294,11 @@ def cast_election_ballot(
                 )
         except IntegrityError as exc:
             raise ElectionError("A ballot was already cast for this home.") from exc
-        for cid in candidate_ids:  # unlinked from the participation row
-            ElectionChoice.objects.create(election=locked, candidate_id=cid)
+        # Into the mixing pool, unlinked from the participation row; written
+        # to ElectionChoice later, shuffled, in another transaction (D56).
+        from governance import mixing
+
+        mixing.pool_election_ballot(locked, candidate_ids)
     record_event(
         "election.ballot_cast",
         actor=actor,
@@ -302,6 +309,13 @@ def cast_election_ballot(
 
 
 def tally(election: Election) -> dict:
+    """Votes per candidate. Once voting has closed anything still in the
+    mixing pool is written first (D56); while voting is open ``pending``
+    says how many ballots are not yet in the counts."""
+    from governance import mixing
+
+    mixing.settle_if_final(mixing.ELECTION, election)
+    pending = mixing.pending_count(mixing.ELECTION, election.pk)
     counts = dict(
         ElectionChoice.objects.filter(election=election)
         .values_list("candidate")
@@ -321,7 +335,7 @@ def tally(election: Election) -> dict:
         r["tied"] = tie_for_last and r["votes"] == cutoff
     with system_access("turnout"):
         ballots = ElectionParticipation.objects.filter(election=election).count()
-    return {"rows": rows, "ballots": ballots, "tie_for_last": tie_for_last}
+    return {"rows": rows, "ballots": ballots, "tie_for_last": tie_for_last, "pending": pending}
 
 
 def _add_years(day: datetime.date, years: int) -> datetime.date:

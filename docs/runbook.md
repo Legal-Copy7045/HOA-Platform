@@ -42,6 +42,19 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
    dc exec web python manage.py import_register /tmp/register.csv --commit
    ```
 
+   Or, without a terminal, in the portal (D54): **Homes and owners ->
+   Import homes and owners** (also linked from Community setup -> People and
+   access). Download the Excel or CSV template, fill one row per owner,
+   delete the two EXAMPLE rows, upload it (CSV UTF-8 or .xlsx, up to 2 MB;
+   it is type-checked and scanned for malware), read the check (new homes,
+   new and matched people, rows with problems, homes left alone), then press
+   Import. The upload is kept privately for the board: delete it on the
+   import's page once done (it is removed automatically after
+   `REGISTER_IMPORT_FILE_DAYS`, 30 by default). The importing board member's
+   own home is created but their ownership is left for another board member
+   (no self-grants): that member uploads the same file again, which is safe.
+   Then invite everyone from Sign-ups.
+
    Delete the file from the server afterwards. Later changes of owner go
    through a transfer on the home's page (Homes and owners); a board member's own ownership is
    recorded by another board member (no self-grants).
@@ -788,6 +801,7 @@ summary. One task runs at a time. The full output of each task is in
 | Check the off-site lock | `manage.py check_offsite_lock` in the web container (only once off-site backups are set up) | 5 min |
 | Re-apply host security | `infra/poc/harden-host.sh` | 25 min |
 | Run the health checks | `manage.py health_check --alert` in the web container | 5 min |
+| Reseed with demo data | `infra/poc/reseed-demo.sh <dataset>` (only on the POC with demo data on; started from Settings → Demo data) | 25 min |
 
 If the page says tasks will not run, the agent has not been seen for five
 minutes: check `systemctl status hoa-portal-agent.timer` and
@@ -796,3 +810,49 @@ typed by a person (`setup-offsite-backups.sh`, `set-stripe-key.sh`,
 `move-files-to-r2.sh`) and one-time setup (`provision-vm.sh`, the first
 `harden-host.sh`) stay in the terminal.
 
+## Reseed the POC with demo data (D53)
+
+Only on the POC (`DEPLOYMENT_STAGE=poc` and `SEED_DEMO_ALLOWED=true` in
+`.env`); on a real deployment the page does not exist and the agent refuses.
+
+1. Sign in as a sysadmin with your own login (passkey or app), open
+   **Settings → Demo data**. It shows which dataset the portal holds now.
+2. Pick a dataset: **Oak Creek Farms (full demo)** (three years of history)
+   or **Fresh start (just handed over)** (44 homes and owners, a
+   declarant-appointed board of three, a sysadmin, a placeholder Declaration,
+   nothing else: good for trying the setup and invitations). Type `RESEED`
+   and press **Reseed with this dataset**.
+3. Within a minute the agent takes a backup (the reseed stops if it fails),
+   saves the real logins, stops the portal, empties the database, migrates,
+   puts the real logins back, seeds the dataset, removes the old data's
+   files and starts the portal (about a minute without the site, more for
+   the backup). Sign in again with your own passkey or app: your login,
+   authenticators, recovery codes, person and sysadmin role are kept, and so
+   are other non-demo logins and the server-task history. With "After
+   reseeding, make me a board member and the owner of a demo home in the new
+   data" ticked (the default), you also get a declarant-appointed board seat
+   from today and become joint owner of the first demo home with a single
+   owner; untick it to come back as sysadmin only (then
+   `demo_make_me_owner` gives you a home). Other kept logins get only their
+   login, person and sysadmin role.
+4. The result is on Server tasks (and Demo data). Full output:
+   `/var/log/hoa-portal-tasks.log` on the VM.
+
+By hand on the VM: `sudo bash /opt/hoa-portal/infra/poc/reseed-demo.sh fresh_start`.
+If it fails before "Emptying the database", nothing was changed. If it fails
+while seeding or removing files, the real logins are already back: sign in
+and reseed again. If it fails in between (migrations, putting the logins
+back), the portal is empty and the saved logins are shredded: restore the
+backup it took first ("Backups and the restore drill"). The audit log of
+the replaced data is in that backup only.
+
+## Printing paper notices (Paper mail, D55)
+
+Association → Paper mail shows who gets paper (owners on the deed who have not agreed to official notices by email) and the mailings. Board members and the manager can prepare and print.
+
+1. **Once: check alignment.** Settings → Paper mail settings: choose single- or double-window #10 envelopes, then print the test letter. Print at **actual size / 100% (no "fit to page", no scaling)**, fold in thirds on the dashed lines, put it in an envelope and check the address shows fully in the window. Adjust the inches (recipient block from the left and top; return address for double windows) and print again. Do the same with the test envelope and the test label sheet; use the shifts to correct a printer that prints slightly off.
+2. **Envelopes:** feed #10 envelopes as the printer's manual says (usually the short edge first, flap closed, printed side as marked on the tray); choose the envelope paper size "#10 (4.125 x 9.5 in)" and landscape if the driver asks. Labels: Avery 5160 or compatible, plain paper setting, actual size; "Start at label" reuses a partly used sheet.
+3. **A mailing:** from a meeting page (Prepare paper notices), the budget page after its notice, or Paper mail → New mailing (blank, meeting, budget, or a Letters and certificates wording). Preview, then Prepare mailing. On the mailing page print the letters (tick "start every letter on a front side" when printing both sides), and envelopes or labels unless you use window envelopes.
+4. **After posting:** "Mark as mailed" with the date (or "Not sending this"). Until then the mailing stays on My items; for a meeting, the meeting page then shows "Paper notices mailed <date> to N homes".
+
+**Tracking barcode (optional, free).** Create a USPS Business Customer Gateway account to get a Mailer ID, and sign up for Informed Visibility (IV). Enter the Mailer ID on Paper mail settings, keep Barcode ID 00, choose the Service Type ID (310 is suggested for First-Class with IV tracking: confirm with USPS), and tick "Print the tracking barcode". Window letters and envelopes then carry the barcode above the name (labels are too small for it). To follow a mailing, sign in to IV and search by Mailer ID and serial range (the mailing's pieces are numbered consecutively; the portal keeps each letter's serial and home). USPS returns scans in IV (and its API) only for barcodes carrying the HOA's own Mailer ID, and keeps scan data for 30 days, so look within a month. Importing IV scans into the portal is a possible later step; it would need IV credentials entered on the server with a script, never through the web app.

@@ -110,6 +110,7 @@ account takeover.
 2. **Secret ballots are secret in the portal, not in the database (D12).**
    - The ballot table stores who voted and how, which is what lets the portal enforce one ballot per lot. Board pages, reports and the audit log never show choices on a secret vote, but someone with direct database access could see them.
    - Truly anonymous ballots need a different design (separating "has voted" from "the choice"). Counsel should say whether that matters for formal votes.
+   - **Update:** separated by D21 (2026-11-25); the remaining database-level link is fixed by D56 (2026-11-26), see section 7.
 
 ## 4. Accepted residual risks
 
@@ -145,3 +146,10 @@ It confirmed end to end that these still work: first-officer bootstrap, assisted
 - Every fixed finding has a regression test, mostly in `core/tests/test_security_review.py` and in each app's tests, marked "Security review 2026-11". There are now over 680 automated tests.
 - ruff, bandit, the migration check and pip-audit (no known vulnerabilities) are clean.
 - The new regression suite (`regression/`, `/regression`) runs all of this plus a browser crawl of every page per role. Its first run found two navigation bugs (fixed).
+
+## 7. Later finding: secret choices linkable by transaction id (fixed 2026-11-26, D56)
+
+- **Finding (external review, Medium):** a secret ballot's "this home voted" row and its choice row were written in the same database transaction, so PostgreSQL's hidden `xmin` column (the inserting transaction id) was the same on both. Anyone who can read both tables (the runtime role can) could join them on vote and `xmin` and see how each home voted. Insertion order (physical position, timestamps) leaked the same way. Elections and anonymous surveys had the same layout. D23 had disclosed this as a known limitation.
+- **Fix:** casting now records the participation and puts the choice in a mixing pool (`governance_pendingsecretchoice`) that carries no person, lot, ballot, participation or time. A separate transaction (a worker task after the cast commits, an hourly sweep, and the close itself) writes pooled choices to the permanent append-only tables in shuffled order with fresh random ids. While voting is open it writes only once twice `SECRET_BALLOT_MIX_MIN` (default 5) are waiting and keeps that many behind, so every batch, including the last one at close, mixes at least five ballots whenever five or more were cast. Closing writes everything before results are computed. The runtime role may insert into, read and delete from the pool, never update or truncate it; the permanent tables stay append-only (model, trigger, grants).
+- **Tests:** `governance/tests/test_secret_mixing_transactions.py` casts in real committed transactions and checks that no permanent choice row shares `xmin` with any participation row (votes, elections, surveys); `governance/tests/test_secret_mixing.py` covers shuffled order, flush thresholds, close and results, double voting, eligibility, grants and that nothing logged or audited carries the choice.
+- **Residual risk (accepted):** while a choice waits in the pool, someone with live database access, a backup taken in that window, or the write-ahead log could still link it. After the flush and VACUUM the permanent tables cannot be linked. Backups keep the pool so a restore never loses a ballot (see D56). Votes cast before this release keep the old linkable layout (demo data only); the board should not run real secret votes on an older version.

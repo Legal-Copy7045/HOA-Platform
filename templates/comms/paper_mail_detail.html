@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ m.subject }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'paper_mail' %}">Paper mail</a> / {{ m.created_at|short_date }}</div>
+  <div class="page-head"><div><h1>{{ m.subject }}</h1>
+    <div class="meta"><span>{{ kind_label }}</span><span>{{ m.letters_count }} letter{{ m.letters_count|pluralize }} to {{ m.homes_count }} home{{ m.homes_count|pluralize }}</span><span>{{ audience_label }}</span>{% if meeting_title %}<span><a href="{% url 'meeting_detail' m.meeting_id %}">{{ meeting_title }}</a></span>{% endif %}
+      {% if closing.kind == "mailed" %}<span class="badge tone-success">Mailed {{ closing.mailed_on|short_date }}</span>{% elif closing %}<span class="badge">Not sent</span>{% else %}<span class="badge tone-warning">Not marked as mailed</span>{% endif %}</div></div></div>
+  <div class="split">
+    <section class="card" id="print"><h2>Print</h2>
+      <p class="small muted">Print at actual size (no "fit to page"). Letters are laid out for a #10 {% if settings.window == "double" %}double{% else %}single{% endif %}-window envelope; check the alignment once with the test page on <a href="{% url 'paper_mail_settings' %}">Paper mail settings</a>.{% if settings.barcode_on or pieces %} Letters and envelopes carry the USPS tracking barcode{% if pieces %} ({{ pieces }} numbered piece{{ pieces|pluralize }}){% endif %}.{% endif %}</p>
+      <form method="get" action="{% url 'paper_mail_letters' m.pk %}" class="stack"><h3>Letters</h3>
+        <p><label><input type="checkbox" name="duplex" value="1"{% if settings.duplex %} checked{% endif %}> Printing on both sides: start every letter on a front side</label></p>
+        <div class="form-actions"><button type="submit">{% icon "file" %} Letters (PDF)</button><a class="btn secondary small" href="{% url 'paper_mail_letters' m.pk %}?first=1">First letter only</a></div></form>
+      <h3>Envelopes or labels</h3>
+      <p class="small muted">Not needed with window envelopes.</p>
+      <p><a class="btn secondary" href="{% url 'paper_mail_envelopes' m.pk %}">{% icon "mail" %} #10 envelopes (PDF)</a></p>
+      <form method="get" action="{% url 'paper_mail_labels' m.pk %}" class="stack"><p><label for="label-start">Start at label (1 to 30, across then down)</label><input id="label-start" type="number" name="start" min="1" max="30" value="1" aria-describedby="label-help"></p><p class="help" id="label-help">Avery 5160 or compatible, 30 labels of 1 x 2-5/8 inches. Use a later number to finish a partly used sheet. Labels have no tracking barcode (it does not fit).</p>
+        <div><button type="submit" class="secondary">Address labels (PDF)</button></div></form>
+    </section>
+    <aside>
+      <section class="card" id="mark"><h3>Mailed?</h3>
+        {% if closing.kind == "mailed" %}<p>{% icon "check" %} Mailed {{ closing.mailed_on|date:"M j, Y" }}.</p>
+        {% elif closing %}<p class="muted">Marked as not sent.</p>
+        {% else %}<form method="post" action="{% url 'paper_mail_mark' m.pk %}" class="stack" data-confirm="Record that these letters were mailed on this date? This is recorded permanently.">{% csrf_token %}<p><label for="mailed-on">Mailed on</label><input id="mailed-on" type="date" name="mailed_on" value="{{ today }}" max="{{ today }}" required></p><div><button type="submit">Mark as mailed</button></div></form>
+          <form method="post" action="{% url 'paper_mail_mark' m.pk %}" data-confirm="Record that this mailing will not be sent? It leaves My items; prepare a new one if needed.">{% csrf_token %}<input type="hidden" name="discard" value="1"><button type="submit" class="secondary small">Not sending this</button></form>{% endif %}
+      </section>
+      {% if first %}<section class="card" id="preview"><h3>First letter</h3><div class="letter-preview prose small" data-testid="letter-preview">
+        <p>{% for line in first.recipient %}{{ line }}<br>{% endfor %}</p><p>{{ first.date }}</p><p><strong>RE: {{ first.subject }}</strong></p><p>Dear {{ first.salutation }}:</p>{{ first.body|linebreaks }}<p>Sincerely,<br>{% for line in first.signature %}{{ line }}<br>{% endfor %}</p></div></section>{% endif %}
+    </aside>
+  </div>
+{% endblock %}
