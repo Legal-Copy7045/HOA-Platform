@@ -498,3 +498,24 @@ def test_push_runs_on_its_own_queue_one_job_at_a_time_and_the_worker_takes_it():
     # more than one job at once, so push can never hold the only slot.
     assert "--queues" not in worker_line
     assert '--concurrency "${WORKER_CONCURRENCY:-2}"' in worker_line
+
+
+# --- R2-008: turning push off always works ----------------------------------------
+
+
+def test_push_can_be_turned_off_while_the_feature_is_off(client, w, push_on):
+    client.force_login(w["owner"])
+    _subscribe(client)
+    client.force_login(w["other"])
+    _subscribe(client, ENDPOINT + "-other")
+    FeatureSetting.objects.filter(key="push").update(enabled=False)
+    client.force_login(w["owner"])
+    page = client.get(reverse("my_profile")).content.decode()
+    assert "switched off for the community" in page
+    assert reverse("push_unsubscribe") in page and "Turn off on all my devices" in page
+    assert _subscribe(client, ENDPOINT + "-new").status_code == 404  # no new sign-ups
+    response = client.post(reverse("push_unsubscribe"))
+    assert response.status_code == 302
+    assert PushSubscription.objects.for_user(w["owner"]).count() == 0
+    assert PushSubscription.objects.for_user(w["other"]).count() == 1
+    assert reverse("push_unsubscribe") not in client.get(reverse("my_profile")).content.decode()

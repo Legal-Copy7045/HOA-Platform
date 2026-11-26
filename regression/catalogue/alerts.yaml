@@ -12,3 +12,6 @@
 - feature: "Push limits (review R2-007): at most 10 devices per login (oldest dropped), adding devices rate-limited per login, a device removed after repeated failures or when its host does not exist, push on its own queue one job at a time so email is never held up"
   since: M4
   match: ["^unit:comms/tests/test_pwa_push.py::test_(a_login_keeps|adding_devices|a_device_is_removed|a_push_host|push_runs)"]
+- feature: "Turning alerts off always works: 'Turn off on all my devices' and 'Stop texts and remove my number' answer and show on My profile whenever the user has a subscription or number, even with push or texts switched off; sign-ups stay off (R2-008)"
+  since: M4
+  match: ["^unit:comms/tests/test_sms.py::test_(number_can_be_removed_while|stop_texts_only_touches)", "^unit:comms/tests/test_pwa_push.py::test_push_can_be_turned_off_while"]

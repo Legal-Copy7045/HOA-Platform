@@ -213,6 +213,12 @@ def _contract_period(invoice) -> str:
         or not contract.covers(invoice.invoice_date)
     ):
         return ""
+    # Pre-approval stands in for the invoice's own approvals, so the contract
+    # must carry as many board approvals as this invoice would need (review
+    # SEC-002). Contracts approved by one member before that rule keep
+    # pre-approving only invoices below the two-approver threshold.
+    if len(contract_approvers(contract)) < _approvals_by_rule(invoice):
+        return ""
     period = contract.period_for(invoice.invoice_date)
     taken = (
         Invoice.objects.filter(contract=contract, contract_period=period)
@@ -461,20 +467,26 @@ from operations.models import (  # noqa: E402
 MAX_OPEN_REQUESTS = 20
 
 
-def _may_raise_for(actor, lot_id: int) -> bool:
+def _raise_lot_ids(actor) -> frozenset[int]:
+    """Lots this person may raise requests (and add photos) for: owned lots,
+    authorized-contact lots and tenancies. Never a view-only contact's lot,
+    even when they own another home (review R2-009)."""
     from core.policy import roles_for
 
     roles = roles_for(actor)
-    return lot_id in roles.account_lot_ids or lot_id in roles.tenant_lot_ids
+    return roles.owned_lot_ids | roles.authorized_lot_ids | roles.tenant_lot_ids
+
+
+def _may_raise_for(actor, lot_id: int) -> bool:
+    return lot_id in _raise_lot_ids(actor)
 
 
 def request_lots(actor):
-    """Lots this person may raise a request for (their account or tenancy)."""
+    """Lots this person may raise a request for (owned, authorized contact or
+    tenancy)."""
     from community.services import lots_by_ids
-    from core.policy import roles_for
 
-    roles = roles_for(actor)
-    return lots_by_ids(roles.account_lot_ids | roles.tenant_lot_ids)
+    return lots_by_ids(_raise_lot_ids(actor))
 
 
 def submit_request(
@@ -721,7 +733,29 @@ def close_committee_task(
 
 # --- Contracts (recurring invoices, Milestone 3) -------------------------------------
 
-from operations.models import Contract, Schedule  # noqa: E402
+from operations.models import Contract, ContractApproval, Schedule  # noqa: E402
+
+
+def _contract_approvals_by_rule(cap_cents: int) -> int:
+    """The invoice rule applied to a contract's cap: two different board
+    approvals at or above invoice.dual_approval_cents, otherwise one."""
+    threshold = rule("invoice.dual_approval_cents")
+    return 2 if threshold is not None and cap_cents >= threshold else 1
+
+
+def contract_approvals_required(contract) -> int:
+    if contract.required_approvals is not None:
+        return contract.required_approvals
+    return _contract_approvals_by_rule(contract.amount_cap_cents)
+
+
+def contract_approvers(contract) -> set[int]:
+    """Board members who approved it, never counting the person who entered it."""
+    return set(
+        ContractApproval.objects.filter(contract=contract)
+        .exclude(approver_id=contract.entered_by_id)
+        .values_list("approver_id", flat=True)
+    )
 
 
 def _not_contract_entrant(obj, actor):
@@ -730,21 +764,71 @@ def _not_contract_entrant(obj, actor):
     return None
 
 
+def _contract_ready(obj, actor):
+    problem = _not_contract_entrant(obj, actor)
+    if problem:
+        return problem
+    have, need = len(contract_approvers(obj)), contract_approvals_required(obj)
+    return None if have >= need else f"{need - have} more approval(s) needed."
+
+
 CONTRACT = Workflow(
     "contract",
     [
+        # Applied only by approve_contract once enough approvals are recorded.
         Transition(
             "approve",
             {"draft"},
             "active",
             "invoice.approve",
             "Approved by the board",
-            guard=_not_contract_entrant,
+            guard=_contract_ready,
             note_required=True,
         ),
         Transition("discard", {"draft"}, "discarded", "contract.manage", "Discard"),
     ],
 )
+
+
+def approve_contract(contract: Contract, *, note: str, actor, request=None) -> Contract:
+    """Record one board member's approval; the contract becomes active (and
+    starts pre-approving invoices) once it has the approvals it needs - two
+    different members, neither the entrant, when its cap is at or above the
+    invoice two-approver threshold (review SEC-002)."""
+    require(actor, "invoice.approve")
+    if not note.strip():
+        raise OperationsError("Please add a note: the minutes or resolution that approve it.")
+    with transaction.atomic():
+        contract = Contract.objects.select_for_update().get(pk=contract.pk)
+        if contract.state != "draft":
+            raise OperationsError("Only a contract waiting for approval can be approved.")
+        problem = _not_contract_entrant(contract, actor)
+        if problem:
+            raise OperationsError(problem)
+        if actor.pk in contract_approvers(contract):
+            raise OperationsError(
+                "You have already approved this contract; a different board "
+                "member must give the second approval."
+            )
+        ContractApproval.objects.create(
+            contract=contract,
+            approver=actor,
+            amount_cap_cents=contract.amount_cap_cents,
+            note=note.strip()[:4000],
+        )
+        record_event(
+            "contract.approval_given",
+            actor=actor,
+            request=request,
+            target=contract,
+            metadata={
+                "have": len(contract_approvers(contract)),
+                "need": contract_approvals_required(contract),
+            },
+        )
+        if _contract_ready(contract, actor) is None:
+            contract = CONTRACT.apply(contract, "approve", actor=actor, request=request, note=note)
+    return contract
 
 
 def create_contract(
@@ -781,6 +865,8 @@ def create_contract(
         ends_on=ends_on,
         citation=citation,
         entered_by=actor,
+        # Fixed now, so changing the threshold rule later cannot reduce it.
+        required_approvals=_contract_approvals_by_rule(amount_cap_cents),
     )
     record_event(
         "contract.entered",

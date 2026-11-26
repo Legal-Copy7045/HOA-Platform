@@ -132,9 +132,16 @@ class UpcomingCharge:
     covered_by_credit: bool
 
 
-def upcoming_charges(balance_cents: int, *, months: int = 3, on=None) -> list[UpcomingCharge]:
+@internal("ledger service")
+def upcoming_charges(
+    balance_cents: int, *, lot_id: int | None = None, months: int = 3, on=None
+) -> list[UpcomingCharge]:
     """The next monthly dues, from the dues rule. A credit on the account is
-    shown being used up month by month (nothing here posts anything)."""
+    shown being used up month by month (nothing here posts anything).
+
+    A month whose assessment is already posted (posted ahead of time) is in
+    the balance already, so it is not listed again (review BUG-005). Prepaid
+    credit is drawn down only as each month posts (owner ruling 2026-11-26)."""
     amount = rule("dues.monthly_cents") or 0
     if not amount:
         return []
@@ -144,20 +151,33 @@ def upcoming_charges(balance_cents: int, *, months: int = 3, on=None) -> list[Up
     year, month = on.year, on.month
     if on.day >= day:
         month += 1
+    if month > 12:
+        year, month = year + 1, 1
+    posted: set[str] = set()
+    if lot_id is not None:
+        posted = set(
+            LedgerEntry.objects.filter(
+                lot_id=lot_id,
+                kind=EntryKind.ASSESSMENT,
+                period__gte=_period(year, month),
+                reversed_by__isnull=True,
+            ).values_list("period", flat=True)
+        )
     out = []
-    for _ in range(months):
+    while len(out) < months:
         if month > 12:
             year, month = year + 1, 1
-        covered = credit >= amount
-        credit = max(credit - amount, 0)
-        out.append(
-            UpcomingCharge(
-                datetime.date(year, month, day),
-                f"Monthly dues {_period(year, month)}",
-                amount,
-                covered,
+        if _period(year, month) not in posted:
+            covered = credit >= amount
+            credit = max(credit - amount, 0)
+            out.append(
+                UpcomingCharge(
+                    datetime.date(year, month, day),
+                    f"Monthly dues {_period(year, month)}",
+                    amount,
+                    covered,
+                )
             )
-        )
         month += 1
     return out
 
@@ -208,6 +228,25 @@ def post_monthly_assessments(*, year: int, month: int, actor, request=None) -> i
 _ACCOUNT_NUMBER = re.compile(r"\d{9,}")
 
 
+def _duplicate_reference(lot, reference: str) -> bool:
+    """A payment with this check number or reference is already on this home's
+    ledger and still stands. A reversed payment (a bounced check) does not
+    count, so the same check can be deposited again (review BUG-006). Both
+    payment entry paths use this, so they agree."""
+    if not reference:
+        return False
+    return (
+        LedgerEntry.objects.unscoped("duplicate check")
+        .filter(
+            lot=lot,
+            kind=EntryKind.PAYMENT,
+            reference=reference[:40],
+            reversed_by__isnull=True,
+        )
+        .exists()
+    )
+
+
 @internal("ledger service")
 def record_payment(
     *,
@@ -224,6 +263,8 @@ def record_payment(
         raise LedgerError("A payment must be a positive amount.")
     if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
         raise LedgerError("Enter a check number or short reference, never an account number.")
+    if _duplicate_reference(lot, reference):
+        raise LedgerError(f"Payment {reference[:40]} for this home is already recorded.")
     entry = LedgerEntry.objects.create(
         lot=lot,
         posted_on=received_on,
@@ -261,11 +302,7 @@ def check_payment(p: BatchPayment, *, today: datetime.date | None = None) -> lis
         errors.append("The date received cannot be in the future.")
     if _ACCOUNT_NUMBER.search(p.reference.replace(" ", "").replace("-", "")):
         errors.append("Enter a check number, never an account number.")
-    elif p.reference and (
-        LedgerEntry.objects.unscoped("duplicate check")
-        .filter(lot=p.lot, kind=EntryKind.PAYMENT, reference=p.reference[:40])
-        .exists()
-    ):
+    elif _duplicate_reference(p.lot, p.reference):
         errors.append(f"Check {p.reference} for this home is already recorded.")
     return errors
 

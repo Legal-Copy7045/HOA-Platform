@@ -313,10 +313,13 @@ class Command(BaseCommand):
             citation="Board resolution (demo)",
             actor=b1,
         )
-        if b2 is not b1:
-            ops.CONTRACT.apply(
-                mowing, "approve", actor=b2, note="Approved at the January meeting (demo)"
-            )
+        # Two board members other than the one who entered it (cap over the
+        # two-approver threshold, review SEC-002).
+        for approver in [u for u in board if u is not b1][:2]:
+            if mowing.state == "draft":
+                mowing = ops.approve_contract(
+                    mowing, note="Approved at the January meeting (demo)", actor=approver
+                )
 
         # FAQ and welcome message (Milestone 3).
         for category, question, answer in [

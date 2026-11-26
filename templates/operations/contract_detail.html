@@ -12,6 +12,15 @@
         {% if invoices %}<ul class="list">{% for i in invoices %}<li><a class="grow" href="{% url 'invoice_detail' i.pk %}">#{{ i.number }} · {{ i.invoice_date|date:"M j, Y" }}{% if i.contract_period %} · {{ i.contract_period }} (pre-approved){% endif %}</a><span class="num">{{ i.amount_cents|cents }}</span>{% status i.state i.get_state_display %}</li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
         <p class="small muted">{{ status.count }} invoice{{ status.count|pluralize }}, {{ status.total_cents|cents }} in total.</p>
       </section>
+      {% if can_approve %}
+        <section class="card">
+          <h2>Your approval</h2>
+          <p class="muted">{{ approvals|length }} of {{ needed }} approval{{ needed|pluralize }} recorded. It pre-approves invoices only once {{ needed }} board member{{ needed|pluralize }} other than the person who entered it approve{{ needed|pluralize:"s," }}.</p>
+          <div class="wf-actions">
+            <form method="post" action="{% url 'contract_action' obj.pk 'approve' %}" class="wf-action" data-confirm="Approve this contract? Once it has the approvals it needs, invoices within its cap are pre-approved, one per period.">{% csrf_token %}<label for="approve-note" class="wf-label">Minutes or resolution that approve it<span class="required-mark" aria-hidden="true">*</span><span class="sr-only"> (required)</span></label><div class="wf-row"><input id="approve-note" name="note" required><button type="submit">{% icon "check" %} Approve</button></div></form>
+          </div>
+        </section>
+      {% endif %}
       {% include "partials/workflow.html" with obj=obj %}
     </div>
     <aside>
@@ -19,6 +28,9 @@
         <dt>Category</dt><dd>{{ obj.category }}</dd>
         <dt>Covers</dt><dd>{{ obj.starts_on|date:"M j, Y" }} – {{ obj.ends_on|date:"M j, Y"|default:"open-ended" }}</dd>
         <dt>Approved by</dt><dd>{{ obj.citation }}</dd></dl></section>
+      <section class="card"><h3>Board approvals <span class="muted small">({{ needed }} needed)</span></h3>
+        {% if approvals %}<ul class="list">{% for a in approvals %}<li>{% icon "check-circle" %}<div class="grow"><div>{{ a.approver.email }}</div><div class="small muted">{{ a.created_at|date:"M j" }}{% if a.note %} · {{ a.note }}{% endif %}</div></div></li>{% endfor %}</ul>
+        {% else %}<p class="muted small">None yet.</p>{% endif %}</section>
       {% if can_manage and obj.state == "active" and not obj.ends_on %}<section class="card"><h3>End the contract</h3>
         <form method="post" class="inline-form" data-confirm="Set the last day this contract covers? This can't be changed afterwards.">{% csrf_token %}<input type="date" name="ends_on" required aria-label="Last day"><button type="submit" class="secondary small">Set end date</button></form></section>{% endif %}
     </aside>

@@ -106,7 +106,7 @@ def my_account(request):
                 "statement": statement,
                 "rows": services.statement_rows(statement),
                 "due": services.amount_due(lot.pk),
-                "upcoming": services.upcoming_charges(statement.balance),
+                "upcoming": services.upcoming_charges(statement.balance, lot_id=lot.pk),
                 "pay_options": payment_options(statement.balance) if online else [],
                 **my_account_people(request.user, lot.pk),
             }

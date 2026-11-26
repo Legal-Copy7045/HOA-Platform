@@ -632,14 +632,17 @@ def _balance_items(user, roles) -> list[Item]:
         if statement.balance <= 0:
             continue
         oldest = oldest_unpaid_on(statement, since)
-        when = f" · due since {short_date(oldest)}" if oldest else ""
+        # A charge posted ahead of its month is due by that date, not overdue
+        # since it (review BUG-005).
+        upcoming = oldest is not None and oldest > timezone.localdate()
+        when = f" · due {'by' if upcoming else 'since'} {short_date(oldest)}" if oldest else ""
         out.append(
             Item(
                 "My home",
                 f"{format_cents(statement.balance)} due on lot {lot.number}",
                 f"See your account and how to pay{when}",
                 reverse("my_account"),
-                "warning",
+                "info" if upcoming else "warning",
                 oldest,
                 nav="my_account",
                 icon="wallet",

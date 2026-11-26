@@ -204,6 +204,9 @@ class Roles:
     # (lot_id, since) for account contacts: the account's opening date.
     contact_since: tuple[tuple[int, datetime.date], ...] = ()
     tenant_lot_ids: frozenset[int] = frozenset()
+    # Lots where this person is an authorized contact (may act for the
+    # account); view-only contacts are in account_lot_ids but not here.
+    authorized_lot_ids: frozenset[int] = frozenset()
     # The login these roles belong to (None in the homeowner view).
     user_id: int | None = None
     committee_ids: frozenset[int] = frozenset()
@@ -328,6 +331,7 @@ def _compute_roles(user, on) -> Roles:
         account_lot_ids=lots | frozenset(contacts["account"]),
         contact_since=tuple(sorted(contact_since.items())),
         tenant_lot_ids=frozenset(contacts["tenant"]),
+        authorized_lot_ids=frozenset(contacts["authorized"]),
         former_periods=tuple(sorted(former["periods"])),
         former_account_ids=frozenset(former["accounts"]),
         user_id=user.pk,
