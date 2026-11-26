@@ -42,6 +42,7 @@
         <section class="card"><h2>Results{% if vote.status != "closed" %} so far{% endif %}</h2>
           {% for r in results.rows %}<div class="bar-row"><div class="bar-label"><span>{{ r.option.label }}</span><span class="muted">{{ r.count }} · {{ r.percent }}%</span></div><meter class="bar" min="0" max="100" value="{{ r.percent }}">{{ r.percent }}%</meter></div>{% endfor %}
           <p class="muted small">{{ results.total }} ballot{{ results.total|pluralize }}.{% if results.outcome %} Turnout {{ results.outcome.turnout }}% of homes; quorum {{ results.outcome.quorum_met|yesno:"met,not met" }}; {% if results.outcome.leading == "tie" %}the leading options are tied, so nothing passes.{% elif results.outcome.leading %}leading option "{{ results.outcome.leading }}" {{ results.outcome.meets_threshold|yesno:"meets,does not meet" }} the pass threshold.{% endif %}{% endif %}</p>
+          {% if results.pending %}<p class="muted small">{{ results.pending }} more secret ballot{{ results.pending|pluralize }} {{ results.pending|pluralize:"is,are" }} waiting to be mixed with others before {{ results.pending|pluralize:"it is,they are" }} counted, so no one can tell whose choice is whose. Every ballot is counted when the vote closes.</p>{% endif %}
         </section>
       {% endif %}
     </div>

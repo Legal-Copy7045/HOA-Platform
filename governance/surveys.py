@@ -452,6 +452,13 @@ def close_survey(survey: Survey, *, actor, request=None) -> Survey:
         locked = Survey.objects.select_for_update().get(pk=survey.pk)
         if locked.status != SurveyStatus.OPEN:
             raise SurveyError("Only an open survey can be closed.")
+        if locked.anonymous:
+            # Every pooled response is written before the results (D56), while
+            # the survey is still open: the database refuses responses to a
+            # closed survey, and none can join the pool once it is.
+            from governance import mixing
+
+            mixing.flush(mixing.SURVEY, locked.pk, final=True)
         Survey.objects.filter(pk=locked.pk).update(
             status=SurveyStatus.CLOSED, closed_at=timezone.now()
         )
@@ -538,14 +545,31 @@ def submit_response(survey: Survey, *, answers: dict, actor, request=None) -> No
         except IntegrityError as exc:
             raise SurveyError("You have already answered this survey.") from exc
         if locked.anonymous:
-            response = SurveyResponse.objects.create(survey=locked)
+            # Into the mixing pool, unlinked from the participation row;
+            # written as a response later, shuffled, in another transaction
+            # (D56).
+            from governance import mixing
+
+            mixing.pool_survey_response(
+                locked,
+                [
+                    {
+                        "question": question.pk,
+                        "choice": fields["choice"].pk if fields.get("choice") else None,
+                        "rating": fields.get("rating"),
+                        "text": fields.get("text", ""),
+                    }
+                    for question in questions
+                    for fields in parsed[question.pk]
+                ],
+            )
         else:
             response = SurveyResponse.objects.create(
                 survey=locked, person_id=person_id, submitted_at=timezone.now()
             )
-        for question in questions:
-            for fields in parsed[question.pk]:
-                SurveyAnswer.objects.create(response=response, question=question, **fields)
+            for question in questions:
+                for fields in parsed[question.pk]:
+                    SurveyAnswer.objects.create(response=response, question=question, **fields)
     record_event(
         "survey.responded",
         actor=actor,
@@ -588,6 +612,12 @@ def results_visible(survey: Survey, user) -> bool:
 def results(survey: Survey, *, include_text: bool) -> dict:
     """Totals per question. Free-text answers only with ``include_text``
     (the board); on an anonymous survey they come with no author."""
+    pending = 0
+    if survey.anonymous:
+        from governance import mixing
+
+        mixing.settle_if_final(mixing.SURVEY, survey)  # closed: write the pool first (D56)
+        pending = mixing.pending_count(mixing.SURVEY, survey.pk)
     questions = list(SurveyQuestion.objects.filter(survey=survey).prefetch_related("choices"))
     with system_access("survey results"):
         participants = SurveyParticipation.objects.filter(survey=survey).count()
@@ -639,13 +669,19 @@ def results(survey: Survey, *, include_text: bool) -> dict:
         "rows": rows,
         "responses": participants,
         "audience": len(audience_people(survey)),
+        "pending": pending,
     }
 
 
 def export_csv(survey: Survey, *, actor, request=None) -> HttpResponse:
     """Every response as a row (formula-safe), audited. An anonymous survey
-    exports no names or times, in random (id) order."""
+    exports no names or times, in random (id) order. Responses still in the
+    mixing pool while the survey is open are not in it yet (D56)."""
     require(actor, "survey.manage")
+    if survey.anonymous:
+        from governance import mixing
+
+        mixing.settle_if_final(mixing.SURVEY, survey)
     questions = list(SurveyQuestion.objects.filter(survey=survey).prefetch_related("choices"))
     by_response: dict = defaultdict(lambda: defaultdict(list))
     for a in SurveyAnswer.objects.filter(response__survey=survey).select_related("choice"):

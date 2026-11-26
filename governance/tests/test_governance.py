@@ -307,6 +307,10 @@ def test_secret_ballot_choice_is_not_stored_with_the_voter(board):
     # The choices carry no voter, lot, time or sequential id.
     fields = {f.name for f in SecretChoice._meta.get_fields()}
     assert fields == {"id", "vote", "option"}
+    # While open the choices wait in the mixing pool (D56): not yet counted.
+    assert services.results(vote)["pending"] == 3
+    assert services.results(vote)["outcome"] is None
+    services.close_vote(vote, actor=board)
     counts = {r["option"].label: r["count"] for r in services.results(vote)["rows"]}
     assert counts == {"Yes": 2, "No": 1}
     # The database itself refuses a secret ballot that records the choice.

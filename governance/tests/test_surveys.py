@@ -330,6 +330,7 @@ def test_anonymous_answers_have_no_link_to_the_person(w):
     survey = _survey(w, anonymous=True)
     surveys.open_survey(survey, actor=w["board"])
     _answer(survey, w["owner_a"])
+    surveys.close_survey(survey, actor=w["board"])  # writes the mixing pool (D56)
     person = _person(w["owner_a"])
     with system_access("t"):
         part = SurveyParticipation.objects.get(survey=survey)
@@ -375,6 +376,7 @@ def test_submitted_answers_are_append_only(w):
     survey = _survey(w, anonymous=True)
     surveys.open_survey(survey, actor=w["board"])
     _answer(survey, w["owner_a"])
+    surveys.close_survey(survey, actor=w["board"])  # writes the mixing pool (D56)
     answer = SurveyAnswer.objects.filter(response__survey=survey).first()
     answer.text = "changed"
     with pytest.raises(AppendOnlyError):
@@ -440,9 +442,14 @@ def test_results_visibility_rules(w, client):
     assert client.get(url).status_code == 404  # still open
     client.force_login(w["board"])
     page = client.get(url)
-    assert page.status_code == 200 and b"Secret pond complaint" in page.content
-    assert _person(w["owner_a"]).display_name.encode() not in page.content  # anonymous
+    # Still in the mixing pool while open (D56): counted, not yet shown.
+    assert page.status_code == 200 and b"Secret pond complaint" not in page.content
+    assert b"1 anonymous response is waiting to be mixed" in page.content
     surveys.close_survey(survey, actor=w["board"])
+    page = client.get(url)
+    assert page.status_code == 200 and b"Secret pond complaint" in page.content
+    assert b"waiting to be mixed" not in page.content
+    assert _person(w["owner_a"]).display_name.encode() not in page.content  # anonymous
     client.force_login(w["owner_b"])
     assert client.get(url).status_code == 404  # closed, but not shared
     surveys.set_sharing(survey, share=True, actor=w["board"])
@@ -458,6 +465,7 @@ def test_export_is_audited_and_anonymous_safe(w, client):
     anon = _survey(w, anonymous=True)
     surveys.open_survey(anon, actor=w["board"])
     _answer(anon, w["owner_a"], text="=HYPERLINK(1)")
+    surveys.close_survey(anon, actor=w["board"])  # writes the mixing pool (D56)
     named = _survey(w)
     surveys.open_survey(named, actor=w["board"])
     _answer(named, w["owner_a"])
