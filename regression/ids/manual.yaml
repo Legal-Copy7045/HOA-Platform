@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-029
+# highest issued: MAN-035
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -29,3 +29,9 @@ MAN-026: "election ballot limit"
 MAN-027: "print a page with values"
 MAN-028: "owner ARC on a phone"
 MAN-029: "neighbor review page on a phone"
+MAN-030: "nightly backup writes a stamped keyed checksum"
+MAN-031: "restore drill uses its own file store"
+MAN-032: "restore drill refuses a tampered or swapped backup"
+MAN-033: "install update refuses a non-main branch"
+MAN-034: "move files to R2 compares counts"
+MAN-035: "push and SMS settings reach the containers"

@@ -3,6 +3,11 @@
 One entry per full run (newest first): date, commit, totals, failing check IDs,
 finding IDs, report link. No real names, hosts or addresses.
 
+## 2026-11-26 — after fixing the 23 findings
+
+- Commit: 3d40fcc. Stages only (verification of the fixes): ci 11 pass; unit 1529 pass; page 878 pass; manual 34. Failing: none.
+- Fixed: BUG-001..007, SEC-001..004, R2-001..012 (BUG-008 fixed earlier), each with tests; owner rulings D30 (prepaid display) applied to BUG-005.
+
 ## 2026-11-26 — first run with the standing security audit
 
 - Commit: 7ef4c17 (run on 29f89cb/cdf21b8 code; the date fix 7ef4c17 came after). Totals: 2334 pass, 2 fail, 28 manual, 2 skip (stale ID removed; live HTTPS not reachable from the cloud session).
