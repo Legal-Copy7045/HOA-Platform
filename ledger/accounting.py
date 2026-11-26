@@ -29,6 +29,7 @@ from core.lists import safe_cell
 from core.money import format_cents
 from core.policy import SYSTEM, require
 from core.scoping import system_access
+from ledger.accounts import CURRENT
 from ledger.models import (
     AccountingSetup,
     BankReconciliation,
@@ -583,7 +584,7 @@ def send_courtesy_reminders(*, today=None) -> int:
     link = settings.PORTAL_BASE_URL + reverse("my_account")
     with system_access("courtesy reminders"):
         for lot in Lot.objects.order_by("number"):
-            owed = past_due(lot.pk, today)
+            owed = past_due(lot.pk, today, account=CURRENT)
             if owed <= 0 or CourtesyReminder.objects.filter(lot=lot, period=period).exists():
                 continue
             emails = {
@@ -664,7 +665,7 @@ def generate_case_letter(case: CollectionCase, *, actor, request=None) -> tuple[
                 f"The notice period from the last letter runs until {due:%B %-d}; "
                 "the next letter can go out then."
             )
-        owed = past_due(case.lot_id)
+        owed = past_due(case.lot_id, account=CURRENT)  # the current owners' account
         if owed <= 0:
             raise AccountingError("This account is not past due.")
         data = letters.notice_pdf(case.lot, kind)

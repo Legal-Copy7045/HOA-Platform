@@ -7,7 +7,8 @@
     <section class="card">
       <div class="card-head"><div><h2>{% if p.lot %}Lot {{ p.lot.number }}{% else %}Former lot{% endif %}{% if p.account %} · account {{ p.account.number }}{% endif %}</h2>
         <div class="muted small">{% if p.lot %}{{ p.lot.street_address }} · {% endif %}{{ p.start|date:"M j, Y" }} – {{ p.end|date:"M j, Y" }}</div></div>
-        <div class="balance"><div class="small muted">Balance when you sold</div><div class="amount-big">{{ p.statement.balance|cents }}</div></div></div>
+        <div class="balance"><div class="small muted">Balance when you sold</div><div class="amount-big">{{ p.sold_balance|cents }}</div>
+          {% if p.credit_owed %}<div class="small" data-testid="credit-owed">Credit owed to you: <strong>{{ p.credit_owed|cents }}</strong>. The board refunds it; ask them if you have not heard.</div>{% endif %}</div></div>
       <div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th></tr></thead>
         <tbody>

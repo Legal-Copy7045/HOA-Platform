@@ -253,6 +253,7 @@ def my_history(request):
     policy.require(request.user, "history.view_own")
     from arc.models import ArcRequest
     from compliance.models import Violation
+    from ledger.accounts import ALL
     from ledger.models import ResaleRequest
     from ledger.services import period_statement
 
@@ -266,13 +267,31 @@ def my_history(request):
                 .first()
             )
             lot = account.lot if account else None
+        # Their own ownership account only (D33-acctfix-1). Once it is
+        # dormant nobody else is on it, so later entries on it (a refund of
+        # their credit) are theirs too; the credit still owed is shown.
+        dormant = account is not None and not account.is_active
+        statement = period_statement(
+            lot_id,
+            start,
+            end,
+            account=account.pk if account else ALL,
+            include_after_end=dormant,
+        )
+        sold = (
+            period_statement(lot_id, start, end, account=account.pk if account else ALL)
+            if dormant
+            else statement
+        )
         periods.append(
             {
                 "lot": lot,
                 "account": account,
                 "start": start,
                 "end": end,
-                "statement": period_statement(lot_id, start, end),
+                "statement": statement,
+                "sold_balance": sold.balance,
+                "credit_owed": -statement.balance if dormant and statement.balance < 0 else 0,
             }
         )
     return render(

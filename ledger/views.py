@@ -17,7 +17,9 @@ from core.money import MoneyField, format_cents
 from core.workflow import WorkflowError
 from documents import attachments
 from documents.attachments import pdf_response
+from ledger import accounts as ledger_accounts
 from ledger import allocation, services
+from ledger.accounts import CURRENT
 from ledger.models import (
     Budget,
     CollectionCase,
@@ -61,14 +63,52 @@ class PaymentForm(forms.Form):
         help_text="Leave all unticked to pay the oldest charges first (the application rule).",
     )
 
-    def __init__(self, *args, open_charges=(), **kwargs):
+    def __init__(self, *args, open_charges=(), accounts=(), **kwargs):
         super().__init__(*args, **kwargs)
+        numbers = {a.pk: a.number for a in accounts}
         self.fields["apply_to"].choices = [
-            (c.entry.pk, f"{c.label}: {c.title} ({format_cents(c.open_cents)} open)")
+            (
+                c.entry.pk,
+                f"{c.label}: {c.title} ({format_cents(c.open_cents)} open)"
+                + (
+                    f" \u00b7 account {numbers.get(c.entry.account_id, '(none)')}"
+                    if len(numbers) > 1
+                    else ""
+                ),
+            )
             for c in open_charges
         ]
         if not open_charges:
             del self.fields["apply_to"]
+        _account_field(self, accounts)
+
+
+def _account_field(form, accounts) -> None:
+    """An "Account" choice when the lot has had more than one owner: a
+    former owner's account stays open to the board for what is still owed
+    either way (D33-acctfix-1). Blank: the account the date falls in."""
+    if len(accounts) < 2:
+        return
+    form.fields["account_id"] = forms.TypedChoiceField(
+        coerce=int,
+        required=False,
+        empty_value=None,
+        label="Account",
+        choices=[("", "The owners' account on that date")]
+        + [
+            (
+                a.pk,
+                f"{a.number} \u00b7 {'current owners' if a.is_active else 'former owner'}"
+                + (f" ({_signed(a.balance_cents)})" if a.balance_cents else ""),
+            )
+            for a in accounts
+        ],
+        help_text="Payments and credits pay only charges of the same account.",
+    )
+
+
+def _signed(cents: int) -> str:
+    return f"owes {format_cents(cents)}" if cents > 0 else f"credit {format_cents(-cents)}"
 
 
 class ChargeForm(forms.Form):
@@ -81,10 +121,18 @@ class ChargeForm(forms.Form):
     amount_cents = MoneyField(label="Amount ($)")
     description = forms.CharField(max_length=200)
 
+    def __init__(self, *args, accounts=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        _account_field(self, accounts)
+
 
 class CreditForm(forms.Form):
     amount_cents = MoneyField(label="Amount ($)")
     description = forms.CharField(max_length=200, label="Reason")
+
+    def __init__(self, *args, accounts=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        _account_field(self, accounts)
 
 
 def _flash(request, fn, ok):
@@ -132,9 +180,12 @@ def my_account(request):
         accounts.append(
             {
                 "lot": lot,
-                "open_charges": allocation.open_charges(lot.pk, since=since),
-                "open_before": allocation.open_before(lot.pk, since) if since else 0,
-                "unapplied": allocation.unapplied_credit(lot.pk),
+                # Today's ownership account only (D33-acctfix-1).
+                "open_charges": allocation.open_charges(lot.pk, since=since, account=CURRENT),
+                "open_before": (
+                    allocation.open_before(lot.pk, since, account=CURRENT) if since else 0
+                ),
+                "unapplied": allocation.unapplied_credit(lot.pk, account=CURRENT),
                 "statement": statement,
                 "rows": services.statement_rows(statement),
                 "due": services.amount_due(lot.pk),
@@ -257,6 +308,7 @@ def lot_ledger(request, pk):
         LedgerEntry.objects.for_user(request.user).filter(lot=lot).select_related("reversed_by")
     )
     open_charges = allocation.open_charges(lot.pk)
+    lot_accounts = ledger_accounts.lot_accounts(lot.pk)
     return render(
         request,
         "ledger/lot.html",
@@ -268,9 +320,11 @@ def lot_ledger(request, pk):
             "aging_columns": services.aging_columns(aging),
             "can_manage": policy.can(request.user, "ledger.manage"),
             "open_charges": open_charges,
-            "payment_form": PaymentForm(open_charges=open_charges),
-            "charge_form": ChargeForm(),
-            "credit_form": CreditForm(),
+            # Former owners' accounts with money still owed either way.
+            "former_accounts": [a for a in lot_accounts if not a.is_active and a.balance_cents],
+            "payment_form": PaymentForm(open_charges=open_charges, accounts=lot_accounts),
+            "charge_form": ChargeForm(accounts=lot_accounts),
+            "credit_form": CreditForm(accounts=lot_accounts),
             "open_case": CollectionCase.objects.for_user(request.user)
             .filter(lot=lot)
             .exclude(state="closed")
@@ -285,8 +339,11 @@ def lot_ledger_action(request, pk, action):
     _finance(request)
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
     actor = request.user
+    lot_accounts = ledger_accounts.lot_accounts(lot.pk)
     if action == "payment":
-        form = PaymentForm(request.POST, open_charges=allocation.open_charges(lot.pk))
+        form = PaymentForm(
+            request.POST, open_charges=allocation.open_charges(lot.pk), accounts=lot_accounts
+        )
         if form.is_valid():
             _flash(
                 request,
@@ -296,7 +353,7 @@ def lot_ledger_action(request, pk, action):
                 "Payment recorded.",
             )
     elif action == "charge":
-        form = ChargeForm(request.POST)
+        form = ChargeForm(request.POST, accounts=lot_accounts)
         if form.is_valid():
             _flash(
                 request,
@@ -306,7 +363,7 @@ def lot_ledger_action(request, pk, action):
                 "Charge posted.",
             )
     elif action == "credit":
-        form = CreditForm(request.POST)
+        form = CreditForm(request.POST, accounts=lot_accounts)
         if form.is_valid():
             _flash(
                 request,

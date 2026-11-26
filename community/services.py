@@ -1275,7 +1275,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
     asked. For the board, manager and auditor."""
     require(actor, "roster.view")
     from community.models import ContactProfile
-    from ledger.services import balances
+    from ledger.services import account_balances
 
     with system_access("board roster"):
         accounts = Account.objects.select_related("lot").order_by("lot__number", "-opened_on")
@@ -1289,7 +1289,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
             AccountContact.objects.filter(account__in=accounts).select_related("person")
         )
         phones = dict(ContactProfile.objects.values_list("person_id", "phone"))
-        owed = balances()
+        owed = account_balances()
     by_account: dict[int, dict] = {a.pk: {"owners": [], "contacts": []} for a in accounts}
     for o in ownerships:
         if o.account_id in by_account and (o.end_date is None or not o.account.is_active):
@@ -1308,7 +1308,7 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
                 "contacts": by_account[a.pk]["contacts"],
                 "emails": [p.email for p in owners if p.email],
                 "phones": [phones[p.pk] for p in owners if phones.get(p.pk)],
-                "balance_cents": owed.get(a.lot_id, 0) if a.is_active else None,
+                "balance_cents": owed.get(a.pk, 0) if a.is_active else None,
             }
         )
     return rows

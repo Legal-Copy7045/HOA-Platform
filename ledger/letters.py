@@ -143,21 +143,21 @@ def _letterhead(profile) -> list[tuple[str, str]]:
 
 
 def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int]:
-    """The statement page; returns (paragraphs, amount due)."""
+    """The statement page of the current owners' account (D33-acctfix-1: a
+    former owner's entries and credit are never on it); returns (paragraphs,
+    amount due)."""
+    from ledger.accounts import account_q, current_account_id
+
     profile = CommunityProfile.get()
     as_of = as_of or timezone.localdate()
     owner_since = since
     since = since or datetime.date(2000, 1, 1)
     names, _salutation, address, account_number = _recipients(lot)
+    account = current_account_id(lot.pk)
     with system_access("statement entries"):
-        forward = sum(
-            LedgerEntry.objects.filter(lot=lot, posted_on__lt=since).values_list(
-                "amount_cents", flat=True
-            )
-        )
-        entries = list(
-            LedgerEntry.objects.filter(lot=lot, posted_on__gte=since, posted_on__lte=as_of)
-        )
+        mine = LedgerEntry.objects.filter(lot=lot).filter(account_q(lot.pk, account))
+        forward = sum(mine.filter(posted_on__lt=since).values_list("amount_cents", flat=True))
+        entries = list(mine.filter(posted_on__gte=since, posted_on__lte=as_of))
     balance = forward + sum(e.amount_cents for e in entries)
     due_day = min(rule("dues.due_day") or 1, 28)
     past_due = balance > 0 and any(e.kind in CHARGE_KINDS and e.posted_on < as_of for e in entries)
@@ -194,7 +194,7 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
                 f"{format_cents(running):>12}",
             )
         )
-    paras += open_charges_paragraphs(lot, since=owner_since)
+    paras += open_charges_paragraphs(lot, since=owner_since, account=account)
     remit = [line for line in (profile.remit_to or "").splitlines() if line.strip()] or [
         profile.legal_name
     ]
@@ -230,13 +230,17 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
     return paras, balance
 
 
-def open_charges_paragraphs(lot: Lot, *, since=None) -> list[tuple[str, str]]:
-    """The open charges, each with its number, due date, original and open
-    amount (open-item accounting, D32-payments)."""
+def open_charges_paragraphs(lot: Lot, *, since=None, account=None) -> list[tuple[str, str]]:
+    """The open charges of the current owners' account (or ``account``),
+    each with its number, due date, original and open amount (open-item
+    accounting, D32-payments)."""
     from ledger import allocation
+    from ledger.accounts import current_account_id
 
-    rows = allocation.open_charges(lot.pk, since=since)
-    before = allocation.open_before(lot.pk, since) if since else 0
+    if account is None:
+        account = current_account_id(lot.pk)
+    rows = allocation.open_charges(lot.pk, since=since, account=account)
+    before = allocation.open_before(lot.pk, since, account=account) if since else 0
     paras = [
         ("normal", ""),
         ("mono", "OPEN CHARGES"),
@@ -265,9 +269,12 @@ def open_charges_paragraphs(lot: Lot, *, since=None) -> list[tuple[str, str]]:
 
 
 def _past_due(lot: Lot, on=None) -> int:
+    """Past due on the current owners' account (their letters are about
+    their own account only)."""
+    from ledger.accounts import CURRENT
     from ledger.services import past_due
 
-    return past_due(lot.pk, on)
+    return past_due(lot.pk, on, account=CURRENT)
 
 
 def _values(lot: Lot, past_due_cents: int) -> dict[str, str]:

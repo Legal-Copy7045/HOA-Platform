@@ -1,4 +1,5 @@
-"""Owner accounts (one per lot), budgets, collections and resale certificates.
+"""Owner accounts (one per ownership period of a lot), budgets, collections
+and resale certificates.
 
 Ledger entries are append-only integer cents (CLAUDE.md rules 5 and 7):
 positive amounts are charges (the lot owes more), negative amounts are
@@ -44,6 +45,12 @@ class LedgerEntry(ScopedAppendOnlyModel):
     scope_lot_path = "lot"
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    # The ownership account this entry belongs to (D33-acctfix-1): set when
+    # the entry is first saved, from its posting date (ledger/accounts.py).
+    # Money is applied only within one account; a sale starts a new one.
+    account = models.ForeignKey(
+        "community.Account", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     posted_on = models.DateField()
     kind = models.CharField(max_length=16, choices=EntryKind.choices)
     amount_cents = models.BigIntegerField()
@@ -60,7 +67,10 @@ class LedgerEntry(ScopedAppendOnlyModel):
 
     class Meta:
         ordering = ["posted_on", "id"]
-        indexes = [models.Index(fields=["lot", "posted_on"])]
+        indexes = [
+            models.Index(fields=["lot", "posted_on"]),
+            models.Index(fields=["account", "posted_on"]),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["lot", "period"],
@@ -79,6 +89,13 @@ class LedgerEntry(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"entry #{self.pk}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self._state.adding and self.account_id is None and not kwargs.get("raw"):
+            from ledger.accounts import for_new_entry
+
+            self.account_id = for_new_entry(self)
+        super().save(*args, **kwargs)
 
 
 # --- Budgets ---------------------------------------------------------------------------

@@ -8,3 +8,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:payments/tests/test_payment_scenarios\\.py::test_"]
+- feature: "Accounting QA fixes (D33-acctfix): money kept per ownership account through a sale (seller's credit on the dormant account, buyer clean, board and former-owner views, account choice on the board forms, migration of history), late fees only on that month's open dues, as-of views ignore later entries, notices state the past-due amount, refunds split surcharge and payment parts, Stripe payouts in the bank reconciliation"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_acctfix\\.py::test_", "^unit:payments/tests/test_acctfix_payments\\.py::test_", "^unit:ledger/tests/test_ledger\\.py::test_new_owner_starts_clean"]

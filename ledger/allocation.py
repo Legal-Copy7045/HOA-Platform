@@ -17,6 +17,9 @@ How money is applied (governing rule ``ledger.assessments_before_fees``):
 * Reversing an entry undoes its applications (negative rows) and matches
   the reversal to the entry, so a bounced payment reopens the charges it
   paid, and a reversed charge frees whatever paid it.
+* Money is applied only to charges of the same ownership account
+  (D33-acctfix-1, ledger/accounts.py): a seller's credit never pays the
+  buyer's dues. Readers take ``account=`` (the whole lot by default).
 
 The engine (``LotBook``) works on plain values so the data migration that
 rebuilt applications for existing entries uses exactly the same steps as
@@ -36,6 +39,7 @@ from django.db.models import Max
 from django.utils import timezone
 
 from core.scoping import internal, system_access
+from ledger.accounts import ALL, account_q, resolve
 
 ORDER_RULE = "ledger.assessments_before_fees"
 AUTO, DIRECTED, REVERSAL, UNWIND, MIGRATION = "auto", "directed", "reversal", "unwind", "migration"
@@ -69,10 +73,13 @@ class _Entry:
     amount: int
     posted_on: datetime.date
     reverses_id: int | None = None
+    account: int | None = None
 
     @classmethod
     def of(cls, e) -> _Entry:
-        return cls(e.id, e.kind, e.amount_cents, e.posted_on, e.reverses_id)
+        # Historical models before migration 0015 have no account.
+        account = getattr(e, "account_id", None)
+        return cls(e.id, e.kind, e.amount_cents, e.posted_on, e.reverses_id, account)
 
 
 @dataclass
@@ -119,6 +126,8 @@ class LotBook:
         )
         for credit in credits:
             for charge in charges:
+                if charge.account != credit.account:
+                    continue  # money stays with its own ownership account
                 cents = min(self.remaining(credit.id), self.remaining(charge.id))
                 self._apply(credit.id, charge.id, cents, kind, out)
                 if not self.remaining(credit.id):
@@ -144,12 +153,32 @@ class LotBook:
         elif directed and entry.amount < 0:
             for charge_id in directed:
                 charge = self.entries.get(charge_id)
-                if charge is None or charge.amount <= 0 or charge.reverses_id:
+                if not self.can_direct(entry, charge):
                     continue
                 cents = min(self.remaining(entry.id), self.remaining(charge_id))
                 if cents > 0:
                     self._apply(entry.id, charge_id, cents, kind or DIRECTED, out)
         self.settle(kind or AUTO, out)
+        return out
+
+    @staticmethod
+    def can_direct(source: _Entry, charge: _Entry | None) -> bool:
+        return (
+            charge is not None
+            and charge.amount > 0
+            and not charge.reverses_id
+            and charge.account == source.account
+        )
+
+    def separate_accounts(self, kind: str = MIGRATION) -> list:
+        """Undo money applied across ownership accounts (history from before
+        D33-acctfix-1), then apply it again within each account."""
+        out: list = []
+        for (s, c), net in list(self.pairs.items()):
+            if net > 0 and self.entries[s].account != self.entries[c].account:
+                self._apply(s, c, -net, kind, out)
+        if out:
+            self.settle(kind, out)
         return out
 
     def open_cents(self) -> int:
@@ -247,7 +276,7 @@ def apply(entry, charge_ids: list[int]) -> list:
         out: list = []
         for charge_id in charge_ids:
             charge = book.entries.get(charge_id)
-            if charge is None or charge.amount <= 0 or charge.reverses_id:
+            if not book.can_direct(book.entries[entry.pk], charge):
                 continue
             cents = min(book.remaining(entry.pk), book.remaining(charge_id))
             if cents > 0:
@@ -398,14 +427,18 @@ def charge_status(entry) -> str:
 
 
 @internal("allocation")
-def charges(lot_id: int, *, open_only: bool = True, since=None) -> list[ChargeView]:
+def charges(lot_id: int, *, open_only: bool = True, since=None, account=ALL) -> list[ChargeView]:
     """The lot's charges with their open amounts and the payments applied to
     each, oldest first. ``since``: leave out charges posted before (an
-    owner's era); their open total is in ``open_before``."""
+    owner's era); their open total is in ``open_before``. ``account``: one
+    ownership account's charges only (ledger/accounts.py)."""
     from ledger.models import ChargeNumber, LedgerEntry, PaymentApplication
 
     book = load_book(lot_id)
-    entries = {e.pk: e for e in LedgerEntry.objects.filter(lot_id=lot_id)}
+    entries = {
+        e.pk: e
+        for e in LedgerEntry.objects.filter(lot_id=lot_id).filter(account_q(lot_id, account))
+    }
     numbers = {n.entry_id: n.label for n in ChargeNumber.objects.filter(entry__lot_id=lot_id)}
     applied: dict[int, dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for s, c, cents in PaymentApplication.objects.filter(lot_id=lot_id).values_list(
@@ -445,12 +478,12 @@ def charges(lot_id: int, *, open_only: bool = True, since=None) -> list[ChargeVi
     return out
 
 
-def open_charges(lot_id: int, *, since=None) -> list[ChargeView]:
-    return charges(lot_id, open_only=True, since=since)
+def open_charges(lot_id: int, *, since=None, account=ALL) -> list[ChargeView]:
+    return charges(lot_id, open_only=True, since=since, account=account)
 
 
 @internal("allocation")
-def open_before(lot_id: int, since) -> int:
+def open_before(lot_id: int, since, *, account=ALL) -> int:
     """Open amount of charges posted before ``since`` (an owner sees it as
     one "from before your ownership" line, not the detail)."""
     from ledger.models import LedgerEntry
@@ -460,14 +493,19 @@ def open_before(lot_id: int, since) -> int:
         book.remaining(e.pk)
         for e in LedgerEntry.objects.filter(
             lot_id=lot_id, posted_on__lt=since, amount_cents__gt=0, kind__in=CHARGE_KIND_VALUES
-        )
+        ).filter(account_q(lot_id, account))
     )
 
 
 @internal("allocation")
-def unapplied_credit(lot_id: int) -> int:
+def unapplied_credit(lot_id: int, *, account=ALL) -> int:
     book = load_book(lot_id)
-    return sum(book.remaining(e.id) for e in book.entries.values() if e.amount < 0)
+    account = resolve(lot_id, account)
+    return sum(
+        book.remaining(e.id)
+        for e in book.entries.values()
+        if e.amount < 0 and (account == ALL or e.account == account)
+    )
 
 
 @dataclass
@@ -481,7 +519,7 @@ class AsOf:
 
 
 @internal("allocation")
-def state_as_of(lot_id: int, as_of: datetime.date) -> AsOf:
+def state_as_of(lot_id: int, as_of: datetime.date, *, account=ALL) -> AsOf:
     """Open amounts on ``as_of``: only entries posted by then, and only the
     applications made by entries posted by then (``effective_on``), so a
     reversal posted later does not reach back (D33-acctfix-3).
@@ -492,7 +530,12 @@ def state_as_of(lot_id: int, as_of: datetime.date) -> AsOf:
     charges - credit equal to the balance on that date."""
     from ledger.models import LedgerEntry, PaymentApplication
 
-    entries = {e.pk: e for e in LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of)}
+    entries = {
+        e.pk: e
+        for e in LedgerEntry.objects.filter(lot_id=lot_id, posted_on__lte=as_of).filter(
+            account_q(lot_id, account)
+        )
+    }
     applied: dict[int, int] = defaultdict(int)
     for s, c, cents in PaymentApplication.objects.filter(
         lot_id=lot_id, effective_on__lte=as_of
@@ -509,10 +552,10 @@ def state_as_of(lot_id: int, as_of: datetime.date) -> AsOf:
     return AsOf(entries, open_, credit, balance)
 
 
-def open_items_as_of(lot_id: int, as_of: datetime.date) -> tuple[list[list], int]:
+def open_items_as_of(lot_id: int, as_of: datetime.date, *, account=ALL) -> tuple[list[list], int]:
     """[(due_on, open_cents)] of charges open on ``as_of`` and the unapplied
     credit, counting only entries and applications posted by then (aging)."""
-    state = state_as_of(lot_id, as_of)
+    state = state_as_of(lot_id, as_of, account=account)
     charges_ = sorted(
         [state.entries[pk].posted_on, cents] for pk, cents in state.open.items() if cents > 0
     )

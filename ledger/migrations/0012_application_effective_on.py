@@ -9,6 +9,7 @@ append-only trigger is lifted only for this one backfill; no amounts change.
 from django.db import migrations, models
 
 BACKFILL = """
+SET CONSTRAINTS ALL IMMEDIATE;
 ALTER TABLE ledger_paymentapplication
   DISABLE TRIGGER ledger_paymentapplication_append_only_row;
 UPDATE ledger_paymentapplication a SET effective_on = d.effective_on

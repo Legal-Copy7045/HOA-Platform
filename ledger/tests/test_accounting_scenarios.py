@@ -235,11 +235,6 @@ def test_former_owner_sees_their_credit_read_only_in_my_history(client, w, books
     _check(books)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BUG: a seller's unapplied credit stays on the lot and pays the buyer's dues "
-    "(ledger is per lot, transfer_lot never settles the old account)",
-)
 def test_sellers_credit_never_pays_the_buyers_dues(client, w, books):
     _charge(w, 4500, "Dues", ago(60))
     _pay(w, 13_500, ago(50), reference="502")

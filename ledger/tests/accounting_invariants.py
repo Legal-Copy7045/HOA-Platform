@@ -2,10 +2,12 @@
 
 ``Books.check()`` asserts, for the whole database:
 
-* every lot: open charges - unapplied credit == balance-forward balance;
+* every lot, and every ownership account (D33-acctfix-1): open charges -
+  unapplied credit == balance-forward balance;
 * every charge's open amount is between 0 and its original amount, and no
   payment or credit is applied beyond its own amount (and no pair is net
-  negative, and applications join a credit to a charge of the same lot);
+  negative, and applications join a credit to a charge of the same lot and
+  the same ownership account);
 * no row of an append-only money table changed or vanished since the last
   check (snapshots), and Postgres refuses UPDATE/DELETE on those tables
   (the trigger for the owner connection; the grants for the runtime role
@@ -92,6 +94,11 @@ def assert_lot_books():
     for app in apps_rows:
         pairs[(app.source_id, app.charge_id)] += app.amount_cents
     assert all(v >= 0 for v in pairs.values()), "a payment is net negative on a charge"
+    for (source_id, charge_id), net in pairs.items():
+        # Rows from before D33-acctfix-1 may cross accounts, undone since.
+        assert not net or entries[source_id].account_id == entries[charge_id].account_id, (
+            f"entry #{source_id} pays entry #{charge_id} of another account"
+        )
     for lot_id in lot_ids:
         book = allocation.load_book(lot_id)
         for entry_id, e in book.entries.items():
@@ -106,6 +113,17 @@ def assert_lot_books():
         )
         for c in allocation.charges(lot_id, open_only=False):
             assert 0 <= c.open_cents <= c.original_cents
+        accounts = {e.account_id for e in entries.values() if e.lot_id == lot_id}
+        for account in accounts:
+            opened = sum(c.open_cents for c in allocation.open_charges(lot_id, account=account))
+            credit = allocation.unapplied_credit(lot_id, account=account)
+            bal = services.balance(lot_id, account=account)
+            assert opened - credit == bal, (
+                f"lot {lot_id} account {account}: open {opened} - credit {credit} != {bal}"
+            )
+        assert sum(services.balance(lot_id, account=a) for a in accounts) == services.balance(
+            lot_id
+        ), f"lot {lot_id}: accounts do not add up to the lot"
 
 
 def assert_online_payments(*, synced: bool = False):
