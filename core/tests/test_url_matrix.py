@@ -222,6 +222,10 @@ PROTECTED = {
     "system_status": ("GET", None),
     "server_tasks": ("GET", None),
     "community_settings": ("GET", None),
+    # Community setup wizard (D51): board only.
+    "setup_home": ("GET", None),
+    "setup_start": ("POST", None),
+    "setup_step": ("GET", None),
     "community_rule_save": ("POST", None),
     "community_profile_save": ("POST", None),
     "common_area_save": ("POST", None),
@@ -877,6 +881,8 @@ def _url(name, key, targets):
         kwargs = {"pk": targets["packet_meeting"], "packet_id": targets["board_packet"]}
     elif name == "event_slot_action":
         kwargs["action"] = "join"
+    elif name == "setup_step":
+        kwargs["step"] = "charge"
     return reverse(name, kwargs=kwargs)
 
 

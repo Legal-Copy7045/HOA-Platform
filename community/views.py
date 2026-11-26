@@ -626,27 +626,17 @@ def _dollars(cents_text: str) -> str:
 @require_POST
 def community_rule_save(request):
     policy.require(request.user, "community.manage_rules")
-    from community.rules import BASIS_POINTS, REGISTRY, percent_to_bp
-    from core.money import parse_cents
+    from community.rule_input import to_stored
+    from community.rules import REGISTRY
 
     data = request.POST.copy()
     spec = REGISTRY.get(data.get("key", ""))
-    if spec is not None and spec.kind == BASIS_POINTS and (data.get("value") or "").strip():
-        # Typed as a percent, stored as whole basis points; the cap is checked
-        # on the stored number (validate_value, spec.maximum).
+    if spec is not None:
+        # Shared with the community setup wizard (D51).
         try:
-            data["value"] = str(percent_to_bp(data["value"]))
+            data["value"] = to_stored(spec, data.get("value", ""))
         except ValueError as exc:
             return _failed(request, CommunityError(str(exc)), reverse("community_settings"))
-    if spec is not None and spec.kind == "cents" and (data.get("value") or "").strip():
-        try:
-            data["value"] = str(parse_cents(data["value"]))
-        except ValueError:
-            return _failed(
-                request,
-                CommunityError("Enter the amount in dollars, e.g. 75.00."),
-                reverse("community_settings"),
-            )
     form = forms.RuleForm(data)
     back = reverse("community_settings")
     if not form.is_valid():

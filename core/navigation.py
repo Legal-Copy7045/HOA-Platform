@@ -75,6 +75,15 @@ HUBS = {
         ),
     ],
     "settings_hub": [
+        # The setup wizard (D51): board members who may change rules.
+        (
+            "Community setup",
+            "setup_home",
+            "list",
+            "community.manage_rules",
+            "Step by step through every set-up decision, showing today's values."
+            " Run setup again at any time.",
+        ),
         (
             "Community settings",
             "community_settings",

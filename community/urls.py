@@ -7,10 +7,15 @@ from community import (
     profile_views,
     reservation_views,
     retention_views,
+    setup_views,
     views,
 )
 
 urlpatterns = [
+    # Community setup wizard (D51)
+    path("board/community-setup/", setup_views.setup_home, name="setup_home"),
+    path("board/community-setup/start/", setup_views.setup_start, name="setup_start"),
+    path("board/community-setup/<slug:step>/", setup_views.setup_step, name="setup_step"),
     path("board/branding/", branding_views.branding_settings, name="branding_settings"),
     path(
         "branding/login-background/<int:pk>.jpg",

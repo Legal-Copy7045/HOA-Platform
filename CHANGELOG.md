@@ -6,6 +6,20 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.20.0 — 2026-11-26
+
+- Community setup (Settings → Community setup): a step-by-step walk through
+  every set-up decision for the board: the community's details and
+  letterhead, what the monthly assessment is called and how much it is, late
+  fees, online and automatic payments, notices, architectural review,
+  violations, common areas, owner requests, meetings and resale, privacy,
+  features, then where people and access and the server stand, and a review
+  that flags anything still at its default or without a citation. Each step
+  shows what Pennsylvania and federal law say about the choice. It saves
+  through the same settings and confirmations as the existing pages, and can
+  be run again at any time; "Finish community setup" is on My items until
+  done (D51).
+
 ## 0.19.0 — 2026-11-26
 
 - Automatic payments can now be once a year: the payer chooses "Once a

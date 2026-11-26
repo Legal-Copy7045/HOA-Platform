@@ -1051,3 +1051,39 @@ class RetentionRun(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"Retention run #{self.pk}"
+
+
+class SetupStepRecord(AppendOnlyModel):
+    """Community setup wizard progress (D51): a run started, a step completed
+    or skipped, a run finished. Append-only; the latest row per step of a run
+    is its state. Run numbers count up from 1 ("Run setup again" starts the
+    next one). Holds no setting values: those stay in their own records."""
+
+    class Action(models.TextChoices):
+        STARTED = "started", "Run started"
+        COMPLETED = "completed", "Step completed"
+        SKIPPED = "skipped", "Step skipped"
+        FINISHED = "finished", "Run finished"
+
+    run = models.PositiveIntegerField()
+    step = models.CharField(max_length=40, blank=True)
+    action = models.CharField(max_length=10, choices=Action.choices)
+    by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["run", "at", "id"]
+        constraints = [
+            # Two board members pressing "Run setup again" at once get one run.
+            models.UniqueConstraint(
+                fields=["run"], condition=Q(action="started"), name="setup_run_started_once"
+            ),
+            models.UniqueConstraint(
+                fields=["run"], condition=Q(action="finished"), name="setup_run_finished_once"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Setup run {self.run}: {self.action} {self.step}".strip()

@@ -1,0 +1,7 @@
+{% load portal %}{# The step's "What the law says" panel (community/pa_law.py, community/us_law.py). Expects: law #}<aside class="card setup-law" aria-labelledby="setup-law-title" data-testid="setup-law">
+  <h2 id="setup-law-title">{% icon "book" %} What the law says</h2>
+  {% for n in law.pa %}<div class="setup-law-entry"><h3>Pennsylvania Uniform Planned Community Act: {{ n.title }}</h3><p class="small">{{ n.text }}</p></div>{% endfor %}
+  {% for n in law.notes %}<div class="setup-law-entry"><h3>{{ n.title }}</h3><p class="small muted">{{ n.citation }}</p><p class="small">{{ n.summary }}</p><p class="small"><strong>For this choice:</strong> {{ n.meaning }}</p><p class="small muted">{{ n.caveat }}</p></div>{% endfor %}
+  {% if law.none %}<p class="small">{{ law.none }}</p>{% endif %}
+  {% if law.pa or law.notes %}<p class="small muted">The Pennsylvania guidance for each setting is shown beside it.</p>{% endif %}
+</aside>

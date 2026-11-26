@@ -62,6 +62,17 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
 
 5. Invite a second board member as soon as possible: the board page warns
    until at least two people with MFA can perform every action.
+6. Walk through **Admin → Settings → Community setup** (`/board/community-setup/`,
+   D51) as a board member. It takes every decision in order: the community's
+   details and letterhead, the monthly charge, late fees, online and automatic
+   payments, notices, architectural review, violations, common areas, owner
+   requests, meetings and resale, privacy, features, then status-only steps
+   for people and access and for the server (email, backups, off-site copy,
+   Stripe and Teller keys, which a sysadmin sets on the server, never in the
+   portal), and a review that flags anything still at its default or without
+   a citation. Each step shows what Pennsylvania and federal law say about
+   it. "Finish community setup" stays on the board's My items until the
+   review is finished; run it again at any time with "Run setup again".
 
 ## Deploying an update
 
@@ -165,7 +176,8 @@ board is emailed.
 
 ## Filling in the governing rules
 
-Board → Community settings. Every value needs a citation (Declaration,
+The easiest way is Settings → Community setup (step by step, D51); the same
+values are on Board → Community settings. Every value needs a citation (Declaration,
 bylaws, or the board resolution that set it). Demo data cites "DEMO -
 replace": replace every one before real use.
 
