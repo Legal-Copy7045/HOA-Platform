@@ -8,6 +8,10 @@ adds an entry here.
 
 ## 0.12.0 — 2026-11-26
 
+- Fixed: the installable-app update check (`/sw.js`) failed with a server
+  error on the live server for every signed-in visitor (it asked for the web
+  address of an empty static file name, which the production file store
+  refuses). That was the cause of the "server errors" health alerts.
 - The account statement is easier to read: a box at the top says the amount
   due and the date to pay by ("Past due since ..." when late), or "You have a
   credit of $X. Nothing to pay.", or "Nothing to pay. Thank you."; then what

@@ -71,7 +71,9 @@ def manifest(request):
 @login_required
 def service_worker(request):
     precache = [static(p) for p in PRECACHE + [i[0] for i in ICONS]]
-    static_prefix = static("")
+    # STATIC_URL, not static(""): with the hashed-name storage used in
+    # production an empty name has no manifest entry and raises ValueError.
+    static_prefix = settings.STATIC_URL
     config = {
         "cache": "static-" + hashlib.sha256("|".join(precache).encode()).hexdigest()[:12],
         "precache": precache,

@@ -99,14 +99,35 @@ def test_service_worker_is_at_the_root_and_caches_static_files_only(client, w):
     assert response["Cache-Control"] == "no-cache"
     body = response.content.decode()
     config = json.loads(body.split("const CONFIG = ", 1)[1].split(";\n", 1)[0])
-    prefix = static("")
-    assert config["staticPrefix"] == prefix
+    prefix = settings.STATIC_URL
+    assert prefix.startswith("/") and config["staticPrefix"] == prefix
     assert config["precache"] and all(p.startswith(prefix) for p in config["precache"])
     # Only GETs under the static prefix are intercepted; everything else
     # (pages, downloads) goes to the network untouched.
     assert "url.pathname.startsWith(CONFIG.staticPrefix)) return;" in body
     assert 'request.method !== "GET") return;' in body
     assert w["owner"].email not in body
+
+
+def test_service_worker_works_with_the_hashed_static_storage(client, w, monkeypatch):
+    """Production stores static files under hashed names (a manifest), where
+    an empty or unknown name raises ValueError: the worker page asked for
+    static("") and failed with a 500 on every update check."""
+    from django.contrib.staticfiles import finders
+
+    from comms import pwa_views
+
+    real = pwa_views.static
+
+    def strict(path):
+        if not path or finders.find(path) is None:
+            raise ValueError(f"Missing staticfiles manifest entry for {path!r}")
+        return real(path)
+
+    monkeypatch.setattr(pwa_views, "static", strict)
+    client.force_login(w["owner"])
+    assert client.get(reverse("pwa_service_worker")).status_code == 200
+    assert client.get(reverse("pwa_manifest")).status_code == 200
 
 
 def test_signed_in_pages_offer_the_app_and_sign_in_page_does_not(client, w):
