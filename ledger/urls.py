@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from ledger import reserve_views, views
+from ledger import disbursement_views, reserve_views, views
 from ledger.bankfeeds import views as bank_views
 
 urlpatterns = [
@@ -77,5 +77,43 @@ urlpatterns += [
         "finance/accounting/bank/<int:pk>/disconnect/",
         bank_views.bank_disconnect,
         name="bank_disconnect",
+    ),
+]
+
+# Disbursements (D52, optional feature "disbursements").
+urlpatterns += [
+    path("finance/disbursements/", disbursement_views.disbursements, name="disbursements"),
+    path(
+        "finance/disbursements/new/", disbursement_views.disbursement_new, name="disbursement_new"
+    ),
+    path(
+        "finance/disbursements/<int:pk>/",
+        disbursement_views.disbursement_detail,
+        name="disbursement_detail",
+    ),
+    re_path(
+        r"^finance/disbursements/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
+        disbursement_views.disbursement_action,
+        name="disbursement_action",
+    ),
+    path(
+        "finance/disbursements/<int:pk>/register/",
+        disbursement_views.disbursement_register,
+        name="disbursement_register",
+    ),
+    path(
+        "finance/disbursements/<int:pk>/checks.pdf",
+        disbursement_views.disbursement_checks_pdf,
+        name="disbursement_checks_pdf",
+    ),
+    path(
+        "finance/disbursements/check-printing/",
+        disbursement_views.check_print_settings,
+        name="check_print_settings",
+    ),
+    path(
+        "finance/disbursements/check-alignment.pdf",
+        disbursement_views.check_alignment_pdf,
+        name="check_alignment_pdf",
     ),
 ]

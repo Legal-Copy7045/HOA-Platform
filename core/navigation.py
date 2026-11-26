@@ -219,6 +219,7 @@ SECTIONS = [
             ("Reserve plan", "reserve_plan", "chart", "reserves.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
             ("Online payments", "online_payments", "wallet", "payments.manage"),
+            ("Disbursements", "disbursements", "dollar", "disbursement.view"),
             ("Resale certificates", "resales", "file", "resale.manage"),
             ("Reports", "reports", "chart", "reports.view"),
         ],

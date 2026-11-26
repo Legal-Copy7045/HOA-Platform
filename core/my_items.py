@@ -480,6 +480,11 @@ def items_for(user) -> list[Item]:
             )
     if can(user, "payments.manage"):
         out.extend(_online_payment_items(user, roles))
+    # Disbursements (D52): approvals, checks to write, refunds owed, surplus.
+    if can(user, "disbursement.propose") or can(user, "disbursement.approve"):
+        from ledger.disbursements import board_items
+
+        out.extend(board_items(user))
     # Entries moved between ownership accounts, to check (fixres BUG-003).
     if can(user, "ledger.manage"):
         from ledger.models import EntryMoveNotice

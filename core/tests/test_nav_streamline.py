@@ -105,6 +105,7 @@ FINANCE = [
     "Budgets",
     "Reserve plan",
     "Accounting",
+    "Disbursements",
     "Resale certificates",
     "Reports",
 ]
@@ -223,6 +224,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Budgets",
         "Reserve plan",
         "Accounting",
+        "Disbursements",
         "Resale certificates",
         "Reports",
     ]

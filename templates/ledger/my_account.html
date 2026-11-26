@@ -29,6 +29,7 @@
       </table></div>{% endif %}
       {% if a.online_receipts %}<h3>Online payments</h3>
       <ul class="list small">{% for p in a.online_receipts %}<li><div class="grow">{{ p.recorded_at|date:"M j, Y" }} &middot; {{ p.total_cents|cents }} &middot; {{ p.get_method_display }}</div><a href="{% url 'payment_receipt' p.pk %}">{% icon "download" %} Receipt (PDF)</a></li>{% endfor %}</ul>{% endif %}
+      {% include "ledger/_checks_to_you.html" with checks=a.checks_to_you %}
       {% if a.autopay %}<h3>Pay assessments automatically</h3>
       <div class="small" data-testid="autopay-summary">
         {% if a.autopay.status == "on" %}<p><span class="status tone-success">On</span> {% if a.autopay.description %}{{ a.autopay.description }}{% else %}Paying from your {{ a.autopay.label }}.{% endif %}</p>

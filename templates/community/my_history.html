@@ -16,6 +16,7 @@
         {% for e in p.statement.entries %}<tr><td class="nowrap">{{ e.posted_on|date:"M j, Y" }}</td><td>{{ e.description }}</td><td class="num">{{ e.amount_cents|cents }}</td></tr>{% empty %}<tr><td colspan="3" class="muted">No activity in this period.</td></tr>{% endfor %}
         </tbody>
       </table></div>
+      {% include "ledger/_checks_to_you.html" with checks=p.checks show_address=True %}
     </section>
   {% empty %}{% include "partials/empty.html" with icon="clock" title="No past ownership" text="There are no earlier ownership periods on your record." %}{% endfor %}
   <div class="grid grid-2">

@@ -436,6 +436,7 @@ def my_history(request):
     from arc.models import ArcRequest
     from compliance.models import Violation
     from ledger.accounts import ALL
+    from ledger.disbursements import checks_for_account
     from ledger.models import ResaleRequest
     from ledger.services import period_statement
 
@@ -478,6 +479,8 @@ def my_history(request):
                 "statement": statement,
                 "sold_balance": sold.balance,
                 "credit_owed": -statement.balance if dormant and statement.balance < 0 else 0,
+                # Refund checks written to them for this period (D52).
+                "checks": checks_for_account(account.pk if account else None),
             }
         )
     from django.db.models import Q

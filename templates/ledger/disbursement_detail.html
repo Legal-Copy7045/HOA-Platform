@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ batch.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'disbursements' %}">Disbursements</a> / {{ batch.title }}</div>
+  <div class="page-head">
+    <div><h1>{{ batch.title }}</h1>
+      <p class="subtitle">{{ batch.get_kind_display }} · total {{ batch.total_cents|cents }} · proposed {{ batch.created_at|short_date }}. <span class="status{% if state.status == 'declined' %} tone-danger{% elif state.status == 'awaiting' %} tone-warning{% else %} tone-success{% endif %}">{{ state.label }}</span></p></div>
+    <div class="actions">
+      <a class="btn secondary" href="{% url 'disbursement_register' batch.pk %}?format=csv">{% icon "download" %} Check register (CSV)</a>
+      <a class="btn secondary" href="{% url 'disbursement_register' batch.pk %}?format=pdf">{% icon "download" %} Check register (PDF)</a>
+    </div>
+  </div>
+  {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ error }}</span></div>{% endif %}
+
+  <section class="card"><h2>Approval</h2>
+    <p class="small">Needs {{ state.needed }} approval{{ state.needed|pluralize }} from board members other than the one who proposed it{% if batch.required_approvals > 1 %} (the total is at or over {{ batch.second_approval_cents|cents }}{% if batch.rule_citation %}, {{ batch.rule_citation }}{% endif %}){% endif %}.{% if batch.kind == "surplus" %} Every board member who owns a home here receives part of a surplus distribution, so such an approval is marked as a recipient's and the distribution then needs two.{% else %} An owner on the refunded account may not approve it.{% endif %}</p>
+    {% if batch.kind == "surplus" %}<p class="small">Board resolution: {% if batch.resolution %}<a href="{% url 'resolutions' %}">{{ batch.resolution.number }}: {{ batch.resolution.title }}</a>{% else %}{{ batch.resolution_ref }}{% endif %}</p>{% endif %}
+    {% if batch.note %}<p class="small">{{ batch.note|linebreaksbr }}</p>{% endif %}
+    <ul class="list small">
+      <li><span class="grow">Proposed by {{ batch.proposed_by.email }}</span><span class="muted">{{ batch.created_at|short_date }}</span></li>
+      {% for d in state.approvals %}<li><span class="grow">Approved by {{ d.approver.email }}{% if d.is_recipient %} <span class="status tone-warning">also a recipient</span>{% endif %}{% if d.note %}: {{ d.note }}{% endif %}</span><span class="muted">{{ d.created_at|short_date }}</span></li>{% endfor %}
+      {% for d in state.declines %}<li><span class="grow">Declined by {{ d.approver.email }}: {{ d.note }}</span><span class="muted">{{ d.created_at|short_date }}</span></li>{% endfor %}
+    </ul>
+    {% if can_approve or can_decline %}
+      {% include "partials/form_errors.html" with form=decision_form %}
+      <div class="actions">
+      {% if can_approve %}<form method="post" action="{% url 'disbursement_action' batch.pk 'approve' %}" class="inline-form" data-confirm="Approve paying {{ batch.total_cents|cents }}?{% if state.have|add:1 >= state.needed %} This is the last approval needed: statement credits post on the accounts now.{% endif %}">{% csrf_token %}<div><label for="approve-note">Note (optional)</label><input id="approve-note" name="note" maxlength="1000"></div><button type="submit">{% icon "check" %} Approve{% if is_recipient %} (you are a recipient){% endif %}</button></form>{% endif %}
+      {% if can_decline %}<form method="post" action="{% url 'disbursement_action' batch.pk 'decline' %}" class="inline-form" data-confirm="Decline this disbursement? It closes and nothing is paid; a corrected one must be proposed again.">{% csrf_token %}<div><label for="decline-note">Reason<span class="required-mark" aria-hidden="true">*</span></label><input id="decline-note" name="note" maxlength="1000" required></div><button type="submit" class="secondary">Decline</button></form>{% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  <h2>Homes</h2>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th scope="col">Home</th><th scope="col">Account</th><th scope="col">Paid by</th><th scope="col">Payee and address</th><th scope="col" class="num">Amount</th><th scope="col">Status</th></tr></thead>
+    <tbody>{% for r in rows %}<tr>
+      <td>{{ r.line.lot.label }}</td><td>{{ r.line.account.number }}</td><td>{{ r.line.get_method_display }}</td>
+      <td class="small">{% if r.line.method == "check" %}{{ r.line.payee_name }}<br>{{ r.line.mail_to|linebreaksbr }}{% else %}<span class="muted">-</span>{% endif %}</td>
+      <td class="num">{{ r.line.amount_cents|cents }}</td>
+      <td>{{ r.label }}{% for c in r.checks %}<div class="small">Check #{{ c.number }} · {{ c.issued_on|short_date }} · {% if c.status == "voided" %}<span class="status tone-danger">Voided</span>{% elif c.status == "cleared" %}<span class="status tone-success">Cleared</span>{% else %}Outstanding{% endif %}</div>
+        {% if c.status == "issued" %}
+          {% if can_issue %}<form method="post" action="{% url 'disbursement_action' batch.pk 'clear' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}">{% if c.suggestion %}<input type="hidden" name="bank_line" value="{{ c.suggestion.pk }}"><span class="small">Bank line {{ c.suggestion.posted_on|short_date }} matches.</span>{% endif %}<input type="date" name="on" value="{% if c.suggestion %}{{ c.suggestion.posted_on|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" aria-label="Cleared on" required><button type="submit" class="secondary small">Mark cleared</button></form>{% endif %}
+          {% if can_void %}<form method="post" action="{% url 'disbursement_action' batch.pk 'void' %}" class="inline-form" data-confirm="Void check #{{ c.number }}? {% if batch.kind == 'refund' %}The refund entry is reversed and the credit is back on the owner's account; {% endif %}a new check can then be written.">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}"><input name="reason" maxlength="150" required aria-label="Reason for voiding" placeholder="Reason"><button type="submit" class="secondary small">Void</button></form>{% endif %}
+        {% endif %}{% endfor %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div></div>
+
+  {% if to_issue and can_issue %}
+    <section class="card"><h2>Write the checks</h2>
+      <p class="small">{{ to_issue|length }} check{{ to_issue|length|pluralize }} to write. Either print them on the association's pre-printed check stock (the stock carries the bank's details; set the positions under <a href="{% url 'check_print_settings' %}">Check printing</a>), or give the treasurer the check register to write them in the bank's bill pay. Then record the check numbers here: a refund is posted on the owner's account when its check is recorded.</p>
+      <form method="get" action="{% url 'disbursement_checks_pdf' batch.pk %}" class="inline-form"><div><label for="print-on">Date on the checks</label><input id="print-on" type="date" name="on" value="{{ today|date:'Y-m-d' }}"></div><button type="submit" class="secondary">{% icon "download" %} Print on check stock (PDF)</button></form>
+      {% include "partials/form_errors.html" with form=issue_form %}
+      <form method="post" action="{% url 'disbursement_action' batch.pk 'issue' %}" class="form-grid" data-confirm="Record these checks as issued with these numbers?{% if batch.kind == 'refund' %} The refund is posted on the owner's account.{% endif %}">{% csrf_token %}{{ issue_form }}<div class="form-actions"><button type="submit">Mark as issued</button></div></form>
+      <p class="small muted">In order: {% for r in to_issue %}{{ r.line.lot.label }}{% if not forloop.last %}; {% endif %}{% endfor %}.</p>
+    </section>
+  {% endif %}
+  <p class="small muted">Checks uncashed after {{ stale_days }} days appear in My items. {{ unclaimed_note }}</p>
+{% endblock %}
