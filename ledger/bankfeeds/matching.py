@@ -91,7 +91,7 @@ def _open_items(today):
                 e.pk,
                 e.posted_on,
                 -e.amount_cents,
-                f"Returned payment · Lot {e.lot.number}",
+                f"Returned payment · {e.lot.label}",
                 0,
             )
         )

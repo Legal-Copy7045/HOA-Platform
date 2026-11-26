@@ -48,7 +48,7 @@ FLAG_LABELS = {
 class Row:
     user: User
     person: object | None
-    lots: list[int] = field(default_factory=list)
+    lots: list[str] = field(default_factory=list)  # addresses (D40)
     board: bool = False
     offices: list[str] = field(default_factory=list)
     roles: list[str] = field(default_factory=list)
@@ -82,9 +82,9 @@ def rows(on: datetime.date | None = None) -> list[Row]:
     )
     with system_access("access review"):
         users = list(User.objects.select_related("person").order_by("email"))
-        lots: dict[int, list[int]] = {}
-        for pid, number in Ownership.objects.active(on).values_list("person_id", "lot__number"):
-            lots.setdefault(pid, []).append(number)
+        lots: dict[int, list] = {}
+        for o in Ownership.objects.active(on).select_related("lot"):
+            lots.setdefault(o.person_id, []).append(o.lot)
         former = set(
             Ownership.objects.filter(end_date__isnull=False, end_date__lte=on).values_list(
                 "person_id", flat=True
@@ -107,7 +107,7 @@ def rows(on: datetime.date | None = None) -> list[Row]:
                 dormant.add(c.person_id)
             else:
                 contacts.setdefault(c.person_id, []).append(
-                    f"{c.get_kind_display()}, lot {c.account.lot.number}"
+                    f"{c.get_kind_display()}, {c.account.lot.label}"
                 )
     out = []
     for user in users:
@@ -116,7 +116,7 @@ def rows(on: datetime.date | None = None) -> list[Row]:
         row = Row(
             user=user,
             person=person,
-            lots=sorted(lots.get(pid, [])),
+            lots=[lot.label for lot in sorted(lots.get(pid, []), key=lambda lot: lot.sort_key)],
             board=pid in seats,
             offices=offices.get(pid, []),
             roles=roles.get(pid, []),

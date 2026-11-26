@@ -150,7 +150,7 @@ def test_owner_list_has_the_form_first_and_no_filters(client, w):
     # Kind of project first, with its guidance; US spelling.
     assert page.index('name="project_type"') < page.index('name="title"')
     assert "Plot plan, height, material and color." in page
-    assert "Where on your lot" in page and 'data-show-if="location=other"' in page
+    assert "Where on your property" in page and 'data-show-if="location=other"' in page
     assert "colour" not in page and "aluminium" not in page
     client.force_login(w["reviewer"])
     assert "Filter the list" in client.get(reverse("arc_list")).content.decode()
@@ -251,7 +251,7 @@ def test_recusal_in_plain_words(client, w):
     board_owner = make_member(board=True, lots=[w["lot"]])
     client.force_login(board_owner)
     page = client.get(reverse("arc_detail", args=[w["req"].pk])).content.decode()
-    assert "You can't review this one because it's your lot" in page
+    assert "You can't review this one because it's your home" in page
 
 
 # --- Files --------------------------------------------------------------------------------

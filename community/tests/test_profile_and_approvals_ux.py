@@ -74,7 +74,7 @@ def test_reset_approval_names_the_person_email_lot_and_starter(client):
     page = client.get(reverse("approvals")).content.decode()
     assert display_name(owner) in page
     assert "reset-me@example.com" in page
-    assert f"Lot {lot.number}" in page
+    assert lot.label in page and f"Lot {lot.number}" not in page
     assert f"Started by {display_name(starter)}" in page
     assert "Account #" not in page
 
@@ -86,7 +86,7 @@ def test_reset_for_someone_without_a_lot_says_so(client):
         subject=board_member, actor=starter, verification_method=VerificationMethod.IN_PERSON
     )
     client.force_login(approver)
-    assert "no current lot" in client.get(reverse("approvals")).content.decode()
+    assert "no current home" in client.get(reverse("approvals")).content.decode()
 
 
 def test_declining_a_seat_nomination_asks_first(client, settings):

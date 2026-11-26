@@ -473,7 +473,7 @@ class Command(BaseCommand):
             actor=b1,
         )
 
-        # Lot neighbors from the (fictional) development plan: next-door lots
+        # Home neighbors from the (fictional) development plan: next-door lots
         # on each of the two roads (Milestone 3 phase 7).
         from arc import signoffs as arc_signoffs
 

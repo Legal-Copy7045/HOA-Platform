@@ -112,13 +112,11 @@ def journal_items(start, end) -> dict[str, list[tuple]]:
     for p in StripePayment.objects.unscoped("accounting").select_related("lot"):
         day = timezone.localdate(p.recorded_at)
         if p.surcharge_cents and start <= day <= end:
-            out["surcharges"].append((day, f"S{p.pk}", p.surcharge_cents, p.lot.number))
+            out["surcharges"].append((day, f"S{p.pk}", p.surcharge_cents, p.lot))
     for ev, surcharge_part, _base in refund_portions():
         day = timezone.localdate(ev.seen_at)
         if surcharge_part and start <= day <= end:
-            out["surcharge_refunds"].append(
-                (day, f"E{ev.pk}", surcharge_part, ev.payment.lot.number)
-            )
+            out["surcharge_refunds"].append((day, f"E{ev.pk}", surcharge_part, ev.payment.lot))
     for bt in StripeBalanceTransaction.objects.exclude(fee_cents=0):
         day = timezone.localdate(bt.created)
         if start <= day <= end:

@@ -1,7 +1,7 @@
 # Community streamlining (owner-approved 2026-11-26): merged pages, the Board and committees page,
 # view-only and former owners' requests, areas with their booking rules, urgent texts from the
 # announcement form and Recurring deadlines on Board tasks. `match` runs over "<stage>:<check>".
-- feature: "Lots and owners with the roster view (accounts, contacts, balances, audited CSV export); the old Roster URL redirects with its query"
+- feature: "Homes and owners with the roster view (accounts, contacts, balances, audited CSV export); the old Roster URL redirects with its query"
   since: M5
   docs: docs/glossary.md
   match: ["^unit:community/tests/test_roster_lists_faq\\.py::test_(roster|old_roster|lots_and_owners|previous_accounts)"]

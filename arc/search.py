@@ -39,7 +39,7 @@ def arc(user, q):
             url=reverse("my_history") if history_only else reverse("arc_detail", args=[r.pk]),
             snippet=snippet(q, r.description, r.project_type),
             date=r.created_at,
-            detail=f"Lot {r.lot.number} · {r.get_state_display()}",
+            detail=f"{r.lot.label} · {r.get_state_display()}",
         )
         for r in rows
     ]

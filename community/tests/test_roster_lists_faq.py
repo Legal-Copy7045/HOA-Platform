@@ -41,8 +41,8 @@ ROSTER = {"view": "roster"}
 def test_roster_lists_accounts_for_the_board_and_auditor(client, w):
     client.force_login(w["auditor"])
     page = client.get(reverse("lot_list"), ROSTER).content
-    assert f"Lot {w['lot_a'].number}".encode() in page
-    assert b"<h1>Lots and owners</h1>" in page and b"Export CSV" in page
+    assert w["lot_a"].label.encode() in page
+    assert b"<h1>Homes and owners</h1>" in page and b"Export CSV" in page
     client.force_login(w["owner"])
     assert client.get(reverse("lot_list"), ROSTER).status_code == 403
     assert client.get(reverse("roster")).status_code == 403
@@ -67,7 +67,7 @@ def test_lots_and_owners_default_view_has_no_contact_details(client, w):
         Person.objects.filter(user=w["owner"]).update(email="owner-a@example.com")
     client.force_login(w["board"])
     page = client.get(reverse("lot_list")).content
-    assert b"<h1>Lots and owners</h1>" in page and b"owner-a@example.com" not in page
+    assert b"<h1>Homes and owners</h1>" in page and b"owner-a@example.com" not in page
     assert b"Accounts, contacts and balances" in page
     roster = client.get(reverse("lot_list"), ROSTER).content
     assert b"owner-a@example.com" in roster

@@ -837,7 +837,7 @@ def test_owner_sees_own_lot_detail(client, world):
     response = client.get(reverse("lot_detail", args=[world["lot_a"].pk]))
     assert response.status_code == 200
     assert b"1 Alpha Way" in response.content
-    assert b"Transfer this lot" not in response.content  # board-only controls
+    assert b"Transfer this home" not in response.content  # board-only controls
 
 
 @pytest.mark.parametrize(

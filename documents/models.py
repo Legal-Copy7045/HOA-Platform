@@ -24,14 +24,14 @@ class Category(models.TextChoices):
     FINANCIAL = "financial", "Financial"
     FORMS = "forms", "Forms"
     ARC = "arc", "Architectural guidelines"
-    LOT = "lot", "Lot-specific"
+    LOT = "lot", "About one home"
     OTHER = "other", "Other"
 
 
 class Visibility(models.TextChoices):
     OWNERS = "owners", "All owners"
     BOARD = "board", "Board, manager and auditor only"
-    LOT = "lot", "Owners of one lot only"
+    LOT = "lot", "Owners of one home only"
     COMMITTEE = "committee", "One committee (and the board)"
 
 

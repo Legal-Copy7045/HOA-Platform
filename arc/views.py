@@ -22,7 +22,7 @@ class _AddressChoice(forms.ModelChoiceField):
     """Owners know their street address, not their lot number."""
 
     def label_from_instance(self, obj):
-        return f"{obj.street_address} (lot {obj.number})" if obj.street_address else str(obj)
+        return obj.label
 
 
 LOCATIONS = [
@@ -49,7 +49,7 @@ class ProjectForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 5}),
         help_text="Sizes, colors and anything the committee should know.",
     )
-    location = forms.ChoiceField(required=False, label="Where on your lot", choices=LOCATIONS)
+    location = forms.ChoiceField(required=False, label="Where on your property", choices=LOCATIONS)
     location_detail = forms.CharField(max_length=200, required=False, label="If other, where?")
     planned_start = forms.DateField(
         label="Planned start",
@@ -130,6 +130,13 @@ def _affected_numbers(req) -> list[int]:
         return list(req.affected_lots.values_list("number", flat=True))
 
 
+def _affected_labels(req) -> list[str]:
+    from core.scoping import system_access
+
+    with system_access("affected homes for intake form"):
+        return [lot.label for lot in req.affected_lots.all()]
+
+
 def _get(request, pk):
     return get_object_or_404(ArcRequest.objects.for_user(request.user), pk=pk)
 
@@ -183,13 +190,13 @@ def arc_list(request):
         return csv_response(
             request,
             "arc-requests",
-            ["Number", "Project", "Type", "Lot", "Status", "Decision due", "Created"],
+            ["Address", "Number", "Project", "Type", "Status", "Decision due", "Created"],
             (
                 [
+                    r.lot.label,
                     f"ARC-{r.pk}",
                     r.title,
                     r.project_type,
-                    r.lot.number,
                     r.get_state_display(),
                     r.review_due_on or "",
                     timezone.localdate(r.created_at),
@@ -326,6 +333,7 @@ def arc_detail(request, pk):
             "can_set_affected": policy.can(user, "arc.intake")
             and req.state in (ArcState.SUBMITTED, ArcState.IN_REVIEW),
             "affected": _affected_numbers(req),
+            "affected_labels": _affected_labels(req),
         },
     )
 
@@ -475,7 +483,7 @@ def arc_affected(request, pk):
     except services.ArcError as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, "Affected lots recorded.")
+        messages.success(request, "Affected homes recorded.")
     return redirect("arc_detail", pk=req.pk)
 
 

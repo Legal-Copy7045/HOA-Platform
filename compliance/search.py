@@ -39,7 +39,7 @@ def violations(user, q):
             url=reverse("my_history") if history_only else reverse("violation_detail", args=[v.pk]),
             snippet=snippet(q, v.description),
             date=v.created_at,
-            detail=f"Lot {v.lot.number} · {v.get_state_display()}",
+            detail=f"{v.lot.label} · {v.get_state_display()}",
         )
         for v in rows
     ]

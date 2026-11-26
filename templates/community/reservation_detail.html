@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Booking #{{ res.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{{ res.area.name }}</h1><p class="subtitle">Booking #{{ res.pk }} for Lot {{ res.lot.number }}</p></div>
+  <div class="page-head"><div><h1>{{ res.area.name }}</h1><p class="subtitle">Booking #{{ res.pk }} for {{ res.lot.label }}</p></div>
     <div class="actions"><a class="btn secondary" href="{% url 'reservations' %}">All bookings</a></div></div>
   <section class="card">
     <dl class="kv">

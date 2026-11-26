@@ -43,7 +43,7 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
    ```
 
    Delete the file from the server afterwards. Later changes of owner go
-   through a transfer on the lot page; a board member's own ownership is
+   through a transfer on the home's page (Homes and owners); a board member's own ownership is
    recorded by another board member (no self-grants).
 
    On a POC seeded with fictional data instead, attach yourself to a demo lot
@@ -154,7 +154,7 @@ board is emailed.
 1. **Dues**: Finance → Owner accounts → "Post monthly dues" on or after the
    1st. Safe to press twice (a lot is never charged twice for a month).
    To automate, set the rule "Post monthly dues automatically" to yes.
-2. **Payments**: record each check on the lot's account page (check number
+2. **Payments**: record each check on the Home account page (check number
    only, never account numbers). Prepayments simply leave a credit.
 3. **Invoices**: enter with the PDF attached, submit; board members other
    than the entrant approve (two at $500 and over); record payment.
@@ -261,7 +261,7 @@ password manager and the POC VM's `.env`.
 
 ## ARC neighbor sign-off and Gemini
 
-1. Record each lot's neighbors once (Board > Lot neighbors), from the
+1. Record each home's neighbors once (Board > Home neighbors), from the
    development plan. They are pre-selected on every architectural request.
 2. On a request, the applicant (or the board or manager) adds the
    neighbors, adds any other addresses, and sends the requests. Owners with

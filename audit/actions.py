@@ -41,7 +41,7 @@ _SPECS = [
     _spec("ownership.ended", "Ownership ended", "lot_id", "person_id", "end_date"),
     _spec(
         "ownership.transferred",
-        "Lot transferred to new owners",
+        "Home transferred to new owners",
         "lot_id",
         "transfer_date",
         "ended_count",
@@ -117,7 +117,7 @@ _SPECS = [
     _spec("account.change_withdrawn", "Account change withdrawn", "action"),
     _spec("arc.project_type_saved", "ARC project type saved", "active"),
     _spec(
-        "register.imported", "Lot and owner register imported", "lots", "owners", "people_created"
+        "register.imported", "Home and owner register imported", "lots", "owners", "people_created"
     ),
     _spec("contract.entered", "Contract entered", "amount_cap_cents", "schedule"),
     _spec("contract.ended", "Contract end date set", "ends_on"),
@@ -133,7 +133,7 @@ _SPECS = [
     ),
     _spec("seat.proposed", "Board seat proposed", "person_id", "seat_type"),
     _spec("seat.proposal_decided", "Board seat proposal decided", "person_id", "decision"),
-    _spec("arc.neighbors_set", "Lot neighbors set", "lot_id", "count"),
+    _spec("arc.neighbors_set", "Home neighbors set", "lot_id", "count"),
     _spec("arc.signoffs_prepared", "Neighbor sign-offs prepared", "count"),
     _spec("arc.signoff_added", "Sign-off added", "kind"),
     _spec("arc.signoff_withdrawn", "Sign-off withdrawn"),
@@ -219,7 +219,7 @@ _SPECS = [
     _spec("attachment.added", "File attached", "owner_type", "scan"),
     _spec("attachment.downloaded", "Attached file downloaded", "owner_type", "scan", "view"),
     _spec("arc.created", "ARC request started", "lot_id"),
-    _spec("arc.affected_lots_set", "ARC affected lots recorded", "count", "added", "removed"),
+    _spec("arc.affected_lots_set", "ARC affected homes recorded", "count", "added", "removed"),
     _spec("arc.position_recorded", "ARC reviewer position recorded"),
     _spec("arc.letter_downloaded", "ARC decision letter downloaded"),
     _spec("violation.reported", "Violation reported", "lot_id", "category"),

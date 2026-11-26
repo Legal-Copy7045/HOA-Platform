@@ -322,7 +322,7 @@ class SignoffRequest(ScopedModel):
         names = getattr(self, "owner_names", "")
         if self.lot_id:
             who = f"{names}, " if names else ""
-            return f"{who}{self.lot.street_address} (lot {self.lot.number})"
+            return f"{who}{self.lot.label}"
         return f"{self.name}, {self.address}" if self.name else self.address
 
 

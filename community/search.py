@@ -40,7 +40,7 @@ def rules(user, q):
     return out[:LIMIT]
 
 
-@register("lots", "Lots", url_name="lot_list")
+@register("lots", "Homes", url_name="lot_list")
 def lots(user, q):
     from django.db.models import Q
 
@@ -59,10 +59,12 @@ def lots(user, q):
     condition = matching(q, "street_address") | Q(pk__in=list(owners))
     if q.isdigit() and len(q) <= 5:
         condition |= Q(number=int(q))
-    rows = Lot.objects.for_user(user).filter(condition).order_by("number")[:LIMIT]
+    rows = sorted(Lot.objects.for_user(user).filter(condition), key=lambda lot: lot.sort_key)[
+        :LIMIT
+    ]
     return [
         Result(
-            title=f"Lot {lot.number}",
+            title=lot.label,
             url=reverse("lot_detail", args=[lot.pk]),
             snippet=snippet(q, lot.street_address, ", ".join(owners.get(lot.pk, []))),
         )
@@ -107,7 +109,7 @@ def directory(user, q):
                 title=e["name"],
                 url=reverse("directory"),
                 snippet=snippet(q, e["street_address"], e["email"], e["phone"]),
-                detail=f"Lot {e['lot']}",
+                detail=e["address"],
             )
         )
     return out[:LIMIT]

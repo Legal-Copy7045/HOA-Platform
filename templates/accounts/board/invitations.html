@@ -5,7 +5,7 @@
   <div class="page-head"><div><h1>Invitations and sign-ups</h1><p class="subtitle">{% if can_send %}Who has signed up to the portal. {% endif %}Invitations only ever go to the email on each person's record and only link a login to an existing person.{% if can_send %} To invite one person, open their record under <a href="{% url 'people' %}">People</a>.{% endif %}</p></div>
     {% if can_send %}<div class="actions"><a class="btn secondary" href="?letters=1">{% icon "download" %} Letters for owners without email ({{ counts.no_email }})</a></div>{% endif %}</div>
   {% if can_send %}
-  <h2>Sign-ups by lot</h2>
+  <h2>Sign-ups by home</h2>
   <div class="grid grid-4">
     <div class="stat tone-success"><div class="label">Signed up</div><div class="value">{{ counts.signed_up }}</div><div class="hint">{{ signed_up_percent }}% of owners</div></div>
     <div class="stat"><div class="label">Invited, waiting</div><div class="value">{{ counts.invited }}</div></div>
@@ -17,8 +17,8 @@
     <form method="post" data-confirm="Email a new invitation link to {{ remind_count }} {% if remind_count == 1 %}person who was{% else %}people who were{% endif %} invited more than 3 days ago and {% if remind_count == 1 %}has{% else %}have{% endif %} not signed up yet? Their old links stop working.">{% csrf_token %}<input type="hidden" name="action" value="remind"><button type="submit" class="secondary"{% if not remind_count %} disabled{% endif %}>Remind those who haven't signed up ({{ remind_count }})</button></form>{% if counts.invited and counts.invited != remind_count %}<span class="small muted">Invitations sent in the last 3 days are not reminded yet.</span>{% endif %}
   </div>
   <div class="table-card"><div class="table-wrap"><table>
-    <thead><tr><th>Lot</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>
-    <tbody>{% for r in rows %}<tr><td>{{ r.lot.number }}</td><td><a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
+    <thead><tr><th>Home</th><th>Owner</th><th>Status</th><th>Invitation</th></tr></thead>
+    <tbody>{% for r in rows %}<tr><td>{{ r.lot.label }}</td><td><a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a></td>
       <td><span class="badge {% if r.status == 'signed_up' %}tone-success{% elif r.status == 'invited' %}tone-info{% else %}tone-warning{% endif %}">{{ r.label }}</span></td>
       <td class="small muted">{% if r.invitation and r.status != "signed_up" %}{% if r.invitation.sent_at %}sent {{ r.invitation.sent_at|short_date }}{% else %}queued{% endif %} · expires {{ r.invitation.expires_at|short_date }}{% endif %}</td></tr>
     {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="users" title="No owners recorded yet" text="Load the register first (import_register)." %}</td></tr>{% endfor %}</tbody>

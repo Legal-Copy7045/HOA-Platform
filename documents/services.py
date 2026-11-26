@@ -108,7 +108,7 @@ def create_document(
         if visibility == Visibility.COMMITTEE:
             raise DocumentError("Committee documents go in the committee's folder.")
     if visibility == Visibility.LOT and lot is None:
-        raise DocumentError("Choose the lot this document belongs to.")
+        raise DocumentError("Choose the home this document belongs to.")
     if visibility != Visibility.LOT:
         lot = None
     if not title.strip():
@@ -259,7 +259,7 @@ def move_document(document: Document, folder: Folder | None, *, actor, request=N
     out of folders. Lot documents stay unfiled."""
     require(actor, "document.manage")
     if document.visibility == Visibility.LOT:
-        raise DocumentError("Lot documents are not filed in folders.")
+        raise DocumentError("Documents for one home are not filed in folders.")
     fields = {"folder": folder}
     if folder is not None:
         fields.update(visibility=folder.visibility, committee=folder.committee)

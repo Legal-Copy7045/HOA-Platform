@@ -802,7 +802,7 @@ def reassign_entry(
             raise LedgerError("This entry was already reversed or moved.")
         target = Account.objects.filter(pk=account_id, lot_id=entry.lot_id).first()
         if target is None:
-            raise LedgerError("Choose one of this lot's accounts.")
+            raise LedgerError("Choose one of this home's accounts.")
         if target.pk == entry.account_id:
             raise LedgerError("It is already on that account.")
         numbers = dict(Account.objects.filter(lot_id=entry.lot_id).values_list("pk", "number"))
@@ -1088,12 +1088,12 @@ COLLECTION = Workflow(
 def open_case(*, lot: Lot, notes: str = "", actor, request=None) -> CollectionCase:
     require(actor, "collections.manage")
     if CollectionCase.objects.filter(lot=lot).exclude(state="closed").exists():
-        raise LedgerError("This lot already has an open collection case.")
+        raise LedgerError("This home already has an open collection case.")
     try:
         with transaction.atomic():
             case = CollectionCase.objects.create(lot=lot, opened_by=actor, notes=notes)
     except IntegrityError as exc:
-        raise LedgerError("This lot already has an open collection case.") from exc
+        raise LedgerError("This home already has an open collection case.") from exc
     record_event(
         "collection.opened",
         actor=actor,
@@ -1321,7 +1321,7 @@ def request_resale(
     from core.policy import can, roles_for
 
     if not can(actor, "resale.manage") and lot.pk not in roles_for(actor).owned_lot_ids:
-        raise LedgerError("Owners can request a certificate only for their own lot.")
+        raise LedgerError("Owners can request a certificate only for their own home.")
     days = rule("resale.deadline_days")
     obj = ResaleRequest.objects.create(
         lot=lot,
@@ -1391,8 +1391,8 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
             "normal",
             "This certificate is provided pursuant to the provisions of Section 5407 of the "
             f"Pennsylvania Uniform Planned Community Act. {b(profile.legal_name)} (hereinafter "
-            f'"Association") represents the following with respect to {b(lot.street_address)} '
-            f'(lot {b(lot.number)}) (hereinafter "Unit"), as of {b(today.strftime("%B %-d, %Y"))}.',
+            f'"Association") represents the following with respect to {b(lot.legal_label)} '
+            f'(hereinafter "Unit"), as of {b(today.strftime("%B %-d, %Y"))}.',
         ),
         ("normal", ""),
         (
@@ -1515,7 +1515,7 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
     # so the certificate's wording above is unchanged.
     from ledger.letters import open_charges_paragraphs
 
-    body += [("pagebreak", ""), ("heading", f"Account of lot {lot.number}")]
+    body += [("pagebreak", ""), ("heading", f"Account of {lot.legal_label}")]
     body += open_charges_paragraphs(lot)
     return pdf.render(body, title=f"Resale certificate {obj.pk}")
 

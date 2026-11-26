@@ -165,7 +165,7 @@ class VoteKind(models.TextChoices):
     # No new informal polls: they are surveys now (owner decision 2026-11-26).
     # Old informal rows stay readable.
     INFORMAL = "informal", "Informal poll (non-binding, one per owner)"
-    FORMAL = "formal", "Formal vote (one per lot)"
+    FORMAL = "formal", "Formal vote (one per home)"
 
 
 class VoteStatus(models.TextChoices):

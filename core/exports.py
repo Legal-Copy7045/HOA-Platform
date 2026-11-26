@@ -57,6 +57,7 @@ def _community(user):
         else None,
         "ownerships": [
             {
+                "address": o.lot.label,
                 "lot": o.lot.number,
                 "type": o.ownership_type,
                 "start": o.start_date.isoformat(),

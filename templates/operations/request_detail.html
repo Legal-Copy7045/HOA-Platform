@@ -4,7 +4,7 @@
 {% block content %}
   <div class="crumbs">{% if owner_view %}<a href="{% url 'requests' %}?mine=1">My requests</a>{% else %}<a href="{% url 'requests' %}">Owner requests</a>{% endif %} / {{ obj.subject|truncatechars:48 }}</div>
   <div class="page-head"><div><h1>{{ obj.subject }}</h1>
-    <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_request_type_display }}</span><span>{% icon "pin" %}{{ obj.lot.street_address|default:obj.lot }}{% if staff %} (lot {{ obj.lot.number }}){% endif %}</span>
+    <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_request_type_display }}</span><span>{% icon "pin" %}{{ obj.lot.label }}</span>{% if staff %}<span class="lot-ref">{{ obj.lot.lot_ref }}</span>{% endif %}
       {% if obj.first_response_at %}<span>{% icon "check" %}Answered {{ obj.first_response_at|date:"M j, Y" }}</span>{% elif obj.respond_by %}<span>{% icon "clock" %}{% if obj.is_overdue %}Response overdue since{% else %}Response expected by{% endif %} {{ obj.respond_by|date:"M j, Y" }}</span>{% endif %}</div></div></div>
   <div class="split">
     <div>

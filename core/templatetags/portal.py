@@ -316,6 +316,14 @@ def quick_actions(context):
     return {"actions": actions_for(context["user"])}
 
 
+@register.inclusion_tag("partials/home_title.html")
+def home_title(lot, level="h1", show_lot_ref=True):
+    """A home as a heading (D40): the address is the title, the plat lot
+    number a muted subtitle in ``.lot-ref`` (the only place a page outside
+    the formal documents may show "Lot N")."""
+    return {"lot": lot, "level": level, "show_lot_ref": show_lot_ref}
+
+
 @register.filter
 def get_item(mapping, key):
     """{{ dict|get_item:key }} for dictionaries keyed by a variable."""

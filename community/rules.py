@@ -31,11 +31,11 @@ REGISTRY: dict[str, RuleSpec] = {
     for spec in [
         RuleSpec(
             "dues.monthly_cents",
-            "Monthly dues per lot",
+            "Monthly dues per home",
             CENTS,
             None,
             "Dues",
-            "Charged on the 1st of each month to every lot's account.",
+            "Charged on the 1st of each month to every home's account.",
         ),
         RuleSpec("dues.due_day", "Day of month dues are due", DAYS, "1", "Dues"),
         RuleSpec(
@@ -164,7 +164,7 @@ REGISTRY: dict[str, RuleSpec] = {
             "resale.deadline_days", "Days to provide a resale certificate", DAYS, None, "Resale"
         ),
         RuleSpec(
-            "vote.quorum_percent", "Quorum for formal votes (% of lots)", PERCENT, None, "Voting"
+            "vote.quorum_percent", "Quorum for formal votes (% of homes)", PERCENT, None, "Voting"
         ),
         RuleSpec(
             "vote.pass_percent", "Share of votes cast needed to pass", PERCENT, None, "Voting"

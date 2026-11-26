@@ -54,7 +54,7 @@ def receipt_pdf(payment) -> bytes:
         ("heading", profile.legal_name),
         ("normal", ""),
         ("heading", "PAYMENT RECEIPT"),
-        ("normal", f"Lot {lot.number}, {lot.street_address}"),
+        ("normal", lot.label),
         ("normal", f"Paid on {timezone.localtime(payment.recorded_at):%B %-d, %Y}"),
         ("normal", f"Paid by: {_method_text(payment)} (online, through Stripe)"),
         ("normal", f"Stripe reference: {payment.payment_intent_id}"),
@@ -87,7 +87,7 @@ def email_receipt(payment) -> None:
 
     user = payment.checkout.user
     body = [
-        f"Thank you. Your online payment for lot {payment.lot.number} was received.",
+        f"Thank you. Your online payment for {payment.lot.label} was received.",
         "",
     ]
     body += [f"  {name}: {format_cents(cents)}" for name, cents in lines(payment)]

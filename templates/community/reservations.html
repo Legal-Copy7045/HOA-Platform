@@ -7,7 +7,7 @@
 
   {% if is_staff %}<section class="card"><h2>Waiting for approval</h2>
     {% if pending %}<ul class="list">{% for r in pending %}<li><div class="todo-icon tone-warning">{% icon "calendar" %}</div>
-      <div class="grow"><div class="title"><a href="{% url 'reservation_detail' r.pk %}">{{ r.area.name }} · Lot {{ r.lot.number }}</a></div>
+      <div class="grow"><div class="title"><a href="{% url 'reservation_detail' r.pk %}">{{ r.area.name }} · {{ r.lot.label }}</a></div>
         <div class="small muted">{{ r.starts_at|date:"D M j, g:i A" }} to {{ r.ends_at|date:"g:i A" }}</div></div>
       <form method="post" action="{% url 'reservation_action' r.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit" class="small">Confirm</button></form>
     </li>{% endfor %}</ul>
@@ -38,6 +38,6 @@
 
   {% if mine %}<section class="card"><h2>My bookings</h2><ul class="list">{% for r in mine %}<li>
     <div class="grow"><div class="title"><a href="{% url 'reservation_detail' r.pk %}">{{ r.area.name }}</a></div>
-      <div class="small muted">{{ r.starts_at|date:"D M j, Y g:i A" }} to {{ r.ends_at|date:"g:i A" }} · Lot {{ r.lot.number }}</div></div>
+      <div class="small muted">{{ r.starts_at|date:"D M j, Y g:i A" }} to {{ r.ends_at|date:"g:i A" }} · {{ r.lot.label }}</div></div>
     {% status r.state r.get_state_display %}</li>{% endfor %}</ul></section>{% endif %}
 {% endblock %}

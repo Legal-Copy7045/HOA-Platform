@@ -37,7 +37,7 @@ def requests(user, q):
             url=reverse("request_detail", args=[r.pk]),
             snippet=snippet(q, r.description),
             date=r.created_at,
-            detail=f"Lot {r.lot.number} · {r.get_state_display()}",
+            detail=f"{r.lot.label} · {r.get_state_display()}",
         )
         for r in rows
     ]

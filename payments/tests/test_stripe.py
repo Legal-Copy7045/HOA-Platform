@@ -384,7 +384,7 @@ def test_debit_card_on_the_surcharge_session_asks_the_board_to_refund_it(client,
     with system_access("t"):
         alert = PaymentAlert.objects.get(kind=AlertKind.SURCHARGE_REFUND)
     assert alert.amount_cents == 300 and alert.stripe_ref == pi_id
-    assert "Refund $3.00 surcharge to lot" in alert.detail and "(debit card)" in alert.detail
+    assert "Refund $3.00 surcharge for " in alert.detail and "(debit card)" in alert.detail
     assert AuditEvent.objects.filter(action="payments.surcharge_refund_due").exists()
     assert not [c for c in w["fake"].posts() if "refund" in c["path"]]
     w["fake"].refunds[ch_id] = [{"id": "re_test999999", "amount": 300, "status": "succeeded"}]

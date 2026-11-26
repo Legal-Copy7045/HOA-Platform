@@ -20,7 +20,7 @@
     <div class="stat"><div class="label">Percent funded today</div><div class="value">{% if result.percent_funded is None %}-{% else %}{{ result.percent_funded }}%{% endif %}</div><div class="hint">Balance compared with the fully funded balance of {{ result.fully_funded_cents|cents }}</div></div>
     <div class="stat"><div class="label">Reserve balance</div><div class="value">{{ balance.cents|cents }}</div><div class="hint">{% if balance.source == "typed" %}Typed by the board{% elif balance.source == "letters" %}From Letters and certificates (resale certificate){% else %}Not entered yet{% endif %}{% if balance.as_of %}, as of {{ balance.as_of|short_date }}{% endif %}</div></div>
     <div class="stat"><div class="label">Contribution per year</div><div class="value">{{ plan.annual_contribution_cents|cents }}</div><div class="hint">Current plan setting</div></div>
-    <div class="stat"><div class="label">Needed per year</div><div class="value">{{ result.needed_contribution_cents|cents }}</div><div class="hint">Smallest level amount that never goes below zero{% if lots %}; about {{ needed_per_lot_month|cents }} per lot per month ({{ lots }} lots){% endif %}</div></div>
+    <div class="stat"><div class="label">Needed per year</div><div class="value">{{ result.needed_contribution_cents|cents }}</div><div class="hint">Smallest level amount that never goes below zero{% if lots %}; about {{ needed_per_lot_month|cents }} per home per month ({{ lots }} homes){% endif %}</div></div>
   </div>
 
   <h2>Year by year</h2>
