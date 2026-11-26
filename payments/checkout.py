@@ -131,6 +131,13 @@ def quote(user, lot, *, charge_ids=None, amount_cents=None) -> Quote:
     return Quote(base, chosen, fees.payment_options(base))
 
 
+def quote_all(user, lot) -> Quote:
+    """Every open charge the payer can choose: what the payment page quotes
+    when opened with ?all=1, and the amount on the dashboard's "Pay $X"
+    button (one computation for both, BUG-008)."""
+    return quote(user, lot, charge_ids=[c.entry.pk for c in _own_open_charges(user, lot)])
+
+
 # --- Starting a checkout ---------------------------------------------------------------------
 
 
@@ -146,13 +153,17 @@ def _person_and_account(user, lot):
 
 
 def _metadata(checkout: PendingCheckout) -> dict:
-    return {
+    """What we tag the session and payment with. Stripe drops a metadata key
+    whose value is empty, so none is ever sent (BUG-009): a lot with no
+    account yet sends no account_id."""
+    values = {
         "pending_checkout": str(checkout.pk),
         "nonce": checkout.nonce,
         "lot_id": str(checkout.lot_id),
         "account_id": str(checkout.account_id or ""),
         "person_id": str(checkout.person_id),
     }
+    return {k: v for k, v in values.items() if v}
 
 
 def session_params(checkout: PendingCheckout, lot_number: str) -> dict:
@@ -318,7 +329,10 @@ def _verify_session(checkout: PendingCheckout, session: dict) -> None:
         raise Mismatch("session_id")
     if session.get("client_reference_id") != checkout.client_reference:
         raise Mismatch("client_reference")
-    if _obj(session.get("metadata")) != _metadata(checkout):
+    # Compare what was sent; an empty value Stripe echoes or drops is no
+    # difference (BUG-009).
+    returned = {k: v for k, v in _obj(session.get("metadata")).items() if v not in ("", None)}
+    if returned != _metadata(checkout):
         raise Mismatch("metadata")
     if bool(session.get("livemode")) != checkout.livemode or checkout.livemode != cfg.livemode:
         raise Mismatch("livemode")
@@ -402,7 +416,7 @@ def _alert(kind, key, *, lot_id=None, amount=0, ref="", detail="") -> PaymentAle
 
 
 @internal("payments check")
-def check(checkout: PendingCheckout) -> str:
+def check(checkout: PendingCheckout, now=None) -> str:
     """Ask Stripe about this checkout now and record the payment if it is
     paid and everything matches. Idempotent. Returns the checkout's state."""
     if checkout.state in (CheckoutState.PAID, CheckoutState.MISMATCH, CheckoutState.FAILED):
@@ -427,7 +441,7 @@ def check(checkout: PendingCheckout) -> str:
         _set_state(checkout, CheckoutState.EXPIRED)
         return checkout.state
     if session.get("status") != "complete":
-        if timezone.now() > checkout.expires_at:
+        if (now or timezone.now()) > checkout.expires_at:
             _set_state(checkout, CheckoutState.EXPIRED)
         return checkout.state
     if not pi:
@@ -477,6 +491,33 @@ def _from_payment_intent(checkout: PendingCheckout, pi: dict) -> str:
     return CheckoutState.PAID
 
 
+def _succeeded_on(checkout: PendingCheckout, charge: dict) -> datetime.date:
+    """The day Stripe says the money was paid: when its balance line was made
+    (a bank payment gets one only once it has succeeded), else when the
+    charge was made; never before the checkout started or after today. Not
+    the day the poller happened to see it (BUG-003)."""
+    today = timezone.localdate()
+    bt = charge.get("balance_transaction")
+    for stamp in (bt.get("created") if isinstance(bt, dict) else None, charge.get("created")):
+        if isinstance(stamp, int) and not isinstance(stamp, bool) and stamp > 0:
+            day = timezone.localdate(datetime.datetime.fromtimestamp(stamp, tz=datetime.UTC))
+            return min(max(day, timezone.localdate(checkout.created_at)), today)
+    return today
+
+
+def _payer_account(locked: PendingCheckout) -> int | None:
+    """The account of the person who paid, stored when they started (one of
+    this lot's), whatever happened to the lot since (D34-fixmoney-1)."""
+    from ledger.accounts import check_account
+    from ledger.services import LedgerError
+
+    try:
+        with system_access("payer account"):
+            return check_account(locked.lot_id, locked.account_id)
+    except LedgerError:
+        return None
+
+
 def _funding(charge: dict) -> str:
     details = _obj(charge.get("payment_method_details"))
     if details.get("type") == "us_bank_account":
@@ -505,9 +546,10 @@ def _record(checkout: PendingCheckout, pi: dict, charge: dict) -> StripePayment 
         entry = ledger.record_online_payment(
             lot=lot,
             amount_cents=locked.base_cents,
-            received_on=timezone.localdate(),
+            received_on=_succeeded_on(locked, charge),
             payment_intent_id=pi["id"],
             apply_to=locked.charge_ids,
+            account_id=_payer_account(locked),
             actor=SYSTEM,
         )
         payment = StripePayment.objects.create(
@@ -541,10 +583,32 @@ def _record(checkout: PendingCheckout, pi: dict, charge: dict) -> StripePayment 
             },
         )
         _safety_net(payment, lot)
+        _former_owner_check(payment, lot)
         from payments.receipts import email_receipt
 
         transaction.on_commit(lambda: email_receipt(payment))
     return payment
+
+
+def _former_owner_check(payment: StripePayment, lot) -> None:
+    """The home was sold while the payment was on its way: it stays on the
+    payer's account (now dormant, so it pays their charges or is credit
+    owed to them), and the board is told (SEC-001)."""
+    from ledger.accounts import current_account_id
+
+    account_id = payment.entry.account_id
+    if account_id is None or account_id == current_account_id(lot.pk):
+        return
+    _alert(
+        AlertKind.FORMER_OWNER,
+        f"former-{payment.payment_intent_id}",
+        lot_id=lot.pk,
+        amount=payment.base_cents,
+        ref=payment.payment_intent_id,
+        detail=f"Online payment of {format_cents(payment.base_cents)} on lot {lot.number} came "
+        "from the former owners after the sale; it is on their account. Refund any credit "
+        "left to them.",
+    )
 
 
 def _safety_net(payment: StripePayment, lot) -> None:

@@ -127,7 +127,11 @@ def record_ownership(
         raise CommunityError("Unknown ownership type.")
     _refuse_self_grant(actor, person, "an ownership")
     try:
-        with transaction.atomic(), system_access("record_ownership"):
+        with (
+            transaction.atomic(),
+            system_access("record_ownership"),
+            _periods_change(lot.pk, actor=actor, request=request),
+        ):
             ownership = Ownership.objects.create(
                 person=person,
                 lot=lot,
@@ -163,7 +167,11 @@ def end_ownership(
     """End an ownership. With the default (today) access stops immediately."""
     _authorize(actor, "ownership.manage")
     end_date = end_date or today()
-    with transaction.atomic(), system_access("end_ownership"):
+    with (
+        transaction.atomic(),
+        system_access("end_ownership"),
+        _periods_change(ownership.lot_id, actor=actor, request=request),
+    ):
         ownership = Ownership.objects.select_for_update().get(pk=ownership.pk)
         if ownership.end_date is not None and ownership.end_date <= end_date:
             raise CommunityError("This ownership has already ended.")
@@ -208,7 +216,11 @@ def transfer_lot(
         raise CommunityError("Each new owner may be listed only once.")
     if ownership_type is None:
         ownership_type = OwnershipType.SOLE if len(new_owners) == 1 else OwnershipType.JOINT
-    with transaction.atomic(), system_access("transfer_lot"):
+    with (
+        transaction.atomic(),
+        system_access("transfer_lot"),
+        _periods_change(lot.pk, actor=actor, request=request),
+    ):
         Lot.objects.select_for_update().get(pk=lot.pk)
         current = list(Ownership.objects.select_for_update().filter(lot=lot).active(transfer_date))
         continuing = {o.person_id for o in current} & {p.pk for p in new_owners}
@@ -245,6 +257,14 @@ def transfer_lot(
 
 
 # --- Accounts (Milestone 3) -------------------------------------------------------
+
+
+def _periods_change(lot_id: int, *, actor, request):
+    """Ownership changes move account periods; entries already posted for a
+    period that now belongs to another account follow it (D34-fixmoney-1)."""
+    from ledger.services import account_periods_change
+
+    return account_periods_change(lot_id, actor=actor, request=request)
 
 
 @internal("community accounts")

@@ -283,21 +283,6 @@ def test_balance_todo_shows_amount_and_due_date(client, w):
     assert item.due == timezone.localdate() - datetime.timedelta(days=40)
 
 
-def test_oldest_unpaid_charge_after_payments():
-    from types import SimpleNamespace as E
-
-    d = datetime.date
-    statement = E(
-        brought_forward=0,
-        entries=[
-            E(pk=1, posted_on=d(2026, 9, 1), amount_cents=100),
-            E(pk=2, posted_on=d(2026, 10, 1), amount_cents=100),
-            E(pk=3, posted_on=d(2026, 10, 5), amount_cents=-150),
-        ],
-    )
-    assert my_items.oldest_unpaid_on(statement, d(2026, 1, 1)) == d(2026, 10, 1)
-
-
 def test_dashboard_and_board_overview_share_one_list(client, w):
     from accounts import mfa_reset
     from accounts.models import VerificationMethod

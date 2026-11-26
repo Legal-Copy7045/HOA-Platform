@@ -233,15 +233,35 @@ def export_csv(start, end, *, actor, request=None) -> bytes:
 # --- Deposit batches ----------------------------------------------------------------------
 
 
-def undeposited_payments():
-    """Owner payments not in a (non-voided) deposit yet."""
-    with system_access("undeposited payments"):
-        deposited = (
+def _deposited_ids() -> set[int]:
+    """Payments in a (non-voided) deposit. A payment moved to another
+    ownership account (D34-fixmoney-1) is the same check: its copy counts as
+    deposited when the original was."""
+    with system_access("deposited payments"):
+        deposited = set(
             DepositItem.objects.values("entry_id")
             .annotate(total=Sum("amount_cents"))
             .exclude(total=0)
             .values_list("entry_id", flat=True)
         )
+        moved = dict(
+            LedgerEntry.objects.filter(
+                kind=EntryKind.PAYMENT, moved_from__isnull=False
+            ).values_list("moved_from_id", "pk")
+        )
+    frontier = list(deposited)
+    while frontier:
+        copy = moved.get(frontier.pop())
+        if copy is not None and copy not in deposited:
+            deposited.add(copy)
+            frontier.append(copy)
+    return deposited
+
+
+def undeposited_payments():
+    """Owner payments not in a (non-voided) deposit yet."""
+    with system_access("undeposited payments"):
+        deposited = _deposited_ids()
         from payments.services import online_entry_ids
 
         return list(
@@ -320,14 +340,10 @@ def _cleared_ids(kind: str) -> set[int]:
 
 def _returned_items(since, as_of):
     """Owner payments that were deposited and then bounced: the reversal of a
-    deposited payment is money the bank takes back (BUG-016)."""
+    deposited payment is money the bank takes back (BUG-016). Moving a
+    payment to another ownership account is not a return (D34-fixmoney-1)."""
     with system_access("returned items"):
-        deposited = set(
-            DepositItem.objects.values("entry_id")
-            .annotate(total=Sum("amount_cents"))
-            .exclude(total=0)
-            .values_list("entry_id", flat=True)
-        )
+        deposited = _deposited_ids()
         return list(
             LedgerEntry.objects.filter(
                 kind=EntryKind.REVERSAL,
@@ -335,6 +351,7 @@ def _returned_items(since, as_of):
                 posted_on__gt=since,
                 posted_on__lte=as_of,
             )
+            .exclude(reverses__moved_to__isnull=False)
             .select_related("lot")
             .order_by("posted_on", "id")
         )

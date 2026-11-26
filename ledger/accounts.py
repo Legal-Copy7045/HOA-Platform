@@ -7,12 +7,22 @@ seller's credit (or debt) stays on the old, dormant account and the buyer
 starts clean. The lot's balance is the sum over its accounts.
 
 An entry belongs to the account whose period covers its posting date
-(``posted_on``), so a check dated before the sale is the seller's even when
-it is entered later. A reversal (or a recorded refund) belongs to the account
-of the entry it corrects. Entries dated before the lot's first account
-belong to that first account; entries dated in a gap between two owners
-belong to the next owner's account. A lot that has never had an owner keeps
-its entries without an account (``None``), as a group of their own.
+(``posted_on``, which for a charge is its due date), so a check dated before
+the sale is the seller's even when it is entered later. A reversal (or a
+recorded refund) belongs to the account of the entry it corrects; a late
+fee to the account of the month's dues it penalises; an online payment to
+the account of the person who paid (stored on its checkout). Entries dated
+before the lot's first account belong to that first account; entries dated
+in a gap between two owners belong to the next owner's account. A lot that
+has never had an owner keeps its entries without an account (``None``), as a
+group of their own.
+
+When the account periods change afterwards (a sale recorded with an earlier
+date), entries posted by the rule on the old periods that now belong to
+another account are moved (``moves_after_change``, D34-fixmoney-1): each is
+reversed on its old account and posted again, unchanged, on the right one
+(``LedgerEntry.moved_from``). Nothing is edited; owner pages leave such a
+pair out (``MOVED_AWAY``), the board sees both.
 """
 
 from __future__ import annotations
@@ -31,17 +41,27 @@ ALL = "all"
 CURRENT = "current"
 
 
+# An entry moved to another account, and the reversal that took it off this
+# one (D34-fixmoney-1): they cancel out, and were never this account's
+# owners' money, so owner pages leave them out.
+MOVED_AWAY = Q(moved_to__isnull=False) | Q(reverses__moved_to__isnull=False)
+
+
 @internal("ledger accounts")
-def account_on(lot_id: int, on: datetime.date) -> int | None:
-    """The id of the lot's account for an entry posted on ``on``."""
+def periods(lot_id: int) -> list[tuple[int, datetime.date, datetime.date | None]]:
+    """The lot's account periods as (id, opened_on, closed_on), oldest first."""
     from community.models import Account
 
-    accounts = list(
+    return list(
         Account.objects.filter(lot_id=lot_id)
         .order_by("opened_on", "id")
         .values_list("pk", "opened_on", "closed_on")
     )
-    return pick(accounts, on)
+
+
+def account_on(lot_id: int, on: datetime.date) -> int | None:
+    """The id of the lot's account for an entry posted on ``on``."""
+    return pick(periods(lot_id), on)
 
 
 def pick(accounts: list[tuple[int, datetime.date, datetime.date | None]], on) -> int | None:
@@ -91,7 +111,86 @@ def for_new_entry(entry) -> int | None:
             .values_list("account_id", flat=True)
             .first()
         )
+    if entry.kind == "late_fee" and entry.period:
+        dues = _dues_account(entry.lot_id, entry.period)
+        if dues is not _NONE:
+            return dues
     return account_on(entry.lot_id, entry.posted_on)
+
+
+_NONE = object()
+
+
+def _dues_account(lot_id: int, period: str):
+    """The account of the month's dues still standing (_NONE: no such dues)."""
+    from ledger.models import LedgerEntry
+
+    rows = list(
+        LedgerEntry.objects.filter(
+            lot_id=lot_id, kind="assessment", period=period, reversed_by__isnull=True
+        )
+        .order_by("-id")
+        .values_list("account_id", flat=True)[:1]
+    )
+    return rows[0] if rows else _NONE
+
+
+@internal("ledger accounts")
+def moves_after_change(lot_id: int, before: list) -> list[tuple]:
+    """The entries to move after the lot's account periods changed from
+    ``before`` to what they are now, as (entry, target account id), oldest
+    first (D34-fixmoney-1).
+
+    Only entries the rule had put where they are (their account is the one
+    the old periods gave their date) move, and only to an account (never to
+    "no account"): an account the board chose by hand for an entry, such as
+    a refund check for a former owner's credit, is kept. Reversals and
+    recorded refunds follow their entry, so a reversed pair stays together
+    on its account; online payments stay with the person who paid; a late
+    fee moves with the month's dues it penalises."""
+    from ledger.models import LedgerEntry
+    from payments.services import online_entry_ids
+
+    after = periods(lot_id)
+    if after == before:
+        return []
+    entries = list(LedgerEntry.objects.filter(lot_id=lot_id).order_by("id"))
+    reversed_ids = {e.reverses_id for e in entries if e.reverses_id}
+    online = online_entry_ids()
+
+    def fixed(e) -> bool:
+        return e.kind in ("reversal", "refund") or e.pk in reversed_ids or e.pk in online
+
+    def by_date(e) -> int | None:
+        new = pick(after, e.posted_on)
+        if e.account_id == pick(before, e.posted_on) and new not in (None, e.account_id):
+            return new
+        return None
+
+    plan: dict[int, int] = {}
+    for e in entries:
+        if fixed(e) or (e.kind == "late_fee" and e.period):
+            continue
+        target = by_date(e)
+        if target is not None:
+            plan[e.pk] = target
+    dues = {
+        (e.period, e.account_id): e.pk
+        for e in entries
+        if e.kind == "assessment" and e.pk not in reversed_ids
+    }
+    for e in entries:
+        if fixed(e) or e.kind != "late_fee" or not e.period:
+            continue
+        month = dues.get((e.period, e.account_id))
+        if month in plan:
+            plan[e.pk] = plan[month]
+        elif month is None:  # no dues for the month on its account: by its date
+            target = by_date(e)
+            if target is not None:
+                plan[e.pk] = target
+    by_pk = {e.pk: e for e in entries}
+    return [(by_pk[pk], plan[pk]) for pk in sorted(plan)]
 
 
 @internal("ledger accounts")

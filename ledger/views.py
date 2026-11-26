@@ -156,9 +156,13 @@ def _ownership_start(user, lot_id):
 
 def _online_receipts(user, lot_id, since):
     """Online payments on this account in the viewer's own time (receipts)."""
+    from ledger.accounts import current_account_id
     from payments.models import StripePayment
 
-    rows = StripePayment.objects.for_user(user).filter(lot_id=lot_id)
+    # The account it was paid on only: never the former owners' (SEC-001).
+    rows = StripePayment.objects.for_user(user).filter(
+        lot_id=lot_id, entry__account_id=current_account_id(lot_id)
+    )
     if since:
         rows = rows.filter(recorded_at__date__gte=since)
     return list(rows[:12])

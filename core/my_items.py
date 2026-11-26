@@ -711,32 +711,14 @@ def _online_payment_items(user, roles) -> list[Item]:
     return out
 
 
-def oldest_unpaid_on(statement, since) -> datetime.date | None:
-    """The posting date of the oldest charge not yet covered by payments
-    (payments and credits pay the oldest charges first)."""
-    charges = []  # [posted_on, remaining]
-    if statement.brought_forward > 0:
-        charges.append([since, statement.brought_forward])
-    credit = -statement.brought_forward if statement.brought_forward < 0 else 0
-    for entry in sorted(statement.entries, key=lambda e: (e.posted_on, e.pk or 0)):
-        if entry.amount_cents > 0:
-            charges.append([entry.posted_on, entry.amount_cents])
-        else:
-            credit += -entry.amount_cents
-    for charge in charges:
-        used = min(credit, charge[1])
-        charge[1] -= used
-        credit -= used
-        if charge[1] > 0:
-            return charge[0]
-    return None
-
-
 def _balance_items(user, roles) -> list[Item]:
-    """A balance due on one of my accounts, with the amount and since when."""
+    """A balance due on one of my accounts, with the amount and since when.
+    The date is My account's (open items: the oldest charge still open on
+    the account, BUG-006) and the button's amount is what the payment page
+    quotes for it (BUG-008)."""
     from community.models import Lot
     from core.money import format_cents
-    from ledger.services import owner_statement
+    from ledger.services import amount_due, owner_statement
 
     out = []
     payable = _payable_online(user)
@@ -745,11 +727,12 @@ def _balance_items(user, roles) -> list[Item]:
         statement = owner_statement(lot.pk, since)
         if statement.balance <= 0:
             continue
-        oldest = oldest_unpaid_on(statement, since)
+        oldest = amount_due(lot.pk).due_on
         # A charge posted ahead of its month is due by that date, not overdue
         # since it (review BUG-005).
         upcoming = oldest is not None and oldest > timezone.localdate()
         when = f" · due {'by' if upcoming else 'since'} {short_date(oldest)}" if oldest else ""
+        label, url = _pay_shortcut(user, lot) if lot.pk in payable else ("", "")
         out.append(
             Item(
                 "My home",
@@ -760,15 +743,27 @@ def _balance_items(user, roles) -> list[Item]:
                 oldest,
                 nav="my_account",
                 icon="wallet",
-                # Straight to the ways to pay, every open charge included
-                # (the payment page works the amounts out again itself).
-                action_label=f"Pay {format_cents(statement.balance)}" if lot.pk in payable else "",
-                action_url=(
-                    reverse("pay_online", args=[lot.pk]) + "?all=1" if lot.pk in payable else ""
-                ),
+                action_label=label,
+                action_url=url,
             )
         )
     return out
+
+
+def _pay_shortcut(user, lot) -> tuple[str, str]:
+    """The "Pay $X" button: straight to the ways to pay with every open
+    charge the payer can choose, labelled with exactly what that page
+    quotes. When it quotes nothing (say, only charges from before this
+    person's time are open), the button opens the page to type an amount."""
+    from core.money import format_cents
+    from payments.checkout import PaymentError, quote_all
+
+    url = reverse("pay_online", args=[lot.pk])
+    try:
+        q = quote_all(user, lot)
+    except PaymentError:
+        return "Pay online", url + "?choose=1"
+    return f"Pay {format_cents(q.base_cents)}", url + "?all=1"
 
 
 def _payable_online(user) -> frozenset[int]:

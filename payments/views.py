@@ -75,7 +75,7 @@ def pay_online(request, lot_id):
             return render(request, "payments/pay.html", ctx)
         everything = [c.entry.pk for c in ctx["open_charges"]]
         try:
-            q = flow.quote(request.user, lot, charge_ids=everything)
+            q = flow.quote_all(request.user, lot)
         except flow.PaymentError as exc:
             # Nothing open, or below the smallest payment: the choice form
             # says why and still offers a typed amount.
@@ -178,9 +178,15 @@ def payment_receipt(request, pk):
     )
     roles = policy.roles_for(request.user)
     if not policy.can(request.user, "finance.view"):
+        from ledger.accounts import current_account_id
+
         since = roles.lot_since.get(payment.lot_id)
-        if payment.lot_id not in roles.account_lot_ids or (
-            since and timezone.localdate(payment.recorded_at) < since
+        if (
+            payment.lot_id not in roles.account_lot_ids
+            # Only the people of the account it was paid on: a buyer never
+            # sees the seller's receipt, whenever it was recorded (SEC-001).
+            or payment.entry.account_id != current_account_id(payment.lot_id)
+            or (since and timezone.localdate(payment.recorded_at) < since)
         ):
             raise Http404
     from payments.receipts import receipt_pdf

@@ -41,6 +41,7 @@ from payments.providers import config
 logger = logging.getLogger("payments")
 
 OPEN_HOURS = 24
+UNANSWERED_DAYS = 3  # an open checkout Stripe has not answered about for this long
 PROCESSING_DAYS = 14
 WATCH_DAYS = 120  # refunds, disputes and bank returns after a payment
 UNMATCHED_HOURS = 24
@@ -53,7 +54,12 @@ REFUND_TYPES = {"refund", "payment_refund", "payment_failure_refund"}
 
 @internal("payments poll")
 def poll_open_checkouts(now=None) -> int:
-    """Every 15 minutes: checkouts started in the last 24 hours."""
+    """Every 15 minutes: checkouts still open. A checkout is marked expired
+    only from Stripe's answer (the session expired, or is past its time and
+    not paid): while Stripe cannot be asked (network, rate limit), it stays
+    open and is asked again, so a payment made near the end is never lost
+    (R2-004). One Stripe has not answered about for days becomes a board
+    item."""
     if not config().available:
         return 0
     now = now or timezone.now()
@@ -61,15 +67,20 @@ def poll_open_checkouts(now=None) -> int:
     for checkout in PendingCheckout.objects.filter(
         state=CheckoutState.OPEN, session_id__isnull=False
     ):
-        if checkout.created_at < now - datetime.timedelta(hours=OPEN_HOURS):
-            check(checkout)  # one last look; expired if Stripe says so or past its time
-            if checkout.state == CheckoutState.OPEN:
-                PendingCheckout.objects.filter(pk=checkout.pk).update(
-                    state=CheckoutState.EXPIRED, state_changed_at=now
-                )
-            continue
-        check(checkout)
+        check(checkout, now=now)
         count += 1
+        if checkout.state == CheckoutState.OPEN and checkout.created_at < now - (
+            datetime.timedelta(hours=OPEN_HOURS) + datetime.timedelta(days=UNANSWERED_DAYS)
+        ):
+            _alert(
+                AlertKind.MISMATCH,
+                f"unanswered-{checkout.pk}",
+                lot_id=checkout.lot_id,
+                amount=checkout.total_cents,
+                ref=checkout.session_id or "",
+                detail=f"Stripe has not answered about online payment #{checkout.pk} for over "
+                f"{UNANSWERED_DAYS} days. Check it in the Stripe dashboard.",
+            )
     return count
 
 
@@ -127,41 +138,74 @@ def poll_recorded(now=None) -> int:
             _watch(payment)
         except stripe_api.StripeError:
             continue
+        except Exception as exc:  # one payment's problem never stops the others (BUG-004)
+            # The error's type only: its message may carry data.
+            logger.warning(
+                "payments.watch_failed",
+                extra={"payment": payment.pk, "error": type(exc).__name__},
+            )
+            continue
         count += 1
     return count
 
 
-def _watch(payment: StripePayment) -> None:
+def _returned(payment: StripePayment) -> None:
+    """A bank payment returned after it succeeded: reverse it on the account
+    and tell the board, all or nothing, with the "seen" mark in the same
+    transaction (BUG-004), so a failure is tried again on the next run. If
+    part of it is recorded as refunded, the portal does not guess (did the
+    refund go out before the return?): the board gets an item to reverse it
+    by hand."""
     from ledger import services as ledger
     from ledger.models import LedgerEntry
 
+    with transaction.atomic():
+        if not _event(payment, EventKind.RETURNED, payment.charge_id, payment.base_cents):
+            return
+        done = LedgerEntry.objects.filter(reverses=payment.entry).exists()
+        if not done:
+            try:
+                with transaction.atomic():
+                    ledger.reverse_entry(
+                        payment.entry, reason="Bank payment returned (Stripe)", actor=SYSTEM
+                    )
+                done = True
+            except ledger.LedgerError:
+                done = False
+        amount = format_cents(payment.base_cents)
+        if done:
+            detail = (
+                f"Bank payment of {amount} on lot {payment.lot.number} was returned; the "
+                "payment was reversed on the account."
+            )
+        else:
+            detail = (
+                f"Bank payment of {amount} on lot {payment.lot.number} was returned, but part "
+                "of it is recorded as refunded. Check at Stripe whether that refund went out; "
+                "reverse the refund entry if it did not, then reverse the payment."
+            )
+        _alert(
+            AlertKind.RETURNED,
+            payment.charge_id,
+            lot_id=payment.lot_id,
+            amount=payment.base_cents,
+            ref=payment.payment_intent_id,
+            detail=detail,
+        )
+        record_event(
+            "payments.returned" if done else "payments.return_needs_board",
+            actor=None,
+            target=payment.checkout,
+            metadata={"lot_id": payment.lot_id, "checkout_id": payment.checkout_id},
+        )
+
+
+def _watch(payment: StripePayment) -> None:
     charge = stripe_api.retrieve_charge(payment.charge_id)
     if bool(charge.get("livemode")) != payment.livemode:
         return
-    if charge.get("status") == "failed" and _event(
-        payment, EventKind.RETURNED, payment.charge_id, payment.base_cents
-    ):
-        # A bank payment returned after it succeeded: reverse it in the ledger.
-        with transaction.atomic():
-            if not LedgerEntry.objects.filter(reverses=payment.entry).exists():
-                ledger.reverse_entry(
-                    payment.entry, reason="Bank payment returned (Stripe)", actor=SYSTEM
-                )
-            _alert(
-                AlertKind.RETURNED,
-                payment.charge_id,
-                lot_id=payment.lot_id,
-                amount=payment.base_cents,
-                ref=payment.payment_intent_id,
-                detail=f"Bank payment of {format_cents(payment.base_cents)} on lot "
-                f"{payment.lot.number} was returned; the payment was reversed on the account.",
-            )
-            record_event(
-                "payments.returned",
-                actor=None,
-                target=payment.checkout,
-                metadata={"lot_id": payment.lot_id, "checkout_id": payment.checkout_id},
-            )
+    if charge.get("status") == "failed":
+        _returned(payment)
     for refund in stripe_api.list_refunds(payment.charge_id).get("data") or []:
         if not isinstance(refund, dict) or refund.get("status") not in ("succeeded", "pending"):
             continue

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import datetime
 import re
 from dataclasses import dataclass
@@ -19,7 +21,7 @@ from core.policy import SYSTEM, require
 from core.scoping import internal, system_access
 from core.workflow import Transition, Workflow
 from ledger import accounts
-from ledger.accounts import ALL, CURRENT, account_q
+from ledger.accounts import ALL, CURRENT, MOVED_AWAY, account_q
 from ledger.models import (
     Budget,
     BudgetLine,
@@ -112,8 +114,13 @@ def owner_statement(lot_id: int, since: datetime.date | None, *, account=CURRENT
     """What a current owner sees: their ownership account (today's, by
     default; D33-acctfix-1), entries from their ownership start, with any
     earlier balance on that account shown as one 'brought forward' line (not
-    the detail). Another account's money (a former owner's) is never in it."""
-    qs = LedgerEntry.objects.filter(lot_id=lot_id).filter(account_q(lot_id, account))
+    the detail). Another account's money (a former owner's) is never in it,
+    nor an entry moved to another account with its reversal (D34-fixmoney-1)."""
+    qs = (
+        LedgerEntry.objects.filter(lot_id=lot_id)
+        .filter(account_q(lot_id, account))
+        .exclude(MOVED_AWAY)
+    )
     since = since or datetime.date(1900, 1, 1)
     forward = qs.filter(posted_on__lt=since).aggregate(s=Sum("amount_cents"))["s"] or 0
     entries = list(qs.filter(posted_on__gte=since))
@@ -134,8 +141,14 @@ def period_statement(
     before their time and the balance on the day they sold. Nothing from
     after the sale, except, with ``include_after_end`` (their account went
     dormant with them, so nobody else is on it), later entries on that
-    account, such as the board refunding a credit."""
-    qs = LedgerEntry.objects.filter(lot_id=lot_id).filter(account_q(lot_id, account))
+    account, such as the board refunding a credit. An entry moved to the
+    buyer's account (a sale recorded later with an earlier date) and its
+    reversal are left out: they were never this owner's (D34-fixmoney-1)."""
+    qs = (
+        LedgerEntry.objects.filter(lot_id=lot_id)
+        .filter(account_q(lot_id, account))
+        .exclude(MOVED_AWAY)
+    )
     forward = qs.filter(posted_on__lt=start).aggregate(s=Sum("amount_cents"))["s"] or 0
     entries = qs.filter(posted_on__gte=start)
     if end is not None and not include_after_end:
@@ -368,15 +381,28 @@ def record_payment(
 
 @internal("ledger service")
 def record_online_payment(
-    *, lot: Lot, amount_cents: int, received_on, payment_intent_id: str, apply_to, actor
+    *,
+    lot: Lot,
+    amount_cents: int,
+    received_on,
+    payment_intent_id: str,
+    apply_to,
+    actor,
+    account_id: int | None = None,
 ) -> LedgerEntry:
     """Only for payments.sync, after Stripe confirmed the payment (actor is
-    SYSTEM; no form or view reaches this)."""
+    SYSTEM; no form or view reaches this). ``account_id``: the account of
+    the person who paid (stored on the checkout when they started it), kept
+    even if the home was sold meanwhile (BUG-003, D34-fixmoney-1); the
+    chosen charges are that account's. Without it, the account of
+    ``received_on``."""
     if actor is not SYSTEM:
         raise PermissionError("Online payments are recorded only by the Stripe sync.")
     if amount_cents <= 0 or not payment_intent_id:
         raise LedgerError("An online payment needs an amount and its Stripe reference.")
-    account_id = accounts.account_on(lot.pk, received_on)
+    account_id = accounts.check_account(lot.pk, account_id)
+    if account_id is None:
+        account_id = accounts.account_on(lot.pk, received_on)
     open_ids = {c.entry.pk for c in _allocation().open_charges(lot.pk, account=account_id)}
     entry = _post_payment(
         lot,
@@ -622,6 +648,100 @@ def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> Le
         metadata={"lot_id": entry.lot_id, "reverses": entry.pk},
     )
     return reversal
+
+
+# --- Moving entries after a sale recorded with an earlier date (D34-fixmoney-1) -------------
+
+_period_change: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "ledger_period_change", default=None
+)
+
+
+@contextlib.contextmanager
+def account_periods_change(lot_id: int, *, actor, request=None):
+    """Wrap a change to a lot's ownership account periods (community
+    services: recording or ending an ownership, a transfer). When the outer
+    change is done, entries already posted that now belong to another
+    account are moved there (``move_entries``). Nested changes of the same
+    lot are handled once, by the outermost."""
+    active = _period_change.get()
+    if active is not None and lot_id in active:
+        yield
+        return
+    token = _period_change.set({**(active or {}), lot_id: True})
+    try:
+        before = accounts.periods(lot_id)
+        yield
+        move_entries(lot_id, before, actor=actor, request=request)
+    finally:
+        _period_change.reset(token)
+
+
+@internal("ledger service")
+def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[LedgerEntry]:
+    """Move to the right ownership account every entry the old account
+    periods (``before``) had put on another one (ledger.accounts.
+    moves_after_change). Each move is two new entries and never changes an
+    amount: a reversal on the old account, dated like the original, and a
+    copy on the new account (``moved_from``), same date, kind, amount,
+    reference and month. A payment that was applied to charges that moved
+    too is applied to their copies. Returns the copies."""
+    from ledger import allocation
+
+    plan = accounts.moves_after_change(lot_id, before)
+    if not plan:
+        return []
+    from community.models import Account
+
+    numbers = dict(Account.objects.filter(lot_id=lot_id).values_list("pk", "number"))
+    copies: dict[int, int] = {}
+    out = []
+    with transaction.atomic():
+        for entry, target in plan:
+            directed = [
+                copies[c]
+                for c, _cents in allocation.applications_of(entry.pk)
+                if c in copies and entry.amount_cents < 0
+            ]
+            LedgerEntry.objects.create(
+                lot_id=lot_id,
+                posted_on=entry.posted_on,
+                kind=EntryKind.REVERSAL,
+                amount_cents=-entry.amount_cents,
+                reverses=entry,
+                description=f"Moved to account {numbers.get(target, target)}: #{entry.pk}"[:200],
+                posted_by=_user(actor),
+            )
+            copy = LedgerEntry(
+                lot_id=lot_id,
+                account_id=target,
+                posted_on=entry.posted_on,
+                kind=entry.kind,
+                amount_cents=entry.amount_cents,
+                description=entry.description,
+                reference=entry.reference,
+                period=entry.period,
+                moved_from=entry,
+                posted_by=_user(actor),
+            )
+            copy._apply_to = directed
+            copy.save()
+            copies[entry.pk] = copy.pk
+            out.append(copy)
+        record_event(
+            "ledger.entries_moved",
+            actor=_user(actor),
+            request=request,
+            metadata={
+                "lot_id": lot_id,
+                "count": len(out),
+                "from_accounts": ",".join(
+                    str(a) for a in sorted({e.account_id for e, _t in plan if e.account_id})
+                ),
+                "to_accounts": ",".join(str(a) for a in sorted({t for _e, t in plan})),
+            },
+        )
+    return out
 
 
 # --- Aging (credits applied to the oldest charges first) ------------------------------------
@@ -935,7 +1055,10 @@ def _actual_for(line: BudgetLine, months) -> list[int]:
             }
             total = (
                 LedgerEntry.objects.filter(
-                    kind__in=kinds[line.income_source], posted_on__year=year, posted_on__month=month
+                    kind__in=kinds[line.income_source],
+                    posted_on__year=year,
+                    posted_on__month=month,
+                    reversed_by__isnull=True,
                 ).aggregate(s=Sum("amount_cents"))["s"]
                 or 0
             )
@@ -1300,7 +1423,15 @@ def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
             open_cents = _allocation().state_as_of(entry.lot_id, on).open.get(entry.pk, 0)
             if open_cents <= 0:
                 continue  # this month's dues are paid (or reversed)
-            out.append({"lot": entry.lot, "balance_cents": open_cents, "late_from": late_from})
+            out.append(
+                {
+                    "lot": entry.lot,
+                    "balance_cents": open_cents,
+                    "late_from": late_from,
+                    # The fee belongs with the dues it penalises (BUG-002).
+                    "account_id": entry.account_id,
+                }
+            )
     return out
 
 
@@ -1327,6 +1458,7 @@ def post_late_fees(*, year: int, month: int, actor, request=None, on=None) -> in
             with transaction.atomic():
                 LedgerEntry.objects.create(
                     lot=row["lot"],
+                    account_id=row["account_id"],
                     posted_on=on or timezone.localdate(),
                     kind=EntryKind.LATE_FEE,
                     amount_cents=fee,
