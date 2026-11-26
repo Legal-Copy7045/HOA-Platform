@@ -238,6 +238,7 @@ REGISTRY: dict[str, RuleSpec] = {
             "On: new owners choose email or post when they sign up, and owners who have not "
             "answered see a to-do. Official notices are always emailed only to owners who "
             "agreed; everyone else gets paper. Turning this off only stops asking.",
+        ),
         # Automatic payments (D46): a safety ceiling, not a fee.
         RuleSpec(
             "payments.autopay_ceiling_percent",

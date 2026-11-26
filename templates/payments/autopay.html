@@ -3,7 +3,7 @@
 {% block title %}Pay assessments automatically · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'my_account' %}">My account</a> / Pay assessments automatically</div>
-  <div class="page-head"><div><h1>Pay assessments automatically</h1><p class="subtitle">Lot {{ lot.number }}. Each monthly assessment is paid on its due day from a bank account or card you save on Stripe's secure page. Late fees and other charges are never paid automatically.</p></div></div>
+  <div class="page-head"><div><h1>Pay assessments automatically</h1><p class="subtitle">{{ lot.label }}. Each monthly assessment is paid on its due day from a bank account or card you save on Stripe's secure page. Late fees and other charges are never paid automatically.</p></div></div>
   {% include "payments/_test_banner.html" %}
   <section class="card" data-testid="autopay-status">
     <h2>Now</h2>

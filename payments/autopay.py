@@ -241,7 +241,7 @@ def session_params(setup: AutopaySetup, lot_number: str) -> dict:
         "metadata": _metadata(setup),
         "setup_intent_data": {
             "metadata": _metadata(setup),
-            "description": f"Automatic HOA assessment payments, lot {lot_number}",
+            "description": f"Automatic HOA assessment payments, {lot_number}",
         },
         "payment_method_types": [setup.method_type],
         "success_url": back + "?session_id={CHECKOUT_SESSION_ID}",
@@ -301,7 +301,7 @@ def start_setup(user, lot, *, method_type: str, request=None) -> str:
     )
     try:
         session = stripe_api.create_checkout_session(
-            session_params(setup, lot.number),
+            session_params(setup, lot.label),
             idempotency_key=f"autopay-setup-{setup.pk}-{setup.nonce[:24]}",
         )
     except stripe_api.StripeError as exc:
@@ -683,9 +683,10 @@ def _hold_back(account, period: str, base: int, ceiling: int) -> None:
         f"autopay-{account.pk}-{period}",
         lot_id=account.lot_id,
         amount=base,
-        detail=f"Automatic payment of {format_cents(base)} for {period} on lot "
-        f"{account.lot.number} was not charged: it is above the ceiling of "
-        f"{format_cents(ceiling)}. Check the account and the monthly assessment amount in Community settings.",
+        detail=f"Automatic payment of {format_cents(base)} for {period} on "
+        f"{account.lot.label} was not charged: it is above the ceiling of "
+        f"{format_cents(ceiling)}. Check the account and the monthly assessment "
+        "amount in Community settings.",
     )
     if alert is not None:
         record_event(
@@ -804,7 +805,7 @@ def intent_params(attempt: AutopayAttempt, event: AutopayEvent, lot_number: str)
         "off_session": True,
         "confirm": True,
         "metadata": metadata,
-        "description": f"HOA assessment {attempt.period}, lot {lot_number} (automatic payment)",
+        "description": f"HOA assessment {attempt.period}, {lot_number} (automatic payment)",
     }
     if event.mandate_id:
         params["mandate"] = event.mandate_id
@@ -823,7 +824,7 @@ def _submit(attempt: AutopayAttempt, *, late: bool = False) -> None:
     key = attempt.idempotency_key + ("-late" if late else "")
     try:
         created = stripe_api.create_payment_intent(
-            intent_params(attempt, event, attempt.lot.number), idempotency_key=key
+            intent_params(attempt, event, attempt.lot.label), idempotency_key=key
         )
     except stripe_api.StripeError as exc:
         if exc.status == 0 or exc.status >= 500 or exc.status == 429:
@@ -1008,7 +1009,7 @@ def _email_failure(attempt, checkout, *, retry: bool, paused: bool) -> None:
         next_step = "Please pay now from My account, or update your payment method."
     body = "\n".join(
         [
-            f"Your automatic payment for lot {lot.number} didn't go through.",
+            f"Your automatic payment for {lot.label} didn't go through.",
             "",
             f"  Assessment {attempt.period}: {format_cents(checkout.base_cents)}"
             + (
@@ -1394,7 +1395,7 @@ def payer_items(user) -> list:
         out.append(
             Item(
                 "My home",
-                f"Your automatic payment didn't go through (lot {lot.number})",
+                f"Your automatic payment didn't go through ({lot.label})",
                 detail,
                 reverse("autopay", args=[lot.pk]),
                 "warning",
