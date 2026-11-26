@@ -9,6 +9,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 |---|---|---|
 | Dashboard | The home page after sign-in: to-dos first, then numbers. | `home`, `core/dashboard.py` |
 | Needs your attention / My items | Everything waiting on you. The dashboard list, the My items page, the Board overview counts and the menu bubbles all come from one list. | `core.my_items.items_for` |
+| Search | The search box at the top of the menu and its results page: finds announcements, documents, meetings, requests and more, grouped by area. Shows only what you can already open. | `core/search.py`, `<app>/search.py` |
 | My home | Your lot, the people on your account. | `my_lot` |
 | My account | Your dues statement and balance. The board's view of every lot is **Owner accounts**. | `ledger` |
 | Account number | The number of one ownership period of a lot (changes when the lot is sold). Shown as plain text, not a badge. | `Account.number` |

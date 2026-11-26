@@ -111,6 +111,8 @@ MEMBER_PAGES = {
     "community_info",
     # Surveys (M5): the list shows only surveys for the viewer's audience.
     "surveys",
+    # Portal search (core.search): see also test_search_never_shows_board_only_content.
+    "search",
 }
 
 # Detail pages every member may open by design (community-wide, not lot
@@ -818,6 +820,30 @@ def test_member_pages_hide_board_only_content_from_owners(client, world, name):
     assert response.status_code == 200
     for secret in BOARD_ONLY_MARKERS:
         assert secret not in response.content
+
+
+@pytest.mark.parametrize(
+    "q", ["Lot B", "Board", "pond", "counsel", "Executive", "audit", "Draft", "nephew", "Bravo"]
+)
+def test_search_never_shows_board_only_content(client, world, q):
+    """Searching for words from owner B's and board-only records finds none of
+    them for owner A (the <mark> highlight is removed before checking)."""
+    client.force_login(world["owner_a"])
+    response = client.get(reverse("search"), {"q": q})
+    assert response.status_code == 200
+    page = response.content.replace(b"<mark>", b"").replace(b"</mark>", b"")
+    for secret in BOARD_ONLY_MARKERS:
+        assert secret not in page
+    assert b"2 Bravo Way" not in page
+
+
+def test_board_search_finds_the_same_records(client, world):
+    """Positive control for the test above: the words do find these records."""
+    client.force_login(world["board"])
+    page = client.get(reverse("search"), {"q": "Lot B"}).content
+    page = page.replace(b"<mark>", b"").replace(b"</mark>", b"")
+    for secret in (b"Lot B hot tub", b"Lot B boat in driveway", b"Lot B leaking gutter"):
+        assert secret in page
 
 
 def test_export_contains_only_my_own_records(client, world):

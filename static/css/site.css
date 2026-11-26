@@ -485,3 +485,15 @@ details.menu-details > .panel-body br { display: none; }
 .group-pinned { border-color: var(--green-700); }
 fieldset.choices { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; }
 fieldset.choices legend { padding: 0; margin-bottom: .4rem; }
+
+/* ---------- Search (core.search) ---------- */
+.nav-search { display: flex; gap: .35rem; margin: 0 .9rem .4rem; }
+.nav-search input { flex: 1; min-width: 0; min-height: 44px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .25); color: #fff; }
+.nav-search input::placeholder { color: #a9cbb7; }
+.nav-search button { min-height: 44px; min-width: 44px; padding: 0 .6rem; background: transparent; border: 1px solid rgba(255, 255, 255, .35); color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+.nav-search input:focus-visible, .nav-search button:focus-visible { outline-color: #f2c14e; }
+.topbar-search { margin-left: auto; color: #fff; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 8px; }
+.topbar-search:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.search-results mark { background: var(--warning-bg); color: inherit; padding: 0 .1em; border-radius: 3px; }
+.search-snippet { color: var(--ink-2); overflow-wrap: anywhere; margin-top: .15rem; }
+.search-results .title { overflow-wrap: anywhere; }
