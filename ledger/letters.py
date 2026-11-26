@@ -20,6 +20,7 @@ from django.utils import timezone
 
 from community.models import Account, CommunityProfile, ContactProfile, Lot, Ownership
 from community.rules import rule
+from community.terms import term_text
 from core import pdf
 from core.money import format_cents
 from core.scoping import system_access
@@ -48,18 +49,18 @@ DEFAULTS = {
     LetterKind.FIRST: (
         "DELINQUENT NOTICE",
         "According to the Association's records, your account shows a delinquency of {amount} "
-        "for the monthly assessments and/or late fees. The Association depends on every owner "
-        "paying their share of the assessments on time to keep up the community.\n\n"
+        "for the monthly {terms} and/or late fees. The Association depends on every owner "
+        "paying their share of the {terms} on time to keep up the community.\n\n"
         "Please bring your account current within {days} days from the date of this letter.\n\n"
         "If your records show a different amount, please review the attached statement of your "
         "account and contact {contact} right away so that we can look into it.",
         False,
     ),
     LetterKind.SECOND: (
-        "DELINQUENT ASSOCIATION DUES - SECOND NOTICE",
+        "DELINQUENT ASSOCIATION {TERMS} - SECOND NOTICE",
         "According to the Association's records, your account shows a delinquency of {amount} "
-        "for the monthly assessments and/or late fees. The Association depends on every owner "
-        "paying their share of the assessments on time.\n\n"
+        "for the monthly {terms} and/or late fees. The Association depends on every owner "
+        "paying their share of the {terms} on time.\n\n"
         "If payment is not received within {days} days from the date of this letter, the "
         "Association may refer the account for collection, which may include legal action.\n\n"
         "If your records show a different amount, please review the attached statement of your "
@@ -96,6 +97,8 @@ def template(kind: str) -> LetterTemplate:
     if found:
         return found
     subject, body, certified = DEFAULTS[kind]
+    # The default wording names the charge with the board's word (D40).
+    subject, body = term_text(subject), term_text(body)
     default = LetterTemplate(kind=kind, subject=subject, body=body, certified=certified)
     default.is_default = True
     return default
@@ -235,7 +238,9 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
     ]
     for i, line in enumerate(remit[:5]):
         paras.append(("mono", line[:40].ljust(42) + (tips[i] if i < len(tips) else "")))
-    paras.append(("small", f"Monthly dues are due on day {due_day} of each month."))
+    paras.append(
+        ("small", term_text(f"The monthly {{term}} is due on day {due_day} of each month."))
+    )
     return paras, balance
 
 

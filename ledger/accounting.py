@@ -25,6 +25,7 @@ from audit.services import record_event
 from comms.notify import send_now
 from community.models import Lot
 from community.rules import rule
+from community.terms import term_text
 from core.lists import safe_cell
 from core.money import format_cents
 from core.policy import SYSTEM, require
@@ -64,7 +65,7 @@ def _cents(value) -> str:
 GL_LABELS = {
     "cash": "Bank (operating cash)",
     "receivable": "Owner receivables",
-    "assessment": "Dues (assessment) income",
+    "assessment": "{Term} income",
     "late_fee": "Late fee income",
     "resale_fee": "Resale certificate fees",
     "other_charge": "Other owner charges",
@@ -79,7 +80,7 @@ GL_LABELS = {
 def gl_rows(setup: AccountingSetup) -> list[dict]:
     accounts = setup.accounts()
     return [
-        {"key": key, "label": label, "value": accounts.get(key, "")}
+        {"key": key, "label": term_text(label), "value": accounts.get(key, "")}
         for key, label in GL_LABELS.items()
     ]
 

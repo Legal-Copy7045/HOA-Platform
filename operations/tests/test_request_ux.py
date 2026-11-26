@@ -52,7 +52,7 @@ def test_owner_form_first_with_address_and_type_descriptions(client, w):
     assert page.index('id="new-request"') < page.index('aria-label="Filter"')
     assert "12 Oak Creek Drive" in page
     assert '<select name="lot"' not in page  # one home: no dropdown
-    assert "Your dues, a charge or a payment on your account." in page
+    assert "Your assessment, a charge or a payment on your account." in page
     assert 'type="radio" name="request_type"' in page
     assert "Filter the list" not in page  # no date filters for owners
     assert 'accept="image/*,application/pdf" multiple' in page

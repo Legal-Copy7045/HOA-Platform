@@ -63,7 +63,7 @@ def test_charges_get_a_stable_number_and_dues_a_month_title(w):
     first = _charge(w, on=D(2026, 4, 1))
     second = _charge(w, on=D(2026, 4, 2))
     views = allocation.open_charges(w["lot"].pk)
-    assert [v.title for v in views] == [f"Dues {DASH} March 2026", "Pool key", "Pool key"]
+    assert [v.title for v in views] == [f"Assessment {DASH} March 2026", "Pool key", "Pool key"]
     labels = [v.label for v in views]
     assert labels[0].startswith("Invoice 2026-") and len(set(labels)) == 3
     with system_access("t"):
@@ -125,7 +125,7 @@ def test_prepayment_stays_as_credit_and_draws_down_as_months_post(w):
     services.post_monthly_assessments(year=2026, month=3, actor=w["board"])
     services.post_monthly_assessments(year=2026, month=4, actor=w["board"])
     (april,) = allocation.open_charges(w["lot"].pk)
-    assert april.title == f"Dues {DASH} April 2026" and april.open_cents == 4500
+    assert april.title == f"Assessment {DASH} April 2026" and april.open_cents == 4500
     _invariant(w["lot"].pk)
 
 

@@ -12,6 +12,7 @@ from audit.services import record_event
 from community.account_views import my_account_people
 from community.models import Lot
 from community.rules import rule, rule_with_citation
+from community.terms import term_text
 from core import features, policy
 from core.money import MoneyField, format_cents
 from core.workflow import WorkflowError
@@ -276,7 +277,7 @@ def ledger_home(request):
             lambda: services.post_monthly_assessments(
                 year=year, month=month, actor=request.user, request=request
             ),
-            "Assessments posted (lots already charged for that month were skipped).",
+            term_text("Monthly {term} posted (homes already charged for that month were skipped)."),
         )
         return redirect("ledger_home")
     bal = services.balances()

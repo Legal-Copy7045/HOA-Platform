@@ -239,6 +239,14 @@ _SPECS = [
     _spec("ledger.credit_posted", "Credit posted", "lot_id", "amount_cents"),
     _spec("ledger.entry_reversed", "Ledger entry reversed", "lot_id", "reverses"),
     _spec("ledger.statement_downloaded", "Statement downloaded", "lot_id"),
+    # D40: one per account and month; counts only, never addresses.
+    _spec(
+        "ledger.statement_emailed",
+        "Monthly statement emailed",
+        "account_id",
+        "period",
+        "recipients",
+    ),
     _spec("collection.opened", "Collection case opened", "lot_id", "balance_cents"),
     _spec("budget.created", "Budget created", "fiscal_year"),
     _spec("budget.line_added", "Budget line added", "kind", "annual_cents"),

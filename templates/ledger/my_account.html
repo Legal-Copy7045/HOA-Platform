@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}My account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>My account</h1><p class="subtitle">Dues are charged on the 1st of each month. Payments made in advance are kept as a credit and used up month by month.</p></div></div>
+  <div class="page-head"><div><h1>My account</h1><p class="subtitle">{% term "Terms" %} are charged on the 1st of each month. Payments made in advance are kept as a credit and used up month by month.</p></div></div>
   {% include "payments/_test_banner.html" %}
   {% for a in accounts %}
     <section class="card">

@@ -453,11 +453,14 @@ def community_settings(request):
     policy.require(request.user, "lot.view_all")
     from community import pa_law
     from community.models import CommonArea, CommunityProfile, GoverningRule
-    from community.rules import REGISTRY, cents_display, rule_origin
+    from community.rules import REGISTRY, cents_display, group_title, rule_origin
+    from community.terms import charge_term, term_text
 
     rows = {r.key: r for r in GoverningRule.objects.all()}
     needing = {s.key for s in rules_needing_attention()}
+    term = charge_term()
     groups: dict[str, list] = {}
+    group_notes: dict[str, str] = {}
     for spec in REGISTRY.values():
         row = rows.get(spec.key)
         guide = pa_law.guide(spec.key)
@@ -465,9 +468,15 @@ def community_settings(request):
         raw = row.value if row and row.value != "" else (spec.default or "")
         effective = raw or (guide.fallback if guide and origin == "pa_law" else "")
         shown = cents_display(int(effective)) if spec.kind == "cents" and effective else effective
-        groups.setdefault(spec.group, []).append(
+        # The "Dues" group is headed with the board's word (D40).
+        title = group_title(spec.group, term)
+        if spec.group in pa_law.GROUP_NOTES:
+            group_notes[title] = pa_law.GROUP_NOTES[spec.group]
+        groups.setdefault(title, []).append(
             {
                 "spec": spec,
+                "label": term_text(spec.label, term),
+                "help": term_text(spec.help, term),
                 "row": row,
                 # Money is typed in dollars, like every other money field.
                 "raw": _dollars(raw) if spec.kind == "cents" and raw.lstrip("-").isdigit() else raw,
@@ -493,7 +502,7 @@ def community_settings(request):
         {
             "groups": groups,
             "attention": attention,
-            "group_notes": pa_law.GROUP_NOTES,
+            "group_notes": group_notes,
             "pa_disclaimer": pa_law.DISCLAIMER,
             "profile_form": forms.ProfileForm(
                 initial={
@@ -565,7 +574,7 @@ def community_rule_save(request):
     saved = "Rule saved."
     if spec is not None and spec.kind == "cents" and form.cleaned_data["value"]:
         unit = f" {MONEY_UNITS[spec.key]}" if spec.key in MONEY_UNITS else ""
-        saved = f"Saved: {spec.label} = {_money(form.cleaned_data['value'])}{unit}."
+        saved = f"Saved: {spec.shown_label} = {_money(form.cleaned_data['value'])}{unit}."
     return _done(request, saved, back + f"#rule-{spec.key}" if spec else back)
 
 

@@ -16,25 +16,29 @@ from core.search import LIMIT, Result, contains, matching, register, snippet
 @register("rules", "Community rules", url_name="community_settings")
 def rules(user, q):
     from community.models import GoverningRule
-    from community.rules import REGISTRY
+    from community.rules import REGISTRY, group_title
+    from community.terms import charge_term, term_text
 
     if not policy.can(user, "lot.view_all"):
         return []
     rows = {r.key: r for r in GoverningRule.objects.all()}
+    term = charge_term()
     out = []
     for spec in REGISTRY.values():
         row = rows.get(spec.key)
         citation = row.citation if row else ""
         notes = row.notes if row else ""
-        if not contains(q, spec.label, spec.help, spec.group, citation, notes):
+        label, help_text = term_text(spec.label, term), term_text(spec.help, term)
+        group = group_title(spec.group, term)
+        if not contains(q, label, help_text, group, citation, notes):
             continue
         out.append(
             Result(
-                title=spec.label,
+                title=label,
                 url=reverse("community_settings"),
-                snippet=snippet(q, spec.help, citation, notes),
+                snippet=snippet(q, help_text, citation, notes),
                 date=row.updated_at if row else None,
-                detail=spec.group + (f" · {citation}" if citation else ""),
+                detail=group + (f" · {citation}" if citation else ""),
             )
         )
     return out[:LIMIT]

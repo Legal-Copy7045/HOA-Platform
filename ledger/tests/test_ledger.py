@@ -42,7 +42,7 @@ def test_monthly_dues_post_once_per_lot_per_month(w):
 
 def test_dues_need_the_rule():
     board = make_member(board=True)
-    with pytest.raises(services.LedgerError, match="monthly dues"):
+    with pytest.raises(services.LedgerError, match="monthly assessment"):
         services.post_monthly_assessments(year=2026, month=1, actor=board)
 
 
@@ -149,7 +149,9 @@ def test_new_owner_starts_clean_and_the_sellers_arrears_stay_on_the_old_account(
     assert services.balance(w["lot"].pk) == 4500  # still on the lot, on the seller's account
     client.force_login(buyer)
     page = client.get(reverse("my_account")).content.decode()
-    assert "Balance brought forward" not in page and "Assessment January 2026" not in page
+    assert (
+        "Balance brought forward" not in page and "Assessment \N{EN DASH} January 2026" not in page
+    )
     assert "Paid up" in page
     client.force_login(w["board"])
     page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
