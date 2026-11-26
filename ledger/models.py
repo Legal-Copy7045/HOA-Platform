@@ -60,6 +60,13 @@ class LedgerEntry(ScopedAppendOnlyModel):
     reverses = models.OneToOneField(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="reversed_by"
     )
+    # Set on the copy of an entry moved to the ownership account it belongs
+    # to after the account periods changed (a sale recorded with an earlier
+    # date, D34-fixmoney-1): the original is reversed on its old account and
+    # this copy, same date, kind and amount, is posted on the right one.
+    moved_from = models.OneToOneField(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="moved_to"
+    )
     posted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
@@ -74,12 +81,12 @@ class LedgerEntry(ScopedAppendOnlyModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["lot", "period"],
-                condition=models.Q(kind="assessment"),
+                condition=models.Q(kind="assessment", moved_from__isnull=True),
                 name="one_assessment_per_lot_per_month",
             ),
             models.UniqueConstraint(
                 fields=["lot", "period"],
-                condition=models.Q(kind="late_fee") & ~models.Q(period=""),
+                condition=models.Q(kind="late_fee", moved_from__isnull=True) & ~models.Q(period=""),
                 name="one_late_fee_per_lot_per_month",
             ),
             models.CheckConstraint(

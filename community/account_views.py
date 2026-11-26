@@ -247,6 +247,23 @@ def owner_account_panel(user, lot_id) -> dict:
     return data
 
 
+def _period_account(accounts, start, end):
+    """Of a former owner's accounts on one lot, the one for the ownership
+    period ``start``..``end``."""
+
+    def overlap(a) -> int:
+        lo = max(a.opened_on, start)
+        hi = min(a.closed_on or end, end)
+        return (hi - lo).days
+
+    covering = [
+        a for a in accounts if a.opened_on <= start and (a.closed_on is None or a.closed_on > start)
+    ]
+    if covering:
+        return covering[-1]
+    return max(accounts, key=overlap, default=None)
+
+
 @login_required
 def my_history(request):
     """Former owners: their own records from their time, read-only."""
@@ -261,11 +278,15 @@ def my_history(request):
     periods = []
     for lot_id, start, end in roles.former_periods:
         with system_access("my history"):
-            account = (
+            # The account of this period (someone who sold, bought back and
+            # sold again has one per period, BUG-010): the one open on the
+            # day the period started, else the one overlapping it most.
+            mine = list(
                 Account.objects.filter(pk__in=roles.former_account_ids, lot_id=lot_id)
                 .select_related("lot")
-                .first()
+                .order_by("opened_on", "id")
             )
+            account = _period_account(mine, start, end)
             lot = account.lot if account else None
         # Their own ownership account only (D33-acctfix-1). Once it is
         # dormant nobody else is on it, so later entries on it (a refund of

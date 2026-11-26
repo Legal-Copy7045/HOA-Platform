@@ -355,6 +355,89 @@ def backfill(entry_model, application_model, number_model, *, qs=None) -> dict[s
     return {"applications": created, "numbers": len(new_numbers)}
 
 
+def redate_reversal_reapplications(entry_model, application_model, *, qs=None) -> int:
+    """Correct the dates migration 0012 gave to money re-applied when a
+    reversal freed it (BUG-005), by new append-only rows (migration 0017).
+
+    When a reversal posted, the money it freed was applied again to other
+    charges in the same step; 0012 dated those rows by the later of their two
+    entries, which can be before the reversal, so a view as of a date
+    between the two counted the payment twice. Each row's step is found
+    again: rows rebuilt by migration 0009 by replaying the history as 0009
+    did, any other row by the newest entry posted before it was made. A row
+    made in a reversal's step, positive, not involving the reversal itself
+    and dated before it, gets two new rows: one undoing it from its old date,
+    one applying it again from the reversal's date. Totals never change.
+    Returns the number of rows corrected."""
+    qs = qs or (lambda model: model.objects.all())
+    fixed = 0
+    lot_ids = sorted(set(qs(application_model).values_list("lot_id", flat=True).distinct()))
+    for lot_id in lot_ids:
+        entries = {
+            e.pk: e for e in qs(entry_model).filter(lot_id=lot_id).order_by("created_at", "id")
+        }
+        timeline = sorted(entries.values(), key=lambda e: (e.created_at, e.pk))
+        rows = list(qs(application_model).filter(lot_id=lot_id).order_by("id"))
+        rebuilt = [r for r in rows if r.kind == MIGRATION]
+        trigger: dict[int, int] = {}
+        if rebuilt:
+            # Migration 0009's rows, in order: replay the entries that existed
+            # then, as 0009 did (default rule, no accounts yet).
+            first = min(r.created_at for r in rebuilt)
+            book = LotBook()
+            expected = []
+            for e in sorted(entries.values(), key=lambda e: e.pk):
+                if e.created_at > first:
+                    continue
+                step = _Entry(e.pk, e.kind, e.amount_cents, e.posted_on, e.reverses_id, None)
+                expected += [
+                    (s, c, cents, e.pk) for s, c, cents, _k in book.post(step, kind=MIGRATION)
+                ]
+            for row, (s, c, cents, made_by) in zip(rebuilt, expected, strict=False):
+                if (row.source_id, row.charge_id, row.amount_cents) != (s, c, cents):
+                    break
+                trigger[row.pk] = made_by
+        for row in rows:
+            if row.kind == MIGRATION:
+                continue
+            made_by = None
+            for e in timeline:
+                if e.created_at > row.created_at:
+                    break
+                made_by = e.pk
+            if made_by is not None:
+                trigger[row.pk] = made_by
+        new = []
+        for row in rows:
+            step = entries.get(trigger.get(row.pk))
+            if (
+                step is None
+                or row.amount_cents <= 0
+                or row.kind not in (AUTO, MIGRATION)
+                or not step.reverses_id
+                or step.pk in (row.source_id, row.charge_id)
+                or step.posted_on <= row.effective_on
+            ):
+                continue
+            for cents, on in (
+                (-row.amount_cents, row.effective_on),
+                (row.amount_cents, step.posted_on),
+            ):
+                new.append(
+                    application_model(
+                        lot_id=lot_id,
+                        source_id=row.source_id,
+                        charge_id=row.charge_id,
+                        amount_cents=cents,
+                        kind=MIGRATION,
+                        effective_on=on,
+                    )
+                )
+            fixed += 1
+        application_model.objects.bulk_create(new)
+    return fixed
+
+
 # --- Reading ---------------------------------------------------------------------------
 
 MONTHS = [datetime.date(2000, m, 1).strftime("%B") for m in range(1, 13)]

@@ -444,6 +444,21 @@ _SPECS = [
         "alert_id",
         "amount_cents",
     ),
+    # Money per ownership period (D34-fixmoney)
+    _spec(
+        "ledger.entries_moved",
+        "Entries moved to the ownership account they belong to",
+        "lot_id",
+        "count",
+        "from_accounts",
+        "to_accounts",
+    ),
+    _spec(
+        "payments.return_needs_board",
+        "Bank payment returned; board to reverse it (refund recorded)",
+        "lot_id",
+        "checkout_id",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

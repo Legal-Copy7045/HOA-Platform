@@ -146,7 +146,7 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
     """The statement page of the current owners' account (D33-acctfix-1: a
     former owner's entries and credit are never on it); returns (paragraphs,
     amount due)."""
-    from ledger.accounts import account_q, current_account_id
+    from ledger.accounts import MOVED_AWAY, account_q, current_account_id
 
     profile = CommunityProfile.get()
     as_of = as_of or timezone.localdate()
@@ -155,7 +155,11 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
     names, _salutation, address, account_number = _recipients(lot)
     account = current_account_id(lot.pk)
     with system_access("statement entries"):
-        mine = LedgerEntry.objects.filter(lot=lot).filter(account_q(lot.pk, account))
+        mine = (
+            LedgerEntry.objects.filter(lot=lot)
+            .filter(account_q(lot.pk, account))
+            .exclude(MOVED_AWAY)
+        )
         forward = sum(mine.filter(posted_on__lt=since).values_list("amount_cents", flat=True))
         entries = list(mine.filter(posted_on__gte=since, posted_on__lte=as_of))
     balance = forward + sum(e.amount_cents for e in entries)
