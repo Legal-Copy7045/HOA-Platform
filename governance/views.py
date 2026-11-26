@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -603,26 +604,55 @@ records_request_action = transition_view(
 def vote_detail(request, pk):
     policy.require(request.user, "vote.view")
     vote = get_object_or_404(Vote, pk=pk)
-    can_manage = policy.can(request.user, "vote.manage")
-    if vote.status == "draft" and not can_manage:
+    if vote.status == "draft" and not policy.can(request.user, "vote.manage"):
         raise Http404  # drafts are invisible, not merely refused
-    show_results = vote.status == "closed" or can_manage
+    return _render_vote(request, vote)
+
+
+def _render_vote(request, vote, *, window_form=None, extend_form=None, status=200):
+    from governance import window
+    from governance.voting_views import ExtendForm, WindowForm
+
+    can_manage = policy.can(request.user, "vote.manage")
+    # No running tallies for anyone while voting is open (D61): results
+    # appear once it has closed.
+    show_results = vote.status == "closed"
     voters = []
-    if services.can_see_voters(vote, request.user):
+    if show_results and services.can_see_voters(vote, request.user):
         voters = Ballot.objects.filter(vote=vote).select_related("person", "lot", "option")
-    return render(
-        request,
-        "governance/vote_detail.html",
-        {
-            "vote": vote,
-            "choices": services.ballot_choices_for(vote, request.user),
-            "my_ballots": services.my_ballots(vote, request.user),
-            "proxy_meetings": proxy_meetings(request.user),
-            "results": services.results(vote) if show_results else None,
-            "can_manage": can_manage,
-            "voters": voters,
-        },
-    )
+    context = {
+        "vote": vote,
+        "choices": services.ballot_choices_for(vote, request.user),
+        "my_ballots": services.my_ballots(vote, request.user),
+        "proxy_meetings": proxy_meetings(request.user),
+        "results": services.results(vote) if show_results else None,
+        "can_manage": can_manage,
+        "voters": voters,
+        "window_form": window_form
+        or (
+            WindowForm(initial=WindowForm.initial_for(vote.opens_at, vote.closes_at))
+            if can_manage and vote.status == "draft"
+            else None
+        ),
+        "extend_form": extend_form or ExtendForm(),
+        "extend_open": extend_form is not None,
+        "who_voted_url": reverse("vote_who_voted_csv", args=[vote.pk])
+        if vote.kind == VoteKind.FORMAL
+        else "",
+    }
+    context.update(window.page_context(vote, request.user))
+    return render(request, "governance/vote_detail.html", context, status=status)
+
+
+@login_required
+def vote_who_voted_csv(request, pk):
+    from governance import window
+
+    policy.require(request.user, "vote.turnout")
+    vote = get_object_or_404(Vote, pk=pk, kind=VoteKind.FORMAL)
+    if vote.status == "draft":
+        raise Http404
+    return window.export_who_has_voted(vote, actor=request.user, request=request)
 
 
 def _casting_formal(request, *args, **kwargs) -> bool:
@@ -662,16 +692,53 @@ def vote_action(request, pk, action):
             "Ballot recorded. Ballots cannot be changed.",
         )
     elif action == "open":
-        _flash(
-            request,
-            lambda: services.open_vote(vote, actor=request.user, request=request),
-            "Vote opened.",
-        )
+        from governance.voting_views import WindowForm
+
+        policy.require(request.user, "vote.manage")
+        form = WindowForm(request.POST)
+        if form.is_valid():
+            try:
+                services.open_vote(
+                    vote,
+                    opens_at=form.cleaned_data["opens_at"],
+                    closes_at=form.cleaned_data["closes_at"],
+                    actor=request.user,
+                    request=request,
+                )
+            except services.GovernanceError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, "Vote opened. It closes by itself at its closing time.")
+                return redirect("vote_detail", pk=vote.pk)
+        return _render_vote(request, vote, window_form=form)
     elif action == "close":
         policy.require(request.user, "vote.manage")
         _flash(
             request,
-            lambda: services.close_vote(vote, actor=request.user, request=request),
+            lambda: services.close_vote(
+                vote, actor=request.user, reason=request.POST.get("reason", ""), request=request
+            ),
             "Vote closed.",
         )
+    elif action == "extend":
+        from governance import window
+        from governance.voting_views import ExtendForm
+
+        policy.require(request.user, "vote.manage")
+        form = ExtendForm(request.POST)
+        if form.is_valid():
+            try:
+                window.extend(
+                    vote,
+                    closes_at=form.cleaned_data["closes_at"],
+                    reason=form.cleaned_data["reason"],
+                    actor=request.user,
+                    request=request,
+                )
+            except window.WindowError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, "Deadline extended. Owners are told by email.")
+                return redirect("vote_detail", pk=vote.pk)
+        return _render_vote(request, vote, extend_form=form)
     return redirect("vote_detail", pk=vote.pk)

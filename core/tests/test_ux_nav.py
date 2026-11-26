@@ -341,10 +341,10 @@ def test_proxy_offered_on_dashboard_when_a_meeting_has_a_vote(client, w):
 
 def _poll(board, **kw):
     from governance import services as gov
-    from governance.tests.helpers import legacy_poll
+    from governance.tests.helpers import legacy_poll, window_kw
 
     vote = legacy_poll(board, **kw)
-    return gov.open_vote(vote, actor=board), list(vote.options.all())
+    return gov.open_vote(vote, actor=board, **window_kw()), list(vote.options.all())
 
 
 def test_after_voting_the_page_says_when(client, w):
@@ -386,7 +386,9 @@ def election(w):
     e = elections.create_election(title="2027 election", seats=2, meeting=meeting, actor=w["board"])
     for user in (w["owner_b"], w["board"]):
         elections.nominate(e, person=_person(user), statement="x" * 300, actor=user)
-    return elections.open_voting(e, actor=w["board"])
+    from governance.tests.helpers import window_kw
+
+    return elections.open_voting(e, actor=w["board"], **window_kw())
 
 
 def test_election_ballot_cards_limit_and_confirmation(client, w, election):

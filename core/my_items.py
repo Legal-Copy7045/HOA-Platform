@@ -738,6 +738,7 @@ def items_for(user) -> list[Item]:
     if can(user, "vote.cast"):
         from governance.models import Vote
         from governance.services import ballot_choices_for
+        from governance.window import when
 
         for vote in Vote.objects.filter(status="open"):
             if ballot_choices_for(vote, user)["can_vote"]:
@@ -745,9 +746,12 @@ def items_for(user) -> list[Item]:
                     Item(
                         "Voting",
                         f"Vote: {vote.title}",
-                        "Your ballot is open",
+                        f"Vote by {when(vote.closes_at)}"
+                        if vote.closes_at
+                        else "Your ballot is open",
                         reverse("vote_detail", args=[vote.pk]),
                         "info",
+                        timezone.localdate(vote.closes_at) if vote.closes_at else None,
                         nav="voting",
                         icon="vote",
                     )
@@ -760,18 +764,40 @@ def items_for(user) -> list[Item]:
         for election in Election.objects.filter(state=ElectionState.VOTING):
             lots = elections.lots_actor_may_vote_for(election, user)
             if lots:
+                from governance.window import when
+
+                deadline = election.voting_closes_at
                 out.append(
                     Item(
                         "Voting",
                         f"Election: {election.title}",
-                        "Your ballot is open"
+                        (f"Vote by {when(deadline)}" if deadline else "Your ballot is open")
                         + (f" ({len(lots)} homes: one ballot each)" if len(lots) > 1 else ""),
                         reverse("election_detail", args=[election.pk]),
                         "info",
+                        timezone.localdate(deadline) if deadline else None,
                         nav="voting",
                         icon="vote",
                     )
                 )
+    # --- Votes and elections closing within 48 hours, with their turnout
+    # (board and manager, D61) ---
+    if can(user, "vote.turnout"):
+        from governance.window import closing_soon_items
+
+        for row in closing_soon_items(user):
+            out.append(
+                Item(
+                    "Voting",
+                    row["title"],
+                    row["detail"],
+                    row["url"],
+                    "info" if row["quorum_met"] in (True, None) else "warning",
+                    row["due"],
+                    nav="voting",
+                    icon="vote",
+                )
+            )
     # --- Surveys (M5): open surveys this person is asked to answer ---
     if can(user, "survey.respond"):
         from governance import surveys

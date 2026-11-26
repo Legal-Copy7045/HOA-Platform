@@ -13,7 +13,7 @@ from core.policy import SYSTEM
 from core.workflow import WorkflowError
 from governance import services
 from governance.models import Ballot, Meeting, Vote, VoteKind
-from governance.tests.helpers import legacy_poll
+from governance.tests.helpers import close_early, legacy_poll, window_kw
 
 pytestmark = pytest.mark.django_db
 
@@ -155,7 +155,7 @@ def _vote(board, kind=VoteKind.INFORMAL, **kw):
 def test_informal_poll_one_ballot_per_owner_and_ballots_never_change(board):
     owner = make_member(lots=[LotFactory()])
     vote, (yes, _) = _vote(board)
-    services.open_vote(vote, actor=board)
+    services.open_vote(vote, actor=board, **window_kw())
     ballot = services.cast_ballot(vote, option_id=yes.pk, actor=owner)
     with pytest.raises(services.GovernanceError):
         services.cast_ballot(vote, option_id=yes.pk, actor=owner)
@@ -169,7 +169,7 @@ def test_ballot_with_malformed_option_or_lot_gets_a_message_not_500(client, boar
 
     owner = make_member(lots=[LotFactory()])
     vote, (yes, _) = _vote(board)
-    services.open_vote(vote, actor=board)
+    services.open_vote(vote, actor=board, **window_kw())
     client.force_login(owner)
     url = reverse("vote_action", args=[vote.pk, "cast"])
     for bad in ("abc", "²", "9" * 30):
@@ -187,7 +187,7 @@ def test_ballot_with_malformed_option_or_lot_gets_a_message_not_500(client, boar
 def test_formal_vote_needs_rules_and_counts_one_ballot_per_lot(board):
     vote, (yes, no) = _vote(board, VoteKind.FORMAL)
     with pytest.raises(services.GovernanceError, match="quorum"):
-        services.open_vote(vote, actor=board)
+        services.open_vote(vote, actor=board, **window_kw())
     community.set_rule(key="vote.quorum_percent", value="50", citation="Bylaws §2.6", actor=board)
     community.set_rule(key="vote.pass_percent", value="67", citation="Declaration §14", actor=board)
     shared_lot = LotFactory()
@@ -201,7 +201,7 @@ def test_formal_vote_needs_rules_and_counts_one_ballot_per_lot(board):
             ownership_type=OwnershipType.JOINT,
             actor=SYSTEM,
         )
-    vote = services.open_vote(vote, actor=board)
+    vote = services.open_vote(vote, actor=board, **window_kw())
     assert vote.quorum_percent == 50 and "Bylaws §2.6" in vote.rules_citation
     services.cast_ballot(vote, option_id=yes.pk, lot_id=shared_lot.pk, actor=a)
     with pytest.raises(services.GovernanceError):  # the co-owner: lot already voted
@@ -212,7 +212,7 @@ def test_formal_vote_needs_rules_and_counts_one_ballot_per_lot(board):
 
 def test_manager_and_auditor_cannot_vote(board):
     vote, (yes, _) = _vote(board)
-    services.open_vote(vote, actor=board)
+    services.open_vote(vote, actor=board, **window_kw())
     for roles in ([Role.MANAGER], [Role.AUDITOR]):
         with pytest.raises(PermissionDenied):
             services.cast_ballot(vote, option_id=yes.pk, actor=make_member(roles=roles))
@@ -228,8 +228,8 @@ def test_secret_ballots_hide_voters_from_the_board(board):
 def test_closed_vote_takes_no_ballots(board):
     owner = make_member(lots=[LotFactory()])
     vote, (yes, _) = _vote(board)
-    services.open_vote(vote, actor=board)
-    services.close_vote(vote, actor=board)
+    services.open_vote(vote, actor=board, **window_kw())
+    close_early(vote, board)
     with pytest.raises(services.GovernanceError):
         services.cast_ballot(vote, option_id=yes.pk, actor=owner)
     assert Ballot.objects.count() == 0
@@ -242,9 +242,9 @@ def test_ballot_from_a_page_loaded_before_close_is_refused(board):
     """D3: the vote's status was checked on a stale object, with no lock."""
     owner = make_member(lots=[LotFactory()])
     vote, (yes, _) = _vote(board)
-    vote = services.open_vote(vote, actor=board)
+    vote = services.open_vote(vote, actor=board, **window_kw())
     stale = Vote.objects.get(pk=vote.pk)  # loaded while open
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
     with pytest.raises(services.GovernanceError):
         services.cast_ballot(stale, option_id=yes.pk, actor=owner)
 
@@ -257,7 +257,7 @@ def _formal_with_ballots(board, yes_count, no_count, quorum="10", passing="50"):
         lot = LotFactory()
         voters.append((lot, make_member(lots=[lot])))
     vote, (yes, no) = _vote(board, VoteKind.FORMAL)
-    vote = services.open_vote(vote, actor=board)
+    vote = services.open_vote(vote, actor=board, **window_kw())
     for i, (lot, member) in enumerate(voters):
         option = yes if i < yes_count else no
         services.cast_ballot(vote, option_id=option.pk, lot_id=lot.pk, actor=member)
@@ -297,7 +297,7 @@ def test_secret_ballot_choice_is_not_stored_with_the_voter(board):
 
     owners = [make_member(lots=[LotFactory()]) for _ in range(3)]
     vote, (yes, no) = _vote(board, secret=True)
-    services.open_vote(vote, actor=board)
+    services.open_vote(vote, actor=board, **window_kw())
     services.cast_ballot(vote, option_id=yes.pk, actor=owners[0])
     services.cast_ballot(vote, option_id=yes.pk, actor=owners[1])
     services.cast_ballot(vote, option_id=no.pk, actor=owners[2])
@@ -310,7 +310,7 @@ def test_secret_ballot_choice_is_not_stored_with_the_voter(board):
     # While open the choices wait in the mixing pool (D56): not yet counted.
     assert services.results(vote)["pending"] == 3
     assert services.results(vote)["outcome"] is None
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
     counts = {r["option"].label: r["count"] for r in services.results(vote)["rows"]}
     assert counts == {"Yes": 2, "No": 1}
     # The database itself refuses a secret ballot that records the choice.
@@ -325,7 +325,7 @@ def test_secret_ballot_choice_is_not_stored_with_the_voter(board):
 def test_open_ballots_still_record_the_choice(board):
     owner = make_member(lots=[LotFactory()])
     vote, (yes, _) = _vote(board)
-    services.open_vote(vote, actor=board)
+    services.open_vote(vote, actor=board, **window_kw())
     ballot = services.cast_ballot(vote, option_id=yes.pk, actor=owner)
     assert ballot.option_id == yes.pk
 
@@ -345,7 +345,7 @@ def test_a_buyer_does_not_see_how_the_seller_voted(board):
         start_date=date(2020, 1, 1),
         actor=SYSTEM,
     )
-    vote = services.open_vote(vote, actor=board)
+    vote = services.open_vote(vote, actor=board, **window_kw())
     # A ballot the seller cast two days ago (written directly to set its date).
     Ballot.objects.create(
         vote=vote,

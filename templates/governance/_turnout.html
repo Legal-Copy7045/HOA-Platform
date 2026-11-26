@@ -1,0 +1,10 @@
+{% load portal %}
+{# Voting window and live turnout (D61). Counts only: never a choice, and no running tallies while voting is open. #}
+{% if turnout %}
+  <section class="card turnout" id="turnout"><h2>{% if turnout.open %}Turnout so far{% else %}Turnout{% endif %}</h2>
+    <p class="turnout-line">{{ turnout_line }}</p>
+    <progress max="{{ turnout.eligible|default:1 }}" value="{{ turnout.voted }}" aria-label="{{ turnout_line }}">{{ turnout.percent }}%</progress>
+    {% if turnout.quorum_needed %}<p class="small">Quorum: {{ turnout.quorum_needed }} of {{ turnout.eligible }} homes ({{ turnout.quorum_percent }}%). {% if turnout.quorum_met %}<span class="status tone-success">Quorum reached{% if turnout.open %} so far{% endif %}</span>{% else %}<span class="status tone-warning">Quorum not reached{% if turnout.open %} yet{% endif %}</span>{% endif %}</p>{% endif %}
+    {% if turnout.open %}<p class="small muted">Results appear once it closes; until then nobody, the board included, sees how the choices are going.{% if turnout.pending %} {{ turnout.pending }} secret {{ turnout.pending|pluralize:"ballot is,ballots are" }} waiting to be mixed with others before {{ turnout.pending|pluralize:"it is,they are" }} written, so no one can tell whose choice is whose; every ballot is counted at the close.{% endif %}</p>{% endif %}
+  </section>
+{% endif %}

@@ -188,6 +188,10 @@ def _render_detail(
         "my_answers": surveys.my_answers(survey, user),
         "results_visible": surveys.results_visible(survey, user),
     }
+    if survey.status != "draft":
+        from governance import window
+
+        context.update(window.page_context(survey, user))
     if can_manage and survey.status == "draft":
         context["settings_form"] = settings_form or SurveyForm(
             initial={
@@ -347,4 +351,8 @@ def survey_results(request, pk):
 def survey_export(request, pk):
     policy.require(request.user, "survey.manage")
     survey = get_object_or_404(Survey, pk=pk)
-    return surveys.export_csv(survey, actor=request.user, request=request)
+    try:
+        return surveys.export_csv(survey, actor=request.user, request=request)
+    except surveys.SurveyError as exc:
+        messages.error(request, str(exc))
+        return redirect("survey_detail", pk=survey.pk)

@@ -24,7 +24,7 @@ from django.utils import timezone
 from core import features, policy
 from core.dates import short_date
 from governance import elections as election_services
-from governance import services, surveys
+from governance import services, surveys, window
 from governance.models import (
     Election,
     ElectionState,
@@ -52,6 +52,76 @@ class _MeetingChoice(forms.ModelChoiceField):
         return f"{m.title} · {timezone.localtime(m.starts_at):%b %-d, %Y}"
 
 
+_LOCAL = "%Y-%m-%dT%H:%M"
+
+
+def _when_widget():
+    return forms.DateTimeInput(attrs={"type": "datetime-local"}, format=_LOCAL)
+
+
+class WindowForm(forms.Form):
+    """The voting window (D61): both times are required; the service checks
+    the order and the shortest voting period (rule vote.min_open_days)."""
+
+    opens_at = forms.DateTimeField(
+        label="Voting opens",
+        widget=_when_widget(),
+        help_text="Now or later. Ballots are taken from this time.",
+    )
+    closes_at = forms.DateTimeField(
+        label="Voting closes",
+        widget=_when_widget(),
+        help_text="Voting closes by itself at this time.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        from governance import window
+
+        kwargs.setdefault("auto_id", "window_%s")
+        super().__init__(*args, **kwargs)
+        days = window.min_open_days()
+        self.fields["closes_at"].help_text = (
+            f"At least {days} day{'s' if days != 1 else ''} after it opens. "
+            "Voting closes by itself at this time."
+        )
+
+    def clean(self):
+        data = super().clean()
+        opens_at, closes_at = data.get("opens_at"), data.get("closes_at")
+        if opens_at and closes_at and closes_at <= opens_at:
+            self.add_error("closes_at", "Voting must close after it opens.")
+        return data
+
+    @classmethod
+    def initial_for(cls, opens_at=None, closes_at=None):
+        from governance import window
+
+        now = timezone.localtime().replace(second=0, microsecond=0)
+        opens_at = opens_at or now
+        closes_at = closes_at or (
+            max(opens_at, now) + datetime.timedelta(days=window.min_open_days() + 1)
+        )
+        return {
+            "opens_at": timezone.localtime(opens_at).strftime(_LOCAL),
+            "closes_at": timezone.localtime(closes_at).strftime(_LOCAL),
+        }
+
+
+class ExtendForm(forms.Form):
+    closes_at = forms.DateTimeField(
+        label="New closing time",
+        widget=_when_widget(),
+        help_text="Later than the current deadline. A deadline can be extended once.",
+    )
+    reason = forms.CharField(
+        label="Why", max_length=300, help_text="Shown to owners in the update email."
+    )
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("auto_id", "extend_%s")
+        super().__init__(*args, **kwargs)
+
+
 class VoteForm(forms.Form):
     """Formal (binding) votes only. Informal polls are surveys now."""
 
@@ -64,10 +134,15 @@ class VoteForm(forms.Form):
     secret = forms.BooleanField(
         label="Secret ballot", required=False, help_text="Counts only: nobody sees who chose what."
     )
+    opens_at = forms.DateTimeField(
+        label="Voting opens",
+        widget=_when_widget(),
+        help_text="Now or later. You open the vote from its page; ballots count from then.",
+    )
     closes_at = forms.DateTimeField(
-        label="Closes at",
-        required=False,
-        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        label="Voting closes",
+        widget=_when_widget(),
+        help_text="Voting closes by itself at this time.",
     )
     meeting = _MeetingChoice(
         label="At meeting",
@@ -78,9 +153,25 @@ class VoteForm(forms.Form):
     )
 
     def __init__(self, *args, user, **kwargs):
+        from governance import window
+
         kwargs.setdefault("auto_id", "vote_%s")
+        if not args and "initial" not in kwargs:
+            kwargs["initial"] = WindowForm.initial_for()
         super().__init__(*args, **kwargs)
         self.fields["meeting"].queryset = _coming_owner_meetings(user)
+        days = window.min_open_days()
+        self.fields["closes_at"].help_text = (
+            f"At least {days} day{'s' if days != 1 else ''} after it opens. "
+            "Voting closes by itself at this time."
+        )
+
+    def clean(self):
+        data = super().clean()
+        opens_at, closes_at = data.get("opens_at"), data.get("closes_at")
+        if opens_at and closes_at and closes_at <= opens_at:
+            self.add_error("closes_at", "Voting must close after it opens.")
+        return data
 
 
 class ElectionForm(forms.Form):
@@ -134,7 +225,9 @@ def _vote_row(v: Vote, user) -> dict:
     if not meta:
         meta.append("Formal vote")
     if v.closes_at and v.status != VoteStatus.CLOSED:
-        meta.append(f"closes {_short(v.closes_at)}")
+        if v.opens_at and v.status == VoteStatus.OPEN and v.opens_at > timezone.now():
+            meta.append(f"opens {window.when(v.opens_at)}")
+        meta.append(f"vote by {window.when(v.closes_at)}")
     if voted:
         meta.append(
             "Your ballot was recorded"
@@ -159,6 +252,10 @@ def _election_row(e: Election, user) -> dict:
     # Only ballots cast since this person owns the lot (R2-010).
     voted = bool(election_services.my_lots_participation(e, user)[0])
     meta = [f"Board election · {e.seats} seat{'s' if e.seats != 1 else ''}"]
+    if e.state == ElectionState.VOTING and e.voting_closes_at:
+        if e.voting_opens_at and e.voting_opens_at > timezone.now():
+            meta.append(f"opens {window.when(e.voting_opens_at)}")
+        meta.append(f"vote by {window.when(e.voting_closes_at)}")
     if can_vote:
         meta.append("Your ballot is open")
     elif voted:

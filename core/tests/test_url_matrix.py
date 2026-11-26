@@ -260,6 +260,9 @@ PROTECTED = {
     "records_request_action": ("POST", "records_request_b"),
     "vote_detail": ("GET", "draft_vote"),
     "vote_action": ("POST", "draft_vote"),
+    # Who has voted (D61): board and manager only.
+    "vote_who_voted_csv": ("GET", "draft_vote"),
+    "election_who_voted_csv": ("GET", "election"),
     # Surveys (M5): a draft is invisible to owners; board steps are refused.
     "survey_detail": ("GET", "draft_survey"),
     "survey_action": ("POST", "draft_survey"),

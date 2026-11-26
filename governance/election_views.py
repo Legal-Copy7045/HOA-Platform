@@ -49,6 +49,24 @@ def _owner_choices():
 def election_detail(request, pk):
     policy.require(request.user, "vote.view")
     election = get_object_or_404(Election, pk=pk)
+    return _render_election(request, election)
+
+
+@login_required
+def election_who_voted_csv(request, pk):
+    from governance import window
+
+    policy.require(request.user, "vote.turnout")
+    election = get_object_or_404(Election, pk=pk)
+    if election.state == ElectionState.NOMINATIONS:
+        raise Http404
+    return window.export_who_has_voted(election, actor=request.user, request=request)
+
+
+def _render_election(request, election, *, window_form=None, extend_form=None, status=200):
+    from governance import window
+    from governance.voting_views import ExtendForm, WindowForm
+
     user = request.user
     can_manage = policy.can(user, "vote.manage")
     me = elections._person(user)
@@ -67,10 +85,25 @@ def election_detail(request, pk):
         and policy.can(user, "vote.cast")
         else None
     )
+    context = window.page_context(election, user)
+    context.update(
+        {
+            "window_form": window_form
+            or (
+                WindowForm(initial=WindowForm.initial_for())
+                if can_manage and election.state == ElectionState.NOMINATIONS
+                else None
+            ),
+            "extend_form": extend_form or ExtendForm(),
+            "extend_open": extend_form is not None,
+            "who_voted_url": reverse("election_who_voted_csv", args=[election.pk]),
+        }
+    )
     return render(
         request,
         "governance/election_detail.html",
-        {
+        context
+        | {
             "e": election,
             "candidates": candidates,
             "me": me,
@@ -88,6 +121,7 @@ def election_detail(request, pk):
             if election.state == ElectionState.CERTIFIED
             else [],
         },
+        status=status,
     )
 
 
@@ -141,17 +175,56 @@ def election_action(request, pk, action):
                 "Withdrawn.",
             )
     elif action == "open":
-        _flash(
-            request,
-            lambda: elections.open_voting(election, actor=user, request=request),
-            "Voting is open.",
-        )
+        from governance.voting_views import WindowForm
+
+        policy.require(user, "vote.manage")
+        form = WindowForm(request.POST)
+        if form.is_valid():
+            try:
+                elections.open_voting(
+                    election,
+                    opens_at=form.cleaned_data["opens_at"],
+                    closes_at=form.cleaned_data["closes_at"],
+                    actor=user,
+                    request=request,
+                )
+            except elections.ElectionError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(
+                    request, "Voting is open. It closes by itself at its closing time."
+                )
+                return redirect("election_detail", pk=election.pk)
+        return _render_election(request, election, window_form=form)
     elif action == "close":
         _flash(
             request,
-            lambda: elections.close_voting(election, actor=user, request=request),
+            lambda: elections.close_voting(
+                election, actor=user, reason=request.POST.get("reason", ""), request=request
+            ),
             "Voting closed.",
         )
+    elif action == "extend":
+        from governance import window
+        from governance.voting_views import ExtendForm
+
+        policy.require(user, "vote.manage")
+        form = ExtendForm(request.POST)
+        if form.is_valid():
+            try:
+                window.extend(
+                    election,
+                    closes_at=form.cleaned_data["closes_at"],
+                    reason=form.cleaned_data["reason"],
+                    actor=user,
+                    request=request,
+                )
+            except window.WindowError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, "Deadline extended. Owners are told by email.")
+                return redirect("election_detail", pk=election.pk)
+        return _render_election(request, election, extend_form=form)
     elif action == "certify":
         _flash(
             request,

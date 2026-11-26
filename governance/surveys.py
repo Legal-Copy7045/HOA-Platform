@@ -446,8 +446,12 @@ def _announce(survey: Survey) -> int:
     return len(emails)
 
 
-def close_survey(survey: Survey, *, actor, request=None) -> Survey:
-    require(actor, "survey.manage")
+def close_survey(survey: Survey, *, actor, at_deadline: bool = False, request=None) -> Survey:
+    """Close the survey: by the board at any time (it is informal), or by
+    SYSTEM after its last day (the periodic task, D61)."""
+    if actor is not policy.SYSTEM:
+        require(actor, "survey.manage")
+        at_deadline = False
     with transaction.atomic():
         locked = Survey.objects.select_for_update().get(pk=survey.pk)
         if locked.status != SurveyStatus.OPEN:
@@ -460,9 +464,15 @@ def close_survey(survey: Survey, *, actor, request=None) -> Survey:
 
             mixing.flush(mixing.SURVEY, locked.pk, final=True)
         Survey.objects.filter(pk=locked.pk).update(
-            status=SurveyStatus.CLOSED, closed_at=timezone.now()
+            status=SurveyStatus.CLOSED, closed_at=timezone.now(), closed_at_deadline=at_deadline
         )
-    record_event("survey.closed", actor=actor, request=request, target=survey)
+    record_event(
+        "survey.closed",
+        actor=None if actor is policy.SYSTEM else actor,
+        request=request,
+        target=survey,
+        metadata={"how": "deadline" if at_deadline else "board"},
+    )
     survey.refresh_from_db()
     return survey
 
@@ -605,11 +615,13 @@ def my_answers(survey: Survey, user) -> dict[int, list[SurveyAnswer]] | None:
 
 
 def results_visible(survey: Survey, user) -> bool:
-    """The board always (once drafted); others only after it closes, if the
-    board chose to share them."""
+    """Only once the survey has closed (no running tallies while it is
+    open, D61): the board always; others if the board chose to share them."""
+    if survey.phase != "closed":
+        return False
     if can_manage(user):
         return True
-    return can_view(survey, user) and survey.phase == "closed" and survey.share_results
+    return can_view(survey, user) and survey.share_results
 
 
 def results(survey: Survey, *, include_text: bool) -> dict:
@@ -681,6 +693,9 @@ def export_csv(survey: Survey, *, actor, request=None) -> HttpResponse:
     exports no names or times, in random (id) order. Responses still in the
     mixing pool while the survey is open are not in it yet (D56)."""
     require(actor, "survey.manage")
+    if survey.phase != "closed":
+        # The answers would be a running tally (D61).
+        raise SurveyError("The answers can be downloaded once the survey has closed.")
     if survey.anonymous:
         from governance import mixing
 

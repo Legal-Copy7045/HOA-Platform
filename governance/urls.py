@@ -28,6 +28,11 @@ urlpatterns = [
     ),
     path("elections/", vv.elections, name="elections"),
     path("elections/<int:pk>/", ev.election_detail, name="election_detail"),
+    path(
+        "elections/<int:pk>/who-voted.csv",
+        ev.election_who_voted_csv,
+        name="election_who_voted_csv",
+    ),
     re_path(
         r"^elections/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
         ev.election_action,
@@ -77,8 +82,9 @@ urlpatterns = [
     path("votes/", vv.votes, name="votes"),
     path("ballot/<str:token>/", views.ballot_link, name="ballot_link"),
     path("votes/<int:pk>/", views.vote_detail, name="vote_detail"),
+    path("votes/<int:pk>/who-voted.csv", views.vote_who_voted_csv, name="vote_who_voted_csv"),
     re_path(
-        r"^votes/(?P<pk>[0-9]+)/(?P<action>cast|open|close)/$",
+        r"^votes/(?P<pk>[0-9]+)/(?P<action>cast|open|close|extend)/$",
         views.vote_action,
         name="vote_action",
     ),

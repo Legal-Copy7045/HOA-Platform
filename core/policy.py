@@ -103,6 +103,8 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "vote.view": MEMBERS | {AUTHORIZED, VIEW_ONLY},
     "vote.cast": frozenset({OWNER}),
     "vote.manage": frozenset({BOARD}),
+    # Live turnout and who has voted (never choices) while voting is open (D61).
+    "vote.turnout": frozenset({BOARD, MANAGER}),
     # Architectural review
     "arc.submit": frozenset({OWNER}),
     "arc.view_all": frozenset({BOARD, ARC_REVIEWER, MANAGER, AUDITOR}),
