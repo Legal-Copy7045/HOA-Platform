@@ -6,6 +6,22 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.9.0 — 2026-11-26
+
+- My home → "Ask to add someone" asks for the person's email, which they sign
+  in with. If they don't use email, a box keeps them on the account as a
+  record only, without a sign-in. When a board member approves, the portal
+  emails them an invitation to sign in. If it cannot (for example, the email
+  already has a login), the approval still stands and the board is told to
+  send the invitation from Invitations and sign-ups. Before approving, the
+  board sees whether an invitation will go out (D40).
+- Owners can ask to change the owners on the deed: add an owner (a joint
+  owner, a trust or an entity) or remove one (for example after a death or a
+  quitclaim). They attach the recorded deed and give its date. Only the board
+  and that account's owners can open the deed. A board member who is not the
+  requester, and not the person added or removed, approves. The account must
+  keep at least one owner; a sale is still recorded by the board (D40).
+
 ## 0.8.0 — 2026-11-26
 
 - System status shows malware scanning at a glance: answering or not, ClamAV
