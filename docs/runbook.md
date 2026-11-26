@@ -298,7 +298,14 @@ backups cannot be restored. Backups land in `/var/backups/hoa-portal/<date>/`
 example Cloudflare R2), and the nightly run uploads the already-encrypted
 files (see "Off-site backups that cannot be deleted" below).
 
-Prove a backup restores, without touching the live portal:
+To take a backup at any other time, use the portal: **Admin → Server tasks →
+Take a backup now** (sysadmins; also on System status next to the Backups
+check). The server's agent runs it within a minute and the page shows the
+result, for example "Backup 2026-11-26T1830Z, 5.3M, copied off-site" (D35).
+If the portal is down, run `sudo bash /opt/hoa-portal/infra/poc/backup.sh`.
+
+Prove a backup restores, without touching the live portal: **Admin → Server
+tasks → Restore drill → Start**. If the portal is down:
 
 ```bash
 sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh
@@ -349,13 +356,13 @@ The probe files stay in the bucket until the lock expires. They hold no data.
 Afterwards:
 
 - System status → Health checks → **Backups** shows the age of the last local and off-site copies and when the lock was last verified. The sysadmins get an email if either copy is more than 36 hours old.
-- Re-check the lock at any time:
+- Re-check the lock at any time: **Admin → Server tasks → Check the off-site lock**. If the portal is down:
 
   ```bash
   sudo docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web python manage.py check_offsite_lock
   ```
 
-- Prove the off-site copy restores (downloads the newest complete backup, checks its keyed checksum, refuses it unless the time signed inside the checksum is the time in its name and not in the future, so an old backup copied under a newer name cannot pass, then restores it into the scratch copy):
+- Prove the off-site copy restores: **Admin → Server tasks → Restore drill from the off-site copy** (or, if the portal is down, the command below). It downloads the newest complete backup, checks its keyed checksum, refuses it unless the time signed inside the checksum is the time in its name and not in the future, so an old backup copied under a newer name cannot pass, then restores it into the scratch copy:
 
   ```bash
   sudo bash /opt/hoa-portal/infra/poc/restore-drill.sh --from-offsite
@@ -373,13 +380,18 @@ error rate has a problem (and again when it recovers):
 sudo bash /opt/hoa-portal/infra/poc/health-timer.sh
 ```
 
-The same checks are on Admin > System status.
+The same checks are on Admin > System status; to run them now and email any
+change, use Admin → Server tasks → Run the health checks.
 
 ## Host security
 
-Run once on the VM (safe to re-run after updates):
+Run once on the VM:
 
     sudo bash /opt/hoa-portal/infra/poc/harden-host.sh
+
+To re-apply it later (after updates, or when System status shows a service
+off), use Admin → Server tasks → Re-apply host security; the command above is
+the fallback when the portal is down.
 
 It sets up:
 
@@ -652,3 +664,30 @@ portal pins API version `2026-08-26.dahlia`):
    prompt, and `DEPLOYMENT_STAGE=production` plus `PAYMENTS_LIVE_ALLOWED=true`
    in the production `.env`. The portal refuses live keys without both, and
    refuses test keys in production.
+
+## Server tasks (D35)
+
+Reusable host operations are started in the portal, not in a terminal:
+**Admin → Server tasks** (sysadmins start them; the board sees the history).
+The web app only records the request; the VM's agent
+(`infra/poc/portal-agent.sh`, every minute) runs the fixed command for it
+from `infra/poc/host-tasks.sh` and writes back the state and a one-line
+summary. One task runs at a time. The full output of each task is in
+`/var/log/hoa-portal-tasks.log` on the VM.
+
+| Task | What runs on the VM | Time limit |
+|---|---|---|
+| Take a backup | `infra/poc/backup.sh` | 20 min |
+| Restore drill | `infra/poc/restore-drill.sh` (newest local backup) | 25 min |
+| Restore drill from the off-site copy | `infra/poc/restore-drill.sh --from-offsite` (only once off-site backups are set up) | 25 min |
+| Check the off-site lock | `manage.py check_offsite_lock` in the web container (only once off-site backups are set up) | 5 min |
+| Re-apply host security | `infra/poc/harden-host.sh` | 25 min |
+| Run the health checks | `manage.py health_check --alert` in the web container | 5 min |
+
+If the page says tasks will not run, the agent has not been seen for five
+minutes: check `systemctl status hoa-portal-agent.timer` and
+`journalctl -u hoa-portal-agent.service` on the VM. Steps that need a secret
+typed by a person (`setup-offsite-backups.sh`, `set-stripe-key.sh`,
+`move-files-to-r2.sh`) and one-time setup (`provision-vm.sh`, the first
+`harden-host.sh`) stay in the terminal.
+
