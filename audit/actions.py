@@ -466,6 +466,16 @@ _SPECS = [
         "lot_id",
         "checkout_id",
     ),
+    # Fixes from the verification run (fixres)
+    _spec(
+        "ledger.moves_checked", "Board checked entries moved between accounts", "lot_id", "count"
+    ),
+    _spec(
+        "payments.unreachable",
+        "Online payment Stripe cannot find: no longer checked",
+        "lot_id",
+        "checkout_id",
+    ),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

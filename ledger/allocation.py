@@ -260,7 +260,51 @@ def after_post(entry, directed: list[int] | None = None) -> list:
     return rows
 
 
+@internal("allocation")
+def post_moved(lot_id: int, items: list) -> list:
+    """Number and apply the copies ``move_entries`` posted (with
+    ``_defer_allocation``), all at once: each payment copy first pays the
+    copies of the charges its original paid (``items``: (copy, charge copy
+    ids)), then everything left follows the rule (fixres BUG-002)."""
+    from ledger.models import PaymentApplication
+
+    with transaction.atomic():
+        _lock(_LOCK_NAMESPACE, lot_id)
+        for copy, _directed in items:
+            _number(copy)
+        book = load_book(lot_id)
+        out: list = []
+        for copy, directed in items:
+            if copy.amount_cents >= 0:
+                continue
+            for charge_id in directed:
+                charge = book.entries.get(charge_id)
+                if not book.can_direct(book.entries[copy.pk], charge):
+                    continue
+                cents = min(book.remaining(copy.pk), book.remaining(charge_id))
+                if cents > 0:
+                    book._apply(copy.pk, charge_id, cents, DIRECTED, out)
+        book.settle(AUTO, out)
+        dates = {e.id: e.posted_on for e in book.entries.values()}
+        PaymentApplication.objects.bulk_create(
+            [
+                PaymentApplication(
+                    lot_id=lot_id,
+                    source_id=s,
+                    charge_id=c,
+                    amount_cents=cents,
+                    kind=kind,
+                    effective_on=max(dates[s], dates[c]),
+                )
+                for s, c, cents, kind in out
+            ]
+        )
+    return out
+
+
 def on_entry_saved(sender, instance, created, raw=False, **kwargs) -> None:
+    if getattr(instance, "_defer_allocation", False):
+        return  # move_entries applies its copies together (post_moved)
     if created and not raw:
         after_post(instance, getattr(instance, "_apply_to", None))
 

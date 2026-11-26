@@ -187,6 +187,9 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
         ("mono", f"{'':<11}{'-- Prior Balance --':<31}{'':>12}{'':>12}{format_cents(forward):>12}"),
     ]
     running = forward
+    from ledger.services import moved_notes
+
+    notes = moved_notes(entries)
     for e in entries:
         running += e.amount_cents
         charge = format_cents(e.amount_cents) if e.amount_cents > 0 else ""
@@ -198,6 +201,8 @@ def statement_paragraphs(lot: Lot, *, since=None, as_of=None) -> tuple[list, int
                 f"{format_cents(running):>12}",
             )
         )
+        if e.pk in notes:
+            paras.append(("mono", f"{'':<11}({notes[e.pk]})"[:78]))
     paras += open_charges_paragraphs(lot, since=owner_since, account=account)
     remit = [line for line in (profile.remit_to or "").splitlines() if line.strip()] or [
         profile.legal_name

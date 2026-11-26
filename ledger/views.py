@@ -308,9 +308,12 @@ def ledger_home(request):
 def lot_ledger(request, pk):
     _finance(request)
     lot = get_object_or_404(Lot.objects.for_user(request.user), pk=pk)
-    entries = (
+    entries = list(
         LedgerEntry.objects.for_user(request.user).filter(lot=lot).select_related("reversed_by")
     )
+    notes = services.moved_notes(entries)
+    for e in entries:
+        e.moved_note = notes.get(e.pk, "")
     open_charges = allocation.open_charges(lot.pk)
     lot_accounts = ledger_accounts.lot_accounts(lot.pk)
     return render(
@@ -329,6 +332,7 @@ def lot_ledger(request, pk):
             "payment_form": PaymentForm(open_charges=open_charges, accounts=lot_accounts),
             "charge_form": ChargeForm(accounts=lot_accounts),
             "credit_form": CreditForm(accounts=lot_accounts),
+            "move_notices": services.open_move_notices(lot.pk, user=request.user),
             "open_case": CollectionCase.objects.for_user(request.user)
             .filter(lot=lot)
             .exclude(state="closed")
@@ -386,6 +390,19 @@ def lot_ledger_action(request, pk, action):
                 entry, reason=request.POST.get("reason", ""), actor=actor, request=request
             ),
             "Reversal posted.",
+        )
+    elif action == "movechecked":
+        from ledger.models import EntryMoveNotice
+
+        notice = get_object_or_404(
+            EntryMoveNotice.objects.for_user(actor),
+            pk=request.POST.get("notice"),
+            lot=lot,
+        )
+        _flash(
+            request,
+            lambda: services.check_move_notice(notice, actor=actor, request=request),
+            "Moved entries marked checked.",
         )
     elif action == "collection":
         # "Open collection case": go to the lot's open case, creating it if

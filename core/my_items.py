@@ -481,6 +481,30 @@ def items_for(user) -> list[Item]:
             )
     if can(user, "payments.manage"):
         out.extend(_online_payment_items(user, roles))
+    # Entries moved between ownership accounts, to check (fixres BUG-003).
+    if can(user, "ledger.manage"):
+        from ledger.models import EntryMoveNotice
+
+        for n in (
+            EntryMoveNotice.objects.for_user(user)
+            .filter(checked_at__isnull=True)
+            .select_related("lot")
+            .order_by("created_at")
+        ):
+            out.append(
+                Item(
+                    "Finance",
+                    f"Lot {n.lot.number}: {n.count} entr{'y' if n.count == 1 else 'ies'}"
+                    " moved to another account",
+                    f"From account {n.from_accounts} to account {n.to_accounts} after an"
+                    " ownership date changed. Check that none was placed on purpose, such as"
+                    " a seller's settlement check.",
+                    reverse("lot_ledger", args=[n.lot_id]) + "#moved",
+                    "warning",
+                    timezone.localdate(n.created_at),
+                    nav="ledger_home",
+                )
+            )
     if can(user, "community.manage_rules"):
         from community.rules import rules_needing_attention
 

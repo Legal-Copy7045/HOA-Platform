@@ -105,6 +105,39 @@ class LedgerEntry(ScopedAppendOnlyModel):
         super().save(*args, **kwargs)
 
 
+class EntryMoveNotice(ScopedModel):
+    """A board to-do after entries were moved to another ownership account
+    (fixres BUG-003): which entries, from and to which accounts. The board
+    checks the list (a seller's settlement check may have moved with the
+    buyer's dues) and marks it checked; never deleted."""
+
+    scope_lot_path = "lot"
+    objects = ScopedQuerySet.as_manager()
+
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    copy_ids = models.JSONField(default=list)
+    from_accounts = models.CharField(max_length=200, blank=True)
+    to_accounts = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    checked_at = models.DateTimeField(null=True, blank=True)
+    checked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Entries moved on lot {self.lot_id}"
+
+    @property
+    def count(self) -> int:
+        return len(self.copy_ids)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Move notices are checked, not deleted.")
+
+
 # --- Budgets ---------------------------------------------------------------------------
 
 

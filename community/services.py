@@ -310,7 +310,9 @@ def _close_account_if_empty(account_id: int | None, on: datetime.date) -> None:
     still_owned = Ownership.objects.filter(account_id=account_id).active(on).exists()
     if still_owned:
         return
-    Account.objects.filter(pk=account_id, closed_on__isnull=True).update(closed_on=on)
+    Account.objects.filter(pk=account_id, closed_on__isnull=True).update(
+        closed_on=on, closed_recorded_at=timezone.now()
+    )
     # Contacts and tenants of a dormant account lose access with it.
     AccountContact.objects.filter(account_id=account_id, end_date__isnull=True).update(end_date=on)
     _invalidate_roles()
@@ -319,7 +321,7 @@ def _close_account_if_empty(account_id: int | None, on: datetime.date) -> None:
 @internal("community accounts")
 def _reopen_account(account_id: int | None) -> None:
     if account_id is not None:
-        Account.objects.filter(pk=account_id).update(closed_on=None)
+        Account.objects.filter(pk=account_id).update(closed_on=None, closed_recorded_at=None)
 
 
 def set_account_number(account: Account, number: str, *, actor, request=None) -> Account:

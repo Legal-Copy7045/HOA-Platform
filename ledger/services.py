@@ -670,9 +670,15 @@ def account_periods_change(lot_id: int, *, actor, request=None):
         return
     token = _period_change.set({**(active or {}), lot_id: True})
     try:
-        before = accounts.periods(lot_id)
-        yield
-        move_entries(lot_id, before, actor=actor, request=request)
+        with transaction.atomic():
+            # Lock the lot before reading the periods (fixres BUG-007): two
+            # changes to the same lot at once take turns, so the second
+            # compares with what the first left.
+            with system_access("lock lot for account periods"):
+                list(Lot.objects.select_for_update().filter(pk=lot_id).values_list("pk"))
+            before = accounts.periods(lot_id)
+            yield
+            move_entries(lot_id, before, actor=actor, request=request)
     finally:
         _period_change.reset(token)
 
@@ -684,25 +690,28 @@ def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[Ledg
     moves_after_change). Each move is two new entries and never changes an
     amount: a reversal on the old account, dated like the original, and a
     copy on the new account (``moved_from``), same date, kind, amount,
-    reference and month. A payment that was applied to charges that moved
-    too is applied to their copies. Returns the copies."""
+    reference and month. A payment keeps the charges it was applied to:
+    they are read before anything is reversed, and the payment's copy is
+    applied first to the copies of those charges (fixres BUG-002). The board
+    gets a My items entry listing the moves (``EntryMoveNotice``, fixres
+    BUG-003). Returns the copies."""
+    from community.models import Account
     from ledger import allocation
+    from ledger.models import EntryMoveNotice
 
     plan = accounts.moves_after_change(lot_id, before)
     if not plan:
         return []
-    from community.models import Account
-
     numbers = dict(Account.objects.filter(lot_id=lot_id).values_list("pk", "number"))
-    copies: dict[int, int] = {}
-    out = []
+    moving = {entry.pk for entry, _t in plan}
+    # What each moving payment pays now, read before any reversal unwinds it.
+    directed = {
+        entry.pk: [c for c, _cents in allocation.applications_of(entry.pk) if c in moving]
+        for entry, _t in plan
+        if entry.amount_cents < 0
+    }
     with transaction.atomic():
         for entry, target in plan:
-            directed = [
-                copies[c]
-                for c, _cents in allocation.applications_of(entry.pk)
-                if c in copies and entry.amount_cents < 0
-            ]
             LedgerEntry.objects.create(
                 lot_id=lot_id,
                 posted_on=entry.posted_on,
@@ -712,6 +721,8 @@ def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[Ledg
                 description=f"Moved to account {numbers.get(target, target)}: #{entry.pk}"[:200],
                 posted_by=_user(actor),
             )
+        copies: dict[int, LedgerEntry] = {}
+        for entry, target in plan:
             copy = LedgerEntry(
                 lot_id=lot_id,
                 account_id=target,
@@ -724,10 +735,27 @@ def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[Ledg
                 moved_from=entry,
                 posted_by=_user(actor),
             )
-            copy._apply_to = directed
+            copy._defer_allocation = True  # applied below, all together
             copy.save()
-            copies[entry.pk] = copy.pk
-            out.append(copy)
+            copies[entry.pk] = copy
+        allocation.post_moved(
+            lot_id,
+            [
+                (copies[entry.pk], [copies[c].pk for c in directed.get(entry.pk, [])])
+                for entry, _t in plan
+            ],
+        )
+        out = list(copies.values())
+        old_ids = sorted({e.account_id for e, _t in plan if e.account_id})
+        new_ids = sorted({t for _e, t in plan})
+        EntryMoveNotice.objects.create(
+            lot_id=lot_id,
+            copy_ids=[c.pk for c in out],
+            from_accounts=(", ".join(numbers.get(a, str(a)) for a in old_ids) or "no account")[
+                :200
+            ],
+            to_accounts=", ".join(numbers.get(a, str(a)) for a in new_ids)[:200],
+        )
         record_event(
             "ledger.entries_moved",
             actor=_user(actor),
@@ -735,13 +763,71 @@ def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[Ledg
             metadata={
                 "lot_id": lot_id,
                 "count": len(out),
-                "from_accounts": ",".join(
-                    str(a) for a in sorted({e.account_id for e, _t in plan if e.account_id})
-                ),
-                "to_accounts": ",".join(str(a) for a in sorted({t for _e, t in plan})),
+                "from_accounts": ",".join(str(a) for a in old_ids),
+                "to_accounts": ",".join(str(a) for a in new_ids),
             },
         )
     return out
+
+
+@internal("ledger service")
+def moved_notes(entries) -> dict[int, str]:
+    """For the moved copies among ``entries``: "Moved from account N on
+    <date>" (fixres BUG-003), shown on board pages and owner statements."""
+    from core.dates import short_date
+
+    ids = [e.moved_from_id for e in entries if getattr(e, "moved_from_id", None)]
+    if not ids:
+        return {}
+    numbers = dict(
+        LedgerEntry.objects.unscoped("moved notes")
+        .filter(pk__in=ids)
+        .values_list("pk", "account__number")
+    )
+    return {
+        e.pk: f"Moved from account {numbers.get(e.moved_from_id) or '(none)'}"
+        f" on {short_date(e.created_at)}"
+        for e in entries
+        if getattr(e, "moved_from_id", None)
+    }
+
+
+def open_move_notices(lot_id: int, *, user) -> list:
+    """The lot's move notices the board has not checked yet, each with its
+    copies (``notice.moved``: list of (entry, note))."""
+    from ledger.models import EntryMoveNotice
+
+    notices = list(
+        EntryMoveNotice.objects.for_user(user).filter(lot_id=lot_id, checked_at__isnull=True)
+    )
+    for notice in notices:
+        moved = list(LedgerEntry.objects.for_user(user).filter(pk__in=notice.copy_ids))
+        notes = moved_notes(moved)
+        notice.moved = [(e, notes.get(e.pk, "")) for e in moved]
+    return notices
+
+
+def check_move_notice(notice, *, actor, request=None):
+    """The board checked the moved entries (and put back, with the account
+    choice, any that belonged where they were)."""
+    from ledger.models import EntryMoveNotice
+
+    _authorize(actor, "ledger.manage")
+    updated = (
+        EntryMoveNotice.objects.unscoped("check move notice")
+        .filter(pk=notice.pk, checked_at__isnull=True)
+        .update(checked_at=timezone.now(), checked_by=_user(actor))
+    )
+    if not updated:
+        raise LedgerError("These moved entries are already marked checked.")
+    record_event(
+        "ledger.moves_checked",
+        actor=_user(actor),
+        request=request,
+        target=notice,
+        metadata={"lot_id": notice.lot_id, "count": notice.count},
+    )
+    return notice
 
 
 # --- Aging (credits applied to the oldest charges first) ------------------------------------
@@ -822,12 +908,13 @@ def statement_rows(statement: OwnerStatement) -> list[StatementRow]:
     rows = []
     if statement.brought_forward:
         rows.append(StatementRow(None, "Balance brought forward", 0, 0, running))
+    notes = moved_notes(statement.entries)
     for e in statement.entries:
         running += e.amount_cents
         rows.append(
             StatementRow(
                 e.posted_on,
-                e.description,
+                f"{e.description} ({notes[e.pk]})" if e.pk in notes else e.description,
                 max(e.amount_cents, 0),
                 max(-e.amount_cents, 0),
                 running,

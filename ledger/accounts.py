@@ -141,19 +141,28 @@ def moves_after_change(lot_id: int, before: list) -> list[tuple]:
     ``before`` to what they are now, as (entry, target account id), oldest
     first (D34-fixmoney-1).
 
-    Only entries the rule had put where they are (their account is the one
-    the old periods gave their date) move, and only to an account (never to
-    "no account"): an account the board chose by hand for an entry, such as
-    a refund check for a former owner's credit, is kept. Reversals and
+    Only entries the rule had put where they are move, and only to an
+    account (never to "no account"): an account the board chose by hand for
+    an entry, such as a refund check for a former owner's credit, is kept.
+    An entry is the rule's when its account is the one the old periods gave
+    its date, or (fixres BUG-001: an ownership ended with an earlier date,
+    the buyer recorded in a later step) when the old periods gave its date
+    no account, it sits on the account whose period ended last before that
+    date, and it was posted before that closing was recorded (so it was
+    posted while the account still covered its date). The entries a closing
+    left on the closed account are so moved by whichever later step gives
+    their date an account again. Reversals and
     recorded refunds follow their entry, so a reversed pair stays together
     on its account; online payments stay with the person who paid; a late
     fee moves with the month's dues it penalises."""
+    from community.models import Account
     from ledger.models import LedgerEntry
     from payments.services import online_entry_ids
 
     after = periods(lot_id)
     if after == before:
         return []
+    closed_at = dict(Account.objects.filter(lot_id=lot_id).values_list("pk", "closed_recorded_at"))
     entries = list(LedgerEntry.objects.filter(lot_id=lot_id).order_by("id"))
     reversed_ids = {e.reverses_id for e in entries if e.reverses_id}
     online = online_entry_ids()
@@ -161,9 +170,18 @@ def moves_after_change(lot_id: int, before: list) -> list[tuple]:
     def fixed(e) -> bool:
         return e.kind in ("reversal", "refund") or e.pk in reversed_ids or e.pk in online
 
+    def placed_by_rule(e) -> bool:
+        old = pick(before, e.posted_on)
+        if e.account_id == old:
+            return True
+        if old is not None or e.account_id != last_closed(before, e.posted_on):
+            return False
+        recorded = closed_at.get(e.account_id)
+        return recorded is None or e.created_at < recorded
+
     def by_date(e) -> int | None:
         new = pick(after, e.posted_on)
-        if e.account_id == pick(before, e.posted_on) and new not in (None, e.account_id):
+        if new not in (None, e.account_id) and placed_by_rule(e):
             return new
         return None
 
@@ -191,6 +209,16 @@ def moves_after_change(lot_id: int, before: list) -> list[tuple]:
                 plan[e.pk] = target
     by_pk = {e.pk: e for e in entries}
     return [(by_pk[pk], plan[pk]) for pk in sorted(plan)]
+
+
+def last_closed(accounts: list, on) -> int | None:
+    """The account whose period ended last on or before ``on``."""
+    ended = [
+        (closed, opened, pk)
+        for pk, opened, closed in accounts
+        if closed is not None and closed <= on
+    ]
+    return max(ended)[2] if ended else None
 
 
 @internal("ledger accounts")
