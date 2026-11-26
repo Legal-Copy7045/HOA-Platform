@@ -14,6 +14,7 @@ from django.apps import apps as global_apps
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection, transaction
 from django.urls import reverse
+from django.utils import timezone
 
 from community.models import Role
 from community.tests.factories import make_member
@@ -215,3 +216,27 @@ def test_migration_redacts_stored_descriptions_and_nothing_else(w):
             "WHERE tgname = 'ledger_banktransaction_append_only_row'"
         )
         assert cursor.fetchone()[0] == "O"
+
+
+# --- SEC-005: Teller Connect script --------------------------------------------------------------
+
+
+def test_connect_script_is_limited_to_tellers_connect_path_and_sends_no_referrer(
+    client, w, settings
+):
+    settings.TELLER_APPLICATION_ID = "app_test"
+    settings.TELLER_ENVIRONMENT = "sandbox"
+    client.force_login(w["board"])
+    session = client.session
+    session["account_authentication_methods_user"] = str(w["board"].pk)
+    session["account_authentication_methods"] = [
+        {"method": "password", "at": timezone.now().timestamp(), "reauthenticated": True}
+    ]
+    session.save()
+    page = client.get(reverse("bank_connect"))
+    assert page.status_code == 200
+    directives = page["Content-Security-Policy"].split(";")
+    script_src = next(d for d in directives if d.strip().startswith("script-src")).split()
+    assert [s for s in script_src if "teller.io" in s] == ["https://cdn.teller.io/connect/"]
+    tag = b'<script src="https://cdn.teller.io/connect/connect.js" referrerpolicy="no-referrer">'
+    assert tag in page.content

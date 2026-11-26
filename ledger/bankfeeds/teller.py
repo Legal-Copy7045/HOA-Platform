@@ -46,10 +46,14 @@ logger = logging.getLogger(__name__)
 
 API_HOST = "api.teller.io"
 API_BASE = f"https://{API_HOST}"
+# Teller publishes Connect only at this unversioned URL, with no integrity
+# hash (checked 2026-11-26), so it cannot be pinned with SRI. The accepted
+# residual risk and its limits are in D34-fixinfra-2 and docs/runbook.md.
 CONNECT_SCRIPT = "https://cdn.teller.io/connect/connect.js"
 # The connect page's Content-Security-Policy additions (that one view only).
+# Scripts only from Teller's /connect/ path, not the whole CDN host.
 CONNECT_CSP = {
-    "script-src": ["https://cdn.teller.io"],
+    "script-src": ["https://cdn.teller.io/connect/"],
     "frame-src": ["https://cdn.teller.io", "https://api.teller.io"],
     "connect-src": ["https://cdn.teller.io", "https://api.teller.io"],
 }

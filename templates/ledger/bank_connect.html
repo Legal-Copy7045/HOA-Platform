@@ -15,7 +15,7 @@
     </div>
     <form method="post" id="teller-enrollment" hidden>{% csrf_token %}<input type="hidden" name="nonce" value="{{ nonce }}"><input type="hidden" name="access_token" value=""></form>
   </section>
-  <script src="{{ connect_script }}"></script>
+  <script src="{{ connect_script }}" referrerpolicy="no-referrer"></script>
   <script src="{% static 'js/bank-connect.js' %}"></script>
   {% endif %}
 {% endblock %}

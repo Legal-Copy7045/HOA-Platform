@@ -480,6 +480,24 @@ reconnected (banks do this every few months, or after a password change):
 then press **Connect a bank** again. **Disconnect** (board) deletes the access
 key and keeps the lines already imported.
 
+**Accepted risk: Teller's Connect script (D34-fixinfra-2).** The Connect a
+bank page loads Teller's script from `https://cdn.teller.io/connect/connect.js`.
+Teller publishes it only at that unversioned address, with no integrity hash,
+so the browser cannot check that the file is the one we reviewed. If Teller's
+CDN were ever compromised, that script could act as the signed-in board member
+on that one page. Limits in place: only this page allows it (its
+Content-Security-Policy admits scripts from Teller's `/connect/` path only,
+nowhere else on the site), the page needs a fresh password or passkey check,
+the script is fetched without a referrer, and it is opened only when a board
+member connects or reconnects the bank (every few months). To reduce it
+further: connect from a browser profile used only for this, sign out right
+after.
+If Teller starts publishing a versioned URL or an integrity hash, pin it in
+`ledger/bankfeeds/teller.py` (`CONNECT_SCRIPT`) with `integrity` and
+`crossorigin` on the script tag. If the browser console on Connect a bank
+reports a blocked Teller script, the path rule in `teller.CONNECT_CSP` needs
+the reported address.
+
 **Statement files (free with any bank).** On the bank's website, download the
 account's activity as **OFX** or **QFX** ("Quicken" or "Money" format) if
 offered, otherwise **CSV**. In Bank feed, add an account for statement files

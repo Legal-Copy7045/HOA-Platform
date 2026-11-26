@@ -167,7 +167,7 @@
   last: ""
 - key: bank feed teller connect
   check: "With Teller set up (sandbox first, then development), Connect a bank asks for the password or passkey, opens Teller's window without CSP errors in the browser console, and after choosing a bank shows the account with its last four digits and recent lines; Sync now adds nothing twice; Disconnect asks first and keeps the lines; no other page's Content-Security-Policy mentions teller.io."
-  steps: "Follow docs/runbook.md 'Bank feed (Teller, free tier)' with TELLER_ENVIRONMENT=sandbox; open the browser console on Connect a bank; connect a sandbox bank; press Sync now twice; check another page's response headers; Disconnect. If the console reports a blocked Teller host, add it to teller.CONNECT_CSP."
+  steps: "Follow docs/runbook.md 'Bank feed (Teller, free tier)' with TELLER_ENVIRONMENT=sandbox; open the browser console on Connect a bank; connect a sandbox bank; press Sync now twice; check another page's response headers; Disconnect. If the console reports a blocked Teller host or script path, add it to teller.CONNECT_CSP (scripts are allowed from https://cdn.teller.io/connect/ only)."
   last: ""
 - key: bank feed statement file
   check: "A real OFX or QFX download and a CSV download from the HOA's bank import into Bank feed (CSV after Match the columns), amounts and dates look right, importing the same file again adds nothing, a matching deposit is offered and once confirmed is ticked on Reconcile a statement with the ending balance filled in; the pages work at phone width."
