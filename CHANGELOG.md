@@ -6,6 +6,23 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.16.0 — 2026-11-26
+
+- Automatic payments can now be once a year: the payer chooses "Once a
+  year" and a month, and on that month's due day the next 12 months'
+  assessments are paid in one payment, less any credit on the account. The
+  money becomes prepaid credit that pays each month's assessment as it is
+  charged; nothing is charged monthly then. The set-up page and Stripe's page
+  say which schedule and roughly what amount; the schedule can be changed on
+  the automatic payments page and takes effect from the next charge.
+- Automatic payments above $500 (a new Community setting, surcharge
+  included; it replaces the old percent ceiling) are no longer charged
+  straight away: they wait for the board's review. The board approves or
+  declines from My items or Online payments (never for a home they pay for,
+  and never the manager); a declined or expired (14 days) payment is not
+  charged and the owners are emailed (D47).
+- Online payments lists homes by address in the automatic payments table.
+
 ## 0.15.0 — 2026-11-26
 
 - Automatic payments (optional feature, off by default; needs Online
