@@ -111,7 +111,7 @@ def test_board_member_has_both_homeowner_and_board_sides(client, board_owner):
     assert policy.can(user, "invoice.approve")
     client.force_login(user)
     page = client.get(reverse("home")).content.decode()
-    assert ">Homeowner<" in page and ">Board<" in page
+    assert ">My home<" in page and ">Association<" in page
 
 
 def test_retiring_from_the_board_keeps_homeowner_access(client, board_owner):
@@ -126,7 +126,7 @@ def test_retiring_from_the_board_keeps_homeowner_access(client, board_owner):
     assert policy.can(user, "arc.submit") and not policy.can(user, "invoice.approve")
     client.force_login(user)
     page = client.get(reverse("home")).content.decode()
-    assert ">Homeowner<" in page and ">Board<" not in page
+    assert ">My home<" in page and ">Association<" not in page
     assert client.get(reverse("my_lot")).status_code == 200
     assert client.get(reverse("board_home")).status_code == 403
 

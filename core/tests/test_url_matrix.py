@@ -861,8 +861,9 @@ def test_role_page_access(client, world, who, allowed, denied):
 
 def test_board_pages_load(client, world):
     client.force_login(world["board"])
+    # The old Board overview sends bookmarks to My items (streamlining).
+    assert client.get(reverse("board_home"))["Location"] == reverse("my_items")
     for name in (
-        "board_home",
         "people",
         "approvals",
         "invitations",

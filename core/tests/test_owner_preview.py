@@ -1,4 +1,4 @@
-"""Homeowner view: the board sees exactly what one lot's owner sees, read-only."""
+"""Preview as owner: the board sees exactly what one lot's owner sees, read-only."""
 
 import pytest
 from django.urls import reverse
@@ -30,8 +30,8 @@ def _start(client, user, lot):
 def test_board_sees_the_owners_menu_and_scope(client, w):
     _start(client, w["board"], w["lot"])
     page = client.get(reverse("home"))
-    assert b"Homeowner view" in page.content
-    assert b"Board overview" not in page.content  # board menu gone
+    assert b"Preview as owner:" in page.content
+    assert b">Association<" not in page.content  # board menu gone
     assert client.get(reverse("board_home")).status_code == 403
     assert client.get(reverse("my_lot")).status_code == 200
     assert client.get(reverse("lot_detail", args=[w["other"].pk])).status_code in (403, 404)
@@ -46,8 +46,9 @@ def test_homeowner_view_is_read_only(client, w):
 
 def test_exit_restores_the_board_view(client, w):
     _start(client, w["board"], w["lot"])
-    client.post(reverse("owner_preview_stop"))
-    assert client.get(reverse("board_home")).status_code == 200
+    response = client.post(reverse("owner_preview_stop"))
+    assert response["Location"] == reverse("lot_detail", args=[w["lot"].pk])  # where it began
+    assert client.get(reverse("people")).status_code == 200
     assert AuditEvent.objects.filter(action="preview.owner_stopped").exists()
 
 
@@ -71,4 +72,4 @@ def test_preview_ends_if_the_viewer_loses_the_role(client, w):
             ended_on=days_ago(1), end_reason="resigned"
         )
     page = client.get(reverse("home"))
-    assert b"Homeowner view" not in page.content
+    assert b"Preview as owner:" not in page.content

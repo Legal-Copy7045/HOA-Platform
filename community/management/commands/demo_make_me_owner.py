@@ -52,6 +52,6 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Done: you are now a joint owner of demo lot {lot}. Sign out and back in; "
-                "the Homeowner section of the menu shows your own home."
+                "the My home section of the menu shows your own home."
             )
         )

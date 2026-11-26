@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Voting · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="page-head"><div><h1>Voting</h1><p class="subtitle">{% if shown.votes %}Formal votes of the owners (binding){% endif %}{% if shown.votes and shown.elections %}, {% endif %}{% if shown.elections %}board elections{% endif %}{% if shown.surveys %}{% if shown.votes or shown.elections %} and {% endif %}surveys (to hear your views, nothing is decided by them){% endif %}.</p></div>
     {% if new.vote or new.election or new.survey %}<div class="actions">
       {% if new.vote %}<a class="btn secondary" href="?new=vote#new-vote">{% icon "plus" %} New vote</a>{% endif %}

@@ -351,7 +351,7 @@ def test_my_items_lists_unassigned_and_my_requests_with_counts(client, w):
     assert {"area": "Requests", "count": 1, "overdue": 0} in counts
     client.force_login(w["board2"])
     assert b"Broken fence" in client.get(reverse("my_items")).content
-    assert b"My items" in client.get(reverse("board_home")).content
+    assert client.get(reverse("board_home"))["Location"] == reverse("my_items")
 
 
 def test_owner_sees_requests_waiting_on_them(w):

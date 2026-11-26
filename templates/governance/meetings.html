@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}Meetings · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="page-head"><div><h1>Meetings</h1><p class="subtitle">Board and owner meetings, with agendas and minutes.</p></div></div>
   <section class="card">
     {% if meetings %}<ul class="list">{% for m in meetings %}<li>

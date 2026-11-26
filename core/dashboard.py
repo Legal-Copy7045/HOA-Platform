@@ -2,8 +2,8 @@
 
 Everything goes through the same permission table and scoped managers as the
 pages it links to, so a dashboard never shows more than the user could open.
-The to-dos are core.my_items (the same list as My items, the Board overview
-counts and the sidebar bubbles), so the three can never disagree.
+The to-dos are core.my_items (the same list as My items and the sidebar
+bubbles), so they can never disagree.
 """
 
 from __future__ import annotations
@@ -23,38 +23,55 @@ def _n(count: int, singular: str, plural: str) -> str:
 
 
 def owner_panel(user, roles) -> dict:
-    from arc.models import ArcRequest
+    """The balance tile per account. Open votes, ARC requests and notices are
+    to-dos already, so they have no tiles; "Pay $X" is on the balance to-do
+    (core.my_items)."""
     from community.models import Lot
-    from compliance.models import Violation
-    from core.scoping import own_records
-    from governance.models import Vote
-    from governance.services import ballot_choices_for
     from ledger.services import owner_statement
 
     accounts = []
     since = roles.lot_since
     for lot in Lot.objects.for_user(user).filter(pk__in=roles.account_lot_ids):
-        start = since.get(lot.pk)
-        accounts.append({"lot": lot, "balance": owner_statement(lot.pk, start).balance})
-    open_arc = (
-        ArcRequest.objects.for_user(user)
-        .filter(lot_id__in=roles.account_lot_ids)
-        .exclude(state__in=["completed", "withdrawn", "denied", "appeal_decided"])
-        .count()
-    )
-    notices = own_records(Violation.objects.for_user(user), user).filter(
-        state__in=["noticed", "responded", "hearing"]
-    )
-    votes = [
-        v for v in Vote.objects.filter(status="open") if ballot_choices_for(v, user)["can_vote"]
-    ]
+        accounts.append({"lot": lot, "balance": owner_statement(lot.pk, since.get(lot.pk)).balance})
+    return {"accounts": accounts, "proxy_meetings": proxy_meetings(user)}
+
+
+def system_panel() -> dict:
+    """A sysadmin-only login's home: the System status summary (health only,
+    never owner data)."""
+    from core.health import run_checks
+    from core.views import _update_status
+
+    health = run_checks()
     return {
-        "accounts": accounts,
-        "open_arc": open_arc,
-        "notices": notices.count(),
-        "votes": len(votes),
-        "proxy_meetings": proxy_meetings(user),
+        "failing": [r for r in health if not r.ok],
+        "checks": len(health),
+        "update": _update_status(),
     }
+
+
+def quick_actions(user, roles) -> list[dict]:
+    out = []
+    # TODO(merge): the finance builder's {% quick_actions %} tag
+    # (core.my_items.quick_actions) renders "Record checks"; use it here and on
+    # My items, and drop this entry and can_record_checks.
+    if _can(roles.groups, "ledger.manage"):
+        out.append({"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"})
+    if roles.groups & policy.ACCOUNT_VIEWERS:
+        if _can(roles.groups, "arc.submit"):
+            out.append(
+                {
+                    "label": "My home improvement requests (ARC)",
+                    "url": reverse("arc_list") + "?mine=1",
+                    "icon": "pencil",
+                }
+            )
+        out += [
+            {"label": "Governing documents", "url": reverse("documents"), "icon": "folder"},
+            {"label": "Update my contact details", "url": reverse("my_profile"), "icon": "user"},
+            {"label": "Sign-in and security", "url": reverse("mfa_index"), "icon": "lock"},
+        ]
+    return out
 
 
 def proxy_meetings(user) -> list:
@@ -139,6 +156,9 @@ def build(user, request=None) -> dict:
         data["owner"] = owner_panel(user, roles)
     if roles.groups & {policy.BOARD, policy.MANAGER, policy.AUDITOR, policy.ARC_REVIEWER}:
         data["staff"] = staff_panel(user, roles)
+    if roles.groups == {policy.SYSADMIN}:  # sysadmin-only login: operations first
+        data["system"] = system_panel()
+    data["quick"] = quick_actions(user, roles)
     from comms.models import Announcement, AnnouncementRead
     from comms.services import upcoming
 

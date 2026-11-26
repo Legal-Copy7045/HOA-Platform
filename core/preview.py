@@ -1,4 +1,4 @@
-"""Homeowner view: a board member or manager sees the portal exactly as the
+"""Preview as owner: a board member or manager sees the portal exactly as the
 owner of one lot sees it, for testing and for helping owners.
 
 - No new data: these roles can already see every lot (lot.view_all).
@@ -81,7 +81,7 @@ class OwnerPreviewMiddleware:
                 name = None
             if name not in ALLOWED_POST_URL_NAMES:
                 return HttpResponseForbidden(
-                    "Homeowner view is read-only. Exit it to make changes.",
+                    "Preview as owner is read-only. Exit the preview to make changes.",
                     content_type="text/plain",
                 )
         request.owner_preview = Preview(user.pk, lot.pk, lot.number)
@@ -116,11 +116,12 @@ def start(request):
 @require_POST
 def stop(request):
     lot_id = request.session.pop(SESSION_KEY, None)
-    if lot_id:
-        record_event(
-            "preview.owner_stopped",
-            actor=request.user,
-            request=request,
-            metadata={"lot_id": lot_id},
-        )
-    return redirect("board_home")
+    if not lot_id:
+        return redirect("home")
+    record_event(
+        "preview.owner_stopped",
+        actor=request.user,
+        request=request,
+        metadata={"lot_id": lot_id},
+    )
+    return redirect("lot_detail", lot_id)  # where "Preview as owner" was started

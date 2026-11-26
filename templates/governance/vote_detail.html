@@ -2,7 +2,6 @@
 {% load portal %}
 {% block title %}{{ vote.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% include "governance/gov_nav.html" %}
   <div class="crumbs"><a href="{% url 'voting' %}">Voting</a> / {{ vote.title|truncatechars:40 }}</div>
   <div class="page-head"><div><h1>{{ vote.title }}</h1>
     <div class="meta">{% status vote.status vote.get_status_display %}<span>{{ vote.get_kind_display }}</span>{% if vote.closes_at %}<span>{% icon "clock" %}Closes {{ vote.closes_at|date:"M j, Y g:i A" }}</span>{% endif %}{% if vote.secret %}<span>{% icon "lock" %}Secret ballot</span>{% endif %}{% if vote.meeting_id %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' vote.meeting_id %}">{{ vote.meeting.title }}</a></span>{% endif %}</div>

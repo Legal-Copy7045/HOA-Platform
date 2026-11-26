@@ -487,30 +487,31 @@ def test_posting_dues_from_the_month_picker(client, w):
 
 
 def test_every_finance_page_shows_the_same_tabs(client, w):
+    """Streamlining 2026-11-26: tabs only across Owner accounts, Collections,
+    Accounting and Reports; the rest of Finance is in the sidebar."""
     client.force_login(w["board"])
-    tabs = ["Owner accounts", "Invoices", "Contracts", "Accounting", "Letters", "Reports"]
-    for name in ("ledger_home", "invoices", "contracts", "vendors", "accounting", "collections"):
+    tabs = ["Owner accounts", "Collections", "Accounting", "Reports"]
+    for name in ("ledger_home", "accounting", "collections", "reports", "reconcile"):
         page = client.get(reverse(name)).content.decode()
         nav = page.split('aria-label="Finance"')[1].split("</nav>")[0]
-        for tab in tabs:
-            assert f">{tab}</a>" in nav, (name, tab)
+        assert [t for t in tabs if f">{t}</a>" in nav] == tabs, name
+        assert ">Invoices</a>" not in nav and ">Letters</a>" not in nav
 
 
 def test_finance_tabs_leave_out_switched_off_features(client, w):
-    from core import features
-
-    features.set_feature("contracts", False, actor=w["board"])
+    """Pages outside the four (other Finance pages, Maintenance) have no tab
+    bar at all: the sidebar is the one menu."""
     client.force_login(w["board"])
-    page = client.get(reverse("ledger_home")).content.decode()
-    nav = page.split('aria-label="Finance"')[1].split("</nav>")[0]
-    assert ">Contracts</a>" not in nav and ">Invoices</a>" in nav
+    for name in ("invoices", "contracts", "vendors", "work_orders", "budgets", "letters_settings"):
+        page = client.get(reverse(name)).content.decode()
+        assert 'aria-label="Finance"' not in page, name
 
 
 def test_manager_does_not_see_the_letters_tab(client, w):
     client.force_login(w["manager"])
     page = client.get(reverse("ledger_home")).content.decode()
     nav = page.split('aria-label="Finance"')[1].split("</nav>")[0]
-    assert ">Letters</a>" not in nav
+    assert ">Letters</a>" not in nav and ">Owner accounts</a>" in nav
 
 
 # --- Accounting setup and 1099 table ----------------------------------------------------------

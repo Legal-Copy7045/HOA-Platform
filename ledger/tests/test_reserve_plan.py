@@ -318,8 +318,11 @@ def test_owner_summary_shows_only_adopted_figures(client, w):
 
 def test_summary_is_in_community_info(client, w):
     client.force_login(w["owner"])
-    page = client.get(reverse("community_info")).content.decode()
-    assert reverse("reserve_summary") in page and "Reserve plan summary" in page
+    # Streamlining 2026-11-26: the summary is part of "Budget and reserves"
+    # (owner_budget), no longer a Community info tile.
+    assert "Budget and reserves" in client.get(reverse("home")).content.decode()
+    page = client.get(reverse("community_info"), follow=True).content.decode()
+    assert reverse("reserve_summary") not in page
 
 
 # --- Board page forms ---------------------------------------------------------------------------
@@ -510,4 +513,4 @@ def test_feature_switch_hides_every_page(client, w):
 def test_reserve_plan_is_in_the_finance_menu_and_tabs(client, w):
     client.force_login(w["manager"])
     html = client.get(reverse("budgets")).content.decode()
-    assert html.count(f'href="{reverse("reserve_plan")}"') >= 2  # sidebar and Finance tab
+    assert html.count(f'href="{reverse("reserve_plan")}"') == 1  # the sidebar (no tab bar)

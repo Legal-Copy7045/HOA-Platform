@@ -54,7 +54,11 @@ def test_board_dashboard_lists_invoice_waiting_for_me(client):
 @pytest.mark.parametrize(
     ("roles", "present", "absent"),
     [
-        ([Role.SYSADMIN], ["System status", "Invitations"], ["Owner accounts", "People", "My lot"]),
+        (
+            [Role.SYSADMIN],
+            ["System status", "Invitations and sign-ups", "Branding"],
+            ["Owner accounts", "People", "My home", "Settings"],
+        ),
         ([Role.AUDITOR], ["Owner accounts", "Reports"], ["Approvals", "People"]),
         ([Role.MANAGER], ["Invoices", "Board tasks"], ["Approvals", "People"]),
     ],

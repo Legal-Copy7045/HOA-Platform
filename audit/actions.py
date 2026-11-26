@@ -101,7 +101,7 @@ _SPECS = [
         "in_directory",
     ),
     _spec("export.own_data", "Downloaded own data"),
-    _spec("preview.owner_started", "Homeowner view started", "lot_id"),
+    _spec("preview.owner_started", "Preview as owner started", "lot_id"),
     _spec("account.number_set", "Account number set"),
     _spec("account.contact_added", "Account contact added", "person_id", "kind"),
     _spec("account.contact_ended", "Account contact ended", "person_id", "kind"),
@@ -188,7 +188,7 @@ _SPECS = [
         "branding.login_background_set", "Sign-in background uploaded", "variant", "width", "height"
     ),
     _spec("branding.login_background_removed", "Sign-in background removed", "variant"),
-    _spec("preview.owner_stopped", "Homeowner view ended", "lot_id"),
+    _spec("preview.owner_stopped", "Preview as owner ended", "lot_id"),
     _spec("announcement.published", "Announcement published", "audience", "urgent"),
     _spec("event.created", "Calendar event created", "audience"),
     _spec("event.cancelled", "Calendar event cancelled"),

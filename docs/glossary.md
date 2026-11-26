@@ -8,7 +8,10 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | What owners and the board see | Meaning | Name in code |
 |---|---|---|
 | Dashboard | The home page after sign-in: to-dos first, then numbers. | `home`, `core/dashboard.py` |
-| Needs your attention / My items | Everything waiting on you. The dashboard list, the My items page, the Board overview counts and the menu bubbles all come from one list. | `core.my_items.items_for` |
+| Menu sections | **My home** (your own lot, account and requests), **Community**, **Association** (the board's work), **Maintenance** (work orders, vendors, contracts), **Finance** and **Admin**. The owner side and the board side stay separate sections. | `core/navigation.py` `SECTIONS` |
+| Needs your attention / My items | Everything waiting on you. The dashboard list, the My items page and the menu bubbles all come from one list. Set-up warnings (fewer than two people able to act, board terms past their end, rules missing a citation) sit at the top of My items. | `core.my_items.items_for` |
+| Second approvals | Requests a second board member must approve (sysadmin nominations, sign-in resets, account changes). Reached from My items. | `approvals` |
+| Preview as owner | A board member or manager sees the portal as one lot's owner does, read-only and logged. Started from the lot's page. | `core/preview.py` |
 | Search | The search box at the top of the menu and its results page: finds announcements, documents, meetings, requests and more, grouped by area. Shows only what you can already open. | `core/search.py`, `<app>/search.py` |
 | My home | Your lot, the people on your account. | `my_lot` |
 | My account | Your dues statement and balance. The board's view of every lot is **Owner accounts**. | `ledger` |
@@ -19,7 +22,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Credit card surcharge | The fee on credit card payments only (never bank or debit), at most 3%. Not part of the account balance. | `payments.credit_card_surcharge_bp` |
 | Online payments | The board's page of Stripe payments, bank payments processing, problems to handle, payouts and the daily check against Stripe. | `online_payments`, `payments.sync` |
 | Account number | The number of one ownership period of a lot (changes when the lot is sold). Shown as plain text, not a badge. | `Account.number` |
-| Home improvement approvals (ARC) | Asking the Architectural Review Committee to approve an exterior change. The board's list is **Architectural review**. | `arc`, `ArcRequest` |
+| My home improvement requests (ARC) | Asking the Architectural Review Committee to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |
 | Neighbor acknowledgement | A neighbor confirms they have seen a project. It never decides the request. | "signoff" (`arc/signoffs.py`) |
 | Notices about my home | Covenant or rule notices sent to an owner. The board's list is **Violations**. | `compliance`, `Violation` |
 | Fix by | The date an owner should fix a notice by. | `cure_by` |
@@ -29,7 +32,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Request #12, Notice #7, Work order #3 | Record numbers. No letter prefixes (ARC-12, V-7, WO-3, R-2). | primary key |
 | Version 2 | A document's second upload. | `DocumentVersion.number` |
 | My requests | Questions and requests to the board. The board's list is **Owner requests**. | `operations.OwnerRequest` |
-| Records requests | An owner's request to inspect association records (Pennsylvania law). | `governance.RecordsRequest` |
+| Records requests | An owner's request to inspect association records (Pennsylvania law). The owner's own list is **My records requests**. | `governance.RecordsRequest` |
 | Voting | One list of **Votes**, **Elections** and **Surveys**, filtered by open or past and by type. Board members start new ones here (New vote, New election, New survey). Owners also find **Give a proxy** for coming owners' meetings. The old addresses of the three lists lead here. | `voting` |
 | Votes | Formal votes of the owners: binding, one ballot per lot, with the quorum and pass rules (and citations) fixed when the vote opens. Informal polls made before November 26, 2026 stay readable under Past; a new poll is a survey with one question. | `Vote` |
 | Elections | Board elections: nominations, ballots, results. | `Election` |
@@ -40,12 +43,14 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Adopt by written consent | A board decision without a meeting: every serving board member must approve in writing; one decline and it is not adopted. The signatures are kept as their own records; once adopted it is recorded as a resolution. | `ConsentRequest`, `consents` (redirects to Resolutions and policies) |
 | Meeting page | Everything about one meeting: agenda, notice, minutes (uploaded here), packet, the votes, elections and resolutions that belong to it, quorum and proxies. Meetings put themselves on the calendar and come off it when cancelled; executive sessions never appear there. | `meeting_detail` |
 | Meeting packet | One PDF for a meeting: cover, agenda, minutes, financial totals and an attachment index, with a .zip of the attachments. The **Board packet** (marked "Confidential – board only") adds receivables and open-item counts; the **Owner packet** never has delinquency, violation or collection details. | `governance/packets.py`, `MeetingPacket` |
-| Community info | One page for **Frequently asked questions**, the **Owner directory**, **Committees** and the **Reserve plan summary**. | `community_info` |
+| Community info | One page for **Frequently asked questions**, **Board and committees**, the **Owner directory** and (for committee members) **Committees**. With only one of these open to you, the menu goes straight to it. | `community_info` |
 | Reserve plan | The board's in-house reserve study: the things the association will one day replace (component, cost today, useful life, years left), a year-by-year projection of the reserve fund, percent funded and the contribution needed. Finance menu. | `reserve_plan`, `ledger/reserves.py` |
 | Record as adopted | The board fixes the current reserve plan's figures as adopted on a date ("reserve plan adopted Nov 26, 2026"); kept unchanged. | `ReserveStudySnapshot` |
 | Reserve plan summary | What owners see of the adopted reserve plan: percent funded, the adopted date and the next major items (no board notes). | `reserve_summary` |
 | Percent funded | The reserve balance compared with the fully funded balance (each component's cost times the share of its life already used). | `percent_funded` |
-| Settings | One page for rarely used set-up pages: Community settings, ARC request types, Lot neighbors, Letters and certificates, Compliance calendar, Branding, Features. | `settings_hub` |
+| Settings | One page for rarely used set-up pages: Community settings, ARC request types, Lot neighbors, Letters and certificates, Common area booking rules, Branding, Features, Contact retention. With only one open to you, the menu goes straight to it. | `settings_hub` |
+| Contact retention | Former owners' contact details cleared after the retention period. | `retention` |
+| Access review | The board's quarterly check of every login's access, on the People page. | `access_review` |
 | Passkeys and security | Your sign-in methods (passkey, authenticator app, recovery codes). | allauth MFA |
 | Download my data | A file with everything the portal holds about you, for your records. | JSON export |
 | RSVP | Your answer to a calendar event: Going, Maybe or Not going, with guests if the event allows. Other owners see counts only. | `comms.EventRsvp`, `comms/rsvp.py` |

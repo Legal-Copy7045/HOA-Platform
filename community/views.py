@@ -171,34 +171,11 @@ def ownership_end(request, pk):
 
 @login_required
 def board_home(request):
+    """The old Board overview: its alerts are at the top of My items now, so
+    bookmarks and emailed links land there."""
     if not policy.can(request.user, "task.manage"):  # board and manager
         policy.require(request.user, "person.manage")
-    from accounts.models import Invitation, MfaReset
-
-    open_nominations = [n for n in SysadminNomination.objects.for_user(request.user) if n.is_open]
-    resets_waiting = [
-        r for r in MfaReset.objects.for_user(request.user) if r.status == "awaiting_approval"
-    ]
-    from core.my_items import counts, items_for_request
-
-    return render(
-        request,
-        "community/board_home.html",
-        {
-            "item_counts": counts(items_for_request(request)),
-            "thin": policy.thinly_covered_actions(),
-            "past_term": BoardSeat.objects.for_user(request.user)
-            .past_term_end()
-            .select_related("person"),
-            "open_nominations": open_nominations,
-            "resets_waiting": resets_waiting,
-            "approvals_waiting": len(open_nominations) + len(resets_waiting),
-            "preview_lots": Lot.objects.for_user(request.user).order_by("number")
-            if policy.can(request.user, "portal.preview_as_owner")
-            else [],
-            "invites_open": Invitation.objects.for_user(request.user).pending().count(),
-        },
-    )
+    return redirect("my_items")
 
 
 @login_required
@@ -216,7 +193,17 @@ def people(request):
             return _done(request, "Person added.", reverse("person_detail", args=[person.pk]))
         return _invalid(request, form, reverse("people"))
     people_ = Person.objects.for_user(request.user).select_related("user")
-    return render(request, "community/people.html", {"people": people_, "form": form})
+    context = {"people": people_, "form": form}
+    if policy.can(request.user, "access_review.record"):
+        # The quarterly access review lives here, not in Settings (streamlining).
+        from accounts import access_review
+
+        last = access_review.latest()
+        context["access_review"] = {
+            "last_on": last.reviewed_at if last else None,
+            "due": access_review.is_due(),
+        }
+    return render(request, "community/people.html", context)
 
 
 @login_required

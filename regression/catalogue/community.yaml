@@ -24,7 +24,7 @@
 - feature: "Change history protected"
   since: M1
   match: ["^unit:community/tests/test_history_protection"]
-- feature: "Homeowner view: board and manager see one lot's owner view, read-only and audited"
+- feature: "Preview as owner (was Homeowner view): board and manager see one lot's owner view, read-only and audited"
   since: M3
   match: ["^unit:core/tests/test_owner_preview"]
 - feature: "Sign-in page background (desktop and phone), uploaded on the Branding page; images re-encoded"
@@ -39,7 +39,7 @@
 - feature: "Community settings show PA law guidance (source, statute, example); statutory fallbacks for meeting notice, quorum and resale deadline"
   since: M3
   match: ["^unit:community/tests/test_pa_law"]
-- feature: "Separate Homeowner and Board menus (Dashboard, My home, own ARC/notices/requests); owners ask the board to add or remove people on their account; POC command to test as an owner"
+- feature: "Separate owner (My home) and board (Association and after) menus (Dashboard, My home, own ARC/notices/requests); owners ask the board to add or remove people on their account; POC command to test as an owner"
   since: M3
   match: ["^unit:community/tests/test_owner_side.py::test_(menu|board_owner|owner_only|my_lot_moved|owner_asks|requester_on|only_owners|other_owners|owner_withdraws|demo_make)"]
 - feature: "ARC project types configured by the board; owners choose one"

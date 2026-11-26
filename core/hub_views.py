@@ -15,7 +15,7 @@ PAGES = {
     ),
     "community_info": (
         "Community info",
-        "Answers to common questions, the owner directory, and committees.",
+        "Answers to common questions, who is on the board and committees, and the owner directory.",
     ),
 }
 
