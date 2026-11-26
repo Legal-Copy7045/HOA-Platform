@@ -58,7 +58,7 @@ def test_first_notice_has_letter_amount_and_statement(w):
     data = letters.notice_pdf(w["lot"], LetterKind.FIRST)
     assert data.startswith(b"%PDF")
     assert b"DELINQUENT NOTICE" in data and b"$123.45" in data
-    assert b"ACCOUNT STATEMENT" in data and b"Gate repair share" in data
+    assert b"Account statement as of" in data and b"Gate repair share" in data
     assert b"CERTIFIED" not in data
     assert b"ten \\(10\\)" in data or b"ten (10)" in data
 
@@ -84,7 +84,9 @@ def test_statement_running_total_and_stub(w):
     paras, balance = letters.statement_paragraphs(w["lot"])
     assert balance == 12345
     text = "\n".join(t for _s, t in paras)
-    assert "Prior Balance" in text and "PAY THIS AMOUNT" in text and "Past Due" in text
+    # D43 wording: brought forward, the slip's amount due, past due since the date.
+    assert "Balance brought forward on" in text and "Amount due:" in text
+    assert "REMITTANCE SLIP" in text and "Past due since" in text
 
 
 def test_only_the_board_edits_wording_and_settings(w):

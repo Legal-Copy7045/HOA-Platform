@@ -390,7 +390,7 @@ def test_statement_and_resale_certificate_list_the_open_charges_and_total(w, boo
     open_rows = [t for t in text.splitlines() if t.startswith(("2026-0", numbers[mar.pk]))]
     assert any(numbers[mar.pk] in r and "$45.00" in r and "$35.00" in r for r in open_rows)
     assert any(numbers[fine.pk] in r and "$30.00" in r for r in text.splitlines())
-    assert "PAY THIS AMOUNT:" in text and "$65.00" in text
+    assert "Amount due: $65.00" in text  # the summary box (D43)
     resale = services.request_resale(lot=lot, requester_name="Agent", actor=w["board"])
     pdf = services.resale_certificate(resale)
     assert b"OPEN CHARGES" in pdf and numbers[fine.pk].encode() in pdf and b"65.00" in pdf

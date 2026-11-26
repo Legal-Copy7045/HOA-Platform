@@ -12,3 +12,4 @@ django-simple-history
 django-allauth[mfa]
 django-axes
 Pillow
+segno

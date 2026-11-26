@@ -65,6 +65,9 @@ OWN_ACCOUNT = {
     "sms_start",
     "sms_verify",
     "sms_stop",
+    # The statement's "Pay online" QR code (D43): opens the signed-in login's
+    # own home only; a hint for another home is ignored.
+    "pay_start",
 }
 # Text from board-only or other-lot fixtures that must never reach owner A.
 BOARD_ONLY_MARKERS = (
