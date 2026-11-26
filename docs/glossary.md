@@ -32,6 +32,9 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Settings | One page for rarely used set-up pages: Community settings, ARC request types, Lot neighbors, Letters and certificates, Compliance calendar, Branding, Features. | `settings_hub` |
 | Passkeys and security | Your sign-in methods (passkey, authenticator app, recovery codes). | allauth MFA |
 | Download my data | A file with everything the portal holds about you, for your records. | JSON export |
+| RSVP | Your answer to a calendar event: Going, Maybe or Not going, with guests if the event allows. Other owners see counts only. | `comms.EventRsvp`, `comms/rsvp.py` |
+| Volunteers | Jobs to sign up for at an event ("Bring a dessert"), each with a number of places. | `VolunteerSlot`, `VolunteerSignup` |
+| Events I'm going to | Dashboard list of coming events you said Going to or volunteer at. | `comms.rsvp.my_upcoming` |
 
 Dates: "Nov 3" for a date in the current month, "Nov 3, 2027" for any other
 (`{{ d|short_date }}`, `core.dates.short_date`).
