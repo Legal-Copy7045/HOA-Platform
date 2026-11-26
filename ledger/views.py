@@ -604,8 +604,27 @@ def budget_detail(request, pk):
             "report": services.budget_vs_actual(budget),
             "form": LineForm(),
             "can_manage": policy.can(request.user, "budget.manage"),
+            "reserve": _reserve_suggestion(request),
         },
     )
+
+
+def _reserve_suggestion(request):
+    """The latest adopted reserve plan's contribution, for the budget page."""
+    from core import features
+    from ledger import reserve_plan, reserves
+
+    if not features.enabled("reserves", request):
+        return None
+    snapshot = reserve_plan.latest_snapshot()
+    if snapshot is None:
+        return None
+    lots = Lot.objects.unscoped("reserve per-lot figure").count()
+    return {
+        "snapshot": snapshot,
+        "per_lot_month": reserves.per_lot_monthly(snapshot.needed_contribution_cents, lots),
+        "lots": lots,
+    }
 
 
 # --- Resale certificates -------------------------------------------------------------------
@@ -779,10 +798,18 @@ def letters_settings(request):
         "ledger/letters_settings.html",
         {
             "profile": CommunityProfile.get(),
+            "reserve_snapshot": _adopted_reserves(request),
             "templates": [letters.template(k) for k in LetterKind.values],
             "placeholders": letters.PLACEHOLDERS,
         },
     )
+
+
+def _adopted_reserves(request):
+    from core import features
+    from ledger import reserve_plan
+
+    return reserve_plan.latest_snapshot() if features.enabled("reserves", request) else None
 
 
 @login_required

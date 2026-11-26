@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Reserve plan summary · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'community_info' %}">Community info</a> / Reserve plan summary</div>
+  <div class="page-head"><div><h1>Reserve plan summary</h1>
+    <p class="subtitle">The association saves in a reserve fund for big replacements such as roads, ponds and signs, so they can be paid for when they come due.</p></div></div>
+  {% if snapshot %}
+    <p>From the <strong>reserve plan adopted {{ snapshot.adopted_on|date:"F j, Y" }}</strong> by the board.</p>
+    <div class="grid grid-3">
+      <div class="stat"><div class="label">Percent funded</div><div class="value">{% if snapshot.percent_funded is None %}-{% else %}{{ snapshot.percent_funded }}%{% endif %}</div><div class="hint">The reserve balance compared with the share of future replacements already worn out</div></div>
+      <div class="stat"><div class="label">Reserve balance</div><div class="value">{{ snapshot.starting_balance_cents|cents }}</div>{% if snapshot.balance_as_of %}<div class="hint">As of {{ snapshot.balance_as_of|date:"F j, Y" }}</div>{% endif %}</div>
+      <div class="stat"><div class="label">Saved per year</div><div class="value">{{ snapshot.annual_contribution_cents|cents }}</div><div class="hint">The plan's yearly contribution to reserves</div></div>
+    </div>
+    <section class="card">
+      <h2>Next major items</h2>
+      {% if snapshot.next_items %}<ul class="list">{% for item in snapshot.next_items %}<li><span class="muted nowrap">{{ item.year }}</span><span class="grow">{{ item.name }}</span><span class="num">{{ item.cents|cents }}</span></li>{% endfor %}</ul>
+      <p class="muted small">Estimated costs, raised for inflation to the year each is expected.</p>
+      {% else %}<p class="muted">Nothing is due within the plan's {{ snapshot.horizon_years }} years.</p>{% endif %}
+    </section>
+    {% if user|can:"request.submit" %}<p><a href="{% url 'requests' %}?mine=1">Ask the board a question about the reserves</a></p>{% endif %}
+  {% else %}<section class="card">{% include "partials/empty.html" with icon="chart" title="No reserve plan adopted yet" text="The board will publish a summary here once it adopts one." %}</section>{% endif %}
+{% endblock %}

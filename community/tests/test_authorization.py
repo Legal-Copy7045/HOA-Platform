@@ -294,6 +294,7 @@ MEMBER_READS = {
                 "reservation.request",
                 "survey.respond",
                 "event.rsvp",
+                "reserves.view_summary",
             },
         ),
         (
@@ -311,6 +312,8 @@ MEMBER_READS = {
                 "committee.view_all",
                 "roster.view",
                 "budget.view_owner",
+                "reserves.view",
+                "reserves.view_summary",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),
@@ -343,6 +346,7 @@ def test_manager_does_data_entry_but_never_approves_or_votes():
         "budget.manage",
         "person.manage",
         "role.sysadmin.approve",
+        "reserves.manage",
     ):
         assert not policy.can(manager, action), action
 

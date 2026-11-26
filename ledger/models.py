@@ -12,6 +12,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 from core.append_only import AppendOnlyModel, ScopedAppendOnlyModel
 from core.scoping import ScopedModel, ScopedQuerySet
@@ -418,3 +419,129 @@ class CollectionLetter(ScopedAppendOnlyModel):
 
     def __str__(self) -> str:
         return f"{self.kind} letter"
+
+
+# --- Reserve plan (in-house reserve study) -------------------------------------------------
+
+
+class ReserveCategory(models.TextChoices):
+    ROADS = "roads", "Roads and paving"
+    STORMWATER = "stormwater", "Stormwater and ponds"
+    SIGNS = "signs", "Signs and entrance"
+    LANDSCAPING = "landscaping", "Landscaping"
+    FENCING = "fencing", "Fencing"
+    LIGHTING = "lighting", "Lighting"
+    OTHER = "other", "Other"
+
+
+class ReserveComponent(models.Model):
+    """Something the association will one day replace, at today's cost.
+    Changing the plan is a board decision; every change is kept (history)."""
+
+    name = models.CharField(max_length=120)
+    category = models.CharField(
+        max_length=12, choices=ReserveCategory.choices, default=ReserveCategory.OTHER
+    )
+    quantity = models.CharField(max_length=60, blank=True, help_text='e.g. "1,200 sq yd"')
+    replacement_cost_cents = models.BigIntegerField()
+    useful_life_years = models.PositiveSmallIntegerField()
+    remaining_life_years = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_replaced_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True, help_text="Board only")
+    active = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["category", "name", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(replacement_cost_cents__gte=0),
+                name="reserve_component_cost_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(useful_life_years__gte=1),
+                name="reserve_component_life_at_least_one",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(remaining_life_years__isnull=False)
+                | models.Q(last_replaced_year__isnull=False),
+                name="reserve_component_remaining_or_last_replaced",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Reserve components are switched off (not active), not deleted.")
+
+    def remaining_life(self, start_year: int) -> int:
+        """Years left at the start of ``start_year`` (0 = due that year)."""
+        if self.remaining_life_years is not None:
+            return self.remaining_life_years
+        return max(0, self.last_replaced_year + self.useful_life_years - start_year)
+
+
+class ReservePlanSettings(models.Model):
+    """One row: the board's reserve plan inputs. Rates are basis points."""
+
+    starting_balance_cents = models.BigIntegerField(null=True, blank=True)
+    balance_as_of = models.DateField(null=True, blank=True)
+    annual_contribution_cents = models.BigIntegerField(default=0)
+    inflation_bp = models.PositiveIntegerField(default=300)
+    interest_bp = models.PositiveIntegerField(default=100)
+    horizon_years = models.PositiveSmallIntegerField(default=30)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    updated_at = models.DateTimeField(default=timezone.now)
+    history = HistoricalRecords()
+
+    def __str__(self) -> str:
+        return "reserve plan settings"
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("The reserve plan settings are kept.")
+
+    @classmethod
+    def get(cls) -> ReservePlanSettings:
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class ReserveStudySnapshot(AppendOnlyModel):
+    """A reserve plan as the board adopted it: the inputs and the figures it
+    produced, kept as recorded. A later adoption is a new snapshot."""
+
+    adopted_on = models.DateField(default=timezone.localdate)
+    adopted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    start_year = models.PositiveSmallIntegerField()
+    horizon_years = models.PositiveSmallIntegerField()
+    starting_balance_cents = models.BigIntegerField()
+    balance_as_of = models.DateField(null=True, blank=True)
+    annual_contribution_cents = models.BigIntegerField()
+    inflation_bp = models.PositiveIntegerField()
+    interest_bp = models.PositiveIntegerField()
+    fully_funded_cents = models.BigIntegerField()
+    percent_funded = models.IntegerField(null=True, blank=True)
+    needed_contribution_cents = models.BigIntegerField()
+    total_expense_cents = models.BigIntegerField()
+    lowest_end_cents = models.BigIntegerField()
+    lowest_year = models.PositiveSmallIntegerField()
+    first_negative_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Components as adopted (no board notes) and the next items due.
+    components = models.JSONField(default=list)
+    next_items = models.JSONField(default=list)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-adopted_on", "-id"]
+
+    def __str__(self) -> str:
+        return f"reserve plan adopted {self.adopted_on}"

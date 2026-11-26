@@ -61,6 +61,13 @@ HUBS = {
             "committee.view",
             "Committee members, topics, tasks and files.",
         ),
+        (
+            "Reserve plan summary",
+            "reserve_summary",
+            "chart",
+            "reserves.view_summary",
+            "How well the reserve fund covers future replacements, and what is due next.",
+        ),
     ],
     "settings_hub": [
         (
@@ -201,6 +208,7 @@ SECTIONS = [
             ("Work orders", "work_orders", "wrench", "finance.view"),
             ("Vendors", "vendors", "users", "finance.view"),
             ("Budgets", "budgets", "chart", "finance.view"),
+            ("Reserve plan", "reserve_plan", "chart", "reserves.view"),
             ("Collections", "collections", "dollar", "finance.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
             ("Resale certificates", "resales", "file", "resale.manage"),

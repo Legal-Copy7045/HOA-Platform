@@ -497,3 +497,5 @@ fieldset.choices legend { padding: 0; margin-bottom: .4rem; }
 .search-results mark { background: var(--warning-bg); color: inherit; padding: 0 .1em; border-radius: 3px; }
 .search-snippet { color: var(--ink-2); overflow-wrap: anywhere; margin-top: .15rem; }
 .search-results .title { overflow-wrap: anywhere; }
+/* Reserve plan: years whose ending balance is below zero (also labeled in text). */
+tr.below-zero th, tr.below-zero td { background: var(--danger-bg); }

@@ -197,6 +197,39 @@ class Command(BaseCommand):
             ledger.add_line(budget, kind=kind, name=name, annual_cents=cents, actor=b1, **extra)
         ledger.adopt_budget(budget, actor=b1)
 
+        # Reserve plan (synthetic figures): a few components, settings, adopted.
+        from ledger import reserve_plan
+
+        reserve_plan.save_settings(
+            starting_balance_cents=4200000,
+            balance_as_of=datetime.date(t.year, 1, 1),
+            annual_contribution_cents=1500000,
+            inflation_bp=300,
+            interest_bp=150,
+            horizon_years=30,
+            actor=b1,
+        )
+        for name, category, quantity, cost, life, left in (
+            ("Main road paving (demo)", "roads", "4,800 sq yd", 26000000, 25, 9),
+            ("Road sealcoat and crack fill (demo)", "roads", "4,800 sq yd", 1800000, 5, 1),
+            ("Pond dredging (demo)", "stormwater", "1 pond", 6000000, 20, 12),
+            ("Stormwater inlets (demo)", "stormwater", "14 inlets", 2100000, 30, 18),
+            ("Entrance sign (demo)", "signs", "2 signs", 1200000, 20, 4),
+            ("Split-rail fence (demo)", "fencing", "900 ft", 1350000, 20, 7),
+            ("Entrance lighting (demo)", "lighting", "6 fixtures", 900000, 15, 0),
+        ):
+            reserve_plan.save_component(
+                name=name,
+                category=category,
+                quantity=quantity,
+                replacement_cost_cents=cost,
+                useful_life_years=life,
+                remaining_life_years=left,
+                notes="Demo estimate, not a real bid.",
+                actor=b1,
+            )
+        reserve_plan.adopt(actor=b1)
+
         for month in range(1, t.month + 1):
             ledger.post_monthly_assessments(year=t.year, month=month, actor=b1)
         for number, lot in lots.items():

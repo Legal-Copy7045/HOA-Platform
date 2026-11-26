@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ component.name }} · Reserve plan · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'reserve_plan' %}">Reserve plan</a> / {{ component.name }}</div>
+  <div class="page-head"><div><h1>{{ component.name }}</h1>
+    <p class="subtitle">{{ component.get_category_display }}{% if component.quantity %} · {{ component.quantity }}{% endif %} · {{ component.replacement_cost_cents|cents }} today · lasts {{ component.useful_life_years }} years · {% if remaining == 0 %}due in {{ start_year }}{% else %}{{ remaining }} year{{ remaining|pluralize }} left from {{ start_year }}{% endif %}{% if not component.active %} · not in the plan{% endif %}</p></div></div>
+  {% if can_manage %}
+    <section class="card">
+      <h2>Change this component</h2>
+      {% include "partials/form_errors.html" %}
+      <p class="muted small">To take it out of the plan, clear "Include in the plan". Components are never deleted; every change is kept below.</p>
+      <form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Save</button><a class="btn secondary" href="{% url 'reserve_plan' %}">Cancel</a></div></form>
+    </section>
+  {% elif component.notes %}
+    <section class="card"><h2>Notes</h2><p>{{ component.notes|linebreaksbr }}</p></section>
+  {% endif %}
+  <h2>Changes</h2>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th scope="col">When</th><th scope="col">By</th><th scope="col" class="num">Cost</th><th scope="col" class="num">Useful life</th><th scope="col" class="num">Years left</th><th scope="col">In plan</th></tr></thead>
+    <tbody>{% for h in history %}<tr><td>{{ h.history_date|short_date }}</td><td>{% if h.history_user %}{{ h.history_user.get_full_name|default:h.history_user.email }}{% else %}-{% endif %}</td><td class="num">{{ h.replacement_cost_cents|cents }}</td><td class="num">{{ h.useful_life_years }}</td><td class="num">{% if h.remaining_life_years is not None %}{{ h.remaining_life_years }}{% else %}last replaced {{ h.last_replaced_year }}{% endif %}</td><td>{% if h.active %}Yes{% else %}No{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

@@ -17,6 +17,7 @@ TABS = (
     ("Work orders", "work_orders", "/finance/work-orders", None, "work_orders"),
     ("Vendors", "vendors", "/finance/vendors", None, "work_orders"),
     ("Budgets", "budgets", "/finance/budgets", None, None),
+    ("Reserve plan", "reserve_plan", "/finance/reserves", "reserves.view", "reserves"),
     ("Accounting", "accounting", "/finance/accounting", None, None),
     ("Collections", "collections", "/finance/collections", None, None),
     ("Letters", "letters_settings", "/finance/letters", "letters.manage", None),
