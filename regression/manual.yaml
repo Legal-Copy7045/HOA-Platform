@@ -241,3 +241,7 @@
   check: "On a phone the meeting page's Board actions panel starts closed below the agenda, opens with one tap, and shows only the steps that apply (send notice first; Mark held disabled with its reason until the meeting starts; minutes after Mark held)."
   steps: "As a demo board member open a coming and a past demo meeting on a phone."
   last: ""
+- key: reseed the POC from settings
+  check: "On the POC, Settings > Demo data lists both datasets and shows what the portal holds; reseeding with Fresh start (typing RESEED) takes a backup first, the portal comes back within a few minutes with 44 homes, a declarant-appointed board of three and no history; you sign in again with your own passkey (and your app code works too), still a sysadmin; Server tasks shows the reseed succeeded with its dataset; reseeding with Oak Creek Farms brings the full demo back the same way. On a portal without demo data the page answers 404 and Settings has no Demo data entry."
+  steps: "Sign in to portal-dev as a sysadmin with a passkey; Settings > Demo data; reseed with Fresh start; wait for the agent (refresh Server tasks); sign in again with the passkey; check Homes and owners, Settings > Demo data, Server tasks; repeat with Oak Creek Farms."
+  last: ""
