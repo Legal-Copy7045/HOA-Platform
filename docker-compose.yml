@@ -84,6 +84,12 @@ x-app-env: &app-env
   SMS_AUTH_TOKEN: ${SMS_AUTH_TOKEN:-}
   SMS_FROM: ${SMS_FROM:-}
   SMS_API_BASE: ${SMS_API_BASE:-https://api.twilio.com}
+  # Bank feed (optional feature "bank_feeds").
+  BANK_FEED_TOKEN_KEY: ${BANK_FEED_TOKEN_KEY:-}
+  TELLER_APPLICATION_ID: ${TELLER_APPLICATION_ID:-}
+  TELLER_ENVIRONMENT: ${TELLER_ENVIRONMENT:-sandbox}
+  TELLER_CERTIFICATE_B64: ${TELLER_CERTIFICATE_B64:-}
+  TELLER_PRIVATE_KEY_B64: ${TELLER_PRIVATE_KEY_B64:-}
 
 # Container logs rotate (10 MB x 3 per service) so they never fill the disk.
 x-logging: &logging

@@ -333,6 +333,18 @@ SMS_AUTH_TOKEN = env("SMS_AUTH_TOKEN", default="")
 SMS_FROM = env("SMS_FROM", default="")
 SMS_API_BASE = env("SMS_API_BASE", default="https://api.twilio.com")
 
+# --- Bank feed (optional feature "bank_feeds", decision D32-bankfeeds) ----------------
+# Key that encrypts stored bank access tokens (any long random string; the
+# Fernet key is derived from it). Connecting a bank is refused while empty.
+BANK_FEED_TOKEN_KEY = env("BANK_FEED_TOKEN_KEY", default="")
+# Teller (teller.io), free developer tier. sandbox | development | production.
+# Development is the free tier for real accounts. The certificate and private
+# key from the Teller dashboard, each base64 of the PEM file (base64 -w0).
+TELLER_APPLICATION_ID = env("TELLER_APPLICATION_ID", default="")
+TELLER_ENVIRONMENT = env("TELLER_ENVIRONMENT", default="sandbox")
+TELLER_CERTIFICATE_B64 = env("TELLER_CERTIFICATE_B64", default="")
+TELLER_PRIVATE_KEY_B64 = env("TELLER_PRIVATE_KEY_B64", default="")
+
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).
 EMAIL_BACKEND = "core.email.RedirectingBackend"
