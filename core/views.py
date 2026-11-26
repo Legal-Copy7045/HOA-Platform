@@ -4,13 +4,14 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.http import HttpRequest, JsonResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from core import policy
 from core.health import CLEARABLE as health_clearable
+from core.health import SCAN_ALERT_MINUTES, SCAN_STUCK_MINUTES, run_checks
 from core.health import resources as health_resources
-from core.health import run_checks
 
 
 @require_GET
@@ -219,16 +220,45 @@ def _scanner_context() -> dict:
     from django.utils.timesince import timesince
 
     from core.health import scanner_version
+    from documents.scan_queue import waiting_files
     from documents.services import scan_summary
 
     if settings.DOCUMENT_SCANNER == "none":
-        return {"scanner_info": None, "scan": None, "signatures_ago": ""}
+        return {"scanner_info": None, "scan": None, "signatures_ago": "", "scan_waiting": []}
     info = scanner_version()
     ago = ""
     if info["signatures_at"]:
         # The daemon reports the database time in UTC (as the health check reads it).
         ago = timesince(info["signatures_at"].replace(tzinfo=datetime.UTC))
-    return {"scanner_info": info, "scan": scan_summary(), "signatures_ago": ago}
+    return {
+        "scanner_info": info,
+        "scan": scan_summary(),
+        "signatures_ago": ago,
+        # Each waiting file in operations terms only: area, times, size,
+        # attempts, last result. No names, titles, owners or addresses (D57).
+        "scan_waiting": waiting_files(),
+    }
+
+
+def _scan_waiting(request):
+    """ "Scan waiting files now": queue the scan task for each waiting file.
+    Sysadmins; audited with counts only (D57)."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from documents import scan_queue
+
+    policy.require(request.user, "system.run_task")
+    queued = scan_queue.queue_waiting(actor=request.user, request=request)
+    if queued:
+        messages.success(
+            request,
+            f"{queued} file{'s' if queued != 1 else ''} queued for a scan. The background worker "
+            "scans them within a minute or two; refresh to see the result.",
+        )
+    else:
+        messages.info(request, "Nothing new to queue: no waiting files, or each is already queued.")
+    return redirect(f"{reverse('system_status')}#scan-queue")
 
 
 def _clear_check(request):
@@ -286,6 +316,8 @@ def system_status(request):
         return _send_test_email(request)
     if request.method == "POST" and request.POST.get("action") == "clear_check":
         return _clear_check(request)
+    if request.method == "POST" and request.POST.get("action") == "scan_waiting":
+        return _scan_waiting(request)
     if request.method == "POST" and request.POST.get("action") in (
         "check_updates",
         "install_update",
@@ -329,6 +361,8 @@ def system_status(request):
             **_scanner_context(),
             "resources": health_resources(),
             "require_clean_scan": settings.DOCUMENT_REQUIRE_CLEAN_SCAN,
+            "scan_stuck_minutes": SCAN_STUCK_MINUTES,
+            "scan_alert_minutes": SCAN_ALERT_MINUTES,
             **_server_errors_context(),
         },
     )

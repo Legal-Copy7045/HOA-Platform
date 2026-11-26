@@ -28,6 +28,14 @@ SIGNATURES_STALE_DAYS = 3
 ERRORS_PER_HOUR = 20
 DISK_FULL_PERCENT = 90
 BACKUP_STALE_HOURS = 36
+# A successful restore drill (restore-drill.sh records it) proves the backups
+# and the key still work; production needs one at least this often (D57).
+RESTORE_DRILL_BEAT = "restore_drill"
+RESTORE_DRILL_STALE_DAYS = 90
+# Files waiting for a malware scan (D57): "stuck" on System status after
+# STUCK, a failing health check after ALERT.
+SCAN_STUCK_MINUTES = 15
+SCAN_ALERT_MINUTES = 30
 
 
 @dataclass
@@ -116,6 +124,26 @@ def _signatures():
     return True, f"Signatures {age} day(s) old"
 
 
+def _scan_queue():
+    """Files waiting for a malware scan (D57). Only while scanning is on."""
+    if settings.DOCUMENT_SCANNER != "clamd":
+        return None
+    from documents import scan_queue
+
+    files = scan_queue.waiting_files()
+    if not files:
+        return True, "None waiting"
+    oldest = scan_queue.oldest_wait_minutes(files)
+    count = f"{len(files)} file{'s' if len(files) != 1 else ''}"
+    if oldest > SCAN_ALERT_MINUTES:
+        return False, (
+            f"{count} cannot be downloaded until scanned; the oldest has waited {oldest} "
+            "minutes. Check the Malware scanner line above, then use Scan waiting files now "
+            "on System status"
+        )
+    return True, f"{count} waiting, the oldest for {oldest} minutes (retried every 10 minutes)"
+
+
 def _errors():
     from core.errors import window_start
     from core.models import ErrorTally
@@ -144,12 +172,24 @@ def _backups():
     from core.models import Heartbeat
 
     beats = dict(Heartbeat.objects.filter(name__startswith="backup_").values_list("name", "at"))
-    beats.update(Heartbeat.objects.filter(name="offsite_lock").values_list("name", "at"))
+    beats.update(
+        Heartbeat.objects.filter(name__in=["offsite_lock", RESTORE_DRILL_BEAT]).values_list(
+            "name", "at"
+        )
+    )
     now = timezone.now()
+    production = settings.DEPLOYMENT_STAGE == "production"
 
     def age(name):
         at = beats.get(name)
         return None if at is None else int((now - at).total_seconds() // 3600)
+
+    drill_at = beats.get(RESTORE_DRILL_BEAT)
+    drill_days = None if drill_at is None else (now - drill_at).days
+    drill_late = drill_days is None or drill_days > RESTORE_DRILL_STALE_DAYS
+    drill = (
+        "restore drill never run" if drill_days is None else f"restore drill {drill_days} days ago"
+    )
 
     local = age("backup_local")
     if local is None:
@@ -157,14 +197,27 @@ def _backups():
     if local > BACKUP_STALE_HOURS:
         return False, f"Last backup {local} hours ago"
     if not offsite.configured():
-        return True, f"Last backup {local} h ago; no off-site copy"
+        if production:
+            return False, (
+                f"Last backup {local} h ago, but no off-site copy is set up (needed in "
+                f"production: run setup-offsite-backups.sh); {drill}"
+            )
+        return True, f"Last backup {local} h ago. Not production-ready: no off-site copy; {drill}"
     remote = age("backup_offsite")
     if remote is None or remote > BACKUP_STALE_HOURS:
         when = "never" if remote is None else f"{remote} hours ago"
         return False, f"Last backup {local} h ago, but off-site copy {when}"
     lock = beats.get("offsite_lock")
     locked = f"lock verified {timezone.localdate(lock):%b %-d}" if lock else "lock not verified"
-    return True, f"Last backup {local} h ago; off-site {remote} h ago, {locked}"
+    detail = f"Last backup {local} h ago; off-site {remote} h ago, {locked}; {drill}"
+    if production and drill_late:
+        return False, (
+            f"{detail}: a restore drill is needed at least every {RESTORE_DRILL_STALE_DAYS} "
+            "days in production (Admin → Server tasks → Restore drill)"
+        )
+    if drill_late:
+        detail += f". Not production-ready: no restore drill in {RESTORE_DRILL_STALE_DAYS} days"
+    return True, detail
 
 
 def _bank_feed():
@@ -252,6 +305,7 @@ CHECKS = [
     ("disk", "Disk space", _disk),
     ("storage", "File store", _storage),
     ("signatures", "Malware scanner", _signatures),
+    ("scan_queue", "Files waiting for a malware scan", _scan_queue),
     ("errors", "Server errors", _errors),
     ("email", "Outgoing email", _email),
     ("backups", "Backups", _backups),
