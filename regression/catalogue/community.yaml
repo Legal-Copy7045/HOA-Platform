@@ -63,3 +63,6 @@
 - feature: "Retention of former owners' contact details: rule with PA guidance, daily task, board preview and run, append-only run record, records never touched"
   since: M4
   match: ["^unit:community/tests/test_retention"]
+- feature: "D40 owner requests: adding someone needs their email unless they don't use email (record only); approval invites them as the approving board member (a failed invitation keeps the approval and points the board to Invitations and sign-ups); deed changes (add owner joint/trust/entity, remove owner) with the deed date and the recorded deed (board and that account's owners only), never approved by the requester or the person added/removed, at least one owner kept, co-owner joins the running account with no ledger moves, sole/joint type follows (audited)"
+  since: M4
+  match: ["^unit:community/tests/test_account_change_owners", "^unit:core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data\\[account_change_"]
