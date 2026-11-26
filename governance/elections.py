@@ -25,6 +25,7 @@ from django.utils import timezone
 from audit.services import record_event
 from community.models import BoardSeat, Lot, Ownership, Person
 from community.rules import rule
+from community.services import _refuse_read_only
 from core import policy
 from core.policy import can, require
 from core.scoping import system_access
@@ -247,6 +248,7 @@ def cast_election_ballot(
         lot_id = int(lot_id)
     except (TypeError, ValueError) as exc:
         raise ElectionError("Choose from the candidates on the ballot.") from exc
+    _refuse_read_only(actor)  # a former owner's login changes nothing (BUG-002)
     with transaction.atomic():
         locked = Election.objects.select_for_update().get(pk=election.pk)
         if locked.state != ElectionState.VOTING:
@@ -384,13 +386,21 @@ def grant_proxy(meeting: Meeting, *, lot: Lot, holder: Person, actor, request=No
 
 def live_proxies(queryset, on=None):
     """Proxies not revoked whose grantor still owns the lot: a sale ends the
-    seller's proxy (security review SEC-003)."""
+    seller's proxy (security review SEC-003). The holder must also still be
+    able to act: an owner of some lot, or on the board. A holder who has sold
+    (a read-only former owner) can no longer use it (review BUG-002)."""
     from django.db.models import Exists, OuterRef
 
     owns = Ownership.objects.active(on).filter(
         person_id=OuterRef("grantor_id"), lot_id=OuterRef("lot_id")
     )
-    return queryset.filter(revoked_at__isnull=True).filter(Exists(owns))
+    holder_owns = Ownership.objects.active(on).filter(person_id=OuterRef("holder_id"))
+    holder_seat = BoardSeat.objects.active(on).filter(person_id=OuterRef("holder_id"))
+    return (
+        queryset.filter(revoked_at__isnull=True)
+        .filter(Exists(owns))
+        .filter(Exists(holder_owns) | Exists(holder_seat))
+    )
 
 
 def revoke_proxy(proxy: Proxy, *, actor, request=None) -> None:

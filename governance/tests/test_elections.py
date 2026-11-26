@@ -247,6 +247,31 @@ def test_selling_the_lot_ends_the_proxy(w):
     assert elections.quorum_status(w["meeting"])["by_proxy"] == 0
 
 
+def test_a_proxy_holder_who_sells_can_no_longer_vote_with_it(client, w):
+    """Review BUG-002: the holder half of the proxy rule."""
+    from community.models import Ownership
+
+    a, _b, c, d = w["owners"]
+    election = _ready(w, a)
+    lot_d = elections.lots_actor_may_vote_for(election, d)[0]["lot"]
+    elections.grant_proxy(w["meeting"], lot=lot_d, holder=_person(c), actor=d)
+    gov.record_attendance(w["meeting"], _person(c), actor=w["board"])
+    assert elections.quorum_status(w["meeting"])["by_proxy"] == 1
+    with system_access("t"):
+        ownership = Ownership.objects.active().get(person=_person(c))
+    community.end_ownership(ownership, end_date=timezone.localdate(), actor=w["board"])
+    # c is now a read-only former owner: the proxy is neither usable nor counted.
+    assert elections.lots_actor_may_vote_for(election, c) == []
+    assert elections.quorum_status(w["meeting"])["by_proxy"] == 0
+    candidate = elections.ballot_candidates(election).first()
+    with pytest.raises((elections.ElectionError, PermissionDenied)):
+        elections.cast_election_ballot(
+            election, lot_id=lot_d.pk, candidate_ids=[candidate.pk], actor=c
+        )
+    with system_access("t"):
+        assert not ElectionParticipation.objects.filter(election=election).exists()
+
+
 def test_bad_form_values_are_refused_not_500(w):
     a, _b, c, _ = w["owners"]
     election = _ready(w, a)
