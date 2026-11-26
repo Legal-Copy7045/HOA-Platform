@@ -12,7 +12,7 @@ in integer cents, synthetic data only.
 |---|---|
 | Dues | Monthly charge due on the 1st (covenants). Annual billing optional. Prepayments sit as credit and are drawn down as charges post. Amounts are data entered by the board, never code. |
 | Fiscal year | Starts January 1 (setting). |
-| Late fee | Current fee ($6) is recorded as a rule but **never applied automatically** until PA law is reviewed with the user. |
+| Late fee | Current fee ($6) is recorded as a rule. *Superseded by D21 (2026-11-25):* the board posts late fees from the late list with a button, allowed while `LEDGER_LATE_FEES_ENABLED` is true (the default; the server's emergency off switch); automatic posting runs only when the board switches on the `late_fee.auto_apply` rule (off by default). |
 | Invoice approval | Under $500: one board approval. $500 and over: two different board approvals. The person who entered an invoice never approves it. Threshold is a rule. |
 | Manager role | New role for management-company staff: data entry and workflow steps (invoices, work orders, violations, ARC intake, documents). Never approves, never votes. |
 | Common areas | Stormwater/ponds; entrance and landscaping (data, editable). |

@@ -1,5 +1,15 @@
 # Security review, November 2026
 
+> **Scope of this document.** Sections 1 to 6 are the review of the portal
+> after Milestone 2 and the UI sprint (commit `c850171`); they do not cover
+> Milestones 3 and 4 or the later streamlining, payments, bank feed and
+> walkthrough work. A fresh full review of the current codebase is
+> scheduled: every run of the project's full regression (`/regression`,
+> `regression/README.md`) includes a full security audit (the claims below,
+> the whole codebase, the new code and the deployment surface), and its
+> findings go to that run's report. Section 7 lists the findings of the
+> external review of 2026-11-26 and their status.
+
 Scope: the whole portal after Milestone 2 and the UI sprint (commit `c850171`).
 Five independent reviews ran in parallel, each proving findings with scripts
 where possible:
@@ -145,3 +155,20 @@ It confirmed end to end that these still work: first-officer bootstrap, assisted
 - Every fixed finding has a regression test, mostly in `core/tests/test_security_review.py` and in each app's tests, marked "Security review 2026-11". There are now over 680 automated tests.
 - ruff, bandit, the migration check and pip-audit (no known vulnerabilities) are clean.
 - The new regression suite (`regression/`, `/regression`) runs all of this plus a browser crawl of every page per role. Its first run found two navigation bugs (fixed).
+
+## 7. External review 2026-11-26
+
+An external review of the current code and deployment. Decision D57 records
+the reasoning; each item has tests.
+
+| # | Finding | Status |
+|---|---|---|
+| X1 | Production could start with malware scanning off, downloads of unscanned files allowed, all mail redirected to one inbox, or a one-hour HSTS. | **Fixed.** `core/settings/production.py` refuses, on the POC and in production, any scanner other than ClamAV and downloads without a clean scan; in production also a mail redirect and HSTS under a year (default now a year there). The tunnel overlay sets the scanner itself. |
+| X2 | The Backups health check passed with no off-site copy and never asked for a restore drill. | **Fixed.** In production: no off-site copy, one older than 36 h, or no passed restore drill in 90 days fails it. The drill now records itself. POC/local say "Not production-ready". |
+| X3 | Files waiting for a malware scan were a bare count; nobody could tell what they were or whether they were stuck. Root cause: a scan that failed at upload (ClamAV not answering yet) was never retried. | **Fixed.** Retry after upload, a 10-minute sweep while ClamAV answers, a list on System status in operations terms only (no names or owners), "Scan waiting files now" (audited, counts only) and a health check after 30 minutes. |
+| X4 | django-allauth 65.22.1: rate limits could be bypassed with IPv4-mapped IPv6 addresses (the app relies on allauth's limits for sign-in, codes and resets). | **Fixed.** 65.23.0 (`requirements/base.in` floor, hashes recompiled). The OIDC CIMD SSRF in the same release does not apply (no OIDC provider). |
+| X5 | No secret scanning, container image scanning or static analysis in CI. | **Fixed.** Gitleaks (whole history weekly and on demand, new commits on every PR), Trivy on the built image (fails on fixable HIGH/CRITICAL), CodeQL for Python and JavaScript. Separate checks; the `test` check is unchanged. |
+| X6 | The regression page crawl ran only by hand. | **Fixed.** `pages` job in CI (about 3 minutes locally, 15-minute limit). |
+| X7 | Infrastructure images floated (`cloudflared:latest` pulled daily on the VM, `postgres:16-alpine`, `clamav:1.4`). | **Fixed, with the owner's condition**: pinned to version and digest only together with Dependabot's docker-compose updates, so every bump is a tested pull request; the daily cloudflared pull is removed. Left on tags: the Dockerfile base (weekly refresh) and the CI Postgres service image (Dependabot cannot update it). |
+| X8 | Documentation drift: README described Milestone 1, late-fee text said fees were off, this document's scope was unclear, and there was no go-live checklist for the HOA's own third-party accounts. | **Fixed.** README, late-fee text (plan, summary, runbook, settings comment), this header, and the runbook's go-live checklist (Stripe, Teller, Twilio, Cloudflare, Gemini data-use terms, production settings, off-site backups and a restore drill, secret-ballot fix deployed before real secret votes). |
+| X9 | A fresh full review of the current codebase. | **Scheduled**: the next full regression run (`/regression`) includes it. |

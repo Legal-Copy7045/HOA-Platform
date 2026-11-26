@@ -93,9 +93,9 @@ dc logs --tail 50 web
 dc exec web python manage.py check_coverage
 ```
 
-```bash
-systemctl list-timers hoa-cloudflared-update.timer
-```
+cloudflared and the other infrastructure images are pinned in the compose
+files and updated by Dependabot pull requests (see "Container image updates"
+below); there is no daily cloudflared timer any more.
 
 File store (writes, reads and deletes a small probe file; prints the store's
 error code if it fails):
@@ -159,8 +159,12 @@ board is emailed.
 3. **Invoices**: enter with the PDF attached, submit; board members other
    than the entrant approve (two at $500 and over); record payment.
 4. **Collections**: Finance → Collections lists balances over 30 days.
-   Reminders, payment plans and referrals are recorded by hand. Late fees
-   are switched off until the PA law review.
+   Reminders, payment plans and referrals are recorded by hand. Late fees:
+   the board posts them from the late list with a button (allowed while
+   `LEDGER_LATE_FEES_ENABLED` is true, the default; set it to false in
+   `.env` as an emergency off switch). They are posted automatically only
+   if the board switches on "Post late fees automatically after the grace
+   period" (`late_fee.auto_apply`, off by default) in Community settings.
 5. **Reports**: Reports page; every report downloads as CSV.
 
 ## Filling in the governing rules
@@ -171,17 +175,67 @@ replace": replace every one before real use.
 
 ## Malware scanning
 
-Off on the POC (`DOCUMENT_SCANNER=none`; System status shows it). To enable:
-add a ClamAV container, set `DOCUMENT_SCANNER=clamd`,
-`DOCUMENT_CLAMD_ADDRESS=clamav:3310` and `DOCUMENT_REQUIRE_CLEAN_SCAN=true`,
-restart, then scan what is already stored:
+On wherever real files are held: the POC/production overlay
+(`docker-compose.tunnel.yml`) runs the `clamav` container and sets
+`DOCUMENT_SCANNER=clamd`, `DOCUMENT_CLAMD_ADDRESS=clamav:3310` and
+`DOCUMENT_REQUIRE_CLEAN_SCAN=true` itself, and production settings refuse to
+start on the POC or in production without them (D57). Local development
+(`docker compose up`) has no scanner.
+
+Every upload is scanned while it is stored. If ClamAV does not answer (it
+needs a few minutes after a restart to load its signatures, or the container
+is down), the file is kept but cannot be downloaded: it is **waiting for a
+scan**. The worker tries it again two minutes after the upload and then every
+10 minutes while ClamAV answers, so waiting files clear by themselves once
+the scanner is back.
+
+System status → **Waiting for a scan** lists each waiting file: where it
+belongs (Document library, ARC request attachment, Owner request photo, ...),
+when it was uploaded, how long it has waited, its size, how many scans were
+tried and what the last one said (scanner unreachable, timed out, never
+attempted). No names, titles or owners: sysadmins see operations data only.
+A file is **stuck** after 15 minutes; the health check "Files waiting for a
+malware scan" fails after 30.
+
+When files are stuck:
+
+1. Look at the **Malware scanner** health line. "Not answering": check the
+   container (`dc ps clamav`, `dc logs --tail 30 clamav`) and give it a few
+   minutes after a restart.
+2. Once it answers, press **Scan waiting files now** (sysadmin; audited with
+   counts only). The worker scans each file within a minute or two.
+3. A file that keeps timing out is probably very large; the scan is retried
+   every 10 minutes.
+
+Everything already stored can be scanned again (after a signature update, for
+example); a file found infected later is blocked from download immediately:
 
 ```bash
-dc exec web python manage.py rescan_files --actor you@example.org --reason "scanner enabled"
+dc exec web python manage.py rescan_files --actor you@example.org --reason "signatures updated"
 ```
 
-Run it again whenever the scanner's signatures update; a file found infected
-later is blocked from download immediately.
+## Container image updates (D57)
+
+The infrastructure images (cloudflared, ClamAV, Postgres, SeaweedFS, Mailpit)
+are pinned in `docker-compose.yml` and `docker-compose.tunnel.yml` to a
+version tag and a digest, so the server runs exactly what was tested.
+Dependabot (`docker-compose` in `.github/dependabot.yml`) checks weekly and
+opens a pull request for each new release; CI validates both compose files,
+builds the portal image and scans the images with Trivy. After the pull
+request is merged, the update reaches the VM like any other: System status →
+Install now (or Install tonight). A new Postgres major version is not
+proposed: it needs a dump and restore, planned separately.
+
+cloudflared used to follow `latest` with a daily pull on the VM
+(`hoa-cloudflared-update.timer`); `start-portal.sh` removes that timer. Keep
+merging the cloudflared pull requests: Cloudflare stops supporting releases
+older than about a year.
+
+The portal image's base (`python:3.13-slim-bookworm` in the `Dockerfile`)
+stays on its tag: `start-portal.sh` refreshes it weekly for security fixes,
+and Dependabot's `docker` entry proposes new tags. The Postgres image of the
+CI test jobs (`.github/workflows/ci.yml`) also stays on its tag: Dependabot
+does not update service images in workflows.
 
 ## Break-glass (sysadmin, on the server)
 
@@ -238,26 +292,67 @@ password manager and the POC VM's `.env`.
 - A restore-and-migrate drill to a scratch environment is required before
   any real data or live payments (CLAUDE.md).
 
-## Production checklist (before real data)
+## Go-live checklist (before real owners, real data or live payments)
 
-- [ ] Restore-and-migrate drill completed and written up.
-- [ ] HOA owns every account: Cloudflare (zone, tunnel, Access), Hostinger,
-      domain registrar, GitHub, hosting.
-- [ ] `SEED_DEMO_ALLOWED=false`; `EMAIL_REDIRECT_ALL_TO` empty;
-      `ADMIN_ENABLED=false` (enforced); `SECURE_HSTS_SECONDS=31536000`.
+Work through it with the board; tick each item in the go-live notes.
+
+**Accounts the HOA owns** (never a volunteer's personal account; at least two
+board members can sign in to each, with MFA):
+
+- [ ] Cloudflare: the domain (registrar and DNS zone), the tunnel, and Zero
+      Trust / Access (remove or replace the POC hostname's Access rule).
+- [ ] Stripe: the HOA's own account, verified, with the restricted key made
+      as in "Online payments (Stripe)" (live keys need
+      `DEPLOYMENT_STAGE=production` and `PAYMENTS_LIVE_ALLOWED=true`).
+- [ ] Teller (bank feed, if used): the HOA's own application, certificate and
+      enrollment.
+- [ ] Twilio (urgent texts, if used): the HOA's account and number, with its
+      A2P registration.
+- [ ] Gemini (scanned acknowledgement forms, if used): an API key on terms
+      that do not use submitted data for training (a paid tier or an
+      agreement that says so). Until then, do not send real signed documents
+      to it: leave `GEMINI_API_KEY` empty and read the forms by hand.
+- [ ] Email (Hostinger or another provider), the GitHub repository and the
+      hosting account.
+
+**Production settings** (the portal refuses to start without most of them):
+
+- [ ] `DEPLOYMENT_STAGE=production`.
+- [ ] Malware scanning: `DOCUMENT_SCANNER=clamd`,
+      `DOCUMENT_CLAMD_ADDRESS=clamav:3310`, `DOCUMENT_REQUIRE_CLEAN_SCAN=true`
+      (set by the tunnel overlay; enforced), and no file left under System
+      status → Waiting for a scan.
+- [ ] `EMAIL_REDIRECT_ALL_TO` empty (enforced in production).
+- [ ] `SECURE_HSTS_SECONDS` unset or at least `31536000` (enforced);
+      `SECURE_HSTS_INCLUDE_SUBDOMAINS=true` once every subdomain serves HTTPS.
+- [ ] `SEED_DEMO_ALLOWED=false` (ignored outside the POC anyway),
+      `ADMIN_ENABLED=false` (enforced).
 - [ ] Fresh secrets generated for production (never reuse POC secrets).
-- [ ] Cloudflare Access for the POC hostname removed or replaced.
-- [ ] Container images pinned by digest; Dependabot PRs reviewed.
+- [ ] Container images pinned by digest (they are) and the open Dependabot
+      pull requests reviewed and merged.
+
+**Backups**:
+
+- [ ] Off-site backups to a locked bucket (`setup-offsite-backups.sh`, lock
+      proved with `check_offsite_lock`). In production the Backups health
+      check fails without an off-site copy less than 36 hours old.
+- [ ] A restore drill passed (Admin → Server tasks → Restore drill, and once
+      from the off-site copy) and written up. In production the health check
+      fails when the last passed drill is more than 90 days old.
+- [ ] Proxmox/VPS backups that contain `.env` are encrypted.
+
+**Before the first real vote and first real owners**:
+
+- [ ] The deployed version (System status → Version) includes the
+      secret-ballot fix (secret ballots stored unlinkable, D21 and the
+      security review). Do not open a real secret ballot on an older version.
 - [ ] Audit IP retention confirmed with the association's counsel.
 - [ ] At least two board members with MFA for every action
       (`check_coverage` clean).
 - [ ] Owner sign-in help page and spare hardware security keys ready.
-- [ ] Malware scanning on (`DOCUMENT_SCANNER=clamd`,
-      `DOCUMENT_REQUIRE_CLEAN_SCAN=true`) and `rescan_files` run.
-- [ ] HSTS one year with subdomains (`SECURE_HSTS_SECONDS=31536000`,
-      `SECURE_HSTS_INCLUDE_SUBDOMAINS=true`) once every subdomain serves HTTPS.
-- [ ] Board decisions in `docs/security-review-2026-11.md` section 3 made.
-
+- [ ] Board decisions in `docs/security-review-2026-11.md` section 3 made,
+      and the findings of the latest full regression run (`/regression`,
+      which includes a full security audit) closed or accepted.
 
 ## ARC neighbor sign-off and Gemini
 
