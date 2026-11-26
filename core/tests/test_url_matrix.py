@@ -370,6 +370,16 @@ PROTECTED = {
     "disbursement_checks_pdf": ("GET", "disbursement"),
     "check_print_settings": ("GET", None),
     "check_alignment_pdf": ("GET", None),
+    # Paper mail (D55): board and manager only; owners get 403 everywhere.
+    "paper_mail": ("GET", None),
+    "paper_mail_new": ("POST", None),
+    "paper_mail_settings": ("POST", None),
+    "paper_mail_test": ("GET", None),
+    "paper_mail_detail": ("GET", "mailing"),
+    "paper_mail_letters": ("GET", "mailing"),
+    "paper_mail_envelopes": ("GET", "mailing"),
+    "paper_mail_labels": ("GET", "mailing"),
+    "paper_mail_mark": ("POST", "mailing"),
 }
 
 
@@ -729,6 +739,15 @@ def world():
                 limit_cents=50_000,
                 expires_at=timezone.now() + timedelta(days=14),
             )
+        from comms import papermail
+
+        mailing = papermail.create_mailing(
+            actor=board,
+            defaults=papermail.source_defaults(),
+            subject="Paper letter",
+            body="Hello {owner_names}",
+            everyone=True,
+        )
     from ledger import disbursements
 
     disbursement = disbursements.propose_surplus(
@@ -736,6 +755,7 @@ def world():
     )
     targets = {
         "disbursement": disbursement.pk,
+        "mailing": mailing.pk,
         "checkout_b": checkout_b.pk,
         "payment_b": payment_b.pk,
         "alert_b": alert_b.pk,

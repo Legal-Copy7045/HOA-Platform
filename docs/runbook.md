@@ -845,3 +845,14 @@ and reseed again. If it fails in between (migrations, putting the logins
 back), the portal is empty and the saved logins are shredded: restore the
 backup it took first ("Backups and the restore drill"). The audit log of
 the replaced data is in that backup only.
+
+## Printing paper notices (Paper mail, D55)
+
+Association → Paper mail shows who gets paper (owners on the deed who have not agreed to official notices by email) and the mailings. Board members and the manager can prepare and print.
+
+1. **Once: check alignment.** Settings → Paper mail settings: choose single- or double-window #10 envelopes, then print the test letter. Print at **actual size / 100% (no "fit to page", no scaling)**, fold in thirds on the dashed lines, put it in an envelope and check the address shows fully in the window. Adjust the inches (recipient block from the left and top; return address for double windows) and print again. Do the same with the test envelope and the test label sheet; use the shifts to correct a printer that prints slightly off.
+2. **Envelopes:** feed #10 envelopes as the printer's manual says (usually the short edge first, flap closed, printed side as marked on the tray); choose the envelope paper size "#10 (4.125 x 9.5 in)" and landscape if the driver asks. Labels: Avery 5160 or compatible, plain paper setting, actual size; "Start at label" reuses a partly used sheet.
+3. **A mailing:** from a meeting page (Prepare paper notices), the budget page after its notice, or Paper mail → New mailing (blank, meeting, budget, or a Letters and certificates wording). Preview, then Prepare mailing. On the mailing page print the letters (tick "start every letter on a front side" when printing both sides), and envelopes or labels unless you use window envelopes.
+4. **After posting:** "Mark as mailed" with the date (or "Not sending this"). Until then the mailing stays on My items; for a meeting, the meeting page then shows "Paper notices mailed <date> to N homes".
+
+**Tracking barcode (optional, free).** Create a USPS Business Customer Gateway account to get a Mailer ID, and sign up for Informed Visibility (IV). Enter the Mailer ID on Paper mail settings, keep Barcode ID 00, choose the Service Type ID (310 is suggested for First-Class with IV tracking: confirm with USPS), and tick "Print the tracking barcode". Window letters and envelopes then carry the barcode above the name (labels are too small for it). To follow a mailing, sign in to IV and search by Mailer ID and serial range (the mailing's pieces are numbered consecutively; the portal keeps each letter's serial and home). USPS returns scans in IV (and its API) only for barcodes carrying the HOA's own Mailer ID, and keeps scan data for 30 days, so look within a month. Importing IV scans into the portal is a possible later step; it would need IV credentials entered on the server with a script, never through the web app.

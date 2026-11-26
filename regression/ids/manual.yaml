@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-070
+# highest issued: MAN-071
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -70,3 +70,4 @@ MAN-67: "community setup wizard on a phone"
 MAN-68: "check stock alignment"
 MAN-069: "reseed the POC from settings"
 MAN-070: "import the register template from a phone and a laptop"
+MAN-071: "paper mail window alignment"

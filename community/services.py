@@ -2191,6 +2191,107 @@ def owner_notice_recipients() -> tuple[list[str], list[Person]]:
     return sorted(set(emails)), paper
 
 
+def _address_key(address: str) -> tuple[str, ...]:
+    """Two postal addresses are the same letter when they match line by line
+    ignoring case, spacing and punctuation at the ends."""
+    return tuple(
+        " ".join(line.split()).strip(" ,.").casefold()
+        for line in address.splitlines()
+        if line.strip()
+    )
+
+
+def _names(names: list[str]) -> str:
+    if len(names) <= 2:
+        return " & ".join(names)
+    return ", ".join(names[:-1]) + " & " + names[-1]
+
+
+def paper_mail_groups(*, everyone: bool = False, lot_id: int | None = None) -> list[dict]:
+    """Who gets a paper letter (D55): one letter per home and postal address.
+
+    Current owners on the deed only (tenants, contacts and former owners
+    never). Unless ``everyone``, an owner who agreed to official notices by
+    email and has an email address is left out, exactly as the notice emails
+    decide (governance.services.send_notice, owner_notice_recipients);
+    everyone else, including owners who withdrew their consent or never
+    answered, gets paper. Owners of one home who share a postal address are
+    named on one letter; a different address gets its own letter.
+    ``lot_id`` limits it to one home. Internal: the caller checks
+    ``mail.print``. Returns dicts with lot, people (ids), names, address."""
+    from community.models import ContactProfile
+
+    with system_access("paper mail recipients"):
+        ownerships = Ownership.objects.active().select_related("person", "person__user", "lot")
+        if lot_id is not None:
+            ownerships = ownerships.filter(lot_id=lot_id)
+        ownerships = list(ownerships.order_by("lot_id", "start_date", "pk"))
+        consent = set(
+            ContactProfile.objects.filter(electronic_notice_consent=True).values_list(
+                "person_id", flat=True
+            )
+        )
+    groups: dict[tuple, dict] = {}
+    seen: set[tuple[int, int]] = set()
+    for own in ownerships:
+        person, lot = own.person, own.lot
+        if (lot.pk, person.pk) in seen:
+            continue
+        seen.add((lot.pk, person.pk))
+        email = person.user.email if person.user_id else person.email
+        if not everyone and person.pk in consent and email:
+            continue
+        address, _source = postal_address(person, lot)
+        key = (lot.pk, _address_key(address))
+        group = groups.setdefault(
+            key, {"lot": lot, "people": [], "names": [], "address": address.strip()}
+        )
+        group["people"].append(person.pk)
+        group["names"].append(person.display_name)
+    out = list(groups.values())
+    out.sort(key=lambda g: (g["lot"].sort_key, g["names"]))
+    for g in out:
+        g["owner_names"] = _names(g["names"])
+    return out
+
+
+def paper_mail_letters(groups: list[dict]) -> list[dict]:
+    """The letters of a saved mailing, from its ``[{"lot", "people"}]``:
+    names and the postal address as they are now (the first person's
+    address), plus the home and its current account number. Internal."""
+    from community.models import Account
+
+    lot_ids = {int(g["lot"]) for g in groups}
+    person_ids = {int(p) for g in groups for p in g["people"]}
+    with system_access("paper mail letters"):
+        lots = {lot.pk: lot for lot in Lot.objects.filter(pk__in=lot_ids)}
+        people = {p.pk: p for p in Person.objects.filter(pk__in=person_ids)}
+        numbers = dict(
+            Account.objects.filter(lot_id__in=lot_ids, closed_on__isnull=True).values_list(
+                "lot_id", "number"
+            )
+        )
+    out = []
+    for index, g in enumerate(groups):
+        lot = lots.get(int(g["lot"]))
+        members = [people[int(p)] for p in g["people"] if int(p) in people]
+        if lot is None or not members:
+            continue
+        address, _source = postal_address(members[0], lot)
+        names = [p.display_name for p in members]
+        out.append(
+            {
+                "index": index,
+                "lot": lot,
+                "names": names,
+                "owner_names": _names(names),
+                "address": address.strip(),
+                "account_number": str(numbers.get(lot.pk) or ""),
+            }
+        )
+    return out
+
+
 # --- Letters and resale certificate settings (Milestone 4) ----------------------------
 
 LETTER_FIELDS = ("letterhead", "remit_to", "letter_contact", "letter_signature")

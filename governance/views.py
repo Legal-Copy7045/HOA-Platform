@@ -285,9 +285,18 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
             "can_upload_minutes": can_upload,
             **_linked(request, meeting),
             **meeting_extras(user, meeting),
+            **_paper_notice(user, meeting),
         },
         status=status,
     )
+
+
+def _paper_notice(user, meeting) -> dict:
+    """Paper notices for this meeting (D55, board and manager): homes that
+    need one, and whether they were prepared or mailed."""
+    from comms import services as comms_services
+
+    return {"paper": comms_services.paper_notice_status(meeting, user)}
 
 
 def _calendar_menu(meeting) -> dict:
@@ -335,7 +344,8 @@ def meeting_action(request, pk, action):
                 messages.warning(
                     request,
                     f"{len(result['paper'])} owner(s) have not consented "
-                    "to email notice and need a paper notice.",
+                    "to email notice and need a paper notice: use Prepare paper notices "
+                    "in the Notice panel.",
                 )
             if result["short_days"]:
                 messages.warning(

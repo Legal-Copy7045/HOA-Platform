@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Paper mail · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Paper mail</h1><p class="subtitle">Letters, envelopes and labels for owners who get official notices by post. Prepare a mailing, print it, then mark it mailed.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'paper_mail_settings' %}">{% icon "sliders" %} Paper mail settings</a></div></div>
+  <div class="split">
+    <section class="card" id="who"><h2>Who gets paper</h2>
+      <p><strong>{{ counts.homes }}</strong> home{{ counts.homes|pluralize }}, <strong>{{ counts.letters }}</strong> letter{{ counts.letters|pluralize }} ({{ counts.owners }} owner{{ counts.owners|pluralize }} on the deed who have not agreed to official notices by email, or withdrew that choice).{% if counts.no_address %} <span class="badge tone-warning">{{ counts.no_address }} without an address</span>{% endif %}</p>
+      <p class="small muted">One letter per home; co-owners with different mailing addresses each get one. Tenants, contacts and former owners never get official notices.</p>
+      {% if groups %}<details><summary class="small">Show the list</summary>
+        <table class="stack-sm"><thead><tr><th>Home</th><th>Named on the letter</th><th>Mailing address</th></tr></thead><tbody>
+          {% for g in groups %}<tr><td class="cell-title" data-label="Home">{{ g.lot.label }}</td><td data-label="Named">{{ g.owner_names }}</td><td data-label="Address">{{ g.address|linebreaksbr|default:"(no address)" }}</td></tr>{% endfor %}
+        </tbody></table></details>{% else %}<p class="muted small">Every owner on the deed has agreed to official notices by email.</p>{% endif %}
+    </section>
+    <section class="card" id="new"><h2>New mailing</h2>
+      <p><a class="btn" href="{% url 'paper_mail_new' %}">{% icon "plus" %} Blank letter</a></p>
+      {% if meetings %}<form method="get" action="{% url 'paper_mail_new' %}" class="stack"><p><label for="pm-meeting">Meeting notice</label><select id="pm-meeting" name="meeting">{% for mt in meetings %}<option value="{{ mt.pk }}">{{ mt.title }} ({{ mt.starts_at|date:"M j" }})</option>{% endfor %}</select></p><div><button type="submit" class="secondary small">Prepare meeting notice</button></div></form>{% endif %}
+      {% if budgets %}<form method="get" action="{% url 'paper_mail_new' %}" class="stack"><p><label for="pm-budget">Budget notice</label><select id="pm-budget" name="budget">{% for b in budgets %}<option value="{{ b.pk }}">{{ b }}</option>{% endfor %}</select></p>
+        <p><label for="pm-stage">Which notice</label><select id="pm-stage" name="stage"><option value="proposed">Proposed budget</option><option value="adopted">Adopted budget</option></select></p><div><button type="submit" class="secondary small">Prepare budget notice</button></div></form>{% endif %}
+      <form method="get" action="{% url 'paper_mail_new' %}" class="stack"><p><label for="pm-template">From Letters and certificates</label><select id="pm-template" name="template">{% for k, label in templates %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></p><div><button type="submit" class="secondary small">Prepare letter</button></div></form>
+    </section>
+  </div>
+  <section class="card" id="mailings"><h2>Mailings</h2>
+    {% if mailings %}<table class="stack-sm"><thead><tr><th>Subject</th><th>Kind</th><th>Prepared</th><th>Letters</th><th>Status</th></tr></thead><tbody>
+      {% for m in mailings %}<tr class="row-link"><td class="cell-title" data-label="Subject"><a class="row-main" href="{% url 'paper_mail_detail' m.pk %}">{{ m.subject }}</a></td><td data-label="Kind">{{ m.get_kind_display }}</td><td data-label="Prepared">{{ m.created_at|short_date }}</td><td data-label="Letters">{{ m.letters_count }}</td>
+        <td data-label="Status">{% if m.closing.kind == "mailed" %}<span class="badge tone-success">Mailed {{ m.closing.mailed_on|short_date }}</span>{% elif m.closing %}<span class="badge">Not sent</span>{% else %}<span class="badge tone-warning">Not marked as mailed</span>{% endif %}</td></tr>{% endfor %}
+    </tbody></table>{% else %}<p class="muted small">No mailings yet.</p>{% endif %}
+  </section>
+{% endblock %}

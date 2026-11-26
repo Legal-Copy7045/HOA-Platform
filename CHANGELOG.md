@@ -6,6 +6,19 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.24.0 — 2026-11-26
+
+- Paper mail (Association → Paper mail, board and manager): letters for
+  owners who get official notices by post, one per home and mailing
+  address, from a meeting notice, a budget notice, the Letters and
+  certificates wording or a blank letter, with placeholders and a preview.
+  One PDF of letters laid out for #10 window envelopes (single or double
+  window, positions adjustable with a test page), #10 envelopes, or a sheet
+  of 30 address labels. "Mark as mailed" is recorded and shown on the
+  meeting page; My items reminds until then.
+- Optional USPS tracking barcode (Intelligent Mail) on window letters and
+  envelopes, once a Mailer ID is entered on Paper mail settings.
+
 ## 0.23.0 — 2026-11-26
 
 - Import homes and owners (Homes and owners → Import homes and owners, also

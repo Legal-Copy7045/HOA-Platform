@@ -1,0 +1,9 @@
+# Paper mail: mail merge for letters, envelopes and labels, USPS Intelligent Mail barcode (D55). `match` runs over "<stage>:<check>".
+- feature: "Paper mail (board and manager): who gets paper (owners on the deed without email consent, withdrawn or no email; one letter per home and postal address; tenants, contacts and former owners never), mailings from a meeting, budget notice, letter wording or blank letter with placeholders and preview; letters for #10 window envelopes with configurable positions and duplex padding, #10 envelopes, Avery 5160 labels; append-only mailing and mark-as-mailed shown on the meeting page and in My items; audit counts only; every URL refused to everyone else"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:comms/tests/test_papermail\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::.*\\[paper_mail", "^manual:paper mail window alignment"]
+- feature: "USPS Intelligent Mail barcode: encoder reproduces the USPS-B-3200 published examples; off until a Mailer ID is entered; serial numbers unique per Mailer ID, taken atomically and kept per mailpiece with the ZIP routing; drawn in the address block of window letters and envelopes, never on labels"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_imb\\.py::test_", "^unit:comms/tests/test_papermail_concurrency\\.py::test_"]

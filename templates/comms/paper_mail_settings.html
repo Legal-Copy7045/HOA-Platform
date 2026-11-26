@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Paper mail settings · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'paper_mail' %}">Paper mail</a> / Settings</div>
+  <div class="page-head"><div><h1>Paper mail settings</h1><p class="subtitle">Where the address prints for your window envelopes, small shifts for your printer, and the USPS tracking barcode. The return address and signature come from Letters and certificates.</p></div></div>
+  <div class="split">
+    <section class="card">
+      <form method="post" class="stack" data-warn-unsaved="Paper mail settings">{% csrf_token %}
+        {% include "partials/form_errors.html" %}
+        {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+        <h2>Letters and envelopes</h2>
+        {{ form.window.as_field_group }}{{ form.address_left_in.as_field_group }}{{ form.address_top_in.as_field_group }}{{ form.return_left_in.as_field_group }}{{ form.return_top_in.as_field_group }}
+        {{ form.envelope_shift_x_in.as_field_group }}{{ form.envelope_shift_y_in.as_field_group }}{{ form.label_shift_x_in.as_field_group }}{{ form.label_shift_y_in.as_field_group }}{{ form.duplex.as_field_group }}
+        <h2>USPS tracking barcode</h2>
+        <p class="small">The Intelligent Mail barcode lets you see where each letter is in the mail. It costs nothing extra and needs no special postage. Get a free Mailer ID by creating a USPS Business Customer Gateway account; then sign up for Informed Visibility to see delivery scans. The Mailer ID is printed on the mail; it is not a secret.</p>
+        {{ form.mailer_id.as_field_group }}{{ form.barcode_id.as_field_group }}{{ form.service_type.as_field_group }}
+        <p class="help">Check with USPS which Service Type ID fits your account and how you mail; the portal does not decide this. USPS list: <a href="{{ stid_url }}" target="_blank" rel="noopener noreferrer">Service Type Identifiers</a>.</p>
+        {{ form.imb_enabled.as_field_group }}
+        <p class="help">Stays off until a Mailer ID is entered. Each letter gets its own serial number, kept with the mailing so a scan can be matched to the home.</p>
+        <div class="form-actions"><button type="submit">Save settings</button><span class="small status tone-warning" data-unsaved-note hidden>Unsaved changes</span></div>
+      </form>
+    </section>
+    <aside><section class="card"><h3>Alignment test</h3>
+      <p class="small">Print at actual size (no scaling), with sample text only. For a letter: fold in thirds on the dashed lines and check the address shows fully in the window. Adjust the inches here and print again.</p>
+      <p><a class="btn secondary small" href="{% url 'paper_mail_test' %}?kind=letter">Test letter (PDF)</a></p>
+      <p><a class="btn secondary small" href="{% url 'paper_mail_test' %}?kind=envelope">Test envelope (PDF)</a></p>
+      <p><a class="btn secondary small" href="{% url 'paper_mail_test' %}?kind=labels">Test label sheet (PDF)</a></p>
+      <p class="small muted">Barcode: {% if current.barcode_on %}on (Mailer ID ending {{ current.mailer_id|slice:"-3:" }}){% else %}off{% endif %}.</p>
+    </section></aside>
+  </div>
+{% endblock %}

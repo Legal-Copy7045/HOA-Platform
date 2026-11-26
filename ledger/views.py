@@ -795,8 +795,18 @@ def budget_detail(request, pk):
             "form": LineForm(),
             "can_manage": policy.can(request.user, "budget.manage"),
             "reserve": _reserve_suggestion(request),
+            # Paper copies of a notice already emailed (D55).
+            "paper_homes": _paper_homes(request.user)
+            if budget.proposed_notice_sent_at or budget.adopted_notice_sent_at
+            else None,
         },
     )
+
+
+def _paper_homes(user):
+    from comms import services as comms_services
+
+    return comms_services.paper_homes_count(user)
 
 
 def _reserve_suggestion(request):

@@ -21,6 +21,11 @@
         {% if can_build_packet and m.status != "cancelled" %}<p><a class="btn small" href="{% url 'meeting_packet' m.pk %}">Build packet</a></p>{% endif %}
       </section>{% endif %}
       <section class="card"><h3>Notice</h3>{% if m.notice_sent_at %}<p>{% icon "check" %} Sent {{ m.notice_sent_at|date:"M j, Y" }}</p>{% elif m.kind == "executive" %}<p class="muted small">Executive sessions are not noticed to owners and are not on the community calendar.</p>{% else %}<p class="muted small">Not sent yet.</p>{% endif %}
+        {% if paper %}<div class="stack" data-testid="paper-notices">
+          {% if paper.paper_mailed %}<p class="small">{% icon "check" %} Paper notices mailed {{ paper.paper_mailed.1.mailed_on|date:"M j, Y" }} to {{ paper.paper_mailed.0.homes_count }} home{{ paper.paper_mailed.0.homes_count|pluralize }}.</p>
+          {% elif paper.paper_open %}<p class="small"><a href="{% url 'paper_mail_detail' paper.paper_open.pk %}">{% icon "mail" %} Paper notices prepared ({{ paper.paper_open.letters_count }} letter{{ paper.paper_open.letters_count|pluralize }}), not marked as mailed</a></p>
+          {% elif paper.paper_homes and m.status == "scheduled" %}<p class="small">{{ paper.paper_homes }} home{{ paper.paper_homes|pluralize }} need{{ paper.paper_homes|pluralize:"s," }} a paper notice{% if m.notice_sent_at %}{% else %} (once the notice is sent){% endif %}.</p><p><a class="btn secondary small" href="{% url 'paper_mail_new' %}?meeting={{ m.pk }}">{% icon "mail" %} Prepare paper notices</a></p>{% endif %}
+        </div>{% endif %}
         {% if m.calendar_event_id and m.kind != "executive" %}<p class="small"><a href="{% url 'event_detail' m.calendar_event_id %}">{% icon "calendar" %} On the community calendar</a></p>{% endif %}</section>
       {% if can_manage %}
         {# Board steps in the order they happen, only those that apply now (WT-008); collapsed on phones (WT-044, static/js/app.js). #}
