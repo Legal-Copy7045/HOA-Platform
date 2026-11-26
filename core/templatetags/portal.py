@@ -118,6 +118,7 @@ _TONES = {
         "failed",
         "failure",
         "mismatch",
+        "unreachable",
     },
     "neutral": {
         "void",

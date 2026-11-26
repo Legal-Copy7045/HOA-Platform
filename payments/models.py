@@ -28,6 +28,9 @@ class CheckoutState(models.TextChoices):
     FAILED = "failed", "Failed"
     EXPIRED = "expired", "Expired"
     MISMATCH = "mismatch", "Not recorded: did not match"
+    # Stripe says it has no such checkout (e.g. after the key changed), and
+    # the board was told: no longer asked about (fixres BUG-005).
+    UNREACHABLE = "unreachable", "Not found at Stripe"
 
 
 class PendingCheckout(ScopedModel):

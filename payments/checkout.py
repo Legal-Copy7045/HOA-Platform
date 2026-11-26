@@ -429,7 +429,10 @@ def check(checkout: PendingCheckout, now=None) -> str:
             pi = stripe_api.retrieve_payment_intent(checkout.payment_intent_id)
             return _from_payment_intent(checkout, pi)
         session = stripe_api.retrieve_checkout_session(checkout.session_id)
-    except stripe_api.StripeError:
+    except stripe_api.StripeError as exc:
+        # Stripe says there is no such session (another key or account):
+        # the poller stops asking after telling the board (fixres BUG-005).
+        checkout.stripe_not_found = exc.status == 404 or exc.code == "bad_id"
         return checkout.state  # try again later
     try:
         _verify_session(checkout, session)

@@ -19,6 +19,8 @@
       <p role="alert">Stripe's record did not match this payment, so nothing was recorded yet. The board has been told and will check it. If you were charged, you do not need to pay again.</p>
     {% elif checkout.state == "failed" %}
       <h2>The payment did not go through</h2><p>Nothing was recorded. You can try again from My account.</p>
+    {% elif checkout.state == "unreachable" %}
+      <h2>We could not find this payment at Stripe</h2><p role="alert">Nothing was recorded. The board has been told and will check it. If you were charged, you do not need to pay again.</p>
     {% elif checkout.state == "expired" %}
       <h2>This payment page has expired</h2><p>Nothing was charged. Start again from My account.</p>
     {% else %}

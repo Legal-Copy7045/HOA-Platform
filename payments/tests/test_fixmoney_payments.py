@@ -322,3 +322,48 @@ def test_pay_button_opens_the_amount_page_when_nothing_is_quoted(client, w):
     assert item.action_label == "Pay online" and item.action_url.endswith("?choose=1")
     client.force_login(spouse)
     assert client.get(item.action_url).status_code == 200
+
+
+# --- fixres BUG-005: checkouts Stripe cannot find stop being polled -----------------------------
+
+
+def _set(checkout, **fields):
+    with system_access("t"):
+        PendingCheckout.objects.filter(pk=checkout.pk).update(**fields)
+
+
+def test_open_checkout_past_its_time_is_asked_hourly_then_daily(client, w):
+    checkout = _start(client, w)
+    expires = checkout.expires_at
+    w["fake"].fail_next = None
+    soon = expires + datetime.timedelta(hours=2)
+    with mock.patch.object(stripe_api, "transport", side_effect=OSError("down")):
+        _set(checkout, last_checked_at=soon - datetime.timedelta(minutes=30))
+        assert sync.poll_open_checkouts(now=soon) == 0  # asked half an hour ago
+        _set(checkout, last_checked_at=soon - datetime.timedelta(minutes=61))
+        assert sync.poll_open_checkouts(now=soon) == 1
+        late = expires + datetime.timedelta(days=2)
+        _set(checkout, last_checked_at=late - datetime.timedelta(hours=5))
+        assert sync.poll_open_checkouts(now=late) == 0  # daily by now
+        _set(checkout, last_checked_at=late - datetime.timedelta(hours=25))
+        assert sync.poll_open_checkouts(now=late) == 1
+    assert _state(checkout) == CheckoutState.OPEN
+
+
+def test_checkout_stripe_cannot_find_is_marked_unreachable_and_no_longer_asked(client, w):
+    checkout = _start(client, w)
+    w["fake"].sessions.pop(checkout.session_id)  # e.g. the test key was replaced
+    much_later = timezone.now() + datetime.timedelta(days=5)
+    assert sync.poll_open_checkouts(now=much_later) == 1
+    assert _state(checkout) == CheckoutState.UNREACHABLE
+    (alert,) = _alerts(AlertKind.MISMATCH)
+    assert "cannot find" in alert.detail
+    assert AuditEvent.objects.filter(action="payments.unreachable").count() == 1
+    asked = len(w["fake"].calls)
+    assert sync.poll_open_checkouts(now=much_later + datetime.timedelta(days=3)) == 0
+    assert len(w["fake"].calls) == asked
+    # Before the board item, a missing checkout is still asked about (less often).
+    second = _start(client, w)
+    w["fake"].sessions.pop(second.session_id)
+    sync.poll_open_checkouts(now=timezone.now() + datetime.timedelta(hours=2))
+    assert _state(second) == CheckoutState.OPEN

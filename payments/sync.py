@@ -22,7 +22,7 @@ from core.money import format_cents
 from core.policy import SYSTEM
 from core.scoping import internal, system_access
 from payments import stripe_api
-from payments.checkout import _alert, check
+from payments.checkout import _alert, _set_state, check
 from payments.models import (
     AlertKind,
     CheckoutState,
@@ -52,14 +52,31 @@ REFUND_TYPES = {"refund", "payment_refund", "payment_failure_refund"}
 # --- Checkouts -----------------------------------------------------------------------------
 
 
+def _due(checkout: PendingCheckout, now) -> bool:
+    """Whether to ask Stripe about an open checkout on this run. Until its
+    time is up, every run (15 minutes); after that Stripe should have
+    answered, so hourly for a day, then daily (fixres BUG-005)."""
+    if checkout.last_checked_at is None or now <= checkout.expires_at:
+        return True
+    late = now - checkout.expires_at
+    every = (
+        datetime.timedelta(hours=1)
+        if late < datetime.timedelta(days=1)
+        else (datetime.timedelta(days=1))
+    )
+    return now - checkout.last_checked_at >= every - datetime.timedelta(minutes=2)
+
+
 @internal("payments poll")
 def poll_open_checkouts(now=None) -> int:
     """Every 15 minutes: checkouts still open. A checkout is marked expired
     only from Stripe's answer (the session expired, or is past its time and
     not paid): while Stripe cannot be asked (network, rate limit), it stays
-    open and is asked again, so a payment made near the end is never lost
-    (R2-004). One Stripe has not answered about for days becomes a board
-    item."""
+    open and is asked again, less often once its time is up (``_due``), so a
+    payment made near the end is never lost (R2-004). One Stripe has not
+    answered about for days becomes a board item; if Stripe says it has no
+    such checkout (another key or account), it is then marked unreachable
+    and no longer asked about (fixres BUG-005)."""
     if not config().available:
         return 0
     now = now or timezone.now()
@@ -67,20 +84,36 @@ def poll_open_checkouts(now=None) -> int:
     for checkout in PendingCheckout.objects.filter(
         state=CheckoutState.OPEN, session_id__isnull=False
     ):
+        if not _due(checkout, now):
+            continue
         check(checkout, now=now)
         count += 1
         if checkout.state == CheckoutState.OPEN and checkout.created_at < now - (
             datetime.timedelta(hours=OPEN_HOURS) + datetime.timedelta(days=UNANSWERED_DAYS)
         ):
+            missing = getattr(checkout, "stripe_not_found", False)
             _alert(
                 AlertKind.MISMATCH,
                 f"unanswered-{checkout.pk}",
                 lot_id=checkout.lot_id,
                 amount=checkout.total_cents,
                 ref=checkout.session_id or "",
-                detail=f"Stripe has not answered about online payment #{checkout.pk} for over "
-                f"{UNANSWERED_DAYS} days. Check it in the Stripe dashboard.",
+                detail=(
+                    f"Stripe cannot find online payment #{checkout.pk} (was the key or account "
+                    "changed?). It is no longer checked. Look for it in the Stripe dashboard."
+                    if missing
+                    else f"Stripe has not answered about online payment #{checkout.pk} for "
+                    f"over {UNANSWERED_DAYS} days. Check it in the Stripe dashboard."
+                ),
             )
+            if missing:
+                _set_state(checkout, CheckoutState.UNREACHABLE)
+                record_event(
+                    "payments.unreachable",
+                    actor=None,
+                    target=checkout,
+                    metadata={"lot_id": checkout.lot_id, "checkout_id": checkout.pk},
+                )
     return count
 
 
