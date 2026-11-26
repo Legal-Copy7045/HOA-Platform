@@ -340,3 +340,62 @@ def test_current_account_reader_still_matches_after_a_move(w, books):
     statement = services.owner_statement(w["lot"].pk, ago(20))
     assert [e.description for e in statement.entries] == ["Dues after the sale"]
     _check(books)
+
+
+# --- Board moves a payment to another account (owner decision 2026-11-26) ---------------------
+
+
+def test_board_moves_a_sellers_settlement_check_back_to_the_seller(client, w, books):
+    seller_dues = _charge(w, DUES, ago(40), "Dues before the sale")
+    settlement = _pay(w, DUES, ago(10), "SETTLE")  # really the seller's arrears
+    _sell(w, ago(20))  # backdated: the check moves to the buyer by rule
+    seller_account, buyer_account = _accounts(w["lot"])
+    (moved,) = _entries(w["lot"], moved_from=settlement)
+    assert moved.account_id == buyer_account.pk
+
+    client.force_login(w["board"])
+    page = client.get(reverse("lot_ledger", args=[w["lot"].pk])).content.decode()
+    assert "Move to account" in page
+    response = client.post(
+        reverse("lot_ledger_action", args=[w["lot"].pk, "reassign"]),
+        {"entry": moved.pk, "account": seller_account.pk, "reason": "Seller's settlement check"},
+    )
+    assert response.status_code == 302
+    (back,) = _entries(w["lot"], moved_from=moved)
+    assert back.account_id == seller_account.pk and back.amount_cents == settlement.amount_cents
+    assert allocation.charge_status(seller_dues) == "paid"
+    assert services.balance(w["lot"].pk, account=seller_account.pk) == 0
+    event = AuditEvent.objects.get(action="ledger.entry_reassigned")
+    assert event.metadata["entry_id"] == moved.pk
+    assert event.metadata["to_account"] == str(seller_account.number)
+    # Nothing edited; a second move of the same entry is refused.
+    with pytest.raises(services.LedgerError):
+        services.reassign_entry(
+            moved, account_id=buyer_account.pk, reason="again", actor=w["board"]
+        )
+    # A later ownership-date change leaves the board's choice alone.
+    _check(books)
+
+
+def test_only_the_board_moves_payments_and_only_within_the_lot(w):
+    from django.core.exceptions import PermissionDenied
+
+    from community.models import Role
+
+    pay = _pay(w, DUES, ago(5), "77")
+    _sell(w, ago(3))
+    seller_account, buyer_account = _accounts(w["lot"])
+    manager = make_member(roles=[Role.MANAGER])
+    with pytest.raises(PermissionDenied):
+        services.reassign_entry(pay, account_id=seller_account.pk, reason="x", actor=manager)
+    other_lot = LotFactory()
+    make_member(lots=[other_lot])
+    with system_access("t"):
+        foreign = Account.objects.filter(lot=other_lot).first()
+    with pytest.raises(services.LedgerError):
+        services.reassign_entry(pay, account_id=foreign.pk, reason="x", actor=w["board"])
+    with pytest.raises(services.LedgerError):
+        services.reassign_entry(pay, account_id=buyer_account.pk, reason=" ", actor=w["board"])
+    charge = _charge(w, 1000, ago(2))
+    with pytest.raises(services.LedgerError):
+        services.reassign_entry(charge, account_id=seller_account.pk, reason="x", actor=w["board"])
