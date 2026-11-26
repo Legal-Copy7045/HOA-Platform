@@ -139,3 +139,7 @@
   check: "setup-offsite-backups.sh reports 'Locked'; the bucket shows the backup files under backups/; deleting one in the Cloudflare dashboard is refused; System status Backups shows the off-site age and 'lock verified'; restore-drill.sh --from-offsite passes."
   steps: "Follow docs/runbook.md 'Off-site backups that cannot be deleted'; then try deleting a backups/ object in the R2 dashboard; open System status; run the off-site drill."
   last: ""
+- key: reserve plan on a phone
+  check: "Finance > Reserve plan reads on a phone: the four figures stack, the year-by-year table scrolls sideways inside its card (not the page), below-zero years are tinted and say 'Below zero', and the Add a component and Plan settings panels open and save."
+  steps: "Sign in as a demo board member on a phone; Finance > Reserve plan; scroll the table; open Plan settings, type 3.5 for inflation and save; add a component; then open Community info > Reserve plan summary as a demo owner."
+  last: ""

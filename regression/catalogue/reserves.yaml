@@ -1,0 +1,16 @@
+# Reserve plan (in-house reserve study): components, projection, adoption, owner summary.
+- feature: "Reserve plan math: year-by-year projection (contributions, interest on the starting balance, inflated repeating replacements), percent funded, needed level contribution; integer cents with stated rounding"
+  since: M5
+  match: ["^unit:ledger/tests/test_reserves_math.py::test_", "^unit:ledger/tests/test_reserve_plan.py::test_projection_uses"]
+- feature: "Reserve plan board page: components with change history, plan settings typed in dollars and percents, below-zero years highlighted, forms re-render with errors"
+  since: M5
+  match: ["^unit:ledger/tests/test_reserve_plan.py::test_(board_saves|component_needs|last_replaced|components_are_never|settings_|starting_balance|inactive|board_adds|invalid_component|edit_component|negative_years)", "^manual:reserve plan on a phone"]
+- feature: "Record as adopted: append-only reserve plan snapshot (model, database trigger, runtime role), audited"
+  since: M5
+  match: ["^unit:ledger/tests/test_reserve_plan.py::test_(adopt|snapshot_is_append_only|runtime_role|board_adopts)"]
+- feature: "Reserve plan permissions: board changes and adopts; manager and auditor view; owners see only the adopted summary in Community info, without board notes; feature switch"
+  since: M5
+  match: ["^unit:ledger/tests/test_reserve_plan.py::test_(only_the_board|owner_cannot|board_manager_and_auditor|manager_posts|owner_sees|owner_summary|summary_is_in|feature_switch|reserve_plan_is_in)", "^unit:core/tests/test_url_matrix.py::test_"]
+- feature: "Reserve plan CSV export (audited, formula-safe); adopted plan's suggested contribution on the budget page and its balance offered on Letters and certificates"
+  since: M5
+  match: ["^unit:ledger/tests/test_reserve_plan.py::test_(csv_export|budget_page|letters_page)"]
