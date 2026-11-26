@@ -297,10 +297,13 @@ def minutes_approval(meeting):
     )
 
 
-def approve_minutes(meeting, *, approved_on=None, note="", actor, request=None):
-    """Record that the board approved the meeting's attached minutes (their
-    current version). A board decision: the manager may attach drafts but not
-    approve them (SEC-003). Append-only and audited."""
+def approve_minutes(meeting, *, approved_on=None, note="", version_id=None, actor, request=None):
+    """Record that the board approved the meeting's attached minutes: the
+    version the board member read (``version_id``, from the form), refused
+    if another version has been published since (fixres BUG-006); internal
+    callers may leave it out for the current version. A board decision: the
+    manager may attach drafts but not approve them (SEC-003). Append-only
+    and audited."""
     from governance.models import MinutesApproval
 
     require(actor, "minutes.adopt")
@@ -324,6 +327,11 @@ def approve_minutes(meeting, *, approved_on=None, note="", actor, request=None):
         version = document.current_version
         if version is None:
             raise GovernanceError("The minutes document has no file yet.")
+        if version_id is not None and version.pk != version_id:
+            raise GovernanceError(
+                f"A new version of the minutes (version {version.number}) was published "
+                "after you opened this page. Read it, then mark it approved if it is right."
+            )
         if MinutesApproval.objects.filter(meeting=current, version=version).exists():
             raise GovernanceError("These minutes are already marked approved.")
         approval = MinutesApproval.objects.create(

@@ -603,7 +603,12 @@ def test_manager_attaches_drafts_but_only_the_board_approves(client, world):
     page = client.get(reverse("meeting_detail", args=[held.pk]))
     assert b"Mark minutes approved" in page.content
     response = client.post(
-        url, {"approved_on": timezone.localdate().isoformat(), "note": "At the January meeting"}
+        url,
+        {
+            "approved_on": timezone.localdate().isoformat(),
+            "note": "At the January meeting",
+            "version": doc.current_version_id,
+        },
     )
     assert response.status_code == 302
     approval = gov.minutes_approval(held)
@@ -649,11 +654,17 @@ def test_minutes_approval_rules_and_records(client, world):
     assert gov.minutes_approval(held).version.number == 2
 
     # A refused form comes back with what was typed.
-    other, _ = _held_meeting_with_minutes(world, world["board"], title="Special board meeting")
+    other, other_doc = _held_meeting_with_minutes(
+        world, world["board"], title="Special board meeting"
+    )
     client.force_login(world["board"])
     page = client.post(
         reverse("meeting_action", args=[other.pk, "approve_minutes"]),
-        {"approved_on": "2001-01-01", "note": "Keep this note"},
+        {
+            "approved_on": "2001-01-01",
+            "note": "Keep this note",
+            "version": other_doc.current_version_id,
+        },
     )
     assert page.status_code == 200
     assert b"before the meeting" in page.content and b"Keep this note" in page.content
@@ -671,3 +682,43 @@ def test_runtime_role_cannot_change_minutes_approvals(world):
     ):
         with pytest.raises(DatabaseError), transaction.atomic(), connection.cursor() as cur:
             cur.execute(sql, [approval.pk])
+
+
+# --- fixres BUG-006 / SEC-001 / R2-001: the version the board member read ----------------------
+
+
+def test_minutes_approval_is_for_the_version_on_the_page(client, world):
+    held, doc = _held_meeting_with_minutes(world, world["board"])
+    client.force_login(world["board"])
+    page = client.get(reverse("meeting_detail", args=[held.pk]))
+    form = page.context["approve_form"]
+    seen = form["version"].value()
+    assert seen == doc.current_version_id
+    assert b"You are approving version 1" in page.content
+    assert b"Mark version 1 of these minutes approved" in page.content
+    # The manager publishes a revised file while the page is open.
+    documents.add_version(
+        doc, file=pdf_upload("december-v2.pdf"), note="Edit", actor=world["board"]
+    )
+    url = reverse("meeting_action", args=[held.pk, "approve_minutes"])
+    today = timezone.localdate().isoformat()
+    page = client.post(url, {"approved_on": today, "note": "As read", "version": seen})
+    assert page.status_code == 200  # the form comes back, nothing recorded
+    assert b"A new version of the minutes (version 2)" in page.content
+    assert b"As read" in page.content
+    # The form now offers the new version, which the page names.
+    doc.refresh_from_db()
+    assert page.context["approve_form"]["version"].value() == str(doc.current_version_id)
+    assert b"You are approving version 2" in page.content
+    assert gov.minutes_approval(held) is None
+    doc.refresh_from_db()
+    client.post(url, {"approved_on": today, "version": doc.current_version_id})
+    assert gov.minutes_approval(held).version.number == 2
+    # Without the version the form is refused.
+    other, _ = _held_meeting_with_minutes(world, world["board"], title="Special board meeting")
+    page = client.post(
+        reverse("meeting_action", args=[other.pk, "approve_minutes"]), {"approved_on": today}
+    )
+    assert page.status_code == 200 and gov.minutes_approval(other) is None
+    with pytest.raises(gov.GovernanceError):
+        gov.approve_minutes(other, version_id=doc.current_version_id, actor=world["board"])

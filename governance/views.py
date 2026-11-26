@@ -110,11 +110,15 @@ class ApproveMinutesForm(forms.Form):
         label="Note",
         help_text="Optional, e.g. which meeting approved them or with what corrections.",
     )
+    # The version shown on the page: the one approved (fixres BUG-006).
+    version = forms.IntegerField(widget=forms.HiddenInput)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, version=None, **kwargs):
         kwargs.setdefault("auto_id", "approve_%s")
         super().__init__(*args, **kwargs)
         self.fields["approved_on"].initial = timezone.localdate()
+        if version is not None:
+            self.fields["version"].initial = version.pk
 
 
 class MinutesUploadForm(forms.Form):
@@ -150,6 +154,17 @@ def _linked(request, meeting) -> dict:
     return out
 
 
+def _for_version(form, version):
+    """A refused approval form, offering the version now current (the page
+    names it), with what was typed kept (fixres BUG-006)."""
+    if form is None or version is None or not form.is_bound:
+        return form
+    if str(form.data.get("version")) != str(version.pk):
+        form.data = form.data.copy()
+        form.data["version"] = str(version.pk)
+    return form
+
+
 def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, status=200):
     user = request.user
     can_manage = policy.can(user, "meeting.manage")
@@ -160,6 +175,15 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
         and meeting.status == MeetingStatus.HELD
         and approval is None
     )
+    minutes_version = None
+    if can_approve:
+        doc = (
+            Document.objects.for_user(user)
+            .select_related("current_version")
+            .filter(pk=meeting.minutes_document_id)
+            .first()
+        )
+        minutes_version = doc.current_version if doc else None
     can_upload = can_manage and policy.can(user, "document.manage")
     minutes_choices = (
         Document.objects.for_user(user).filter(category="minutes") if can_manage else []
@@ -179,7 +203,13 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
             "minutes_form": minutes_form
             or (MinutesUploadForm() if can_upload and not meeting.minutes_document_id else None),
             "minutes_approval": approval,
-            "approve_form": (approve_form or ApproveMinutesForm()) if can_approve else None,
+            "approve_form": (
+                _for_version(approve_form, minutes_version)
+                or ApproveMinutesForm(version=minutes_version)
+            )
+            if can_approve
+            else None,
+            "minutes_version": minutes_version,
             "deadlines": deadlines,
             "deadline_default": deadline_default,
             "can_record_resolution": policy.can(user, "resolution.record"),
@@ -269,6 +299,7 @@ def meeting_action(request, pk, action):
                 meeting,
                 approved_on=form.cleaned_data["approved_on"],
                 note=form.cleaned_data["note"],
+                version_id=form.cleaned_data["version"],
                 actor=request.user,
                 request=request,
             ),
