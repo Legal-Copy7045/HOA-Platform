@@ -1,0 +1,9 @@
+# The monthly charge's name and the monthly statement email (D40). `match` runs over "<stage>:<check>".
+- feature: "What the monthly charge is called (default Assessment, the Act's word; board setting with citation): every page, email, letter, rule label and new charge uses it (\"Assessment – December 2026\", WT-003); old entries keep their wording; no template hard-codes \"dues\""
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:community/tests/test_terms\\.py::test_"]
+- feature: "Monthly statement email when the month's charge posts (on by default, untick on My profile): owners and authorized/view-only contacts only, never tenants, former owners or other homes; once per account per month; amount due, pay-by date or prepaid/nothing-to-pay line, autopay hook, signed-in links, how to stop, current account's statement PDF attached; audited with counts only"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_statement_email\\.py::test_", "^manual:monthly statement email"]
