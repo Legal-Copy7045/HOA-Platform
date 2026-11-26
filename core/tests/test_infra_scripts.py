@@ -561,3 +561,94 @@ def test_falco_key_is_pinned_to_the_published_fingerprint():
     assert 'gpg --batch --export "$FALCO_KEY_FPR"' in section
     assert "| gpg --dearmor" not in text
     assert "sources.list.d/falcosecurity.list" in text[text.index("==> 4.") :]
+
+
+# --- fixres R2-005: the off-site drill skips future-dated names --------------------------------
+
+
+@pytestmark_bash
+@pytest.mark.parametrize(
+    ("names", "picked"),
+    [
+        (["2026-11-24T0230Z", "2026-11-25T0230Z"], "2026-11-25T0230Z"),
+        # A set named in the future is skipped; the newest valid one is used.
+        (["2026-11-24T0230Z", "2026-11-25T0230Z", "2099-01-01T0000Z"], "2026-11-25T0230Z"),
+        (["2026-11-25T0230Z", "not-a-stamp", "2026-11-26T1300Z"], "2026-11-25T0230Z"),
+        (["2099-01-01T0000Z"], None),
+        ([], None),
+    ],
+)
+def test_offsite_drill_picks_the_newest_backup_not_in_the_future(names, picked):
+    result = _lib('offsite_pick "$1"', "2026-11-26T1200Z", stdin="".join(f"{n}\n" for n in names))
+    if picked is None:
+        assert result.returncode != 0
+    else:
+        assert result.returncode == 0 and result.stdout.strip() == picked
+    if any(n > "2026-11-26T1200Z" for n in names if n[:1] == "2"):
+        assert "dated in the future" in result.stderr
+
+
+def test_restore_drill_uses_the_picker_and_still_checks_the_signed_stamp():
+    drill = Path(POC, "restore-drill.sh").read_text()
+    assert 'offsite_pick "$(date -u +%Y-%m-%dT%H%MZ)"' in drill
+    assert "pull_backup --list | tail -1" not in drill
+    assert drill.index("offsite_pick") < drill.index('offsite_stamp_ok "$REMOTE" "$STAMP"')
+
+
+# --- fixres R2-006: a re-run keeps a verified Falco keyring without falco.org ------------------
+
+GPG = shutil.which("gpg")
+
+
+def _falco_step() -> str:
+    text = Path(POC, "harden-host.sh").read_text()
+    start = text.index("# On a re-run, a keyring")
+    return text[start : text.index('echo "deb [signed-by=', start)]
+
+
+def _gpg(args, env, text=False):
+    return subprocess.run(  # noqa: S603  # nosec B603
+        [GPG, "--batch", *args], check=True, capture_output=True, env=env, text=text
+    ).stdout
+
+
+def _keyring(tmp_path, name) -> tuple[Path, str]:
+    home = tmp_path / f"gnupg-{name}"
+    home.mkdir(mode=0o700)
+    env = {"GNUPGHOME": str(home), "PATH": "/usr/bin:/bin"}
+    uid = f"{name} <{name}@example.invalid>"
+    _gpg(["--passphrase", "", "--quick-gen-key", uid, "ed25519", "sign", "never"], env)
+    out = _gpg(["--with-colons", "--list-keys"], env, text=True)
+    fpr = next(line.split(":")[9] for line in out.splitlines() if line.startswith("fpr"))
+    ring = tmp_path / f"{name}.gpg"
+    ring.write_bytes(_gpg(["--export", fpr], env))
+    return ring, fpr
+
+
+def _run_falco_step(tmp_path, keyring: Path, fpr: str) -> subprocess.CompletedProcess:
+    script = (
+        "set -euo pipefail\n"
+        'curl() { echo "DOWNLOAD $*" >&2; return 7; }\n'  # falco.org unreachable
+        f'FALCO_KEYRING="{keyring}"\nFALCO_KEY_FPR="{fpr}"\n' + _falco_step()
+    )
+    return subprocess.run(  # noqa: S603  # nosec B603
+        [BASH, "-c", script],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "GNUPGHOME": str(tmp_path / "g")},
+    )
+
+
+@pytest.mark.skipif(BASH is None or GPG is None, reason="bash and gpg needed")
+def test_falco_rerun_keeps_the_pinned_keyring_without_downloading(tmp_path):
+    (tmp_path / "g").mkdir(mode=0o700)
+    ring, fpr = _keyring(tmp_path, "pinned")
+    result = _run_falco_step(tmp_path, ring, fpr)
+    assert result.returncode == 0, result.stderr
+    assert "already installed and verified" in result.stdout
+    assert "DOWNLOAD" not in result.stderr
+    # A keyring with another key, or none, still needs the download and check.
+    other, _ = _keyring(tmp_path, "other")
+    for keyring in (other, tmp_path / "missing.gpg"):
+        result = _run_falco_step(tmp_path, keyring, fpr)
+        assert result.returncode != 0 and "DOWNLOAD" in result.stderr

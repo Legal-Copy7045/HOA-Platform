@@ -44,7 +44,9 @@ if [ "$FROM_OFFSITE" -eq 1 ]; then
   # Download the newest complete off-site backup (still encrypted) with the
   # live portal's off-site settings; it is then checked like any other.
   LIVE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
-  REMOTE="$("${LIVE[@]}" exec -T web python manage.py pull_backup --list | tail -1 | tr -cd '0-9TZ-')"
+  # The newest backup not dated in the future (others are skipped with a warning).
+  REMOTE="$("${LIVE[@]}" exec -T web python manage.py pull_backup --list \
+    | offsite_pick "$(date -u +%Y-%m-%dT%H%MZ)")" || REMOTE=""
   [ -n "$REMOTE" ] || { echo "No complete backup found in the off-site bucket." >&2; exit 1; }
   SRC="$(mktemp -d /root/hoa-offsite-drill.XXXXXX)"; chmod 700 "$SRC"
   OFFSITE_DIR="$SRC"

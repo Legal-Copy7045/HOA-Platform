@@ -185,26 +185,34 @@ FALCO_KEY_FPR_PUBLISHED="478B2FBBC75F4237B731DA4365106822B35B1B1F"
 FALCO_KEY_FPR="$(printf '%s' "${HOA_FALCO_KEY_FPR:-$FALCO_KEY_FPR_PUBLISHED}" | tr -d ' ' | tr 'a-f' 'A-F')"
 FALCO_KEYRING=/usr/share/keyrings/falco-archive-keyring.gpg
 apt-get install -y -qq --no-install-recommends curl gnupg >/dev/null
-FALCO_TMP="$(mktemp -d)"; chmod 700 "$FALCO_TMP"
-curl -fsSL https://falco.org/repo/falcosecurity-packages.asc -o "$FALCO_TMP/falco.asc"
-FALCO_FOUND="$(gpg --show-keys --with-colons "$FALCO_TMP/falco.asc" 2>/dev/null | awk -F: '$1 == "fpr" {print $10}' || true)"
-if ! printf '%s\n' "$FALCO_FOUND" | grep -qxF "$FALCO_KEY_FPR"; then
-  echo "Falco's signing key does not have the expected fingerprint." >&2
-  echo "  expected: $FALCO_KEY_FPR" >&2
-  echo "  found:    $(printf '%s' "$FALCO_FOUND" | tr '\n' ' ')" >&2
-  echo "Not installing Falco. If Falco has rotated its key, compare with the table at" >&2
-  echo "https://falco.org/docs/setup/packages/ and re-run with HOA_FALCO_KEY_FPR=<fingerprint>." >&2
+# On a re-run, a keyring that holds exactly the pinned key (checked here, not
+# trusted by its name) is kept, so the step does not need falco.org (R2-006).
+FALCO_INSTALLED="$(gpg --show-keys --with-colons "$FALCO_KEYRING" 2>/dev/null \
+  | awk -F: '$1 == "pub" {p = 1; next} p && $1 == "fpr" {print $10; p = 0}' || true)"
+if [ -s "$FALCO_KEYRING" ] && [ "$FALCO_INSTALLED" = "$FALCO_KEY_FPR" ]; then
+  echo "    Falco signing key $FALCO_KEY_FPR already installed and verified"
+else
+  FALCO_TMP="$(mktemp -d)"; chmod 700 "$FALCO_TMP"
+  curl -fsSL https://falco.org/repo/falcosecurity-packages.asc -o "$FALCO_TMP/falco.asc"
+  FALCO_FOUND="$(gpg --show-keys --with-colons "$FALCO_TMP/falco.asc" 2>/dev/null | awk -F: '$1 == "fpr" {print $10}' || true)"
+  if ! printf '%s\n' "$FALCO_FOUND" | grep -qxF "$FALCO_KEY_FPR"; then
+    echo "Falco's signing key does not have the expected fingerprint." >&2
+    echo "  expected: $FALCO_KEY_FPR" >&2
+    echo "  found:    $(printf '%s' "$FALCO_FOUND" | tr '\n' ' ')" >&2
+    echo "Not installing Falco. If Falco has rotated its key, compare with the table at" >&2
+    echo "https://falco.org/docs/setup/packages/ and re-run with HOA_FALCO_KEY_FPR=<fingerprint>." >&2
+    rm -rf "$FALCO_TMP"
+    exit 1
+  fi
+  mkdir -p -m 700 "$FALCO_TMP/gnupg"
+  GNUPGHOME="$FALCO_TMP/gnupg" gpg --batch --quiet --import "$FALCO_TMP/falco.asc"
+  GNUPGHOME="$FALCO_TMP/gnupg" gpg --batch --export "$FALCO_KEY_FPR" > "$FALCO_TMP/falco.gpg"
+  [ -s "$FALCO_TMP/falco.gpg" ] || { echo "Could not export Falco's key $FALCO_KEY_FPR." >&2; rm -rf "$FALCO_TMP"; exit 1; }
+  install -m 0644 "$FALCO_TMP/falco.gpg" "$FALCO_KEYRING"
+  GNUPGHOME="$FALCO_TMP/gnupg" gpgconf --kill all >/dev/null 2>&1 || true
   rm -rf "$FALCO_TMP"
-  exit 1
+  echo "    Falco signing key $FALCO_KEY_FPR verified"
 fi
-mkdir -p -m 700 "$FALCO_TMP/gnupg"
-GNUPGHOME="$FALCO_TMP/gnupg" gpg --batch --quiet --import "$FALCO_TMP/falco.asc"
-GNUPGHOME="$FALCO_TMP/gnupg" gpg --batch --export "$FALCO_KEY_FPR" > "$FALCO_TMP/falco.gpg"
-[ -s "$FALCO_TMP/falco.gpg" ] || { echo "Could not export Falco's key $FALCO_KEY_FPR." >&2; rm -rf "$FALCO_TMP"; exit 1; }
-install -m 0644 "$FALCO_TMP/falco.gpg" "$FALCO_KEYRING"
-GNUPGHOME="$FALCO_TMP/gnupg" gpgconf --kill all >/dev/null 2>&1 || true
-rm -rf "$FALCO_TMP"
-echo "    Falco signing key $FALCO_KEY_FPR verified"
 echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" \
   > /etc/apt/sources.list.d/falcosecurity.list
 apt-get update -qq
