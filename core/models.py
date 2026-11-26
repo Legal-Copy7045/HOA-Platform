@@ -52,6 +52,35 @@ class ErrorTally(models.Model):
         return f"{self.hour:%Y-%m-%d %H}:00 ({self.count})"
 
 
+class ErrorSignature(models.Model):
+    """One kind of server error in one hour (decision D45): which exception
+    class, which route (URL name or view path, never the request path, query
+    string or URL arguments), where in our code, the status and the release,
+    with a count. Never an exception message, source line, variable, user or
+    IP address."""
+
+    hour = models.DateTimeField()
+    fingerprint = models.CharField(max_length=64)
+    exc_type = models.CharField(max_length=120)
+    route = models.CharField(max_length=200, blank=True)
+    method = models.CharField(max_length=10, blank=True)
+    where = models.CharField(max_length=300, blank=True)
+    status = models.PositiveSmallIntegerField()
+    release = models.CharField(max_length=40, blank=True)
+    count = models.PositiveIntegerField(default=0)
+    first_seen = models.DateTimeField()
+    last_seen = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["hour", "fingerprint"], name="error_signature_per_hour")
+        ]
+        indexes = [models.Index(fields=["last_seen"])]
+
+    def __str__(self) -> str:
+        return f"{self.hour:%Y-%m-%d %H}:00 {self.exc_type} ({self.count})"
+
+
 class AlertState(models.Model):
     """Which health checks are failing and when sysadmins were last told."""
 

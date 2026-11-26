@@ -92,3 +92,7 @@
 - feature: "Scanner figures and server resources (D39): signature age, 7-day scan counts, files waiting; memory without cache, swap, load from /proc; Server memory alert only after 10 minutes low"
   since: M5
   match: ["^unit:core/tests/test_resources_and_scanner\\.py::test_"]
+- feature: "Server errors by kind (D45): signatures per hour (class, route name, our code frame, status, release; never path, query, message or user), deliberate 503s labelled, plain-words sentence with a Technical line in the alert email (top 5 + more) and the System status card (sysadmins only), never breaks a response, 30-day purge"
+  since: M5
+  docs: docs/runbook.md
+  match: ["^unit:core/tests/test_error_signatures"]

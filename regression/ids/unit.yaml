@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-2600
+# highest issued: UNIT-2616
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -2586,3 +2586,19 @@ UNIT-2597: "community/tests/test_notice_consent.py::test_invitations_page_counts
 UNIT-2598: "community/tests/test_notice_consent.py::test_counts_and_wording_are_board_only"
 UNIT-2599: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[contact_method_notices]"
 UNIT-2600: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[contact_method_notices]"
+UNIT-2601: "core/tests/test_error_signatures.py::test_raised_exception_records_class_route_and_app_frame_but_no_message_or_path"
+UNIT-2602: "core/tests/test_error_signatures.py::test_returned_5xx_without_exception_is_recorded_by_status_and_route[500]"
+UNIT-2603: "core/tests/test_error_signatures.py::test_returned_5xx_without_exception_is_recorded_by_status_and_route[503]"
+UNIT-2604: "core/tests/test_error_signatures.py::test_healthz_database_down_is_labelled"
+UNIT-2605: "core/tests/test_error_signatures.py::test_email_unavailable_page_is_labelled"
+UNIT-2606: "core/tests/test_error_signatures.py::test_same_error_counts_up_within_the_hour_and_starts_afresh_next_hour"
+UNIT-2607: "core/tests/test_error_signatures.py::test_alert_lists_the_top_five_kinds_in_site_time_and_how_many_more"
+UNIT-2608: "core/tests/test_error_signatures.py::test_alert_without_signatures_still_goes_out"
+UNIT-2609: "core/tests/test_error_signatures.py::test_failure_while_recording_never_breaks_the_response"
+UNIT-2610: "core/tests/test_error_signatures.py::test_retention_purge_removes_only_old_rows"
+UNIT-2611: "core/tests/test_error_signatures.py::test_clearing_the_errors_check_forgets_recent_signatures"
+UNIT-2612: "core/tests/test_error_signatures.py::test_status_page_shows_recent_errors_card_to_sysadmins_only"
+UNIT-2613: "core/tests/test_error_signatures.py::test_status_page_says_when_there_were_none"
+UNIT-2614: "core/tests/test_error_signatures.py::test_where_prefers_our_code_and_never_carries_source_or_locals"
+UNIT-2615: "core/tests/test_error_signatures.py::test_plain_words_name_the_page_the_cause_who_noticed_and_what_to_do"
+UNIT-2616: "core/tests/test_error_signatures.py::test_unknown_pages_and_errors_fall_back_to_a_sensible_sentence"

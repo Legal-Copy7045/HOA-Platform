@@ -117,14 +117,10 @@ def _signatures():
 
 
 def _errors():
+    from core.errors import window_start
     from core.models import ErrorTally
 
-    since = timezone.now() - datetime.timedelta(hours=1)
-    total = sum(
-        ErrorTally.objects.filter(
-            hour__gte=since.replace(minute=0, second=0, microsecond=0)
-        ).values_list("count", flat=True)
-    )
+    total = sum(ErrorTally.objects.filter(hour__gte=window_start()).values_list("count", flat=True))
     return total < ERRORS_PER_HOUR, f"{total} server error(s) in the last hour"
 
 
@@ -272,11 +268,13 @@ def clear(key: str) -> None:
 
         clear_failure()
     else:
-        from core.models import ErrorTally
+        from core.models import ErrorSignature, ErrorTally
 
-        # Counts only (no URLs, messages or users): forget the last hour's.
+        # Forget the last hours' counts and signatures (no URLs, messages or
+        # users in either), so the check and the next email start afresh.
         since = timezone.now() - datetime.timedelta(hours=2)
         ErrorTally.objects.filter(hour__gte=since).delete()
+        ErrorSignature.objects.filter(hour__gte=since).delete()
 
 
 def run_checks() -> list[Result]:
@@ -300,6 +298,17 @@ def sysadmin_emails() -> list[str]:
     return [u.email for u in User.objects.filter(is_active=True) if is_sysadmin(u)]
 
 
+def _error_lines(now) -> list[str]:
+    """What the server errors were (D45): the top kinds in the last hour.
+    Class names, route names and code locations only."""
+    from core.errors import alert_lines
+
+    try:
+        return alert_lines(now)
+    except Exception as exc:  # the alert itself must still go out
+        return [f"  (error list unavailable: {type(exc).__name__})"]
+
+
 def alert(results: list[Result], *, now=None) -> int:
     """Email the sysadmins about changes. Returns the number of emails sent."""
     from core.models import AlertState
@@ -314,6 +323,8 @@ def alert(results: list[Result], *, now=None) -> int:
             )
             if not state.failing or due:
                 news.append(f"PROBLEM  {r.label}: {r.detail}")
+                if r.key == "errors":
+                    news.extend(_error_lines(now))
                 state.last_alerted_at = now
             if not state.failing:
                 state.since = now

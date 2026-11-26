@@ -35,6 +35,13 @@ class CoreConfig(AppConfig):
             post_delete.connect(invalidate_roles, sender=model, dispatch_uid=f"roles.del.{label}")
         m2m_changed.connect(invalidate_roles, dispatch_uid="roles.m2m")
 
+        # Server error signatures (D45): also exceptions raised in middleware.
+        from django.core.signals import got_request_exception
+
+        from core.errors import on_request_exception
+
+        got_request_exception.connect(on_request_exception, dispatch_uid="core.error_signature")
+
         import logging
 
         from django.conf import settings
