@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Reimbursement claim · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'reimbursements' %}">Reimbursements</a> / Claim #{{ claim.pk }}</div>
+  <div class="page-head"><div><h1>Reimbursement claim #{{ claim.pk }}</h1>
+    <p class="subtitle">{{ claim.amount_cents|cents }} paid to {{ claim.payee }} on {{ claim.spent_on|date:"F j, Y" }} · {{ claim.category.code }} {{ claim.category.name }} · <span class="status {% if st.status == 'paid' %}tone-success{% elif st.status == 'awaiting' or st.status == 'approved' %}tone-warning{% else %}tone-info{% endif %}">{{ label }}</span></p></div></div>
+  <section class="card"><h2>Claim</h2>
+    <p>{{ claim.description|linebreaksbr }}</p>
+    <ul class="list small">
+      <li><span class="grow">Claimed by {{ claim.claimant.display_name }}</span><span class="muted">{{ claim.created_at|short_date }}</span></li>
+      <li><span class="grow">Needs {{ st.need }} approval{{ st.need|pluralize }} from board members other than the claimant; {{ st.have }} so far</span></li>
+      {% for d in st.decisions %}<li><span class="grow">{{ d.get_decision_display }} by {{ d.by.email }}{% if d.note %}: {{ d.note }}{% endif %}</span><span class="muted">{{ d.created_at|short_date }}</span></li>{% endfor %}
+      {% if st.invoice %}<li><span class="grow">Paid so far {{ st.paid_cents|cents }}</span></li>{% endif %}
+    </ul>
+    <h3>Receipts</h3>
+    <ul class="list small">{% for f in files %}<li><a class="grow" href="{% url 'reimbursement_file' claim.pk f.file.pk %}">{{ f.file.original_filename }}</a><span class="muted">{{ f.scan }}</span></li>{% empty %}<li>No receipt.</li>{% endfor %}</ul>
+  </section>
+  {% if own_matter %}<p class="board-note" data-testid="own-home-note">This is your own claim: other board members approve and pay it.</p>{% endif %}
+  {% if can_decide %}<section class="card"><h2>Decision</h2>
+    {% if not clean_receipt %}<p class="alert warning">{% icon "alert" %}<span>No receipt has passed the malware scan yet; the claim can be approved once one has.</span></p>{% endif %}
+    <div class="actions">
+      {% if clean_receipt %}<form method="post" action="{% url 'reimbursement_action' claim.pk 'approve' %}" class="inline-form" data-confirm="{% acting_confirm "Approve paying this claim?" %}">{% csrf_token %}<div><label for="approve-note">Note (optional)</label><input id="approve-note" name="note" maxlength="500"></div><button type="submit">{% icon "check" %} {% for_board "Approve" %}</button></form>{% endif %}
+      <form method="post" action="{% url 'reimbursement_action' claim.pk 'decline' %}" class="inline-form" data-confirm="{% acting_confirm "Decline this claim? It will not be paid; the claimant sees the reason." %}">{% csrf_token %}<div><label for="decline-note">Reason</label><input id="decline-note" name="note" maxlength="500" required></div><button type="submit" class="secondary">{% for_board "Decline" %}</button></form>
+    </div></section>{% endif %}
+  {% if can_withdraw %}<form method="post" action="{% url 'reimbursement_action' claim.pk 'withdraw' %}" data-confirm="Withdraw this claim? It will not be paid.">{% csrf_token %}<button type="submit" class="secondary">Withdraw my claim</button></form>{% endif %}
+  {% if pay_refusal %}<p class="board-note">{{ pay_refusal }}</p>{% endif %}
+  {% if can_pay %}<section class="card"><h2>Pay</h2>
+    <p class="small">Print a check on the association's check stock from <a href="{% url 'vendor_checks' %}">Checks</a>, or record a bank transfer (its reference only, never account numbers).</p>
+    <form method="post" action="{% url 'reimbursement_action' claim.pk 'transfer' %}" class="inline-form" data-confirm="Record this claim as paid by bank transfer?">{% csrf_token %}
+      <div><label for="paid-on">Paid on</label><input id="paid-on" type="date" name="paid_on" value="{{ today|date:'Y-m-d' }}"></div>
+      <div><label for="reference">Transfer reference</label><input id="reference" name="reference" maxlength="40" required></div>
+      <button type="submit">Record bank transfer</button></form></section>{% endif %}
+{% endblock %}

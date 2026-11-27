@@ -382,4 +382,7 @@
 - key: vendor document key on the VM
   check: "sudo bash infra/poc/set-vendor-key.sh makes the key without typing, check_vendor_key passes, the setup wizard's server step says Set up, --rotate re-encrypts existing documents (0 under an old key afterwards), and a copy of the key is stored apart from the backups."
   steps: "VM console as hoa; run the script, then --rotate after uploading one demo document; open the document as a board member after each step."
+- key: vendor check alignment
+  check: "Checks prints an approved invoice's check on the association's stock with the same positions as refund checks: date, payee, amount, amount in words, memo with the invoice number (or the reimbursement claim) and the payee's address in a #10 window envelope all line up; the check number on the stock matches the number recorded."
+  steps: "Sign in as a demo board member; Finance > More finance > Checks; tick an approved demo invoice; Print checks (PDF) at 100% onto a voided blank check; fold into a window envelope; Record as issued with the stock's number; confirm the invoice shows Paid and the register lists the check."
   last: ""

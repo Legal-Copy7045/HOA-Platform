@@ -46,15 +46,26 @@ class ProjectForm(forms.Form):
     special_assessment_ref = forms.CharField(
         max_length=200, required=False, label="Special assessment (resolution), if any"
     )
+    special_assessment = forms.ModelChoiceField(
+        queryset=None, required=False, label="Special assessment record (optional)"
+    )
     reserve_component = forms.ModelChoiceField(
         queryset=None, required=False, label="Reserve plan component (optional)"
     )
 
     def __init__(self, *args, **kwargs):
-        from ledger.models import ReserveComponent
+        from core import features
+        from ledger.models import ReserveComponent, SpecialAssessment
 
         super().__init__(*args, **kwargs)
         self.fields["reserve_component"].queryset = ReserveComponent.objects.filter(active=True)
+        if features.enabled("special_assessments"):
+            # The levy that funds it (D75): association-wide records.
+            field = self.fields["special_assessment"]
+            field.queryset = SpecialAssessment.objects.order_by("-pk")
+            field.label_from_instance = lambda sa: f"#{sa.pk} {sa.title}"
+        else:
+            del self.fields["special_assessment"]
 
 
 @login_required
@@ -228,12 +239,14 @@ def capital_project_detail(request, pk):
                     "budget_cents": f"{project.budget_cents / 100:.2f}",
                     "funding": project.funding,
                     "special_assessment_ref": project.special_assessment_ref,
+                    "special_assessment": project.special_assessment_id,
                     "reserve_component": project.reserve_component_id,
                 }
             ),
             "choices": _link_choices(),
             "link_kinds": LinkKind.choices,
             "special_label": cp.special_assessment_label(project),
+            "special_url": cp.special_assessment_url(project, user),
             "me": user.pk,
         },
     )

@@ -708,6 +708,25 @@ def fund_positions(as_of: datetime.date) -> dict[str, dict]:
     return out
 
 
+def books_in_use() -> bool:
+    """The books are switched on and set up (a start date)."""
+    return features.enabled("books") and funds.books_start() is not None
+
+
+@internal("books: closed_fund_positions")
+def closed_fund_positions() -> tuple[datetime.date, dict[str, dict]] | None:
+    """(last day of the last closed month, ``fund_positions`` then), or None
+    while the books are not in use or no month is closed. Other areas (the
+    cash-flow forecast, the owners' finance summary) read fund balances here."""
+    if not books_in_use():
+        return None
+    key = periods.last_closed_month()
+    if key is None:
+        return None
+    _start, end = periods.month_bounds(key)
+    return end, fund_positions(end)
+
+
 def _fund_check(end: datetime.date) -> Check:
     check = Check(
         "funds",

@@ -76,6 +76,11 @@ GL_LABELS = {
     "processing_fees": "Payment processing fees",
     # Disbursements (D52)
     "surplus_fund": "Surplus distributions paid from (reserve or surplus fund)",
+    # Special assessments (D75)
+    "special_assess": "Special assessment income",
+    # Finance options (D80, D82)
+    "interest": "Interest charged on overdue balances",
+    "legal_cost": "Collection costs and attorney fees recovered",
 }
 
 
@@ -97,6 +102,9 @@ GL_GROUPS = [
             ("late_fee", "Late fees posted on overdue accounts."),
             ("resale_fee", "Fees for resale certificates when a home is sold."),
             ("other_charge", "Any other charge posted to an owner's account."),
+            ("special_assess", "Special assessment installments (D75)."),
+            ("interest", "Interest posted on overdue balances (D80)."),
+            ("legal_cost", "Collection costs and attorney fees charged to owners (D82)."),
             ("card_surcharge", "The surcharge owners pay when they pay by credit card."),
         ],
     ),
@@ -129,13 +137,19 @@ GL_GROUPS = [
 
 def standard_accounts() -> dict[str, str]:
     """The account each key uses when its box is left empty."""
-    from ledger.models import DEFAULT_GL, DISBURSEMENT_GL, ONLINE_GL
+    from ledger.models import (
+        DEFAULT_GL,
+        DISBURSEMENT_GL,
+        ONLINE_GL,
+        OWNER_FINANCE_GL,
+        SPECIAL_ASSESSMENT_GL,
+    )
 
     defaults = {
         k.strip(): v.strip()
         for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
     }
-    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL}
+    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **SPECIAL_ASSESSMENT_GL, **OWNER_FINANCE_GL}
 
 
 def setup_groups(setup: AccountingSetup, values: dict[str, str] | None = None) -> list[dict]:
@@ -282,6 +296,14 @@ def journal_lines(start: datetime.date, end: datetime.date) -> list:
             .select_related("invoice__vendor", "invoice__category")
             .order_by("paid_on", "id")
         )
+    from ledger.models import SpecialAssessmentCharge
+
+    with system_access("accounting export: special assessment funds"):
+        special_funds = dict(
+            SpecialAssessmentCharge.objects.filter(entry__posted_on__lte=end).values_list(
+                "entry_id", "installment__assessment__fund"
+            )
+        )
     from payments.services import journal_items, online_entry_ids
 
     online = online_entry_ids()
@@ -362,6 +384,9 @@ def journal_lines(start: datetime.date, end: datetime.date) -> list:
                 e.lot,
             )
         else:
+            # Each charge kind has its own income account (interest D80 and
+            # legal costs D82 included); a special assessment installment is
+            # income of the levy's fund (D75), owed in operating receivables.
             income = gl.get(kind, gl["other_charge"])
             pair(
                 e.posted_on,
@@ -372,6 +397,9 @@ def journal_lines(start: datetime.date, end: datetime.date) -> list:
                 e.amount_cents,
                 memo,
                 e.lot,
+                cfund=special_funds.get(e.reverses_id or e.pk, OP)
+                if kind == EntryKind.SPECIAL_ASSESSMENT
+                else OP,
             )
     stripe = journal_items(start, end)
     for day, ref, cents, lot in stripe["surcharges"]:
@@ -830,6 +858,8 @@ def vendor_1099_totals(year: int) -> list[dict]:
     threshold = rule("accounting.1099_threshold_cents") or 0
     totals = dict(
         InvoicePayment.objects.filter(paid_on__year=year)
+        # Expense reimbursements (D77) repay a volunteer, not a vendor: not 1099.
+        .filter(invoice__reimbursement__isnull=True)
         .values("invoice__vendor_id")
         .annotate(t=Sum("amount_cents"))
         .values_list("invoice__vendor_id", "t")

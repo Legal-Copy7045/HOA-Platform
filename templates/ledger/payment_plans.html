@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Payment plans · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="page-head"><div><h1>Payment plans</h1>
+    <p class="subtitle">Installment plans for homes with a collection case. Set one up from the collection case; a board member other than the one who prepared it approves it.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Home</th><th scope="col" class="num">Plan</th><th scope="col" class="num">Paid</th><th scope="col">Next installment</th><th scope="col">Status</th></tr></thead>
+    <tbody>{% for r in rows %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'payment_plan_detail' r.plan.pk %}">{{ r.plan.lot.label }}</a></td>
+      <td class="num" data-label="Plan">{{ r.plan.total_cents|cents }}</td><td class="num" data-label="Paid">{{ r.paid_cents|cents }}</td>
+      <td data-label="Next installment">{% if r.next and r.status == "active" %}{{ r.next.installment.amount_cents|cents }} · {{ r.next.installment.due_on|short_date }}{% else %}<span class="muted">-</span>{% endif %}</td>
+      <td data-label="Status"><span class="status {% if r.status == 'active' %}tone-success{% elif r.status == 'proposed' %}tone-warning{% elif r.status == 'defaulted' %}tone-danger{% else %}tone-info{% endif %}">{{ r.status_label }}</span>{% if r.missed and r.status == "active" %} <span class="status tone-danger">{{ r.missed|length }} missed</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="dollar" title="No payment plans" text="Plans set up from a collection case appear here." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

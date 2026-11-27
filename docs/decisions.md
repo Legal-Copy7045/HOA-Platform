@@ -1037,3 +1037,45 @@ The owner asked: "Also create a vendor onboarding process that captures the requ
 **Trade-offs accepted.** A public form is new attack surface: anyone can reach the start URL and, with a valid link, post up to 30 PDFs to one round. Mitigations above (unguessable keyed-hash tokens, rate limits, size limits before buffering, scanning, PDF only, no scripts, no data out). Holding tax IDs at all raises the stakes of a breach; mitigated by application-layer encryption, board-only audited viewing and retention with disposal.
 
 Tests: `operations/tests/test_vendor_onboarding.py`, `test_vendor_onboarding_public.py`, `test_vendor_onboarding_demo.py`; URL matrix PUBLIC and PROTECTED entries.
+
+
+## D75. Special assessments (2026-11-27)
+
+The association is self-managed (no management company, no accountant) and needs to levy one-off assessments for a purpose, such as a capital project, alongside the monthly charge.
+
+Decided (`ledger/special_assessments.py`, optional feature `special_assessments`, More finance → Special assessments):
+
+1. **Levy, board only, under a resolution.** Title, purpose, total, the fund it is designated to (operating or reserve, `SpecialAssessment.fund`; the general ledger maps it), the board resolution (required: in the portal or by reference, as D52), installments with due dates (1 to 60; monthly, quarterly, half-yearly or yearly from the first due date on the form).
+2. **Owners' vote where the Declaration requires it.** Rule `special_assessment.vote_required_cents` (empty: never); above it the levy needs a closed formal vote in the portal or the reference of one held elsewhere; rule `special_assessment.vote_percent` is recorded on the levy with the citations. The portal does not re-count the vote.
+3. **Allocation.** Rule `special_assessment.equal_shares` (on, Declaration §8.4/§8.14 style): equal per home, the odd cents one each in address order (`split_largest_remainder`); off: the board enters every home's share, which must add up to the total. A home's share is split evenly over its installments, the odd cents on the first.
+4. **Posting.** A new owner-ledger entry kind `special_assess` ("Special assessment"), one charge per home and installment named "<Title> – installment k of N", dated the due date (so it belongs to the ownership account of that day), applied by open-item allocation like any charge (`allocation.CHARGE_KIND_VALUES`). The daily task `ledger.tasks.special_assessments` posts what is due (and anything missed); `SpecialAssessmentCharge` (unique per installment and home) makes it idempotent. "Post installments due now" does the same by button (`ledger.manage`).
+5. **Late fees** only when rule `special_assessment.late_fees` is on at the levy (fixed on it): `late_fee.cents` once per home and installment still open after `late_fee.grace_days`, by the board's button or automatically with `late_fee.auto_apply`; never on one's own home (D65).
+6. **Notice.** "Send the owner notice" emails at once (`comms.notify.send_now`, never the digest) the owners who agreed to electronic notice and counts the others for Paper mail; recorded once (`SpecialAssessmentNotice`); a My item until sent. Owners see each special assessment, their share and the installments' status on My account; the charges are on the statement.
+7. **Cancelling** future installments: board, with a reason (append-only `SpecialAssessmentCancel`), only installments not yet posted; a posted charge is corrected by a normal reversal.
+
+Every record is append-only (model, trigger, runtime grants).
+
+## D76. Payment plans (2026-11-27)
+
+A collection case had only a "Payment plan agreed" state with a note. Decided (`ledger/payment_plans.py`, optional feature `payment_plans`):
+
+1. **Prepare** (board or manager, never on one's own home): the plan covers the open charges of the home's current ownership account (their ids and total fixed on the plan); installments (date and amount, equal monthly by default or typed one per line) must add up to it. Rules fixed on the plan: `payment_plan.suspend_late_fees` (on), `payment_plan.grace_days` (10), `payment_plan.default_days` (30).
+2. **Approve**: a board member other than the preparer (two people), never their own matter; approval moves the case to "Payment plan agreed" through the collection workflow. The generic "Payment plan agreed" step now needs an approved plan (guard), and the case page no longer offers it as a button.
+3. **Owner**: sees the plan, the next installment and the agreement letter on My account, and may record "I agree to this plan" (owners on the deed of today's account; refused during an account-recovery lock); a My item when an installment is due within 14 days.
+4. **Tracking from allocation**: paid = the plan's total less what is still open of its charges (`allocation.state_as_of`). An installment is met once the paid amount reaches the installments due so far, missed after the grace days (board My item), and the plan **defaults** when one is still unmet `default_days` after its due date. The daily task `ledger.tasks.payment_plans` records completed or defaulted plans as SYSTEM: a defaulted plan returns the case to its state before the plan (new system-only transitions `plan_end_open|reminder|second|final`), a completed one closes the case when nothing is past due (else it returns too). The board may cancel a plan (reason).
+5. **Late fees**: while a plan is current (approved, no missed installment) and it was agreed with the rule on, `services.late_fee_candidates` skips the home.
+6. **Letter**: `ledger.letters.payment_plan_pdf`, the letterhead layout of the notices, with the schedule, the late-fee and default terms and a signature line.
+
+## D77. Expense reimbursements and vendor checks (2026-11-27)
+
+Decided (`operations/reimbursements.py`, `operations/vendor_checks.py`, features `reimbursements` and `vendor_checks`):
+
+1. **Claims**: board members, committee members and volunteer owners submit the amount, date, who was paid, expense category, description and at least one receipt (the attachments path: content-type allowlist, size limit, malware scan; a flagged file refuses the claim). Scoped to the claimant.
+2. **Approval**: a board member other than the claimant (D65), never the manager; two at or over rule `reimbursement.second_approval_cents` (fixed at submission). Only while a receipt passes the scan rule. Decline with a reason; the claimant may withdraw while it waits.
+3. **Books**: the final approval creates an approved `Invoice` from the system payee "Expense reimbursements" (`R-<claim>`, the claim's category, the approvals copied as `InvoiceApproval` rows); paying records an `InvoicePayment`, so the journal books it to the category with no new journal code. The 1099 worksheet leaves reimbursements out.
+4. **Paying (D66)**: by check (below) or "Record bank transfer" with a short reference (never account numbers). The claimant never takes a step on their own payment; a board member's claim is paid, printed, cleared or voided only by another board member.
+5. **Vendor checks**: approved invoices with money still to pay are printed one per page on the association's check stock (the disbursement `CheckPrintSettings` and `check_page`, amount in words, payee and address for a window envelope, memo "Invoice <number>" or "Reimbursement claim #N"). "Record as issued" with the first number records each `InvoicePayment` (method check, the number as reference) and a `VendorCheck`. **Check numbers are unique across every association check** (`ledger/check_numbers.py`, used by disbursement checks too, under the shared check advisory lock). Clear (typed date or the matching bank-feed line); void (board only) records a negative `InvoicePayment` and reopens the invoice (new system-only transition `payment_voided`). `vendor_checks.outstanding_checks(as_of)` lists uncleared ones for reconciliation; as invoice payments they are already in `accounting.uncleared`.
+
+## D78. Budget preparation (2026-11-27)
+
+What existed (budgets and lines, budget-versus-actual, proposed and adopted notices with paper copies, adoption, the adopted reserve plan) is reused unchanged. Added (`ledger/budget_prep.py`): **Start next year's budget** on Budgets makes the next fiscal year's draft from the latest budget: each line from this year's budget, its actuals (approved and paid invoices by category, the budget report's source) or the higher, plus an optional increase (basis points, half up to the cent); categories spent without a line are added; the reserve contribution line comes from the adopted reserve plan (`ReserveStudySnapshot.annual_contribution_cents`); other income lines carry over; the monthly charge per home is the net need ÷ homes ÷ 12, rounded up to a multiple of rule `budget.assessment_rounding_cents` (default whole dollars) and the income line is that times homes times 12. **Budget compared** shows last year's budget, last year's actuals and the draft side by side with the change from today's `dues.monthly_cents`. Notices and adoption stay on the budget page.

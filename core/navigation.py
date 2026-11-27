@@ -116,6 +116,35 @@ HUBS = {
             "The Form 1120-H worksheet, 1099 totals with the IRIS upload file, and the filing "
             "deadlines.",
         ),
+        # Finance gaps (D75-D77).
+        (
+            "Special assessments",
+            "special_assessments",
+            "dollar",
+            "special_assessment.view",
+            "One-off assessments for a purpose, levied under a board resolution, in installments.",
+        ),
+        (
+            "Payment plans",
+            "payment_plans",
+            "clock",
+            "finance.view",
+            "Installment plans for homes with a collection case.",
+        ),
+        (
+            "Reimbursements",
+            "reimbursements",
+            "receipt",
+            "reimbursement.view_all",
+            "Expenses volunteers paid for the association, approved and paid back.",
+        ),
+        (
+            "Checks",
+            "vendor_checks",
+            "receipt",
+            "vendor_check.view",
+            "Print checks for approved invoices and reimbursements; the check register.",
+        ),
         (
             "Resale certificates",
             "resales",
@@ -314,6 +343,8 @@ SECTIONS = [
             ("My requests", "requests?mine=1", "mail", ("lot.view_own", "request.submit")),
             ("My records requests", "records_requests?mine=1", "inbox", "records_request.submit"),
             ("My history", "my_history", "clock", "history.view_own"),
+            # Expense reimbursements (D77): one's own claims.
+            ("My reimbursements", "reimbursements?mine=1", "receipt", "reimbursement.menu"),
         ],
     ),
     (

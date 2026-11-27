@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Special assessments · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head">
+    <div><h1>Special assessments</h1>
+      <p class="subtitle">One-off assessments for a purpose such as a capital project, levied under a board resolution (and the owners' vote where the Declaration requires it). Each installment is posted on every home's account on its due date.</p></div>
+    {% if can_levy %}<div class="actions"><a class="btn" href="{% url 'special_assessment_new' %}">{% icon "plus" %} Levy a special assessment</a></div>{% endif %}
+  </div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Special assessment</th><th scope="col" class="num">Total</th><th scope="col">Installments</th><th scope="col" class="num">Posted</th><th scope="col" class="num">Still open</th><th scope="col">Next due</th></tr></thead>
+    <tbody>{% for r in rows %}<tr class="row-link">
+      <td class="cell-title"><a class="row-main" href="{% url 'special_assessment_detail' r.sa.pk %}">{{ r.sa.title }}</a><div class="small muted">{{ r.sa.get_fund_display }} · levied {{ r.sa.created_at|short_date }}</div></td>
+      <td class="num" data-label="Total">{{ r.sa.total_cents|cents }}</td>
+      <td data-label="Installments">{{ r.sa.installments }}{% if r.cancelled_from %} <span class="status tone-warning">cancelled from {{ r.cancelled_from }}</span>{% endif %}</td>
+      <td class="num" data-label="Posted">{{ r.posted_cents|cents }}</td>
+      <td class="num" data-label="Still open">{{ r.open_cents|cents }}</td>
+      <td data-label="Next due">{% if r.next %}{{ r.next.installment.due_on|short_date }}{% else %}<span class="muted">-</span>{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="dollar" title="No special assessments" text="A special assessment levied by the board appears here with its installments." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

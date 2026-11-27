@@ -1153,6 +1153,36 @@ def statement_pdf(lot: Lot, *, since: datetime.date | None = None, reminder: boo
 
 # --- Collections (tracking only; no automatic fees or legal steps) -----------------------
 
+# --- Payment plans in the collection workflow (D76) ---------------------------------------
+# Where a case returns when its payment plan ends unpaid: the state before the plan.
+PLAN_END_STATES = {
+    "open": "open",
+    "reminder": "reminder_sent",
+    "second": "second_reminder",
+    "final": "final_notice",
+}
+
+
+def _plan_approved(obj, actor):
+    from core import features
+    from ledger import payment_plans
+
+    # With the payment_plans feature off, the note-only step works as before.
+    if actor is SYSTEM or not features.enabled("payment_plans"):
+        return None
+    if payment_plans.approved_plan(obj) is not None:
+        return None
+    from core.workflow import NotForYou
+
+    return NotForYou("Set up the payment plan on its own page; its approval moves the case.")
+
+
+def _plan_service_only(obj, actor):
+    from core.workflow import NotForYou
+
+    return None if actor is SYSTEM else NotForYou("Recorded when the payment plan ends.")
+
+
 COLLECTION = Workflow(
     "collection",
     [
@@ -1180,7 +1210,24 @@ COLLECTION = Workflow(
             "collections.manage",
             "Payment plan agreed",
             note_required=True,
+            # D76: only once a payment plan is approved (ledger/payment_plans.py).
+            guard=_plan_approved,
         ),
+        # D76: a payment plan that ends unpaid (defaulted or cancelled, or
+        # completed with something past due) returns the case to where it
+        # was before the plan. Taken by ledger/payment_plans.py only.
+        *[
+            Transition(
+                f"plan_end_{key}",
+                {"payment_plan"},
+                state,
+                "collections.manage",
+                "Payment plan ended",
+                note_required=True,
+                guard=_plan_service_only,
+            )
+            for key, state in PLAN_END_STATES.items()
+        ],
         Transition(
             "refer",
             {"second_reminder", "final_notice", "payment_plan"},
@@ -1704,6 +1751,11 @@ def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
         return []
     period = _period(year, month)
     out = []
+    # D76: no late fee while the home keeps a payment plan (rule
+    # payment_plan.suspend_late_fees, fixed on each plan).
+    from ledger.payment_plans import late_fee_suspended_lots
+
+    suspended = late_fee_suspended_lots(on)
     with system_access("late fee candidates"):
         assessments = LedgerEntry.objects.filter(kind=EntryKind.ASSESSMENT, period=period)
         already = set(
@@ -1713,7 +1765,7 @@ def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
         )
         for entry in assessments.select_related("lot"):
             late_from = entry.posted_on + datetime.timedelta(days=int(grace) + 1)
-            if on < late_from or entry.lot_id in already:
+            if on < late_from or entry.lot_id in already or entry.lot_id in suspended:
                 continue
             open_cents = _allocation().state_as_of(entry.lot_id, on).open.get(entry.pk, 0)
             if open_cents <= 0:

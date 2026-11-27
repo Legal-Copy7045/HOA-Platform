@@ -178,7 +178,18 @@ def test_minimum_balance_and_payment_plan_exclusions(w):
     _interest_setup()
     m = _last()
     case = ledger.open_case(lot=w["lot_b"], actor=w["board"])
-    ledger.COLLECTION.apply(case, "payment_plan", actor=w["board"], note="12 months")
+    # A payment plan in force (D76, wired at 0.40.0): prepared, then approved
+    # by another board member.
+    from ledger import payment_plans
+
+    _charges, total, _account = payment_plans.covered_charges(case)
+    first_due = timezone.localdate() + datetime.timedelta(days=10)
+    plan = payment_plans.prepare(
+        case,
+        installments=payment_plans.even_installments(total, 3, first_due),
+        actor=w["board"],
+    )
+    payment_plans.approve(plan, actor=w["board2"])
     lots = {c.lot.pk for c in interest.candidates(year=m.year, month=m.month)}
     assert lots == {w["lot_a"].pk}  # B keeps to a plan: no interest
     _rule("interest.suspend_on_payment_plan", "false")

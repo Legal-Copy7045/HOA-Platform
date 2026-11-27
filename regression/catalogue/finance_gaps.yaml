@@ -1,0 +1,35 @@
+# Finance gaps (D75-D78): special assessments, payment plans, expense
+# reimbursements, vendor checks and budget preparation.
+- feature: "Special assessments (D75): board levies under a resolution; owners' vote above the rule's amount; equal shares (largest remainder) or a custom table; installments split evenly"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_(equal_split|levy_needs|vote_required|custom_allocation)"]
+- feature: "Special assessment installments post once per home on their due date (scheduled task idempotent), named '<Title> – installment k of N', applied by open-item allocation, in the journal; owner sees them on My account"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_(installments_post_once|scheduled_task_posts|charge_kind_in_allocation|special_assessment_pages)"]
+- feature: "Special assessments: cancelling future installments only (reason, board), late fees only when levied with them and never on one's own home, owner notice emailed once with audit counts only, records append-only"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_(cancel_future|late_fees_on_installments|notice_emailed_once|special_assessment_records_are_append_only)"]
+- feature: "Payment plans (D76): prepared by board or manager for the open balance, approved by another board member (never the manager, never one's own home); the generic case step cannot skip the plan"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_(prepare_checks_total|preparer_cannot_approve|generic_case_step|payment_plan_pages)"]
+- feature: "Payment plans: installments met or missed from allocation, missed ones on My items, automatic default back to the case's prior state and completion closing the case (SYSTEM, audited), late fees suspended while current"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_(plan_completes|plan_defaults|late_fees_suspended)"]
+- feature: "Payment plans: owner sees the plan and next installment on My account, agrees by a signed-in click, downloads the agreement letter; other owners get 404"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_owner_acknowledges", "^unit:core/tests/test_url_matrix.py::test_.*payment_plan"]
+- feature: "Expense reimbursements (D77): receipt required and malware-scanned (a flagged file refuses the claim; approval waits for a clean scan); approved by board members other than the claimant (two above the rule); declines and withdrawals; append-only"
+  since: M5
+  match: ["^unit:operations/tests/test_payouts.py::test_(submit_needs|two_approvals|receipt_scan_gate|decline_and_withdraw|submit_page)"]
+- feature: "Reimbursements become an approved invoice in their category: paid by transfer or check, booked by category in the journal, left off the 1099 worksheet; payments to board members only by another board member (D66); claims scoped to the claimant"
+  since: M5
+  match: ["^unit:operations/tests/test_payouts.py::test_(approval_by_others|claims_are_scoped|reimbursement_check_follows)", "^unit:core/tests/test_url_matrix.py::test_.*reimbursement"]
+- feature: "Vendor checks (D77): printed on check stock, recorded as issued with the invoice payment, numbers unique across vendor and disbursement checks, void (board) reopens the invoice, cleared, outstanding list for reconciliation"
+  since: M5
+  match: ["^unit:operations/tests/test_payouts.py::test_(issue_checks|check_numbers_shared|void_reopens|outstanding_checks|vendor_checks_page)", "^unit:core/tests/test_url_matrix.py::test_.*vendor_check", "^manual:vendor check alignment"]
+- feature: "Budget preparation (D78): next year's draft from this year's budget or actuals with an increase, the adopted reserve plan's contribution, the monthly charge per home rounded by rule with its change, and a side-by-side comparison; board only"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_(grow_rounds|prepare_next_year|prepare_uses_adopted|budget_prepare_pages)", "^unit:core/tests/test_url_matrix.py::test_.*budget_(prepare|compare)"]
+- feature: "Finance gaps demo data: a special assessment partly paid, a current and a defaulted payment plan, reimbursements in every state, checks issued, cleared and voided, a draft next-year budget"
+  since: M5
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_finance_gaps_demo_seed"]

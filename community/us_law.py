@@ -143,6 +143,32 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "other state filing with your preparer.",
         ),
     ],
+    # Finance gaps (D75-D78): special assessments, payment plans,
+    # reimbursements and budget preparation.
+    "money_extra": [
+        LawNote(
+            "68 Pa.C.S. § 5302(a), § 5314, § 5315",
+            "Uniform Planned Community Act: assessments, allocation and the lien",
+            "The board levies assessments, special ones included, allocated as the "
+            "Declaration says; unpaid assessments and late charges are a lien on the home.",
+            "Levy a special assessment only under a board resolution and, where the "
+            "Declaration requires, after the owners' vote; record both on the levy.",
+        ),
+        LawNote(
+            "15 U.S.C. § 1692 et seq.",
+            "Fair Debt Collection Practices Act",
+            "Applies to third parties collecting for the association, not to the association "
+            "collecting its own assessments.",
+            "If counsel or an agent arranges payment plans, their letters must follow the Act.",
+        ),
+        LawNote(
+            "Internal Revenue Code, accountable plans (26 U.S.C. § 62(c))",
+            "Expense reimbursements",
+            "Repaying an expense someone paid for the association, against a receipt, is not "
+            "pay or income to them.",
+            "Keep the receipt with every claim; reimbursements are left off the 1099 worksheet.",
+        ),
+    ],
     "payments": [
         LawNote(
             "12 C.F.R. § 1005.10(b)",

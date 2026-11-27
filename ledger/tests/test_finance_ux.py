@@ -608,16 +608,17 @@ def test_collection_case_has_one_shared_note_for_every_step(client, w):
     client.force_login(w["board"])
     page = client.get(reverse("collection_detail", args=[case.pk])).content.decode()
     assert page.count('name="note"') == 1
-    assert reverse("collection_action", args=[case.pk, "payment_plan"]) in page
+    # D76: a payment plan is set up on its own page; its approval moves the case.
+    assert reverse("payment_plan_new", args=[case.pk]) in page
     assert reverse("collection_action", args=[case.pk, "close"]) in page
     assert "required for" in page
     response = client.post(
-        reverse("collection_action", args=[case.pk, "payment_plan"]),
-        {"note": "Six monthly payments"},
+        reverse("collection_action", args=[case.pk, "close"]),
+        {"note": "Paid in full"},
     )
     assert response.status_code == 302
     case.refresh_from_db()
-    assert case.state == "payment_plan"
+    assert case.state == "closed"
 
 
 # --- Invoice: the file comes before the approval buttons --------------------------------------

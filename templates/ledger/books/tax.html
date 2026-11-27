@@ -22,6 +22,6 @@
     {% else %}<p class="small muted">No vendor at or over the threshold.</p>{% endif %}</section>
   <section class="card"><h2>Filing deadlines</h2>
     {% if deadlines %}<ul class="list small">{% for d in deadlines %}<li><span class="grow">{{ d.0 }}{% if d.3 %} <span class="muted">({{ d.3 }})</span>{% endif %}</span><span>{{ d.1 }}</span></li>{% endfor %}</ul>{% endif %}
-    <p class="small muted">On <a href="{% url 'tasks' %}?tab=deadlines">Recurring deadlines</a> with reminders. Confirm with your preparer which federal and Pennsylvania filings apply.</p>
+    <p class="small muted">On {% if user|can:"task.manage" %}<a href="{% url 'tasks' %}?tab=deadlines">Recurring deadlines</a>{% else %}Recurring deadlines{% endif %} with reminders. Confirm with your preparer which federal and Pennsylvania filings apply.</p>
     {% if can_deadlines %}<form method="post">{% csrf_token %}<input type="hidden" name="year" value="{{ year }}"><button type="submit" class="secondary">Add the tax and state filings to Recurring deadlines</button></form>{% endif %}</section>
 {% endblock %}

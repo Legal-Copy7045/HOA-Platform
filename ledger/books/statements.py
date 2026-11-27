@@ -187,7 +187,7 @@ def budget_vs_actual(fiscal_year: int, through: datetime.date | None = None) -> 
             planned = line.monthly_cents()[:n]
             account = _budget_account(line, gl)
             if line.kind == LineKind.INCOME and line.income_source == IncomeSource.OTHER:
-                accounts = [gl["other_charge"], gl["late_fee"]]
+                accounts = [gl["other_charge"], gl["late_fee"], gl["interest"], gl["legal_cost"]]
             else:
                 accounts = [account] if account else []
             months = [0] * n
@@ -309,7 +309,9 @@ def annual_accounting(fiscal_year: int) -> dict:
 @internal("books: tax_worksheet")
 def tax_worksheet(fiscal_year: int) -> dict:
     """Totals for the tax preparer: exempt-function income (from members as
-    members: assessments, owner fees) against other income (interest...).
+    members: assessments, special assessments, owner fees, interest and
+    collection costs charged to owners) against other income (bank
+    interest...).
     Homeowners associations commonly file Form 1120-H (IRC § 528); the
     preparer confirms the form."""
     from ledger.books.models import GLCategory
@@ -327,7 +329,14 @@ def tax_worksheet(fiscal_year: int) -> dict:
             "other_charge",
             "credit",
             "card_surcharge",
+            # Charged to members as members (D75, D80, D82): special
+            # assessments, interest on their overdue balances and collection
+            # costs recovered. Bank interest (a bank category) is not.
+            "special_assess",
+            "interest",
+            "legal_cost",
         )
+        if k in gl
     }
     member |= set(
         GLCategory.objects.filter(exempt_function=True, kind=CategoryKind.INCOME).values_list(

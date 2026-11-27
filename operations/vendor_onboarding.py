@@ -420,11 +420,13 @@ def w9_on_file(vendor) -> bool:
 
 
 def coi_expires_on(vendor) -> datetime.date | None:
+    """The certificate of insurance expiry: the later of the approved
+    onboarding's and the vendor record's (a certificate recorded on
+    Renewals after onboarding moves ``insurance_expires_on`` only)."""
     vendor = _vendor(vendor)
     profile = profile_of(vendor)
-    if profile is not None and profile.coi_expires_on:
-        return profile.coi_expires_on
-    return vendor.insurance_expires_on
+    dates = [d for d in (profile and profile.coi_expires_on, vendor.insurance_expires_on) if d]
+    return max(dates) if dates else None
 
 
 def coi_current(vendor, on: datetime.date | None = None) -> bool:

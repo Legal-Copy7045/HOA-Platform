@@ -20,9 +20,9 @@ the linked contracts and vendors are committed to for this project, typed
 when linking) and spent (payments on the linked invoices). Owners see only
 the projects the board shows them: title, status, budget and spent.
 
-For claude/books-and-close at merge: ``spend_by_project`` gives each
-project's fund and the invoices it paid, so statements can show capital
-spending by project and fund.
+``spend_by_project`` gives each project's fund and the invoices it paid,
+for capital spending by project and fund; the books' statements do not show
+it yet (their figures are by account and fund, 0.40.0).
 """
 
 from __future__ import annotations
@@ -73,13 +73,29 @@ class ProjectError(ValueError):
     """A refusal the page shows."""
 
 
-# --- Adapter (switch at merge) -----------------------------------------------------------
+# --- The special assessment that funds it (D75) -------------------------------------------
 
 
 def special_assessment_label(project: CapitalProject) -> str:
-    """Switch to claude/finance-gaps at merge: link the special assessment
-    record. Interim: the reference the board typed."""
+    """The special assessment funding the project: the levy record (its
+    title and number) when linked, else the reference the board typed."""
+    sa = project.special_assessment
+    if sa is not None:
+        return f"Special assessment #{sa.pk}: {sa.title}"
     return project.special_assessment_ref
+
+
+def special_assessment_url(project: CapitalProject, user) -> str | None:
+    """The linked levy's page, for someone who may open it (feature on)."""
+    from django.urls import reverse
+
+    from core import features
+
+    if project.special_assessment_id is None or not features.enabled("special_assessments"):
+        return None
+    if not can(user, "special_assessment.view"):
+        return None
+    return reverse("special_assessment_detail", args=[project.special_assessment_id])
 
 
 # --- Reading -------------------------------------------------------------------------------
@@ -162,7 +178,8 @@ def owner_summaries() -> list[dict]:
 
 
 def spend_by_project() -> list[dict]:
-    """For the books branch: each project's fund and the invoices it paid."""
+    """Each project's fund and the invoices it paid (capital spending by
+    project and fund)."""
     out = []
     for project in CapitalProject.objects.exclude(state=ProjectState.CANCELLED):
         links = active_links(project)
@@ -199,6 +216,7 @@ def create(
     description: str = "",
     reserve_component=None,
     special_assessment_ref: str = "",
+    special_assessment=None,
     actor,
     request=None,
 ) -> CapitalProject:
@@ -209,7 +227,7 @@ def create(
         raise ProjectError("The budget must be more than zero.")
     if funding not in Funding.values:
         raise ProjectError("Choose how it is funded.")
-    if funding == Funding.SPECIAL and not special_assessment_ref.strip():
+    if funding == Funding.SPECIAL and not (special_assessment or special_assessment_ref.strip()):
         raise ProjectError("Name the special assessment (its resolution) that funds it.")
     with transaction.atomic():
         project = CapitalProject.objects.create(
@@ -219,6 +237,7 @@ def create(
             funding=funding,
             reserve_component=reserve_component,
             special_assessment_ref=special_assessment_ref.strip()[:200],
+            special_assessment=special_assessment,
             created_by=actor,
         )
         _event(project, "created", actor, to_state=project.state)
@@ -232,7 +251,13 @@ def create(
     return project
 
 
-EDITABLE = ("title", "description", "reserve_component", "special_assessment_ref")
+EDITABLE = (
+    "title",
+    "description",
+    "reserve_component",
+    "special_assessment_ref",
+    "special_assessment",
+)
 
 
 def update(project: CapitalProject, *, actor, request=None, **fields) -> CapitalProject:

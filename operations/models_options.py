@@ -42,9 +42,16 @@ class CapitalProject(models.Model):
     )
     budget_cents = models.PositiveBigIntegerField()
     funding = models.CharField(max_length=10, choices=Funding.choices)
-    # Special assessment funding: a reference until the special assessments
-    # of claude/finance-gaps exist (operations.capital_projects adapter).
+    # Special assessment funding: the levy record (D75) when there is one,
+    # else a reference the board typed (operations.capital_projects).
     special_assessment_ref = models.CharField(max_length=200, blank=True)
+    special_assessment = models.ForeignKey(
+        "ledger.SpecialAssessment",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="capital_projects",
+    )
     resolution_ref = models.CharField(max_length=200, blank=True)
     state = models.CharField(
         max_length=12, choices=ProjectState.choices, default=ProjectState.PLANNED
@@ -199,8 +206,8 @@ class ClaimState(models.TextChoices):
 
 
 class InsuranceClaim(models.Model):
-    # The association's policy: free text until claude/document-renewals adds
-    # its Policy model (operations.insurance_claims.policy_label adapter).
+    # The association's policy as typed; operations.insurance_claims.policy_for
+    # reads the matching documents renewals InsurancePolicy from these.
     carrier = models.CharField(max_length=200)
     policy_number = models.CharField(max_length=80, blank=True)
     incident_on = models.DateField()

@@ -85,18 +85,37 @@ def _lot(number):
         return Lot.objects.get(number=number)
 
 
-def _legal(board) -> None:
-    from ledger import legal, services
+def _new_case(lot, staff):
+    """A collection case for a home with arrears (a charge from 75 days ago
+    when it owes nothing), unless one is already open."""
+    from ledger import services
     from ledger.models import CollectionCase
 
-    today = timezone.localdate()
-    # Lot 27: referred, lien filed, a chargeable cost charged to the account.
-    lot = _lot(27)
-    staff = _staff_for(board, lot)
     with system_access("demo finance options"):
         case = CollectionCase.objects.filter(lot=lot).exclude(state="closed").first()
-    if case is None:
-        case = services.open_case(lot=lot, actor=staff)
+    if case is not None:
+        return case
+    if services.balance(lot.pk) <= 0:
+        services.post_charge(
+            lot=lot,
+            kind="other_charge",
+            amount_cents=42000,
+            description="Retaining wall repair (demo)",
+            posted_on=timezone.localdate() - datetime.timedelta(days=75),
+            actor=staff,
+        )
+    return services.open_case(lot=lot, actor=staff)
+
+
+def _legal(board) -> None:
+    from ledger import legal, services
+
+    today = timezone.localdate()
+    # Lot 13: referred, lien filed, a chargeable cost charged to the account.
+    # (Homes without a collection case: the demo states keep theirs, D53.)
+    lot = _lot(13)
+    staff = _staff_for(board, lot)
+    case = _new_case(lot, staff)
     for step in ("send_reminder", "send_second_reminder"):
         services.COLLECTION.apply(case, step, actor=staff)
         case.refresh_from_db()
@@ -142,10 +161,10 @@ def _legal(board) -> None:
     )
     legal.post_cost(cost, actor=staff)
 
-    # Lot 15: referred, lien filed, paid in full, lien released, case closed.
-    lot = _lot(15)
+    # Lot 18: referred, lien filed, paid in full, lien released, case closed.
+    lot = _lot(18)
     staff = _staff_for(board, lot)
-    case = services.open_case(lot=lot, actor=staff)
+    case = _new_case(lot, staff)
     for step in ("send_reminder", "send_second_reminder"):
         services.COLLECTION.apply(case, step, actor=staff)
         case.refresh_from_db()

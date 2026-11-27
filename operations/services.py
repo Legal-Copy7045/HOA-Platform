@@ -50,7 +50,7 @@ from django.db.models import Sum  # noqa: E402
 
 from community.rules import rule  # noqa: E402
 from core.policy import SYSTEM  # noqa: E402
-from core.workflow import Transition, Workflow, WorkflowError  # noqa: E402
+from core.workflow import NotForYou, Transition, Workflow, WorkflowError  # noqa: E402
 from operations.models import (  # noqa: E402
     ApprovalDecision,
     ExpenseCategory,
@@ -297,6 +297,18 @@ INVOICE = Workflow(
             confirm="Record this invoice as paid in full?",
             guard=_fully_paid,
         ),
+        # D77: a voided vendor check reopens a paid invoice for a new payment.
+        # Taken only by operations/vendor_checks.py (as SYSTEM).
+        Transition(
+            "payment_voided",
+            {"paid"},
+            "approved",
+            "invoice.record_payment",
+            "Check voided: awaiting payment again",
+            guard=lambda obj, actor: (
+                None if actor is SYSTEM else NotForYou("Recorded when a check is voided.")
+            ),
+        ),
         Transition(
             "void",
             {"draft", "pending_approval", "rejected"},
@@ -359,12 +371,23 @@ def _vendor_may_be_paid(invoice: Invoice, actor, request=None) -> None:
     """D79: an unapproved or inactive vendor's invoices are neither approved
     nor paid (older vendors are grandfathered as active), and a board member
     the vendor's conflict disclosure names takes no step on them (D65)."""
-    from operations.vendor_onboarding import invoice_block_reason
-
-    problem = invoice_block_reason(invoice.vendor)
+    problem = payment_block_reason(invoice)
     if problem:
         raise OperationsError(problem)
     conflicts.refuse(actor, invoice, area="invoice", request=request, error=OperationsError)
+
+
+def payment_block_reason(invoice: Invoice) -> str | None:
+    """Why the invoice's vendor may not be paid (D79), or None. An expense
+    reimbursement (D77) is paid to the system payee "Expense reimbursements",
+    which is kept inactive so it is never picked as a vendor: the claim's own
+    approvals govern it instead."""
+    from operations.models import ReimbursementInvoice
+    from operations.vendor_onboarding import invoice_block_reason
+
+    if ReimbursementInvoice.objects.filter(invoice_id=invoice.pk).exists():
+        return None
+    return invoice_block_reason(invoice.vendor)
 
 
 def approve(invoice: Invoice, *, note: str = "", actor, request=None) -> Invoice:
