@@ -83,8 +83,7 @@ Each stage prints one line (counts) and its failing checks; full output goes to
 - **Fix nothing in product code** during a run: commit only the suite records
   (catalogue, ids, claims, manual, new tests, RUNS.md, WALKTHROUGHS.md,
   published.yaml) and tell the owner the totals, the failures, the findings by
-  severity (claims not held) and the report links. The owner decides what is
-  fixed, and is asked before any finding is fixed.
+  severity (claims not held) and the report links. The run itself stays an independent check, but its findings do not wait for the owner: every finding with a clear fix is fixed in the next release, unasked. The owner is asked only when the fix is uncertain, weakens a security setting, changes a legal or governance rule, or merges or removes pages (never a keep-separate item).
 
 ```
 regression/
@@ -185,7 +184,7 @@ by hand into `out/walkthrough-findings.json` (the older format in
 `walkthrough_report.py`, ids `WT-001..`), which then wins. `walkthrough_report.py` renders
 `out/walkthrough.html` from all three (only failing pages are embedded, as
 small thumbnails; `--no-thumbs` embeds none). A walkthrough fixes nothing in
-product code: the owner decides.
+product code; its clear fixes go in the next release (see "Fix nothing" above).
 
 ## Results and IDs
 
