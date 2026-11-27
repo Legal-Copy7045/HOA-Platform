@@ -35,6 +35,9 @@ const WIDTHS = {
 // Downloads (with or without a query string) are not pages; same list as pages.js.
 const SKIP = [/logout/, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
+// Downloads checked as downloads (expect a file, not a page): the meeting
+// packet .zip (WT-003, WT-042).
+const DOWNLOADS = [{ re: /\/meetings\/\d+\/packets\/\d+\/zip\/?$/, type: 'application/zip' }];
 const MAX_PAGES = Number(process.env.WALK_MAX_PAGES || 160);
 const CONCURRENCY = Number(process.env.WALK_CONCURRENCY || 3);
 const TAP = 40;
@@ -284,9 +287,11 @@ async function walkRole(browser, role) {
   }
   const via = new Map(); // pattern -> how it was reached
   const queue = [];
+  const downloads = new Map(); // pattern -> href
   const push = (href, how, from) => {
     if (!href || !href.startsWith('/') || href.startsWith('//')) return;
     const key = pattern(href);
+    if (DOWNLOADS.some((d) => d.re.test(href)) && !downloads.has(key)) downloads.set(key, href);
     if (via.has(key) || SKIP.some((re) => re.test(href))) return;
     via.set(key, { how, from });
     queue.push(href);
@@ -330,6 +335,19 @@ async function walkRole(browser, role) {
     for (const href of (pages[key].phone && pages[key].phone.hrefs) || []) push(href, 'link', key);
   }
   if (queue.length) add(`${role}: walkthrough reached every page type`, false, `stopped at ${MAX_PAGES} pages; ${queue.length} not visited`);
+  for (const [key, href] of downloads) {
+    const want = DOWNLOADS.find((d) => d.re.test(href));
+    let status = 0;
+    let type = '';
+    try {
+      const resp = await views.desktop.page.request.get(base + href, { maxRedirects: 0 });
+      status = resp.status();
+      type = (resp.headers()['content-type'] || '').split(';')[0];
+      await resp.body();
+    } catch (e) { type = String(e).slice(0, 120); }
+    add(`${role}: ${key} downloads a file (HTTP 200, ${want.type})`, status === 200 && type === want.type,
+      `HTTP ${status} ${type}`);
+  }
 
   // Menu label = page <h1>; no duplicate labels in the menu.
   for (const width of Object.keys(WIDTHS)) {
