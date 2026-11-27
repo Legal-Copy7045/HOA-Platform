@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Interest on overdue balances · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs">{% hub_crumb "finance_overview" %}Interest on overdue balances</div>
+  <div class="page-head"><div><h1>Interest on overdue balances</h1>
+    <p class="subtitle">Simple interest on past-due {% term "terms" %}, posted once a month on each account at the rate the Declaration allows. Never compounded.</p></div>
+    {% if can_post and not policy.problem and due and candidates %}<div class="actions"><form method="post" data-confirm="Post this month's interest on {{ candidates|length }} account{{ candidates|length|pluralize }}? Each appears on the owner's statement with how it was worked out.">{% csrf_token %}<input type="hidden" name="do" value="post"><button type="submit">{% for_board "Post this month's interest" %}</button></form></div>{% endif %}
+  </div>
+  {% if policy.problem %}<div class="alert warning">{% icon "alert" %}<span>{{ policy.problem }} Until then nothing is charged.</span></div>{% endif %}
+  <div class="grid grid-4">
+    <div class="stat"><div class="label">Rate</div><div class="value">{% if monthly %}{{ monthly }}%/mo{% else %}-{% endif %}</div><div class="hint">{% if policy.citation %}{{ policy.citation }}{% else %}No citation recorded{% endif %}</div></div>
+    <div class="stat"><div class="label">Past due for more than</div><div class="value">{{ policy.grace_days }} days</div></div>
+    <div class="stat"><div class="label">Smallest balance</div><div class="value">{{ policy.min_cents|cents }}</div></div>
+    <div class="stat"><div class="label">Posted on</div><div class="value">{{ posting_on|date:"M j" }}</div><div class="hint">{% if policy.include_fees %}Includes late fees and earlier interest{% else %}On the {% term "term" %} only, not fees or interest{% endif %}{% if policy.suspend_on_plan %}; none during a payment plan{% endif %}</div></div>
+  </div>
+  {% if notice %}<p class="small muted">Owners read on My account: “{{ notice }}”</p>{% endif %}
+  <h2>This month{% if not due %} (posts on {{ posting_on|date:"F j" }}){% endif %}</h2>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th>Home</th><th class="num">Past due</th><th class="num">Interest</th><th>Statement line</th></tr></thead>
+    <tbody>{% for c in candidates %}<tr><td class="cell-title"><a href="{% url 'lot_ledger' c.lot.pk %}">{{ c.lot.label }}</a></td><td class="num" data-label="Past due">{{ c.principal_cents|cents }}</td><td class="num" data-label="Interest">{{ c.interest_cents|cents }}</td><td data-label="Statement line" class="small">{{ c.description }}</td></tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="check" title="Nothing to charge this month" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <h2>Posted</h2>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th>Home</th><th>Posted</th><th class="num">Amount</th><th>Line</th><th></th></tr></thead>
+    <tbody>{% for e in postings %}<tr><td class="cell-title"><a href="{% url 'lot_ledger' e.lot.pk %}">{{ e.lot.label }}</a></td><td data-label="Posted">{{ e.posted_on|short_date }}</td><td class="num" data-label="Amount">{{ e.amount_cents|cents }}</td><td class="small" data-label="Line">{{ e.description }}</td>
+      <td>{% if e.reversed_by %}<span class="muted small">Reversed</span>{% elif can_reverse %}<details><summary class="small">Reverse</summary><form method="post" class="inline" data-confirm="Reverse this interest charge? A reversing entry is posted; the charge stays on the record.">{% csrf_token %}<input type="hidden" name="do" value="reverse"><input type="hidden" name="entry" value="{{ e.pk }}"><label class="sr-only" for="reason-{{ e.pk }}">Reason</label><input id="reason-{{ e.pk }}" name="reason" required placeholder="Reason"><button type="submit" class="secondary small">{% for_board "Reverse" %}</button></form></details>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="receipt" title="No interest posted yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <p class="small muted">Rules: Settings, Community setup, “Interest, forecast, legal, projects and claims”. The monthly task posts on the posting day; a board member's own home is posted by the task or another board member.</p>
+{% endblock %}

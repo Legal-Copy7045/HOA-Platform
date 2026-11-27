@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-092
+# highest issued: MAN-100
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -92,3 +92,11 @@ MAN-089: "bounce mailbox with a real provider"
 MAN-090: "first sign-in and getting started on a phone"
 MAN-091: "phone tab strips wrap"
 MAN-092: "finance overview on a phone"
+MAN-093: "year-end package verifies on another machine"
+MAN-094: "real bank OFX month-end balance"
+MAN-095: "tax worksheet with the preparer"
+MAN-096: "vendor onboarding on a phone"
+MAN-097: "vendor document key on the VM"
+MAN-098: "finance options read right on a phone"
+MAN-099: "interest and legal costs reviewed by counsel"
+MAN-100: "vendor check alignment"

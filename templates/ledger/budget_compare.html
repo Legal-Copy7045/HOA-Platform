@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}FY{{ budget.fiscal_year }} budget compared · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'budgets' %}">Budgets</a> / <a href="{% url 'budget_detail' budget.pk %}">FY{{ budget.fiscal_year }}</a> / Compared</div>
+  <div class="page-head"><div><h1>FY{{ budget.fiscal_year }} budget compared</h1>
+    <p class="subtitle">{% if prior %}Beside the FY{{ prior.fiscal_year }} budget and what was spent and charged that year.{% else %}No budget for the year before.{% endif %} {{ budget.notes }}</p></div>
+    <div class="actions"><a class="btn" href="{% url 'budget_detail' budget.pk %}">Open the budget</a></div></div>
+  {% with h=per_home %}<section class="card" data-testid="per-home"><h2>Monthly {% term "term" %} per home</h2>
+    <p><strong>{{ h.monthly_cents|cents }}</strong> a month for each of {{ h.homes }} homes{% if h.current_cents is not None %} ({{ change_percent }} from today's {{ h.current_cents|cents }}, a change of {{ h.change_cents|cents }}){% endif %}.</p>
+    <p class="small muted">Expenses {{ h.expense_cents|cents }} less other income {{ h.other_income_cents|cents }} = {{ h.need_cents|cents }} a year; divided by {{ h.homes }} homes and 12 months = {{ h.exact_cents|cents }}, rounded up to a multiple of {{ h.rounding_cents|cents }}{% if h.citation %} ({{ h.citation }}){% endif %}. That brings in {{ h.annual_total_cents|cents }} a year. Each home pays the same share (the Declaration's allocation).</p>
+    {% if snapshot %}<p class="small">Reserve plan adopted {{ snapshot.adopted_on|short_date }}: contribution {{ snapshot.annual_contribution_cents|cents }} a year; the smallest level amount that keeps the fund above zero is {{ snapshot.needed_contribution_cents|cents }}.</p>{% endif %}
+    <p class="small">Next: send the proposed budget to owners and adopt it on the <a href="{% url 'budget_detail' budget.pk %}">budget page</a>.</p>
+  </section>{% endwith %}
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Line</th><th scope="col" class="num">Last year's budget</th><th scope="col" class="num">Last year's actual</th><th scope="col" class="num">FY{{ budget.fiscal_year }}</th><th scope="col" class="num">Change</th></tr></thead>
+    <tbody>{% for r in rows %}<tr><td class="cell-title">{{ r.line.name }} <span class="small muted">{{ r.line.get_kind_display }}{% if r.dropped %} · not carried over{% endif %}</span></td>
+      <td class="num" data-label="Last year's budget">{% if r.prior_cents is not None %}{{ r.prior_cents|cents }}{% endif %}</td>
+      <td class="num" data-label="Last year's actual">{% if r.actual_cents is not None %}{{ r.actual_cents|cents }}{% endif %}</td>
+      <td class="num" data-label="FY{{ budget.fiscal_year }}">{{ r.next_cents|cents }}</td>
+      <td class="num" data-label="Change">{% if r.change_cents is not None %}{{ r.change_cents|cents }}{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

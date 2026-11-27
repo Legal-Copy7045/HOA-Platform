@@ -371,3 +371,44 @@ def test_people_links_to_sign_ups_instead_of_filtering(client, w):
     assert f'href="{reverse("lot_list")}?view=signups"' in html
     signups = _html(client, w["board"], reverse("lot_list") + "?view=signups")
     assert "Signed up" in signups
+
+
+# --- Walkthrough failures after the 0.41 merge ---------------------------------------------
+
+
+def test_contacts_are_not_sent_to_the_owners_arc_page(client, w):
+    """An authorized or view-only contact is a resident but may not open
+    My home improvement requests (arc.submit is the owner's)."""
+    from community import help as owner_help
+    from community.models import Account, Person
+    from core.policy import SYSTEM
+    from core.scoping import system_access
+
+    contact = make_member()
+    with system_access("test"):
+        person = Person.objects.get(user=contact)
+        account = Account.objects.get(lot=w["lot"], closed_on__isnull=True)
+    community.add_account_contact(account, person=person, kind="authorized", actor=SYSTEM)
+    topic = next(t for t in owner_help.TOPICS if t.slug == "architectural-review")
+    link = owner_help.section_link(contact, topic)
+    assert link is None or "mine=1" not in link[1]
+    assert owner_help.section_link(w["owner"], topic)[1].endswith("?mine=1")
+
+
+def test_welcome_tiles_are_named_after_their_pages_and_are_not_hub_tiles():
+    source = (Path(settings.BASE_DIR) / "templates/community/welcome.html").read_text()
+    for name in ("My account", "My home improvement requests (ARC)", "Announcements", "Help"):
+        assert f"<strong>{name}</strong>" in source
+    js = (Path(settings.BASE_DIR) / "regression/walkthrough.js").read_text()
+    assert "ul.tiles:not(.welcome-tiles) a.tile" in js
+
+
+def test_help_links_and_crumbs_are_tap_targets_on_phones():
+    assert ".how-link, .form-actions > a.small, .crumbs a { display: inline-flex;" in CSS
+    assert "button.small { min-height: 44px; }" in CSS
+
+
+def test_crawls_skip_the_disbursement_register_download():
+    for name in ("walkthrough.js", "pages.js"):
+        js = (Path(settings.BASE_DIR) / "regression" / name).read_text()
+        assert "/\\/disbursements\\/\\d+\\/register\\//" in js, name

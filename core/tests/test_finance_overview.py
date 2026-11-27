@@ -132,13 +132,136 @@ def test_switched_off_features_leave_the_overview(client, board):
 
 
 def test_card_labels_are_the_pages_headings(client, board):
-    for key in ("online_payments", "disbursements", "reserves", "bank_feeds"):
+    for key in ALL_FINANCE_FEATURES:
         features.set_feature(key, True, actor=board)
     client.force_login(board)
     for card in finance_overview.CARDS:
         response = client.get(reverse(card.url_name))
         assert response.status_code == 200, card.url_name
-        assert f"<h1>{card.label}</h1>" in response.content.decode(), card.url_name
+        html = response.content.decode()
+        if card.anchor:  # a section of a page: its heading and anchor
+            assert f'id="{card.anchor[1:]}"' in html, card.label
+            continue
+        assert f"<h1>{card.label}</h1>" in html, card.url_name
+
+
+ALL_FINANCE_FEATURES = (
+    "online_payments",
+    "disbursements",
+    "reserves",
+    "bank_feeds",
+    "books",
+    "financial_statements",
+    "special_assessments",
+    "payment_plans",
+    "reimbursements",
+    "vendor_checks",
+    "overdue_interest",
+    "cashflow_forecast",
+    "capital_projects",
+    "insurance_claims",
+    "vendor_onboarding",
+)
+
+
+def test_every_old_more_finance_page_is_a_card_and_marks_the_overview(client, board):
+    """The 0.40.0 More finance tiles all open from the overview (D89), which
+    is current on them, and their My items land on their own cards."""
+    for key in ALL_FINANCE_FEATURES:
+        features.set_feature(key, True, actor=board)
+    old_hub = (
+        "reserve_plan",
+        "online_payments",
+        "disbursements",
+        "books_accounts",
+        "books_coding",
+        "tax_worksheet",
+        "special_assessments",
+        "payment_plans",
+        "reimbursements",
+        "vendor_checks",
+        "resales",
+        "interest",
+        "cashflow",
+    )
+    client.force_login(board)
+    response = client.get(reverse("finance_overview"))
+    urls = {c["url"] for g in response.context["groups"] for c in g["cards"]}
+    for name in old_hub:
+        assert reverse(name) in urls, name
+        assert name in navigation.SUBPAGES["finance_overview"], name
+        page = client.get(reverse(name))
+        current = [i["label"] for i in _entries(page).values() if i["current"]]
+        assert current == ["Finance overview"], name
+
+
+def test_finance_items_land_on_their_cards(client, board, monkeypatch):
+    for key in ALL_FINANCE_FEATURES:
+        features.set_feature(key, True, actor=board)
+    _fake_items(
+        monkeypatch,
+        [
+            Item("Finance", "Notice", "x", "/s/", nav="special_assessments"),
+            Item("Finance", "Low", "x", "/c/", nav="cashflow"),
+            Item("Finance", "Approve", "x", "/r/", nav="reimbursements"),
+            Item("Collections", "Plan", "x", "/p/", nav="payment_plans"),
+            Item("Finance", "Close", "x", "/b/", nav="books_close"),
+        ],
+    )
+    client.force_login(board)
+    response = client.get(reverse("finance_overview"))
+    cards = {c["label"]: c["count"] for g in response.context["groups"] for c in g["cards"]}
+    for label in (
+        "Special assessments",
+        "Cash-flow forecast",
+        "Reimbursements",
+        "Payment plans",
+        "Month and year close",
+    ):
+        assert cards[label] == 1, label
+    assert _entries(response)["finance_overview"]["count"] == sum(cards.values()) == 5
+
+
+def test_navs_of_finance_items_are_their_pages():
+    """No finance item counts toward the retired More finance hub."""
+    from pathlib import Path
+
+    from django.conf import settings
+
+    root = Path(settings.BASE_DIR)
+    for path in (
+        "ledger/special_assessments.py",
+        "ledger/cashflow.py",
+        "operations/reimbursements.py",
+    ):
+        assert 'nav="finance_more"' not in (root / path).read_text(), path
+    assert 'nav="payment_plans"' in (root / "ledger/payment_plans.py").read_text()
+
+
+def test_fund_strip_when_the_books_have_a_closed_month(client, board, monkeypatch):
+    import datetime
+
+    from ledger.books import close
+
+    features.set_feature("books", True, actor=board)
+    monkeypatch.setattr(
+        close,
+        "closed_fund_positions",
+        lambda: (
+            datetime.date(2026, 10, 31),
+            {
+                "operating": {"cash": 1234500, "balance": 0},
+                "reserve": {"cash": 50000, "balance": 0},
+            },
+        ),
+    )
+    client.force_login(board)
+    html = client.get(reverse("finance_overview")).content.decode()
+    assert 'data-testid="fund-strip"' in html and "$12,345.00" in html
+    assert "October 2026" in html
+    monkeypatch.setattr(close, "closed_fund_positions", lambda: None)
+    html = client.get(reverse("finance_overview")).content.decode()
+    assert 'data-testid="fund-strip"' not in html
 
 
 def test_overview_queries_are_bounded(client, board):
@@ -159,7 +282,7 @@ def test_overview_queries_are_bounded(client, board):
     for _ in range(15):
         LotFactory()
     assert queries() <= few + 2
-    # The cards themselves: one or two queries each at most.
+    # The cards themselves: a few queries each (a rule read is one), never one per home.
     from ledger import finance_overview as fo
 
     request = client.get(reverse("finance_overview")).wsgi_request
@@ -167,7 +290,7 @@ def test_overview_queries_are_bounded(client, board):
     for card in fo.CARDS:
         with CaptureQueriesContext(connection) as cq:
             card.figure(ctx)
-        assert len(cq.captured_queries) <= 3, card.label
+        assert len(cq.captured_queries) <= 8, card.label
 
 
 def test_overview_cards_stack_on_phones():

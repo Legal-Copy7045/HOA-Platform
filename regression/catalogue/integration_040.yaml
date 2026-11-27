@@ -1,0 +1,23 @@
+# Release 0.40.0 integration: the adapters between books (D69-D71), renewals
+# (D72), finance gaps (D75-D78), vendor onboarding (D79) and finance options
+# (D80-D85) read their real sources. `match` runs over "<stage>:<check>".
+- feature: "Taxes and renewals read vendor onboarding (W-9 on file, 1099 eligibility with unknown treated as yes, certificate expiry the later of onboarding's and the vendor record's, so a certificate recorded on Renewals still counts)"
+  since: M5
+  docs: CLAUDE.md
+  match: ["^unit:ledger/tests/test_release_040_wiring\\.py::test_(w9_and_1099|needs_1099|renewals_vendor_coi|recording_a_certificate)"]
+- feature: "Insurance claims name the association policy recorded on Renewals (number or carrier, the term in force on the incident date), typed text as the fallback"
+  since: M5
+  docs: CLAUDE.md
+  match: ["^unit:ledger/tests/test_release_040_wiring\\.py::test_claim_policy_label"]
+- feature: "Cash-flow opening balances, owners' fund balances and budget against actual from the books' closed months, interim figures marked not closed while the books are off or nothing is closed"
+  since: M5
+  docs: CLAUDE.md
+  match: ["^unit:ledger/tests/test_release_040_wiring\\.py::test_(cashflow_and_owner_finance|books_off_keeps|budget_vs_actual_from)"]
+- feature: "Journal maps interest (D80) and collection costs (D82) to their own operating income accounts and special assessments (D75) to the levy's fund; all member (exempt-function) income on the 1120-H worksheet, bank interest not"
+  since: M5
+  docs: CLAUDE.md
+  match: ["^unit:ledger/tests/test_release_040_wiring\\.py::test_(journal_maps|1120h_counts)"]
+- feature: "Interest reads payment plans in force and charges past-due special assessment installments; the cash-flow forecast includes special assessment installments by fund"
+  since: M5
+  docs: CLAUDE.md
+  match: ["^unit:ledger/tests/test_release_040_wiring\\.py::test_(interest_principal|cashflow_special)"]

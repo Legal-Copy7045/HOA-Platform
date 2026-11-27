@@ -76,10 +76,29 @@ def seed(c) -> None:
     )
     ledger.reverse_entry(wrong, reason="Wrong home (demo).", actor=manager)
 
-    # Not seeded: a payment or credit moved to another account of the home
-    # (reassign_entry). allocation.backfill does not replay the move's
-    # unwinding, so ledger/tests/test_allocation.py's rebuild of the seeded
-    # community would no longer match (reported with the demo work).
+    # A payment moved to another account of the home (reassign_entry): the
+    # seller of lot 31 paid their last bill after the sale, so the board
+    # moves it from the buyer's account back to the seller's (D87: the
+    # rebuild of history replays moves too).
+    from community.demo.oak_creek import TRANSFERRED_LOT
+    from community.models import Account
+
+    sold = lots[TRANSFERRED_LOT]
+    seller_account = Account.objects.filter(lot=sold, closed_on__isnull=False).first()
+    if seller_account is not None:
+        late = ledger.record_payment(
+            lot=sold,
+            amount_cents=4500,
+            received_on=c.days(-30),
+            reference="SETTLE-31",
+            actor=manager,
+        )
+        ledger.reassign_entry(
+            late,
+            account_id=seller_account.pk,
+            reason="The seller's last payment, sent after the sale (demo).",
+            actor=treas,
+        )
 
     # --- Collection cases at every step ------------------------------------------------
     C = ledger.COLLECTION
@@ -95,9 +114,7 @@ def seed(c) -> None:
         if state == "final_notice":
             C.apply(case, "send_final_notice", actor=manager)
         if state == "payment_plan":
-            C.apply(
-                case, "payment_plan", actor=manager, note="$100 a month from next month (demo)."
-            )
+            _payment_plan(c, case, manager, treas)
         if state == "referred":
             C.apply(case, "refer", actor=treas, note="Sent to the association's attorney (demo).")
         case.refresh_from_db()
@@ -219,3 +236,26 @@ def seed(c) -> None:
             cand = row["candidates"][0]
             matching.confirm(row["line"], kind=cand.kind, object_id=cand.object_id, actor=manager)
             break
+
+
+def _payment_plan(c, case, manager, treas) -> None:
+    """The case at "Payment plan agreed": with payment plans on (D76) only an
+    approved plan moves it there (prepared by the manager, approved by the
+    treasurer); with the feature off, the note-only step."""
+    from core import features
+    from ledger import payment_plans
+    from ledger import services as ledger
+
+    if not features.enabled("payment_plans"):
+        ledger.COLLECTION.apply(
+            case, "payment_plan", actor=manager, note="$100 a month from next month (demo)."
+        )
+        return
+    _charges, total, _account = payment_plans.covered_charges(case)
+    plan = payment_plans.prepare(
+        case,
+        installments=payment_plans.even_installments(total, 3, c.days(10)),
+        note="Three monthly installments from next month (demo).",
+        actor=manager,
+    )
+    payment_plans.approve(plan, actor=treas)

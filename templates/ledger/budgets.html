@@ -10,6 +10,12 @@
       <h2>Budgets</h2>
       {% if budgets %}<ul class="list">{% for b in budgets %}<li><div class="todo-icon">{% icon "chart" %}</div><a class="grow title" href="{% url 'budget_detail' b.pk %}">FY{{ b.fiscal_year }}</a>{% status b.status %}</li>{% endfor %}</ul>
       {% else %}{% include "partials/empty.html" with icon="chart" title="No budgets yet" %}{% endif %}
+      {% if can_manage and latest %}<form method="post" action="{% url 'budget_prepare' %}" class="form-grid" data-testid="prepare-budget">{% csrf_token %}<input type="hidden" name="source" value="{{ latest.pk }}">
+        <h3>Start next year's budget</h3><p class="small muted">A draft for FY{{ latest.fiscal_year|add:1 }} filled in from FY{{ latest.fiscal_year }}, with the reserve contribution from the adopted reserve plan and the monthly {% term "term" %} it needs per home.</p>
+        <div class="field"><label for="basis">Start each line from</label><select id="basis" name="basis"><option value="budget">This year's budget</option><option value="actual">This year's actual spending</option><option value="higher">The higher of the two</option></select></div>
+        <div class="field"><label for="increase">Increase (%)</label><input id="increase" name="increase" value="0" inputmode="decimal" size="5"></div>
+        <div class="field"><label><input type="checkbox" name="reserve" value="1" checked> Reserve contribution from the adopted reserve plan</label></div>
+        <div class="form-actions"><button type="submit">Start FY{{ latest.fiscal_year|add:1 }} budget</button></div></form>{% endif %}
       {% if can_manage %}<form method="post" class="inline-form">{% csrf_token %}<div><label for="fy">New budget for fiscal year</label><input id="fy" name="fiscal_year" value="{{ year }}" inputmode="numeric" size="6"></div><button type="submit">Create</button></form>{% endif %}
     </section>
     <section class="card">

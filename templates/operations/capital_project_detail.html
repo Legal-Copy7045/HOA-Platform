@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ obj.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'capital_projects' %}">Capital projects</a> / {{ obj.title }}</div>
+  <div class="page-head"><div><h1>{{ obj.title }}</h1><div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_funding_display }}</span>{% if special_label %}<span>{% if special_url %}<a href="{{ special_url }}">{{ special_label }}</a>{% else %}{{ special_label }}{% endif %}</span>{% endif %}{% if obj.reserve_component %}<span>Reserve component: {{ obj.reserve_component.name }}</span>{% endif %}</div>
+    {% if obj.description %}<p class="subtitle">{{ obj.description }}</p>{% endif %}</div></div>
+  <div class="grid grid-4">
+    <div class="stat"><div class="label">Budget</div><div class="value">{{ f.budget|cents }}</div><div class="hint">{{ f.original|cents }} approved{% if f.changes %}, {{ f.changes|cents }} in change orders{% endif %}</div></div>
+    <div class="stat"><div class="label">Committed</div><div class="value">{{ f.committed|cents }}</div><div class="hint">Contracts and vendors for this project</div></div>
+    <div class="stat"><div class="label">Spent</div><div class="value">{{ f.spent|cents }}</div><div class="hint">{{ f.spent_percent }}% of the budget; paid invoices linked below</div></div>
+    <div class="stat"><div class="label">Done</div><div class="value">{{ obj.percent_complete }}%</div><div class="hint">{% if obj.owner_visible %}Owners see the summary{% else %}Not shown to owners{% endif %}</div></div>
+  </div>
+  <div class="split"><div>
+    <section class="card" aria-labelledby="approval-h"><h2 id="approval-h">Approval</h2>
+      {% if obj.resolution_ref %}<p>Board resolution: <strong>{{ obj.resolution_ref }}</strong>{% if obj.required_approvals %} · needs {{ obj.required_approvals }} board approval{{ obj.required_approvals|pluralize }}{% endif %}</p>{% endif %}
+      {% if approvals %}<ul class="list">{% for a in approvals %}<li><span class="grow">Approved by {{ a.approver }}</span><span class="small muted">{{ a.created_at|date:"M j, Y" }}</span></li>{% endfor %}</ul>{% endif %}
+      {% if obj.state == "planned" %}
+        {% if can_manage and not obj.required_approvals %}<form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="ask_approval"><div class="field"><label for="resolution">Board resolution approving it</label><input id="resolution" name="resolution_ref" required></div><div class="form-actions"><button type="submit">Send for board approval</button></div></form>{% endif %}
+        {% if can_approve and obj.required_approvals and not approved_by_me %}<form method="post" data-confirm="Approve {{ obj.title }} with a budget of {{ obj.budget_cents|cents }} under {{ obj.resolution_ref }}?">{% csrf_token %}<input type="hidden" name="do" value="approve"><button type="submit">{% for_board "Approve" %}</button></form>{% endif %}
+      {% endif %}
+      {% if steps %}<form method="post" class="form-grid">{% csrf_token %}<div class="field"><label for="step-note">Note (required to cancel)</label><textarea id="step-note" name="note" rows="2"></textarea></div><div class="wf-actions">
+        {% for s in steps %}<button type="submit" name="do" value="{{ s }}" class="{% if s == 'cancel' %}danger{% else %}secondary{% endif %}"{% if s == 'cancel' %} data-confirm="Cancel this project? It is kept as cancelled; nothing more can be linked."{% endif %}>{% if s == 'start' %}Work has started{% elif s == 'complete' %}Mark completed{% else %}Cancel project{% endif %}</button>{% endfor %}</div></form>{% endif %}
+    </section>
+    <section class="card" id="changes" aria-labelledby="changes-h"><h2 id="changes-h">Change orders</h2>
+      {% if changes %}<ul class="list">{% for co, st, decisions in changes %}<li><span class="grow"><strong>{% if co.amount_cents > 0 %}+{% endif %}{{ co.amount_cents|cents }}</strong> · {{ co.reason }}<br><span class="small muted">Proposed by {{ co.proposed_by }} {{ co.created_at|date:"M j, Y" }} · needs {{ co.required_approvals }} · {{ st|capfirst }}{% for d in decisions %} · {{ d.get_decision_display }} by {{ d.by }}{% endfor %}</span></span>
+        {% if st == "pending" and can_approve and co.proposed_by_id != me %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="change" value="{{ co.pk }}"><label class="sr-only" for="co-note-{{ co.pk }}">Note</label><input id="co-note-{{ co.pk }}" name="note" placeholder="Note (to decline)"><button type="submit" name="do" value="approve_change" class="small">{% for_board "Approve" %}</button><button type="submit" name="do" value="decline_change" class="secondary small">Decline</button></form>{% endif %}</li>{% endfor %}</ul>
+      {% else %}<p class="muted">None.</p>{% endif %}
+      {% if can_manage and obj.state in "approved in_progress" %}<details class="panel"><summary>Propose a change order</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="change"><div class="field"><label for="co-amount">Change to the budget ($, negative to cut)</label><input id="co-amount" name="amount" required inputmode="decimal"></div><div class="field"><label for="co-reason">Reason</label><textarea id="co-reason" name="reason" rows="2" required></textarea></div><div class="form-actions"><button type="submit">Propose</button></div></form><p class="small muted">A board member other than the one who proposes it approves it; two at or above the amount in Community setup.</p></div></details>{% endif %}
+    </section>
+    <section class="card" aria-labelledby="links-h"><h2 id="links-h">Contracts, vendors, invoices and work orders</h2>
+      {% if links %}<ul class="list">{% for l in links %}<li><span class="grow">{{ l.get_kind_display }}: {% if l.contract %}<a href="{% url 'contract_detail' l.contract.pk %}">{{ l.contract }}</a>{% elif l.vendor %}<a href="{% url 'vendor_detail' l.vendor.pk %}">{{ l.vendor }}</a>{% elif l.invoice %}<a href="{% url 'invoice_detail' l.invoice.pk %}">{{ l.invoice }}</a> · {{ l.invoice.amount_cents|cents }} · {{ l.invoice.state|capfirst }}{% elif l.work_order %}<a href="{% url 'work_order_detail' l.work_order.pk %}">{{ l.work_order.title }}</a>{% endif %}{% if l.committed_cents %} · committed {{ l.committed_cents|cents }}{% endif %}</span>
+        {% if can_manage %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="do" value="unlink"><input type="hidden" name="link" value="{{ l.pk }}"><button type="submit" class="secondary small">Unlink</button></form>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">Nothing linked yet.</p>{% endif %}
+      {% if can_manage %}<details class="panel"><summary>Link a record</summary><div class="panel-body">
+        {% for kind, label in link_kinds %}<form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="link"><input type="hidden" name="kind" value="{{ kind }}">
+          <div class="field"><label for="link-{{ kind }}">{{ label }}</label><select id="link-{{ kind }}" name="object_id">{% for o in choices|get_item:kind %}<option value="{{ o.pk }}">{% if kind == "work_order" %}{{ o.title }}{% else %}{{ o }}{% endif %}</option>{% endfor %}</select></div>
+          {% if kind == "contract" or kind == "vendor" %}<div class="field"><label for="committed-{{ kind }}">Committed for this project ($)</label><input id="committed-{{ kind }}" name="committed" inputmode="decimal"></div>{% endif %}
+          <div class="form-actions"><button type="submit" class="secondary">Link {{ label|lower }}</button></div></form>{% endfor %}</div></details>{% endif %}
+    </section>
+  </div><aside>
+    <section class="card"><h3>Photos, permits and documents</h3>
+      {% if files %}<ul class="list">{% for f in files %}<li><a class="grow" href="{% url 'capital_project_file' obj.pk f.pk %}">{% icon "download" %} {{ f.original_filename }}</a></li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
+      {% if can_manage %}<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="do" value="upload"><label for="proj-file" class="small">Add files (PDF or photos)</label><input id="proj-file" type="file" name="file" multiple accept=".pdf,.png,.jpg,.jpeg"><button type="submit" class="secondary small">Upload</button></form>{% endif %}
+    </section>
+    {% if can_manage %}<section class="card"><h3>Details</h3><form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="update">{{ edit_form }}
+      <div class="field"><label for="pct">Percent complete</label><input id="pct" name="percent_complete" type="number" min="0" max="100" value="{{ obj.percent_complete }}"></div>
+      <div class="field"><label><input type="checkbox" name="owner_visible"{% if obj.owner_visible %} checked{% endif %}> Show owners the summary (title, status, budget, spent)</label></div>
+      <div class="form-actions"><button type="submit" class="secondary">Save details</button></div></form><p class="small muted">After approval the budget changes only by change order.</p></section>{% endif %}
+    <section class="card"><h3>History</h3><ul class="list">{% for e in events %}<li><span class="grow small">{{ e.action|humanize_action }}{% if e.note %}: {{ e.note }}{% endif %}<br><span class="muted">{{ e.by }} · {{ e.at|date:"M j, Y" }}</span></span></li>{% endfor %}</ul></section>
+  </aside></div>
+{% endblock %}

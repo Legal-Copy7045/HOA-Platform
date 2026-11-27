@@ -32,3 +32,6 @@
 - feature: "One sign-up view: People links to Homes and owners → Sign-ups (WT-001)"
   since: "0.41"
   match: ["^unit:core/tests/test_walkthrough_041.py::test_people_links_to_sign_ups", "^unit:core/tests/test_walkthrough2_fixes.py::test_people_find"]
+- feature: "Walkthrough after the 0.41 merge: contacts not sent to the owners' ARC page, Welcome tiles named after their pages, 44 px help links and crumbs, crawls skip the register PDF (D89)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_(contacts_are_not_sent|welcome_tiles|help_links_and_crumbs|crawls_skip)"]

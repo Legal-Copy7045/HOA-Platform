@@ -76,6 +76,11 @@ GL_LABELS = {
     "processing_fees": "Payment processing fees",
     # Disbursements (D52)
     "surplus_fund": "Surplus distributions paid from (reserve or surplus fund)",
+    # Special assessments (D75)
+    "special_assess": "Special assessment income",
+    # Finance options (D80, D82)
+    "interest": "Interest charged on overdue balances",
+    "legal_cost": "Collection costs and attorney fees recovered",
 }
 
 
@@ -97,6 +102,9 @@ GL_GROUPS = [
             ("late_fee", "Late fees posted on overdue accounts."),
             ("resale_fee", "Fees for resale certificates when a home is sold."),
             ("other_charge", "Any other charge posted to an owner's account."),
+            ("special_assess", "Special assessment installments (D75)."),
+            ("interest", "Interest posted on overdue balances (D80)."),
+            ("legal_cost", "Collection costs and attorney fees charged to owners (D82)."),
             ("card_surcharge", "The surcharge owners pay when they pay by credit card."),
         ],
     ),
@@ -129,13 +137,19 @@ GL_GROUPS = [
 
 def standard_accounts() -> dict[str, str]:
     """The account each key uses when its box is left empty."""
-    from ledger.models import DEFAULT_GL, DISBURSEMENT_GL, ONLINE_GL
+    from ledger.models import (
+        DEFAULT_GL,
+        DISBURSEMENT_GL,
+        ONLINE_GL,
+        OWNER_FINANCE_GL,
+        SPECIAL_ASSESSMENT_GL,
+    )
 
     defaults = {
         k.strip(): v.strip()
         for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
     }
-    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL}
+    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **SPECIAL_ASSESSMENT_GL, **OWNER_FINANCE_GL}
 
 
 def setup_groups(setup: AccountingSetup, values: dict[str, str] | None = None) -> list[dict]:
@@ -226,18 +240,50 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
     accounting package (QuickBooks, Xero...). Owner charges and payments are
     identified by address and lot number only, never by name. Vendor payments are by
     vendor and expense category code."""
+    return [line.row() for line in journal_lines(start, end)]
+
+
+def journal_lines(start: datetime.date, end: datetime.date) -> list:
+    """The journal as structured lines (ledger.books.journal.JLine), each side
+    with its fund (D69): owner money is the operating fund's; cash is the
+    fund of the bank account it is in (a match to a line of another account
+    moves it there); a coded bank line is its category's and its account's;
+    a surplus distribution is paid from the reserve fund unless the rule
+    ``books.surplus_from_reserve`` is off."""
+    from ledger.books.journal import JLine, cash_locator
     from operations.models import InvoicePayment
 
     gl = AccountingSetup.get().accounts()
-    rows: list[list[str]] = []
+    lines: list = []
+    locate = cash_locator()
+    OP = "operating"
+    surplus_fund = "reserve" if rule("books.surplus_from_reserve") else OP
 
-    def pair(date, journal, ref, debit_acct, credit_acct, cents, memo, lot=None):
+    def pair(
+        date,
+        journal,
+        ref,
+        debit_acct,
+        credit_acct,
+        cents,
+        memo,
+        lot=None,
+        *,
+        dfund=OP,
+        cfund=OP,
+        dkind="",
+        ckind="",
+    ):
         if cents < 0:  # a reversal: swap sides
             debit_acct, credit_acct, cents = credit_acct, debit_acct, -cents
-        amount = _cents(cents)
+            dfund, cfund = cfund, dfund
+            dkind, ckind = ckind, dkind
         number = str(lot.number) if lot is not None else ""
-        rows.append([date.isoformat(), journal, ref, debit_acct, amount, "", memo, number])
-        rows.append([date.isoformat(), journal, ref, credit_acct, "", amount, memo, number])
+        n = len(lines) // 2 + 1
+        lines.append(JLine(date, journal, ref, debit_acct, cents, 0, memo, number, dfund, dkind, n))
+        lines.append(
+            JLine(date, journal, ref, credit_acct, 0, cents, memo, number, cfund, ckind, n)
+        )
 
     with system_access("accounting export"):
         entries = list(
@@ -249,6 +295,14 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
             InvoicePayment.objects.filter(paid_on__range=(start, end))
             .select_related("invoice__vendor", "invoice__category")
             .order_by("paid_on", "id")
+        )
+    from ledger.models import SpecialAssessmentCharge
+
+    with system_access("accounting export: special assessment funds"):
+        special_funds = dict(
+            SpecialAssessmentCharge.objects.filter(entry__posted_on__lte=end).values_list(
+                "entry_id", "installment__assessment__fund"
+            )
         )
     from payments.services import journal_items, online_entry_ids
 
@@ -273,32 +327,37 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
                 -e.amount_cents,
                 f"{e.lot.label}: surplus distribution credit",
                 e.lot,
+                dfund=surplus_fund,
             )
         elif role == disbursements.REFUND_CHECK:
             # An owner's credit refunded by check (D52); a void reverses it.
+            cash, fund = locate.entry(e)
             pair(
                 e.posted_on,
                 "Disbursements",
                 ref,
                 gl["receivable"],
-                gl["cash"],
+                cash,
                 e.amount_cents,
                 f"{e.lot.label}: credit refunded by check",
                 e.lot,
+                cfund=fund,
             )
         elif kind == EntryKind.PAYMENT:
             # A payment is a negative entry: debit cash, credit receivables.
             # Online payments sit at Stripe until the payout reaches the bank.
             is_online = e.pk in online or e.reverses_id in online
+            cash, fund = (gl["stripe_clearing"], OP) if is_online else locate.entry(e)
             pair(
                 e.posted_on,
                 "Owner payments",
                 ref,
-                gl["stripe_clearing"] if is_online else gl["cash"],
+                cash,
                 gl["receivable"],
                 -e.amount_cents,
                 memo + (" (online)" if is_online else ""),
                 e.lot,
+                dfund=fund,
             )
         elif kind == EntryKind.REFUND:
             # Part of an online payment refunded at Stripe (D33-acctfix-5):
@@ -325,6 +384,9 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
                 e.lot,
             )
         else:
+            # Each charge kind has its own income account (interest D80 and
+            # legal costs D82 included); a special assessment installment is
+            # income of the levy's fund (D75), owed in operating receivables.
             income = gl.get(kind, gl["other_charge"])
             pair(
                 e.posted_on,
@@ -335,6 +397,9 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
                 e.amount_cents,
                 memo,
                 e.lot,
+                cfund=special_funds.get(e.reverses_id or e.pk, OP)
+                if kind == EntryKind.SPECIAL_ASSESSMENT
+                else OP,
             )
     stripe = journal_items(start, end)
     for day, ref, cents, lot in stripe["surcharges"]:
@@ -366,16 +431,65 @@ def journal_rows(start: datetime.date, end: datetime.date) -> list[list[str]]:
         pair(day, "Online payments", ref, gl["processing_fees"], gl["stripe_clearing"], cents, memo)
     for day, ref, cents, payout_id in stripe["payouts"]:
         memo = f"Stripe payout {payout_id}"[:120]
-        pair(day, "Online payments", ref, gl["cash"], gl["stripe_clearing"], cents, memo)
+        cash, fund = locate.item("payout", int(ref[1:]) if ref[:1] == "O" else 0)
+        pair(day, "Online payments", ref, cash, gl["stripe_clearing"], cents, memo, dfund=fund)
     # Surplus distribution checks post no owner entry: fund to bank (D52).
     for day, ref, cents, lot, memo in disbursements.surplus_check_journal(start, end):
-        pair(day, "Disbursements", ref, gl["surplus_fund"], gl["cash"], cents, memo, lot)
+        cash, fund = locate.item("check", int(ref[1:].rstrip("V")))
+        pair(
+            day,
+            "Disbursements",
+            ref,
+            gl["surplus_fund"],
+            cash,
+            cents,
+            memo,
+            lot,
+            dfund=surplus_fund,
+            cfund=fund,
+        )
     for p in payments:
         inv = p.invoice
         expense = f"{inv.category.code} {inv.category.name}".strip()
         memo = f"{inv.vendor.name} invoice {inv.number}"[:120]
-        pair(p.paid_on, "Vendor payments", f"P{p.pk}", expense, gl["cash"], p.amount_cents, memo)
-    return rows
+        cash, fund = locate.item("payment", p.pk)
+        pair(
+            p.paid_on,
+            "Vendor payments",
+            f"P{p.pk}",
+            expense,
+            cash,
+            p.amount_cents,
+            memo,
+            dfund=fund,
+            cfund=fund,
+            dkind="expense",
+        )
+    # Bank lines coded to a category (D69): bank interest, fees, debits,
+    # transfers between the association's accounts.
+    from ledger.books.models import GLEntry
+
+    for g in (
+        GLEntry.objects.filter(posted_on__range=(start, end))
+        .select_related("category", "transaction")
+        .order_by("posted_on", "id")
+    ):
+        memo = (g.category.name + (f" - {g.memo}" if g.memo else ""))[:120]
+        ref = f"B{g.transaction_id}" + ("R" if g.reverses_id else "")
+        pair(
+            g.posted_on,
+            "Bank",
+            ref,
+            g.cash_account,
+            g.category_account,
+            g.amount_cents,
+            memo,
+            dfund=g.cash_fund,
+            cfund=g.fund,
+            dkind="asset",
+            ckind=g.category.kind,
+        )
+    return lines
 
 
 def export_csv(start, end, *, actor, request=None) -> bytes:
@@ -449,6 +563,9 @@ def create_deposit(*, entry_ids, deposited_on, bank_reference="", actor, request
         raise AccountingError("Choose the payments in this deposit.")
     if deposited_on > timezone.localdate():
         raise AccountingError("A deposit date cannot be in the future.")
+    from ledger.books.periods import refuse_closed
+
+    refuse_closed(deposited_on, error=AccountingError, what="The deposit date")
     with transaction.atomic():
         AccountingSetup.objects.select_for_update().get(pk=AccountingSetup.get().pk)
         available = {e.pk: e for e in undeposited_payments() if e.pk in ids}
@@ -741,6 +858,8 @@ def vendor_1099_totals(year: int) -> list[dict]:
     threshold = rule("accounting.1099_threshold_cents") or 0
     totals = dict(
         InvoicePayment.objects.filter(paid_on__year=year)
+        # Expense reimbursements (D77) repay a volunteer, not a vendor: not 1099.
+        .filter(invoice__reimbursement__isnull=True)
         .values("invoice__vendor_id")
         .annotate(t=Sum("amount_cents"))
         .values_list("invoice__vendor_id", "t")

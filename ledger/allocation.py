@@ -43,7 +43,16 @@ from ledger.accounts import ALL, account_q, resolve
 
 ORDER_RULE = "ledger.assessments_before_fees"
 AUTO, DIRECTED, REVERSAL, UNWIND, MIGRATION = "auto", "directed", "reversal", "unwind", "migration"
-CHARGE_KIND_VALUES = ("assessment", "late_fee", "other_charge", "resale_fee", "refund")
+CHARGE_KIND_VALUES = (
+    "assessment",
+    "late_fee",
+    "other_charge",
+    "resale_fee",
+    "refund",
+    "interest",  # D80: interest on overdue balances
+    "legal_cost",  # D82: collection costs charged under the Declaration
+    "special_assess",  # special assessment installments (D75)
+)
 _LOCK_NAMESPACE = 5_320_001  # pg advisory lock namespace for lot allocation
 _NUMBER_LOCK = 5_320_002
 
@@ -265,9 +274,16 @@ def post_moved(lot_id: int, items: list) -> list:
     """Number and apply the copies ``move_entries`` posted (with
     ``_defer_allocation``), all at once: each payment copy first pays the
     copies of the charges its original paid (``items``: (copy, charge copy
-    ids)), then everything left follows the rule (fixres BUG-002)."""
+    ids)), then everything left follows the rule (fixres BUG-002).
+
+    Like ``after_post``, nothing is applied while allocation is suspended:
+    otherwise a move made then would leave the lot with only the move's rows,
+    and ``backfill`` (which skips lots that have applications) would never
+    replay the rest of its history (D87)."""
     from ledger.models import PaymentApplication
 
+    if _suspended.get():
+        return []
     with transaction.atomic():
         _lock(_LOCK_NAMESPACE, lot_id)
         for copy, _directed in items:

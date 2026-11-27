@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% load help_tags portal %}
+{% load help_tags portal finance_options %}
 {% block title %}My account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>My account</h1><p class="subtitle">{% term "Terms" %} are charged on the 1st of each month. Payments made in advance are kept as a credit and used up month by month. {% how_it_works "paying" %}</p></div></div>
   {% include "payments/_test_banner.html" %}
+  {% interest_notice %}{# D80: the interest policy, only with the feature on #}
   {% for a in accounts %}
     <section class="card">
       <div class="card-head"><div>{% home_title a.lot "h2" %}</div>
@@ -34,6 +35,7 @@
       {% if a.online_receipts %}<h3>Online payments</h3>
       <ul class="list small">{% for p in a.online_receipts %}<li><div class="grow">{{ p.recorded_at|date:"M j, Y" }} &middot; {{ p.total_cents|cents }} &middot; {{ p.get_method_display }}</div><a href="{% url 'payment_receipt' p.pk %}">{% icon "download" %} Receipt (PDF)</a></li>{% endfor %}</ul>{% endif %}
       {% include "ledger/_checks_to_you.html" with checks=a.checks_to_you %}
+      {% include "ledger/_my_plans.html" %}
       {% if a.autopay %}<h3>Pay assessments automatically</h3>
       <div class="small" data-testid="autopay-summary">
         {% if a.autopay.status == "on" %}<p><span class="status tone-success">On</span> {% if a.autopay.description %}{{ a.autopay.description }}{% else %}Paying from your {{ a.autopay.label }}.{% endif %}</p>
@@ -53,4 +55,5 @@
   {% endfor %}
   {% if can_request_resale %}<p class="link-row"><a href="{% url 'resales' %}">Selling your home? Request a resale certificate</a></p>
   {% elif accounts %}<p class="small muted" data-testid="resale-owner-only">Selling the home? Only an owner on the deed can ask for a resale certificate.</p>{% endif %}
+  {% if can_claim %}<p class="link-row"><a href="{% url 'reimbursement_new' %}">Paid an association expense yourself? Claim an expense</a></p>{% endif %}
 {% endblock %}

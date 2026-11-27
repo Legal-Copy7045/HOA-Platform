@@ -14,7 +14,12 @@
           <div><label for="xs">From</label><input id="xs" type="date" name="start" value="{{ last_month_start|date:'Y-m-d' }}" required></div>
           <div><label for="xe">To</label><input id="xe" type="date" name="end" value="{{ today|date:'Y-m-d' }}" required></div>
           <button type="submit" class="secondary">{% icon "download" %} Download CSV</button></form>
-        <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by address and lot number only, never by name. Accounts come from the Setup tab.</p></section>
+        <p class="small muted">Date, journal, reference, account, debit, credit, memo: one balanced pair per transaction. Owners appear by address and lot number only, never by name. Accounts come from the Setup tab.</p>
+        {% if books_on %}<details data-testid="quickbooks"><summary class="small">Optional: QuickBooks Online journal import</summary><form method="get" action="{% url 'accounting_quickbooks' %}" class="inline-form">
+          <div><label for="qs">From</label><input id="qs" type="date" name="start" value="{{ last_month_start|date:'Y-m-d' }}" required></div>
+          <div><label for="qe">To</label><input id="qe" type="date" name="end" value="{{ today|date:'Y-m-d' }}" required></div>
+          <button type="submit" class="secondary">{% icon "download" %} QuickBooks CSV</button></form>
+          <p class="small muted">Only if the association also keeps QuickBooks Online: the same journal in its journal-entry import layout, the fund as the class. The portal's own books (<a href="{% url 'books_close' %}">Month and year close</a>, <a href="{% url 'financial_statements' %}">Financial statements</a>) need no other package.</p></details>{% endif %}</section>
       {% if can_manage %}<section class="card"><h2>Payments to deposit</h2>
         {% if undeposited %}<form method="post">{% csrf_token %}<input type="hidden" name="section" value="deposit">
           {# The summary and the action first, the list to review after (WT-033). #}

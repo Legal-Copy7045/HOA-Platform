@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Bank accounts and funds · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "finance_overview" %}Bank accounts and funds</nav>
+  <div class="page-head"><div><h1>Bank accounts and funds</h1>
+    <p class="subtitle">Every association bank account belongs to a fund: operating, or reserve (the reserve the board determines, Declaration §8.7). The primary operating account holds deposits, Stripe payouts and checks unless they are matched to another account's line. Opening balances are on the books' start date{% if start %} ({{ start|date:"M j, Y" }}){% endif %}.</p></div></div>
+  {% if not start %}<div class="alert warning">{% icon "alert" %}<span>Set the books' start date first: <a href="{% url 'accounting' %}?tab=setup">Accounting setup</a> (the opening balance date).</span></div>{% endif %}
+  {% if locked %}<p class="small muted">A month is closed: an account's fund and opening balance can no longer change (reopen first, or post a correction).</p>{% endif %}
+  {% if positions %}<div class="stat-row">{% for fund, p in positions.items %}<div class="stat card"><div class="small muted">{% if fund == "reserve" %}Reserve fund{% else %}Operating fund{% endif %}</div><div class="big">{{ p.balance|cents }}</div><div class="small muted">cash {{ p.cash|cents }}</div></div>{% endfor %}</div>{% endif %}
+  <section class="card"><h2>Accounts</h2>
+    {% if rows %}<ul class="list">{% for r in rows %}<li><div class="grow"><strong>{{ r.conn.label }}</strong>{% if r.conn.institution_name %} · {{ r.conn.institution_name }}{% endif %}<br>
+      <span class="small muted">{% if r.setup %}{{ r.setup.get_fund_display }} · {{ r.setup.gl_account }}{% if r.setup.is_primary %} · primary{% endif %} · opening {% if r.setup.opening_balance_cents is None %}not set{% else %}{{ r.setup.opening_balance_cents|cents }}{% endif %}{% else %}Not in the books yet{% endif %}</span>
+      {% if can_setup %}<details{% if not r.setup %} open{% endif %}><summary class="small">{% if r.setup %}Change{% else %}Put in the books{% endif %}</summary><form method="post" class="inline-form">{% csrf_token %}<input type="hidden" name="connection" value="{{ r.conn.pk }}">
+        <div><label for="f{{ r.conn.pk }}">Fund</label><select id="f{{ r.conn.pk }}" name="fund">{% for v, l in funds %}<option value="{{ v }}"{% if r.setup.fund == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+        <div><label for="g{{ r.conn.pk }}">Chart account</label><input id="g{{ r.conn.pk }}" name="gl_account" maxlength="80" value="{{ r.setup.gl_account|default:'' }}" placeholder="{{ cash_default }}"></div>
+        <div><label for="o{{ r.conn.pk }}">Opening balance ($)</label><input id="o{{ r.conn.pk }}" name="opening" inputmode="decimal" value="{% if r.setup.opening_balance_cents is not None %}{{ r.setup.opening_balance_cents|cents|cut:'$'|cut:',' }}{% endif %}"></div>
+        <label class="small"><input type="checkbox" name="is_primary" value="1"{% if r.setup.is_primary %} checked{% endif %}> Primary operating account</label>
+        <button type="submit" class="small">{% for_board "Save" %}</button></form></details>{% endif %}
+    </div></li>{% endfor %}</ul>
+    {% else %}<p class="small muted">No bank account yet. Add one below (updated by importing statement files), or connect one on the <a href="{% url 'bank_feed' %}">Bank feed</a>.</p>{% endif %}
+  </section>
+  {% if can_setup %}<section class="card"><h2>Add an account</h2>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="add">
+      <div class="field"><label for="an">Name</label><input id="an" name="display_name" maxlength="80" required placeholder="Reserve savings"></div>
+      <div class="field"><label for="ai">Bank</label><input id="ai" name="institution_name" maxlength="80"></div>
+      <div class="field"><label for="al">Last four digits of the account number</label><input id="al" name="last_four" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" size="5"><p class="small muted">Only the last four: the portal never keeps full account or routing numbers.</p></div>
+      <div class="field"><label for="af">Fund</label><select id="af" name="fund">{% for v, l in funds %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="ao">Opening balance on the start date ($)</label><input id="ao" name="opening" inputmode="decimal"></div>
+      <div class="form-actions"><button type="submit" class="secondary">Add account</button></div></form></section>{% endif %}
+{% endblock %}

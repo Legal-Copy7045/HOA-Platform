@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Cash-flow forecast · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs">{% hub_crumb "finance_overview" %}Cash-flow forecast</div>
+  <div class="page-head"><div><h1>Cash-flow forecast</h1>
+    <p class="subtitle">The next 12 months of operating and reserve cash: {% term "terms" %} expected, bills and contracts, the reserve contribution and the reserve plan's replacements.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'cashflow_export' %}?{{ query }}{% if query %}&amp;{% endif %}format=csv">{% icon "download" %} CSV</a><a class="btn secondary" href="{% url 'cashflow_export' %}?{{ query }}{% if query %}&amp;{% endif %}format=pdf">{% icon "download" %} PDF</a></div>
+  </div>
+  {% if forecast.warnings %}<div class="alert danger">{% icon "alert" %}<span>Cash runs low in {{ forecast.warnings|length }} month{{ forecast.warnings|length|pluralize }}, first {{ forecast.warnings.0.start|date:"F Y" }}.</span></div>{% endif %}
+  <details class="panel"{% if scenario.active %} open{% endif %}><summary>What if… (not saved)</summary><div class="panel-body">
+    <form method="get" class="form-grid">
+      <div class="field"><label for="rate">Collection rate change</label><select id="rate" name="rate">{% for r in rates %}<option value="{{ r }}"{% if r == scenario.rate_change_pct %} selected{% endif %}>{% if r %}{{ r }} points{% else %}as forecast{% endif %}</option>{% endfor %}</select></div>
+      <div class="field"><label for="extra">Extra spending every month ($)</label><input id="extra" name="extra" value="{{ extra }}" inputmode="decimal"></div>
+      <div class="field"><label for="oneoff">A one-off cost next month ($)</label><input id="oneoff" name="oneoff" value="{{ oneoff }}" inputmode="decimal"></div>
+      <div class="form-actions"><button type="submit">Show</button>{% if scenario.active %} <a href="{% url 'cashflow' %}">Back to the forecast</a>{% endif %}</div>
+    </form></div></details>
+  <div class="table-card"><div class="table-wrap"><table class="dense stack-sm">
+    <thead><tr><th scope="col">Month</th><th scope="col" class="num">Collected</th><th scope="col" class="num">Spending</th><th scope="col" class="num">To reserve</th><th scope="col" class="num">Operating closing</th><th scope="col" class="num">Reserve spending</th><th scope="col" class="num">Reserve closing</th><th scope="col" class="num">Reserve plan</th></tr></thead>
+    <tbody>{% for r in forecast.rows %}<tr{% if r.warning %} class="row-danger"{% endif %}>
+      <td class="cell-title">{{ r.start|date:"M Y" }}{% if r.warning %} <span class="badge danger">Low</span>{% endif %}</td>
+      <td class="num" data-label="Collected">{{ r.collections|add:r.interest_income|cents }}</td>
+      <td class="num" data-label="Spending">{{ r.operating_out|cents }}</td>
+      <td class="num" data-label="To reserve">{{ r.transfer|cents }}</td>
+      <td class="num{% if r.operating_low %} danger{% endif %}" data-label="Operating closing">{{ r.operating_close|cents }}</td>
+      <td class="num" data-label="Reserve spending">{{ r.reserve_out|cents }}</td>
+      <td class="num{% if r.reserve_low %} danger{% endif %}" data-label="Reserve closing">{{ r.reserve_close|cents }}</td>
+      <td class="num" data-label="Reserve plan">{% if r.reserve_target is None %}-{% else %}{{ r.reserve_target|cents }}{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <ul class="small muted">{% for n in forecast.notes %}<li>{{ n }}</li>{% endfor %}
+    <li>Operating warns below {{ forecast.inputs.min_operating|cents }}; reserve warns below the reserve plan's lowest balance for that year.</li>
+    <li>Special assessment installments are not in this forecast yet.</li></ul>
+{% endblock %}

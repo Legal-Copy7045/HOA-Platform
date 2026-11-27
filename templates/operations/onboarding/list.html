@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Vendor onboarding · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'vendors' %}">Vendors</a> / Vendor onboarding</div>
+  <div class="page-head"><div><h1>Vendor onboarding</h1><div class="meta"><span>New vendors fill in an emailed form; two board members approve them before they can be paid.</span></div></div></div>
+  {% if not key_ready %}<div class="alert warning" role="status">{% icon "alert" %}<div>The vendor document key is not set up on the server, so no links can be sent and no documents opened. A sysadmin runs <code>sudo bash infra/poc/set-vendor-key.sh</code>.</div></div>{% endif %}
+  <div class="split">
+    <div>
+      <h2>Waiting</h2>
+      <div class="table-card"><div class="table-wrap"><table class="stack-sm"><thead><tr><th>Vendor</th><th>Kind</th><th>Status</th><th>Since</th></tr></thead><tbody>
+        {% for r in open_rounds %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'vendor_onboarding_review' r.pk %}">{{ r.vendor.name }}</a></td><td data-label="Kind">{{ r.get_mode_display }}</td><td data-label="Status">{{ r.get_status_display }}</td><td data-label="Since">{{ r.status_changed_at|date:"M j, Y" }}</td></tr>{% empty %}<tr><td colspan="4" class="muted">Nothing waiting.</td></tr>{% endfor %}
+      </tbody></table></div></div>
+      <h2>Closed</h2>
+      <div class="table-card"><div class="table-wrap"><table class="stack-sm"><thead><tr><th>Vendor</th><th>Kind</th><th>Outcome</th><th>When</th></tr></thead><tbody>
+        {% for r in closed_rounds %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'vendor_onboarding_review' r.pk %}">{{ r.vendor.name }}</a></td><td data-label="Kind">{{ r.get_mode_display }}</td><td data-label="Outcome">{{ r.get_status_display }}</td><td data-label="When">{{ r.status_changed_at|date:"M j, Y" }}</td></tr>{% empty %}<tr><td colspan="4" class="muted">None yet.</td></tr>{% endfor %}
+      </tbody></table></div></div>
+      <ul class="setup-links"><li><a href="{% url 'vendor_requirements' %}">Vendor requirements and terms</a></li></ul>
+    </div>
+    <aside>{% if can_invite %}<section class="card"><h3>Invite a vendor</h3>
+      <form method="post" action="{% url 'vendor_onboarding_invite' %}">{% csrf_token %}{% include "partials/form_errors.html" %}{% if form.non_field_errors %}<div class="alert danger" role="alert"><div>{{ form.non_field_errors|join:" " }}</div></div>{% endif %}{{ form }}
+        <p class="small muted">The vendor gets a link that works once, until they submit or it expires. The vendor stays inactive until two board members approve.</p>
+        <div class="form-actions"><button type="submit">Send the link</button></div></form></section>{% endif %}</aside>
+  </div>
+{% endblock %}

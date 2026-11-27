@@ -4,6 +4,7 @@
 {% block content %}
   {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Finance overview</h1><p class="subtitle">Every part of the association's money in one place: where each stands, and what waits on you there.{% if waiting %} <strong>{{ waiting }} waiting on you</strong> in all.{% endif %}</p></div></div>
+  {% if funds %}<section aria-labelledby="funds-h" data-testid="fund-strip"><h2 id="funds-h" class="sr-only">Funds</h2><div class="grid grid-3">{% for f in funds %}<a class="stat" href="{% url 'financial_statements' %}"><div class="label">{{ f.label }} fund cash</div><div class="value">{{ f.cash|cents }}</div><div class="hint">At the end of {{ funds_as_of|date:"F Y" }}, the last closed month</div></a>{% endfor %}</div></section>{% endif %}
   {% if tiles %}<div class="grid grid-3">{% for t in tiles %}<a class="stat" href="{{ t.url }}"><div class="label">{{ t.label }}</div><div class="value">{{ t.value }}</div></a>{% endfor %}</div>{% endif %}
   {# D89: one card per component, grouped; the number on a card is its own My items count, and the menu bubble is their sum. #}
   {% for g in groups %}

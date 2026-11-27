@@ -118,3 +118,27 @@ def test_phone_picture_alone_serves_both(client, board):
 def test_unknown_variant_is_refused(board):
     with pytest.raises(branding.BrandingError):
         branding.set_login_background(_jpeg_with_gps(), variant="tv", actor=board)
+
+
+def test_the_picture_is_malware_scanned_before_it_is_decoded(board, settings, monkeypatch):
+    """D87 (SEC-005): the original upload goes through the scan gate first."""
+    from documents.models import ScanResult
+
+    seen = []
+
+    def decode(*args, **kwargs):
+        seen.append("decoded")
+        raise AssertionError("decoded before the scan refused it")
+
+    monkeypatch.setattr(branding, "_reencode", decode)
+    monkeypatch.setattr(branding, "scan", lambda f: (ScanResult.INFECTED, "clamd"))
+    with pytest.raises(branding.BrandingError, match="malware scanner"):
+        branding.set_login_background(_jpeg_with_gps(), actor=board)
+    settings.DOCUMENT_REQUIRE_CLEAN_SCAN = True
+    monkeypatch.setattr(branding, "scan", lambda f: (ScanResult.ERROR, "clamd"))
+    with pytest.raises(branding.BrandingError, match="could not be checked"):
+        branding.set_login_background(_jpeg_with_gps(), actor=board)
+    assert seen == [] and branding.current_login_background() is None
+    monkeypatch.undo()
+    monkeypatch.setattr(branding, "scan", lambda f: (ScanResult.CLEAN, "clamd"))
+    assert branding.set_login_background(_jpeg_with_gps(), actor=board).width

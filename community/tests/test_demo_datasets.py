@@ -98,8 +98,10 @@ OAK_CREEK_COUNTS = {
     "documents.Document": 19,  # incl. 10 from documents/demo_renewals.py (D72)
     "governance.Meeting": 7,
     "governance.Vote": 5,
-    "operations.Invoice": 10,
-    "operations.Vendor": 8,  # incl. 4 from documents/demo_renewals.py (D72)
+    "operations.Invoice": 15,  # incl. 5 from ledger/demo_finance_gaps.py (D75-D78)
+    # incl. 4 from documents/demo_renewals.py (D72), and the demo pond vendor
+    # and the reimbursement payee from ledger/demo_finance_gaps.py (D77)
+    "operations.Vendor": 10,
 }
 
 

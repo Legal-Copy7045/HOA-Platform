@@ -401,7 +401,8 @@ def election(w):
         elections.nominate(e, person=_person(user), statement="x" * 300, actor=user)
     from governance.tests.helpers import window_kw
 
-    return elections.open_voting(e, actor=w["board"], **window_kw())
+    # The board member stands as a candidate: another opens voting (D87).
+    return elections.open_voting(e, actor=w["board2"], **window_kw())
 
 
 def test_election_ballot_cards_limit_and_confirmation(client, w, election):

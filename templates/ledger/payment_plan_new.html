@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Set up a payment plan · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'collections' %}">Collections</a> / <a href="{% url 'collection_detail' case.pk %}">{{ case.lot.label }}</a> / Payment plan</div>
+  <div class="page-head"><div><h1>Set up a payment plan</h1>
+    <p class="subtitle">{{ case.lot.label }}: the plan covers the {{ total|cents }} open on the home's account today. A board member other than you approves it.</p></div></div>
+  {% if own_matter %}<p class="board-note" data-testid="own-home-note">{{ own_note }}</p>{% else %}
+  <section class="card"><h2>What it covers</h2>
+    <ul class="list small">{% for c in charges %}<li><span class="grow">{{ c.title }} · {{ c.due_on|short_date }}</span><span>{{ c.open_cents|cents }}</span></li>{% empty %}<li>Nothing is open.</li>{% endfor %}</ul>
+    <p class="small muted">Late fees while the plan is kept: {% if suspend.0 %}none{% else %}as usual{% endif %}{% if suspend.1 %} ({{ suspend.1 }}){% endif %}. An installment is missed {{ grace.0 }} days after its due date and the plan defaults {{ default.0 }} days after it{% if default.1 %} ({{ default.1 }}){% endif %}.</p>
+  </section>
+  {% include "partials/form_errors.html" %}
+  {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+  <form method="post" class="card form-grid">{% csrf_token %}
+    {% for field in form %}<div class="field">{{ field.label_tag }}{{ field }}{% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}{% for e in field.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>{% endfor %}
+    <div class="form-actions"><button type="submit">Prepare the plan</button></div>
+  </form>{% endif %}
+{% endblock %}

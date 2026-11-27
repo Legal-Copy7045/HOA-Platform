@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Financial statements · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Financial statements</h1>
+    <p class="subtitle">{{ period.label }}{% if period.closed %} · closed{% else %} · <strong>not closed</strong>: figures may still change{% endif %}. Balance sheet by fund, income and expenses with the budget, reserve activity and unpaid balances, from the portal's books.</p></div>
+    {% if s %}<div class="actions"><a class="btn secondary" href="{% url 'financial_statements_pdf' %}?{{ query }}">{% icon "download" %} PDF</a><a class="btn secondary" href="{% url 'financial_statements_csv' %}?{{ query }}">{% icon "download" %} CSV</a></div>{% endif %}</div>
+  <form method="get" class="inline-form"><div><label for="sy">Fiscal year</label><select id="sy" name="year">{% for y in years %}<option value="{{ y }}"{% if period.kind == "year" and period.fiscal_year == y %} selected{% endif %}>{{ y }}</option>{% endfor %}</select></div><button type="submit" class="secondary">Show year</button></form>
+  {% if months %}<form method="get" class="inline-form"><div><label for="sm">Month</label><select id="sm" name="month">{% for m in months %}<option value="{{ m }}"{% if period.key == m %} selected{% endif %}>{{ m }}</option>{% endfor %}</select></div><button type="submit" class="secondary">Show month</button></form>{% endif %}
+  {% if not s %}<div class="alert warning">{% icon "alert" %}<span>The books have no start date yet: <a href="{% url 'accounting' %}?tab=setup">Accounting setup</a>.</span></div>{% else %}
+  <p class="small muted">{{ s.basis }}</p>
+  <section class="card"><h2>Balance sheet at {{ period.end|date:"M j, Y" }}</h2>
+    <div class="split">{% for fund, f in s.balance_sheet.funds.items %}<div data-testid="fund-{{ fund }}"><h3>{{ f.label }}</h3><div class="table-wrap"><table class="stack-sm"><tbody>
+      {% for a, c in f.assets_rows %}<tr><td class="cell-title">{{ a }}</td><td class="num" data-label="Amount">{{ c|cents }}</td></tr>{% endfor %}
+      {% for a, c in f.liabilities_rows %}<tr><td class="cell-title">Less {{ a }}</td><td class="num" data-label="Amount">{{ c|cents }}</td></tr>{% endfor %}
+      <tr><th>Fund balance</th><th class="num">{{ f.fund_balance|cents }}</th></tr></tbody></table></div></div>{% endfor %}</div>
+    <p><strong>All funds: {{ s.balance_sheet.total_fund_balance|cents }}</strong></p></section>
+  <section class="card"><h2>Income and expenses</h2><div class="table-wrap"><table class="stack-sm"><thead><tr><th>Account</th><th class="num">This period</th><th class="num">Year to date</th></tr></thead><tbody>
+    {% for r in s.income.income_rows %}<tr><td class="cell-title">{{ r.account }}</td><td class="num" data-label="Period">{{ r.total|cents }}</td><td></td></tr>{% endfor %}
+    <tr><th>Income</th><th class="num">{{ s.income.income_total|cents }}</th><th class="num">{{ s.year_to_date.income_total|cents }}</th></tr>
+    {% for r in s.income.expense_rows %}<tr><td class="cell-title">{{ r.account }}</td><td class="num" data-label="Period">{{ r.total|cents }}</td><td></td></tr>{% endfor %}
+    <tr><th>Expenses</th><th class="num">{{ s.income.expense_total|cents }}</th><th class="num">{{ s.year_to_date.expense_total|cents }}</th></tr>
+    <tr><th>Net income</th><th class="num">{{ s.income.net_total|cents }}</th><th class="num">{{ s.year_to_date.net_total|cents }}</th></tr>
+  </tbody></table></div></section>
+  <section class="card"><h2>Budget against actual, fiscal year {{ s.budget.fiscal_year }}</h2>
+    {% if not s.budget.budget %}<p class="small muted">No adopted budget for this year: actual figures only.</p>{% endif %}
+    <div class="table-wrap"><table class="stack-sm"><thead><tr><th>Line</th><th class="num">Budget to date</th><th class="num">Actual</th><th class="num">Variance</th></tr></thead><tbody>
+      {% for r in s.budget.rows %}<tr><td class="cell-title">{{ r.name }}</td><td class="num" data-label="Budget">{{ r.planned_total|cents }}</td><td class="num" data-label="Actual">{{ r.actual_total|cents }}</td><td class="num" data-label="Variance">{{ r.variance|cents }}</td></tr>{% endfor %}
+      {% for r in s.budget.unbudgeted %}<tr><td class="cell-title">{{ r.name }} <span class="small muted">not budgeted</span></td><td></td><td class="num" data-label="Actual">{{ r.actual_total|cents }}</td><td></td></tr>{% endfor %}
+    </tbody></table></div></section>
+  <div class="split">
+    <section class="card"><h2>Reserve fund activity</h2><ul class="list small">
+      <li><span class="grow">Opening balance</span><span>{{ s.reserve.opening|cents }}</span></li>
+      <li><span class="grow">Transfers in</span><span>{{ s.reserve.transfers_in|cents }}</span></li>
+      <li><span class="grow">Interest and other income</span><span>{{ s.reserve.income|cents }}</span></li>
+      <li><span class="grow">Spent from reserves</span><span>{{ s.reserve.expenses|cents }}</span></li>
+      <li><span class="grow">Between funds and distributions</span><span>{{ s.reserve.interfund|add:s.reserve.other|cents }}</span></li>
+      <li><span class="grow"><strong>Closing balance</strong></span><span><strong>{{ s.reserve.closing|cents }}</strong></span></li></ul></section>
+    <section class="card"><h2>Unpaid balances by age</h2><ul class="list small">{% for label, c in s.aging.rows %}<li><span class="grow">{{ label }}</span><span>{{ c|cents }}</span></li>{% endfor %}
+      <li><span class="grow">{{ s.aging.homes }} home{{ s.aging.homes|pluralize }} with a balance due</span><span>{{ s.aging.total|cents }}</span></li></ul></section>
+  </div>
+  {% if s.annual %}<section class="card" data-testid="annual-accounting"><h2>Annual accounting</h2>
+    <ul class="list small"><li><span class="grow">Income</span><span>{{ s.annual.income_cents|cents }}</span></li><li><span class="grow">Expenditures</span><span>{{ s.annual.expenditures_cents|cents }}</span></li><li><span class="grow">Reserves set aside</span><span>{{ s.annual.reserves_cents|cents }}</span></li><li><span class="grow"><strong>Net excess (deficit) of income over expenditures plus reserves</strong></span><span><strong>{{ s.annual.net_cents|cents }}</strong></span></li></ul>
+    <p class="small muted">The surplus candidate for a distribution (Disbursements); the board decides any distribution. Tax figures: <a href="{% url 'tax_worksheet' %}?year={{ period.fiscal_year }}">Tax worksheet</a>.</p></section>{% endif %}
+  {% endif %}
+  <section class="card" id="package"><h2>Year-end package</h2>
+    <p class="small muted">One .zip with the statements, the journal, each month's reconciliations and exceptions, the owner subledger by home, disbursements, invoices with approvals, the approval trail, the invoice files as they were, the tax worksheet, the treasurer handover sheet and a signed manifest. Built by itself when a year closes.{% if not key_configured %} Signed with a key derived from the server's secret; set BOOKS_PACKAGE_KEY on the server to verify packages elsewhere.{% endif %}</p>
+    {% if packages %}<ul class="list">{% for p in packages %}<li><span class="grow">Fiscal year {{ p.fiscal_year }} · built {{ p.built_at|date:"M j, Y" }}{% if p.automatic %} at the close{% endif %} · {{ p.file_count }} files{% if not p.year_closed %} · year not closed{% endif %}{% if p.skipped_count %} · {{ p.skipped_count }} left out{% endif %}</span>{% if can_package %}<a class="btn secondary small" href="{% url 'year_end_package' %}?id={{ p.pk }}">{% icon "download" %} Download</a>{% endif %}</li>{% endfor %}</ul>{% endif %}
+    {% if can_package %}<form method="post" action="{% url 'year_end_package' %}">{% csrf_token %}<input type="hidden" name="year" value="{{ period.fiscal_year }}"><button type="submit" class="secondary">Build the package for fiscal year {{ period.fiscal_year }}</button></form>{% endif %}
+  </section>
+{% endblock %}

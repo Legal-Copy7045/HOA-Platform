@@ -106,6 +106,69 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "The treasurer should confirm the dormancy period and keep a list of uncashed checks.",
         ),
     ],
+    "books": [
+        LawNote(
+            "26 U.S.C. § 528; IRS Form 1120-H",
+            "Homeowners associations' federal income tax",
+            "An association that meets the tests (at least 60% of gross income from members' "
+            "assessments and fees, at least 90% of spending on the association's property) may "
+            "file Form 1120-H; other income such as bank interest is taxed after a $100 "
+            "deduction. Otherwise Form 1120 applies.",
+            "The year-end tax worksheet separates exempt-function income from other income for "
+            "the preparer, who confirms the form.",
+        ),
+        LawNote(
+            "68 Pa.C.S. § 5316, § 5407",
+            "Uniform Planned Community Act: records and resale certificates",
+            "The association keeps financial records detailed enough for resale certificates "
+            "and makes them available to owners.",
+            "Closed months and year-end packages keep the books as they were; corrections are "
+            "posted in the open month with a reference.",
+        ),
+        LawNote(
+            "IRC § 6041, § 6071(c); IRS Instructions for Forms 1099-MISC and 1099-NEC; IRIS",
+            "1099s for vendors",
+            "Payments to some vendors over the year must be reported on Form 1099-NEC or "
+            "1099-MISC by January 31, to the vendor and to the IRS (the Information Returns "
+            "Intake System, IRIS, takes a CSV upload).",
+            "The Tax worksheet gives the totals, an IRIS upload file and recipient copies "
+            "without taxpayer numbers (the portal keeps none: add them in IRIS from the W-9). "
+            "The year close stops for vendors over the threshold without a W-9.",
+        ),
+        LawNote(
+            "15 Pa.C.S. § 146",
+            "Pennsylvania annual report for corporations",
+            "Nonprofit corporations file an annual report with the PA Department of State.",
+            "It is put on Recurring deadlines with a reminder; confirm the due date and any "
+            "other state filing with your preparer.",
+        ),
+    ],
+    # Finance gaps (D75-D78): special assessments, payment plans,
+    # reimbursements and budget preparation.
+    "money_extra": [
+        LawNote(
+            "68 Pa.C.S. § 5302(a), § 5314, § 5315",
+            "Uniform Planned Community Act: assessments, allocation and the lien",
+            "The board levies assessments, special ones included, allocated as the "
+            "Declaration says; unpaid assessments and late charges are a lien on the home.",
+            "Levy a special assessment only under a board resolution and, where the "
+            "Declaration requires, after the owners' vote; record both on the levy.",
+        ),
+        LawNote(
+            "15 U.S.C. § 1692 et seq.",
+            "Fair Debt Collection Practices Act",
+            "Applies to third parties collecting for the association, not to the association "
+            "collecting its own assessments.",
+            "If counsel or an agent arranges payment plans, their letters must follow the Act.",
+        ),
+        LawNote(
+            "Internal Revenue Code, accountable plans (26 U.S.C. § 62(c))",
+            "Expense reimbursements",
+            "Repaying an expense someone paid for the association, against a receipt, is not "
+            "pay or income to them.",
+            "Keep the receipt with every claim; reimbursements are left off the 1099 worksheet.",
+        ),
+    ],
     "payments": [
         LawNote(
             "12 C.F.R. § 1005.10(b)",
@@ -226,6 +289,48 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "Record the Bylaws' own numbers with their citation where they differ.",
         ),
     ],
+    # Finance options (D80-D85).
+    "finance_options": [
+        LawNote(
+            "68 Pa.C.S. § 5315",
+            "Uniform Planned Community Act: the association's lien",
+            "Assessments, late charges, fines and interest are a lien on the home from the day "
+            "they are due; no filing is needed. Costs and reasonable attorney fees are part of "
+            "it when the Declaration says so. Proceedings must start within three years.",
+            "Charge interest and collection costs only as the Declaration allows, and record "
+            "what counsel filed (a statement of lien, a judgment) and when it was released.",
+        ),
+        LawNote(
+            "41 P.S. § 101 et seq.",
+            "Pennsylvania Loan Interest and Protection Law (usury)",
+            "Sets a 6% legal rate and limits interest on loans; whether it reaches interest on "
+            "unpaid assessments is not settled for every case.",
+            "Stay at or below the Declaration's rate, never compound, and ask counsel before "
+            "choosing a rate above 6%.",
+        ),
+        LawNote(
+            "15 U.S.C. § 1692 et seq.; 73 P.S. § 2270.1 et seq.",
+            "Fair Debt Collection Practices Act; Fair Credit Extension Uniformity Act",
+            "Govern how a collection attorney or agency contacts an owner and what it may say "
+            "and charge; the Pennsylvania act also covers creditors' own collection conduct.",
+            "Letters from counsel follow these acts; the portal only records that they were sent.",
+        ),
+        LawNote(
+            "50 U.S.C. § 3901 et seq.",
+            "Servicemembers Civil Relief Act",
+            "Protects servicemembers on active duty before a default judgment and caps interest "
+            "on their pre-service debts at 6% while they serve.",
+            "Check active duty before suing or charging interest above 6% to a servicemember.",
+        ),
+        LawNote(
+            "40 P.S. § 1171.5; 42 Pa.C.S. § 8371",
+            "Pennsylvania Unfair Insurance Practices Act; insurer bad faith",
+            "Insurers must handle claims promptly and fairly; a court may award more where an "
+            "insurer acts in bad faith on a claim.",
+            "Keep the claim's dates, letters and the adjuster's answers on the claim; they "
+            "matter if a claim is delayed or denied.",
+        ),
+    ],
     "privacy": [
         LawNote(
             "73 P.S. § 2301 et seq.",
@@ -266,6 +371,46 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "Pennsylvania Breach of Personal Information Notification Act",
             "Requires notifying people when certain personal information is exposed in a breach.",
             "Encrypted backups and a locked off-site copy are part of keeping owners' data safe.",
+        ),
+    ],
+    "vendors": [
+        LawNote(
+            "26 U.S.C. § 6041, § 6041A, § 3406; IRS Form W-9 and Instructions for Forms "
+            "1099-MISC and 1099-NEC",
+            "Form W-9 and Form 1099 reporting",
+            "A business that pays a vendor for services may have to report the payments on a "
+            "Form 1099 and should collect a Form W-9 first; payments to corporations are "
+            "generally not reported except attorneys' fees, and payments for goods only are not. "
+            "Without a W-9 backup withholding can apply.",
+            "The portal asks every vendor how it is taxed and keeps the W-9 encrypted; the "
+            "1099 list follows that answer. The tax preparer confirms which vendors and the "
+            "current IRS threshold.",
+            "Have the association's counsel or tax preparer confirm how this applies.",
+        ),
+        LawNote(
+            "IRS record-keeping guidance (Publication 583; Publication 15 for employment taxes)",
+            "How long tax records are kept",
+            "Records that support information returns are kept at least 3 years; employment "
+            "tax records at least 4.",
+            "The W-9 retention rule defaults to 4 years after the last 1099 year; the tax "
+            "preparer should confirm.",
+            "Have the association's counsel or tax preparer confirm how this applies.",
+        ),
+        LawNote(
+            "73 P.S. § 517.1 et seq.",
+            "Pennsylvania Home Improvement Consumer Protection Act",
+            "Contractors doing home improvement work in Pennsylvania register with the Attorney "
+            "General and carry liability insurance.",
+            "The registration number is asked of home improvement contractors; whether work on "
+            "common areas is home improvement under the Act is a question for counsel.",
+        ),
+        LawNote(
+            "77 P.S. § 1 et seq.",
+            "Pennsylvania Workers' Compensation Act",
+            "Employers carry workers' compensation insurance; some sole proprietors and others "
+            "without employees may be exempt and say so in writing.",
+            "Contractors upload a certificate or an exemption statement, so an injured "
+            "worker's claim does not fall on the association.",
         ),
     ],
 }

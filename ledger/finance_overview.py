@@ -11,6 +11,7 @@ record.
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass, field
 
 from django.urls import reverse
@@ -119,23 +120,159 @@ def _reports(ctx) -> str:
     return f"{_n(len(REPORTS), 'report')}, each as a page, CSV or PDF."
 
 
+def _month(key: str) -> str:
+    year, month = key.split("-")[:2]
+    return datetime.date(int(year), int(month), 1).strftime("%B %Y")
+
+
+def _books_close(ctx) -> str:
+    from ledger.books import close, periods
+
+    if not close.books_in_use():
+        return "The books are not set up yet: start on Bank accounts and funds."
+    last = periods.last_closed_month()
+    closed = f"Closed through {_month(last)}" if last else "No month closed yet"
+    exceptions = sum(r.blocking for r in close.open_runs())
+    return f"{closed} · {_n(exceptions, 'open exception')}."
+
+
+def _financial_statements(ctx) -> str:
+    from ledger.books import close, periods
+
+    last = periods.last_closed_month() if close.books_in_use() else None
+    if last:
+        return f"Final figures through {_month(last)}; later months are marked not closed."
+    return "Balance sheet by fund, income and expenses, budget against actual."
+
+
+def _books_accounts(ctx) -> str:
+    from ledger.books.models import BankAccountSetup
+
+    n = BankAccountSetup.objects.count()
+    return f"{_n(n, 'bank account')} in the books." if n else "No bank account in the books yet."
+
+
+def _books_coding(ctx) -> str:
+    from ledger.books import coding
+
+    n = len(coding.active_rules())
+    return f"{_n(n, 'rule')} coding bank lines by themselves." if n else "No coding rules yet."
+
+
+def _year_end(ctx) -> str:
+    from ledger.books.models import YearEndPackage
+
+    pkg = YearEndPackage.objects.order_by("-fiscal_year", "-id").first()
+    if pkg is None:
+        return "No year-end package built yet."
+    return f"Latest: fiscal year {pkg.fiscal_year}{' (year closed)' if pkg.year_closed else ''}."
+
+
+def _tax(ctx) -> str:
+    from ledger.books import periods, tax
+
+    year = periods.fiscal_year_of(ctx.today) - 1
+    return f"Form 1120-H for fiscal year {year} due {tax.filing_due(year):%b %-d, %Y}."
+
+
+def _special_assessments(ctx) -> str:
+    from ledger.models import SpecialAssessment
+
+    n = SpecialAssessment.objects.count()
+    return f"{_n(n, 'special assessment')} levied." if n else "None levied."
+
+
+def _payment_plans(ctx) -> str:
+    from ledger.models import PaymentPlan
+
+    n = PaymentPlan.objects.for_user(ctx.user).count()
+    return f"{_n(n, 'plan')} on record." if n else "No payment plans yet."
+
+
+def _interest(ctx) -> str:
+    from ledger import interest
+
+    policy = interest.current_policy()
+    if not policy.rate_bp:
+        return "No rate recorded: nothing is charged."
+    return f"{interest.monthly_rate_text(policy.rate_bp)} on balances past due."
+
+
+def _cashflow(ctx) -> str:
+    return "The next 12 months of operating and reserve cash, with what-ifs."
+
+
+def _reimbursements(ctx) -> str:
+    from operations.models_payouts import ReimbursementClaim
+
+    n = ReimbursementClaim.objects.for_user(ctx.user).count()
+    return f"{_n(n, 'claim')} on record." if n else "No claims yet."
+
+
+def _vendor_checks(ctx) -> str:
+    from operations.models_payouts import VendorCheck
+
+    n = VendorCheck.objects.count()
+    return f"{_n(n, 'check')} in the register." if n else "No checks written yet."
+
+
+def _vendors(ctx) -> str:
+    from operations.models import Vendor
+
+    active = Vendor.objects.filter(active=True).count()
+    line = f"{_n(active, 'active vendor')}."
+    try:
+        from operations.onboarding_models import OnboardingRound, RoundStatus
+
+        if features.enabled("vendor_onboarding", ctx.request):
+            waiting = OnboardingRound.objects.filter(status=RoundStatus.SUBMITTED).count()
+            line += f" {waiting} onboarding waiting for review." if waiting else ""
+    except ImportError:  # pragma: no cover - onboarding not installed
+        pass
+    return line
+
+
+def _capital_projects(ctx) -> str:
+    from operations.models_options import CapitalProject
+
+    n = CapitalProject.objects.exclude(state__in=["completed", "cancelled"]).count()
+    return f"{_n(n, 'project')} planned or under way." if n else "No open projects."
+
+
+def _insurance_claims(ctx) -> str:
+    from operations.models_options import InsuranceClaim
+
+    n = InsuranceClaim.objects.exclude(state__in=["closed", "denied", "paid"]).count()
+    return f"{_n(n, 'open claim')}." if n else "No open claims."
+
+
 @dataclass(frozen=True)
 class Card:
     group: str
-    label: str  # the page's <h1>
+    label: str  # the page's <h1> (or the section's heading, with an anchor)
     url_name: str
     icon: str
     permission: str
     figure: object  # callable(ctx) -> str
     # My items sidebar keys whose items wait on this page.
     counts: tuple[str, ...] = field(default=())
+    # A section of a page rather than a page of its own (Year-end package).
+    anchor: str = ""
 
 
-MONEY_IN, MONEY_OUT, BOOKS, PLANNING = "Money in", "Money out", "Books", "Planning"
-GROUPS = (MONEY_IN, MONEY_OUT, BOOKS, PLANNING)
+MONEY_IN, MONEY_OUT, BOOKS, PLANNING, YEAR_END = (
+    "Money in",
+    "Money out",
+    "Books",
+    "Planning",
+    "Year end and tax",
+)
+GROUPS = (MONEY_IN, MONEY_OUT, BOOKS, PLANNING, YEAR_END)
 
-# Every finance component. A later component (books, tax...) adds a card here.
+# Every finance component. A later component adds a card here (and, without a
+# menu entry of its own, its URL name to navigation.SUBPAGES["finance_overview"]).
 CARDS: tuple[Card, ...] = (
+    # Money in
     Card(
         MONEY_IN,
         "Owner accounts",
@@ -156,6 +293,25 @@ CARDS: tuple[Card, ...] = (
     ),
     Card(
         MONEY_IN,
+        "Payment plans",
+        "payment_plans",
+        "clock",
+        "finance.view",
+        _payment_plans,
+        ("payment_plans",),
+    ),
+    Card(
+        MONEY_IN,
+        "Special assessments",
+        "special_assessments",
+        "dollar",
+        "special_assessment.view",
+        _special_assessments,
+        ("special_assessments",),
+    ),
+    # Online payments holds the automatic payment reviews and failures (D47, D74).
+    Card(
+        MONEY_IN,
         "Online payments",
         "online_payments",
         "wallet",
@@ -165,21 +321,35 @@ CARDS: tuple[Card, ...] = (
     ),
     Card(
         MONEY_IN,
-        "Resale certificates",
-        "resales",
-        "file",
-        "resale.manage",
-        _resales,
-        ("resales",),
+        "Interest on overdue balances",
+        "interest",
+        "dollar",
+        "finance.view",
+        _interest,
+        ("interest",),
+    ),
+    Card(
+        MONEY_IN, "Resale certificates", "resales", "file", "resale.manage", _resales, ("resales",)
+    ),
+    # Money out
+    Card(MONEY_OUT, "Invoices", "invoices", "receipt", "finance.view", _invoices, ("invoices",)),
+    Card(
+        MONEY_OUT,
+        "Checks",
+        "vendor_checks",
+        "receipt",
+        "vendor_check.view",
+        _vendor_checks,
+        ("vendor_checks",),
     ),
     Card(
         MONEY_OUT,
-        "Invoices",
-        "invoices",
+        "Reimbursements",
+        "reimbursements",
         "receipt",
-        "finance.view",
-        _invoices,
-        ("invoices",),
+        "reimbursement.view_all",
+        _reimbursements,
+        ("reimbursements",),
     ),
     Card(
         MONEY_OUT,
@@ -190,42 +360,51 @@ CARDS: tuple[Card, ...] = (
         _disbursements,
         ("disbursements",),
     ),
+    Card(MONEY_OUT, "Vendors", "vendors", "users", "finance.view", _vendors, ("vendors",)),
+    # Books
     Card(
         BOOKS,
-        "Accounting",
-        "accounting",
-        "receipt",
-        "finance.view",
-        _accounting,
-        ("accounting",),
+        "Month and year close",
+        "books_close",
+        "check-circle",
+        "books.view",
+        _books_close,
+        ("books_close",),
     ),
     Card(
         BOOKS,
-        "Bank feed",
-        "bank_feed",
-        "activity",
-        "bank_feed.view",
-        _bank_feed,
-        ("bank_feed",),
+        "Bank accounts and funds",
+        "books_accounts",
+        "wallet",
+        "books.view",
+        _books_accounts,
+        ("books_accounts",),
     ),
     Card(
         BOOKS,
-        "Reports",
-        "reports",
+        "Bank categories and rules",
+        "books_coding",
+        "list",
+        "books.view",
+        _books_coding,
+        ("books_coding",),
+    ),
+    Card(
+        BOOKS,
+        "Financial statements",
+        "financial_statements",
         "chart",
-        "reports.view",
-        _reports,
-        ("reports",),
+        "statements.view",
+        _financial_statements,
+        ("financial_statements",),
     ),
     Card(
-        PLANNING,
-        "Budgets",
-        "budgets",
-        "chart",
-        "finance.view",
-        _budgets,
-        ("budgets",),
+        BOOKS, "Accounting", "accounting", "receipt", "finance.view", _accounting, ("accounting",)
     ),
+    Card(BOOKS, "Bank feed", "bank_feed", "activity", "bank_feed.view", _bank_feed, ("bank_feed",)),
+    Card(BOOKS, "Reports", "reports", "chart", "reports.view", _reports, ("reports",)),
+    # Planning
+    Card(PLANNING, "Budgets", "budgets", "chart", "finance.view", _budgets, ("budgets",)),
     Card(
         PLANNING,
         "Reserve plan",
@@ -235,8 +414,47 @@ CARDS: tuple[Card, ...] = (
         _reserve_plan,
         ("reserve_plan",),
     ),
+    Card(
+        PLANNING,
+        "Cash-flow forecast",
+        "cashflow",
+        "chart",
+        "finance.view",
+        _cashflow,
+        ("cashflow",),
+    ),
+    Card(
+        PLANNING,
+        "Capital projects",
+        "capital_projects",
+        "wrench",
+        "capital_project.view",
+        _capital_projects,
+        ("capital_projects",),
+    ),
+    Card(
+        PLANNING,
+        "Insurance claims",
+        "insurance_claims",
+        "shield",
+        "insurance.view",
+        _insurance_claims,
+        ("insurance_claims",),
+    ),
+    # Year end and tax
+    Card(
+        YEAR_END,
+        "Year-end package",
+        "financial_statements",
+        "file",
+        "books.package",
+        _year_end,
+        (),
+        anchor="#package",
+    ),
+    Card(YEAR_END, "Tax worksheet", "tax_worksheet", "file", "tax.view", _tax, ("tax_worksheet",)),
 )
-URL_NAMES = tuple(c.url_name for c in CARDS)
+URL_NAMES = tuple(dict.fromkeys(c.url_name for c in CARDS))
 
 
 def open_cards(groups: frozenset[str], request=None) -> list[Card]:
@@ -257,6 +475,7 @@ class _Context:
     def __init__(self, request):
         self.request = request
         self.user = request.user
+        self.today = timezone.localdate()
         self._balances = None
 
     def balances(self):
@@ -282,7 +501,7 @@ def build(request) -> dict:
             {
                 "group": card.group,
                 "label": card.label,
-                "url": reverse(card.url_name),
+                "url": reverse(card.url_name) + card.anchor,
                 "icon": card.icon,
                 "status": card.figure(ctx),
                 "count": card_count(card, counts),
@@ -304,6 +523,7 @@ def build(request) -> dict:
             },
         ]
     return {
+        **_fund_strip(request),
         "groups": [
             {"title": g, "cards": [r for r in rows if r["group"] == g]}
             for g in GROUPS
@@ -312,4 +532,25 @@ def build(request) -> dict:
         "tiles": tiles,
         "waiting": sum(r["count"] for r in rows),
         "today": timezone.localdate(),
+    }
+
+
+def _fund_strip(request) -> dict:
+    """Each fund's cash at the end of the last closed month, when the books
+    are set up (D69-D71): the same figures the forecast and the owners'
+    summary read (``closed_fund_positions``)."""
+    if not features.enabled("books", request) or not policy.can(request.user, "books.view"):
+        return {"funds": [], "funds_as_of": None}
+    from ledger.books import close, funds
+
+    found = close.closed_fund_positions()
+    if found is None:
+        return {"funds": [], "funds_as_of": None}
+    end, positions = found
+    return {
+        "funds": [
+            {"label": funds.FUND_LABELS.get(fund, fund), "cash": pos["cash"]}
+            for fund, pos in positions.items()
+        ],
+        "funds_as_of": end,
     }

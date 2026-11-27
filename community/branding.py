@@ -1,4 +1,4 @@
-"""Login page background: upload, re-encode, serve (no personal data)."""
+"""Login page background: upload, malware scan, re-encode, serve (no personal data)."""
 
 from __future__ import annotations
 
@@ -44,6 +44,31 @@ def _reencode(uploaded) -> tuple[bytes, str, int, int]:
         raise BrandingError("That picture could not be read. Try a JPEG or PNG.") from exc
 
 
+def scan(fileobj):  # a seam for tests, like documents.services.scan
+    from documents.scanning import scan as run
+
+    return run(fileobj)
+
+
+def _scan_gate(uploaded) -> None:
+    """The original upload passes the malware scan before Pillow decodes it
+    (D87): the same rule as every stored file (``scan_allows_download``), and
+    since the picture is shown without sign-in, nothing unscanned is kept
+    where scanning is required."""
+    from documents.models import ScanResult
+    from documents.services import scan_allows_download
+
+    uploaded.seek(0)
+    result, _scanner = scan(uploaded)
+    uploaded.seek(0)
+    if result == ScanResult.INFECTED:
+        raise BrandingError("The picture was flagged by the malware scanner and was not used.")
+    if not scan_allows_download(result):
+        raise BrandingError(
+            "The picture could not be checked for malware just now. Try again in a few minutes."
+        )
+
+
 def _variant(value: str) -> str:
     if value not in VARIANTS:
         raise BrandingError("Choose desktop or phone.")
@@ -61,6 +86,7 @@ def set_login_background(
         check_upload(uploaded, allowed={"jpg", "jpeg", "png"})
     except UploadRejected as exc:
         raise BrandingError(str(exc)) from exc
+    _scan_gate(uploaded)
     data, content_type, width, height = _reencode(uploaded)
     image = LoginBackground(
         variant=variant,

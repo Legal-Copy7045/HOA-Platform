@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Bank categories and rules · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "finance_overview" %}Bank categories and rules</nav>
+  <div class="page-head"><div><h1>Bank categories and rules</h1>
+    <p class="subtitle">Money that passes through no owner account and no invoice (bank interest, bank fees, insurance or utilities paid by bank debit, transfers between the association's accounts) enters the books when its bank line is coded to a category. Rules code new lines by themselves; deposits, payouts and checks are matched on the Bank feed instead.</p></div></div>
+  <div class="split">
+    <div>
+      {% if suggestions and can_rules %}<section class="card"><h2>Suggested rules</h2><ul class="list">{% for s in suggestions %}<li><span class="grow">“{{ s.contains }}” ({% if s.sign == "in" %}money in{% else %}money out{% endif %}) → {{ s.category }} <span class="small muted">coded {{ s.count }} times by hand</span></span>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="rule"><input type="hidden" name="contains" value="{{ s.contains }}"><input type="hidden" name="sign" value="{{ s.sign }}"><input type="hidden" name="category" value="{{ s.category_id }}"><input type="hidden" name="name" value="{{ s.contains|title }}"><button type="submit" class="small">{% for_board "Make it a rule" %}</button></form></li>{% endfor %}</ul></section>{% endif %}
+      <section class="card"><h2>Lines waiting</h2>
+        {% if waiting %}<ul class="list">{% for line in waiting %}<li><div class="grow"><strong>{{ line.posted_on|short_date }}</strong> · {{ line.description|default:"(no description)" }} · {{ line.amount_cents|cents }}<br><span class="small muted">{{ line.connection.label }}</span>
+          {% if can_code %}<form method="post" action="{% url 'books_action' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="action" value="code"><input type="hidden" name="next" value="coding"><input type="hidden" name="line" value="{{ line.pk }}"><select name="category" aria-label="Category">{% for k in categories %}{% if k.active %}<option value="{{ k.pk }}">{{ k.name }}</option>{% endif %}{% endfor %}</select>{% if can_rules %}<label class="small"><input type="checkbox" name="make_rule" value="1"> and lines like it</label>{% endif %}<button type="submit" class="small">Code</button></form>{% endif %}</div></li>{% endfor %}</ul>
+        {% else %}<p class="small muted">Nothing waiting: every line is matched or coded.</p>{% endif %}</section>
+      <section class="card"><h2>Recently coded</h2>
+        {% if recent %}<ul class="list">{% for g in recent %}<li><span class="grow small">{{ g.posted_on|short_date }} · {{ g.transaction.description|default:"(no description)" }} → {{ g.category.name }}{% if g.reverses_id %} (undone){% endif %} · {% if g.rule_id %}rule #{{ g.rule_id }}{% else %}by hand{% endif %}{% if g.reference %} · {{ g.reference }}{% endif %}</span><span>{{ g.amount_cents|cents }}</span>
+          {% if can_code and not g.reverses_id %}<form method="post" action="{% url 'books_action' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="action" value="uncode"><input type="hidden" name="next" value="coding"><input type="hidden" name="entry" value="{{ g.pk }}"><input name="reason" maxlength="200" placeholder="Why" aria-label="Why undo" required><button type="submit" class="small secondary">Undo</button></form>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="small muted">None yet.</p>{% endif %}</section>
+    </div>
+    <div>
+      <section class="card"><h2>Rules</h2>
+        {% if rules %}<ul class="list">{% for r in rules %}<li><span class="grow">{% if not r.active %}<s>{% endif %}#{{ r.pk }} “{{ r.contains }}” · {{ r.get_sign_display }}{% if r.connection %} · {{ r.connection.label }}{% endif %} → {{ r.category.name }}{% if not r.active %}</s> <span class="small muted">ended</span>{% endif %}</span>
+          {% if can_rules and r.active %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="end_rule"><input type="hidden" name="rule" value="{{ r.pk }}"><button type="submit" class="small secondary">End</button></form>{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="small muted">No rules yet.</p>{% endif %}
+        {% if can_rules %}<details><summary>New rule</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="rule">
+          <div class="field"><label for="rc">The bank's description contains</label><input id="rc" name="contains" maxlength="80" required placeholder="INTEREST"></div>
+          <div class="field"><label for="rs">Money</label><select id="rs" name="sign">{% for v, l in signs %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="rk">Category</label><select id="rk" name="category">{% for k in categories %}{% if k.active %}<option value="{{ k.pk }}">{{ k.name }}</option>{% endif %}{% endfor %}</select></div>
+          <div class="field"><label for="ra">Only this account</label><select id="ra" name="connection"><option value="">Any account</option>{% for c in connections %}<option value="{{ c.pk }}">{{ c.label }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="rn">Name</label><input id="rn" name="name" maxlength="80"></div>
+          <div class="form-actions"><button type="submit">{% for_board "Save rule" %}</button></div></form></details>{% endif %}
+      </section>
+      <section class="card"><h2>Categories</h2>
+        <ul class="list">{% for k in categories %}<li><span class="grow">{{ k.name }} <span class="small muted">{{ k.account }} · {{ k.get_kind_display }}{% if k.fund %} · {{ k.get_fund_display }}{% endif %}{% if k.exempt_function %} · member income{% endif %}{% if not k.active %} · off{% endif %}</span></span></li>{% endfor %}</ul>
+        {% if can_setup %}<details><summary>New category</summary><form method="post">{% csrf_token %}<input type="hidden" name="action" value="category">
+          <div class="field"><label for="cn">Name</label><input id="cn" name="name" maxlength="80" required></div>
+          <div class="field"><label for="ca">Chart account (number and name)</label><input id="ca" name="account" maxlength="80" required placeholder="6250 Postage"></div>
+          <div class="field"><label for="ck">Kind</label><select id="ck" name="kind">{% for v, l in kinds %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="cf">Fund</label><select id="cf" name="fund"><option value="">The bank account's fund</option>{% for v, l in funds %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+          <label class="small"><input type="checkbox" name="exempt_function" value="1"> Income from owners as members (Form 1120-H exempt-function income)</label>
+          <div class="form-actions"><button type="submit" class="secondary">{% for_board "Save category" %}</button></div></form></details>{% endif %}
+      </section>
+    </div>
+  </div>
+{% endblock %}

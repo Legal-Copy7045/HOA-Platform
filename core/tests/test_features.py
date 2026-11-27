@@ -30,6 +30,14 @@ OFF_BY_DEFAULT = {
     "autopay",
     "usps_tracking",
     "bounce_tracking",
+    "vendor_onboarding",
+    # Finance options (D80-D85)
+    "overdue_interest",
+    "cashflow_forecast",
+    "collections_legal",
+    "capital_projects",
+    "owner_finance_dashboard",
+    "insurance_claims",
 }
 
 

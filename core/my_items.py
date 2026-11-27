@@ -530,6 +530,10 @@ def items_for(user) -> list[Item]:
         from documents import retention
 
         out.extend(retention.my_items(user, today))
+    # Vendor onboarding (D79): reviews, expired links, older vendors to complete.
+    from operations.vendor_onboarding import my_items as vendor_onboarding_items
+
+    out.extend(vendor_onboarding_items(user))
     # Recurring deadlines (Board tasks tab): hidden with the "compliance" feature.
     from core.features import enabled as feature_on
 
@@ -663,6 +667,27 @@ def items_for(user) -> list[Item]:
         from ledger.disbursements import board_items
 
         out.extend(board_items(user))
+    # Books and close (D70): exceptions, second agreements and reopens.
+    if can(user, "books.code") or can(user, "books.close"):
+        from ledger.books.close import board_items as books_items
+
+        out.extend(books_items(user))
+    # Finance gaps (D75-D77): special assessment notices, payment plans to
+    # approve or with a missed installment, reimbursements to approve or pay.
+    from core import features as _features
+
+    if _features.enabled("special_assessments"):
+        from ledger.special_assessments import board_items as sa_items
+
+        out.extend(sa_items(user))
+    if _features.enabled("payment_plans") and can(user, "collections.manage"):
+        from ledger.payment_plans import board_items as plan_items
+
+        out.extend(plan_items(user))
+    if _features.enabled("reimbursements"):
+        from operations.reimbursements import board_items as claim_items
+
+        out.extend(claim_items(user))
     # Entries moved between ownership accounts, to check (fixres BUG-003).
     if can(user, "ledger.manage"):
         from ledger.models import EntryMoveNotice
@@ -977,6 +1002,17 @@ def items_for(user) -> list[Item]:
         out.extend(_paper_mail_items())
     if can(user, "ledger.view_own"):
         out.extend(_balance_items(user, roles))
+    # D76, D77: the owner's payment plan; the claimant's own reimbursements.
+    from core import features as _feat
+
+    if _feat.enabled("payment_plans") and can(user, "payment_plan.acknowledge"):
+        from ledger.payment_plans import owner_items as plan_owner_items
+
+        out.extend(plan_owner_items(user))
+    if _feat.enabled("reimbursements"):
+        from operations.reimbursements import claimant_items
+
+        out.extend(claimant_items(user))
     out.extend(_contact_items(user, roles))
     out.extend(_signin_items(user))
     # Getting started (D73): one entry for the steps nothing above asks for.
@@ -992,12 +1028,40 @@ def items_for(user) -> list[Item]:
 
         out.extend(payer_items(user))
 
+    # Finance options (D81-D85): each module's own items, only with its
+    # feature on (the path check below hides them too).
+    out.extend(_finance_option_items(user))
+
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
     from core import features
 
     states = features.states()  # one query, not one per item (optimization A9)
     return [i for i in out if features.path_enabled(i.url, states_=states)]
+
+
+def _finance_option_items(user) -> list[Item]:
+    from core import features
+
+    out: list[Item] = []
+    on = features.states()  # one query for all four
+    if on.get("cashflow_forecast"):
+        from ledger import cashflow
+
+        out.extend(cashflow.my_items(user))
+    if on.get("collections_legal"):
+        from ledger import legal
+
+        out.extend(legal.my_items(user))
+    if on.get("capital_projects"):
+        from operations import capital_projects
+
+        out.extend(capital_projects.my_items(user))
+    if on.get("insurance_claims"):
+        from operations import insurance_claims
+
+        out.extend(insurance_claims.my_items(user))
+    return out
 
 
 def _paper_mail_items() -> list[Item]:

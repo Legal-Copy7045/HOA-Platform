@@ -383,7 +383,7 @@ def test_collection_case_on_own_account(client, w):
     assert BADGE not in page and "your own home's collection case" in page
     assert reverse("collection_letter", args=[case.pk]) not in page
     assert reverse("collection_notice_pdf", args=[case.pk, "first"]) not in page
-    ledger.COLLECTION.apply(case, "payment_plan", actor=w["board2"], note="6 months")
+    ledger.COLLECTION.apply(case, "send_reminder", actor=w["board2"], note="First reminder")
 
 
 # --- 10. Ledger entries -----------------------------------------------------------------------

@@ -232,6 +232,21 @@ class Invoice(models.Model):
     def delete(self, *args, **kwargs):
         raise PermissionError("Invoices are voided, not deleted.")
 
+    conflict_noun = "vendor's invoice"
+
+    def conflict_of_interest(self, user) -> bool:
+        """D79: a board member the vendor's conflict disclosure names may not
+        approve, pay or otherwise advance its invoices (core.conflicts)."""
+        from operations.vendor_onboarding import person_conflicted
+
+        return person_conflicted(user, self.vendor_id)
+
+    def conflict_message(self, actor) -> str:
+        return (
+            "You are named in this vendor's conflict-of-interest disclosure: another board "
+            "member handles its invoices."
+        )
+
 
 class ApprovalDecision(models.TextChoices):
     APPROVE = "approve", "Approve"
@@ -456,3 +471,27 @@ class ComplianceItem(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Compliance items are retired, not deleted.")
+
+
+# Finance options (D83 capital projects, D85 insurance claims): their models
+# live in their own module; imported here so Django registers them.
+from operations.models_options import (  # noqa: E402, F401
+    CapitalProject,
+    CapitalProjectApproval,
+    CapitalProjectEvent,
+    CapitalProjectLink,
+    ChangeOrder,
+    ChangeOrderDecision,
+    InsuranceClaim,
+    InsuranceClaimEvent,
+    InsuranceMoney,
+    SettlementApproval,
+    SettlementOffer,
+)
+
+# Expense reimbursements and vendor checks (D77): their own module, so the
+# models merge cleanly with other operations work.
+from operations.models_payouts import *  # noqa: E402, F403
+
+# --- Vendor onboarding (D79): models in their own module -----------------------------
+from operations.onboarding_models import *  # noqa: E402, F403

@@ -141,6 +141,12 @@ def seed() -> SeedResult:
     __import__("core.demo_monitoring", fromlist=["seed"]).seed()  # D74 monitoring demo data
 
     call_command("seed_demo_help", stdout=io.StringIO())  # D73: help pages, checklist progress
+    # Finance gaps before the books close any month (D75-D78 demo records).
+    __import__("ledger.demo_finance_gaps").demo_finance_gaps.seed()
+    call_command("seed_demo_books", stdout=io.StringIO())  # books and close (D69-D71)
+    from ledger import demo_finance_options  # finance options (D80-D85)
+
+    demo_finance_options.seed()
     return SeedResult(
         summary=(
             "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "

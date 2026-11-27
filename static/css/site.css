@@ -665,6 +665,10 @@ tr.row-link:hover .row-main { text-decoration: underline; }
     min-height: 44px; display: flex; align-items: center; gap: .6rem; }
   input[type=checkbox], input[type=radio] { width: 22px; height: 22px; flex: none; }
   .wf-action.is-blocked button { min-height: 44px; }
+  /* Help links ("How this works", "Help: how it all works") are tap targets too. */
+  .how-link, .form-actions > a.small, .crumbs a { display: inline-flex; align-items: center; min-height: 44px; }
+  .filters a, .subnav a { min-width: 44px; justify-content: center; }
+  button.small { min-height: 44px; }
   /* Two summary tiles per row, not one (WT-042). */
   .grid-3:has(> .stat), .grid-4:has(> .stat), .grid-2:has(> .stat) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
   .grid:has(> .stat) > .stat:only-child { grid-column: 1 / -1; }
@@ -848,3 +852,6 @@ li.activity-row .activity-details > summary { display: inline-flex; align-items:
 table.diff td { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
 table.diff tr.diff-replace .diff-old, table.diff tr.diff-delete .diff-old { background: var(--danger-bg); }
 table.diff tr.diff-replace .diff-new, table.diff tr.diff-insert .diff-new { background: var(--success-bg); }
+
+/* Finance options (D84): bars on the owners finance summary. */
+meter.bar { width: 100%; max-width: 16rem; height: 1rem; vertical-align: middle; }

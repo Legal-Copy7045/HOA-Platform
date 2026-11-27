@@ -738,7 +738,10 @@ with `manage.py check_teller`, and offers to delete the copied files.
 trying it with fake banks; `production` is Teller's paid tier).
 `BANK_FEED_TOKEN_KEY` encrypts the stored access key: it is generated once and
 must never change (a new key means reconnecting the bank). Keep a copy in the
-password manager. To undo: `cp .env.before-teller .env` and restart.
+password manager. While the check runs the old file is kept as
+`.env.before-teller` (mode 600); a failed check says how to put it back, and a
+passed check removes it (it holds the old keys, D87). To change it, run the
+script again.
 
 **3. Connect.** A board member: Admin -> Settings -> Features, switch on
 **Bank feed**. Then Finance -> Accounting -> Bank feed -> **Connect a bank**
@@ -836,7 +839,9 @@ items.
    N (debit card)"; refund it in the Stripe dashboard and the portal closes
    the item when it sees the refund.)
 3. On the VM, put the key in `.env` (hidden prompt; never paste a key into a
-   chat, ticket or the repository):
+   chat, ticket or the repository). Only a restricted key (`rk_...`) is
+   accepted: the script and the portal refuse a full secret key (`sk_...`)
+   everywhere (D87), and `check_stripe` says so:
 
    ```bash
    sudo bash /opt/hoa-portal/infra/poc/set-stripe-key.sh
@@ -992,6 +997,36 @@ Finance → Disbursements pays money back to owners: a **surplus distribution** 
 
 **For counsel before the first surplus distribution:** 68 Pa.C.S. § 5313 (surplus funds) applies unless the Declaration provides otherwise; confirm what the Declaration says, whether reserve funds may be treated as surplus, and record the citation on the rule in Community settings.
 
+## Treasurer's guide: special assessments, payment plans, reimbursements, checks, next year's budget (D75-D78)
+
+The association is self-managed, so these are the treasurer's (and the board's) steps. Each opens from Finance → Finance overview unless noted.
+
+**Special assessment** (Special assessments → Levy a special assessment)
+1. Adopt the board resolution first (Resolutions and policies, or note its reference). If the total is above the Declaration's limit (Community setup → "Special assessments, payment plans and reimbursements"), hold the owners' vote first and link it.
+2. Levy: title, purpose, total, fund (operating or reserve), number of installments, first due date and spacing. Equal shares per home unless the community's rule says otherwise.
+3. Send the owner notice from the special assessment's page (email at once to owners who accepted email; prepare paper copies on Paper mail for the rest).
+4. Installments post by themselves each morning on their due dates; "Post installments due now" does it at once. To stop future installments, use "Cancel future installments" with the reason; a posted charge is corrected only by a reversal on the home's account.
+
+**Payment plan** (from the home's collection case → Set up payment plan)
+1. The plan covers what is open on the home's account today. Enter the number of monthly installments and the first due date, or type your own schedule (one line per installment: `2027-01-15 150.00`).
+2. Another board member approves it (Payment plans, or My items); the case then shows "Payment plan agreed". Download the agreement letter, mail it, and ask the owner to agree on My account or sign and return the letter.
+3. Missed installments show on My items; after the default period the plan ends by itself and the case returns to its earlier step (letters and late fees resume). A paid-off plan closes the case.
+
+**Expense reimbursement** (anyone who paid an association expense: My reimbursements, or My account → Claim an expense)
+1. Submit the amount, date, shop, category and description with the receipt.
+2. A board member other than the claimant approves (two above the set limit). Nobody approves or pays their own claim; a board member's claim is paid by another board member, never the manager.
+3. Pay by check from Checks, or "Record bank transfer" with the transfer's reference (never account numbers).
+
+**Checks** (Checks)
+1. Tick the approved invoices and reimbursements to pay; print them on the check stock ("Print checks (PDF)", 100% scale). Test the alignment first with Disbursements → Check printing → alignment page on plain paper; the positions are shared with refund checks.
+2. Sign and mail, then "Record as issued" with the first check number on the stock: each invoice is recorded as paid by its check. A number is used once across all the association's checks.
+3. When the bank statement shows the check, mark it Cleared (the bank feed line is suggested when there is one). A lost or wrong check is voided by a board member; the invoice is open again.
+
+**Next year's budget** (Budgets → Start next year's budget)
+1. Choose what each line starts from (this year's budget, actual spending, or the higher), any increase, and whether to use the adopted reserve plan's contribution.
+2. Check the draft on "Budget compared": last year's budget, actuals and the new figures, with the monthly charge per home (rounded up as the board's rule says) and the change.
+3. Edit lines on the budget page, send the proposed budget to owners, adopt it, then send the adopted notice and set the new monthly amount in Community settings.
+
 ## Server tasks (D36)
 
 Reusable host operations are started in the portal, not in a terminal:
@@ -1078,7 +1113,7 @@ With USPS tracking on, the portal reads USPS scans of barcoded paper mail itself
    sudo bash /opt/hoa-portal/infra/poc/set-usps.sh
    ```
 
-   Choose `cat` (the default) or `production`, type the BCG user name and the password (hidden). The script saves them in `.env` (a copy of the old file is kept as `.env.before-usps`), restarts the portal and signs in once with `manage.py check_usps_iv` (no mail is looked up). It prints `OK: signed in to ...` or what failed. To undo: `cp .env.before-usps .env && sudo bash infra/poc/start-portal.sh`. When CAT works, run it again with `production`.
+   Choose `cat` (the default) or `production`, type the BCG user name and the password (hidden). The script saves them in `.env` (the old file is kept as `.env.before-usps`, mode 600, until the check passes, then removed, D87), restarts the portal and signs in once with `manage.py check_usps_iv` in the worker container, the only one given the password (no mail is looked up). It prints `OK: signed in to ...` or what failed; a failed check says how to put the old file back. To change the login, run it again. When CAT works, run it again with `production`.
 4. **Switch it on:** Admin → Features → USPS tracking. Settings → Paper mail settings then shows "Connected to the USPS test environment (CAT)" (or "Connected to USPS Informed Visibility") and when it last checked. The tracking barcode must be on for the mailing: only letters printed with it can be followed.
 
 **What the statuses mean** (mailing page, USPS tracking card):
@@ -1127,10 +1162,11 @@ that bounced, until a mailing for that home is prepared or someone presses
    It asks the IMAP host (e.g. `imap.example.org`), the port (993), the user
    name, the folder (INBOX), the optional envelope sender and the password
    (hidden), saves them in `.env` (the old file is kept as
-   `.env.before-bounce-mailbox`), restarts the portal and signs in once with
+   `.env.before-bounce-mailbox`, mode 600, until the check passes, then
+   removed, D87), restarts the portal and signs in once with
    `manage.py check_bounce_mailbox` (no message is read). It prints
-   `OK: signed in to ...` or what failed. To undo:
-   `cp .env.before-bounce-mailbox .env && sudo bash infra/poc/start-portal.sh`.
+   `OK: signed in to ...` or what failed; a failed check says how to put the
+   old file back. To change the mailbox, run it again.
 4. **Switch it on:** Admin → Features → Bounced email. System status then has a
    "Bounce mailbox" check (last read, hard bounces in the last 7 days), and the
    Community setup's server step shows it as set up.
@@ -1156,4 +1192,40 @@ two hours without a successful read does.
 if the next email bounces too, it shows again. For a bounced official notice,
 use "Prepare the letter" on Paper mail (it prepares a letter for that one home,
 whatever their email choice) and mark the mailing as mailed as usual.
+
+
+## Month-end and year-end close (D70, D71)
+
+**What happens by itself.** Every day the portal codes new bank lines by the board's rules, confirms bank matches that can only be one thing, and from the close day (rule `books.close_day`, the 3rd) checks last month. If every bank line is matched or coded, every account's balance at month end is known and reconciles, the month's assessments and late fees are posted (or waived), no payment waits to be deposited, the Stripe payouts are matched, transfers have both sides and no fund is below zero, the month closes by itself. Once a fiscal year's twelve months are closed the year closes too, the tax filings are put on Recurring deadlines and the year-end package is built.
+
+**First time.** Accounting → Setup: the opening date (the books start the next day). Finance overview → Bank accounts and funds: each account's fund (operating, reserve), chart account and balance on that date; tick the primary operating account. Finance overview → Bank categories and rules: check the categories, add rules for lines that repeat ("INTEREST" → Interest income, "SERVICE CHARGE" → Bank fees, "TRANSFER TO SAVINGS" money out and "TRANSFER FROM CHECKING" money in → Transfer between the association's accounts).
+
+**When My items says "<Month> books: N exceptions".** Open Finance → Month and year close. What each means:
+- *A bank line is not matched or coded*: code it to a category (tick "lines like this" to make a rule), or match it on the Bank feed (a deposit, payout or check).
+- *Enter the balance on <date>*: the bank did not report a month-end balance. Import the month's OFX/QFX file (it carries the ledger balance) or type the statement's ending balance.
+- *Off by $X*: usually a missing bank line, a wrong opening balance or an item matched to the wrong account. If it is genuinely right (a bank error corrected next month), explain it; another board member must agree.
+- *No late fee*: post the month's late fees, or waive one with the reason (a board decision; never your own home).
+- *Payment waiting to be deposited*: record the deposit on Accounting.
+- *Payout not matched or not arrived*: match it on the Bank feed; one Stripe has not paid yet stays until it arrives.
+- *Transfer with no matching line*: code the other account's line as a transfer too; a transfer in transit at month end can be explained.
+- *Fund below zero*: money was spent from the wrong fund or an entry is missing.
+- Warnings (stale checks, reserve contribution short) never stop the close.
+
+**Mistakes in a closed month.** Post the correction in the open month (coding a line again, a reversal): the portal adds the reference to the original date. Reopening needs a board member's request and a different board member's approval; only the latest closed month, and only while its year is open.
+
+**Year end.** Finance → Financial statements → the fiscal year: the statements (PDF, CSV) and the year-end package. The package's manifest.json is signed with `BOOKS_PACKAGE_KEY` (set it in the server's .env and keep a copy with the treasurer's records); on the server `python manage.py verify_books_package <file.zip>` checks it; elsewhere use the snippet in the package's README.txt with the key. Finance overview → Tax worksheet: Form 1120-H line by line with the 60%/90% tests, the 1099 IRIS upload (add each vendor's TIN from the W-9 in IRIS; the portal keeps none) and recipient copies. Nothing is filed by the portal; the preparer confirms the form and the figures.
+
+## Vendor onboarding (D79)
+
+**Key set-up (sysadmin, once, on the VM).** `sudo bash infra/poc/set-vendor-key.sh` makes the vendor document key on the server (nothing to type), saves it in `.env`, restarts the portal and runs `manage.py check_vendor_key`. Then copy the key into the HOA's password manager (`sudo grep -E '^VENDOR_DOCUMENT_KEY' /opt/hoa-portal/.env`) and `shred` the `.env.before-vendor-key` copy the script names. Keep that copy apart from the backups: the backups hold the encrypted documents only. The setup wizard's server step shows "Vendor document key: Set up".
+
+**Rotating the key.** `sudo bash infra/poc/set-vendor-key.sh --rotate` keeps the old key in `VENDOR_DOCUMENT_KEY_FALLBACKS`, makes a new one and re-encrypts every stored document; `check_vendor_key` then reports "0 under an old key". Remove the fallback only after that, and store the new key in the password manager. A restore needs the key that was current when the backup was taken (or the fallbacks).
+
+**Switching it on.** Admin → Features → Vendor onboarding (or the Vendors step of Community setup, where the link life, insurance minimums and W-9 retention are set with citations). Finance → Vendors → Vendor requirements and terms: the board ticks what each kind of vendor provides (with a citation) and edits the terms.
+
+**Sending a link (board or manager).** Finance → Vendors → Vendor onboarding → Invite a vendor: name, email, services and kind of work. The vendor is created inactive and gets an email with the link (it works until it expires or they submit). "Send a new link" on the request ends the old one. For a vendor added before onboarding, open its Onboarding record → Complete onboarding; for an expired certificate or a new W-9, Ask for updated documents (the link shows only those items).
+
+**Reviewing (board).** My items lists "Review vendor onboarding: <vendor>". Check the answers, the warnings (insurance below the minimum, expired certificates), the documents (W-9s open for board members only; every view is logged) and any conflict disclosure; link anyone it names (they cannot approve the vendor or its invoices). Approve, Return to the vendor (say what to change: they get a new link), or Decline. Two different board members approve; the one who sent the link does not. Until then the vendor's invoices cannot be approved or paid.
+
+**W-9 retention.** My items shows "W-9s past retention" when any are due; Finance → Vendors → W-9 retention: one board member proposes disposal, a different one confirms.
 

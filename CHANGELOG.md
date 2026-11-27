@@ -6,6 +6,51 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.41.0 — 2026-11-27
+
+Fixes from the full check (D87):
+
+- A board member who sold their home, or a co-owner removed from a deed, can
+  no longer post, move, reverse or refund money on the account they were on.
+- A co-owner removed from a deed no longer sees checks written after they left.
+- Architectural review recusal now covers tenants and contacts of the
+  neighbouring homes a request affects, and whoever owned them at the time.
+- A candidate cannot open, extend or close their own election.
+- Account recovery: "still waiting" emails at most once a day; statement and
+  digest emails cannot be switched off during the lock afterwards.
+- Online payments accept only a restricted Stripe key (rk_...): if the POC
+  uses a full key, run set-stripe-key.sh again with a restricted one.
+- The server refuses a database role with superuser rights; text messages
+  refuse redirects; the sign-in picture is malware-scanned; the USPS password
+  reaches only the worker; key scripts remove their .env backup copies.
+- Rebuilding payment matching after "Move to account" now gives the same
+  balances.
+
+## 0.40.0 — 2026-11-27
+
+The portal is now the association's books (self-managed, D69-D85):
+
+- Books and automatic close (D69-D71): operating and reserve funds across the
+  association's bank accounts, bank lines coded by rules (interest, fees,
+  insurance, transfers...), and months that close themselves when everything
+  balances; anything that does not becomes an exception for the treasurer on
+  My items. Closed months are locked; reopening takes two board members. The
+  year closes itself too, with financial statements, the annual accounting
+  figure, a Form 1120-H worksheet, 1099 files (no tax ID numbers stored), PA
+  filing deadlines and a signed year-end package with a treasurer handover
+  sheet. Optional QuickBooks Online export.
+- Special assessments, payment plans with schedules, expense reimbursements,
+  vendor check printing and next year's budget pre-filled from this year
+  (D75-D78).
+- Optional features, all off until the board switches them on: interest on
+  overdue balances, a 12-month cash-flow forecast, liens and legal steps in
+  collections, capital projects, an owners' operating-vs-reserve and
+  budget-vs-actual summary, insurance claims (D80-D85).
+- Vendor onboarding (D79): a single-use link where a vendor fills in their
+  details, W-9 and insurance certificate (encrypted in the portal; key set on
+  the server with set-vendor-key.sh), reviewed by two board members before
+  any invoice can be paid.
+
 ## 0.39.0 — 2026-11-27
 
 - Renewals (D72, Maintenance → Renewals): the association's insurance

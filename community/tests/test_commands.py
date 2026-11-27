@@ -210,6 +210,18 @@ def test_web_and_worker_refuse_to_run_as_the_database_owner(settings):
     call_command("check_db_role")  # single-role databases are allowed to skip
 
 
+def test_check_db_role_refuses_a_powerful_runtime_role(settings):
+    """D87 (SEC-006): a superuser, BYPASSRLS, CREATEROLE or CREATEDB runtime
+    role is refused. The test connection (the owner role) has CREATEDB."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_user")
+        settings.DB_APP_ROLE = cursor.fetchone()[0]
+    with pytest.raises(CommandError, match="CREATEDB"):
+        call_command("check_db_role")
+
+
 def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
     """The whole demo community renders on every board and owner page."""
     from django.urls import reverse
@@ -219,7 +231,9 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
 
     settings.SEED_DEMO_ALLOWED = True
     run("seed_demo")
-    assert Vendor.objects.count() == 8  # demo states (4) + documents/demo_renewals.py (4, D72)
+    # demo states (4) + documents/demo_renewals.py (4, D72) + the D77 demo
+    # vendor and reimbursement payee (ledger/demo_finance_gaps.py)
+    assert Vendor.objects.count() == 10
     assert Invoice.objects.filter(state="paid").exists()
     with system_access("t"):
         assert LedgerEntry.objects.filter(kind="assessment").exists()

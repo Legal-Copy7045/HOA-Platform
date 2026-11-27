@@ -97,8 +97,10 @@ COMMUNITY = [
 ]
 CONTACT_HOME = ["My home", "My account", "Notices about my home", "My requests"]
 NOT_BUDGET = [c for c in COMMUNITY if c != "Budget and reserves"]
-# Budgets, Reserve plan, Online payments, Disbursements and Resale
-# certificates open from the Finance overview (D89).
+# Budgets, Month and year close, Financial statements and the old More
+# finance pages open from the Finance overview (D89).
+
+
 FINANCE = [
     # The Finance overview first (D89); Budgets and the old More finance
     # pages open from it.
@@ -128,7 +130,8 @@ MENUS = {
     "former_owner": {"": ["Dashboard"], "My history": ["My history"]},
     "board": {
         "": ["Dashboard", "My items", "Help"],
-        "My home": MY_HOME,
+        # D77: board and committee members' own expense claims.
+        "My home": [*MY_HOME, "My reimbursements"],
         "Community": COMMUNITY,
         "Association": [
             "Owner requests",

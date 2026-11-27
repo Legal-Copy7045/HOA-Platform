@@ -250,6 +250,19 @@ SUBPAGES = {
         "online_payments",
         "disbursements",
         "resales",
+        # The old More finance pages of 0.40.0 (D69-D81).
+        "books_close",
+        "financial_statements",
+        "books_accounts",
+        "books_coding",
+        "tax_worksheet",
+        "year_end_package",
+        "special_assessments",
+        "payment_plans",
+        "reimbursements",
+        "vendor_checks",
+        "interest",
+        "cashflow",
     ],
 }
 
@@ -285,6 +298,8 @@ SECTIONS = [
             ("My requests", "requests?mine=1", "mail", ("lot.view_own", "request.submit")),
             ("My records requests", "records_requests?mine=1", "inbox", "records_request.submit"),
             ("My history", "my_history", "clock", "history.view_own"),
+            # Expense reimbursements (D77): one's own claims.
+            ("My reimbursements", "reimbursements?mine=1", "receipt", "reimbursement.menu"),
         ],
     ),
     (
@@ -297,6 +312,8 @@ SECTIONS = [
             ("Documents", "documents", "folder", "document.view_owner"),
             ("Resolutions and policies", "resolutions", "file", "resolution.view"),
             ("Budget and reserves", "owner_budget", "chart", "budget.view_owner"),
+            # Capital projects the board shares with owners (D83).
+            ("Community projects", "community_projects", "wrench", "capital_project.view_summary"),
             ("Community info", "community_info", "info", HUB),
             ("Common area bookings", "reservations", "calendar", "reservation.view"),
         ],
@@ -324,6 +341,9 @@ SECTIONS = [
             ("Contracts", "contracts", "file", "finance.view"),
             # Insurance, vendor certificates and contract deadlines (D72).
             ("Renewals", "renewals", "shield", "renewals.view"),
+            # Finance options (D83, D85): optional features, off by default.
+            ("Capital projects", "capital_projects", "wrench", "capital_project.view"),
+            ("Insurance claims", "insurance_claims", "shield", "insurance.view"),
         ],
     ),
     (

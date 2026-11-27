@@ -34,7 +34,7 @@ const WIDTHS = {
 };
 // Downloads (with or without a query string) are not pages; same list as pages.js.
 // /help/ask/ is the "Ask the board" shortcut: it forwards to a new owner request by design (D73).
-const SKIP = [/logout/, /\/help\/ask\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
+const SKIP = [/logout/, /\/help\/ask\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=(csv|pdf)/, /\/disbursements\/\d+\/register\//, /download/, /\/files?\//, /\/letters?\//, /statement/,
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 // Downloads checked as downloads (expect a file, not a page): the meeting
 // packet .zip (WT-003, WT-042).
@@ -106,7 +106,8 @@ function readPage() {
   const buttons = uniq([...main.querySelectorAll('.page-actions a, .page-actions button, a.btn, button, input[type=submit]')]
     .map((b) => clean(b) || b.value || b.getAttribute('aria-label'))).slice(0, 40);
   const links = [...main.querySelectorAll('a[href]')];
-  const tiles = [...main.querySelectorAll('ul.tiles a.tile')].map((a) => ({
+  // Hub tiles only: Welcome's tiles introduce pages that are also in the menu.
+  const tiles = [...main.querySelectorAll('ul.tiles:not(.welcome-tiles) a.tile')].map((a) => ({
     label: clean(a.querySelector('strong')), href: a.getAttribute('href'), text: clean(a.querySelector('span')),
   }));
   return {

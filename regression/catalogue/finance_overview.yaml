@@ -1,7 +1,7 @@
 # Finance overview and counts on every hub tile (D89).
 - feature: "Finance overview: a card per finance component with status, own count and link; role-scoped; bounded queries; replaces More finance"
   since: "0.41"
-  match: ["^unit:core/tests/test_finance_overview.py::test_(overview_|finance_menu|switched_off|card_labels)", "^unit:core/tests/test_nav_streamline.py::test_(sidebar_for_every_role|board_menu_has_every_section|online_payments_only)", "^unit:core/tests/test_board_cues.py::test_more_finance_hub", "^unit:ledger/tests/test_reserve_plan.py::test_reserve_plan_is_in_the_finance_menu", "^unit:core/tests/test_url_matrix.py::.*\\[finance_overview\\]"]
+  match: ["^unit:core/tests/test_finance_overview.py::test_(overview_|finance_menu|switched_off|card_labels|every_old_more_finance|finance_items_land|navs_of_finance|fund_strip)", "^unit:core/tests/test_nav_streamline.py::test_(sidebar_for_every_role|board_menu_has_every_section|online_payments_only)", "^unit:core/tests/test_board_cues.py::test_more_finance_hub", "^unit:ledger/tests/test_reserve_plan.py::test_reserve_plan_is_in_the_finance_menu", "^unit:core/tests/test_url_matrix.py::.*\\[finance_overview\\]"]
 - feature: "Every hub tile shows its own waiting count; the menu bubble is their sum"
   since: "0.41"
   match: ["^unit:core/tests/test_finance_overview.py::test_(hub_tiles|every_hub_bubble)"]
