@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-3781
+# highest issued: UNIT-3789
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -3680,12 +3680,12 @@ UNIT-3691: "core/tests/test_walkthrough_041.py::test_sysadmin_activity_is_compac
 UNIT-3692: "core/tests/test_walkthrough_041.py::test_reserve_plan_settings_before_the_years_and_quiet_years_collapsed"
 UNIT-3693: "core/tests/test_walkthrough_041.py::test_home_neighbors_find_filter_and_one_home_at_a_time"
 UNIT-3694: "core/tests/test_walkthrough_041.py::test_owner_accounts_list_first_and_forms_in_closed_panels"
-UNIT-3695: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[ledger/reserve_plan.html-{% hub_crumb "finance_overview" %}Reserve plan]"
-UNIT-3696: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[ledger/disbursements.html-{% hub_crumb "finance_overview" %}Disbursements]"
-UNIT-3697: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[payments/board.html-{% hub_crumb "finance_overview" %}Online payments]"
-UNIT-3698: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[comms/faq.html-{% hub_crumb "community_info" %}Frequently asked questions]"
-UNIT-3699: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[community/directory.html-{% hub_crumb "community_info" %}Owner directory]"
-UNIT-3700: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[community/board_and_committees.html-{% hub_crumb "community_info" %}Board and]"
+UNIT-3695: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[ledger/reserve_plan.html-{% hub_crumb \"finance_overview\" %}Reserve plan]"
+UNIT-3696: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[ledger/disbursements.html-{% hub_crumb \"finance_overview\" %}Disbursements]"
+UNIT-3697: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[payments/board.html-{% hub_crumb \"finance_overview\" %}Online payments]"
+UNIT-3698: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[comms/faq.html-{% hub_crumb \"community_info\" %}Frequently asked questions]"
+UNIT-3699: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[community/directory.html-{% hub_crumb \"community_info\" %}Owner directory]"
+UNIT-3700: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[community/board_and_committees.html-{% hub_crumb \"community_info\" %}Board and]"
 UNIT-3701: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[ledger/resales.html-Resale certificates</nav>]"
 UNIT-3702: "core/tests/test_walkthrough_041.py::test_hub_children_have_a_way_back[community/register_import.html-Homes and owners</a> / Import</nav>]"
 UNIT-3703: "core/tests/test_walkthrough_041.py::test_faq_crumb_links_to_community_info"
@@ -3767,3 +3767,11 @@ UNIT-3778: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_s
 UNIT-3779: "core/tests/test_url_matrix.py::test_anonymous_visitors_are_sent_to_sign_in[interest]"
 UNIT-3780: "core/tests/test_url_matrix.py::test_member_pages_require_sign_in[community_projects]"
 UNIT-3781: "core/tests/test_url_matrix.py::test_member_pages_hide_board_only_content_from_owners[community_projects]"
+UNIT-3782: "core/tests/test_walkthrough_041.py::test_contacts_are_not_sent_to_the_owners_arc_page"
+UNIT-3783: "core/tests/test_walkthrough_041.py::test_welcome_tiles_are_named_after_their_pages_and_are_not_hub_tiles"
+UNIT-3784: "core/tests/test_walkthrough_041.py::test_help_links_and_crumbs_are_tap_targets_on_phones"
+UNIT-3785: "core/tests/test_walkthrough_041.py::test_crawls_skip_the_disbursement_register_download"
+UNIT-3786: "core/tests/test_finance_overview.py::test_every_old_more_finance_page_is_a_card_and_marks_the_overview"
+UNIT-3787: "core/tests/test_finance_overview.py::test_finance_items_land_on_their_cards"
+UNIT-3788: "core/tests/test_finance_overview.py::test_navs_of_finance_items_are_their_pages"
+UNIT-3789: "core/tests/test_finance_overview.py::test_fund_strip_when_the_books_have_a_closed_month"
