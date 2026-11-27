@@ -138,7 +138,7 @@ MENUS = {
             "Architectural review",
             "Violations",
             "Records requests",
-            "Board tasks",
+            "Tasks and deadlines",
             "People",
             "Homes and owners",
             "Paper mail",
@@ -156,7 +156,7 @@ MENUS = {
             "Architectural review",
             "Violations",
             "Records requests",
-            "Board tasks",
+            "Tasks and deadlines",
             "Homes and owners",
             "Paper mail",
         ],
@@ -226,7 +226,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Architectural review",
         "Violations",
         "Records requests",
-        "Board tasks",
+        "Tasks and deadlines",
         "People",
         "Homes and owners",
         "Paper mail",
@@ -321,7 +321,7 @@ def test_hub_with_several_pages_links_to_the_hub(client, board):
 def test_subpages_mark_their_entry_current(client, board):
     cases = [
         ("access_review", "People"),
-        ("tasks", "Board tasks"),
+        ("tasks", "Tasks and deadlines"),
         ("signoffs_mine", "My home improvement requests (ARC)"),
     ]
     for name, label in cases:

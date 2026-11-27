@@ -198,7 +198,7 @@
   steps: "Sign in on the POC as a demo owner, a demo tenant, a board member, the manager and the sysadmin; open each section; on the board login open My items and People (Access review panel); start Preview as owner from a lot's page and exit."
   last: ""
 - key: streamlined community pages at phone width
-  check: "Homes and owners (both views), Invitations and sign-ups, Budget and reserves, Board and committees, Common area booking rules and Board tasks > Recurring deadlines read well on a phone: no sideways scrolling outside the tables, tabs reachable, forms usable; Board and committees shows names and offices only."
+  check: "Homes and owners (both views), Invitations and sign-ups, Budget and reserves, Board and committees, Common area booking rules and Tasks and deadlines > Recurring deadlines read well on a phone: no sideways scrolling outside the tables, tabs reachable, forms usable; Board and committees shows names and offices only."
   steps: "On the POC with demo data, open each page as a demo board member on a phone (Board and committees also as a demo owner and a tenant); switch the Homes and owners view; open an area on Common area booking rules and save; open Recurring deadlines and edit an item."
   last: ""
 - key: urgent text from an announcement
@@ -392,4 +392,8 @@
 - key: finance overview on a phone
   check: "On a 390 px phone and on a desktop, a demo board member's Finance overview shows the cards (one column on the phone) with each card's number beside its title, and the Finance menu number equals the sum of the numbers on the cards; the dashboard's Record payments received button has clear space above the stat tiles; the demo manager's and auditor's overview shows only what they may open (D89)."
   steps: "POC with fictional data (oak_creek), signed in as a demo board member, the demo manager and the demo auditor; compare the menu bubble with the cards; check the dashboard on both widths."
+  last: ""
+- key: panel plus and icon buttons line up
+  check: "On a desktop and a 390 px phone, the '+' box of 'File in a folder' on a document page (and every other disclosure panel) sits centred on the label's line, turns into '−' when open, and icon buttons such as 'Ask the board' show the icon and label on one centred line; the Getting started steps show the bold title with the description on its own line below; on Checks (To pay) and Records retention each row's checkbox can be ticked with a thumb (about 44x44); the setup wizard's percent boxes show '%' after them and the Common areas step saves with no areas."
+  steps: "POC with fictional data, signed in as a demo board member; open a document, the dashboard, Help > Getting started, Finance overview > Checks, Records retention and Settings > Community setup (Payments, Governance, Common areas) on both widths."
   last: ""

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}{{ title }} · Community setup · {{ SITE_NAME }}{% endblock %}
+{% block title %}Setup: {{ title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'settings_hub' %}#setup">Community setup</a></div>
+  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'settings_hub' %}#setup">Community setup</a> / Step {{ number }} of {{ total }}</div>
   <div class="setup-progress">
     <p class="small muted" id="setup-progress-label">Step {{ number }} of {{ total }}{% if run %} · setup run {{ run }}{% endif %}{% if state == "completed" %} · <span class="status tone-success">Done</span>{% elif state == "skipped" %} · <span class="status tone-warning">Skipped</span>{% endif %}</p>
     <progress max="{{ total }}" value="{{ number }}" aria-labelledby="setup-progress-label">Step {{ number }} of {{ total }}</progress>
   </div>
-  <div class="page-head"><div><h1>{{ title }}</h1><p class="subtitle">{{ intro }}</p></div></div>
+  <div class="page-head"><div><h1>Setup: {{ title }}</h1><p class="subtitle">{{ intro }}</p></div></div>
 
   {% include "community/setup/_law.html" %}
 
@@ -47,7 +47,7 @@
       <fieldset class="card setup-group"><legend><h2>{{ group.title }}</h2></legend>
         {% for r in group.rules %}<div class="setup-rule" id="rule-{{ r.spec.key }}">
           <p class="setup-flags">{% if r.needs_attention %}<span class="status tone-warning">Needs a value or citation</span>{% elif r.origin == "pa_law" %}<span class="status tone-info">PA law fallback</span>{% elif r.origin == "default" %}<span class="status tone-neutral">Default</span>{% endif %}{% if r.changed %} <span class="status tone-info">Changed since the last setup</span>{% endif %}</p>
-          {% include "community/setup/_field.html" with f=r.value %}
+          {% include "community/setup/_field.html" with f=r.value suffix=r.suffix %}
           {% if r.help %}<p class="help">{{ r.help }}</p>{% endif %}
           {% if r.default %}<p class="help">Empty means: {{ r.default }}{% if r.origin == "pa_law" %} ({{ r.guide.fallback_citation }}){% endif %}.</p>{% endif %}
           {% if r.guide %}<details class="rule-guide"><summary class="small">Usually set in: {{ r.guide.source }} · PA law and an example</summary>
@@ -61,7 +61,10 @@
 
     {% if step.key == "common_areas" %}
       <fieldset class="card setup-group"><legend><h2>Common areas</h2></legend>
-        {% if areas %}<ul class="list">{% for a in areas %}<li><div class="grow"><div class="title">{{ a.name }}</div><div class="small muted">{{ a.get_kind_display }}{% if not a.active %} · not in use{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted">No common areas recorded yet.</p>{% endif %}
+        {% if areas %}<ul class="list" data-testid="setup-areas">{% for a in areas %}<li><div class="grow"><div class="title">{{ a.name }}</div><div class="small muted">{{ a.get_kind_display }}{% if not a.active %} · removed (not in use; its history is kept){% endif %}</div></div>
+          {% if a.active %}<button type="submit" form="setup-area-actions" name="area_remove" value="{{ a.pk }}" class="small secondary" aria-label="Remove {{ a.name }}">Remove</button>{% else %}<button type="submit" form="setup-area-actions" name="area_restore" value="{{ a.pk }}" class="small secondary" aria-label="Put {{ a.name }} back in use">Put back</button>{% endif %}</li>{% endfor %}</ul>
+          <p class="small muted">Removing an area stops it being offered or booked; it is never deleted, so its bookings and history stay. An area with upcoming bookings is removed once they are cancelled.</p>
+        {% else %}<p class="muted">No common areas recorded yet. That is fine: save and continue without any.</p>{% endif %}
         <h3>Add a common area (optional)</h3>
         {% include "community/setup/_field.html" with f=area_form.name %}
         {% include "community/setup/_field.html" with f=area_form.kind %}
@@ -151,5 +154,6 @@
       <button type="submit" name="action" value="skip" class="secondary" formnovalidate>Skip for now</button>
     </div>
   </form>
+  {% if step.key == "common_areas" and areas %}{# The Remove / Put back buttons belong to this form, so Enter in the step still saves. #}<form method="post" id="setup-area-actions" hidden>{% csrf_token %}</form>{% endif %}
   <p class="small muted setup-footer">{{ law.footer }}</p>
 {% endblock %}

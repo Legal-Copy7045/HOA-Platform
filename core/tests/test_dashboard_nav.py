@@ -60,7 +60,7 @@ def test_board_dashboard_lists_invoice_waiting_for_me(client):
             ["Owner accounts", "People", "My home", "Settings"],
         ),
         ([Role.AUDITOR], ["Owner accounts", "Reports"], ["Approvals", "People"]),
-        ([Role.MANAGER], ["Invoices", "Board tasks"], ["Approvals", "People"]),
+        ([Role.MANAGER], ["Invoices", "Tasks and deadlines"], ["Approvals", "People"]),
     ],
 )
 def test_sidebar_by_role(client, roles, present, absent):

@@ -172,7 +172,7 @@ def steps(user, request=None) -> list[Step]:
             (K.CONFIRMED, "contact") in marks
             or _audited(user, ("contact.method_added", "contact.method_changed"))
             or _audited(user, ("profile.updated",), has_key="mailing"),
-            "My profile",
+            "Contact details",
             action="confirm_contact",
             action_label="These are right",
         )
@@ -210,7 +210,7 @@ def steps(user, request=None) -> list[Step]:
                 (K.CONFIRMED, "statements") in marks
                 or not on
                 or _audited(user, ("profile.updated",), has_key="in_directory"),
-                "My profile",
+                "Statement email",
                 action="confirm_statements",
                 action_label="Keep it on" if on else "Keep it off",
             )

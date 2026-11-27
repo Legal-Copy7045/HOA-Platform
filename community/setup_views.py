@@ -20,8 +20,22 @@ from django.urls import NoReverseMatch, reverse
 from django.views.decorators.http import require_POST
 
 from community import forms, services, setup
-from community.rule_input import to_stored, to_typed
-from community.rules import BOOL, CENTS, TEXT, cents_display, group_title, validate_value
+from community.rule_input import (
+    citation_example,
+    example_value,
+    is_demo_citation,
+    to_stored,
+    to_typed,
+)
+from community.rules import (
+    BOOL,
+    CENTS,
+    TEXT,
+    group_title,
+    unit_suffix,
+    validate_value,
+    value_display,
+)
 from community.services import CommunityError
 from core import features, policy
 
@@ -37,14 +51,24 @@ def _bool_text(raw) -> str:
 
 
 def _shown(spec, raw) -> str:
-    """A stored value as people read it."""
+    """A stored value as people read it ("$75.00", "51%", "3%", "Yes")."""
+    return value_display(spec, raw)
+
+
+def _default_typed(spec) -> str:
+    """The default as a greyed placeholder: as it would be typed for a
+    percent (the % is shown after the box), as people read it otherwise."""
+    from community.pa_law import guide
+
+    raw = spec.default
+    if raw is None:
+        g = guide(spec.key)
+        raw = g.fallback if g else None
     if raw in (None, ""):
         return ""
-    if spec.kind == CENTS and str(raw).lstrip("-").isdigit():
-        return cents_display(int(raw))
-    if spec.kind == BOOL:
-        return _bool_text(raw)
-    return str(raw)
+    if unit_suffix(spec):
+        return to_typed(spec, raw)
+    return _shown(spec, raw)
 
 
 def _default_text(spec) -> str:
@@ -89,21 +113,35 @@ class RuleStepForm(djforms.Form):
                 attrs = {"inputmode": "decimal" if spec.kind == CENTS else "numeric"}
                 if spec.kind == TEXT:
                     attrs = {}
-                if default:
-                    attrs["placeholder"] = default
+                # Greyed: the default that applies when left empty, else an
+                # example of what goes there.
+                placeholder = _default_typed(spec) or example_value(spec)
+                if placeholder:
+                    attrs["placeholder"] = placeholder
                 field = djforms.CharField(
                     required=False, max_length=200, widget=djforms.TextInput(attrs=attrs)
                 )
                 initial = to_typed(spec, row.value if row else "")
             field.label = spec.shown_label + (" (dollars)" if spec.kind == CENTS else "")
+            if unit_suffix(spec) and "%" not in field.label:
+                field.label += " (%)"
             field.initial = initial
             self.fields[f"{slug}__value"] = field
+            citation = row.citation if row else ""
+            demo = is_demo_citation(citation)
             self.fields[f"{slug}__citation"] = djforms.CharField(
                 required=False,
                 max_length=200,
                 label=f"Citation for: {spec.shown_label}",
-                initial=row.citation if row else "",
-                widget=djforms.TextInput(attrs={"placeholder": "e.g. Declaration §6.3"}),
+                # The demo data's "DEMO - replace" is not a citation to edit:
+                # the box shows an example instead (and keeps it if left empty).
+                initial="" if demo else citation,
+                help_text=(
+                    "The demo data has no real citation here: enter where this rule is written."
+                    if demo
+                    else ""
+                ),
+                widget=djforms.TextInput(attrs={"placeholder": citation_example(spec)}),
             )
 
     def clean(self):
@@ -116,7 +154,11 @@ class RuleStepForm(djforms.Form):
             except ValueError as exc:
                 self.add_error(f"{slug}__value", str(exc))
                 continue
-            self.stored[spec.key] = (value, (cleaned.get(f"{slug}__citation") or "").strip())
+            citation = (cleaned.get(f"{slug}__citation") or "").strip()
+            row = self.rows.get(spec.key)
+            if not citation and row and is_demo_citation(row.citation):
+                citation = row.citation  # left empty: the demo citation stays as it was
+            self.stored[spec.key] = (value, citation)
         return cleaned
 
     def changed_keys(self) -> list[str]:
@@ -168,6 +210,7 @@ def _rule_items(form, since):
                 "guide": pa_law.guide(spec.key),
                 "origin": rule_origin(spec.key),
                 "default": _default_text(spec),
+                "suffix": unit_suffix(spec),
                 "needs_attention": spec.key in needing,
                 "changed": bool(since and row and row.updated_at > since),
             }
@@ -516,11 +559,11 @@ def setup_step(request, step):
     if specs:
         rule_form = RuleStepForm(specs, _rule_rows(), data)
     if step == "common_areas":
-        area_form = (
-            forms.CommonAreaForm(data, prefix="area")
-            if data
-            else forms.CommonAreaForm(prefix="area")
-        )
+        area_form = _area_form(data)
+        if request.method == "POST":
+            response = _area_in_use(request, s)
+            if response is not None:
+                return response
     feature_keys = _feature_keys(s)
 
     if request.method == "POST":
@@ -534,6 +577,54 @@ def setup_step(request, step):
         return _go_next(step)
 
     return _render_step(request, s, run, states, since, profile_form, rule_form, area_form)
+
+
+AREA_PLACEHOLDERS = {
+    "name": "e.g. Pond and walking path",
+    "notes": "e.g. Mowed by the landscaper April to October; the gate key is with the manager.",
+}
+
+
+def _area_form(data):
+    """The optional "Add a common area" fields. No browser "required": the
+    step saves with no area added (and with no areas at all)."""
+    form = forms.CommonAreaForm(data, prefix="area", use_required_attribute=False)
+    for name, text in AREA_PLACEHOLDERS.items():
+        form.fields[name].widget.attrs["placeholder"] = text
+    form.fields["name"].required = False  # checked only when an area is being added
+    return form
+
+
+def _area_in_use(request, s):
+    """The Remove / Put back buttons beside each area: the area is taken out
+    of use or put back (never deleted: its bookings and history stay), then
+    the step shows again."""
+    from community.models import CommonArea
+
+    for field, in_use in (("area_remove", False), ("area_restore", True)):
+        pk = (request.POST.get(field) or "").strip()
+        if not pk:
+            continue
+        if not pk.isdigit():
+            raise Http404
+        area = CommonArea.objects.filter(pk=int(pk)).first()
+        if area is None:
+            raise Http404
+        try:
+            services.set_common_area_in_use(
+                area=area, in_use=in_use, actor=request.user, request=request
+            )
+        except CommunityError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(
+                request,
+                f"{area.name} put back in use."
+                if in_use
+                else f"{area.name} removed: no longer offered or bookable. Its history is kept.",
+            )
+        return redirect("setup_step", step=s.key)
+    return None
 
 
 def _render_step(
@@ -607,6 +698,30 @@ class CommunityDetailsForm(forms.ProfileForm):
         help_text="e.g. the association, by its managing agent.",
     )
 
+    # A greyed example in every box, so each says what goes there (fictional).
+    PLACEHOLDERS = {
+        "legal_name": "e.g. Maple Hollow Homeowners Association",
+        "fiscal_year_start_month": "e.g. 1 (January)",
+        "signin_help_contact": "e.g. board@example.org or (555) 010-0142",
+        "welcome_message": "e.g. Welcome to the portal. The annual meeting is on May 12.",
+        "arc_form_return_to": "e.g. Maple Hollow HOA, c/o Example Management, PO Box 100, "
+        "Anytown PA 17000",
+        "arc_form_conditions": "e.g. Work starts only after written approval and follows the "
+        "approved plans.",
+        "letterhead": "e.g. Maple Hollow Homeowners Association\nc/o Example Management\n"
+        "PO Box 100, Anytown PA 17000",
+        "remit_to": "e.g. Maple Hollow HOA\nPO Box 100\nAnytown PA 17000",
+        "letter_contact": "e.g. accounts@example.org, (555) 010-0100",
+        "letter_signature": "e.g. Maple Hollow Homeowners Association\nby Example Management, "
+        "its managing agent",
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, text in self.PLACEHOLDERS.items():
+            if name in self.fields:
+                self.fields[name].widget.attrs["placeholder"] = text
+
 
 PROFILE_FIELDS = (
     "legal_name",
@@ -654,7 +769,7 @@ def _save(request, s, profile_form, rule_form, area_form, feature_keys, run, sta
     adding_area = area_form is not None and (request.POST.get("area-name") or "").strip()
     if area_form is not None and not adding_area:
         # Adding an area is optional: an empty one is not an error.
-        area_form = forms.CommonAreaForm(prefix="area")
+        area_form = _area_form(None)
     if adding_area and not area_form.is_valid():
         valid = False
     if not valid:

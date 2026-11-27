@@ -2,7 +2,7 @@
 <ul class="list checklist">{% for s in checklist.steps %}{% if not compact or not s.done %}
   <li class="checklist-step{% if s.done %} is-done{% endif %}">
     <span class="todo-icon{% if s.done %} tone-success{% endif %}" aria-hidden="true">{% if s.done %}{% icon "check" %}{% else %}{% icon "arrow-right" %}{% endif %}</span>
-    <span class="grow"><span class="title">{% if s.done %}<span class="sr-only">Done: </span>{% endif %}{{ s.title }}</span><span class="small muted todo-detail">{{ s.detail }}</span></span>
+    <span class="grow"><span class="title">{% if s.done %}<span class="sr-only">Done: </span>{% endif %}{{ s.title }}</span> <span class="small muted todo-detail">{{ s.detail }}</span></span>
     {% if not s.done %}<span class="checklist-actions">
       {% if s.action and not compact %}<form method="post" action="{% url 'getting_started' %}" class="inline">{% csrf_token %}<button type="submit" name="action" value="{{ s.action }}" class="small">{{ s.action_label }}</button></form>{% endif %}
       <a class="btn small secondary" href="{{ s.url }}">{{ s.link_label }}</a>

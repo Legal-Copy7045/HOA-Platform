@@ -1,0 +1,24 @@
+# Release 0.43 UI fixes: percents read as percents, greyed examples in every
+# setup box, common areas removed from the wizard, the reimbursement receipt
+# 500, and the walkthrough's naming and layout findings (WT-002..WT-049).
+- feature: "Percent rules (whole percents and basis points such as the card surcharge) are typed and shown as percents with a % after the box, in 'Empty means' defaults, the review, Community settings, Online payments and the tax worksheet; stored as whole percents or basis points"
+  since: "0.43"
+  match: ["^unit:community/tests/test_setup_wizard_values.py::test_(the_card_surcharge|whole_percent|a_fraction|every_percent|wizard_shows_the_surcharge|wizard_saves_a_typed|vote_percents|community_settings_show|payments_and_tax)"]
+- feature: "Every setup wizard box shows its default or a realistic greyed example (e.g.), citation boxes an example matching where the rule is usually written; the demo's 'DEMO - replace' citation shows as an empty box with an example and is kept, unaudited, when left empty"
+  since: "0.43"
+  match: ["^unit:community/tests/test_setup_wizard_values.py::test_(every_rule_box|examples_come|wizard_boxes_carry|the_demo_citation)"]
+- feature: "Setup wizard common areas: saves with no areas (no browser 'required'); Remove takes an area out of use (never deleted, history kept, audited) and Put back restores it; refused while upcoming bookings are waiting or confirmed; board only"
+  since: "0.43"
+  match: ["^unit:community/tests/test_setup_wizard_values.py::test_(the_add_fields|an_area_is_removed|an_area_with_upcoming|only_the_board_removes|an_unknown_area)", "^unit:community/tests/test_setup_wizard.py::test_common_area"]
+- feature: "Attachment downloads (reimbursement receipts and every other attachment) are streamed only after the scoped fetch; a file missing from the store is a 404 page, not a Server Error, and no download is audited (WT-001)"
+  since: "0.43"
+  match: ["^unit:operations/tests/test_payouts.py::test_(staff_open_a_claims_receipt|a_receipt_missing|a_receipt_of_another)"]
+- feature: "Walkthrough fixes: board and staff see their work before Getting started (WT-002); checklist titles and descriptions apart (WT-003/034); one bank status on the Finance overview and interest as a percent a month (WT-004/005); count bubbles stay on the card title (WT-009)"
+  since: "0.43"
+  match: ["^unit:core/tests/test_walkthrough_043.py::test_(board_dashboard|owner_dashboard|checklist_title|bank_feed_and_books|interest_card|overview_count)"]
+- feature: "Walkthrough naming fixes: My items groups named after menu entries (WT-010), one name for My profile (WT-014), a role label for contacts, tenants and former owners plus the office (WT-015/040), 'Setup:' step headings and step number (WT-017), tab titles starting with the heading (WT-021), breadcrumbs naming the page (WT-022), Tasks and deadlines (WT-026)"
+  since: "0.43"
+  match: ["^unit:core/tests/test_walkthrough_043.py::test_(my_items_groups|my_profile|every_resident_group|an_office|setup_step_headings|tab_title|help_breadcrumbs|tasks_menu_entry)"]
+- feature: "Shared CSS: the panel +/- box is drawn and centred on its label ('+ File in a folder'), icons centred in buttons, row checkboxes in tables wrapped in a 44x44 label on phones, short breadcrumbs 44px wide (WT-049)"
+  since: "0.43"
+  match: ["^unit:core/tests/test_walkthrough_043.py::test_(panel_plus|row_checkboxes|help_breadcrumbs)", "^manual:panel plus and icon buttons line up"]

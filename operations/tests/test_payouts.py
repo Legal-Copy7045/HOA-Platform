@@ -307,3 +307,51 @@ def test_vendor_checks_page(client, w):
     client.force_login(owner)
     assert client.get(reverse("vendor_checks")).status_code == 403
     assert Invoice.objects.get(pk=inv.pk).state == "approved"
+
+
+# --- Receipts: streamed only after the authorization check (WT-001) -------------------------
+
+
+@pytest.mark.parametrize("who", ["board2", "manager"])
+def test_staff_open_a_claims_receipt_and_the_download_is_audited(client, w, who):
+    from documents.attachments import attachments_for
+
+    claim = _claim(w)
+    file_id = attachments_for(claim).first().pk
+    client.force_login(w[who])
+    response = client.get(reverse("reimbursement_file", args=[claim.pk, file_id]))
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content).startswith(b"%PDF")
+    assert response["Cache-Control"] == "private, no-store"
+    assert AuditEvent.objects.filter(action="attachment.downloaded").count() == 1
+
+
+def test_a_receipt_missing_from_the_store_is_a_404_not_a_server_error(client, w):
+    """The walkthrough's 500: the file record exists but the store no longer
+    holds the file. The page is a 404 with its links; no download is audited."""
+    from django.core.files.storage import default_storage
+
+    from documents.attachments import attachments_for
+
+    claim = _claim(w)
+    attachment = attachments_for(claim).first()
+    default_storage.delete(attachment.file.name)
+    client.raise_request_exception = True
+    for who in ("board2", "manager", "volunteer"):
+        client.force_login(w[who])
+        url = reverse("reimbursement_file", args=[claim.pk, attachment.pk])
+        assert client.get(url).status_code == 404
+    assert not AuditEvent.objects.filter(action="attachment.downloaded").exists()
+
+
+def test_a_receipt_of_another_claim_or_out_of_scope_is_a_404(client, w):
+    from documents.attachments import attachments_for
+
+    claim = _claim(w)
+    other = _claim(w, who="board")
+    other_file = attachments_for(other).first().pk
+    client.force_login(w["volunteer"])
+    # Someone else's claim, and another claim's file under one's own claim.
+    assert client.get(reverse("reimbursement_file", args=[other.pk, other_file])).status_code == 404
+    assert client.get(reverse("reimbursement_file", args=[claim.pk, other_file])).status_code == 404
+    assert not AuditEvent.objects.filter(action="attachment.downloaded").exists()

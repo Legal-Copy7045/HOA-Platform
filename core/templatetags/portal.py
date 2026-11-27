@@ -29,6 +29,16 @@ def max_upload_bytes() -> int:
 
 
 @register.filter
+def bp_percent(value) -> str:
+    """{{ rate_bp|bp_percent }} -> 2.5% (basis points read as a percent)."""
+    from community.rules import bp_display
+
+    if value in (None, ""):
+        return ""
+    return f"{bp_display(int(value))}%"
+
+
+@register.filter
 def cents_plain(value) -> str:
     """{{ amount_cents|cents_plain }} -> 1234.56 (for form inputs)."""
     if value is None:

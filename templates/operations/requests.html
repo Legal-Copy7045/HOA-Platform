@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load help_tags portal %}
-{% block title %}Requests · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if staff %}Owner requests{% else %}My requests{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>{% if staff %}Owner requests{% else %}My requests{% endif %}</h1>
     <p class="subtitle">{% if staff %}Questions and reports from owners, contacts and tenants. Each type has a response target set in Community settings.{% elif read_only %}Requests raised on the account you follow. You can read them; only the owners and authorized contacts can ask or reply.{% else %}Ask a question or report a problem. We'll reply here and email you a link.{% endif %} {% how_it_works "requests" %}</p></div>

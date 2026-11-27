@@ -557,13 +557,13 @@ def community_settings(request):
     policy.require(request.user, "lot.view_all")
     from community import pa_law
     from community.models import CommonArea, CommunityProfile, GoverningRule
+    from community.rule_input import citation_example, example_value
     from community.rules import (
-        BASIS_POINTS,
         REGISTRY,
-        bp_display,
-        cents_display,
         group_title,
         rule_origin,
+        unit_suffix,
+        value_display,
     )
     from community.terms import charge_term, term_text
 
@@ -578,9 +578,8 @@ def community_settings(request):
         origin = rule_origin(spec.key)
         raw = row.value if row and row.value != "" else (spec.default or "")
         effective = raw or (guide.fallback if guide and origin == "pa_law" else "")
-        shown = cents_display(int(effective)) if spec.kind == "cents" and effective else effective
-        if spec.kind == BASIS_POINTS and effective:
-            shown = f"{bp_display(effective)}%"
+        # As people read it everywhere: "$75.00", "51%", "3%" (value_display).
+        shown = value_display(spec, effective)
         # The "Dues" group is headed with the board's word (D42).
         title = group_title(spec.group, term)
         if spec.group in pa_law.GROUP_NOTES:
@@ -594,6 +593,10 @@ def community_settings(request):
                 # Money is typed in dollars, like every other money field.
                 "raw": _typed(spec, raw),
                 "shown": shown,
+                "suffix": unit_suffix(spec),
+                "fallback_shown": value_display(spec, guide.fallback) if guide else "",
+                "example": example_value(spec),
+                "citation_example": citation_example(spec),
                 "guide": guide,
                 "origin": origin,
                 "needs_attention": spec.key in needing,

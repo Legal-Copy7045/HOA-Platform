@@ -189,12 +189,18 @@ td.actions { text-align: right; white-space: nowrap; }
 form p { margin: 0 0 .9rem; }
 .field { margin: 0 0 1rem; }
 label, .field-label { display: block; font-weight: 600; font-size: .9rem; margin: 0 0 .3rem; color: var(--ink); }
+/* A table row's checkbox wrapped in its label (the tap target, wider on phones). */
+.tap-check { display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 2px; cursor: pointer; }
 label.choice, .checkbox label { font-weight: 500; display: flex; gap: .5rem; align-items: center; margin: .25rem 0; }
 .required-mark { color: var(--danger); margin-left: .15rem; }
 input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], input[type=datetime-local],
 input[type=tel], input[type=search], input[type=url], input:not([type]), select, textarea {
   font: inherit; font-size: 1rem; width: 100%; max-width: 32rem; min-height: 44px; padding: .5rem .65rem; border: 1px solid #8a8f88; border-radius: 8px; background: #fff; color: var(--ink); }
 textarea { max-width: 44rem; min-height: 5.5rem; }
+/* A unit after the box (percent rules: "51 %"): the box and the unit on one line. */
+.input-unit { display: inline-flex; align-items: center; gap: .4rem; max-width: 100%; }
+.input-unit > input { width: 8rem; }
+.input-unit > .unit { font-weight: 600; color: var(--ink-2); }
 input:focus, select:focus, textarea:focus { border-color: var(--green-700); outline: 3px solid var(--green-700); outline-offset: 1px; }
 input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-color: var(--green-700); }
 input[type=file] { font: inherit; font-size: 1rem; padding: .45rem; border: 1px dashed #8a8f88; border-radius: 8px; background: var(--surface-2); width: 100%; max-width: 32rem; }
@@ -217,8 +223,15 @@ fieldset { border: 0; padding: 0; margin: 0; }
 details.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 1rem; box-shadow: var(--shadow); }
 details.panel > summary { cursor: pointer; min-height: 44px; padding: .85rem 1.1rem; font-weight: 600; list-style: none; display: flex; align-items: center; gap: .5rem; color: var(--green-800); }
 details.panel > summary::-webkit-details-marker { display: none; }
-details.panel > summary::before { content: "+"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--green-50); color: var(--green-700); font-weight: 700; }
-details.panel[open] > summary::before { content: "−"; }
+/* The + / − box is drawn (two bars), not a text glyph: a glyph sits on the
+   font's baseline and looked off-centre beside the label. flex: none keeps it
+   square; the summary's align-items centres it on the label's line. */
+details.panel > summary::before { content: ""; flex: none; width: 22px; height: 22px; border-radius: 6px;
+  background: linear-gradient(var(--green-700), var(--green-700)) center / 10px 2px no-repeat,
+    linear-gradient(var(--green-700), var(--green-700)) center / 2px 10px no-repeat, var(--green-50); }
+details.panel[open] > summary::before { background: linear-gradient(var(--green-700), var(--green-700)) center / 10px 2px no-repeat, var(--green-50); }
+/* Icon buttons and links: the icon and the label sit on one centred line. */
+.btn > .icon, button > .icon, summary > .icon, .button > .icon { vertical-align: middle; align-self: center; }
 details.panel > .panel-body { padding: 0 1.1rem 1.1rem; }
 details:not(.panel) { margin: .6rem 0; }
 details:not(.panel) > summary { cursor: pointer; color: var(--green-700); font-weight: 600; min-height: 44px; display: flex; align-items: center; gap: .4rem; }
@@ -482,7 +495,7 @@ details.menu-details > .panel-body br { display: none; }
 .todo-link { display: flex; align-items: center; gap: .75rem; padding: .7rem 0; min-height: 44px; width: 100%; text-decoration: none; color: inherit; }
 .todo-link .title { display: block; font-weight: 600; color: var(--ink); }
 .todo-link:hover .title { color: var(--green-700); text-decoration: underline; }
-.todo-link .todo-detail { display: block; }
+.todo-link .todo-detail { display: block; margin-top: .1rem; }
 .todo-link .todo-arrow { color: var(--muted); }
 .list > li.todo .todo-action { flex: none; }
 /* ---------- Homeowner ARC, requests and notices (UX review) ---------- */
@@ -516,6 +529,9 @@ fieldset.choices legend { padding: 0; margin-bottom: .4rem; }
 .how-link { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; font-weight: 600; }
 .how-link .icon { width: 1em; height: 1em; }
 .checklist-step { flex-wrap: wrap; }
+/* The step's title and its description on their own lines, a little apart. */
+.checklist-step .title, .checklist-step .todo-detail { display: block; }
+.checklist-step .todo-detail { margin-top: .2rem; }
 .checklist-step.is-done .title { color: var(--muted); }
 .checklist-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .checklist-actions form.inline { margin: 0; }
@@ -664,9 +680,14 @@ tr.row-link:hover .row-main { text-decoration: underline; }
   label.choice, .checkbox label, label:has(> input[type=checkbox]), label:has(> input[type=radio]), li > label:has(input[type=checkbox]) {
     min-height: 44px; display: flex; align-items: center; gap: .6rem; }
   input[type=checkbox], input[type=radio] { width: 22px; height: 22px; flex: none; }
+  /* A row's own checkbox in a table: the label around it is the tap target,
+     at least 44x44 (the box itself stays 22px). */
+  .tap-check, td label:has(> input[type=checkbox]) { display: inline-flex; min-width: 44px; min-height: 44px; justify-content: center; }
   .wf-action.is-blocked button { min-height: 44px; }
   /* Help links ("How this works", "Help: how it all works") are tap targets too. */
   .how-link, .form-actions > a.small, .crumbs a { display: inline-flex; align-items: center; min-height: 44px; }
+  /* A short breadcrumb ("Help") is still 44px wide (WT-049). */
+  .crumbs a { min-width: 44px; justify-content: center; }
   .filters a, .subnav a { min-width: 44px; justify-content: center; }
   button.small { min-height: 44px; }
   /* Two summary tiles per row, not one (WT-042). */
@@ -843,6 +864,9 @@ li.activity-row .activity-details > summary { display: inline-flex; align-items:
 .tiles .tile .badge-count, .tiles .finance-card .badge-count, .card h2 .badge-count { display: inline-block; margin-left: .35rem; background: #f2c14e; color: #3a2a00; font-size: .72rem; font-weight: 700; padding: 0 .45rem; border-radius: 99px; line-height: 1.6; vertical-align: middle; }
 .finance-group > h2 { margin: 1.5rem 0 .6rem; }
 .finance-card span { overflow-wrap: anywhere; }
+/* The title and its count on one line: the bubble never drops below the title (WT-009). */
+.tiles .finance-card strong { display: flex; align-items: center; gap: .35rem; }
+.tiles .finance-card strong > .badge-count { flex: none; margin-left: 0; }
 /* My items in two parts, like the dashboard (WT-003). */
 .my-items-part { display: flex; align-items: center; gap: .5rem; margin: 1.5rem 0 .75rem; }
 /* The dashboard's two parts for people with a home and board work (D64). */

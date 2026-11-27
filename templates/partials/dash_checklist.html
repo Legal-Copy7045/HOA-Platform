@@ -1,0 +1,6 @@
+{% load portal %}{# Getting started (D73) on the dashboard: first for residents, after the work for board and staff (WT-002). #}
+{% with checklist=dash.checklist %}<section class="card" id="getting-started" aria-labelledby="getting-started-h">
+    <div class="card-head"><h2 id="getting-started-h">Getting started</h2><span class="small muted">{{ checklist.done }} of {{ checklist.total }} done</span></div>
+    {% include "community/_checklist.html" with compact=True %}
+    <div class="form-actions"><a class="btn secondary" href="{% url 'getting_started' %}">{% icon "check-circle" %} Open your checklist</a><a class="small" href="{% url 'help' %}">Help: how it all works</a></div>
+  </section>{% endwith %}

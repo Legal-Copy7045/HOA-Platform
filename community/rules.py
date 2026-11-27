@@ -854,9 +854,11 @@ def validate_value(key: str, raw: str) -> str:
         # ASCII digits only and a sane size (review D9): str.isdigit() also
         # accepts characters like "²" that int() then refuses on every read.
         if not re.fullmatch(r"[0-9]{1,12}", raw):
+            if spec.kind == PERCENT:
+                raise ValueError(f"{spec.shown_label}: enter a whole percent, e.g. 51.")
             raise ValueError(f"{spec.shown_label}: enter a whole number.")
         if spec.kind == PERCENT and int(raw) > 100:
-            raise ValueError(f"{spec.shown_label}: must be 0-100.")
+            raise ValueError(f"{spec.shown_label}: must be 0-100%.")
         if spec.maximum is not None and int(raw) > spec.maximum:
             if spec.kind == BASIS_POINTS:
                 raise ValueError(f"{spec.shown_label}: at most {bp_display(spec.maximum)}%.")
@@ -954,6 +956,30 @@ def bp_display(bp: int | str | None) -> str:
     bp = int(bp)
     whole, frac = divmod(bp, 100)
     return f"{whole}" if frac == 0 else f"{whole}.{frac:02d}".rstrip("0")
+
+
+def unit_suffix(spec: RuleSpec) -> str:
+    """The unit shown after a rule's input and value: "%" for percents and
+    basis points (typed and shown as a percent), else ""."""
+    return "%" if spec.kind in (PERCENT, BASIS_POINTS) else ""
+
+
+def value_display(spec: RuleSpec, raw: str | int | None) -> str:
+    """A stored rule value as people read it everywhere (settings, the setup
+    wizard's defaults and review, help): "$75.00", "51%", "2.5%", "Yes". ""
+    for nothing stored."""
+    if raw in (None, ""):
+        return ""
+    text = str(raw).strip()
+    if spec.kind == CENTS and text.lstrip("-").isdigit():
+        return cents_display(int(text))
+    if spec.kind == BASIS_POINTS and text.isdigit():
+        return f"{bp_display(text)}%"
+    if spec.kind == PERCENT and text.isdigit():
+        return f"{int(text)}%"
+    if spec.kind == BOOL:
+        return "Yes" if text.lower() in ("1", "true", "yes") else "No"
+    return text
 
 
 def cents_display(cents: int | None) -> str:

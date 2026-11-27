@@ -142,7 +142,7 @@ def seed(c) -> None:
     mowing = Contract.objects.get(title="Common area mowing (demo)")
     invoice(green, "GL-M1", 85000, "5200", contract=mowing)
 
-    # Board tasks: open (first part), done, dropped, overdue.
+    # Tasks and deadlines: open (first part), done, dropped, overdue.
     ops.create_task(title="Renew the D&O policy (demo)", due_date=c.days(-3), actor=manager)
     task = ops.create_task(title="Order new mailbox posts (demo)", actor=manager)
     ops.close_task(task, status="done", actor=manager)

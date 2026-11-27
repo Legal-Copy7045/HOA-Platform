@@ -347,7 +347,7 @@ def test_a_consent_waits_in_my_items_until_each_board_member_answers(w):
     from core.my_items import items_for
 
     def waiting(user):
-        return [i for i in items_for(user) if i.area == "Written consent"]
+        return [i for i in items_for(user) if i.area == "Resolutions and policies"]
 
     consent = elections.propose_consent(title="Buy salt", text="Buy 2 tons.", actor=w["board"])
     assert [i.title for i in waiting(w["board"])] == ["Buy salt"]

@@ -729,7 +729,7 @@ def board_items(user) -> list:
     for sa in SpecialAssessment.objects.exclude(pk__in=sent)[:20]:
         items.append(
             Item(
-                "Finance",
+                "Finance overview",
                 f"Send the owner notice for the special assessment {sa.title}",
                 "Owners who agreed to email get it at once; the others need a paper copy.",
                 reverse("special_assessment_detail", args=[sa.pk]),

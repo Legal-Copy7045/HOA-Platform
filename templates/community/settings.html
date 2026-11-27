@@ -32,15 +32,15 @@
           {% if r.guide %}<details class="rule-guide"><summary class="small">Usually set in: {{ r.guide.source }} · PA law and an example</summary>
             <dl class="kv small"><dt>PA law</dt><dd>{{ r.guide.law }}</dd>
               <dt>Example</dt><dd>{{ r.guide.example }}</dd>
-              {% if r.guide.fallback %}<dt>Fallback</dt><dd>{{ r.guide.fallback }}{% if r.spec.kind == "percent" %}%{% elif r.spec.kind == "days" %} days{% endif %} ({{ r.guide.fallback_citation }}), used until you record a value.</dd>{% endif %}</dl>
+              {% if r.guide.fallback %}<dt>Fallback</dt><dd>{{ r.fallback_shown }}{% if r.spec.kind == "days" %} days{% endif %} ({{ r.guide.fallback_citation }}), used until you record a value.</dd>{% endif %}</dl>
           </details>{% endif %}</div>
         {% if can_edit %}
           <form method="post" action="{% url 'community_rule_save' %}" class="rule-form inline-form">{% csrf_token %}
             <input type="hidden" name="key" value="{{ r.spec.key }}">
             {% if r.spec.kind == "cents" %}<div><label class="small" for="v-{{ r.spec.key }}">Amount in dollars</label><input id="v-{{ r.spec.key }}" name="value" value="{{ r.raw }}" size="10" inputmode="decimal" data-money-preview="{{ r.unit }}" aria-describedby="m-{{ r.spec.key }}"> <span class="small parsed-money" id="m-{{ r.spec.key }}" data-money-out aria-live="polite">{% if r.shown %}= {{ r.shown }}{% if r.unit %} {{ r.unit }}{% endif %}{% endif %}</span></div>
-            {% elif r.spec.kind == "bp" %}<div><label class="small" for="v-{{ r.spec.key }}">Percent</label><input id="v-{{ r.spec.key }}" name="value" value="{{ r.raw }}" size="6" inputmode="decimal"> <span class="small">%</span></div>
-            {% else %}<div><label class="small" for="v-{{ r.spec.key }}">Value <span class="muted">{{ r.shown }}</span></label><input id="v-{{ r.spec.key }}" name="value" value="{{ r.raw }}" size="10"></div>{% endif %}
-            <div class="grow"><label class="small" for="c-{{ r.spec.key }}">Citation</label><input id="c-{{ r.spec.key }}" name="citation" value="{{ r.row.citation|default:'' }}" placeholder="Declaration §"></div>
+            {% elif r.suffix %}<div><label class="small" for="v-{{ r.spec.key }}">Percent</label><span class="input-unit"><input id="v-{{ r.spec.key }}" name="value" value="{{ r.raw }}" size="6" inputmode="decimal"{% if r.example %} placeholder="{{ r.example }}"{% endif %}><span class="unit" aria-hidden="true">%</span></span></div>
+            {% else %}<div><label class="small" for="v-{{ r.spec.key }}">Value <span class="muted">{{ r.shown }}</span></label><input id="v-{{ r.spec.key }}" name="value" value="{{ r.raw }}" size="10"{% if r.example %} placeholder="{{ r.example }}"{% endif %}></div>{% endif %}
+            <div class="grow"><label class="small" for="c-{{ r.spec.key }}">Citation</label><input id="c-{{ r.spec.key }}" name="citation" value="{{ r.row.citation|default:'' }}" placeholder="{{ r.citation_example }}"></div>
             <button type="submit" class="secondary small">Save</button>
           </form>
         {% else %}<div class="rule-value"><strong>{{ r.shown|default:"-" }}</strong><div class="small muted">{% if r.origin == "pa_law" %}{{ r.guide.fallback_citation }}{% else %}{{ r.row.citation|default:"No citation" }}{% endif %}</div></div>{% endif %}
