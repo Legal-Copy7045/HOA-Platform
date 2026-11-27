@@ -20,7 +20,7 @@ from community import services as community
 from community.models import Role
 from community.tests.factories import LotFactory, make_member
 from core.scoping import system_access
-from governance import elections, mixing, services, surveys
+from governance import elections, mixing, sealing, services, surveys
 from governance.models import (
     Ballot,
     ElectionChoice,
@@ -89,13 +89,13 @@ def _physical(table, column, where_column, target_id):
 
 def test_a_pooled_choice_has_no_person_lot_ballot_or_time(board):
     fields = {f.name for f in PendingSecretChoice._meta.get_fields()}
-    assert fields == {"id", "vote", "election", "survey", "payload", "sort_key"}
+    assert fields == {"id", "vote", "election", "survey", "sealed", "sort_key"}
     assert PendingSecretChoice._meta.pk.get_internal_type() == "UUIDField"
     voters = _owners(1)
     vote, options = _secret_formal(board, ["Yes", "No"])
     _cast(vote, voters, options, [0])
     row = PendingSecretChoice.objects.get(vote=vote)
-    assert row.payload == {"option": options[0].pk}
+    assert sealing.unseal("vote", vote.pk, row.sealed) == {"option": options[0].pk}
     ballot = Ballot.objects.get(vote=vote)
     assert ballot.option_id is None
     with connection.cursor() as cursor:
@@ -104,8 +104,8 @@ def test_a_pooled_choice_has_no_person_lot_ballot_or_time(board):
             " WHERE table_name = 'governance_pendingsecretchoice' ORDER BY column_name"
         )
         columns = [r[0] for r in cursor.fetchall()]
-    assert columns == ["election_id", "id", "payload", "sort_key", "survey_id", "vote_id"]
-    assert set(row.payload) == {"option"}  # nothing but the choice
+    assert columns == ["election_id", "id", "sealed", "sort_key", "survey_id", "vote_id"]
+    assert set(sealing.unseal("vote", vote.pk, row.sealed)) == {"option"}  # only the choice
 
 
 def test_casting_defers_the_flush_after_commit(
@@ -365,7 +365,7 @@ def test_anonymous_survey_responses_are_pooled_and_written_at_close(board, sw):
         _respond(survey, voters[0][1], 0, "again")
     pooled = PendingSecretChoice.objects.filter(survey=survey)
     assert pooled.count() == 3
-    assert set(pooled.first().payload) == {"answers"}
+    assert set(sealing.unseal("survey", survey.pk, pooled.first().sealed)) == {"answers"}
     open_results = surveys.results(survey, include_text=True)
     assert open_results["responses"] == 3 and open_results["pending"] == 3
     surveys.close_survey(survey, actor=board)
@@ -447,7 +447,7 @@ def test_runtime_role_may_stage_and_flush_but_never_rewrite_choices(settings):
 
 def test_the_flush_statement_works_as_the_runtime_role(app_role_connection):
     cur = app_role_connection.cursor()
-    cur.execute("DELETE FROM governance_pendingsecretchoice WHERE vote_id = -1 RETURNING payload")
+    cur.execute("DELETE FROM governance_pendingsecretchoice WHERE vote_id = -1 RETURNING sealed")
     assert cur.fetchall() == []
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         cur.execute("UPDATE governance_pendingsecretchoice SET sort_key = 0 WHERE vote_id = -1")

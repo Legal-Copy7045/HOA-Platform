@@ -931,17 +931,21 @@ def _mix_key() -> int:
 
 
 class PendingSecretChoice(models.Model):
-    """A secret choice waiting to be written to its permanent table (D56).
+    """A secret choice waiting to be written to its permanent table (D56, D68).
 
-    Casting records who voted (append-only, as before) and puts the choice
-    here, with nothing that names the voter: no person, lot, ballot or
-    participation id and no timestamp; a random id and a random sort key.
-    ``governance.mixing`` later moves pooled choices to ``SecretChoice``,
-    ``ElectionChoice`` or ``SurveyResponse``/``SurveyAnswer`` in a separate
-    transaction and in shuffled order, so the permanent rows share no
-    transaction id, sequence, time or physical order with the participation
-    rows. A staging area, not a record: rows are deleted when moved (the
-    runtime role may INSERT, SELECT and DELETE here, never UPDATE)."""
+    Casting records who voted (append-only, as before) and, in the same
+    transaction so one vote per home stays atomic, puts the choice here with
+    nothing that names the voter: no person, lot, ballot or participation id
+    and no timestamp; a random id and a random sort key. The choice itself is
+    ``sealed`` (``governance.sealing``: AES-GCM under a key from the server's
+    environment, padded to one size per vote, election or survey), so this
+    row, which shares the casting transaction's id with the participation,
+    holds nothing readable from the database, a dump or the write-ahead log.
+    ``governance.mixing`` later opens pooled choices in memory and writes them
+    to ``SecretChoice``, ``ElectionChoice`` or ``SurveyResponse``/
+    ``SurveyAnswer`` in a separate transaction and in shuffled order. A
+    staging area, not a record: rows are deleted when moved (the runtime role
+    may INSERT, SELECT and DELETE here, never UPDATE)."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     vote = models.ForeignKey(
@@ -953,9 +957,10 @@ class PendingSecretChoice(models.Model):
     survey = models.ForeignKey(
         Survey, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
-    # vote: {"option": id}; election: {"candidates": [ids]}; survey:
-    # {"answers": [{"question": id, "choice": id|None, "rating": n|None, "text": ""}]}
-    payload = models.JSONField()
+    # Sealed (governance.sealing) JSON. vote: {"option": id}; election:
+    # {"candidates": [ids]}; survey: {"answers": [{"question": id,
+    # "choice": id|None, "rating": n|None, "text": ""}]}
+    sealed = models.BinaryField()
     sort_key = models.BigIntegerField(default=_mix_key)
 
     class Meta:

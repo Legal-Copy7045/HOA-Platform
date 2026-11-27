@@ -78,11 +78,13 @@ echo "==> Database"
 # in the dump on purpose. Excluding it (--exclude-table-data) would make a
 # restore taken during an open vote lose the choices still waiting there
 # while keeping the "this home voted" rows, and those homes could not vote
-# again: a binding vote would silently miss ballots. The cost: a backup taken
-# while a secret vote, election or anonymous survey is open holds up to about
-# 2 x SECRET_BALLOT_MIX_MIN pooled choices per open item whose order in the
-# dump can still be matched to the casting order. Backups are encrypted and
-# held under the two-person rules; after the vote closes the pool is empty.
+# again: a binding vote would silently miss ballots. Pooled choices are
+# sealed (D68) under a key derived from DJANGO_SECRET_KEY, which lives only in
+# .env and is never in this backup: a dump taken while a secret vote,
+# election or anonymous survey is open pairs each pooled row with a casting
+# order, but the row is ciphertext. Keep .env apart from these backups, and
+# restore with the same DJANGO_SECRET_KEY (or it in
+# DJANGO_SECRET_KEY_FALLBACKS) or pooled ballots cannot be counted.
 # The password goes through the environment, not the command line, so it
 # never shows in the host's process list (SEC-008).
 PGPASSWORD="$OWNER_PW" "${COMPOSE[@]}" exec -T -e PGPASSWORD postgres \
