@@ -1,6 +1,6 @@
 # Stable check IDs for the ci stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: CI-013
+# highest issued: CI-014
 CI-001: "ruff lint"
 CI-002: "ruff format"
 CI-003: "bandit security scan"
@@ -14,3 +14,4 @@ CI-010: "no pull_request_target"
 CI-011: "regression output git-ignored"
 CI-012: "versions (VERSION, CHANGELOG.md, versions.yaml)"
 CI-013: "privacy guard"
+CI-014: "regression logs current for the release"

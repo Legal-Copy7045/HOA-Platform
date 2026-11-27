@@ -236,7 +236,7 @@ SUBPAGES = {
     "community_info": ["committees"],
     "paper_mail": ["paper_mail_settings"],
     # The incident timeline opens from System status (D74).
-    "system_status": ["ops_timeline"],
+    "system_status": ["ops_timeline", "system_restart"],
     # The board reads server task history on Sysadmin activity (WT-007);
     # sysadmins, who cannot open that page, keep Server tasks in the menu.
     "sysadmin_activity": ["server_tasks"],

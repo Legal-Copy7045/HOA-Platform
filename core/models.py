@@ -169,6 +169,8 @@ class HostTask(models.Model):
         HARDEN_HOST = "harden_host", "Re-apply host security"
         HEALTH_CHECK = "health_check", "Run the health checks"
         RESEED_DEMO = "reseed_demo", "Reseed with demo data"
+        # System status -> Restart the portal (D91): web and worker, both compose files.
+        RESTART_APP = "restart_app", "Restart the portal"
 
     class State(models.TextChoices):
         REQUESTED = "requested", "Waiting for the server"

@@ -100,3 +100,27 @@ the demo data for the new modules once:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web python manage.py seed_demo_operations
 ```
+
+## Compose files always together (D91)
+
+On the VM the portal is always `docker-compose.yml` plus
+`docker-compose.tunnel.yml`. `.env` holds
+`COMPOSE_FILE=docker-compose.yml:docker-compose.tunnel.yml` (written by
+`make-env.sh`; `start-portal.sh` and `update-portal.sh` add it to an older
+`.env`, appending one line and touching no other), so a plain
+`docker compose ...` in `/opt/hoa-portal` uses both files too. Without it,
+`docker compose up -d --force-recreate web worker` recreated web without the
+`edge` network and cloudflared lost the site.
+
+cloudflared is on the `edge` network only (security review E3/E9): it must
+never reach Postgres or the file store. Never fix a lost tunnel with
+`docker network connect <project>_default <cloudflared>`; run
+`sudo bash infra/poc/update-portal.sh` (or `start-portal.sh`), which
+disconnects cloudflared from any other network every time it runs. The
+"Tunnel network" health check on System status fails while cloudflared is on
+another network (the agent reports it each minute).
+
+To restart web and worker, use System status -> Restart the portal (a server
+task: sysadmins, a fresh sign-in check and a confirmation, at most once every
+10 minutes), or `sudo bash infra/poc/restart-portal.sh` on the VM. Both use
+both compose files.

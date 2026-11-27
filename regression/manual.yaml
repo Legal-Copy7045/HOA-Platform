@@ -393,3 +393,11 @@
   check: "On a 390 px phone and on a desktop, a demo board member's Finance overview shows the cards (one column on the phone) with each card's number beside its title, and the Finance menu number equals the sum of the numbers on the cards; the dashboard's Record payments received button has clear space above the stat tiles; the demo manager's and auditor's overview shows only what they may open (D89)."
   steps: "POC with fictional data (oak_creek), signed in as a demo board member, the demo manager and the demo auditor; compare the menu bubble with the cards; check the dashboard on both widths."
   last: ""
+- key: compose files together on the VM
+  check: "On the VM, .env has COMPOSE_FILE=docker-compose.yml:docker-compose.tunnel.yml; a plain `sudo docker compose up -d --force-recreate web worker` in /opt/hoa-portal keeps the site reachable through the tunnel and warns about no orphans; cloudflared is on the edge network only (never the default network); System status lists Tunnel network as OK (D91)."
+  steps: "After updating to 0.43.0: grep COMPOSE_FILE /opt/hoa-portal/.env; run the recreate; open the site; sudo docker inspect -f '{{json .NetworkSettings.Networks}}' on the cloudflared container; check System status."
+  last: ""
+- key: restart the portal from system status
+  check: "As a sysadmin on the POC, System status -> Restart... asks for the password or passkey, shows the confirmation page, and Restart the portal now restarts web and worker within a minute or two; the page then shows Done with the result; a second restart within 10 minutes is refused; the tunnel keeps working (D91)."
+  steps: "POC, signed in as the sysadmin; System status -> Restart...; confirm; refresh after a minute; try again at once; open the site from outside."
+  last: ""

@@ -251,9 +251,9 @@ def test_a_strange_id_stops_the_agent(vm):
 
 
 def test_the_case_statement_is_the_only_mapping():
-    assert TASKS.count("TASK_CMD=(") == 8  # the reset plus one per kind
+    assert TASKS.count("TASK_CMD=(") == 9  # the reset plus one per kind
     body = TASKS.split("host_task_command() {", 1)[1].split("\n}\n", 1)[0]
-    assert body.count("TASK_CMD=(") == 8 and "*)\n      return 1 ;;" in body
+    assert body.count("TASK_CMD=(") == 9 and "*)\n      return 1 ;;" in body
     from core.models import HostTask
 
     mapped = set(re.findall(r"^    ([a-z_]+)\)$", body, re.M))
@@ -439,6 +439,63 @@ def test_attach_requester_is_a_fixed_flag_with_the_task_id(vm, attach, args):
     assert _read(vm, "ran.log") == f"reseed-demo.sh {args}\n"
     assert not (vm / "pwned").exists()
     assert "[state=succeeded]" in _finish(psql)
+
+
+# --- Restart the portal (D91) ---------------------------------------------------------------
+
+RESTART = (POC / "restart-portal.sh").read_text()
+
+
+@needs_bash
+def test_restart_runs_the_fixed_script_and_reports_its_last_line(vm):
+    _script(
+        vm / "infra" / "poc" / "restart-portal.sh",
+        f'echo "restart-portal.sh $*" >> "{vm}/ran.log"\n'
+        'echo "==> Restarting the web server and the background worker"\n'
+        'echo "Restarted the web server and the background worker; the site answers."\n',
+    )
+    result, psql = _run(vm, "31|restart_app")
+    assert result.returncode == 0, result.stderr
+    assert _read(vm, "ran.log") == "restart-portal.sh \n"  # no arguments at all
+    finish = _finish(psql)
+    assert "[state=succeeded]" in finish
+    assert "[summary=Restarted the web server and the background worker; the site answers.]" in (
+        finish
+    )
+
+
+@needs_bash
+@pytest.mark.parametrize("kind", ["restart", "restart_app ", "restart_web", "RESTART_APP"])
+def test_only_the_exact_restart_kind_is_accepted(vm, kind):
+    _, psql = _run(vm, f"32|{kind}")
+    assert _read(vm, "ran.log") == ""
+    assert "[state=refused]" in _finish(psql)
+
+
+def test_restart_case_entry_and_script_use_both_compose_files():
+    assert (
+        "    restart_app)\n      TASK_MINUTES=5; "
+        'TASK_CMD=(bash "$APP_DIR/infra/poc/restart-portal.sh") ;;'
+    ) in TASKS
+    assert (
+        'COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml '
+        "-f docker-compose.tunnel.yml)"
+    ) in RESTART
+    order = [
+        "ensure_compose_file .env",
+        '"${COMPOSE[@]}" restart web worker',
+        "grep -q '_edge$'",
+        '"${COMPOSE[@]}" up -d --no-deps --force-recreate web',
+        "{{.State.Health.Status}}",
+        "\ncloudflared_edge_only\n",
+        'echo "Restarted the web server',
+    ]
+    positions = [RESTART.index(step) for step in order]
+    assert positions == sorted(positions)
+    # Nothing rebuilt, pulled or migrated; nothing else restarted.
+    for word in ("build", "pull", "migrate", "down", "postgres", "eval ", "bash -c"):
+        assert word not in RESTART.split("set -euo pipefail", 1)[1], word
+    assert "set -euo pipefail" in RESTART and '"$(id -u)" -eq 0' in RESTART
 
 
 def test_reseed_script_accepts_only_the_flag_and_a_numeric_task_id():

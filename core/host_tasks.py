@@ -38,6 +38,19 @@ RESEED_CONFIRM_TEXT = (
 )
 
 
+# Restarting the portal (D91): started only from its own confirmation page
+# (System status -> Restart the portal), which sends this fixed value; at most
+# once every RESTART_COOLDOWN, and like every task one at a time.
+RESTART_CONFIRM_VALUE = "restart"
+RESTART_COOLDOWN = datetime.timedelta(minutes=10)
+RESTART_CONFIRM_TEXT = (
+    "The portal's web server and background worker are stopped and started again "
+    "(with both compose files, so the tunnel keeps reaching the site). Everyone is "
+    "unavailable for up to a minute; anything being typed into a form at that moment "
+    "may need to be sent again. The database, files, scanner and tunnel keep running."
+)
+
+
 class HostTaskRefused(Exception):
     """A request the portal will not pass on (shown to the person as is)."""
 
@@ -52,6 +65,9 @@ class TaskSpec:
     # reseed_demo (D53): offered only where demo data is allowed, takes a
     # dataset from the registry and the typed confirmation word.
     demo_only: bool = False
+    # Started from its own page (a URL name) after a confirmation step, never
+    # with the plain Start button (restart_app, D91).
+    own_page: str = ""
 
 
 TASKS = [
@@ -111,6 +127,14 @@ TASKS = [
         RESEED_CONFIRM_TEXT,
         demo_only=True,
     ),
+    TaskSpec(
+        Kind.RESTART_APP,
+        "Restart the portal",
+        "Stops and starts the web server and the background worker, for example after a "
+        "setting changed on the server. Started from System status, after a confirmation.",
+        RESTART_CONFIRM_TEXT,
+        own_page="system_restart",
+    ),
 ]
 BY_KIND = {spec.kind: spec for spec in TASKS}
 
@@ -169,6 +193,8 @@ def request_task(
         attach_requester = attach_requester is True
     else:
         dataset, attach_requester = "", False
+    if kind == Kind.RESTART_APP:
+        check_restart(confirmation)
     waiting = current()
     if waiting is not None:
         raise HostTaskRefused(
@@ -193,6 +219,33 @@ def request_task(
         metadata["attach_requester"] = attach_requester
     record_event("system.task_requested", actor=actor, request=request, metadata=metadata)
     return task
+
+
+def last_restart() -> HostTask | None:
+    return HostTask.objects.filter(kind=Kind.RESTART_APP).select_related("requested_by").first()
+
+
+def restart_wait(now=None) -> datetime.timedelta | None:
+    """How long until another restart may be asked for (None: now)."""
+    last = last_restart()
+    if last is None:
+        return None
+    left = last.requested_at + RESTART_COOLDOWN - (now or timezone.now())
+    return left if left > datetime.timedelta(0) else None
+
+
+def check_restart(confirmation: str) -> None:
+    """A restart needs its confirmation page's fixed value and no other
+    restart asked for in the last RESTART_COOLDOWN (D91)."""
+    if confirmation != RESTART_CONFIRM_VALUE:
+        raise HostTaskRefused("Confirm the restart on its own page first.")
+    left = restart_wait()
+    if left is not None:
+        minutes = max(1, -(-int(left.total_seconds()) // 60))
+        raise HostTaskRefused(
+            "The portal was restarted a few minutes ago. Another restart can be asked for in "
+            f"{minutes} minute{'s' if minutes != 1 else ''}."
+        )
 
 
 _CONTROL = re.compile(r"[^\t\n\x20-\x7e]")

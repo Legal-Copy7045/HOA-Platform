@@ -64,6 +64,23 @@ psql_run -v hs="$HOST_SECURITY" >/dev/null <<'SQL'
 UPDATE core_updatestatus SET host_security = :'hs'::jsonb WHERE id = 1;
 SQL
 
+# The tunnel's networks (D91): cloudflared belongs on the edge network only
+# (security review E3/E9). Reported for the "Tunnel network" health check;
+# start-portal.sh and update-portal.sh disconnect anything else. Plain network
+# names only (lib.sh network_names), through psql variables.
+TUNNEL_LINES="$(cloudflared_networks)"
+TUNNEL_STATE=absent
+TUNNEL_EXTRA=""
+if [ -n "$TUNNEL_LINES" ]; then
+  TUNNEL_STATE=running
+  TUNNEL_EXTRA="$(extra_networks <<<"$TUNNEL_LINES" | head -5 | tr '\n' ' ' | cut -c1-300)"
+fi
+psql_run -v ts="$TUNNEL_STATE" -v te="${TUNNEL_EXTRA% }" >/dev/null <<'SQL'
+UPDATE core_updatestatus
+   SET host_security = host_security || jsonb_build_object('tunnel', :'ts', 'tunnel_extra', :'te')
+ WHERE id = 1;
+SQL
+
 # Server memory, swap and load for System status (D39): read from /proc,
 # numbers only, a few milliseconds a minute. low_since records when available
 # memory first dropped under 10%, so the health check alerts only when it

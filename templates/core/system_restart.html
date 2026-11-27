@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Restart the portal · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'system_status' %}">System status</a> / Restart the portal</div>
+  <div class="page-head"><div><h1>Restart the portal</h1>
+    <p class="subtitle">Stops and starts the portal's web server and background worker. The portal only asks; the server's own agent does it from its fixed list of tasks (decision D91).</p></div></div>
+  {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> The server's agent has not reported in the last few minutes. A restart waits until it is back.</span></div>{% endif %}
+  {% if current %}<section class="card" id="current-task"><h2>Now</h2>
+    <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email }} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
+    <p class="small muted">Refresh the page to see the result. If the page does not load, wait a minute: the portal is starting again.</p></section>{% endif %}
+  <section class="card" id="last-restart"><h2>Last restart</h2>
+    {% if last %}<p>{{ last.task.requested_at|date:"M j, Y g:i A" }} · {% status last.task.state last.task.get_state_display %} · asked by {{ last.task.requested_by.email }}</p>
+      {% if last.summary %}<p class="small">{{ last.summary }}</p>{% endif %}
+      {% if last.tail %}<details><summary>Last lines of output</summary><pre class="small task-output">{{ last.tail }}</pre></details>{% endif %}
+    {% else %}<p class="muted">The portal has not been restarted from here yet.</p>{% endif %}
+  </section>
+  <section class="card" id="confirm-restart"><h2>Confirm</h2>
+    <div class="alert warning" role="note">{% icon "alert" %}<span>{{ confirm_text }}</span></div>
+    {% if wait_minutes %}<p class="small muted">Another restart can be asked for in {{ wait_minutes }} minute{{ wait_minutes|pluralize }}.</p>{% endif %}
+    <form method="post">{% csrf_token %}<input type="hidden" name="confirm" value="{{ confirm_value }}">
+      <div class="inline-form"><button type="submit" class="danger"{% if current or wait_minutes %} disabled title="{% if current %}A server task is waiting or running{% else %}Restarted a few minutes ago{% endif %}"{% endif %}>Restart the portal now</button>
+      <a class="btn secondary" href="{% url 'system_status' %}">Cancel</a></div>
+    </form>
+  </section>
+{% endblock %}
