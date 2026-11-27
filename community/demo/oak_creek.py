@@ -141,6 +141,7 @@ def seed() -> SeedResult:
     __import__("core.demo_monitoring", fromlist=["seed"]).seed()  # D74 monitoring demo data
 
     call_command("seed_demo_help", stdout=io.StringIO())  # D73: help pages, checklist progress
+    call_command("seed_demo_books", stdout=io.StringIO())  # books and close (D69-D71)
     return SeedResult(
         summary=(
             "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "

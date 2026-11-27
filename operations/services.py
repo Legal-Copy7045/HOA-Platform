@@ -421,6 +421,9 @@ def record_payment(
         raise OperationsError("Choose a payment method.")
     if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
         raise OperationsError("Enter a check number or short reference, never an account number.")
+    from ledger.books.periods import refuse_closed  # no posting into a closed month (D70)
+
+    refuse_closed(paid_on, error=OperationsError, what="The payment date")
     with transaction.atomic():
         invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if invoice.state != "approved":

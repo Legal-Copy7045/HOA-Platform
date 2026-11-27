@@ -99,6 +99,21 @@ STEPS: list[Step] = [
         features=("disbursements",),
     ),
     Step(
+        "books",
+        "Books and close",
+        "The association's own books: whether months and years close by themselves when "
+        "everything balances, the close day, the deposit and check limits, the monthly "
+        "reserve contribution and how bank lines are coded. Bank accounts, their funds and "
+        "the categories are set on the linked pages.",
+        groups=("Books and close",),
+        features=("books", "financial_statements"),
+        links=(
+            ("Bank accounts and funds", "books_accounts", "books.setup"),
+            ("Bank categories and rules", "books_coding", "books.view"),
+            ("Month and year close", "books_close", "books.view"),
+        ),
+    ),
+    Step(
         "payments",
         "Online payments and automatic payments",
         "Whether owners can pay online (Stripe's hosted page) and set up automatic "

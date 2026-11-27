@@ -106,6 +106,43 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "The treasurer should confirm the dormancy period and keep a list of uncashed checks.",
         ),
     ],
+    "books": [
+        LawNote(
+            "26 U.S.C. § 528; IRS Form 1120-H",
+            "Homeowners associations' federal income tax",
+            "An association that meets the tests (at least 60% of gross income from members' "
+            "assessments and fees, at least 90% of spending on the association's property) may "
+            "file Form 1120-H; other income such as bank interest is taxed after a $100 "
+            "deduction. Otherwise Form 1120 applies.",
+            "The year-end tax worksheet separates exempt-function income from other income for "
+            "the preparer, who confirms the form.",
+        ),
+        LawNote(
+            "68 Pa.C.S. § 5316, § 5407",
+            "Uniform Planned Community Act: records and resale certificates",
+            "The association keeps financial records detailed enough for resale certificates "
+            "and makes them available to owners.",
+            "Closed months and year-end packages keep the books as they were; corrections are "
+            "posted in the open month with a reference.",
+        ),
+        LawNote(
+            "IRC § 6041, § 6071(c); IRS Instructions for Forms 1099-MISC and 1099-NEC; IRIS",
+            "1099s for vendors",
+            "Payments to some vendors over the year must be reported on Form 1099-NEC or "
+            "1099-MISC by January 31, to the vendor and to the IRS (the Information Returns "
+            "Intake System, IRIS, takes a CSV upload).",
+            "The Tax worksheet gives the totals, an IRIS upload file and recipient copies "
+            "without taxpayer numbers (the portal keeps none: add them in IRIS from the W-9). "
+            "The year close stops for vendors over the threshold without a W-9.",
+        ),
+        LawNote(
+            "15 Pa.C.S. § 146",
+            "Pennsylvania annual report for corporations",
+            "Nonprofit corporations file an annual report with the PA Department of State.",
+            "It is put on Recurring deadlines with a reminder; confirm the due date and any "
+            "other state filing with your preparer.",
+        ),
+    ],
     "payments": [
         LawNote(
             "12 C.F.R. § 1005.10(b)",

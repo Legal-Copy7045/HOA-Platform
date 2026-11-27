@@ -93,6 +93,10 @@ SMS_AUTH_TOKEN=
 SMS_FROM=
 # SMS_API_BASE=https://api.twilio.com
 
+# Year-end packages (D71): signs each package's manifest; keep a copy with the
+# treasurer's records (docs/runbook.md "Month-end and year-end close").
+BOOKS_PACKAGE_KEY=$(secret 32)
+
 # Bank feed (optional; docs/runbook.md "Bank feed (Teller, free tier)").
 BANK_FEED_TOKEN_KEY=$(secret 32)
 TELLER_APPLICATION_ID=

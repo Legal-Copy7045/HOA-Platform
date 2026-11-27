@@ -738,6 +738,8 @@ class BankTransactionSource(models.TextChoices):
     TELLER = "teller", "Teller"
     OFX = "ofx", "OFX/QFX file"
     CSV = "csv", "CSV file"
+    # A month-end statement balance typed by the treasurer (D70).
+    ENTERED = "entered", "Entered from the statement"
 
 
 class BankTransaction(AppendOnlyModel):
@@ -797,8 +799,9 @@ class BankMatch(AppendOnlyModel):
     undoes = models.OneToOneField(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="undone_by"
     )
+    # Empty when the automatic close confirmed an unambiguous match (D70).
     confirmed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     confirmed_at = models.DateTimeField(default=timezone.now)
 
@@ -1138,3 +1141,7 @@ class CheckPrintSettings(models.Model):
     def get(cls) -> CheckPrintSettings:
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# --- Books and close (D69-D71): ledger/books/models.py ---------------------------------
+from ledger.books.models import *  # noqa: E402, F403

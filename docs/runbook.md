@@ -1157,3 +1157,24 @@ if the next email bounces too, it shows again. For a bounced official notice,
 use "Prepare the letter" on Paper mail (it prepares a letter for that one home,
 whatever their email choice) and mark the mailing as mailed as usual.
 
+
+## Month-end and year-end close (D70, D71)
+
+**What happens by itself.** Every day the portal codes new bank lines by the board's rules, confirms bank matches that can only be one thing, and from the close day (rule `books.close_day`, the 3rd) checks last month. If every bank line is matched or coded, every account's balance at month end is known and reconciles, the month's assessments and late fees are posted (or waived), no payment waits to be deposited, the Stripe payouts are matched, transfers have both sides and no fund is below zero, the month closes by itself. Once a fiscal year's twelve months are closed the year closes too, the tax filings are put on Recurring deadlines and the year-end package is built.
+
+**First time.** Accounting → Setup: the opening date (the books start the next day). More finance → Bank accounts and funds: each account's fund (operating, reserve), chart account and balance on that date; tick the primary operating account. More finance → Bank categories and rules: check the categories, add rules for lines that repeat ("INTEREST" → Interest income, "SERVICE CHARGE" → Bank fees, "TRANSFER TO SAVINGS" money out and "TRANSFER FROM CHECKING" money in → Transfer between the association's accounts).
+
+**When My items says "<Month> books: N exceptions".** Open Finance → Month and year close. What each means:
+- *A bank line is not matched or coded*: code it to a category (tick "lines like this" to make a rule), or match it on the Bank feed (a deposit, payout or check).
+- *Enter the balance on <date>*: the bank did not report a month-end balance. Import the month's OFX/QFX file (it carries the ledger balance) or type the statement's ending balance.
+- *Off by $X*: usually a missing bank line, a wrong opening balance or an item matched to the wrong account. If it is genuinely right (a bank error corrected next month), explain it; another board member must agree.
+- *No late fee*: post the month's late fees, or waive one with the reason (a board decision; never your own home).
+- *Payment waiting to be deposited*: record the deposit on Accounting.
+- *Payout not matched or not arrived*: match it on the Bank feed; one Stripe has not paid yet stays until it arrives.
+- *Transfer with no matching line*: code the other account's line as a transfer too; a transfer in transit at month end can be explained.
+- *Fund below zero*: money was spent from the wrong fund or an entry is missing.
+- Warnings (stale checks, reserve contribution short) never stop the close.
+
+**Mistakes in a closed month.** Post the correction in the open month (coding a line again, a reversal): the portal adds the reference to the original date. Reopening needs a board member's request and a different board member's approval; only the latest closed month, and only while its year is open.
+
+**Year end.** Finance → Financial statements → the fiscal year: the statements (PDF, CSV) and the year-end package. The package's manifest.json is signed with `BOOKS_PACKAGE_KEY` (set it in the server's .env and keep a copy with the treasurer's records); on the server `python manage.py verify_books_package <file.zip>` checks it; elsewhere use the snippet in the package's README.txt with the key. More finance → Tax worksheet: Form 1120-H line by line with the 60%/90% tests, the 1099 IRIS upload (add each vendor's TIN from the W-9 in IRIS; the portal keeps none) and recipient copies. Nothing is filed by the portal; the preparer confirms the form and the figures.

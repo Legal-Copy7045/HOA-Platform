@@ -323,6 +323,11 @@ MEMBER_READS = {
                 # D72: Renewals (read only) and document access history.
                 "renewals.view",
                 "document.access_history",
+                # Books and close (D69-D71): read only, plus the package and tax.
+                "books.view",
+                "statements.view",
+                "books.package",
+                "tax.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

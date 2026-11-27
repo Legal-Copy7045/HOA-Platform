@@ -9,6 +9,9 @@ class LedgerConfig(AppConfig):
         from django.db.models.signals import post_save
 
         from ledger import exports  # noqa: F401  (registers the data-export section)
+        from ledger.books.audit_actions import register_all
+
+        register_all()  # books and close (D69-D71)
         from ledger.allocation import on_entry_saved
         from ledger.models import LedgerEntry
 

@@ -641,6 +641,11 @@ def items_for(user) -> list[Item]:
         from ledger.disbursements import board_items
 
         out.extend(board_items(user))
+    # Books and close (D70): exceptions, second agreements and reopens.
+    if can(user, "books.code") or can(user, "books.close"):
+        from ledger.books.close import board_items as books_items
+
+        out.extend(books_items(user))
     # Entries moved between ownership accounts, to check (fixres BUG-003).
     if can(user, "ledger.manage"):
         from ledger.models import EntryMoveNotice

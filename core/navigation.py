@@ -93,6 +93,29 @@ HUBS = {
             "disbursement.view",
             "Surplus distributions and refunds to owners, with their checks.",
         ),
+        # Books and close (D69, D71).
+        (
+            "Bank accounts and funds",
+            "books_accounts",
+            "wallet",
+            "books.view",
+            "The association's bank accounts, the fund each belongs to and their opening balances.",
+        ),
+        (
+            "Bank categories and rules",
+            "books_coding",
+            "list",
+            "books.view",
+            "Categories bank lines are coded to, and the rules that code them by themselves.",
+        ),
+        (
+            "Tax worksheet",
+            "tax_worksheet",
+            "file",
+            "tax.view",
+            "The Form 1120-H worksheet, 1099 totals with the IRIS upload file, and the filing "
+            "deadlines.",
+        ),
         (
             "Resale certificates",
             "resales",
@@ -325,6 +348,9 @@ SECTIONS = [
             ("Collections", "collections", "dollar", "finance.view"),
             ("Budgets", "budgets", "chart", "finance.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
+            # Books and close (D70, D71).
+            ("Month and year close", "books_close", "check-circle", "books.view"),
+            ("Financial statements", "financial_statements", "chart", "statements.view"),
             ("Reports", "reports", "chart", "reports.view"),
             # Reserve plan, Online payments, Disbursements, Resale certificates.
             ("More finance", "finance_more", "dollar", HUB),

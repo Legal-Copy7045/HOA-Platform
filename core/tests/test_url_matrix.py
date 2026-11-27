@@ -430,6 +430,18 @@ PROTECTED = {
     "records_disposal_decide": ("POST", None),
     "records_hold_place": ("POST", None),
     "records_hold_release": ("POST", None),
+    # Books and close, statements and tax (D69-D71): board, manager, auditor.
+    "books_close": ("GET", None),
+    "books_action": ("POST", None),
+    "books_accounts": ("GET", None),
+    "books_coding": ("GET", None),
+    "accounting_quickbooks": ("GET", None),
+    "financial_statements": ("GET", None),
+    "financial_statements_csv": ("GET", None),
+    "financial_statements_pdf": ("GET", None),
+    "year_end_package": ("GET", None),
+    "tax_worksheet": ("GET", None),
+    "tax_download": ("GET", None),
 }
 # Pages refused before their record is looked up: any id will do (D72).
 PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
