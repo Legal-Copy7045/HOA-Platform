@@ -6,6 +6,31 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.40.0 — 2026-11-27
+
+The portal is now the association's books (self-managed, D69-D85):
+
+- Books and automatic close (D69-D71): operating and reserve funds across the
+  association's bank accounts, bank lines coded by rules (interest, fees,
+  insurance, transfers...), and months that close themselves when everything
+  balances; anything that does not becomes an exception for the treasurer on
+  My items. Closed months are locked; reopening takes two board members. The
+  year closes itself too, with financial statements, the annual accounting
+  figure, a Form 1120-H worksheet, 1099 files (no tax ID numbers stored), PA
+  filing deadlines and a signed year-end package with a treasurer handover
+  sheet. Optional QuickBooks Online export.
+- Special assessments, payment plans with schedules, expense reimbursements,
+  vendor check printing and next year's budget pre-filled from this year
+  (D75-D78).
+- Optional features, all off until the board switches them on: interest on
+  overdue balances, a 12-month cash-flow forecast, liens and legal steps in
+  collections, capital projects, an owners' operating-vs-reserve and
+  budget-vs-actual summary, insurance claims (D80-D85).
+- Vendor onboarding (D79): a single-use link where a vendor fills in their
+  details, W-9 and insurance certificate (encrypted in the portal; key set on
+  the server with set-vendor-key.sh), reviewed by two board members before
+  any invoice can be paid.
+
 ## 0.39.0 — 2026-11-27
 
 - Renewals (D72, Maintenance → Renewals): the association's insurance

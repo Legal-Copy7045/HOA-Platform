@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Capital projects · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Capital projects</h1><p class="subtitle">Big projects with their budget, board approval, change orders and what has been spent.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th>Project</th><th>Status</th><th>Paid from</th><th class="num">Budget</th><th class="num">Committed</th><th class="num">Spent</th><th class="num">Done</th></tr></thead>
+    <tbody>{% for p, f in rows %}<tr class="row-link">
+      <td class="cell-title"><a class="row-main" href="{% url 'capital_project_detail' p.pk %}">{{ p.title }}</a>{% if p.owner_visible %} <span class="small muted">(owners see a summary)</span>{% endif %}</td>
+      <td data-label="Status">{% status p.state p.get_state_display %}</td><td data-label="Paid from">{{ p.get_funding_display }}</td>
+      <td class="num" data-label="Budget">{{ f.budget|cents }}</td><td class="num" data-label="Committed">{{ f.committed|cents }}</td><td class="num" data-label="Spent">{{ f.spent|cents }}</td><td class="num" data-label="Done">{{ p.percent_complete }}%</td></tr>
+    {% empty %}<tr><td colspan="7">{% include "partials/empty.html" with icon="wrench" title="No capital projects yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  {% if can_manage %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Add a project</summary><div class="panel-body">
+    <form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Add project</button></div></form>
+    <p class="small muted">A project is planned until the board approves it with a resolution (two board members at or above the amount set in Community setup).</p></div></details>{% endif %}
+{% endblock %}

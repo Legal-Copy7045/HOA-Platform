@@ -105,6 +105,9 @@ FINANCE = [
     "Collections",
     "Budgets",
     "Accounting",
+    # Books and close (D70, D71).
+    "Month and year close",
+    "Financial statements",
     "Reports",
     "More finance",
 ]
@@ -127,7 +130,8 @@ MENUS = {
     "former_owner": {"": ["Dashboard"], "My history": ["My history"]},
     "board": {
         "": ["Dashboard", "My items", "Help"],
-        "My home": MY_HOME,
+        # D77: board and committee members' own expense claims.
+        "My home": [*MY_HOME, "My reimbursements"],
         "Community": COMMUNITY,
         "Association": [
             "Owner requests",

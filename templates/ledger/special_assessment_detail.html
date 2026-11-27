@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ sa.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'special_assessments' %}">Special assessments</a> / {{ sa.title }}</div>
+  <div class="page-head"><div><h1>{{ sa.title }}</h1>
+    <p class="subtitle">{{ sa.total_cents|cents }} · {{ sa.get_allocation_display }} · {{ sa.get_fund_display }} · levied {{ sa.created_at|short_date }}</p></div>
+    {% if can_levy and not notice %}<div class="actions"><form method="post" action="{% url 'special_assessment_action' sa.pk 'notice' %}" data-confirm="Email the notice now to owners who accepted email notice? The others are counted for paper mail.">{% csrf_token %}<button type="submit">{% icon "mail" %} Send the owner notice</button></form></div>{% endif %}
+  </div>
+  <section class="card"><h2>Purpose and authority</h2>
+    <p>{{ sa.purpose|linebreaksbr }}</p>
+    <ul class="list small">
+      <li><span class="grow">Board resolution: {% if sa.resolution %}{{ sa.resolution.number }}: {{ sa.resolution.title }}{% else %}{{ sa.resolution_ref }}{% endif %}</span></li>
+      {% if sa.vote_required %}<li><span class="grow">Owners' vote{% if sa.vote_threshold_percent %} ({{ sa.vote_threshold_percent }}% needed){% endif %}: {% if sa.vote %}{{ sa.vote.title }}{% else %}{{ sa.vote_ref }}{% endif %}</span></li>{% endif %}
+      <li><span class="grow">Late fees on installments: {% if sa.late_fees %}yes{% else %}no{% endif %}</span></li>
+      {% if sa.rule_citation %}<li><span class="grow">Citations: {{ sa.rule_citation }}</span></li>{% endif %}
+      {% if notice %}<li><span class="grow">Owner notice sent {{ notice.created_at|short_date }}: {{ notice.emailed }} emailed, {{ notice.paper }} need paper{% if notice.paper %} (<a href="{% url 'paper_mail' %}">Paper mail</a>){% endif %}</span></li>{% endif %}
+      {% for c in cancels %}<li><span class="grow">Installments from {{ c.from_number }} cancelled {{ c.created_at|short_date }}: {{ c.reason }}</span></li>{% endfor %}
+    </ul>
+  </section>
+  <h2>Installments</h2>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Installment</th><th scope="col">Due</th><th scope="col" class="num">All homes</th><th scope="col">Status</th><th scope="col" class="num">Paid</th><th scope="col" class="num">Still open</th></tr></thead>
+    <tbody>{% for r in installments %}<tr><td class="cell-title">{{ r.installment.number }} of {{ sa.installments }}</td><td data-label="Due">{{ r.installment.due_on|short_date }}</td><td class="num" data-label="All homes">{{ r.total_cents|cents }}</td>
+      <td data-label="Status"><span class="status {% if r.status == 'posted' %}tone-success{% elif r.status == 'cancelled' %}tone-danger{% else %}tone-info{% endif %}">{{ r.status|capfirst }}</span></td>
+      <td class="num" data-label="Paid">{% if r.status == "posted" %}{{ r.paid_cents|cents }}{% endif %}</td><td class="num" data-label="Still open">{% if r.status == "posted" %}{{ r.open_cents|cents }}{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <div class="actions">
+    {% if can_post %}<form method="post" action="{% url 'special_assessment_action' sa.pk 'post' %}">{% csrf_token %}<button type="submit" class="secondary">Post installments due now</button></form>{% endif %}
+    {% if can_late_fee %}<form method="post" action="{% url 'special_assessment_action' sa.pk 'latefees' %}" data-confirm="Post the late fee on every installment still open after the grace period?">{% csrf_token %}<button type="submit" class="secondary">Post late fees</button></form>{% endif %}
+  </div>
+  {% if can_levy and first_cancellable <= sa.installments %}<details class="panel"><summary>Cancel future installments</summary><div class="panel-body">
+    <p class="small">Installments not yet posted stop. Charges already posted stay; correct one only by a reversal on the home's account.</p>
+    <form method="post" action="{% url 'special_assessment_action' sa.pk 'cancel' %}" class="form-grid" data-confirm="{% acting_confirm "Cancel these installments? They will not post on any account." %}">{% csrf_token %}
+      <div class="field"><label for="from-number">From installment</label><input id="from-number" name="from_number" type="number" min="{{ first_cancellable }}" max="{{ sa.installments }}" value="{{ first_cancellable }}"></div>
+      <div class="field"><label for="cancel-reason">Reason</label><input id="cancel-reason" name="reason" maxlength="300" required></div>
+      <div class="form-actions"><button type="submit" class="secondary">{% for_board "Cancel installments" %}</button></div></form></div></details>{% endif %}
+  <h2>Homes</h2>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Home</th><th scope="col" class="num">Share</th></tr></thead>
+    <tbody>{% for s in shares %}<tr><td class="cell-title">{{ s.lot.label }}</td><td class="num" data-label="Share">{{ s.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

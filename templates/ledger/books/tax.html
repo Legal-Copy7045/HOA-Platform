@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Tax worksheet · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "finance_more" %}Tax worksheet</nav>
+  <div class="page-head"><div><h1>Tax worksheet</h1>
+    <p class="subtitle">Fiscal year {{ year }}{% if w and not w.closed %} · <strong>not closed</strong>{% endif %}. Worksheets for the tax preparer, from the books: Form 1120-H line by line, the 1099 totals with an IRS IRIS upload file and recipient copies, and the filing deadlines. Nothing is filed by the portal; confirm the form and every figure with your tax preparer.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'tax_download' %}?year={{ year }}&amp;format=worksheet_pdf">{% icon "download" %} Worksheet PDF</a><a class="btn secondary" href="{% url 'tax_download' %}?year={{ year }}&amp;format=worksheet_csv">{% icon "download" %} CSV</a></div></div>
+  <form method="get" class="inline-form"><div><label for="ty">Fiscal year</label><select id="ty" name="year">{% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}</select></div><button type="submit" class="secondary">Show</button></form>
+  {% if w %}<section class="card" data-testid="form-1120h"><h2>Form 1120-H</h2>
+    {% if not w.qualifies %}<div class="alert warning">{% icon "alert" %}<span>A qualification test fails: Form 1120 may be needed instead of Form 1120-H. Ask the tax preparer.</span></div>{% endif %}
+    <p class="small">Exempt-function income (assessments, late fees and other member charges; not reported as gross income): <strong>{{ w.exempt_function_cents|cents }}</strong></p>
+    <div class="table-wrap"><table class="stack-sm"><thead><tr><th>Line</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>{% for n, label, c in w.lines %}<tr><td>{{ n }}</td><td class="cell-title">{{ label }}</td><td class="num" data-label="Amount">{{ c|cents }}</td></tr>{% endfor %}</tbody></table></div>
+    <ul class="list small"><li><span class="grow">60% test: exempt-function income share of gross income</span><span class="status{% if w.sixty.passes %} tone-success{% else %} tone-danger{% endif %}">{% if w.sixty.percent is not None %}{{ w.sixty.percent }}% · {% endif %}{% if w.sixty.passes %}Pass{% else %}Fail{% endif %}</span></li>
+      <li><span class="grow">90% test: spending on association property (reserves included)</span><span class="status{% if w.ninety.passes %} tone-success{% else %} tone-danger{% endif %}">{% if w.ninety.percent is not None %}{{ w.ninety.percent }}% · {% endif %}{% if w.ninety.passes %}Pass{% else %}Fail{% endif %}</span></li></ul>
+    <p class="small muted">Rate {{ w.rate_bp|floatformat:0 }} basis points{% if w.rate_citation %} ({{ w.rate_citation }}){% endif %}. Due {{ w.due|date:"F j, Y" }} (IRC § 6072(a)). {{ w.caveat }}</p></section>
+  {% else %}<div class="alert warning">{% icon "alert" %}<span>The books have no start date yet: <a href="{% url 'accounting' %}?tab=setup">Accounting setup</a>.</span></div>{% endif %}
+  <section class="card"><h2>1099s for {{ calendar_year }}</h2>
+    <p class="small muted">Vendors paid at least {{ threshold.0|cents }} in the calendar year{% if threshold.1 %} ({{ threshold.1 }}){% endif %}. The portal keeps no taxpayer numbers: the IRIS file leaves the TIN columns empty for you to complete in IRIS from each vendor's W-9.</p>
+    {% if vendors %}<div class="table-wrap"><table class="stack-sm"><thead><tr><th>Vendor</th><th class="num">1099-NEC</th><th class="num">1099-MISC</th><th>W-9</th></tr></thead><tbody>{% for v in vendors %}<tr><td class="cell-title">{{ v.vendor.name }}</td><td class="num" data-label="NEC">{{ v.nec_cents|cents }}</td><td class="num" data-label="MISC">{{ v.misc_cents|cents }}</td><td data-label="W-9">{% if v.w9 %}On file{% else %}<span class="status tone-warning">Missing</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+      <div class="actions"><a class="btn secondary" href="{% url 'tax_download' %}?year={{ calendar_year }}&amp;format=iris">{% icon "download" %} IRIS upload CSV</a><a class="btn secondary" href="{% url 'tax_download' %}?year={{ calendar_year }}&amp;format=1099_pdf">{% icon "download" %} Recipient copies PDF</a></div>
+    {% else %}<p class="small muted">No vendor at or over the threshold.</p>{% endif %}</section>
+  <section class="card"><h2>Filing deadlines</h2>
+    {% if deadlines %}<ul class="list small">{% for d in deadlines %}<li><span class="grow">{{ d.0 }}{% if d.3 %} <span class="muted">({{ d.3 }})</span>{% endif %}</span><span>{{ d.1 }}</span></li>{% endfor %}</ul>{% endif %}
+    <p class="small muted">On {% if user|can:"task.manage" %}<a href="{% url 'tasks' %}?tab=deadlines">Recurring deadlines</a>{% else %}Recurring deadlines{% endif %} with reminders. Confirm with your preparer which federal and Pennsylvania filings apply.</p>
+    {% if can_deadlines %}<form method="post">{% csrf_token %}<input type="hidden" name="year" value="{{ year }}"><button type="submit" class="secondary">Add the tax and state filings to Recurring deadlines</button></form>{% endif %}</section>
+{% endblock %}

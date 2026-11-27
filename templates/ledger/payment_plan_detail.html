@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Payment plan · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'payment_plans' %}">Payment plans</a> / {{ plan.lot.label }}</div>
+  <div class="page-head"><div><h1>Payment plan: {{ plan.lot.label }}</h1>
+    <p class="subtitle">{{ plan.total_cents|cents }} in {{ schedule|length }} installment{{ schedule|length|pluralize }} · paid {{ paid_cents|cents }} · <span class="status {% if status == 'active' %}tone-success{% elif status == 'proposed' %}tone-warning{% elif status == 'defaulted' %}tone-danger{% else %}tone-info{% endif %}">{{ status_label }}</span></p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'payment_plan_letter' plan.pk %}">{% icon "download" %} Agreement letter (PDF)</a><a class="btn secondary" href="{% url 'collection_detail' plan.case_id %}">Collection case</a></div>
+  </div>
+  <section class="card"><h2>Terms</h2><ul class="list small">
+    <li><span class="grow">Late fees while the plan is kept: {% if plan.suspend_late_fees %}none{% else %}as usual{% endif %}</span></li>
+    <li><span class="grow">Missed {{ plan.grace_days }} days after a due date; defaults {{ plan.default_days }} days after it</span></li>
+    {% if plan.rule_citation %}<li><span class="grow">Citations: {{ plan.rule_citation }}</span></li>{% endif %}
+    <li><span class="grow">Prepared by {{ plan.prepared_by.email }}</span><span class="muted">{{ plan.created_at|short_date }}</span></li>
+    {% for e in events.values %}<li><span class="grow">{{ e.get_kind_display }}{% if e.by %} by {{ e.by.email }}{% endif %}{% if e.note %}: {{ e.note }}{% endif %}</span><span class="muted">{{ e.created_at|short_date }}</span></li>{% endfor %}
+    {% if plan.note %}<li><span class="grow">{{ plan.note }}</span></li>{% endif %}
+  </ul>
+  {% if own_matter %}<p class="board-note" data-testid="own-home-note">{{ own_note }}</p>{% endif %}
+  {% if preparer and status == "proposed" %}<p class="small muted">You prepared this plan; another board member approves it.</p>{% endif %}
+  <div class="actions">
+    {% if can_decide %}<form method="post" action="{% url 'payment_plan_action' plan.pk 'approve' %}" class="inline-form" data-confirm="{% acting_confirm "Approve this payment plan? The collection case moves to Payment plan agreed." %}">{% csrf_token %}<button type="submit">{% icon "check" %} {% for_board "Approve" %}</button></form>
+    <form method="post" action="{% url 'payment_plan_action' plan.pk 'decline' %}" class="inline-form" data-confirm="{% acting_confirm "Decline this plan? The case stays where it is." %}">{% csrf_token %}<div><label for="decline-note">Reason</label><input id="decline-note" name="note" maxlength="300" required></div><button type="submit" class="secondary">{% for_board "Decline" %}</button></form>{% endif %}
+    {% if can_cancel %}<form method="post" action="{% url 'payment_plan_action' plan.pk 'cancel' %}" class="inline-form" data-confirm="{% acting_confirm "Cancel this plan? The collection case returns to where it was before the plan." %}">{% csrf_token %}<div><label for="cancel-note">Reason for cancelling</label><input id="cancel-note" name="note" maxlength="300" required></div><button type="submit" class="secondary">{% for_board "Cancel plan" %}</button></form>{% endif %}
+  </div></section>
+  <h2>Installments</h2>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Installment</th><th scope="col">Due</th><th scope="col" class="num">Amount</th><th scope="col" class="num">Due so far</th><th scope="col">Status</th></tr></thead>
+    <tbody>{% for r in schedule %}<tr><td class="cell-title">{{ r.installment.number }}</td><td data-label="Due">{{ r.installment.due_on|short_date }}</td><td class="num" data-label="Amount">{{ r.installment.amount_cents|cents }}</td><td class="num" data-label="Due so far">{{ r.cumulative_cents|cents }}</td>
+      <td data-label="Status"><span class="status {% if r.status == 'met' %}tone-success{% elif r.status == 'missed' %}tone-danger{% elif r.status == 'due' %}tone-warning{% else %}tone-info{% endif %}">{% if r.status == "met" %}Paid{% elif r.status == "missed" %}Missed{% elif r.status == "due" %}Due{% else %}Upcoming{% endif %}</span></td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

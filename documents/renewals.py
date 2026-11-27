@@ -5,8 +5,9 @@ renewals. Three kinds of item are tracked, each with a deadline:
 
 * the association's own insurance policies (``InsurancePolicy``): the end of
   the term, unless a later term has been recorded as its renewal;
-* vendors' insurance certificates: the vendor's ``insurance_expires_on``
-  (set by each new ``VendorCertificate``), for active vendors;
+* vendors' insurance certificates: vendor onboarding's expiry (D79), else
+  the vendor's ``insurance_expires_on`` (set by each new
+  ``VendorCertificate``), for active vendors;
 * active contracts with an end date: for a contract that renews by itself
   (``ContractTerms.renewal == auto``) the last day to give notice of
   cancellation (end less ``notice_days``); otherwise the end itself. Once a
@@ -152,10 +153,14 @@ def _policies(today) -> list[Renewal]:
 
 def vendor_coi_expiry(vendor) -> datetime.date | None:
     """The day the vendor's certificate of insurance expires, or None when
-    none is on file. The one place renewals reads it: for now the vendor's
-    ``insurance_expires_on`` (set by each new ``VendorCertificate``); vendor
-    onboarding (D79) may supply it instead at merge."""
-    return vendor.insurance_expires_on
+    none is on file. The one place renewals reads it: vendor onboarding's
+    ``coi_expires_on`` (D79), which falls back to the vendor's own
+    ``insurance_expires_on`` for vendors older than onboarding (and takes the
+    later of the two, so a certificate recorded here after onboarding counts)."""
+    from operations import vendor_onboarding
+
+    expires = vendor_onboarding.coi_expires_on(vendor)
+    return expires if expires is not None else vendor.insurance_expires_on
 
 
 def _vendors(today) -> list[Renewal]:

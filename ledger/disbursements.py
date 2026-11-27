@@ -1054,6 +1054,9 @@ def issue_checks(
     today = timezone.localdate()
     if issued_on > today:
         raise DisbursementError("The issue date cannot be in the future.")
+    from ledger.books.periods import refuse_closed
+
+    refuse_closed(issued_on, error=DisbursementError, what="The issue date")  # D70
     out = []
     with transaction.atomic(), system_access("issue checks"):
         _lock(_BATCH_LOCK, batch.pk)
@@ -1067,9 +1070,10 @@ def issue_checks(
         if not lines:
             raise DisbursementError("There are no checks to write for this disbursement.")
         numbers = next_numbers(first_number, len(lines))
-        taken = set(
-            DisbursementCheck.objects.filter(number__in=numbers).values_list("number", flat=True)
-        )
+        # One check stock (D77): vendor checks share the numbers.
+        from ledger import check_numbers
+
+        taken = check_numbers.taken(numbers)
         if taken:
             raise DisbursementError(f"Check number {sorted(taken)[0]} is already recorded.")
         for line, number in zip(lines, numbers, strict=True):

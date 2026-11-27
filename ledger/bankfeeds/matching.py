@@ -24,7 +24,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from audit.services import record_event
-from core.policy import require
+from core.policy import SYSTEM, require
 from ledger import accounting as acc
 from ledger.bankfeeds.base import BankFeedError
 from ledger.models import AccountingSetup, BankMatch, BankTransaction, DepositBatch, ReconciledItem
@@ -184,12 +184,18 @@ def confirm(line: BankTransaction, *, kind: str, object_id: int, actor, request=
         )
         if item is None or _fits(line, item) is None:
             raise BankFeedError("That item does not match this bank line's amount and date.")
+        from ledger.books.close import refuse_match_into_closed
+
+        refuse_match_into_closed(line, item.on, error=BankFeedError)  # D70
         match = BankMatch.objects.create(
-            transaction=line, kind=kind, object_id=int(object_id), confirmed_by=actor
+            transaction=line,
+            kind=kind,
+            object_id=int(object_id),
+            confirmed_by=None if actor is SYSTEM else actor,
         )
     record_event(
         "bank_feed.match_confirmed",
-        actor=actor,
+        actor=None if actor is SYSTEM else actor,
         request=request,
         target=match,
         metadata={"connection_id": line.connection_id, "kind": kind, "object_id": int(object_id)},
@@ -205,6 +211,10 @@ def undo(match: BankMatch, *, actor, request=None) -> BankMatch:
             raise BankFeedError("This match is already undone.")
         if ReconciledItem.objects.filter(kind=match.kind, object_id=match.object_id).exists():
             raise BankFeedError("This item is on a reconciled statement; the match stays.")
+        from ledger.books.periods import is_closed
+
+        if is_closed(match.transaction.posted_on):
+            raise BankFeedError("This bank line is in a closed month; the match stays.")
         reversal = BankMatch.objects.create(
             transaction_id=match.transaction_id,
             kind=match.kind,

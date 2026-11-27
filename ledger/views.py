@@ -204,6 +204,8 @@ def my_account(request):
                 "online_receipts": _online_receipts(request.user, lot.pk, since),
                 # Checks the association wrote to this account's owners (D52).
                 "checks_to_you": _checks_to_you(lot.pk),
+                # Payment plans (D76) and special assessments (D75).
+                **_plans_and_special(request, lot.pk),
                 # Automatic payments (D46): payers only, feature on.
                 "autopay": autopay_for_payer(request.user, lot) if online else None,
                 **my_account_people(request.user, lot.pk),
@@ -222,8 +224,31 @@ def my_account(request):
             "disclosure": disclosure() if online else "",
             "payable_to": profile.legal_name,
             "remit_lines": [line for line in profile.remit_to.splitlines() if line.strip()],
+            # D77: volunteers claim back association expenses they paid.
+            "can_claim": _features_enabled("reimbursements", request)
+            and policy.can(request.user, "reimbursement.submit"),
         },
     )
+
+
+def _features_enabled(key: str, request) -> bool:
+    from core import features
+
+    return features.enabled(key, request)
+
+
+def _plans_and_special(request, lot_id: int) -> dict:
+    """My account (D75, D76): the home's current payment plan and its special
+    assessments, while those features are on."""
+    from core import features
+    from ledger import payment_plans, special_assessments
+
+    out = {"payment_plans": [], "special_assessments": []}
+    if features.enabled("payment_plans", request):
+        out["payment_plans"] = payment_plans.for_owner(request.user, lot_id)
+    if features.enabled("special_assessments", request):
+        out["special_assessments"] = special_assessments.for_lot(lot_id)
+    return out
 
 
 def _checks_to_you(lot_id: int) -> list[dict]:
@@ -675,6 +700,8 @@ def collection_detail(request, pk):
         t
         for t in services.COLLECTION.available(case, request.user)
         if t.action not in ("send_reminder", "send_second_reminder", "send_final_notice")
+        # D76: a payment plan's ending moves the case (service only).
+        and not t.action.startswith("plan_end_")
     ]
     # Own matters (D65): one's own home's collection case is read-only here.
     own = conflicts.page_context(request.user, case, services.COLLECTION)
@@ -696,8 +723,26 @@ def collection_detail(request, pk):
             and policy.can(request.user, "collections.manage")
             and policy.can(request.user, "mail.print"),
             "action_url_name": "collection_action",
+            **_case_plan(request, case, own["own_matter"]),
         },
     )
+
+
+def _case_plan(request, case, own_matter: bool) -> dict:
+    """The collection case's payment plan (D76), and whether one can be set up."""
+    from core import features
+    from ledger import payment_plans
+
+    if not features.enabled("payment_plans", request):
+        return {}
+    plan = payment_plans.plan_for_case(case)
+    return {
+        "plan": payment_plans.overview(plan) if plan else None,
+        "can_plan": plan is None
+        and case.state in payment_plans.PLAN_STATES
+        and policy.can(request.user, "payment_plan.prepare")
+        and not own_matter,
+    }
 
 
 @login_required
@@ -767,11 +812,18 @@ def budgets(request):
         "ledger/budgets.html",
         {
             "budgets": Budget.objects.all(),
+            # D78: "Start next year's budget" from the latest one.
+            "latest": _prepare_source(),
             "categories": ExpenseCategory.objects.all(),
             "year": timezone.localdate().year + 1,
             "can_manage": policy.can(request.user, "budget.manage"),
         },
     )
+
+
+def _prepare_source():
+    latest = Budget.objects.order_by("-fiscal_year").first()
+    return latest if latest and latest.lines.exists() else None
 
 
 @login_required
@@ -971,6 +1023,19 @@ def owner_budget(request):
     from core import features
 
     policy.require(request.user, "budget.view_owner")
+    if features.enabled("owner_finance_dashboard", request):
+        # Owners' finance summary (D84): just operating vs reserve and the
+        # budget against actual (ledger/owner_finance.py).
+        from ledger import owner_finance
+
+        return render(
+            request,
+            "ledger/owner_finance.html",
+            {
+                **owner_finance.context(request),
+                "kinds": [("income", "Money in"), ("expense", "Money out")],
+            },
+        )
     show_budget = features.enabled("owner_budget", request)
     show_reserves = features.enabled("reserves", request) and policy.can(
         request.user, "reserves.view_summary"
@@ -991,8 +1056,21 @@ def owner_budget(request):
             "summary": services.budget_summary(budget) if budget else None,
             "dues": rule_with_citation("dues.monthly_cents"),
             "snapshot": snapshot,
+            # The annual accounting of closed fiscal years (D71): the figures
+            # the Declaration has owners receive; nothing per home.
+            "annual_accounting": _owner_annual_accounting(request),
         },
     )
+
+
+def _owner_annual_accounting(request) -> list:
+    from core import features
+
+    if not features.enabled("financial_statements", request):
+        return []
+    from ledger.books import statements
+
+    return statements.owner_annual_accounting()
 
 
 # --- Letters and certificates (Milestone 4) ----------------------------------------------
@@ -1184,6 +1262,7 @@ def accounting(request):
         "ledger/accounting.html",
         {
             "can_manage": can_manage,
+            "books_on": features.enabled("books", request),
             "bank_feed_on": features.enabled("bank_feeds", request)
             and policy.can(request.user, "bank_feed.view"),
             "undeposited": undeposited,

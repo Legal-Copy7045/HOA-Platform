@@ -299,6 +299,11 @@ MEMBER_READS = {
                 "reserves.view_summary",
                 "payments.pay",
                 "help.checklist",  # Getting started (D73): residents
+                # Capital projects the board shares with owners (D83).
+                "capital_project.view_summary",
+                # D76, D77: agree to one's payment plan; claim an expense back.
+                "payment_plan.acknowledge",
+                "reimbursement.submit",
             },
         ),
         (
@@ -323,6 +328,19 @@ MEMBER_READS = {
                 # D72: Renewals (read only) and document access history.
                 "renewals.view",
                 "document.access_history",
+                # Books and close (D69-D71): read only, plus the package and tax.
+                "books.view",
+                "statements.view",
+                "books.package",
+                "tax.view",
+                # Finance options (D83, D85): read-only.
+                "capital_project.view",
+                "capital_project.view_summary",
+                "insurance.view",
+                # D75, D77: finance readers.
+                "special_assessment.view",
+                "reimbursement.view_all",
+                "vendor_check.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

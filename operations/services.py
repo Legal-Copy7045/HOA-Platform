@@ -50,7 +50,7 @@ from django.db.models import Sum  # noqa: E402
 
 from community.rules import rule  # noqa: E402
 from core.policy import SYSTEM  # noqa: E402
-from core.workflow import Transition, Workflow, WorkflowError  # noqa: E402
+from core.workflow import NotForYou, Transition, Workflow, WorkflowError  # noqa: E402
 from operations.models import (  # noqa: E402
     ApprovalDecision,
     ExpenseCategory,
@@ -207,6 +207,10 @@ def _contract_period(invoice) -> str:
     if not invoice.contract_id:
         return ""
     contract = Contract.objects.get(pk=invoice.contract_id)
+    from operations.vendor_onboarding import is_active as vendor_is_active
+
+    if not vendor_is_active(invoice.vendor_id):
+        return ""  # D79: an unapproved vendor's invoice is never pre-approved
     if (
         contract.state != "active"
         or contract.vendor_id != invoice.vendor_id
@@ -293,6 +297,18 @@ INVOICE = Workflow(
             confirm="Record this invoice as paid in full?",
             guard=_fully_paid,
         ),
+        # D77: a voided vendor check reopens a paid invoice for a new payment.
+        # Taken only by operations/vendor_checks.py (as SYSTEM).
+        Transition(
+            "payment_voided",
+            {"paid"},
+            "approved",
+            "invoice.record_payment",
+            "Check voided: awaiting payment again",
+            guard=lambda obj, actor: (
+                None if actor is SYSTEM else NotForYou("Recorded when a check is voided.")
+            ),
+        ),
         Transition(
             "void",
             {"draft", "pending_approval", "rejected"},
@@ -351,8 +367,32 @@ def create_invoice(
     return invoice
 
 
+def _vendor_may_be_paid(invoice: Invoice, actor, request=None) -> None:
+    """D79: an unapproved or inactive vendor's invoices are neither approved
+    nor paid (older vendors are grandfathered as active), and a board member
+    the vendor's conflict disclosure names takes no step on them (D65)."""
+    problem = payment_block_reason(invoice)
+    if problem:
+        raise OperationsError(problem)
+    conflicts.refuse(actor, invoice, area="invoice", request=request, error=OperationsError)
+
+
+def payment_block_reason(invoice: Invoice) -> str | None:
+    """Why the invoice's vendor may not be paid (D79), or None. An expense
+    reimbursement (D77) is paid to the system payee "Expense reimbursements",
+    which is kept inactive so it is never picked as a vendor: the claim's own
+    approvals govern it instead."""
+    from operations.models import ReimbursementInvoice
+    from operations.vendor_onboarding import invoice_block_reason
+
+    if ReimbursementInvoice.objects.filter(invoice_id=invoice.pk).exists():
+        return None
+    return invoice_block_reason(invoice.vendor)
+
+
 def approve(invoice: Invoice, *, note: str = "", actor, request=None) -> Invoice:
     require(actor, "invoice.approve")
+    _vendor_may_be_paid(invoice, actor, request)
     with transaction.atomic():
         invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if invoice.state != "pending_approval":
@@ -421,6 +461,10 @@ def record_payment(
         raise OperationsError("Choose a payment method.")
     if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
         raise OperationsError("Enter a check number or short reference, never an account number.")
+    from ledger.books.periods import refuse_closed  # no posting into a closed month (D70)
+
+    refuse_closed(paid_on, error=OperationsError, what="The payment date")
+    _vendor_may_be_paid(invoice, actor, request)
     with transaction.atomic():
         invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if invoice.state != "approved":

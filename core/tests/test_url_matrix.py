@@ -54,6 +54,15 @@ PUBLIC = {
     "recovery_request",
     "recovery_link",
     "recovery_continue",
+    # Vendor onboarding (D79, owner-approved exception): the public vendor
+    # form. Only a valid emailed link opens a session, bound to one round;
+    # that session reaches nothing else (operations/tests/
+    # test_vendor_onboarding_public.py iterates every URL).
+    "vendor_onboarding_start",
+    "vendor_onboarding_form",
+    "vendor_onboarding_upload",
+    "vendor_onboarding_submit",
+    "vendor_onboarding_done",
 }
 # Links emailed before sign-in became mandatory (D24): sign-in first, then
 # only the neighboring lot's owner is sent on to their review page.
@@ -136,6 +145,12 @@ MEMBER_PAGES = {
     "welcome",
     "getting_started",
     "ask_board",
+    # Capital projects shared with owners (D83): title, status, budget and
+    # spent only (ledger/tests/test_finance_options.py checks the rest).
+    "community_projects",
+    # Expense reimbursements (D77): a volunteer owner sees only their own claims.
+    "reimbursements",
+    "reimbursement_new",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -402,6 +417,26 @@ PROTECTED = {
     "disbursement_checks_pdf": ("GET", "disbursement"),
     "check_print_settings": ("GET", None),
     "check_alignment_pdf": ("GET", None),
+    # Finance gaps (D75-D78): board, manager and auditor pages; lot B's plan,
+    # owner B's claim and its receipt are 404 for owner A.
+    "special_assessments": ("GET", None),
+    "special_assessment_new": ("GET", None),
+    "special_assessment_detail": ("GET", "special_assessment"),
+    "special_assessment_action": ("POST", "special_assessment"),
+    "payment_plans": ("GET", None),
+    "payment_plan_new": ("GET", "collection"),
+    "payment_plan_detail": ("GET", "plan_b"),
+    "payment_plan_action": ("POST", "plan_b"),
+    "payment_plan_letter": ("GET", "plan_b"),
+    "payment_plan_acknowledge": ("POST", "plan_b"),
+    "reimbursement_detail": ("GET", "claim_b"),
+    "reimbursement_action": ("POST", "claim_b"),
+    "reimbursement_file": ("GET", "claim_b"),
+    "vendor_checks": ("GET", None),
+    "vendor_checks_pdf": ("GET", None),
+    "vendor_check_action": ("POST", "vendor_check"),
+    "budget_prepare": ("POST", None),
+    "budget_compare": ("GET", "budget"),
     # Paper mail (D55): board and manager only; owners get 403 everywhere.
     "paper_mail": ("GET", None),
     "paper_mail_new": ("POST", None),
@@ -430,6 +465,44 @@ PROTECTED = {
     "records_disposal_decide": ("POST", None),
     "records_hold_place": ("POST", None),
     "records_hold_release": ("POST", None),
+    # Books and close, statements and tax (D69-D71): board, manager, auditor.
+    "books_close": ("GET", None),
+    "books_action": ("POST", None),
+    "books_accounts": ("GET", None),
+    "books_coding": ("GET", None),
+    "accounting_quickbooks": ("GET", None),
+    "financial_statements": ("GET", None),
+    "financial_statements_csv": ("GET", None),
+    "financial_statements_pdf": ("GET", None),
+    "year_end_package": ("GET", None),
+    "tax_worksheet": ("GET", None),
+    "tax_download": ("GET", None),
+    # Finance options (D80-D85): board, manager and auditor pages only (each
+    # feature on or off; owners get 403/404 either way). Feature-on cross-owner
+    # tests: ledger/tests/test_finance_options.py.
+    "interest": ("POST", None),
+    "cashflow": ("GET", None),
+    "cashflow_export": ("GET", None),
+    "collection_legal": ("POST", "collection"),
+    "collection_legal_file": ("GET", "collection"),
+    "capital_projects": ("POST", None),
+    "capital_project_detail": ("GET", "lot"),
+    "capital_project_file": ("GET", "lot"),
+    "insurance_claims": ("POST", None),
+    "insurance_claim_detail": ("GET", "lot"),
+    "insurance_claim_file": ("GET", "lot"),
+    # Vendor onboarding (D79): board and manager pages; owners get 403.
+    "vendor_onboarding_list": ("GET", None),
+    "vendor_onboarding_invite": ("POST", None),
+    "vendor_onboarding_review": ("GET", "vendor_round"),
+    "vendor_onboarding_action": ("POST", "vendor_round"),
+    "vendor_onboarding_file": ("GET", "vendor_round"),
+    "vendor_onboarding_vendor": ("GET", "vendor"),
+    "vendor_onboarding_vendor_action": ("POST", "vendor"),
+    "vendor_file_summary": ("GET", "vendor"),
+    "vendor_requirements": ("GET", None),
+    "vendor_w9_retention": ("GET", None),
+    "vendor_w9_disposal": ("POST", None),
 }
 # Pages refused before their record is looked up: any id will do (D72).
 PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
@@ -465,8 +538,21 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        # Off by default; checked here.
-        for key in ("push", "sms", "bank_feeds", "usps_tracking", "bounce_tracking"):
+        for key in (  # off by default; checked here
+            "push",
+            "sms",
+            "bank_feeds",
+            "usps_tracking",
+            "bounce_tracking",
+            # Finance options (D80-D85)
+            "overdue_interest",
+            "cashflow_forecast",
+            "collections_legal",
+            "capital_projects",
+            "owner_finance_dashboard",
+            "insurance_claims",
+            "vendor_onboarding",
+        ):
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
@@ -574,7 +660,7 @@ def world():
         )
         violation_b_file = attach(violation_b, pdf("boat.pdf"), actor=board)
         from operations import services as operations
-        from operations.models import ExpenseCategory
+        from operations.models import ExpenseCategory, OnboardingRound
 
         vendor = operations.save_vendor(name="Pond Pros (demo)", actor=board)
         work_order = operations.create_work_order(title="Fix pond pump", actor=board)
@@ -811,7 +897,52 @@ def world():
     disbursement = disbursements.propose_surplus(
         total_cents=4400, year=2026, resolution_ref="Resolution 2026-14", actor=board
     )
+    # Finance gaps (D75-D77): a special assessment, lot B's payment plan,
+    # owner B's reimbursement claim and a vendor check.
+    from ledger import payment_plans
+    from ledger import special_assessments as sa_service
+    from operations import reimbursements as rb
+    from operations import services as operations_services
+    from operations import vendor_checks
+
+    special = sa_service.levy(
+        title="Pond special levy",
+        purpose="Pond",
+        total_cents=4400,
+        due_dates=[timezone.localdate() + timedelta(days=30)],
+        resolution_ref="Resolution 2026-20",
+        actor=board,
+    )
+    ledger.post_charge(
+        lot=lot_b, kind="other_charge", amount_cents=5000, description="Lot B fee", actor=board
+    )
+    plan_total = payment_plans.covered_charges(collection)[1]
+    plan_b = payment_plans.prepare(
+        collection,
+        installments=[(timezone.localdate() + timedelta(days=10), plan_total)],
+        actor=board,
+    )
+    claim_b = rb.submit(
+        amount_cents=1200,
+        spent_on=timezone.localdate(),
+        payee="Lot B pond supplies",
+        category=ExpenseCategory.objects.get(code="5100"),
+        description="Lot B pond",
+        files=[pdf("receipt-b.pdf")],
+        actor=owner_b,
+    )
+    claim_b_file = attachments_for(claim_b).first()
+    operations_services.INVOICE.apply(invoice, "submit", actor=board)
+    operations_services.approve(invoice, actor=board2)
+    vendor_check = vendor_checks.issue(
+        [invoice.pk], first_number="9001", issued_on=timezone.localdate(), actor=board
+    )[0]
     targets = {
+        "special_assessment": special.pk,
+        "plan_b": plan_b.pk,
+        "claim_b": claim_b.pk,
+        "claim_b_file": claim_b_file.pk,
+        "vendor_check": vendor_check.pk,
         "disbursement": disbursement.pk,
         "mailing": mailing.pk,
         "checkout_b": checkout_b.pk,
@@ -868,6 +999,7 @@ def world():
         "violation_b": violation_b.pk,
         "violation_b_file": violation_b_file.pk,
         "vendor": vendor.pk,
+        "vendor_round": OnboardingRound.objects.create(vendor=vendor, created_by=board).pk,
         "work_order": work_order.pk,
         "invoice": invoice.pk,
         "invoice_file": invoice_file.pk,
@@ -1003,10 +1135,28 @@ def _url(name, key, targets):
         kwargs["slug"] = "paying"
     elif name == "disbursement_action":
         kwargs["action"] = "approve"
+    elif name in ("collection_legal_file", "capital_project_file", "insurance_claim_file"):
+        kwargs["file_id"] = 1
+    elif name in ("special_assessment_action", "payment_plan_action"):
+        kwargs["action"] = "cancel" if name == "special_assessment_action" else "approve"
+    elif name == "reimbursement_action":
+        kwargs["action"] = "approve"
+    elif name == "reimbursement_file":
+        kwargs["file_id"] = targets["claim_b_file"]
+    elif name == "vendor_check_action":
+        kwargs["action"] = "void"
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
     elif name.startswith("register_import_") or name in PK_ONE:
         kwargs["pk"] = 1
+    elif name == "vendor_onboarding_action":
+        kwargs["action"] = "approve"
+    elif name == "vendor_onboarding_file":
+        kwargs["file_id"] = 1
+    elif name == "vendor_onboarding_vendor_action":
+        kwargs["action"] = "update"
+    elif name == "vendor_w9_disposal":
+        kwargs = {"pk": 1, "step": "propose"}
     return reverse(name, kwargs=kwargs)
 
 

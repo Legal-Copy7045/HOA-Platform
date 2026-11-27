@@ -1,0 +1,31 @@
+# Vendor onboarding (D79): public emailed form, encrypted W-9s, two board approvals.
+- feature: "Onboarding link: board or manager invites an inactive vendor; 256-bit token minted by the worker, stored only as a keyed hash; expires by rule, on submission or when a new link is sent; neutral answers for unknown, malformed, expired, replaced and used links"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(invite_creates|link_email_subject|link_expires|resend_kills|submission_uses|unknown_or_malformed|worker_mints|owners_cannot_invite)", "^unit:operations/tests/test_vendor_onboarding_public.py::test_(unknown_tokens|expired_replaced|a_replaced_link)"]
+- feature: "Public vendor form (approved exception to no anonymous access): token swapped for a 2-hour session bound to one round and redirected off the URL; signed-in users refused; rate limits per client and link; strict CSP without scripts, no referrer, no portal navigation; the session reaches no other URL and no other round's draft"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding_public.py::test_(opening_the_link|the_link_reopens|signed_in_users|session_expires|opening_is_rate_limited|full_flow|feature_off|the_vendor_session_reaches_nothing_else|the_draft_of_one_round)", "^unit:core/tests/test_url_matrix.py::test_every_named_url_is_classified", "^manual:vendor onboarding on a phone"]
+- feature: "Vendor uploads: PDF only by content, size limit before buffering, CSRF, malware scan gate (infected never stored, unscanned never opened), append-only records"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(uploads_are_pdf_only|infected_files|files_waiting_for_a_scan|vendor_files_are_append_only)", "^unit:operations/tests/test_vendor_onboarding_public.py::test_upload_"]
+- feature: "Vendor documents encrypted at the application layer (AES-256-GCM under VENDOR_DOCUMENT_KEY, bound to the record); fails closed without the key; rotation with fallbacks and re-encryption; check_vendor_key; key script on the server"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(w9_bytes_are_encrypted|without_the_key|key_rotation|check_vendor_key)", "^unit:community/tests/test_setup_wizard_guard.py::test_every_secret_taking_server_script", "^manual:vendor document key on the VM"]
+- feature: "What vendors provide: required documents per kind of work as data with citations (board changes with a citation), 1099 eligibility as data with the preparer caveat, versioned terms, no tax ID or account numbers in free text"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(required_documents|1099_eligibility|requirement_changes|submit_refuses|changed_terms|free_text_refuses|no_tin)"]
+- feature: "Review: append-only submission snapshot; two different board members approve, never the inviter or a person linked to the conflict disclosure; return with a new link; decline; update links for named documents; My items"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(two_different|the_inviter|return_issues|decline_keeps|a_conflicted_board_member|update_link|board_my_items)"]
+- feature: "Invoices: an unapproved or inactive vendor's invoices are not approved, pre-approved or paid; older vendors grandfathered with a Complete onboarding item; conflicted board members take no step on the vendor's invoices (D65)"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(unapproved_vendors|older_vendors|a_conflicted_board_member)", "^unit:operations/tests/test_invoices.py::"]
+- feature: "W-9 viewing board only (never the manager), audited with ids and shown as the vendor's access history, streamed as an attachment without caching; vendor file PDF without TIN; board pages refuse owners"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(w9_view_is_board_only|vendor_file_summary)", "^unit:core/tests/test_url_matrix.py::test_(owner_a_cannot_reach_owner_b_data|anonymous_visitors_are_sent_to_sign_in)\\[vendor_(onboarding|file|requirements|w9)"]
+- feature: "W-9 retention by rule after the last 1099 year, two-person disposal keeping the record"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(w9_retention|payments_extend)"]
+- feature: "Demo data: vendors in every onboarding state with obviously fake W-9s (000-00-0000 SAMPLE), skipped without a key"
+  since: M5
+  match: ["^unit:operations/tests/test_vendor_onboarding_demo.py::"]

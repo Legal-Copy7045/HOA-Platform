@@ -93,12 +93,79 @@ HUBS = {
             "disbursement.view",
             "Surplus distributions and refunds to owners, with their checks.",
         ),
+        # Books and close (D69, D71).
+        (
+            "Bank accounts and funds",
+            "books_accounts",
+            "wallet",
+            "books.view",
+            "The association's bank accounts, the fund each belongs to and their opening balances.",
+        ),
+        (
+            "Bank categories and rules",
+            "books_coding",
+            "list",
+            "books.view",
+            "Categories bank lines are coded to, and the rules that code them by themselves.",
+        ),
+        (
+            "Tax worksheet",
+            "tax_worksheet",
+            "file",
+            "tax.view",
+            "The Form 1120-H worksheet, 1099 totals with the IRIS upload file, and the filing "
+            "deadlines.",
+        ),
+        # Finance gaps (D75-D77).
+        (
+            "Special assessments",
+            "special_assessments",
+            "dollar",
+            "special_assessment.view",
+            "One-off assessments for a purpose, levied under a board resolution, in installments.",
+        ),
+        (
+            "Payment plans",
+            "payment_plans",
+            "clock",
+            "finance.view",
+            "Installment plans for homes with a collection case.",
+        ),
+        (
+            "Reimbursements",
+            "reimbursements",
+            "receipt",
+            "reimbursement.view_all",
+            "Expenses volunteers paid for the association, approved and paid back.",
+        ),
+        (
+            "Checks",
+            "vendor_checks",
+            "receipt",
+            "vendor_check.view",
+            "Print checks for approved invoices and reimbursements; the check register.",
+        ),
         (
             "Resale certificates",
             "resales",
             "file",
             "resale.manage",
             "Certificates for a home being sold, with the fee and the documents.",
+        ),
+        # Finance options (D80, D81): optional features, off by default.
+        (
+            "Interest on overdue balances",
+            "interest",
+            "dollar",
+            "finance.view",
+            "Simple interest on past-due {terms}, posted monthly at the Declaration's rate.",
+        ),
+        (
+            "Cash-flow forecast",
+            "cashflow",
+            "chart",
+            "finance.view",
+            "The next 12 months of operating and reserve cash, with what-ifs.",
         ),
     ],
     "settings_hub": [
@@ -276,6 +343,8 @@ SECTIONS = [
             ("My requests", "requests?mine=1", "mail", ("lot.view_own", "request.submit")),
             ("My records requests", "records_requests?mine=1", "inbox", "records_request.submit"),
             ("My history", "my_history", "clock", "history.view_own"),
+            # Expense reimbursements (D77): one's own claims.
+            ("My reimbursements", "reimbursements?mine=1", "receipt", "reimbursement.menu"),
         ],
     ),
     (
@@ -288,6 +357,8 @@ SECTIONS = [
             ("Documents", "documents", "folder", "document.view_owner"),
             ("Resolutions and policies", "resolutions", "file", "resolution.view"),
             ("Budget and reserves", "owner_budget", "chart", "budget.view_owner"),
+            # Capital projects the board shares with owners (D83).
+            ("Community projects", "community_projects", "wrench", "capital_project.view_summary"),
             ("Community info", "community_info", "info", HUB),
             ("Common area bookings", "reservations", "calendar", "reservation.view"),
         ],
@@ -315,6 +386,9 @@ SECTIONS = [
             ("Contracts", "contracts", "file", "finance.view"),
             # Insurance, vendor certificates and contract deadlines (D72).
             ("Renewals", "renewals", "shield", "renewals.view"),
+            # Finance options (D83, D85): optional features, off by default.
+            ("Capital projects", "capital_projects", "wrench", "capital_project.view"),
+            ("Insurance claims", "insurance_claims", "shield", "insurance.view"),
         ],
     ),
     (
@@ -325,6 +399,9 @@ SECTIONS = [
             ("Collections", "collections", "dollar", "finance.view"),
             ("Budgets", "budgets", "chart", "finance.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
+            # Books and close (D70, D71).
+            ("Month and year close", "books_close", "check-circle", "books.view"),
+            ("Financial statements", "financial_statements", "chart", "statements.view"),
             ("Reports", "reports", "chart", "reports.view"),
             # Reserve plan, Online payments, Disbursements, Resale certificates.
             ("More finance", "finance_more", "dollar", HUB),

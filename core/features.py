@@ -299,6 +299,86 @@ FEATURES: list[Feature] = [
             "check_alignment_pdf",
         },
     ),
+    # Books and close (D69, D70): the association's own books, for a
+    # self-managed association (on by default).
+    _f(
+        "books",
+        "Books and month-end close",
+        "The association's own books: bank accounts by fund (operating, reserve), bank lines "
+        "coded to categories by rules, and the month and year close that runs by itself when "
+        "everything balances.",
+        {
+            "books_close",
+            "books_action",
+            "books_accounts",
+            "books_coding",
+            "accounting_quickbooks",
+        },
+    ),
+    # Financial statements and the year-end package (D71).
+    _f(
+        "financial_statements",
+        "Financial statements",
+        "Balance sheet by fund, income and expenses against the budget, reserve activity, "
+        "the annual accounting and the year-end package for the treasurer and the tax "
+        "preparer.",
+        {
+            "financial_statements",
+            "financial_statements_csv",
+            "financial_statements_pdf",
+            "year_end_package",
+            "tax_worksheet",
+            "tax_download",
+        },
+    ),
+    # --- Finance gaps (D75-D78) ---
+    _f(
+        "special_assessments",
+        "Special assessments",
+        "One-off assessments for a purpose such as a capital project, levied under a board "
+        "resolution (and the owners' vote where required), in one sum or installments posted "
+        "on their due dates.",
+        {
+            "special_assessments",
+            "special_assessment_new",
+            "special_assessment_detail",
+            "special_assessment_action",
+        },
+    ),
+    _f(
+        "payment_plans",
+        "Payment plans",
+        "Installment plans for owners behind on their account: prepared, approved by a board "
+        "member, tracked installment by installment, ending as completed or defaulted.",
+        {
+            "payment_plans",
+            "payment_plan_new",
+            "payment_plan_detail",
+            "payment_plan_action",
+            "payment_plan_letter",
+            "payment_plan_acknowledge",
+        },
+    ),
+    _f(
+        "reimbursements",
+        "Expense reimbursements",
+        "Board members, committee members and volunteers claim back association expenses "
+        "they paid, with the receipt; another board member approves and the treasurer pays.",
+        {
+            "reimbursements",
+            "reimbursement_new",
+            "reimbursement_detail",
+            "reimbursement_action",
+            "reimbursement_file",
+        },
+    ),
+    _f(
+        "vendor_checks",
+        "Checks",
+        "Print checks for approved invoices and reimbursements on the association's check "
+        "stock, with a check register, voids and clearing.",
+        {"vendor_checks", "vendor_checks_pdf", "vendor_check_action"},
+    ),
     # Automatic payments of the monthly assessment (D46): also needs
     # "online_payments" on and Stripe keys on the server.
     _f(
@@ -337,6 +417,90 @@ FEATURES: list[Feature] = [
         {"person_email_bounce_clear", "bounce_paper_done"},
         default=False,
     ),
+    # --- Finance options (D80-D85), all off by default ---
+    _f(
+        "overdue_interest",
+        "Interest on overdue balances",
+        "Simple interest on past-due assessments, posted once a month at the Declaration's "
+        "rate (only if the Declaration allows it; set the rate with its citation).",
+        {"interest"},
+        default=False,
+    ),
+    _f(
+        "cashflow_forecast",
+        "Cash-flow forecast",
+        "The next 12 months of operating and reserve cash, with what-if changes and a warning "
+        "when a month runs low.",
+        {"cashflow", "cashflow_export"},
+        default=False,
+    ),
+    _f(
+        "collections_legal",
+        "Liens and legal collection",
+        "On a collection case: attorney referral, demand letters, liens, lawsuits, costs, money "
+        "recovered and the lien release (board only).",
+        {"collection_legal", "collection_legal_file"},
+        default=False,
+    ),
+    _f(
+        "capital_projects",
+        "Capital projects",
+        "Big projects with their budget, approvals, change orders, contracts, invoices and "
+        "progress; owners see a short summary of the ones the board shares.",
+        {
+            "capital_projects",
+            "capital_project_detail",
+            "capital_project_file",
+            "community_projects",
+        },
+        default=False,
+    ),
+    # Budget and reserves (owner_budget, in ANY_OF): with this on, owners see
+    # only operating vs reserve and budget vs actual there (D84).
+    _f(
+        "owner_finance_dashboard",
+        "Owners' finance summary",
+        "Budget and reserves shows owners just two things: operating vs reserve money, and "
+        "the budget against what was actually spent this year.",
+        set(),
+        default=False,
+    ),
+    _f(
+        "insurance_claims",
+        "Insurance claims",
+        "Claims on the association's insurance: dates, adjuster, deadlines, settlement "
+        "approval and money received (board and manager).",
+        {"insurance_claims", "insurance_claim_detail", "insurance_claim_file"},
+        default=False,
+    ),
+    _f(
+        "vendor_onboarding",
+        "Vendor onboarding",
+        "New vendors fill in an emailed form (W-9, insurance, licences, conflicts) and two board "
+        "members approve them before they can be paid; documents are encrypted in the portal "
+        "(needs the vendor document key on the server).",
+        {
+            # The public form (D79): the only pages besides sign-in without sign-in.
+            "vendor_onboarding_start",
+            "vendor_onboarding_form",
+            "vendor_onboarding_upload",
+            "vendor_onboarding_submit",
+            "vendor_onboarding_done",
+            # Board and manager pages.
+            "vendor_onboarding_list",
+            "vendor_onboarding_invite",
+            "vendor_onboarding_review",
+            "vendor_onboarding_action",
+            "vendor_onboarding_file",
+            "vendor_onboarding_vendor",
+            "vendor_onboarding_vendor_action",
+            "vendor_file_summary",
+            "vendor_requirements",
+            "vendor_w9_retention",
+            "vendor_w9_disposal",
+        },
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"
@@ -355,7 +519,7 @@ BY_URL = {name: f.key for f in FEATURES for name in f.url_names}
 ANY_OF = {
     "voting": frozenset({"votes", "elections", "surveys"}),
     # Budget and reserves (streamlining): the budget and the reserve summary.
-    "owner_budget": frozenset({"owner_budget", "reserves"}),
+    "owner_budget": frozenset({"owner_budget", "reserves", "owner_finance_dashboard"}),
 }
 
 

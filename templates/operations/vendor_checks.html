@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Checks · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Checks</h1>
+    <p class="subtitle">Pay approved invoices and reimbursements by check on the association's pre-printed check stock. Check numbers are shared with owner refund checks: each is used once. Outstanding (not cleared): {{ outstanding_cents|cents }}.</p></div>
+    {% if can_issue %}<div class="actions"><a class="btn secondary" href="{% url 'check_print_settings' %}">{% icon "sliders" %} Check printing</a></div>{% endif %}
+  </div>
+  {% if can_issue %}<section class="card"><h2>To pay</h2>
+    {% if payables %}<form method="post" id="issue-form">{% csrf_token %}
+    <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+      <thead><tr><th scope="col">Pay</th><th scope="col">Payee</th><th scope="col">Memo</th><th scope="col" class="num">Amount</th></tr></thead>
+      <tbody>{% for p in payables %}<tr><td class="cell-title">{% if p.refusal %}<span class="small muted">{{ p.refusal }}</span>{% else %}<input type="checkbox" name="invoice" value="{{ p.invoice.pk }}" aria-label="Pay {{ p.memo }}">{% endif %}</td>
+        <td data-label="Payee">{{ p.payee }}</td><td data-label="Memo"><a href="{% url 'invoice_detail' p.invoice.pk %}">{{ p.memo }}</a></td><td class="num" data-label="Amount">{{ p.remaining_cents|cents }}</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+    <p class="small">1. Print the chosen checks on the check stock (test the alignment first on plain paper). 2. Record them as issued with the first check number: the invoices are then paid.</p>
+    <div class="inline-form">
+      <div><label for="issued-on">Date on the checks</label><input id="issued-on" type="date" name="issued_on" value="{{ today|date:'Y-m-d' }}"></div>
+      <div><label for="first-number">First check number</label><input id="first-number" name="first_number" value="{{ next_number }}" inputmode="numeric" maxlength="12"></div>
+      <button type="submit" formaction="{% url 'vendor_checks_pdf' %}" formmethod="get" class="secondary">{% icon "download" %} Print checks (PDF)</button>
+      <button type="submit" data-confirm="Record the chosen checks as issued? Each invoice is recorded as paid by its check.">{% icon "check" %} Record as issued</button>
+    </div></form>
+    {% else %}<p class="muted">No approved invoices or reimbursements waiting for payment.</p>{% endif %}
+  </section>{% endif %}
+  <h2>Check register</h2>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Check</th><th scope="col">Payee</th><th scope="col">Memo</th><th scope="col" class="num">Amount</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
+    <tbody>{% for r in register %}<tr><td class="cell-title">#{{ r.check.number }} · {{ r.check.issued_on|short_date }}</td><td data-label="Payee">{{ r.check.payee_name }}</td><td data-label="Memo">{{ r.check.memo }}</td><td class="num" data-label="Amount">{{ r.check.amount_cents|cents }}</td>
+      <td data-label="Status"><span class="status {% if r.status == 'cleared' %}tone-success{% elif r.status == 'voided' %}tone-danger{% else %}tone-warning{% endif %}">{{ r.status|capfirst }}</span>{% if r.event %} <span class="small muted">{{ r.event.on|short_date }}{% if r.event.reason %}: {{ r.event.reason }}{% endif %}</span>{% endif %}</td>
+      <td>{% if r.status == "issued" %}{% if r.refusal %}<span class="small muted">{{ r.refusal }}</span>{% else %}
+        {% if can_issue %}<form method="post" action="{% url 'vendor_check_action' r.check.pk 'clear' %}" class="inline-form">{% csrf_token %}{% if r.suggestion %}<input type="hidden" name="bank_line" value="{{ r.suggestion.pk }}"><span class="small">Bank line {{ r.suggestion.posted_on|short_date }}</span>{% else %}<input type="date" name="on" value="{{ today|date:'Y-m-d' }}" aria-label="Cleared on">{% endif %}<button type="submit" class="secondary small">Cleared</button></form>{% endif %}
+        {% if can_void %}<form method="post" action="{% url 'vendor_check_action' r.check.pk 'void' %}" class="inline-form" data-confirm="{% acting_confirm "Void this check? The invoice is open for payment again." %}">{% csrf_token %}<input name="reason" maxlength="150" required aria-label="Reason for voiding" placeholder="Reason"><button type="submit" class="secondary small">{% for_board "Void" %}</button></form>{% endif %}
+      {% endif %}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6">{% include "partials/empty.html" with icon="receipt" title="No checks yet" text="Checks recorded as issued appear here." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

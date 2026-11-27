@@ -4,6 +4,7 @@
 {% block content %}
   {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Vendors</h1><p class="subtitle">Contractors and service providers. Insurance expiring within 30 days is highlighted.</p></div></div>
+  {% include "operations/onboarding/_vendors_link.html" %}
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Vendor</th><th>Services</th><th>Insurance</th><th>W-9</th></tr></thead>
     <tbody>{% for v in vendors %}<tr><td class="cell-title"><a href="{% url 'vendor_detail' v.pk %}">{{ v.name }}</a>{% if not v.active %} <span class="status tone-neutral">Inactive</span>{% endif %}</td><td data-label="Services">{{ v.services }}</td>

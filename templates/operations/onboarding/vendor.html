@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Onboarding record: {{ vendor.name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'vendors' %}">Vendors</a> / <a href="{% url 'vendor_detail' vendor.pk %}">{{ vendor.name }}</a> / Onboarding record</div>
+  <div class="page-head"><div><h1>Onboarding record: {{ vendor.name }}</h1><div class="meta"><span>{{ status_text }}</span><a href="{% url 'vendor_file_summary' vendor.pk %}">Vendor file (PDF)</a></div></div></div>
+  {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<div>{{ error }}</div></div>{% endif %}
+  {% if not active %}<div class="alert warning" role="status">{% icon "alert" %}<div>This vendor's invoices can't be approved or paid until two board members approve its onboarding.</div></div>{% endif %}
+  <div class="split">
+    <div>
+      <dl class="facts">
+        <dt>W-9 on file</dt><dd>{% if w9_on_file %}Yes{% if w9_received_on %}, received {{ w9_received_on|date:"M j, Y" }}{% if profile.w9_revision %} ({{ profile.w9_revision }}){% endif %}{% endif %}{% else %}No{% endif %}</dd>
+        <dt>Insurance certificate</dt><dd>{% if coi_expires_on %}{% if coi_current %}Current{% else %}Expired{% endif %}, expires {{ coi_expires_on|date:"M j, Y" }}{% else %}None on file{% endif %}</dd>
+        <dt>Form 1099</dt><dd>{% if eligible_1099 is None %}Not known yet{% elif eligible_1099 %}Likely reportable{% else %}Generally not reportable{% endif %}</dd>
+        {% if profile %}<dt>Kind of work</dt><dd>{{ profile.get_vendor_type_display }}</dd>
+        <dt>Taxed as</dt><dd>{{ profile.get_entity_type_display|default:"—" }}</dd>
+        <dt>Remit-to address</dt><dd>{{ profile.remit_address|default:"—"|linebreaksbr }}</dd>
+        {% if profile.hic_registration %}<dt>PA HIC registration</dt><dd>{{ profile.hic_registration }}</dd>{% endif %}
+        {% if profile.licences %}<dt>Licences</dt><dd>{{ profile.licences }}</dd>{% endif %}{% endif %}
+        <dt>Documents required</dt><dd>{% for i in required %}{{ i.label }}{% if not forloop.last %}; {% endif %}{% empty %}None{% endfor %}</dd>
+      </dl>
+      {% if grandfathered %}<p class="small muted">Added before vendor onboarding, so it stays active.{% if missing %} Missing: {{ missing|join:", " }}.{% endif %}</p>{% endif %}
+      <h2>Onboarding requests</h2>
+      <ul>{% for r in rounds %}<li><a href="{% url 'vendor_onboarding_review' r.pk %}">{{ r.get_mode_display }}, {{ r.created_at|date:"M j, Y" }}</a>: {{ r.get_status_display }}</li>{% empty %}<li class="muted">None.</li>{% endfor %}</ul>
+      {% if history %}<h2>Document access history</h2>
+      <ul class="small">{% for e in history %}<li>{{ e.occurred_at|date:"M j, Y H:i" }}: {% if e.action == "vendor.w9_viewed" %}W-9{% else %}document{% endif %} opened by {{ e.actor.person.display_name|default:e.actor }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+    <aside>{% if can_invite and not open_round and key_ready %}
+      {% if grandfathered %}<section class="card"><h3>Complete onboarding</h3>
+        <form method="post" action="{% url 'vendor_onboarding_vendor_action' vendor.pk 'complete' %}">{% csrf_token %}<label for="vt">Kind of work</label><select id="vt" name="vendor_type">{% for v, l in vendor_types %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select><p class="small muted">Emails {{ vendor.email|default:"(no email on file)" }} the full form. The vendor stays active meanwhile.</p><div class="form-actions"><button type="submit">Send the form</button></div></form></section>{% endif %}
+      {% if profile.approved_at or grandfathered %}<section class="card"><h3>Ask for updated documents</h3>
+        <form method="post" action="{% url 'vendor_onboarding_vendor_action' vendor.pk 'update' %}">{% csrf_token %}<fieldset><legend class="sr-only">Documents</legend>{% for i in update_items %}<label class="check"><input type="checkbox" name="items" value="{{ i.key }}"> {{ i.label }}</label>{% endfor %}</fieldset><p class="small muted">The link shows only these items; two board members approve the update.</p><div class="form-actions"><button type="submit" class="secondary">Send update link</button></div></form></section>{% endif %}
+    {% elif open_round %}<section class="card"><p class="small">An onboarding request is open: <a href="{% url 'vendor_onboarding_review' open_round.pk %}">see it</a>.</p></section>{% endif %}</aside>
+  </div>
+{% endblock %}

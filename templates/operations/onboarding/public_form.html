@@ -1,0 +1,47 @@
+{% extends "operations/onboarding/public_base.html" %}
+{% load portal %}
+{% block content %}
+  <h1>{% if update %}Update your documents{% else %}Vendor information{% endif %}</h1>
+  <p>{{ association }} asks {% if update %}for the documents listed below{% else %}every vendor for the details below before it can pay them{% endif %}. Your answers are saved each time you press Save; nothing is sent until you press Submit. This page closes after 2 hours; open your emailed link again to carry on.</p>
+  <p class="small muted">Never type a tax ID number or bank details here: your tax ID belongs only on the W-9 you upload, and the association pays by check to the remit-to address.</p>
+  {% if rnd.status == "returned" and rnd.return_reason %}<div class="alert warning" role="status"><div><strong>The association asks you to change something:</strong> {{ rnd.return_reason|linebreaksbr }}</div></div>{% endif %}
+  {% if not key_ready %}<div class="alert danger" role="alert"><div>Uploads are not available right now. Please try again later.</div></div>{% endif %}
+
+  {% if items %}<h2>What you need to provide</h2>
+  <ul>{% for i in items %}<li>{{ i.label }}</li>{% endfor %}</ul>{% endif %}
+
+  <form method="post" action="{% url 'vendor_onboarding_form' %}">{% csrf_token %}
+    {% include "partials/form_errors.html" %}
+    {% if form.non_field_errors %}<div class="alert danger" role="alert"><div>{{ form.non_field_errors|join:" " }}</div></div>{% endif %}
+    {% for field in form %}
+      {% if field.name == "terms_accepted" %}
+        <h2>The association's vendor terms</h2>
+        <div class="card"><p class="small">{{ terms|linebreaksbr }}</p></div>
+      {% endif %}
+      <div class="field">{{ field.label_tag }}{{ field }}{% if field.errors %}<div class="error">{{ field.errors|first }}</div>{% endif %}</div>
+    {% endfor %}
+    <div class="form-actions"><button type="submit">Save</button></div>
+  </form>
+
+  <h2 id="docs">Documents (PDF only, up to {{ max_mb }} MB each)</h2>
+  {% for d in docs %}
+    <section class="card">
+      <h3>{{ d.item.label }}{% if not d.required %} <span class="muted small">(optional)</span>{% endif %}</h3>
+      <p class="small muted">{{ d.item.help }}</p>
+      {% if d.file %}<p class="small">Received: {{ d.file.original_filename }} on {{ d.received|date:"M j, Y" }}. Uploading again replaces it.</p>{% endif %}
+      {% if key_ready %}<form method="post" action="{% url 'vendor_onboarding_upload' %}" enctype="multipart/form-data">{% csrf_token %}
+        <input type="hidden" name="kind" value="{{ d.item.file_kind }}">
+        <label for="file-{{ d.item.file_kind }}" class="sr-only">PDF for {{ d.item.label }}</label>
+        <input id="file-{{ d.item.file_kind }}" type="file" name="file" accept="application/pdf,.pdf" required>
+        <div class="form-actions"><button type="submit" class="secondary">Upload</button></div>
+      </form>{% endif %}
+    </section>
+  {% endfor %}
+
+  <h2>Submit</h2>
+  {% if missing %}<div class="alert info" role="status"><div><strong>Still needed before you can submit:</strong><ul>{% for m in missing %}<li>{{ m }}</li>{% endfor %}</ul></div></div>{% endif %}
+  <form method="post" action="{% url 'vendor_onboarding_submit' %}">{% csrf_token %}
+    <p class="small muted">After you submit, the form is locked and this link stops working.</p>
+    <div class="form-actions"><button type="submit"{% if missing %} disabled{% endif %}>Submit to {{ association }}</button></div>
+  </form>
+{% endblock %}

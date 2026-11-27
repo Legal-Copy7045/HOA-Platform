@@ -30,6 +30,17 @@ class EntryKind(models.TextChoices):
     # Part of an online payment the board refunded at Stripe, recorded on the
     # account (positive: the owner has that money back). D33-acctfix-5.
     REFUND = "refund", "Payment refunded"
+    # Finance options (D80, D82): simple interest on overdue assessments,
+    # posted monthly by ledger/interest.py; collection costs and attorney
+    # fees the Declaration lets the association charge (ledger/legal.py).
+    # The journal maps both to their own income accounts on the operating
+    # fund (OWNER_FINANCE_GL); both are member (exempt-function) income.
+    INTEREST = "interest", "Interest on overdue balance"
+    LEGAL_COST = "legal_cost", "Collection costs and attorney fees"
+    # A special assessment installment (D75, ledger/special_assessments.py).
+    # The journal credits special assessment income in the levy's fund
+    # (SpecialAssessment.fund, operating or reserve).
+    SPECIAL_ASSESSMENT = "special_assess", "Special assessment"
 
 
 CHARGE_KINDS = {
@@ -38,6 +49,9 @@ CHARGE_KINDS = {
     EntryKind.OTHER_CHARGE,
     EntryKind.RESALE_FEE,
     EntryKind.REFUND,
+    EntryKind.INTEREST,  # D80
+    EntryKind.LEGAL_COST,  # D82
+    EntryKind.SPECIAL_ASSESSMENT,  # D75
 }
 
 
@@ -92,6 +106,13 @@ class LedgerEntry(ScopedAppendOnlyModel):
             ),
             models.CheckConstraint(
                 condition=~models.Q(amount_cents=0), name="ledger_entry_nonzero"
+            ),
+            # Interest on overdue balances (D80): one posting per ownership
+            # account and month, whatever runs the task or presses the button.
+            models.UniqueConstraint(
+                fields=["account", "period"],
+                condition=models.Q(kind="interest", moved_from__isnull=True) & ~models.Q(period=""),
+                name="one_interest_per_account_per_month",
             ),
         ]
 
@@ -342,6 +363,15 @@ ONLINE_GL = {
 }
 # Disbursements (D52): where a surplus distribution is paid from.
 DISBURSEMENT_GL = {"surplus_fund": "3100 Reserve and surplus fund"}
+# Special assessments (D75): their income account, in the fund of
+# SpecialAssessment.fund (ledger.accounting.journal_lines).
+SPECIAL_ASSESSMENT_GL = {"special_assess": "4400 Special assessment income"}
+# Finance options (D80, D82): interest charged on overdue balances and
+# collection costs recovered from owners, operating fund, member income.
+OWNER_FINANCE_GL = {
+    "interest": "4150 Interest on overdue balances",
+    "legal_cost": "4250 Collection costs recovered",
+}
 
 
 class AccountingSetup(models.Model):
@@ -374,7 +404,14 @@ class AccountingSetup(models.Model):
             k.strip(): v.strip()
             for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
         }
-        return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **out}
+        return {
+            **defaults,
+            **ONLINE_GL,
+            **DISBURSEMENT_GL,
+            **SPECIAL_ASSESSMENT_GL,
+            **OWNER_FINANCE_GL,
+            **out,
+        }
 
 
 class DepositBatch(AppendOnlyModel):
@@ -738,6 +775,8 @@ class BankTransactionSource(models.TextChoices):
     TELLER = "teller", "Teller"
     OFX = "ofx", "OFX/QFX file"
     CSV = "csv", "CSV file"
+    # A month-end statement balance typed by the treasurer (D70).
+    ENTERED = "entered", "Entered from the statement"
 
 
 class BankTransaction(AppendOnlyModel):
@@ -797,8 +836,9 @@ class BankMatch(AppendOnlyModel):
     undoes = models.OneToOneField(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="undone_by"
     )
+    # Empty when the automatic close confirmed an unambiguous match (D70).
     confirmed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     confirmed_at = models.DateTimeField(default=timezone.now)
 
@@ -1138,3 +1178,15 @@ class CheckPrintSettings(models.Model):
     def get(cls) -> CheckPrintSettings:
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# --- Books and close (D69-D71): ledger/books/models.py ---------------------------------
+from ledger.books.models import *  # noqa: E402, F403
+
+# Special assessments (D75) and payment plans (D76): their own module, so the
+# models merge cleanly with other ledger work.
+from ledger.models_finance_gaps import *  # noqa: E402, F403
+
+# Finance options (D80-D85): collections legal records live in their own
+# module; imported here so Django registers them with the ledger app.
+from ledger.models_options import LegalEvent  # noqa: E402, F401
