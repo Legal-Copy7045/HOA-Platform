@@ -8,6 +8,15 @@ import time
 import urllib.parse
 
 
+def _today_midnight_utc() -> int:
+    import datetime
+
+    from django.utils import timezone
+
+    day = timezone.localdate()
+    return int(datetime.datetime(day.year, day.month, day.day, tzinfo=datetime.UTC).timestamp())
+
+
 def _unflatten(pairs) -> dict:
     """a[b][0]=c form encoding back into nested dicts/lists."""
     out: dict = {}
@@ -276,7 +285,10 @@ class FakeStripe:
                 "id": po_id,
                 "amount": net if amount is None else amount,
                 "status": "paid",
-                "arrival_date": int(time.time()),
+                # Like Stripe: the arrival day as midnight UTC of that date
+                # (the site's local "today"), not the current instant, so
+                # tests don't depend on the hour they run at.
+                "arrival_date": _today_midnight_utc(),
                 "livemode": self.livemode,
             }
         )
