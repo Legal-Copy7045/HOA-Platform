@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-104
+# highest issued: MAN-105
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -104,3 +104,4 @@ MAN-101: "compose files together on the VM"
 MAN-102: "restart the portal from system status"
 MAN-103: "panel plus and icon buttons line up"
 MAN-104: "smtp2go with a real account"
+MAN-105: "shorter menu with my violations and records in my requests"

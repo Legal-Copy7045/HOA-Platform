@@ -41,12 +41,15 @@ def test_owner_list_wording(client, w):
     page = client.get(reverse("violations")).content.decode()
     assert "Please fix by" in page and "Cure by" not in page
     assert "V-" not in page and "12 Oak Creek Drive" in page
+    # 0.43.0: the owner's list is "My violations" (menu, heading, tab title).
+    assert "<h1>My violations</h1>" in page and "<title>My violations ·" in page
+    assert "Notices about my home" not in page
 
 
 def test_owner_detail_wording_and_one_reply_box(client, w):
     client.force_login(w["owner"])
     page = client.get(reverse("violation_detail", args=[w["v"].pk])).content.decode()
-    assert f'href="{reverse("violations")}?mine=1">Notices</a>' in page
+    assert f'href="{reverse("violations")}?mine=1">My violations</a>' in page
     assert page.index('class="crumbs"') < page.index("<h1>")
     assert "Your response" in page and "formal response" in page
     assert "Please fix by" in page and "Cure by" not in page

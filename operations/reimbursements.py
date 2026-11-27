@@ -528,7 +528,8 @@ def claimant_items(user) -> list:
                 f"{claim.payee} · {claim.spent_on:%B %-d}",
                 reverse("reimbursement_detail", args=[claim.pk]),
                 "info",
-                nav="reimbursements?mine=1",
+                # No menu entry since 0.43.0 (D95): counted in My items only.
+                nav="",
             )
         )
     return items

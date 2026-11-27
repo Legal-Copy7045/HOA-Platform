@@ -605,7 +605,18 @@ def submit_records_request(*, description: str, actor, request=None) -> RecordsR
     return obj
 
 
-# --- Votes ---------------------------------------------------------------------------------
+def my_records_requests(user):
+    """The person's own records requests, newest first: the records requests
+    section of My requests (D95). Scoped like the list page; a board member
+    sees only their own here, never everyone's."""
+    from core.scoping import own_records
+
+    if not can(user, "records_request.submit"):
+        return RecordsRequest.objects.none()
+    rows = RecordsRequest.objects.for_user(user)
+    if can(user, "records_request.manage"):
+        rows = own_records(rows, user)
+    return rows.select_related("requester")
 
 
 def create_vote(

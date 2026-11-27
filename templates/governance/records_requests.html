@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% load help_tags portal %}
-{% block title %}Records requests · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if mine %}My records requests{% else %}Records requests{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  {# D95: the owner's records requests are a section of My requests. #}
+  {% if mine %}<div class="crumbs"><a href="{% url 'requests' %}?mine=1">My requests</a> / Records requests</div>{% endif %}
   <div class="page-head"><div><h1>{% if mine %}My records requests{% else %}Records requests{% endif %}</h1><p class="subtitle">{% if mine %}Pennsylvania law lets owners inspect the association's records. Ask here and follow your request to its due date.{% else %}Owners may ask to inspect association records. Requests and responses are tracked with their due dates.{% endif %} {% how_it_works "requests" %}</p></div>
     {% if can_submit and user|can:"records_request.manage" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'records_requests' %}">All requests (board)</a>{% else %}<a class="btn secondary" href="{% url 'records_requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
