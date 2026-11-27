@@ -25,14 +25,13 @@ from core.scoping import system_access
 DEMO = "DEMO - replace"
 
 
-def _login_for(person: Person, email: str) -> User:
-    """Give a seeded person a login without a password (authorship only)."""
-    if person.user_id:
-        return person.user
-    user = User.objects.create_user(email)
-    community.link_login(person, user, actor=SYSTEM)
-    person.refresh_from_db()
-    return user
+def _login_for(person: Person) -> User:
+    """Give a seeded person a login without a password or authenticator, on
+    the email of their Person record, so the board can send them a new setup
+    link (D59) when a tester wants to sign in as them."""
+    from community.demo.states import login_for
+
+    return login_for(person)
 
 
 class Command(BaseCommand):
@@ -78,7 +77,7 @@ class Command(BaseCommand):
 
         t = today()
         seats = list(BoardSeat.objects.active().select_related("person")[:3])
-        board = [_login_for(s.person, f"demo-board{i}@example.com") for i, s in enumerate(seats)]
+        board = [_login_for(s.person) for s in seats]
         b1, b2 = board[0], board[1] if len(board) > 1 else board[0]
 
         def staff_for(matter):
@@ -93,8 +92,8 @@ class Command(BaseCommand):
             o.lot.number: o.person
             for o in Ownership.objects.active().select_related("lot", "person")
         }
-        owner3 = _login_for(owner_of[3], "demo-owner3@example.com")
-        owner12 = _login_for(owner_of[12], "demo-owner12@example.com")
+        owner3 = _login_for(owner_of[3])
+        owner12 = _login_for(owner_of[12])
 
         rules = {
             "dues.monthly_cents": "4500",
@@ -637,3 +636,8 @@ class Command(BaseCommand):
             source="csv",
             actor=b1,
         )
+
+        # Records in every state and test personas (community/demo/states/).
+        from community.demo import states
+
+        states.seed()

@@ -4,7 +4,7 @@
     <div class="card-head"><h2 id="part-{{ p.key }}-h" class="dash-part-title">{% if p.key == "board" %}<span class="board-badge">{{ nav.work_label }}</span> {% endif %}{{ p.title }}</h2>{% if p.more %}<a class="small desktop-only" href="{% url 'my_items' %}">See all in My items</a>{% endif %}</div>
     {% if p.todos %}
       <ul class="list">{% for t in p.todos %}{% include "partials/todo.html" %}{% endfor %}</ul>
-      {% if p.todos|length > 4 or p.more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all in My items</a>{% endif %}
+      {% if p.queue and p.todos|length > 4 or p.more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all in My items</a>{% endif %}
     {% elif p.key == "board" %}
       {% include "partials/empty.html" with icon="check-circle" title="No board work waiting" text="Requests, approvals and follow-ups for the association will appear here." %}
     {% else %}

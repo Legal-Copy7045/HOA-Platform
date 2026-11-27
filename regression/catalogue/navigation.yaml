@@ -35,3 +35,6 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:core/tests/test_own_matters.py::", "^unit:arc/tests/test_arc.py::test_(recusal|recused|board_member_applicant)", "^unit:ledger/tests/test_disbursements.py::test_an_owner_of_the_refunded", "^unit:community/tests/test_account_change_owners.py::test_the_requester_cannot", "^manual:own matters"]
+- feature: "Dashboard: owners with many to-dos see them all and never a link to the staff-only My items page"
+  since: M5
+  match: ["^unit:core/tests/test_dashboard_queue_link.py::test_"]
