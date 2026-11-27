@@ -40,10 +40,18 @@ TODAY = timezone.localdate()
 
 @pytest.fixture
 def w():
+    # Most tests here use the equal split with checks allowed; the D67 tests
+    # at the end switch to the defaults (share paid, credits only).
     community.set_rule(
-        key="disbursement.surplus_equal_shares",
+        key="disbursement.surplus_by_share_paid",
+        value="false",
+        citation="Declaration §8.4 (test)",
+        actor=SYSTEM,
+    )
+    community.set_rule(
+        key="disbursement.surplus_cash_allowed",
         value="true",
-        citation="Declaration §6.2 (test)",
+        citation="Board resolution (test)",
         actor=SYSTEM,
     )
     lots = [
@@ -142,14 +150,9 @@ def test_surplus_split_is_equal_per_home_with_the_remainder_in_address_order(w):
     assert [r["amount_cents"] for r in again] == [201, 201, 201, 200, 200]
 
 
-def test_surplus_split_needs_equal_shares_rule_and_a_cent_per_home(w):
+def test_surplus_split_needs_a_cent_per_home(w):
     with pytest.raises(disb.DisbursementError):
         disb.surplus_split(4)
-    community.set_rule(
-        key="disbursement.surplus_equal_shares", value="false", citation="Decl. (t)", actor=SYSTEM
-    )
-    with pytest.raises(disb.DisbursementError, match="not split equally"):
-        disb.surplus_split(1000)
 
 
 def test_amount_in_words():
@@ -331,18 +334,6 @@ def test_refund_credit_is_checked_again_at_approval(w):
     with pytest.raises(disb.DisbursementError, match="only"):
         disb.approve(batch, actor=w["board"])
     assert not DisbursementDecision.objects.filter(batch=batch).exists()
-
-
-def test_statement_credit_only_for_open_accounts(w):
-    batch = _surplus(w)
-    # The home is sold between the proposal and the approval.
-    with mock.patch("community.tasks.notify_board.defer"):
-        community.transfer_lot(
-            w["lots"][1], new_owners=[PersonFactory()], transfer_date=TODAY, actor=SYSTEM
-        )
-    with pytest.raises(disb.DisbursementError, match="sold"):
-        disb.approve(batch, actor=w["board"])
-    assert not LedgerEntry.objects.unscoped("t").filter(kind="credit").exists()
 
 
 # --- Checks -------------------------------------------------------------------------------
@@ -941,7 +932,8 @@ def test_pa_guidance_cites_the_surplus_funds_section():
     from community import pa_law
 
     assert "§ 5313" in pa_law.GROUP_NOTES["Disbursements"]
-    assert "counsel" in pa_law.guide("disbursement.surplus_equal_shares").law.lower()
+    assert "counsel" in pa_law.guide("disbursement.surplus_by_share_paid").law.lower()
+    assert "§8.10" in pa_law.guide("disbursement.surplus_cash_allowed").example
 
 
 # --- D66: payees and who processes a payment ------------------------------------------------
@@ -1100,3 +1092,164 @@ def test_a_board_member_who_sold_their_home_gets_a_resign_reminder(w):
     # The board member without a home here (declarant-style test fixture)
     # also shows: an owner-elected seat needs a home.
     assert all("board seat" not in t for t in (i.title for i in items_for(w["owners"][1])))
+
+
+# --- D67: surplus credited in proportion to what was paid ------------------------------------
+
+
+def _declaration_rules(*, with_home=True, cash=False):
+    """The defaults (share paid, credit stays with the home, credits only),
+    or the variants a board may choose."""
+    for key, value in (
+        ("disbursement.surplus_by_share_paid", "true"),
+        ("disbursement.surplus_stays_with_home", "true" if with_home else "false"),
+        ("disbursement.surplus_cash_allowed", "true" if cash else "false"),
+    ):
+        community.set_rule(key=key, value=value, citation="Declaration §8.10 (test)", actor=SYSTEM)
+
+
+_PERIOD = iter(range(1, 10_000))
+
+
+def _fy_day():
+    """A day in this fiscal year after the test homes' accounts opened."""
+    return max(disb.fiscal_year_range(TODAY.year)[0], days_ago(200))
+
+
+def _assessment(lot, cents, on=None):
+    with system_access("t"):
+        return LedgerEntry.objects.create(
+            lot=lot,
+            posted_on=on or _fy_day(),
+            kind="assessment",
+            period=f"2099-t{next(_PERIOD)}",
+            amount_cents=cents,
+            description="Assessment (test)",
+        )
+
+
+def _paid(w, lot, cents, ref):
+    services.record_payment(
+        lot=lot, amount_cents=cents, received_on=_fy_day(), reference=ref, actor=w["board"]
+    )
+
+
+def _sell(lot, on=None):
+    with mock.patch("community.tasks.notify_board.defer"):
+        community.transfer_lot(
+            lot, new_owners=[PersonFactory()], transfer_date=on or days_ago(1), actor=SYSTEM
+        )
+
+
+def test_defaults_are_share_paid_stays_with_home_and_credits_only():
+    from community.rules import rule
+
+    assert rule("disbursement.surplus_by_share_paid") is True
+    assert rule("disbursement.surplus_stays_with_home") is True
+    assert rule("disbursement.surplus_cash_allowed") is False
+
+
+def test_surplus_is_split_by_what_was_paid_that_year(w):
+    _declaration_rules()
+    a, b, c = w["lots"]
+    for lot in (a, b, c):
+        _assessment(lot, 4000)
+    _paid(w, a, 4000, "1")  # paid in full
+    _paid(w, b, 2000, "2")  # paid half; c paid nothing
+    paid = {acct.lot_id: cents for acct, cents in disb.assessments_paid(TODAY.year)}
+    assert paid[a.pk] == 4000 and paid[b.pk] == 2000 and c.pk not in paid
+    lines = {p["lot"].pk: p for p in disb.surplus_split(600, year=TODAY.year)}
+    assert lines[a.pk]["amount_cents"] == 400 and lines[b.pk]["amount_cents"] == 200
+    assert c.pk not in lines
+    assert all(p["method"] == "credit" for p in lines.values())
+
+
+def test_credits_only_refuses_checks(w):
+    _declaration_rules()
+    lot = w["lots"][0]
+    _assessment(lot, 4000)
+    _paid(w, lot, 4000, "1")
+    with pytest.raises(disb.DisbursementError, match="statement credits only"):
+        disb.surplus_split(100, year=TODAY.year, by_check=[lot.pk])
+
+
+def test_a_credit_that_stays_with_the_home_goes_to_the_buyer(w):
+    _declaration_rules()
+    lot = w["lots"][0]
+    _assessment(lot, 4000)
+    _paid(w, lot, 4000, "1")  # paid by the seller
+    seller_account = _account(lot)
+    _sell(lot)
+    buyer_account = _account(lot)
+    batch = disb.propose_surplus(
+        total_cents=1000, year=TODAY.year, resolution_ref="Resolution 2026-20", actor=w["manager"]
+    )
+    (line,) = _lines(batch)
+    assert line.account_id == buyer_account.pk and line.method == "credit"
+    disb.approve(batch, actor=w["board"])
+    assert disb.account_credit(buyer_account) == 1000
+    assert disb.account_credit(seller_account) == 0
+
+
+def test_a_credit_that_follows_the_owner_goes_to_the_sellers_old_account(w):
+    _declaration_rules(with_home=False)
+    lot = w["lots"][0]
+    _assessment(lot, 4000)
+    _paid(w, lot, 4000, "1")
+    old = _account(lot)
+    _sell(lot)
+    batch = disb.propose_surplus(
+        total_cents=1000, year=TODAY.year, resolution_ref="Resolution 2026-20", actor=w["manager"]
+    )
+    (line,) = _lines(batch)
+    assert line.account_id == old.pk and line.method == "credit"
+    disb.approve(batch, actor=w["board"])
+    assert disb.account_credit(old) == 1000
+    # The board can then refund it (Disbursements: refunds owed to former owners).
+    assert any(r["account"].pk == old.pk for r in disb.dormant_credits())
+
+
+def test_a_sellers_share_is_a_check_when_it_follows_the_owner_and_checks_are_allowed(w):
+    _declaration_rules(with_home=False, cash=True)
+    lot = w["lots"][0]
+    _assessment(lot, 4000)
+    _paid(w, lot, 4000, "1")
+    _sell(lot)
+    (line,) = disb.surplus_split(1000, year=TODAY.year)
+    assert line["former"]
+    # A check when the seller has a mailing address on file, else a credit.
+    assert line["method"] == ("check" if line["mail_to"] else "credit")
+
+
+def test_a_home_sold_between_proposal_and_approval(w):
+    """Stays with the home: the credit goes to the buyer's account. Follows
+    the owner: to the seller's old account."""
+    batch = _surplus(w)  # the fixture's equal split; the credit stays with the home
+    _sell(w["lots"][1], on=TODAY)
+    disb.approve(batch, actor=w["board"])
+    with system_access("t"):
+        credit = LedgerEntry.objects.get(kind="credit", lot=w["lots"][1])
+    assert credit.account_id == _account(w["lots"][1]).pk
+
+
+def test_the_proposal_page_offers_no_checks_with_credits_only(w, client):
+    _declaration_rules()
+    client.force_login(w["manager"])
+    page = client.get(reverse("disbursement_new") + "?kind=surplus").content.decode()
+    assert 'data-testid="by-check"' not in page
+    assert "statement credits only" in page and "stays with the home" in page
+    assert "Declaration §8.10 (test)" in page
+
+
+def test_the_wizard_has_a_surplus_step_with_every_disbursement_rule():
+    from community import setup
+
+    step = next(s for s in setup.STEPS if s.key == "surplus")
+    keys = {spec.key for spec in setup.assign_rules()["surplus"]}
+    assert {
+        "disbursement.surplus_by_share_paid",
+        "disbursement.surplus_stays_with_home",
+        "disbursement.surplus_cash_allowed",
+        "disbursement.second_approval_cents",
+    } <= keys
+    assert "disbursements" in step.features

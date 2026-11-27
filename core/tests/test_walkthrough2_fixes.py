@@ -478,9 +478,14 @@ def test_add_row_script_is_in_app_js():
 
 
 def test_surplus_homes_sit_in_a_closed_panel_after_the_main_fields(client, w):
+    from community import services as community_services
     from core import features
 
     features.set_feature("disbursements", True, actor=SYSTEM)
+    # The check panel exists only when the board allows surplus checks (D67).
+    community_services.set_rule(
+        key="disbursement.surplus_cash_allowed", value="true", citation="t", actor=SYSTEM
+    )
     client.force_login(w["board"])
     html = client.get(reverse("disbursement_new") + "?kind=surplus").content.decode()
     assert '<details class="panel" id="by-check" data-testid="by-check">' in html

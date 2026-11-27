@@ -767,8 +767,13 @@ def world():
             body="Hello {owner_names}",
             everyone=True,
         )
+    from community import services as community_services
     from ledger import disbursements
 
+    # An equal split: the matrix's homes have no assessments paid (D67).
+    community_services.set_rule(
+        key="disbursement.surplus_by_share_paid", value="false", citation="t", actor=SYSTEM
+    )
     disbursement = disbursements.propose_surplus(
         total_cents=4400, year=2026, resolution_ref="Resolution 2026-14", actor=board
     )

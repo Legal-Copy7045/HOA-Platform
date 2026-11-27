@@ -83,10 +83,20 @@ STEPS: list[Step] = [
         "late_fees",
         "Late fees and collections",
         "When a payment is late, what the late fee is, whether fees post by themselves, "
-        "and the notice periods of the collection letters. Also the invoice approval limit "
-        "and how money is paid back to owners (surplus distributions and refunds).",
-        groups=("Dues", "Invoices", "Disbursements"),
+        "and the notice periods of the collection letters. Also the invoice approval limit.",
+        groups=("Dues", "Invoices"),
         links=(("Letters and certificates", "letters_settings", "letters.manage"),),
+    ),
+    Step(
+        "surplus",
+        "Surplus and refunds",
+        "What happens to a year's surplus, as your Declaration and Bylaws say: whether it is "
+        "split by what each owner paid or equally per home, whether the credit stays with the "
+        "home or goes with the owner who paid (a seller), and whether the board may pay it by "
+        "check instead of a credit against future charges. Also the amount at which a "
+        "disbursement needs a second board approval.",
+        groups=("Disbursements",),
+        features=("disbursements",),
     ),
     Step(
         "payments",

@@ -32,3 +32,6 @@
 - feature: "Payments to board members (D66): refund payee is today's owners or the owners at the sale, never a removed co-owner; nobody processes a payment to an account they were ever on; checks to board members only by another board member; Mark as issued leaves the rest; resign reminder"
   since: M5
   match: ["^unit:ledger/tests/test_disbursements.py::test_(refund_payee|a_seller_on_the_board|a_payment_to_a_board_member|surplus_checks_to_board|the_disbursement_page_hides|a_board_member_who_sold)"]
+- feature: "Surplus per the Declaration (D67): split by assessments paid in the fiscal year (or equal), credit stays with the home (or follows the owner who paid), credits only unless checks are allowed; wizard step Surplus and refunds"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(defaults_are_share_paid|surplus_is_split_by_what_was_paid|credits_only_refuses|a_credit_that_stays_with_the_home|a_credit_that_follows_the_owner|a_sellers_share_is_a_check|a_home_sold_between|the_proposal_page_offers_no_checks|the_wizard_has_a_surplus_step)"]

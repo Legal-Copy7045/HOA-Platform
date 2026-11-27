@@ -2,20 +2,26 @@
 
 Two kinds, each a batch of one line per ownership account:
 
-* **Surplus distribution**: the board returns surplus (for example reserves
-  above the adopted plan's fully funded target) to every home with an owner.
-  The board enters the total; the portal splits it by the governing rule
-  ``disbursement.surplus_equal_shares`` (equal per home; the remainder cent
-  by cent in address order, see ``split_largest_remainder``). A board
-  resolution is required (68 Pa.C.S. § 5313; ``community/pa_law.py``).
+* **Surplus distribution**: the board returns a surplus (what is left of a
+  fiscal year's assessments after the common expenses and reserves) to the
+  owners who paid. The board enters the total; the portal splits it by the
+  governing rule ``disbursement.surplus_by_share_paid`` (default: in
+  proportion to the assessments each ownership account paid that fiscal
+  year, a seller's old account included; off: equal per home with an owner
+  today), the remainder cent by cent in address order
+  (``split_largest_remainder``). Each share is a statement credit, which the
+  open-item rule applies to the next assessments until it is used up; checks
+  only with ``disbursement.surplus_cash_allowed`` (D67). A board resolution
+  is required (68 Pa.C.S. § 5313; ``community/pa_law.py``).
 * **Owner refund**: one account's credit paid back, typically a seller's
   dormant account after a sale (D33-acctfix-1: money stays with its
   ownership account). Never more than the account's credit, checked when
   proposed, when approved and when the check is issued.
 
-Each line is paid by **statement credit** (active accounts only: a credit
-entry, applied by the open-item rule to open and future charges) or by
-**check** (the only way for a former owner). The portal never knows bank
+Each line is paid by **statement credit** (a credit entry, applied by the
+open-item rule to open and future charges; on a seller's dormant account it
+waits there to be refunded) or by **check** (refunds, and surplus shares
+when the board allows checks). The portal never knows bank
 account numbers: checks are written in the bank's bill pay or accounting
 package from the check register, or printed on the association's
 pre-printed check stock (the stock carries the bank's numbers).
@@ -79,7 +85,14 @@ from ledger.models import (
     ReconciledItem,
 )
 
-EQUAL_RULE = "disbursement.surplus_equal_shares"
+# The split and how it is paid (D67): in proportion to the assessments each
+# owner paid in the fiscal year (off: equal per home), and statement credits
+# only unless the board allows checks.
+SHARE_PAID_RULE = "disbursement.surplus_by_share_paid"
+CASH_RULE = "disbursement.surplus_cash_allowed"
+# Whose a share is (D67): the home's (credited to its account today, the
+# default) or the ownership account that paid it (a seller's old account).
+HOME_RULE = "disbursement.surplus_stays_with_home"
 SECOND_APPROVAL_RULE = "disbursement.second_approval_cents"
 STALE_DAYS = 90  # an uncashed check gets a board item after this long
 MAX_TOTAL_CENTS = 100_000_000_00  # $100 million: anything above is a typing mistake
@@ -498,32 +511,122 @@ def surplus_accounts() -> list[Account]:
     return sorted(accounts, key=lambda a: home_sort_key(a.lot))
 
 
-def surplus_split(total_cents: int, *, by_check=()) -> list[dict]:
-    """The proposed lines of a surplus distribution: each home's share and
-    how it is paid (statement credit unless its lot is in ``by_check``)."""
-    _check_total(total_cents)
-    if rule(EQUAL_RULE) is False:
-        raise DisbursementError(
-            "Community settings say a surplus is not split equally per home, and the portal "
-            "has no per-home shares to split by. Ask counsel how the Declaration allocates "
-            "common expenses, then refund each home separately."
-        )
-    accounts = surplus_accounts()
-    if not accounts:
-        raise DisbursementError("No home has an owner to distribute to.")
-    if total_cents < len(accounts):
-        raise DisbursementError("The total must give every home at least one cent.")
-    shares = split_largest_remainder(total_cents, [1] * len(accounts))
-    by_check = {int(x) for x in by_check}
+def cash_allowed() -> bool:
+    """May a surplus share be paid by check (rule ``CASH_RULE``, off by default:
+    a Declaration that credits surplus gives no basis for cash)."""
+    return rule(CASH_RULE) is True
+
+
+def by_share_paid() -> bool:
+    return rule(SHARE_PAID_RULE) is not False
+
+
+def stays_with_home() -> bool:
+    return rule(HOME_RULE) is not False
+
+
+def _open_account(lot_id: int) -> Account | None:
+    with system_access("home's open account"):
+        return Account.objects.active().select_related("lot").filter(lot_id=lot_id).first()
+
+
+def fiscal_year_range(year: int) -> tuple[datetime.date, datetime.date]:
+    """[first day, day after the last) of fiscal year ``year``."""
+    from ledger.services import fiscal_months
+
+    months = fiscal_months(int(year))
+    first_y, first_m = months[0]
+    last_y, last_m = months[-1]
+    end = datetime.date(last_y + (last_m == 12), last_m % 12 + 1, 1)
+    return datetime.date(first_y, first_m, 1), end
+
+
+@internal("surplus shares paid")
+def assessments_paid(year: int) -> list[tuple[Account, int]]:
+    """Each ownership account (open or dormant) with what it paid towards the
+    {term}s of fiscal year ``year``, in address order, accounts that paid
+    nothing left out. Paid = the charge less what is still open on it
+    (open-item allocation); reversed charges count for nothing."""
+    from ledger.allocation import charges
+
+    start, end = fiscal_year_range(year)
+    accounts = Account.objects.select_related("lot").filter(opened_on__lt=end)
     out = []
-    for account, cents in zip(accounts, shares, strict=True):
-        method = DisbursementMethod.CHECK if account.lot_id in by_check else "credit"
+    for account in accounts:
+        paid = 0
+        for c in charges(account.lot_id, open_only=False, account=account.pk):
+            if c.entry.kind != EntryKind.ASSESSMENT or c.reversed:
+                continue
+            if start <= c.entry.posted_on < end:
+                paid += max(0, c.original_cents - max(0, c.open_cents))
+        if paid > 0:
+            out.append((account, paid))
+    return sorted(out, key=lambda pair: (home_sort_key(pair[0].lot), pair[0].opened_on))
+
+
+def surplus_split(total_cents: int, *, year: int | None = None, by_check=()) -> list[dict]:
+    """The proposed lines of a surplus distribution: each account's share and
+    how it is paid. By share paid (default): in proportion to the {term}s each
+    account paid in fiscal ``year``; otherwise equal per home with an owner
+    today. Each share is a statement credit (on a seller's old account too)
+    unless checks are allowed: then homes in ``by_check`` and sellers with a
+    mailing address are paid by check."""
+    _check_total(total_cents)
+    by_check = {int(x) for x in by_check}
+    cash = cash_allowed()
+    if by_check and not cash:
+        raise DisbursementError(
+            "Community settings pay a surplus as statement credits only (the Declaration "
+            "credits it against future assessments); paying by check is switched off."
+        )
+    if by_share_paid():
+        if year is None:
+            raise DisbursementError("Enter the fiscal year the surplus is from.")
+        paid = assessments_paid(year)
+        if stays_with_home():
+            # Everything paid on each home, credited to its account today.
+            per_lot: dict[int, int] = {}
+            for account, cents in paid:
+                per_lot[account.lot_id] = per_lot.get(account.lot_id, 0) + cents
+            paid = []
+            for lot_id, cents in per_lot.items():
+                account = _open_account(lot_id)
+                if account is not None:  # a home with no owner today gets nothing
+                    paid.append((account, cents))
+            paid.sort(key=lambda pair: home_sort_key(pair[0].lot))
+        if not paid:
+            raise DisbursementError(
+                "Nobody paid assessments in that fiscal year, so there is nothing to split by."
+            )
+        accounts = [a for a, _ in paid]
+        weights = [cents for _, cents in paid]
+    else:
+        accounts = surplus_accounts()
+        if not accounts:
+            raise DisbursementError("No home has an owner to distribute to.")
+        weights = [1] * len(accounts)
+    if total_cents < len(accounts):
+        raise DisbursementError("The total must give every share at least one cent.")
+    shares = split_largest_remainder(total_cents, weights)
+    out = []
+    for account, cents, weight in zip(accounts, shares, weights, strict=True):
+        if cents <= 0:
+            continue  # a share too small to round to a cent
+        method = "credit"
+        if cash and ((account.is_active and account.lot_id in by_check) or not account.is_active):
+            method = DisbursementMethod.CHECK
         payee, address, source = payee_for(account) if method == "check" else ("", "", "")
+        if method == "check" and not account.is_active and not address:
+            # A seller with no address on file: a credit on the old account,
+            # refunded later from Disbursements once an address is known.
+            method, payee, source = "credit", "", ""
         out.append(
             {
                 "lot": account.lot,
                 "account": account,
                 "amount_cents": cents,
+                "paid_cents": weight if by_share_paid() else None,
+                "former": not account.is_active,
                 "method": method,
                 "payee_name": payee,
                 "mail_to": address,
@@ -559,7 +662,7 @@ def propose_surplus(
     ref = _resolution_check(resolution, resolution_ref)
     if not 2000 <= int(year) <= 2100:
         raise DisbursementError("Enter the year the surplus is from.")
-    lines = surplus_split(total_cents, by_check=by_check)
+    lines = surplus_split(total_cents, year=year, by_check=by_check)
     for line in lines:
         if line["method"] == "check" and not line["mail_to"]:
             raise DisbursementError(
@@ -680,8 +783,6 @@ def _create(
             proposed_by=actor,
         )
         for line in lines:
-            if line["method"] == "credit" and not line["account"].is_active:
-                raise DisbursementError("A statement credit can only go to an open account.")
             DisbursementLine.objects.create(
                 batch=batch,
                 lot=line["lot"],
@@ -799,15 +900,23 @@ def _post_credits(batch, lines, *, actor, request) -> int:
     for line in lines:
         if line.method != DisbursementMethod.CREDIT:
             continue
-        account = Account.objects.get(pk=line.account_id)
-        if not account.is_active:
-            raise DisbursementError(
-                f"{line.lot.label}: the home was sold since this was proposed, so its share "
-                "cannot be a statement credit. Decline this and propose it again."
-            )
+        # Sold since it was proposed (D67): a share that stays with the home
+        # goes to the home's account today; one that follows the owner to
+        # their (now dormant) account, from which the board can refund it.
+        account_id = line.account_id
+        if stays_with_home():
+            account = Account.objects.get(pk=account_id)
+            if not account.is_active:
+                current = _open_account(line.lot_id)
+                if current is None:
+                    raise DisbursementError(
+                        f"{line.lot.label} has no owner today, so its share cannot be "
+                        "credited. Decline this and propose it again."
+                    )
+                account_id = current.pk
         entry = LedgerEntry.objects.create(
             lot_id=line.lot_id,
-            account_id=line.account_id,
+            account_id=account_id,
             posted_on=today,
             kind=EntryKind.CREDIT,
             amount_cents=-line.amount_cents,

@@ -6,6 +6,20 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.36.0 — 2026-11-27
+
+- Surplus distributions follow the Declaration (D67). A surplus is split in
+  proportion to the assessments paid in its fiscal year (or equally per
+  home, as a setting) and posted as statement credits that pay the next
+  assessments until used up.
+- The credit stays with the home by default: what a seller paid towards
+  goes to the home's account, so the buyer receives it. A setting makes it
+  follow the owner who paid instead (a seller's share then waits on their
+  old account to be refunded).
+- Paying a surplus by check is off unless the board switches it on.
+- Community setup has a new "Surplus and refunds" step with these choices
+  and what the law says.
+
 ## 0.35.0 — 2026-11-27
 
 - Refund checks are made out to the right people: today's owners while the

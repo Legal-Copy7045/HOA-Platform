@@ -284,14 +284,36 @@ REGISTRY: dict[str, RuleSpec] = {
         ),
         # Disbursements (D52): money paid back to owners.
         RuleSpec(
-            "disbursement.surplus_equal_shares",
-            "Split a surplus distribution equally per home",
+            "disbursement.surplus_by_share_paid",
+            "Split a surplus in proportion to what each owner paid that year",
             BOOL,
             "true",
             "Disbursements",
-            "On: every home with an owner gets the same share (the remainder cent by cent in "
-            "address order), as for an equal monthly {term}. Off if the Declaration allocates "
-            "common expenses unequally: the portal then does not split a surplus.",
+            "On: each owner who paid {terms} in the surplus's fiscal year gets a share in "
+            "proportion to what they paid, a seller for their part of the year included. Off: "
+            "an equal share for every home with an owner today. With an equal {term} per home "
+            "and everyone paid up, both give the same split.",
+        ),
+        RuleSpec(
+            "disbursement.surplus_stays_with_home",
+            "A surplus credit stays with the home, not the owner who paid",
+            BOOL,
+            "true",
+            "Disbursements",
+            "On: each home's share (from everything paid on it that year, whoever owned it) "
+            "is credited to the home's account today, so a buyer receives what a seller "
+            "paid towards. Off: each share goes to the ownership account that paid it, a "
+            "seller's old account included, from which the board refunds it.",
+        ),
+        RuleSpec(
+            "disbursement.surplus_cash_allowed",
+            "Allow paying a surplus share by check",
+            BOOL,
+            "false",
+            "Disbursements",
+            "Off: every share is a statement credit that pays the next {terms} until it is "
+            "used up. On: the board may pay chosen homes by check (and, when shares follow "
+            "the owner, a seller's share is paid by check).",
         ),
         RuleSpec(
             "disbursement.second_approval_cents",
@@ -365,6 +387,10 @@ REGISTRY: dict[str, RuleSpec] = {
 # database (rules are never deleted, their history is kept) but nothing reads
 # it and the settings page does not list it.
 RETIRED: dict[str, str] = {
+    "disbursement.surplus_equal_shares": (
+        "D67: replaced by disbursement.surplus_by_share_paid (off = equal shares) and "
+        "disbursement.surplus_cash_allowed."
+    ),
     "payments.autopay_ceiling_percent": (
         "D47: replaced by payments.autopay_review_cents (a dollar limit with board review)."
     ),
