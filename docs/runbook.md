@@ -17,6 +17,12 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
 - Never in the repository, chat, tickets or email.
 - The Postgres owner and superuser passwords are used only by the one-shot
   `migrate` service and restores. Web and worker never receive them.
+- `DJANGO_SECRET_KEY` also seals secret ballots waiting in the mixing pool
+  (D6x). Rotating it while a secret vote, election or anonymous survey is
+  open: put the old value in `DJANGO_SECRET_KEY_FALLBACKS` until they close,
+  or those ballots cannot be counted (the vote refuses to close). Keep `.env`
+  apart from the database backups; a Proxmox VM backup holds both, so it can
+  link pooled ballots taken during an open vote and is kept like `.env`.
 
 ## First-time setup of the POC (once)
 

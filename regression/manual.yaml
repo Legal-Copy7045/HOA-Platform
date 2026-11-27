@@ -294,6 +294,10 @@
   check: "On the POC, a secret test vote's ballots show as \"waiting to be mixed\" on the vote page while fewer than ten are pooled, the worker writes them once ten wait (five stay behind), and closing the vote counts every ballot with nothing left waiting (D56)."
   steps: "Open a secret demo vote, cast ballots from demo owners, check the vote page as the board after each; cast ten or more and wait a minute for the worker; close the vote and check the counts equal the ballots cast."
   last: ""
+- key: secret choices never readable in the write-ahead log
+  check: "In a scratch database, anonymous survey answers with a marker text, cast in committed transactions, appear in the write-ahead log only in the flush transaction's inserts into governance_surveyanswer, never in a casting transaction's records, the pool rows or their TOAST chunks (D6x)."
+  steps: "As the postgres superuser in a scratch database: CREATE EXTENSION pg_walinspect; note pg_current_wal_insert_lsn(); cast three answers with distinct markers and close the survey; search pg_get_wal_block_info(start, end, true) block_data and block_fpi_data for each marker and compare the xid with the participations' xmin."
+  last: "2026-11-27: scratch database, 272 WAL block records: each marker only in the one flush transaction (governance_surveyanswer); pool records ciphertext only, equal size"
 - key: waiting files clear after a scanner restart
   check: "On the POC, upload a document while the clamav container is stopped: System status shows it under Waiting for a scan (Document library, Scanner unreachable, no file name), Stuck after 15 minutes and the Files waiting for a malware scan check failing after 30; start clamav and within 10 minutes (or after Scan waiting files now) the list is empty and the file downloads."
   steps: "dc stop clamav; upload a test PDF as the board; open System status as a sysadmin; dc start clamav; wait for the scanner line to say On; press Scan waiting files now."

@@ -16,6 +16,11 @@ env = environ.Env()
 
 # --- Core -------------------------------------------------------------------
 SECRET_KEY = env("DJANGO_SECRET_KEY")
+# Previous keys, still accepted for signatures and for opening secret choices
+# sealed in the mixing pool (D6x) after DJANGO_SECRET_KEY is rotated. Keep the
+# old key here until every secret vote, election and anonymous survey open at
+# the rotation has closed.
+SECRET_KEY_FALLBACKS = env.list("DJANGO_SECRET_KEY_FALLBACKS", default=[])
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
@@ -51,6 +56,7 @@ BOARD_SEAT_SECOND_APPROVAL = env.bool("BOARD_SEAT_SECOND_APPROVAL", default=True
 # mixing pool with no identity and are written to the permanent tables in
 # shuffled batches, in a separate transaction, keeping at least this many
 # behind while voting is open; closing writes everything. Never below 2.
+# Pooled choices are sealed with a key derived from DJANGO_SECRET_KEY (D6x).
 SECRET_BALLOT_MIX_MIN = max(2, env.int("SECRET_BALLOT_MIX_MIN", default=5))
 
 # ARC neighbor sign-off (Milestone 3): single-use links expire after this
