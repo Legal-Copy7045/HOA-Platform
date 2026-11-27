@@ -60,8 +60,9 @@ ORDER = ["ci", "unit", "page", "live", "manual", "walkthrough"]
 DEFAULT_STAGES = ["ci", "unit", "page", "manual"]
 PARALLEL = ("ci", "unit", "page", "walkthrough")
 UNIT_LANES = 3
-PAGE_PORT = 8011
-WALK_PORT = 8012
+# Ports can be moved (REGRESSION_PAGE_PORT, REGRESSION_WALK_PORT) so two checkouts can run at once.
+PAGE_PORT = int(os.environ.get("REGRESSION_PAGE_PORT", "8011"))
+WALK_PORT = int(os.environ.get("REGRESSION_WALK_PORT", "8012"))
 # Stage results go to out/<stage>.json, except where that name is taken:
 # out/walkthrough.json is the walkthrough's inventory (role -> width -> pages).
 RESULT_FILE = {"walkthrough": "walkthrough-checks.json"}
