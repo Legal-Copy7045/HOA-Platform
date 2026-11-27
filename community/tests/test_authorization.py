@@ -297,6 +297,9 @@ MEMBER_READS = {
                 "event.rsvp",
                 "reserves.view_summary",
                 "payments.pay",
+                # D76, D77: agree to one's payment plan; claim an expense back.
+                "payment_plan.acknowledge",
+                "reimbursement.submit",
             },
         ),
         (
@@ -318,6 +321,10 @@ MEMBER_READS = {
                 "reserves.view_summary",
                 "bank_feed.view",
                 "disbursement.view",
+                # D75, D77: finance readers.
+                "special_assessment.view",
+                "reimbursement.view_all",
+                "vendor_check.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

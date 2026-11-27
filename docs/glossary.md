@@ -39,6 +39,17 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Statement credit | A credit on an owner's account that pays the next charges ("Surplus distribution credit – 2026"). | `credit` entry |
 | Check register | The list of checks a disbursement needs (payee, mailing address, amount, memo, check number), as CSV or PDF, for writing the checks in the bank's bill pay or the accounting package. | `disbursement_register` |
 | Check printing | Where each field prints on the association's pre-printed check stock, with an alignment test page. | `check_print_settings` |
+| Special assessments | The board's page of one-off assessments levied for a purpose (a capital project): the resolution and, where required, the owners' vote; each home's share; installments posted on their due dates as "<Title> – installment k of N". More finance hub (D75). | `special_assessments`, `ledger/special_assessments.py`, entry kind `special_assess` |
+| Levy a special assessment | The board's form to levy one: title, purpose, total, fund (operating or reserve), installments and due dates, resolution, vote. | `special_assessment_new` |
+| Payment plans | Installment plans agreed for a home with a collection case: prepared (board or manager), approved by another board member, tracked installment by installment, completed or defaulted automatically. More finance hub (D76). | `payment_plans`, `ledger/payment_plans.py` |
+| Set up a payment plan | The page, from a collection case, where a plan's installments are entered. | `payment_plan_new` |
+| Your payment plan | The owner's view of their plan on My account, with the next installment, the agreement letter and "I agree to this plan". | `ledger/_my_plans.html` |
+| Reimbursements | The board's page of expense reimbursement claims (D77): approved by a board member other than the claimant, paid by check or bank transfer. More finance hub. | `reimbursements`, `operations/reimbursements.py` |
+| My reimbursements | One's own claims for association expenses paid out of pocket (board and committee members' menu; volunteers reach it from My account). | `reimbursements?mine=1` |
+| Claim an expense | The form for a reimbursement claim with its receipt. | `reimbursement_new` |
+| Checks | The board's page for paying approved invoices and reimbursements by check on the association's check stock, with the check register, voids and clearing (D77). More finance hub. | `vendor_checks`, `operations/vendor_checks.py` |
+| Start next year's budget | On Budgets: a draft for the next fiscal year from this year's budget and actuals, with the adopted reserve plan's contribution and the monthly charge per home (D78). | `budget_prepare`, `ledger/budget_prep.py` |
+| Budget compared | A draft budget beside last year's budget and actuals, with the monthly charge per home and its change. | `budget_compare` |
 | Account number | The number of one ownership period of a home (changes when the home is sold). Shown as plain text, not a badge. | `Account.number` |
 | My home improvement requests (ARC) | Asking the Architectural Review Committee to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |
 | Neighbor acknowledgement | A neighbor confirms they have seen a project. It never decides the request. | "signoff" (`arc/signoffs.py`) |

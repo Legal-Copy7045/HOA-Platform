@@ -338,3 +338,7 @@
   check: "As a demo board member who owns a home, with a second board member: your own home's request, notice, booking and account show no Board label, say 'another board member handles it' where the board's buttons would be, and the staff steps are greyed out; you can still reply, withdraw, respond, cancel and pay as the owner. Signed in as the other board member, the same pages carry the Board label and every step works. An internal note the other board member writes on your request is not shown to you (D65)."
   steps: "POC with fictional data: raise a request for your demo home, ask the other board member to post an internal note, open both views on a desktop and a phone; check Sysadmin activity or the audit log for 'own_matter_refused' after a crafted POST."
   last: ""
+- key: vendor check alignment
+  check: "Checks prints an approved invoice's check on the association's stock with the same positions as refund checks: date, payee, amount, amount in words, memo with the invoice number (or the reimbursement claim) and the payee's address in a #10 window envelope all line up; the check number on the stock matches the number recorded."
+  steps: "Sign in as a demo board member; Finance > More finance > Checks; tick an approved demo invoice; Print checks (PDF) at 100% onto a voided blank check; fold into a window envelope; Record as issued with the stock's number; confirm the invoice shows Paid and the register lists the check."
+  last: ""

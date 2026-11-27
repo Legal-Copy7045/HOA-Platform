@@ -134,6 +134,7 @@ def seed() -> SeedResult:
 
     # seed_demo prints one summary for the whole dataset.
     call_command("seed_demo_operations", stdout=io.StringIO())
+    __import__("ledger.demo_finance_gaps").demo_finance_gaps.seed()  # D75-D78 demo records
     return SeedResult(
         summary=(
             "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "

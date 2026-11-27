@@ -945,6 +945,36 @@ Finance → Disbursements pays money back to owners: a **surplus distribution** 
 
 **For counsel before the first surplus distribution:** 68 Pa.C.S. § 5313 (surplus funds) applies unless the Declaration provides otherwise; confirm what the Declaration says, whether reserve funds may be treated as surplus, and record the citation on the rule in Community settings.
 
+## Treasurer's guide: special assessments, payment plans, reimbursements, checks, next year's budget (D75-D78)
+
+The association is self-managed, so these are the treasurer's (and the board's) steps. Each lives under Finance → More finance unless noted.
+
+**Special assessment** (Special assessments → Levy a special assessment)
+1. Adopt the board resolution first (Resolutions and policies, or note its reference). If the total is above the Declaration's limit (Community setup → "Special assessments, payment plans and reimbursements"), hold the owners' vote first and link it.
+2. Levy: title, purpose, total, fund (operating or reserve), number of installments, first due date and spacing. Equal shares per home unless the community's rule says otherwise.
+3. Send the owner notice from the special assessment's page (email at once to owners who accepted email; prepare paper copies on Paper mail for the rest).
+4. Installments post by themselves each morning on their due dates; "Post installments due now" does it at once. To stop future installments, use "Cancel future installments" with the reason; a posted charge is corrected only by a reversal on the home's account.
+
+**Payment plan** (from the home's collection case → Set up payment plan)
+1. The plan covers what is open on the home's account today. Enter the number of monthly installments and the first due date, or type your own schedule (one line per installment: `2027-01-15 150.00`).
+2. Another board member approves it (Payment plans, or My items); the case then shows "Payment plan agreed". Download the agreement letter, mail it, and ask the owner to agree on My account or sign and return the letter.
+3. Missed installments show on My items; after the default period the plan ends by itself and the case returns to its earlier step (letters and late fees resume). A paid-off plan closes the case.
+
+**Expense reimbursement** (anyone who paid an association expense: My reimbursements, or My account → Claim an expense)
+1. Submit the amount, date, shop, category and description with the receipt.
+2. A board member other than the claimant approves (two above the set limit). Nobody approves or pays their own claim; a board member's claim is paid by another board member, never the manager.
+3. Pay by check from Checks, or "Record bank transfer" with the transfer's reference (never account numbers).
+
+**Checks** (Checks)
+1. Tick the approved invoices and reimbursements to pay; print them on the check stock ("Print checks (PDF)", 100% scale). Test the alignment first with Disbursements → Check printing → alignment page on plain paper; the positions are shared with refund checks.
+2. Sign and mail, then "Record as issued" with the first check number on the stock: each invoice is recorded as paid by its check. A number is used once across all the association's checks.
+3. When the bank statement shows the check, mark it Cleared (the bank feed line is suggested when there is one). A lost or wrong check is voided by a board member; the invoice is open again.
+
+**Next year's budget** (Budgets → Start next year's budget)
+1. Choose what each line starts from (this year's budget, actual spending, or the higher), any increase, and whether to use the adopted reserve plan's contribution.
+2. Check the draft on "Budget compared": last year's budget, actuals and the new figures, with the monthly charge per home (rounded up as the board's rule says) and the change.
+3. Edit lines on the budget page, send the proposed budget to owners, adopt it, then send the adopted notice and set the new monthly amount in Community settings.
+
 ## Server tasks (D36)
 
 Reusable host operations are started in the portal, not in a terminal:
