@@ -61,7 +61,7 @@ def w():
 def test_owner_menu_merges_voting_and_community_info(client, w):
     client.force_login(w["owner"])
     found = labels(client.get(reverse("home")))
-    for label in ("Voting", "Community info", "My records requests"):
+    for label in ("Voting", "Community info", "My requests", "My violations"):
         assert label in found
     for label in (
         "Votes and polls",
@@ -71,6 +71,8 @@ def test_owner_menu_merges_voting_and_community_info(client, w):
         "Committees",
         "Settings",
         "Records requests",
+        # 0.43.0 (D92): a section of My requests.
+        "My records requests",
     ):
         assert label not in found
 

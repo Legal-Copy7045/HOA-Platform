@@ -153,6 +153,19 @@ def requests_list(request):
     elif request.method == "POST":
         policy.require(user, "request.submit")
         return redirect(reverse("requests") + "?mine=1")
+    from core import features
+
+    # D92: owners' records requests are a section of My requests (with an
+    # "Ask for records" button to the records request form).
+    records = None
+    if (
+        mine
+        and policy.can(user, "records_request.submit")
+        and features.url_name_enabled("records_requests", request)
+    ):
+        from governance.services import my_records_requests
+
+        records = list(my_records_requests(user)[:50])
     return render(
         request,
         "operations/requests.html",
@@ -172,6 +185,7 @@ def requests_list(request):
             ),
             # View-only contacts: the account's requests, read-only.
             "read_only": mine and not policy.can(user, "request.submit"),
+            "records": records,
         },
     )
 

@@ -1,0 +1,15 @@
+# The 0.43.0 menu trim (D92): My reimbursements leaves My home, "Notices about
+# my home" is "My violations", records requests are a section of My requests.
+# `match` runs over "<stage>:<check>".
+- feature: "No role's menu has My reimbursements, My records requests or Notices about my home, and no menu repeats a label; the owner's sidebar is 14 entries and a board member's 35"
+  since: "0.43"
+  match: ["^unit:core/tests/test_menu_043.py::test_(no_role_has_the_old_entries_or_a_duplicate_label|menu_lengths|sections_list_has_no_mine_entry_for_records_or_reimbursements)", "^unit:core/tests/test_nav_streamline.py::test_sidebar_for_every_role"]
+- feature: "The owner's side of Violations is My violations: menu label, page heading, tab title, breadcrumb, My home card, glossary; the board's list stays Violations; the notice letter keeps its name inside the violation"
+  since: "0.43"
+  match: ["^unit:core/tests/test_menu_043.py::test_owner_violations_entry_is_named_my_violations", "^unit:compliance/tests/test_owner_notices.py::test_owner_(list_wording|detail_wording_and_one_reply_box)", "^unit:core/tests/test_nav_counts.py::test_owner_gets_bubbles_for_their_own_notices_only"]
+- feature: "My reimbursements opens from the board side: the Finance overview (board members only, while the feature is on, and current there), a committee's page for its members, My account for anyone who may claim; a waiting claim stays in My items with no menu bubble (D77, D92)"
+  since: "0.43"
+  match: ["^unit:core/tests/test_menu_043.py::test_(committee_member_menu_has_no_reimbursements_entry|finance_overview_links_the_board_members_own_claims|switched_off_reimbursements_hide_the_link|own_claim_waits_in_my_items_without_a_menu_bubble)"]
+- feature: "My requests shows the person's own records requests with status and an Ask for records button to the records request form; a board member sees only their own there; contacts and tenants get no such section; the records request pages go back to My requests; another owner's request is a 404 (D92)"
+  since: "0.43"
+  match: ["^unit:core/tests/test_menu_043.py::test_(my_requests_shows_own_records_requests_with_status|contacts_and_tenants_get_no_records_section|records_request_pages_go_back_to_my_requests|records_request_detail_is_404_for_another_owner)"]

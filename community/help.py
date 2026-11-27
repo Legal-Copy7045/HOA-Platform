@@ -86,7 +86,7 @@ TOPICS: list[Topic] = [
         "How violation notices work",
         "What a notice about your home means, the time to fix it, responding and hearings.",
         ("lot.view_own", "violation.view_all"),
-        ("Notices about my home", "violations?mine=1"),
+        ("My violations", "violations?mine=1"),
         ("Violations", "violations"),
         feature="violations",
     ),
@@ -394,8 +394,8 @@ def _violations(request=None) -> list[Section]:
     notice = Section("The notice")
     notice.paras.append(
         "If something at a home seems to break the covenants or rules, the board sends the "
-        "owners a notice saying what it is and which rule it is under. It appears on Notices "
-        "about my home and, if you chose it, by email or post."
+        "owners a notice saying what it is and which rule it is under. It appears on My "
+        "violations and, if you chose it, by email or post."
     )
     fix = Section("Fixing it")
     if cure:
@@ -727,9 +727,9 @@ PAGE_DESCRIPTIONS = {
     "my_lot": "Your home and the people on your account.",
     "my_account": "Your statement, balance, charges and payments.",
     "arc_list?mine=1": "Asking to change the outside of your home, and neighbors' projects.",
-    "violations?mine=1": "Covenant or rule notices about your home, and your replies.",
-    "requests?mine=1": "Your questions and reports to the board, with the replies.",
-    "records_requests?mine=1": "Your requests to inspect the association's records.",
+    "violations?mine=1": "Covenant or rule violations at your home, their notices, your replies.",
+    "requests?mine=1": "Your questions and reports to the board, with the replies, and your "
+    "requests to inspect the association's records.",
     "my_history": "Your statements and requests from your time as an owner.",
     "announcements": "News from the board.",
     "calendar": "Meetings and community events.",

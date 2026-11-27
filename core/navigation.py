@@ -229,6 +229,8 @@ SUBPAGES = {
     # marks Calendar current.
     "calendar": ["meetings"],
     "arc_list?mine=1": ["signoffs_mine"],
+    # Owners' records requests are a section of My requests (D92).
+    "requests?mine=1": ["records_requests?mine=1"],
     "people": ["access_review"],
     "lot_list": ["invitations"],
     "tasks": ["compliance"],
@@ -260,6 +262,8 @@ SUBPAGES = {
         "special_assessments",
         "payment_plans",
         "reimbursements",
+        # One's own claims (D92): the board's Finance overview links there.
+        "reimbursements?mine=1",
         "vendor_checks",
         "interest",
         "cashflow",
@@ -292,14 +296,17 @@ SECTIONS = [
             ("My home", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
             ("My home improvement requests (ARC)", "arc_list?mine=1", "pencil", "arc.submit"),
-            ("Notices about my home", "violations?mine=1", "flag", "lot.view_own"),
+            # The owner side of Violations; letters and notices are
+            # documents inside each violation (0.43.0).
+            ("My violations", "violations?mine=1", "flag", "lot.view_own"),
             # Residents (incl. view-only contacts and tenants); former owners
-            # see their requests inside My history instead.
+            # see their requests inside My history instead. Owners' records
+            # requests are a section of it (SUBPAGES, 0.43.0).
             ("My requests", "requests?mine=1", "mail", ("lot.view_own", "request.submit")),
-            ("My records requests", "records_requests?mine=1", "inbox", "records_request.submit"),
             ("My history", "my_history", "clock", "history.view_own"),
-            # Expense reimbursements (D77): one's own claims.
-            ("My reimbursements", "reimbursements?mine=1", "receipt", "reimbursement.menu"),
+            # My reimbursements (D77) left the menu in 0.43.0: claims are board
+            # and committee work, reached from the Finance overview, a
+            # committee's page, My account and My items (D92).
         ],
     ),
     (

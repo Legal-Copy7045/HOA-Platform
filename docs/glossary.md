@@ -55,7 +55,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Set up a payment plan | The page, from a collection case, where a plan's installments are entered. | `payment_plan_new` |
 | Your payment plan | The owner's view of their plan on My account, with the next installment, the agreement letter and "I agree to this plan". | `ledger/_my_plans.html` |
 | Reimbursements | The board's page of expense reimbursement claims (D77): approved by a board member other than the claimant, paid by check or bank transfer. Finance overview hub. | `reimbursements`, `operations/reimbursements.py` |
-| My reimbursements | One's own claims for association expenses paid out of pocket (board and committee members' menu; volunteers reach it from My account). | `reimbursements?mine=1` |
+| My reimbursements | One's own claims for association expenses paid out of pocket. Not a menu entry (D92): board members open it from the Finance overview, committee members from their committee's page, anyone who may claim from My account. | `reimbursements?mine=1` |
 | Claim an expense | The form for a reimbursement claim with its receipt. | `reimbursement_new` |
 | Checks | The board's page for paying approved invoices and reimbursements by check on the association's check stock, with the check register, voids and clearing (D77). Finance overview hub. | `vendor_checks`, `operations/vendor_checks.py` |
 | Start next year's budget | On Budgets: a draft for the next fiscal year from this year's budget and actuals, with the adopted reserve plan's contribution and the monthly charge per home (D78). | `budget_prepare`, `ledger/budget_prep.py` |
@@ -63,9 +63,9 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Account number | The number of one ownership period of a home (changes when the home is sold). Shown as plain text, not a badge. | `Account.number` |
 | My home improvement requests (ARC) | Asking the Architectural Review Committee to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |
 | Neighbor acknowledgement | A neighbor confirms they have seen a project. It never decides the request. | "signoff" (`arc/signoffs.py`) |
-| Notices about my home | Covenant or rule notices sent to an owner. The board's list is **Violations**. | `compliance`, `Violation` |
+| My violations | The owner's side of **Violations**: covenant or rule violations at your home, each with the notice (letter) the association sent and your response. Notices and letters are documents within a violation. Formerly "Notices about my home". | `violations?mine=1`, `compliance`, `Violation` |
 | Fix by | The date an owner should fix a notice by. | `cure_by` |
-| Official notices | The formal notices the association must send every owner on the deed (meeting, budget and assessment notices, delinquency letters, others the Declaration or law requires), by email to those who agreed, by post to everyone else. Not the same as **Notices about my home**. | `notice_choice`, `community/notices.py` |
+| Official notices | The formal notices the association must send every owner on the deed (meeting, budget and assessment notices, delinquency letters, others the Declaration or law requires), by email to those who agreed, by post to everyone else. Not the same as a violation's notice (**My violations**). | `notice_choice`, `community/notices.py` |
 | Paper mail | The board's and manager's page for official notices by post: who gets paper (owners on the deed who have not agreed to email), new mailings, printing letters, envelopes and labels, and marking them mailed. **Paper mail settings** (on Settings) holds where the address prints for window envelopes and the USPS tracking barcode. | `paper_mail`, `comms/papermail.py` |
 | Mailing | One paper mailing: its wording, who it goes to (one letter per home and mailing address), when it was mailed. Kept permanently. | `comms.Mailing` |
 | USPS tracking | Reading USPS Informed Visibility scans of barcoded letters (optional feature). A letter is Mailed, Processed, Sorted for delivery on a date (usually delivered that day or the next), or flagged with No scans after 5 days. | `usps_tracking`, `comms/usps_tracking.py`, `comms/usps_iv.py` |
@@ -78,8 +78,8 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Checked for completeness | The board checks a submitted request has everything it needs, then the review clock starts. | `submitted` state |
 | Request #12, Notice #7, Work order #3 | Record numbers. No letter prefixes (ARC-12, V-7, WO-3, R-2). | primary key |
 | Version 2 | A document's second upload. | `DocumentVersion.number` |
-| My requests | Questions and requests to the board. The board's list is **Owner requests**. View-only contacts see the requests on the account they follow, read-only; former owners find theirs in **My history**. | `operations.OwnerRequest` |
-| Records requests | An owner's request to inspect association records (Pennsylvania law). The owner's own list is **My records requests**. | `governance.RecordsRequest` |
+| My requests | Questions and requests to the board, and (owners) one's own **Records requests** with "Ask for records". The board's list is **Owner requests**. View-only contacts see the requests on the account they follow, read-only; former owners find theirs in **My history**. | `operations.OwnerRequest` |
+| Records requests | An owner's request to inspect association records (Pennsylvania law). The board's list; an owner's own are a section of **My requests** ("Ask for records", D92). | `governance.RecordsRequest` |
 | Voting | One list of **Votes**, **Elections** and **Surveys**, filtered by open or past and by type. Board members start new ones here (New vote, New election, New survey). Owners also find **Give a proxy** for coming owners' meetings. The old addresses of the three lists lead here. | `voting` |
 | Votes | Formal votes of the owners: binding, one ballot per home, with the quorum and pass rules (and citations) fixed when the vote opens. Informal polls made before November 26, 2026 stay readable under Past; a new poll is a survey with one question. | `Vote` |
 | Elections | Board elections: nominations, ballots, results. | `Election` |

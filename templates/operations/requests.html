@@ -5,6 +5,7 @@
   <div class="page-head"><div><h1>{% if staff %}Owner requests{% else %}My requests{% endif %}</h1>
     <p class="subtitle">{% if staff %}Questions and reports from owners, contacts and tenants. Each type has a response target set in Community settings.{% elif read_only %}Requests raised on the account you follow. You can read them; only the owners and authorized contacts can ask or reply.{% else %}Ask a question or report a problem. We'll reply here and email you a link.{% endif %} {% how_it_works "requests" %}</p></div>
     <div class="actions">{% if form and not open_form and page.object_list %}<a class="btn" href="?mine=1&amp;new=1#new-request" data-opens="new-request">{% icon "plus" %} Ask the board a question</a>{% endif %}
+    {% if records is not None %}<a class="btn secondary" href="{% url 'records_requests' %}?mine=1&amp;new=1#new-request" data-testid="ask-for-records">{% icon "inbox" %} Ask for records</a>{% endif %}
     {% if is_staff and user|can:"request.submit" %}{% if mine %}<a class="btn secondary" href="{% url 'requests' %}">All owner requests</a>{% else %}<a class="btn secondary" href="{% url 'requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}{% endif %}</div></div>
   {% if form %}<details class="panel" id="new-request"{% if open_form or not page.object_list %} open{% endif %}><summary>Ask a question or report a problem</summary><div class="panel-body">
     <form method="post" action="{% url 'requests' %}?mine=1" enctype="multipart/form-data">{% csrf_token %}
@@ -44,4 +45,12 @@
     {% else %}{% include "partials/empty.html" with icon="inbox" title="No requests here" %}{% endif %}
   </section>
   </div>
+  {# D92: the owner's records requests (Pennsylvania law) are part of My requests. #}
+  {% if records is not None %}<section class="card" id="records-requests" aria-labelledby="records-h" data-testid="my-records-requests"><h2 id="records-h">Records requests</h2>
+    <p class="small muted">Pennsylvania law lets owners inspect the association's records. Ask with "Ask for records" and follow each request to its due date.</p>
+    {% if records %}<div class="table-wrap"><table class="stack-sm">
+      <thead><tr><th>Request</th><th>Status</th><th>Due</th></tr></thead>
+      <tbody>{% for r in records %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'records_request_detail' r.pk %}">Records request #{{ r.pk }}</a><div class="small muted">{{ r.description|truncatechars:80 }}</div></td><td data-label="Status">{% status r.state r.get_state_display %}</td><td class="nowrap" data-label="Due">{{ r.due_on|short_date|default:"" }}</td></tr>{% endfor %}</tbody>
+    </table></div>{% else %}<p class="muted small">No records requests yet.</p>{% endif %}
+  </section>{% endif %}
 {% endblock %}

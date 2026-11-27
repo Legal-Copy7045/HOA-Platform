@@ -24,7 +24,7 @@
   <div class="grid grid-2">
     <section class="card"><h3>Home improvement requests (ARC)</h3>
       {% if arc %}<ul class="list">{% for r in arc %}<li><span class="grow">{{ r.title|default:r }}</span><span class="small muted">{{ r.get_state_display }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}</section>
-    <section class="card"><h3>Notices</h3>
+    <section class="card"><h3>Violations</h3>
       {% if violations %}<ul class="list">{% for v in violations %}<li><span class="grow">{{ v }}</span><span class="small muted">{{ v.get_state_display }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}</section>
     <section class="card"><h3>Requests</h3>
       {% if requests %}<ul class="list">{% for r in requests %}<li><a class="grow" href="{% url 'request_detail' r.pk %}">{{ r.subject }}</a><span class="small muted">{{ r.created_at|short_date }} · {{ r.get_state_display }}</span></li>{% endfor %}</ul>{% else %}<p class="muted small">None.</p>{% endif %}</section>

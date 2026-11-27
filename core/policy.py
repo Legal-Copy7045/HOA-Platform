@@ -328,8 +328,9 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # owners claim; a board member other than the claimant approves; paying
     # is data entry (D66 limits who pays a board member).
     "reimbursement.submit": frozenset({OWNER, BOARD, COMMITTEE_MEMBER}),
-    # The "My reimbursements" menu entry: those who usually spend for the
-    # association (volunteer owners reach the page from My account).
+    # The "My reimbursements" link on the Finance overview and a committee's
+    # page (D92): those who usually spend for the association (volunteer
+    # owners reach the page from My account).
     "reimbursement.menu": frozenset({BOARD, COMMITTEE_MEMBER}),
     "reimbursement.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
     "reimbursement.approve": frozenset({BOARD}),

@@ -6,7 +6,7 @@
   <div class="page-head"><div><h1>{{ committee.name }}</h1>
     <div class="meta">{% if committee.citation %}<span>{% icon "book" %}{{ committee.citation }}</span>{% endif %}{% if not committee.active %}<span class="badge">Retired</span>{% endif %}</div>
     {% if committee.purpose %}<p class="subtitle">{{ committee.purpose }}</p>{% endif %}</div>
-    {% if can_manage %}<div class="actions"><form method="post" action="{% url 'committee_action' committee.pk committee.active|yesno:'retire,reactivate' %}">{% csrf_token %}<button type="submit" class="secondary small">{% if committee.active %}Retire committee{% else %}Reactivate{% endif %}</button></form></div>{% endif %}</div>
+    {% feature_on "reimbursements" as claims_on %}{% if can_manage or claims_on and can_work and user|can:"reimbursement.menu" %}<div class="actions">{% if claims_on and can_work and user|can:"reimbursement.menu" %}<a class="btn secondary small" href="{% url 'reimbursements' %}?mine=1" data-testid="my-reimbursements-link">{% icon "receipt" %} My reimbursements</a>{% endif %}{% if can_manage %}<form method="post" action="{% url 'committee_action' committee.pk committee.active|yesno:'retire,reactivate' %}">{% csrf_token %}<button type="submit" class="secondary small">{% if committee.active %}Retire committee{% else %}Reactivate{% endif %}</button></form>{% endif %}</div>{% endif %}</div>
   <div class="split">
     <div>
       <section class="card"><h2>Discussions</h2>
