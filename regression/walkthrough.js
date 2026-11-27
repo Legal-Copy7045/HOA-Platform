@@ -32,8 +32,9 @@ const WIDTHS = {
   desktop: { viewport: { width: 1280, height: 900 } },
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 },
 };
-const SKIP = [/logout/, /\.pdf$/, /\.csv(\?|$)/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
-  /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/, /\.zip$/, /\.ics(\?|$)/];
+// Downloads (with or without a query string) are not pages; same list as pages.js.
+const SKIP = [/logout/, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
+  /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 const MAX_PAGES = Number(process.env.WALK_MAX_PAGES || 160);
 const CONCURRENCY = Number(process.env.WALK_CONCURRENCY || 3);
 const TAP = 40;
