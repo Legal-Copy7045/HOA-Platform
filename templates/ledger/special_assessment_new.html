@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Levy a special assessment · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'special_assessments' %}">Special assessments</a> / Levy</div>
+  <div class="page-head"><div><h1>Levy a special assessment</h1>
+    <p class="subtitle">{% if equal %}Every one of the {{ homes }} homes pays an equal share{% if equal_rule.1 %} ({{ equal_rule.1 }}){% endif %}, the odd cents one each in address order.{% else %}Enter each home's share below; they must add up to the total{% if equal_rule.1 %} ({{ equal_rule.1 }}){% endif %}.{% endif %}
+    {% if vote_cents is not None %}Above {{ vote_cents|cents }} the owners must approve it{% if vote_percent %} ({{ vote_percent }}% of the votes){% endif %}{% if vote_cite %}, {{ vote_cite }}{% endif %}: link the closed vote or type its reference.{% endif %}
+    Late fees on its installments: {% if late_fees %}yes{% else %}no{% endif %}.</p></div></div>
+  {% include "partials/form_errors.html" %}
+  {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+  <form method="post" class="card form-grid" data-confirm="Levy this special assessment? Its installments post on every home's account on their due dates. {% acting_confirm %}">{% csrf_token %}
+    {% for field in form %}<div class="field">{{ field.label_tag }}{{ field }}{% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}{% for e in field.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>{% endfor %}
+    <div class="form-actions"><button type="submit">{% icon "check" %} {% for_board "Levy" %}</button></div>
+  </form>
+{% endblock %}

@@ -20,6 +20,8 @@
           </div>
         </form>
       </section>{% endif %}
+      {% if plan %}<section class="card" data-testid="case-plan"><h2>Payment plan</h2><p class="small">{{ plan.plan.total_cents|cents }} · paid {{ plan.paid_cents|cents }} · {{ plan.status_label }}{% if plan.missed %} · {{ plan.missed|length }} installment{{ plan.missed|length|pluralize }} missed{% endif %}</p><a class="btn secondary" href="{% url 'payment_plan_detail' plan.plan.pk %}">Open the payment plan</a></section>
+      {% elif can_plan %}<section class="card"><h2>Payment plan</h2><p class="small">Agree installments for what is open on the account; another board member approves the plan, and its approval moves this case.</p><a class="btn" href="{% url 'payment_plan_new' obj.pk %}">{% icon "plus" %} Set up payment plan</a></section>{% endif %}
       {% include "partials/workflow.html" with obj=obj actions=None %}
       {% legal_panel obj %}{# D82: board only, with the feature on #}
     </div>

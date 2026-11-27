@@ -50,7 +50,7 @@ from django.db.models import Sum  # noqa: E402
 
 from community.rules import rule  # noqa: E402
 from core.policy import SYSTEM  # noqa: E402
-from core.workflow import Transition, Workflow, WorkflowError  # noqa: E402
+from core.workflow import NotForYou, Transition, Workflow, WorkflowError  # noqa: E402
 from operations.models import (  # noqa: E402
     ApprovalDecision,
     ExpenseCategory,
@@ -296,6 +296,18 @@ INVOICE = Workflow(
             "Paid in full",
             confirm="Record this invoice as paid in full?",
             guard=_fully_paid,
+        ),
+        # D77: a voided vendor check reopens a paid invoice for a new payment.
+        # Taken only by operations/vendor_checks.py (as SYSTEM).
+        Transition(
+            "payment_voided",
+            {"paid"},
+            "approved",
+            "invoice.record_payment",
+            "Check voided: awaiting payment again",
+            guard=lambda obj, actor: (
+                None if actor is SYSTEM else NotForYou("Recorded when a check is voided.")
+            ),
         ),
         Transition(
             "void",

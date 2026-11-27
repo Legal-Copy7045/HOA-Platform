@@ -118,6 +118,31 @@ GROUP_NOTES: dict[str, str] = {
         "Not set by the Act; an operations choice. Keeping the portal running protects the "
         f"association's records, which it must keep ({ACT} § 5316)."
     ),
+    # Finance gaps (D75-D78).
+    "Special assessments": (
+        f"The board levies assessments, including special assessments, under its powers "
+        f"({ACT} § 5302(a)) and allocates them among the lots as the Declaration says "
+        f"(§ 5314); unpaid installments are a lien on the lot like any assessment (§ 5315). "
+        f"Many Declarations require the owners' approval of a special assessment above an "
+        f"amount, or of capital improvements. Counsel should confirm the Declaration's "
+        f"limits, the vote needed and the notice before the board levies."
+    ),
+    "Payment plans": (
+        f"The Act does not regulate payment plans; agreeing one is part of collecting "
+        f"assessments ({ACT} § 5302(a)) and does not release the lien (§ 5315). Waiving late "
+        f"fees while a plan is kept is a board collection policy. Counsel should confirm the "
+        f"agreement's wording."
+    ),
+    "Reimbursements": (
+        "The Act does not regulate how the association repays expenses a volunteer paid; "
+        "these are internal financial controls the board sets by resolution, like invoice "
+        "approval. Nobody approves or pays their own claim."
+    ),
+    "Budget preparation": (
+        f"The board adopts the budget and the assessments that fund it ({ACT} § 5302(a)), "
+        f"allocated among the lots as the Declaration says (§ 5314). Rounding the monthly "
+        f"amount is a board decision; owners must get the notices the Bylaws require."
+    ),
     "Account recovery": (
         "Not set by the Act; a board security policy. The Act does not regulate how owners "
         "sign in. The waiting period and the lock afterwards protect votes, notices and "
@@ -509,6 +534,63 @@ GUIDES["tax.1099_misc_categories"] = Guide(
     "payments go on which form (services on 1099-NEC; rents and some other payments on "
     "1099-MISC). Filed through IRIS or on paper; the preparer confirms.",
     "Blank (all services): tax preparer's advice, 2027.",
+)
+
+# --- Finance gaps (D75-D78) ------------------------------------------------------------
+GUIDES["special_assessment.equal_shares"] = Guide(
+    DECLARATION,
+    f"Assessments are allocated among the lots as the Declaration says ({ACT} § 5314); "
+    f"special assessments follow the same allocation unless the Declaration sets another "
+    f"(for example, a limited common element benefiting some lots only).",
+    "On: Declaration §8.4 and §8.14 (assessments equal per lot).",
+)
+GUIDES["special_assessment.vote_required_cents"] = Guide(
+    DECLARATION,
+    f"The Act lets the board levy assessments ({ACT} § 5302(a)) but leaves limits to the "
+    f"Declaration and Bylaws, which often require the owners' approval of a special "
+    f"assessment or capital improvement above an amount.",
+    "$10,000: Declaration §8.6 (special assessments over $10,000 need owner approval).",
+)
+GUIDES["special_assessment.vote_percent"] = Guide(
+    DECLARATION,
+    f"The share of votes comes from the Declaration or Bylaws; the Act sets the quorum "
+    f"fallback for meetings ({ACT} § 5309), not this threshold.",
+    "67%: Declaration §8.6 (two-thirds of the votes cast).",
+)
+GUIDES["special_assessment.late_fees"] = Guide(
+    DECLARATION,
+    f"The association may charge late fees on assessments ({ACT} § 5302(a)(11)); they are "
+    f"part of the lien (§ 5315). Whether they apply to special assessment installments is "
+    f"for the Declaration or the board's collection policy.",
+    "Off: Board collection policy, resolution 2026-09.",
+)
+GUIDES["payment_plan.suspend_late_fees"] = Guide(
+    BOARD,
+    f"Not covered by the Act; a board collection policy. The lien for the unpaid "
+    f"assessments stays in place while a plan is kept ({ACT} § 5315).",
+    "On: Board collection policy, resolution 2026-09.",
+)
+GUIDES["payment_plan.grace_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; a board collection policy.",
+    "10 days: Board collection policy, resolution 2026-09.",
+)
+GUIDES["payment_plan.default_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; a board collection policy. A defaulted plan returns the "
+    "account to the normal collection steps.",
+    "30 days: Board collection policy, resolution 2026-09.",
+)
+GUIDES["reimbursement.second_approval_cents"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal financial control like the invoice approval rule.",
+    "Two approvals at $500 and over: Board resolution 2026-07 (spending controls).",
+)
+GUIDES["budget.assessment_rounding_cents"] = Guide(
+    BOARD,
+    f"Not covered by the Act; the board adopts the budget and assessments ({ACT} § 5302(a)) "
+    f"and may round the monthly amount, keeping the allocation of § 5314.",
+    "Whole dollars: Board budget procedure, resolution 2026-10.",
 )
 
 GUIDES["recovery.wait_hours"] = Guide(

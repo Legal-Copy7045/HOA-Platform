@@ -491,3 +491,7 @@ from operations.models_options import (  # noqa: E402, F401
 
 # --- Vendor onboarding (D79): models in their own module -----------------------------
 from operations.onboarding_models import *  # noqa: E402, F403
+
+# Expense reimbursements and vendor checks (D77): their own module, so the
+# models merge cleanly with other operations work.
+from operations.models_payouts import *  # noqa: E402, F403

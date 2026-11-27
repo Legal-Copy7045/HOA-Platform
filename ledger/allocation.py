@@ -51,6 +51,7 @@ CHARGE_KIND_VALUES = (
     "refund",
     "interest",  # D80: interest on overdue balances
     "legal_cost",  # D82: collection costs charged under the Declaration
+    "special_assess",  # special assessment installments (D75)
 )
 _LOCK_NAMESPACE = 5_320_001  # pg advisory lock namespace for lot allocation
 _NUMBER_LOCK = 5_320_002

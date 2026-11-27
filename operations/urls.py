@@ -111,3 +111,29 @@ urlpatterns += [
         name="insurance_claim_file",
     ),
 ]
+
+# Expense reimbursements and vendor checks (D77).
+from operations import payout_views as pv  # noqa: E402
+
+urlpatterns += [
+    path("reimbursements/", pv.reimbursements, name="reimbursements"),
+    path("reimbursements/new/", pv.reimbursement_new, name="reimbursement_new"),
+    path("reimbursements/<int:pk>/", pv.reimbursement_detail, name="reimbursement_detail"),
+    re_path(
+        r"^reimbursements/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
+        pv.reimbursement_action,
+        name="reimbursement_action",
+    ),
+    path(
+        "reimbursements/<int:pk>/receipts/<int:file_id>/",
+        pv.reimbursement_file,
+        name="reimbursement_file",
+    ),
+    path("finance/checks/", pv.vendor_checks, name="vendor_checks"),
+    path("finance/checks/print.pdf", pv.vendor_checks_pdf, name="vendor_checks_pdf"),
+    re_path(
+        r"^finance/checks/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
+        pv.vendor_check_action,
+        name="vendor_check_action",
+    ),
+]

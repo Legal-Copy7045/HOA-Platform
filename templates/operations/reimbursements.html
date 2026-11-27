@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{% if mine %}My reimbursements{% else %}Reimbursements{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head">
+    <div><h1>{% if mine %}My reimbursements{% else %}Reimbursements{% endif %}</h1>
+      <p class="subtitle">{% if mine %}Association expenses you paid yourself and claimed back, with the receipt. Board members other than you approve each claim; the treasurer pays it by check or bank transfer.{% else %}Expenses board members, committee members and volunteers paid for the association. A board member other than the claimant approves; nobody pays their own claim.{% endif %}</p></div>
+    {% if can_submit %}<div class="actions"><a class="btn" href="{% url 'reimbursement_new' %}">{% icon "plus" %} Claim an expense</a></div>{% endif %}
+  </div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th scope="col">Expense</th>{% if not mine %}<th scope="col">Claimed by</th>{% endif %}<th scope="col" class="num">Amount</th><th scope="col">Status</th></tr></thead>
+    <tbody>{% for r in rows %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'reimbursement_detail' r.claim.pk %}">{{ r.claim.payee }}</a><div class="small muted">{{ r.claim.spent_on|short_date }} · {{ r.claim.category.name }}</div></td>
+      {% if not mine %}<td data-label="Claimed by">{{ r.claim.claimant.display_name }}</td>{% endif %}
+      <td class="num" data-label="Amount">{{ r.claim.amount_cents|cents }}</td>
+      <td data-label="Status">{% for k, v in labels.items %}{% if k == r.state.status %}<span class="status {% if k == 'paid' %}tone-success{% elif k == 'awaiting' or k == 'approved' %}tone-warning{% else %}tone-info{% endif %}">{{ v }}</span>{% endif %}{% endfor %}</td></tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="receipt" title="No reimbursement claims" text="Claims for expenses paid out of pocket appear here." %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

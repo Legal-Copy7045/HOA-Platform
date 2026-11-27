@@ -408,7 +408,8 @@ def test_accounting_setup_round_trips_unchanged(client, w):
     assert setup.opening_cash_cents == 125000
     assert setup.opening_cash_on == datetime.date(2026, 1, 1)
     summary = client.get(url).content.decode()
-    assert "Accounting set up: 11 accounts mapped (1 changed from the standard)" in summary
+    # 12 with the special assessment income account (D75).
+    assert "Accounting set up: 12 accounts mapped (1 changed from the standard)" in summary
     assert "$1,250.00" in summary
 
 
