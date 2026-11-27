@@ -107,6 +107,8 @@ _TONES = {
         "processing",
         "requested",  # server task
         "running",  # server task
+        "invited",  # vendor onboarding (D79)
+        "returned",  # vendor onboarding: back with the vendor
     },
     "danger": {
         "denied",

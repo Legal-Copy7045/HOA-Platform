@@ -93,6 +93,9 @@ x-app-env: &app-env
   SMS_API_BASE: ${SMS_API_BASE:-https://api.twilio.com}
   # Bank feed (optional feature "bank_feeds").
   BANK_FEED_TOKEN_KEY: ${BANK_FEED_TOKEN_KEY:-}
+  # Vendor onboarding (D79): set by infra/poc/set-vendor-key.sh.
+  VENDOR_DOCUMENT_KEY: ${VENDOR_DOCUMENT_KEY:-}
+  VENDOR_DOCUMENT_KEY_FALLBACKS: ${VENDOR_DOCUMENT_KEY_FALLBACKS:-}
   TELLER_APPLICATION_ID: ${TELLER_APPLICATION_ID:-}
   TELLER_ENVIRONMENT: ${TELLER_ENVIRONMENT:-sandbox}
   TELLER_CERTIFICATE_B64: ${TELLER_CERTIFICATE_B64:-}

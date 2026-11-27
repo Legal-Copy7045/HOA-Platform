@@ -29,6 +29,7 @@ OFF_BY_DEFAULT = {
     "online_payments",
     "autopay",
     "usps_tracking",
+    "vendor_onboarding",
 }
 
 

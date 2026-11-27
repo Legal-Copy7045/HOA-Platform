@@ -8,7 +8,8 @@
   {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<div>{{ error }}</div></div>{% endif %}
   <p class="small muted">A W-9 is always required when the vendor's answers make it likely 1099-reportable ({{ citation_1099 }}). Vendors confirm they used the current IRS revision ({{ w9_revision }}). {{ preparer_caveat }} {{ counsel_caveat }}</p>
   <form method="post">{% csrf_token %}<input type="hidden" name="form" value="requirements">
-    <div class="table-card"><div class="table-wrap"><table><thead><tr><th>Kind of work</th>{% for i in items %}<th>{{ i.label }}</th>{% endfor %}</tr></thead><tbody>
+    {# data-wide: a grid of kinds of work by documents reads only as a grid; it scrolls sideways on a phone #}
+    <div class="table-card"><div class="table-wrap"><table data-wide><thead><tr><th>Kind of work</th>{% for i in items %}<th>{{ i.label }}</th>{% endfor %}</tr></thead><tbody>
       {% for row in table %}<tr><td class="cell-title">{{ row.label }}</td>{% for c in row.items %}<td><label class="check"><input type="checkbox" name="req__{{ row.type }}__{{ c.key }}"{% if c.required %} checked{% endif %}{% if not can_edit %} disabled{% endif %}><span class="sr-only">{{ c.label }}</span></label><div class="small muted">{{ c.citation }}{% if c.default %} (default){% endif %}</div></td>{% endfor %}</tr>{% endfor %}
     </tbody></table></div></div>
     {% if can_edit %}<label for="citation">Citation for these changes (board resolution or policy)</label><input id="citation" name="citation" maxlength="200" required>
