@@ -371,7 +371,10 @@ def test_settings_page_has_a_jump_select_and_opens_one_attention_section(client,
 def _events(action, n, actor, minutes_apart=1):
     from audit.models import AuditEvent
 
-    now = timezone.now() - datetime.timedelta(hours=1)
+    # Noon yesterday (site time): a run never straddles local midnight, which
+    # would rightly split it into two days' rows.
+    noon = timezone.localtime().replace(hour=12, minute=0, second=0, microsecond=0)
+    now = noon - datetime.timedelta(days=1)
     for i in range(n):
         AuditEvent.objects.create(
             action=action,
