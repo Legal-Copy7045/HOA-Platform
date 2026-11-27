@@ -64,3 +64,14 @@ def pytest_collection_modifyitems(config, items):
     if deselected:
         config.hook.pytest_deselected(items=deselected)
     items[:] = keep
+
+
+@pytest.fixture(autouse=True)
+def _fresh_service_credentials():
+    """Keys and connections (D93) keeps what it read for a few seconds per
+    process: every test starts and ends with nothing remembered."""
+    from core import credentials
+
+    credentials.forget()
+    yield
+    credentials.forget()

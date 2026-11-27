@@ -23,6 +23,19 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
   or those ballots cannot be counted (the vote refuses to close). Keep `.env`
   apart from the database backups; a Proxmox VM backup holds both, so it can
   link pooled ballots taken during an open vote and is kept like `.env`.
+- Third-party service keys (email, Stripe, Teller, USPS, the bounce
+  mailbox, Gemini, the vendor document key) are entered in the browser:
+  System status -> Keys and connections (D93). Sysadmins only, after a fresh
+  passkey check; each key is tested with its provider first, stored
+  encrypted, never shown again, and the board is emailed about every change.
+  Stripe and Teller changes wait for another board member's approval, and
+  their account is pinned. The set-*.sh scripts below still work as an
+  optional fallback; a value saved in the portal wins over `.env`.
+- `CREDENTIALS_KEK` (created in `.env` by make-env.sh, or by start-portal.sh
+  on the first start of 0.44.0) unlocks those saved keys. Copy it into the
+  HOA password manager with `DJANGO_SECRET_KEY`, apart from the backups:
+  restoring the database without it loses the saved keys (they read as
+  empty) and with them the vendor document key and the vendor documents.
 
 ## First-time setup of the POC (once)
 
@@ -866,7 +879,7 @@ items.
    sudo bash /opt/hoa-portal/infra/poc/set-stripe-key.sh
    ```
 
-4. Admin -> Features: switch on **Online payments**. Community settings:
+4. Settings → Features (board): switch on **Online payments**. Community settings:
    check **Credit card surcharge** (default 300 = 3%) and give it its
    citation (board resolution).
 5. Finance -> Online payments shows "TEST MODE"; owners' pay pages carry a
@@ -919,7 +932,7 @@ Built and tested in test mode; live use needs the HOA's own Stripe account
    PaymentMethods Write, turning off still stops the charges but the card
    stays on the Customer at Stripe (the audit log shows
    `payments.autopay_detach_failed`; detach it in the dashboard).
-2. Admin -> Features: switch on **Automatic payments** (Online payments must
+2. Settings → Features (board): switch on **Automatic payments** (Online payments must
    be on too). Community settings: **Automatic payments above this wait for
    the board's review** (`payments.autopay_review_cents`, default $500.00, D47)
    with its citation; the due day (`dues.due_day`) is when the charge is made.
@@ -1133,7 +1146,7 @@ With USPS tracking on, the portal reads USPS scans of barcoded paper mail itself
    ```
 
    Choose `cat` (the default) or `production`, type the BCG user name and the password (hidden). The script saves them in `.env` (the old file is kept as `.env.before-usps`, mode 600, until the check passes, then removed, D87), restarts the portal and signs in once with `manage.py check_usps_iv` in the worker container, the only one given the password (no mail is looked up). It prints `OK: signed in to ...` or what failed; a failed check says how to put the old file back. To change the login, run it again. When CAT works, run it again with `production`.
-4. **Switch it on:** Admin → Features → USPS tracking. Settings → Paper mail settings then shows "Connected to the USPS test environment (CAT)" (or "Connected to USPS Informed Visibility") and when it last checked. The tracking barcode must be on for the mailing: only letters printed with it can be followed.
+4. **Switch it on:** Settings → Features (board) → USPS tracking. Settings → Paper mail settings then shows "Connected to the USPS test environment (CAT)" (or "Connected to USPS Informed Visibility") and when it last checked. The tracking barcode must be on for the mailing: only letters printed with it can be followed.
 
 **What the statuses mean** (mailing page, USPS tracking card):
 
@@ -1189,7 +1202,7 @@ that bounced, until a mailing for that home is prepared or someone presses
    sender, that one setting is switched off again (many SMTP relays refuse it).
    With SMTP2Go (`set-smtp2go.sh`) no bounce mailbox is needed: SMTP2Go reports
    bounces. To change the mailbox, run it again.
-4. **Switch it on:** Admin → Features → Bounced email. System status then has a
+4. **Switch it on:** Settings → Features (board) → Bounced email. System status then has a
    "Bounce mailbox" check (last read, hard bounces in the last 7 days), and the
    Community setup's server step shows it as set up.
 
@@ -1244,7 +1257,7 @@ whatever their email choice) and mark the mailing as mailed as usual.
 
 **Rotating the key.** `sudo bash infra/poc/set-vendor-key.sh --rotate` keeps the old key in `VENDOR_DOCUMENT_KEY_FALLBACKS`, makes a new one and re-encrypts every stored document; `check_vendor_key` then reports "0 under an old key". Remove the fallback only after that, and store the new key in the password manager. A restore needs the key that was current when the backup was taken (or the fallbacks).
 
-**Switching it on.** Admin → Features → Vendor onboarding (or the Vendors step of Community setup, where the link life, insurance minimums and W-9 retention are set with citations). Finance → Vendors → Vendor requirements and terms: the board ticks what each kind of vendor provides (with a citation) and edits the terms.
+**Switching it on.** Settings → Features (board) → Vendor onboarding (or the Vendors step of Community setup, where the link life, insurance minimums and W-9 retention are set with citations). Finance → Vendors → Vendor requirements and terms: the board ticks what each kind of vendor provides (with a citation) and edits the terms.
 
 **Sending a link (board or manager).** Finance → Vendors → Vendor onboarding → Invite a vendor: name, email, services and kind of work. The vendor is created inactive and gets an email with the link (it works until it expires or they submit). "Send a new link" on the request ends the old one. For a vendor added before onboarding, open its Onboarding record → Complete onboarding; for an expired certificate or a new W-9, Ask for updated documents (the link shows only those items).
 

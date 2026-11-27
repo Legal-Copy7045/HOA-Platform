@@ -262,6 +262,10 @@ PROTECTED = {
     "server_tasks": ("GET", None),
     # D91: Restart the portal (sysadmins; then a fresh sign-in check).
     "system_restart": ("POST", None),
+    # D93: Keys and connections (sysadmins; a key change also the board).
+    "keys_connections": ("GET", None),
+    "keys_service": ("POST", None),
+    "keys_change": ("POST", None),
     # D74: the incident timeline (sysadmins); bounced email actions (board,
     # and board or manager for the paper copy).
     "ops_timeline": ("GET", None),
@@ -508,7 +512,7 @@ PROTECTED = {
     "vendor_w9_disposal": ("POST", None),
 }
 # Pages refused before their record is looked up: any id will do (D72).
-PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
+PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release", "keys_change"}
 
 
 def _named_urls() -> set[str]:
@@ -1150,6 +1154,8 @@ def _url(name, key, targets):
         kwargs["action"] = "void"
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
+    elif name == "keys_service":
+        kwargs["service"] = "stripe"
     elif name.startswith("register_import_") or name in PK_ONE:
         kwargs["pk"] = 1
     elif name == "vendor_onboarding_action":
@@ -1231,13 +1237,14 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "keys_connections",
                 "invitations",
                 "approvals",
             ],
         ),
         (
             "sysadmin",
-            ["system_status", "server_tasks", "invitations"],
+            ["system_status", "server_tasks", "invitations", "keys_connections"],
             ["lot_list", "board_home", "people", "sysadmin_activity", "my_lot"],
         ),
         (
@@ -1250,6 +1257,7 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "keys_connections",
                 "my_lot",
             ],
         ),

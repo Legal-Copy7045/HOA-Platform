@@ -366,6 +366,30 @@ def _server_status():
     }
 
 
+def _key_services(step_key: str) -> list[dict]:
+    """Keys and connections (D93) for this step: configured or not, and
+    whether saved in the portal. Never a value, never a field to type one."""
+    from core import credentials
+
+    out = []
+    for key in setup.KEY_SERVICES[step_key]:
+        try:
+            info = credentials.status(key)
+        except Exception as exc:  # shown like a failed check
+            info = {
+                "label": credentials.BY_KEY[key].label,
+                "configured": False,
+                "in_portal": False,
+                "pending": False,
+                "unreadable": False,
+                "error": type(exc).__name__,
+            }
+        info["key"] = key
+        info["script"] = credentials.BY_KEY[key].script
+        out.append(info)
+    return out
+
+
 def _vendor_key_ready() -> bool:
     """Whether the vendor document key is set (D79). Never the key."""
     from operations import vendor_crypto
@@ -660,6 +684,8 @@ def _render_step(
         extra["server"] = _server_status()
     if s.key == "notices":
         extra["sms_ready"] = _server_status()["sms"]
+    if s.key in setup.KEY_SERVICES:
+        extra["key_services"] = _key_services(s.key)
     return render(
         request,
         "community/setup/step.html",

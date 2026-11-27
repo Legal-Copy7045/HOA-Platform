@@ -63,6 +63,10 @@
       <div class="value small-value">{% if not last_restart %}Not restarted from here{% elif last_restart.task.state == "requested" %}Requested{% elif last_restart.task.state == "running" %}Restarting now…{% else %}{{ last_restart.task.get_state_display }}{% endif %}</div>
       <div class="hint">{% if last_restart %}{{ last_restart.task.requested_at|date:"M j, g:i A" }}{% if last_restart.summary %} · {{ last_restart.summary }}{% endif %}{% else %}Web server and background worker, with both compose files.{% endif %}</div>
       {% if can_run_task %}<div class="inline-form"><a class="btn secondary small" href="{% url 'system_restart' %}">Restart…</a></div>{% endif %}</div>
+    <div class="stat" id="keys"><div class="label">Keys and connections</div>
+      <div class="value small-value">Email, payments, bank, USPS, AI</div>
+      <div class="hint">Service keys, entered and tested here; stored encrypted.</div>
+      <div class="inline-form"><a class="btn secondary small" href="{% url 'keys_connections' %}">Open…</a></div></div>
     <div class="stat {% if pending_migrations %}tone-danger{% else %}tone-success{% endif %}"><div class="label">Unapplied migrations</div><div class="value">{{ pending_migrations }}</div></div>
     <div class="stat"><div class="label">Background jobs</div><div class="value small-value">{% for status, n in jobs %}{{ status }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}None{% endfor %}</div>
       {% if failed_jobs %}<div class="hint">Failed: {% for name, n in failed_jobs %}{{ name }} ({{ n }}){% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}</div>

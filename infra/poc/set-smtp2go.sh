@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Optional since 0.44.0 (D93): the same keys can be entered in the browser on
+# System status -> Keys and connections, which wins over .env; this script
+# stays as the fallback.
 # Send the portal's email through SMTP2Go's HTTP API (owner's decision, 0.43.0)
 # and read delivery and bounce reports back from SMTP2Go (pull only: no
 # webhook, no bounce mailbox). Asks for the API key at a hidden prompt (not
@@ -119,6 +122,6 @@ echo "Removed .env.before-smtp2go (the copy of the previous settings)."
 echo
 echo "Done. Email now goes through SMTP2Go; System status -> Email shows the last send and the"
 echo "last read of SMTP2Go's delivery reports (every 5 minutes). Switch on Bounced email in"
-echo "Admin -> Features so bouncing addresses are flagged. No bounce mailbox is needed."
+echo "Settings → Features (board) so bouncing addresses are flagged. No bounce mailbox is needed."
 echo "DNS: SPF, DKIM and return-path records for ${SENDER#*@} must be verified in SMTP2Go"
 echo "(Sending -> Verified Senders), or mail lands in spam. To change the key, run this again."

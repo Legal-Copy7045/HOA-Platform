@@ -57,3 +57,15 @@ def growth_snapshot(timestamp: int) -> bool:
 
     ops_timeline.purge_tallies()
     return growth.snapshot() is not None
+
+
+@app.task(queue="maintenance", queueing_lock="reencrypt_vendor_documents")
+def reencrypt_vendor_documents() -> int:
+    """After the vendor document key is rotated on Keys and connections (D93):
+    rewrite every stored vendor document under the new key. Reads the keys
+    afresh (not this process's 15-second copy)."""
+    from core import credentials
+    from operations import vendor_onboarding
+
+    credentials.forget()
+    return vendor_onboarding.reencrypt_all()

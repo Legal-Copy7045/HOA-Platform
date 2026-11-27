@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Optional since 0.44.0 (D93): the same keys can be entered in the browser on
+# System status -> Keys and connections, which wins over .env; this script
+# stays as the fallback.
 # Put the HOA's Stripe key into the POC's .env and restart the portal
 # (decision D32-payments). The key is typed at a hidden prompt: it is not
 # shown, logged or put on any command line, and never belongs in the
@@ -53,5 +56,5 @@ if ! "${COMPOSE[@]}" exec -T web python manage.py check_stripe; then
 fi
 env_discard_backup "$BACKUP"
 echo "Removed .env.before-stripe (the copy of the previous settings, with the old secret)."
-echo "Done. Switch on Online payments in Admin -> Features, then open Finance -> Online payments."
+echo "Done. Switch on Online payments in Settings → Features (board), then open Finance -> Online payments."
 echo "To change the key, run this script again."

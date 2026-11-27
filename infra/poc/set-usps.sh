@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Optional since 0.44.0 (D93): the same keys can be entered in the browser on
+# System status -> Keys and connections, which wins over .env; this script
+# stays as the fallback.
 # Put the HOA's USPS Business Customer Gateway login into the POC's .env so
 # the portal can read Informed Visibility scans of barcoded paper mail
 # (decision D60), restart the portal and check the login (sign-in only, no
@@ -57,5 +60,5 @@ if ! "${COMPOSE[@]}" exec -T worker python manage.py check_usps_iv; then
 fi
 env_discard_backup "$BACKUP"
 echo "Removed .env.before-usps (the copy of the previous settings, with the old secret)."
-echo "Done. Switch on USPS tracking in Admin -> Features; Settings -> Paper mail settings shows the connection."
+echo "Done. Switch on USPS tracking in Settings → Features (board); Settings -> Paper mail settings shows the connection."
 echo "To change the login, run this script again."

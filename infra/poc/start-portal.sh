@@ -53,6 +53,11 @@ add_setting() {
 # Plain `docker compose ...` here uses both compose files (D91), so a hand-run
 # recreate keeps web on the tunnel's edge network.
 ensure_compose_file .env
+# Keys and connections (D93): the key-encryption key for the service keys a
+# sysadmin enters in the browser, and the bank feed's token key. Made here on
+# the first start after the update, never typed; an existing value is kept.
+env_ensure_secret .env CREDENTIALS_KEK 32
+env_ensure_secret .env BANK_FEED_TOKEN_KEY 32
 if grep -q '^DEPLOYMENT_STAGE=poc' .env; then
   add_setting BOARD_SEAT_SECOND_APPROVAL false
 fi

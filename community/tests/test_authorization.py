@@ -354,6 +354,8 @@ MEMBER_READS = {
                 # Server tasks (D35)
                 "system.run_task",
                 "system.view_tasks",
+                # Keys and connections (D93)
+                "system.manage_keys",
             },
         ),
         # Former owners read their old requests inside My history.

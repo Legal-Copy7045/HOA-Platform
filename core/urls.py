@@ -7,6 +7,7 @@ from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
 from core import hub_views, preview
 from core.followups import set_follow_up
+from core.keys_views import keys_change, keys_connections, keys_service
 from core.my_items_views import my_items_page
 from core.search_views import search_page
 from core.server_task_views import demo_data, server_tasks, system_restart
@@ -29,6 +30,10 @@ urlpatterns = [
     path("", home, name="home"),
     path("ops/status/", system_status, name="system_status"),
     path("ops/status/restart/", system_restart, name="system_restart"),
+    # Keys and connections (D93): sysadmins; Stripe and Teller changes also the board.
+    path("ops/status/keys/", keys_connections, name="keys_connections"),
+    path("ops/status/keys/change/<int:pk>/", keys_change, name="keys_change"),
+    path("ops/status/keys/<slug:service>/", keys_service, name="keys_service"),
     path("ops/tasks/", server_tasks, name="server_tasks"),
     path("ops/timeline/", ops_timeline, name="ops_timeline"),
     path("account/profile/", my_profile, name="my_profile"),

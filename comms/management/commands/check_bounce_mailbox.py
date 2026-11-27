@@ -20,12 +20,10 @@ class Command(BaseCommand):
     help = "Check the bounce mailbox login: sign in and open the folder only."
 
     def handle(self, *args, **options):
-        from django.conf import settings
-
         from comms import bounces
 
         cfg = bounces.config()
-        if cfg.configured and not settings.BOUNCE_IMAP_PASSWORD:
+        if cfg.configured and not cfg.password:
             raise CommandError(
                 "The mailbox password is given to the worker container only: run this check "
                 "there (docker compose ... exec worker python manage.py check_bounce_mailbox)."

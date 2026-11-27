@@ -1,7 +1,6 @@
 """Check the Teller set-up on this server without calling Teller (used by
 infra/poc/set-teller.sh after it saves the settings). Never prints a secret."""
 
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 
@@ -17,7 +16,7 @@ class Command(BaseCommand):
         except BankFeedError as exc:
             raise CommandError(str(exc)) from exc
         problems = []
-        if not settings.TELLER_APPLICATION_ID:
+        if not teller.application_id():
             problems.append("the Teller application ID is missing")
         if not tokens.configured():
             problems.append("BANK_FEED_TOKEN_KEY is missing")

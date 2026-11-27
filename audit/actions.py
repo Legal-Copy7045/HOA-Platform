@@ -830,6 +830,30 @@ _SPECS = [
     # Server tasks (hosttasks, D35)
     _spec("system.task_requested", "Server task requested", "kind", "dataset", "attach_requester"),
     _spec("system.task_finished", "Server task finished on the VM", "kind", "state", "dataset"),
+    # Keys and connections (D93): service and setting names, ids and states only, never a value.
+    _spec(
+        "system.credential_saved",
+        "Service key or setting saved on Keys and connections",
+        "service",
+        "change_id",
+        "names",
+        "waits_for_board",
+        "tested",
+        "test_ok",
+        "saved_anyway",
+        "pin_change",
+    ),
+    _spec("system.credential_tested", "Service key tested", "service", "ok", "code"),
+    _spec("system.credential_cleared", "Saved service keys removed", "service", "change_id"),
+    _spec(
+        "system.credential_decided",
+        "Stripe or Teller key change decided",
+        "service",
+        "change_id",
+        "decision",
+    ),
+    _spec("system.credential_refused", "Service key change refused", "service", "reason"),
+    _spec("system.vendor_key_made", "Vendor document key made or rotated", "change_id", "rotated"),
     # Demo datasets and reseeding the POC (D53)
     _spec("system.demo_seeded", "Fictional demo data loaded", "dataset"),
     _spec("system.logins_kept", "Real logins restored after a demo reseed", "count", "tasks"),

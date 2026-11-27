@@ -209,3 +209,41 @@ def test_bounce_config_needs_only_the_flag_outside_the_worker(settings):
     assert bounces.config().configured
     settings.BOUNCE_IMAP_PASSWORD_SET = False
     assert not bounces.config().configured
+
+
+@needs_bash
+def test_env_ensure_secret_adds_a_missing_or_empty_key_and_keeps_a_set_one(tmp_path):
+    """Keys and connections (D93): CREDENTIALS_KEK and BANK_FEED_TOKEN_KEY
+    appear on their own at install; a set value is never replaced."""
+    env = tmp_path / ".env"
+    env.write_text(OTHERS + "BANK_FEED_TOKEN_KEY=\nCREDENTIALS_KEK_OLD=x")
+    result = _lib(
+        'env_ensure_secret "$1" CREDENTIALS_KEK 32; env_ensure_secret "$1" BANK_FEED_TOKEN_KEY',
+        str(env),
+    )
+    assert result.returncode == 0, result.stderr
+    text = env.read_text()
+    kek = re.search(r"^CREDENTIALS_KEK=([0-9a-f]{64})$", text, re.M)
+    bank = re.search(r"^BANK_FEED_TOKEN_KEY=([0-9a-f]{64})$", text, re.M)
+    assert kek and bank and kek.group(1) != bank.group(1)
+    assert kek.group(1) not in result.stdout + result.stderr  # the name only
+    assert text.startswith(OTHERS)
+    again = _lib('env_ensure_secret "$1" CREDENTIALS_KEK', str(env))
+    assert again.returncode == 0 and env.read_text() == text
+
+
+def test_install_creates_the_kek_and_only_web_and_worker_get_it():
+    start = (POC / "start-portal.sh").read_text()
+    assert "env_ensure_secret .env CREDENTIALS_KEK 32" in start
+    assert "env_ensure_secret .env BANK_FEED_TOKEN_KEY 32" in start
+    assert "CREDENTIALS_KEK=$(secret 32)" in (POC / "make-env.sh").read_text()
+    compose = (POC.parent.parent / "docker-compose.yml").read_text()
+    anchors = compose.split("x-app-env:", 1)[1].split("x-logging:", 1)[0]
+    assert "CREDENTIALS_KEK" not in anchors  # not in the shared block: never migrate
+    assert compose.count("CREDENTIALS_KEK: ${CREDENTIALS_KEK:-}") == 2
+    for service in ("web", "worker"):
+        block = compose.split(f"\n  {service}:\n", 1)[1].split("\n\n", 1)[0]
+        assert "CREDENTIALS_KEK" in block, service
+    for service in ("migrate", "create-bucket"):
+        block = compose.split(f"\n  {service}:\n", 1)[1].split("\n\n", 1)[0]
+        assert "CREDENTIALS_KEK" not in block, service

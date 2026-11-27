@@ -127,6 +127,24 @@ env_add_missing() {
   env_update "$file" "$key" "$value"
 }
 
+# env_ensure_secret <file> <key> [bytes]: give the key a fresh random hex
+# value (openssl rand, default 32 bytes) when .env has no line for it or an
+# empty one; never changes a value that is set (D93: CREDENTIALS_KEK and
+# BANK_FEED_TOKEN_KEY appear on their own at install, no manual step). Prints
+# the key's name only, never the value.
+env_ensure_secret() {
+  local file="$1" key="$2" bytes="${3:-32}" current value
+  env_key_ok "$key" || return 2
+  [[ "$bytes" =~ ^[0-9]{2,3}$ ]] || return 2
+  current="$(env_get "$file" "$key" || true)"
+  current="${current//[\"\']/}"
+  [ -z "$current" ] || return 0
+  value="$(openssl rand -hex "$bytes")"
+  [ "${#value}" -ge 32 ] || { echo "env_ensure_secret: could not make a value." >&2; return 1; }
+  echo "Adding a new random ${key} to .env"
+  env_update "$file" "$key" "$value"
+}
+
 # env_get <file> <key>: the value of the key's first line (quotes kept).
 env_get() {
   local file="$1" key="$2" line

@@ -44,6 +44,10 @@ LOG_LEVEL=INFO
 SECURE_HSTS_SECONDS=3600
 
 AUDIT_HASH_KEY=$(secret 32)
+# Keys and connections (D93): encrypts the service keys entered in the
+# browser (System status -> Keys and connections). Keep a copy with
+# DJANGO_SECRET_KEY in the password manager, apart from the backups.
+CREDENTIALS_KEK=$(secret 32)
 AUDIT_IP_RETENTION_DAYS=365
 
 POSTGRES_SUPERUSER_PASSWORD=$(secret 24)
@@ -59,7 +63,8 @@ S3_ACCESS_KEY_ID=$(secret 10)
 S3_SECRET_ACCESS_KEY=$(secret 24)
 S3_REGION=us-east-1
 
-# Email: fill in the Hostinger mailbox before invitations are used (step 6).
+# Email: fill in the mail server on System status -> Keys and connections
+# before invitations are used (or here; a value saved there wins).
 EMAIL_HOST=smtp.hostinger.com
 EMAIL_PORT=465
 EMAIL_USE_SSL=true
@@ -85,7 +90,7 @@ OFFICERS_REQUIRE_BOARD_SEAT=true
 OFFICERS_REQUIRE_BOARD_SEAT_CITATION=
 
 # Installable app and alerts (optional; the board switches "push" and "sms"
-# on in Admin -> Features). Push keys: docker compose exec web python manage.py
+# on in Settings → Features (board)). Push keys: docker compose exec web python manage.py
 # generate_vapid_keys. Restart the portal after filling these in.
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
@@ -108,12 +113,12 @@ TELLER_ENVIRONMENT=development
 TELLER_CERTIFICATE_B64=
 TELLER_PRIVATE_KEY_B64=
 
-# USPS tracking (optional; sudo bash infra/poc/set-usps.sh fills these in).
+# USPS tracking (optional; System status -> Keys and connections, or set-usps.sh).
 USPS_IV_ENVIRONMENT=cat
 USPS_IV_USERNAME=
 USPS_IV_PASSWORD=
 
-# Bounced email (optional; sudo bash infra/poc/set-bounce-mailbox.sh fills these in).
+# Bounced email (optional; Keys and connections, or set-bounce-mailbox.sh).
 BOUNCE_IMAP_HOST=
 BOUNCE_IMAP_PORT=993
 BOUNCE_IMAP_USER=

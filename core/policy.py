@@ -243,6 +243,12 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     # The board sees the history (who asked, when, the outcome); no owner data.
     "system.run_task": frozenset({SYSADMIN}),
     "system.view_tasks": frozenset({BOARD, SYSADMIN}),
+    # --- Keys and connections (D93) ---
+    # Entering, testing and removing third-party service keys: sysadmins only
+    # (after a fresh passkey or authenticator check). Stripe and Teller
+    # changes wait for a board member who did not enter them.
+    "system.manage_keys": frozenset({SYSADMIN}),
+    "system.approve_keys": frozenset({BOARD}),
     # --- Disbursements (D52, optional feature "disbursements") ---
     # The manager prepares (proposes, prints, records check numbers and
     # clearing); approving, declining and voiding a check are board decisions.

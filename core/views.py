@@ -205,8 +205,8 @@ def _send_test_email(request):
     else:
         messages.error(
             request,
-            "The mail server refused or did not answer. Check the EMAIL_ settings in .env "
-            "(see Outgoing email below), restart, and try again.",
+            "The mail server refused or did not answer. Check the email settings on Keys and "
+            "connections (or the EMAIL_ settings in .env; see Outgoing email below) and try again.",
         )
     if request.POST.get("next") == "server_tasks":
         return redirect("server_tasks")

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Optional since 0.44.0 (D93): the same keys can be entered in the browser on
+# System status -> Keys and connections, which wins over .env; this script
+# stays as the fallback.
 # Make the vendor document key on this server and put it into the POC's .env
 # (decision D79), restart the portal and check it. The key encrypts vendors'
 # W-9s and insurance certificates inside the portal (AES-256-GCM). It is
@@ -74,4 +77,4 @@ env_discard_backup "$BACKUP"
 echo "Removed .env.before-vendor-key (the copy of the previous settings)."
 echo "Done. Now keep a copy of the key apart from the backups (the HOA's password manager):"
 echo "  sudo grep -E '^VENDOR_DOCUMENT_KEY' $APP_DIR/.env"
-echo "Switch on Vendor onboarding in Admin -> Features (Settings -> Community setup -> Vendors)."
+echo "Switch on Vendor onboarding in Settings → Features (board) (Settings -> Community setup -> Vendors)."

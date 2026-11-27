@@ -122,13 +122,17 @@ class Config:
 
 def selected() -> bool:
     """Whether SMTP2Go is the chosen provider (EMAIL_PROVIDER=smtp2go)."""
-    return (getattr(settings, "EMAIL_PROVIDER", "smtp") or "smtp").strip().lower() == PROVIDER
+    from core import credentials
+
+    return (credentials.get("EMAIL_PROVIDER") or "smtp").strip().lower() == PROVIDER
 
 
 def config() -> Config:
-    region = (getattr(settings, "SMTP2GO_REGION", "") or "global").strip().lower()
+    from core import credentials
+
+    region = (credentials.get("SMTP2GO_REGION") or "global").strip().lower()
     host = REGIONS.get(region, "")
-    key = (getattr(settings, "SMTP2GO_API_KEY", "") or "").strip()
+    key = (credentials.get("SMTP2GO_API_KEY") or "").strip()
     if not host:
         return Config(False, "", "", FAILURE_WORDS["bad_region"], "bad_region")
     if not key:
@@ -136,6 +140,12 @@ def config() -> Config:
     if not KEY_RE.match(key):
         return Config(False, host, "", FAILURE_WORDS["bad_key"], "bad_key")
     return Config(True, host, key)
+
+
+def default_from() -> str:
+    from core import credentials
+
+    return credentials.get("DEFAULT_FROM_EMAIL")
 
 
 def provider_label() -> str:
@@ -271,7 +281,7 @@ def payload_for(message) -> dict:
     headers = dict(getattr(message, "extra_headers", None) or {})
     lower = {k.lower(): k for k in headers}
     sender = headers.get(lower["from"]) if "from" in lower else ""
-    sender = _single_line(sender or message.from_email or settings.DEFAULT_FROM_EMAIL)
+    sender = _single_line(sender or message.from_email or default_from())
     custom = [
         {"header": _single_line(name)[:100], "value": _single_line(value)[:900]}
         for name, value in headers.items()

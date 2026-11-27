@@ -229,6 +229,9 @@ services:
     environment:
       <<: *app-env
       SMTP2GO_API_KEY: ${SMTP2GO_API_KEY:-}
+      # Keys and connections (D93): opens the service keys saved in the
+      # database. Web and worker only, never migrate or create-bucket.
+      CREDENTIALS_KEK: ${CREDENTIALS_KEK:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -250,6 +253,7 @@ services:
       USPS_IV_PASSWORD: ${USPS_IV_PASSWORD:-}
       BOUNCE_IMAP_PASSWORD: ${BOUNCE_IMAP_PASSWORD:-}
       SMTP2GO_API_KEY: ${SMTP2GO_API_KEY:-}
+      CREDENTIALS_KEK: ${CREDENTIALS_KEK:-}
     depends_on:
       migrate: {condition: service_completed_successfully}
 

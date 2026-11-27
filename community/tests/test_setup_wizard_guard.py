@@ -90,3 +90,24 @@ def test_the_new_voting_rules_are_on_the_governance_step(client, board):
     assert "Shortest voting period" in page
     assert "close a formal vote or election before its deadline" in page
     assert "Show owners the turnout" in page
+
+
+def test_every_service_key_is_on_a_step_with_its_state(client, board):
+    """Keys and connections (D93): every service whose keys a sysadmin enters
+    in the browser shows on the setup wizard as configured or not, on the
+    server step and on the step it belongs to, never with a field to type a
+    key or a value."""
+    from core import credentials
+
+    mapped = {k for keys in setup.KEY_SERVICES.values() for k in keys}
+    assert mapped == set(credentials.BY_KEY), "Map every service in community/setup.py"
+    assert set(setup.KEY_SERVICES["server"]) == set(credentials.BY_KEY)
+    for step_key, services in setup.KEY_SERVICES.items():
+        assert step_key in setup.BY_KEY, step_key
+        page = _page(client, step_key)
+        assert 'data-testid="setup-keys"' in page, step_key
+        for key in services:
+            assert f'data-key-service="{key}"' in page, (step_key, key)
+            assert credentials.BY_KEY[key].label in page
+        assert "Keys and connections" in page
+        assert 'type="password"' not in page

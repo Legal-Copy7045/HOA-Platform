@@ -15,15 +15,45 @@ import base64
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 
-from django.conf import settings
+from core import credentials
 
 log = logging.getLogger(__name__)
 
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 MAX_BYTES = 15 * 1024 * 1024  # inline data limit, with headroom
 ALLOWED = {"application/pdf", "image/png", "image/jpeg"}
+DEFAULT_MODEL = "gemini-2.5-flash"
+MODEL_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}"
+
+
+def api_key() -> str:
+    """The Gemini key: Keys and connections (D93), else GEMINI_API_KEY."""
+    return credentials.get("GEMINI_API_KEY") or ""
+
+
+def ping() -> None:
+    """Ask for the model's description (no data is sent): proves the key and
+    the model name. Raises AIError."""
+    key, model = api_key(), credentials.get("GEMINI_MODEL") or DEFAULT_MODEL
+    if not key:
+        raise AIError("No Gemini key is configured.")
+    req = urllib.request.Request(  # noqa: S310 - fixed https endpoint
+        MODEL_URL.format(model=urllib.parse.quote(model, safe="")),
+        headers={"x-goog-api-key": key},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310  # nosec B310
+            resp.read(65536)
+    except urllib.error.HTTPError as exc:
+        log.warning("gemini ping failed", extra={"status": exc.code})
+        raise AIError(f"The reading service refused the key (HTTP {exc.code}).") from exc
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        log.warning("gemini ping failed", extra={"exc_type": type(exc).__name__})
+        raise AIError("The reading service could not be reached.") from exc
 
 
 class AIError(RuntimeError):
@@ -56,7 +86,8 @@ SCHEMA = {
 
 
 def read_signed_form(data: bytes, content_type: str, expected: list[dict]) -> list[dict]:
-    if not settings.GEMINI_API_KEY:
+    key, model = api_key(), credentials.get("GEMINI_MODEL") or DEFAULT_MODEL
+    if not key:
         raise AIError("No Gemini key is configured.")
     if content_type not in ALLOWED:
         raise AIError("Only PDF, PNG or JPEG scans can be read.")
@@ -82,11 +113,11 @@ def read_signed_form(data: bytes, content_type: str, expected: list[dict]) -> li
             "temperature": 0,
         },
     }
-    url = ENDPOINT.format(model=settings.GEMINI_MODEL)
+    url = ENDPOINT.format(model=urllib.parse.quote(model, safe=""))
     req = urllib.request.Request(  # noqa: S310 - fixed https endpoint
         url,
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "x-goog-api-key": settings.GEMINI_API_KEY},
+        headers={"Content-Type": "application/json", "x-goog-api-key": key},
         method="POST",
     )
     try:

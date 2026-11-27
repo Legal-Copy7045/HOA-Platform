@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Optional since 0.44.0 (D93): the same keys can be entered in the browser on
+# System status -> Keys and connections, which wins over .env; this script
+# stays as the fallback.
 # One-time set-up of the bank feed's Teller connection (decision D32-bankfeeds).
 # Teller's certificate and private key identify the HOA to Teller, so they are
 # secrets: they go into the server's .env here and never through the portal's
@@ -11,7 +14,7 @@
 # downloaded files (certificate.pem, private_key.pem) to /root/teller/ on this
 # server. This script checks them, saves them, creates the key that encrypts
 # Teller's access tokens if there is none, offers to delete the copied files
-# and restarts the portal. Then: Admin -> Features -> Bank feed, and
+# and restarts the portal. Then: Settings → Features (board) -> Bank feed, and
 # Finance -> Accounting -> Bank feed -> Connect a bank.
 set -euo pipefail
 
@@ -79,5 +82,5 @@ if [ -n "$CERT" ]; then
 fi
 env_discard_backup "$BACKUP"
 echo "Removed .env.before-teller (the copy of the previous settings, with the old secret)."
-echo "Done. Switch on Bank feed in Admin -> Features, then Finance -> Accounting -> Bank feed -> Connect a bank."
+echo "Done. Switch on Bank feed in Settings → Features (board), then Finance -> Accounting -> Bank feed -> Connect a bank."
 echo "Keep the certificate and key in the HOA's password manager; never send them by email or chat."

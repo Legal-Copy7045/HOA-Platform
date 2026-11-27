@@ -97,7 +97,7 @@ bounce mailbox is needed). In the SMTP2Go dashboard, once:
    `DEFAULT_FROM_EMAIL`), restarts web and worker, checks again from the
    portal and sends a test email. If anything fails, only those keys are put
    back. Back to plain SMTP: `sudo bash infra/poc/set-smtp2go.sh --off`.
-4. Admin → Features → Bounced email on, so addresses that bounce are flagged.
+4. Settings → Features (board) → Bounced email on, so addresses that bounce are flagged.
 
 Every set-*.sh script edits `.env` through `lib.sh` (`env_update`): only
 its own keys change, every other line is kept, the file stays mode 600, and
