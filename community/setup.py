@@ -98,6 +98,17 @@ STEPS: list[Step] = [
         groups=("Disbursements",),
         features=("disbursements",),
     ),
+    # Finance gaps (D75-D78).
+    Step(
+        "money_extra",
+        "Special assessments, payment plans and reimbursements",
+        "How a special assessment is split and when the owners must vote on it, whether its "
+        "installments carry late fees; how payment plans treat late fees and missed "
+        "installments; when an expense reimbursement needs a second approval; and how next "
+        "year's monthly charge is rounded when the budget is prepared.",
+        groups=("Special assessments", "Payment plans", "Reimbursements", "Budget preparation"),
+        features=("special_assessments", "payment_plans", "reimbursements", "vendor_checks"),
+    ),
     Step(
         "payments",
         "Online payments and automatic payments",

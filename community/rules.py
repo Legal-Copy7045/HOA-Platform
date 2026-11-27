@@ -325,6 +325,92 @@ REGISTRY: dict[str, RuleSpec] = {
             "approve. A surplus distribution approved by an owner who receives part of it "
             "always needs two.",
         ),
+        # --- Finance gaps (D75-D78): special assessments, payment plans,
+        # reimbursements and budget preparation. Self-contained block.
+        RuleSpec(
+            "special_assessment.equal_shares",
+            "Split a special assessment equally among the homes",
+            BOOL,
+            "true",
+            "Special assessments",
+            "On: every home pays the same share (the remainder cent by cent in address order), "
+            "as most Declarations allocate common expenses equally per lot. Off: the board "
+            "enters each home's amount when it levies the assessment.",
+        ),
+        RuleSpec(
+            "special_assessment.vote_required_cents",
+            "Special assessments above this need an owners' vote",
+            CENTS,
+            None,
+            "Special assessments",
+            "Total of the special assessment (all homes, all installments). Above it the board "
+            "may levy only after the owners approve it; the vote is linked to the levy. Leave "
+            "empty when the Declaration lets the board levy any special assessment.",
+        ),
+        RuleSpec(
+            "special_assessment.vote_percent",
+            "Share of the owners' votes needed to approve a special assessment",
+            PERCENT,
+            None,
+            "Special assessments",
+            "Recorded on the levy with its citation, so the vote's result can be checked "
+            "against it.",
+        ),
+        RuleSpec(
+            "special_assessment.late_fees",
+            "Charge late fees on special assessment installments",
+            BOOL,
+            "false",
+            "Special assessments",
+            "On: an installment still unpaid after the late-fee grace period gets the late fee "
+            "(once per installment), posted by the board's late fee button or automatically "
+            "when late fees post by themselves.",
+        ),
+        RuleSpec(
+            "payment_plan.suspend_late_fees",
+            "No late fees while a payment plan is kept",
+            BOOL,
+            "true",
+            "Payment plans",
+            "On: a home whose payment plan is current gets no monthly late fee. The fee comes "
+            "back if the plan is defaulted.",
+        ),
+        RuleSpec(
+            "payment_plan.grace_days",
+            "Days after a plan installment's due date before it counts as missed",
+            DAYS,
+            "10",
+            "Payment plans",
+            "A missed installment puts an item on the board's My items.",
+        ),
+        RuleSpec(
+            "payment_plan.default_days",
+            "Days after a missed plan installment's due date before the plan defaults",
+            DAYS,
+            "30",
+            "Payment plans",
+            "Still unpaid by then, the plan ends as defaulted and the collection case returns "
+            "to where it was before the plan (letters and late fees resume).",
+        ),
+        RuleSpec(
+            "reimbursement.second_approval_cents",
+            "Reimbursement claims needing a second board approval",
+            CENTS,
+            "50000",
+            "Reimbursements",
+            "At or over this, two board members other than the claimant must approve. Below "
+            "it, one.",
+        ),
+        RuleSpec(
+            "budget.assessment_rounding_cents",
+            "Round next year's monthly {term} up to a multiple of",
+            CENTS,
+            "100",
+            "Budget preparation",
+            "When the board prepares next year's budget, the monthly {term} per home is the "
+            "budget's net need divided by the homes and twelve months, rounded up to this "
+            "(100 = whole dollars, 1 = to the cent).",
+        ),
         RuleSpec(
             "retention.former_owner_contact_days",
             "Days after someone leaves before their contact details are cleared",

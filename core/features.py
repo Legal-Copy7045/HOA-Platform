@@ -262,6 +262,54 @@ FEATURES: list[Feature] = [
             "check_alignment_pdf",
         },
     ),
+    # --- Finance gaps (D75-D78) ---
+    _f(
+        "special_assessments",
+        "Special assessments",
+        "One-off assessments for a purpose such as a capital project, levied under a board "
+        "resolution (and the owners' vote where required), in one sum or installments posted "
+        "on their due dates.",
+        {
+            "special_assessments",
+            "special_assessment_new",
+            "special_assessment_detail",
+            "special_assessment_action",
+        },
+    ),
+    _f(
+        "payment_plans",
+        "Payment plans",
+        "Installment plans for owners behind on their account: prepared, approved by a board "
+        "member, tracked installment by installment, ending as completed or defaulted.",
+        {
+            "payment_plans",
+            "payment_plan_new",
+            "payment_plan_detail",
+            "payment_plan_action",
+            "payment_plan_letter",
+            "payment_plan_acknowledge",
+        },
+    ),
+    _f(
+        "reimbursements",
+        "Expense reimbursements",
+        "Board members, committee members and volunteers claim back association expenses "
+        "they paid, with the receipt; another board member approves and the treasurer pays.",
+        {
+            "reimbursements",
+            "reimbursement_new",
+            "reimbursement_detail",
+            "reimbursement_action",
+            "reimbursement_file",
+        },
+    ),
+    _f(
+        "vendor_checks",
+        "Checks",
+        "Print checks for approved invoices and reimbursements on the association's check "
+        "stock, with a check register, voids and clearing.",
+        {"vendor_checks", "vendor_checks_pdf", "vendor_check_action"},
+    ),
     # Automatic payments of the monthly assessment (D46): also needs
     # "online_payments" on and Stripe keys on the server.
     _f(

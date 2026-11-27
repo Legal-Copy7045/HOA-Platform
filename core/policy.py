@@ -243,6 +243,32 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "disbursement.approve": frozenset({BOARD}),
     "disbursement.issue": frozenset({BOARD, MANAGER}),
     "disbursement.void": frozenset({BOARD}),
+    # --- Finance gaps (D75-D78) ---
+    # Special assessments: the board levies (under a resolution) and cancels
+    # future installments; finance readers see them; owners see their own
+    # charges on My account. Posting due installments is ledger.manage.
+    "special_assessment.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "special_assessment.levy": frozenset({BOARD}),
+    # Payment plans: the manager may prepare one; a board member other than
+    # the preparer approves; owners on the deed acknowledge their own.
+    "payment_plan.prepare": frozenset({BOARD, MANAGER}),
+    "payment_plan.approve": frozenset({BOARD}),
+    "payment_plan.acknowledge": frozenset({OWNER}),
+    # Expense reimbursements: board members, committee members and volunteer
+    # owners claim; a board member other than the claimant approves; paying
+    # is data entry (D66 limits who pays a board member).
+    "reimbursement.submit": frozenset({OWNER, BOARD, COMMITTEE_MEMBER}),
+    # The "My reimbursements" menu entry: those who usually spend for the
+    # association (volunteer owners reach the page from My account).
+    "reimbursement.menu": frozenset({BOARD, COMMITTEE_MEMBER}),
+    "reimbursement.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
+    "reimbursement.approve": frozenset({BOARD}),
+    "reimbursement.pay": frozenset({BOARD, MANAGER}),
+    # Vendor checks: printing and recording them is data entry; voiding is
+    # the board's.
+    "vendor_check.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "vendor_check.issue": frozenset({BOARD, MANAGER}),
+    "vendor_check.void": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);
