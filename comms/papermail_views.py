@@ -167,8 +167,19 @@ def paper_mail(request):
             "budgets": Budget.objects.all()[:5] if policy.can(request.user, "finance.view") else [],
             "homes": _homes(request.user),
             "settings": papermail.settings(),
+            "bounced": _bounced(),
         },
     )
+
+
+def _bounced() -> list[dict]:
+    """Official notices that bounced (D74): one row per home, with the
+    letter's link. Only while bounce tracking is on."""
+    from comms import bounces
+
+    if not bounces.feature_on():
+        return []
+    return [{"copy": c, "url": bounces.paper_url(c.lot)} for c in bounces.paper_copies_needed()]
 
 
 @login_required

@@ -191,6 +191,13 @@ STEPS: list[Step] = [
         groups=("Account recovery",),
     ),
     Step(
+        "monitoring",
+        "Server warnings",
+        "How early the sysadmins are warned that the server's disk is filling up (D74). "
+        "Everything else about the server is on the Server and email step.",
+        groups=("Server warnings",),
+    ),
+    Step(
         "features",
         "Features",
         "Every optional part of the portal, on or off. A switched-off feature leaves the "
@@ -208,8 +215,8 @@ STEPS: list[Step] = [
     Step(
         "server",
         "Server and email",
-        "Outgoing email, backups, the off-site copy, the payment and bank keys and the USPS "
-        "tracking login. These "
+        "Outgoing email, the bounce mailbox, backups, the off-site copy, the payment and bank "
+        "keys and the USPS tracking login. These "
         "are done on the server by a sysadmin; this step shows where things stand.",
         kind=SERVER,
     ),

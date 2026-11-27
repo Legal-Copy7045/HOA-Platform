@@ -605,6 +605,47 @@ every frame) and the `view` name; match it to the list by error type, route
 and time. Fix the cause, ship the fix, then "Clear" the Server errors check.
 Counts and signatures are removed after 30 days.
 
+### The incident timeline and the other checks (D74)
+
+System status → Incident timeline (and "See the whole timeline", `/ops/timeline/`)
+is one list, newest first, of what happened to the portal as a system in the
+last 90 days: each health check when it **started failing** and when it
+**recovered**, each health email (and one that reached nobody), backups,
+off-site copies and passed restore drills, updates the VM agent installed or
+failed, host-security alerts (Falco, file integrity, audit; the details stay in
+the email), bursts of bounced email, each kind of server error once when first
+seen, and server tasks when they finished. Filter by kind at the top; Older and
+Newer page through 25 at a time. Read it after an alert to see what else
+changed around the same time (a failed update just before errors started, a
+backup that stopped, the worker going quiet). It holds operations words and
+counts only: never a name, an address, a home or a message. Sysadmins only.
+
+The checks added with it:
+
+- **Background jobs**: a job that failed in the last day, keeps retrying (more
+  than 3 tries), has hung (running over 45 minutes) or is waiting over 20
+  minutes to start. System status → Background job problems says which job in
+  plain words with its task name underneath. A failed job runs again at its
+  next time; if one keeps failing, look in the worker's log for the task name
+  (`sudo docker compose logs worker --since 24h | grep <task name>`), fix the
+  cause, then **Clear** the check. A backlog with "Background worker" failing
+  means the worker is down: `sudo docker compose restart worker`.
+- **Payment processing** (once Stripe is set up): payments that did not match
+  Stripe's record, automatic payments that failed for a technical reason,
+  Stripe not answering or refusing the key (`sudo docker compose exec web
+  python manage.py check_stripe`; re-run `set-stripe-key.sh` if the key was
+  revoked), or an unusual number of declines in a day. One decline is normal:
+  the payer was emailed, and a failed automatic payment is on the board's My
+  items until it is resolved.
+- **Database connections**: above 80% of Postgres's `max_connections` new pages
+  may fail; restart the web and worker containers.
+- **Storage growth**: from a daily record of the database, the uploaded files
+  and the disk, "at this rate the disk is full in about N days"; it fails below
+  the board's warning (Settings → Community setup → Server warnings, default 60
+  days). Free space (old Docker images: `sudo docker image prune`), grow the VM's
+  disk, or move uploads to R2 (`move-files-to-r2.sh`). The figures and a 90-day
+  line are on System status → Storage and database growth.
+
 ## Host security
 
 Run once on the VM:
@@ -1053,3 +1094,66 @@ With USPS tracking on, the portal reads USPS scans of barcoded paper mail itself
 | USPS would not show it | USPS answered "not yours": the barcode's Mailer ID is not on this BCG account. |
 
 **Problems.** System status → "USPS tracking" fails when USPS refuses the sign-in (the sysadmins also get one email a day: re-run `set-usps.sh`, check the password has not expired and the user still has IV-MTR access), when USPS refuses every letter (check that the Mailer ID on Paper mail settings belongs to this account), or when no check has worked for a day (the worker, or USPS, is down). The portal keeps under 400 requests a minute (USPS allows 500).
+
+## Bounced email (D74)
+
+With **Bounced email** on, the portal reads bounce reports from a mailbox the
+association owns every 20 minutes (IMAP over TLS, pull only; nothing calls the
+portal). A hard bounce (the address does not accept mail) shows on the
+person's page for the board and on their own My profile; a hard bounce of an
+**official notice** (meeting or budget notice to an owner who chose email) puts
+"Send a paper copy to <address>" on My items and on Paper mail → Official notices
+that bounced, until a mailing for that home is prepared or someone presses
+"Sent another way".
+
+1. **A mailbox.** Best: a dedicated address, e.g. `bounces@<your domain>`, at
+   the association's mail provider, with IMAP switched on (and an app password
+   where the provider needs one). Keep its password in the HOA's password
+   manager.
+2. **Make bounces reach it.** Either set the portal's sender address
+   (`DEFAULT_FROM_EMAIL`) to an address whose bounces land in that mailbox, or
+   give the mailbox's own address when the script asks for the envelope sender
+   (`BOUNCE_RETURN_PATH`): outgoing mail is then sent with the envelope sender
+   `bounces+<token>@<domain>` (the From line people see does not change), so the
+   provider must deliver plus-addresses to the mailbox (most do). Check that SPF
+   still passes for that domain (see "Email deliverability").
+3. **Enter the login on the server** (never on the portal's pages, by email or
+   in a chat):
+
+   ```
+   sudo bash /opt/hoa-portal/infra/poc/set-bounce-mailbox.sh
+   ```
+
+   It asks the IMAP host (e.g. `imap.example.org`), the port (993), the user
+   name, the folder (INBOX), the optional envelope sender and the password
+   (hidden), saves them in `.env` (the old file is kept as
+   `.env.before-bounce-mailbox`), restarts the portal and signs in once with
+   `manage.py check_bounce_mailbox` (no message is read). It prints
+   `OK: signed in to ...` or what failed. To undo:
+   `cp .env.before-bounce-mailbox .env && sudo bash infra/poc/start-portal.sh`.
+4. **Switch it on:** Admin → Features → Bounced email. System status then has a
+   "Bounce mailbox" check (last read, hard bounces in the last 7 days), and the
+   Community setup's server step shows it as set up.
+
+**How a bounce is matched.** Every email the portal sends carries a signed
+token (an `X-Portal-Ref` header, inside its Message-ID, and in the envelope
+sender when set up). A report counts only if the token's signature checks and
+it is under 45 days old, so a forged bounce cannot mark anyone. The portal
+reads only the report's status lines and returned headers, never attachments,
+and keeps a keyed hash of the failed address, never the address or the text.
+Messages it read are marked as read in the mailbox; empty the folder now and
+then, or let the provider's retention do it.
+
+**When the check fails.** "the mailbox refused the user name or password": the
+password changed or the app password was revoked, run the script again; "could
+not be reached": host, port or firewall; "certificate did not check out": the
+host name is not the one on the server's certificate (use the provider's IMAP
+host name, and port 993 for IMAP over TLS). A single failed read does not alert;
+two hours without a successful read does.
+
+**A bounced address.** On the person's page, ask the owner for a working address
+(they see the same note on My profile). Once it is fixed, press "Mark as fixed";
+if the next email bounces too, it shows again. For a bounced official notice,
+use "Prepare the letter" on Paper mail (it prepares a letter for that one home,
+whatever their email choice) and mark the mailing as mailed as usual.
+

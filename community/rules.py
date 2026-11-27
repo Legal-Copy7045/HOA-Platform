@@ -386,6 +386,18 @@ REGISTRY: dict[str, RuleSpec] = {
             maximum=336,
             minimum=24,
         ),
+        # D74: how early System status warns that the server's disk will fill.
+        RuleSpec(
+            "monitoring.disk_full_warn_days",
+            "Warn when the server's disk will be full within this many days",
+            DAYS,
+            "60",
+            "Server warnings",
+            "From the last 90 days' growth, System status estimates when the server's disk "
+            "will be full; below this many days the sysadmins are emailed. At least 7.",
+            maximum=365,
+            minimum=7,
+        ),
         *[
             RuleSpec(
                 f"request.sla_days.{key}",

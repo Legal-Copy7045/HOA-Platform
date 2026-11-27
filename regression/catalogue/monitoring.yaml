@@ -1,0 +1,25 @@
+# Monitoring (D74): find a problem before an owner reports it. `match` runs over "<stage>:<check>".
+- feature: "Background jobs check: Procrastinate's tables read for jobs failed in a day, retried over 3 times, hanging over 45 minutes and waiting over 20 minutes; task names only (never arguments), plain words with the task name underneath, on System status and in the alert email; Clear starts afresh"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_monitoring_d74\\.py::test_(no_job|failed_jobs|retried_hanging|unknown_task|clearing_forgets|job_failures_reach|system_status_lists_job|the_new_checks)"]
+- feature: "Incident timeline: append-only OpsEvent for health check failures and recoveries, alert emails (and ones that reached nobody), backups, off-site copies and passed restore drills, updates (VM agent), host alerts, bounce bursts; merged with first-seen server errors and finished server tasks; newest first, 90 days, filters and pages; sysadmins only, no owner data; recording never breaks the caller"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_monitoring_d74\\.py::test_(health_transitions|an_alert_that_reaches|timeline_merges|timeline_pages|timeline_page_is|backup_heartbeats_and|record_never)", "^unit:core/tests/test_url_matrix\\.py::.*\\[ops_timeline"]
+- feature: "Storage and growth: daily append-only GrowthSnapshot (database size, largest tables, connections, uploaded files' total, the agent's disk), least-squares days until the disk is full after a week of figures, board rule monitoring.disk_full_warn_days, 90-day lines on System status; Database connections check warns above 80%"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_monitoring_d74\\.py::test_(slope|days_until|growth_check|snapshot|connections|sparkline|system_status_shows_the_trend)"]
+- feature: "Payment processing alerts: mismatches, technical automatic-payment failures, Stripe trouble counted per hour by the client (never declines), decline bursts; counts and plain words only, hidden until Stripe is set up; board My item per unresolved failed automatic payment, not for one's own home"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:payments/tests/test_failure_alerts\\.py::test_", "^unit:core/tests/test_monitoring_d74\\.py::test_stripe_trouble"]
+- feature: "Bounced email (optional feature bounce_tracking): signed per-message token on all outgoing mail (header, Message-ID, optional VERP envelope sender) with the kind of email; RFC 3464 and common formats parsed safely (size caps, no attachments, forged or old tokens ignored, auto-replies ignored); IMAP over TLS with verified certificates against a fake server; append-only bounces with hashed addresses; bouncing address on the person page and My profile, board clears; a hard-bounced official notice asks the board and manager for a paper copy until a mailing or 'Sent another way'; health check, wizard status, check_bounce_mailbox, set-bounce-mailbox.sh"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:comms/tests/test_bounces\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::.*\\[(person_email_bounce_clear|bounce_paper_done)", "^unit:community/tests/test_setup_wizard_guard\\.py::test_every_secret_taking_server_script", "^manual:bounce mailbox with a real provider"]
+- feature: "Monitoring demo data: a month of storage figures, timeline lines and two bounces seeded once with the oak_creek dataset"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_demo_monitoring\\.py::test_"]

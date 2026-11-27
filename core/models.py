@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Now
 from django.utils import timezone
 
 from core.append_only import AppendOnlyModel
@@ -246,3 +247,91 @@ class DemoSeed(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Demo seed records are kept.")
+
+
+# --- Monitoring (D74) ------------------------------------------------------------------
+
+
+class OpsEventKind(models.TextChoices):
+    """The incident timeline's filters (core/ops_timeline.py)."""
+
+    HEALTH = "health", "Health checks"
+    ALERTS = "alerts", "Alert emails"
+    BACKUPS = "backups", "Backups and drills"
+    UPDATES = "updates", "Updates"
+    HOST = "host", "Host security"
+    PAYMENTS = "payments", "Payments"
+    EMAIL = "email", "Email delivery"
+    SCANS = "scans", "Malware scans"
+    JOBS = "jobs", "Background jobs"
+    STORAGE = "storage", "Storage"
+
+
+class OpsEvent(AppendOnlyModel):
+    """One line of the operational incident timeline (D74): a health check
+    that started failing or recovered, an alert email, a backup or drill, an
+    update installed by the VM agent, a host-security alert, a burst of
+    bounced email. Operations words and counts only: never a name, an email
+    address, a home, a URL or an exception message. The VM agent inserts
+    update results directly (infra/poc/portal-agent.sh), hence the database
+    defaults."""
+
+    at = models.DateTimeField(default=timezone.now, db_default=Now())
+    kind = models.CharField(max_length=10, choices=OpsEventKind.choices)
+    # The health check's key, or what happened ("local", "restore_drill"...).
+    key = models.CharField(max_length=40, blank=True, default="", db_default="")
+    # problem / recovered / info
+    state = models.CharField(max_length=10, default="info", db_default="info")
+    message = models.CharField(max_length=300)
+    count = models.PositiveIntegerField(default=0, db_default=0)
+
+    class Meta:
+        ordering = ["-at", "-id"]
+        indexes = [models.Index(fields=["kind", "at"]), models.Index(fields=["at"])]
+
+    def __str__(self) -> str:
+        return f"{self.kind} {self.state} {self.key}"
+
+
+class OpsTally(models.Model):
+    """A count per hour of something that is not an error page but should be
+    noticed when it keeps happening (D74): e.g. Stripe not answering. Counts
+    only."""
+
+    name = models.CharField(max_length=40)
+    hour = models.DateTimeField()
+    count = models.PositiveIntegerField(default=0)
+    last_code = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["name", "hour"], name="ops_tally_per_hour")]
+
+    def __str__(self) -> str:
+        return f"{self.name} {self.hour:%Y-%m-%d %H}:00 ({self.count})"
+
+
+class GrowthSnapshot(AppendOnlyModel):
+    """Once a day (D74): how big the database is, its largest tables, the
+    connections in use, the uploaded files' total size and the server's
+    disk. Sizes in bytes; table names only."""
+
+    taken_on = models.DateField(unique=True)
+    taken_at = models.DateTimeField(default=timezone.now)
+    database_bytes = models.BigIntegerField()
+    # [[table name, bytes], ...] the ten largest, largest first.
+    largest_tables = models.JSONField(default=list)
+    connections = models.PositiveIntegerField()
+    max_connections = models.PositiveIntegerField()
+    files_bytes = models.BigIntegerField(null=True, blank=True)
+    files_count = models.PositiveIntegerField(null=True, blank=True)
+    disk_total_bytes = models.BigIntegerField(null=True, blank=True)
+    disk_free_bytes = models.BigIntegerField(null=True, blank=True)
+    # "agent" (the VM's disk, from the agent) or "container" (as the web
+    # container sees its root file system).
+    disk_source = models.CharField(max_length=10, blank=True)
+
+    class Meta:
+        ordering = ["-taken_on"]
+
+    def __str__(self) -> str:
+        return f"growth {self.taken_on}"

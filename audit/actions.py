@@ -254,6 +254,23 @@ _SPECS = [
     _spec("collections.courtesy_sent", "Courtesy payment reminders sent", "count"),
     _spec("system.test_email_sent", "Test email sent", "ok"),
     _spec("system.host_alert", "Host security alert emailed", "kind", "lines", "sent"),
+    # Bounced email (D74): counts and ids only, never an address.
+    _spec(
+        "comms.bounces_read",
+        "Bounce mailbox read",
+        "read",
+        "recorded",
+        "hard",
+        "unmatched",
+        "skipped",
+    ),
+    _spec("comms.bounce_cleared", "Bouncing email address marked fixed", "person_id", "addresses"),
+    _spec(
+        "comms.bounce_paper_sent",
+        "Paper copy of a bounced official notice sent another way",
+        "lot_id",
+        "bounces",
+    ),
     _spec("system.offsite_lock_checked", "Off-site backup lock checked", "locked"),
     _spec("system.health_check_cleared", "Health check cleared", "check"),
     _spec(

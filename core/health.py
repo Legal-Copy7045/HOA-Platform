@@ -261,6 +261,40 @@ def _assessment_posting():
     return health()
 
 
+def _jobs():
+    """Failed, repeatedly retried, hanging and long-waiting background jobs
+    (D74, core/job_health.py): task names only."""
+    from core import job_health
+
+    return job_health.check()
+
+
+def _payment_failures():
+    """Online payments and automatic payments that failed, payments that did
+    not match their checkout, and Stripe not answering (D74): counts only."""
+    from payments.failure_alerts import health
+
+    return health()
+
+
+def _bounce_mailbox():
+    from comms.bounces import health
+
+    return health()
+
+
+def _connections():
+    from core.growth import connections_check
+
+    return connections_check()
+
+
+def _storage_growth():
+    from core.growth import growth_check
+
+    return growth_check()
+
+
 LOW_MEMORY_MINUTES = 10
 
 
@@ -320,11 +354,16 @@ CHECKS = [
     ("signatures", "Malware scanner", _signatures),
     ("scan_queue", "Files waiting for a malware scan", _scan_queue),
     ("errors", "Server errors", _errors),
+    ("jobs", "Background jobs", _jobs),
     ("email", "Outgoing email", _email),
+    ("bounce_mailbox", "Bounce mailbox", _bounce_mailbox),
     ("backups", "Backups", _backups),
     ("memory", "Server memory", _memory),
+    ("connections", "Database connections", _connections),
+    ("storage_growth", "Storage growth", _storage_growth),
     ("bank_feed", "Bank feed", _bank_feed),
     ("payments", "Online payments", _payments),
+    ("payment_failures", "Payment processing", _payment_failures),
     ("assessment_posting", "Monthly assessment posting", _assessment_posting),
     ("demo_data", "Demo data", _demo_data),
     ("usps_tracking", "USPS tracking", _usps_tracking),
@@ -332,7 +371,7 @@ CHECKS = [
 
 
 # Checks that remember past failures; a sysadmin can clear them once fixed.
-CLEARABLE = {"email", "errors"}
+CLEARABLE = {"email", "errors", "jobs"}
 
 
 def clear(key: str) -> None:
@@ -344,6 +383,10 @@ def clear(key: str) -> None:
         from core.email import clear_failure
 
         clear_failure()
+    elif key == "jobs":
+        from core import job_health
+
+        job_health.clear()
     else:
         from core.models import ErrorSignature, ErrorTally
 
@@ -386,8 +429,42 @@ def _error_lines(now) -> list[str]:
         return [f"  (error list unavailable: {type(exc).__name__})"]
 
 
+def _job_lines() -> list[str]:
+    from core.job_health import alert_lines
+
+    return alert_lines()
+
+
+def _payment_lines() -> list[str]:
+    try:
+        from payments.failure_alerts import alert_lines
+
+        return alert_lines()
+    except Exception as exc:  # the alert itself must still go out
+        return [f"  (payment figures unavailable: {type(exc).__name__})"]
+
+
+DETAIL_LINES = {"jobs": _job_lines, "payment_failures": _payment_lines}
+
+
+def _transition(r: Result, state: str) -> None:
+    """Keep the change on the incident timeline (D74), append-only."""
+    from core import ops_timeline
+
+    word = "Started failing" if state == "problem" else "Recovered"
+    ops_timeline.record(
+        ops_timeline.check_kind(r.key),
+        f"{r.label}: {word}. {r.detail}",
+        key=r.key,
+        state=state,
+    )
+
+
 def alert(results: list[Result], *, now=None) -> int:
-    """Email the sysadmins about changes. Returns the number of emails sent."""
+    """Email the sysadmins about changes. Returns the number of emails sent.
+    Each start of a failure and each recovery is also kept on the incident
+    timeline, as is every alert email (D74)."""
+    from core import ops_timeline
     from core.models import AlertState
 
     now = now or timezone.now()
@@ -402,13 +479,17 @@ def alert(results: list[Result], *, now=None) -> int:
                 news.append(f"PROBLEM  {r.label}: {r.detail}")
                 if r.key == "errors":
                     news.extend(_error_lines(now))
+                elif r.key in DETAIL_LINES:
+                    news.extend(DETAIL_LINES[r.key]())
                 state.last_alerted_at = now
             if not state.failing:
                 state.since = now
+                _transition(r, "problem")
             state.failing = True
         elif state.failing:
             news.append(f"RECOVERED  {r.label}: {r.detail}")
             state.failing, state.since = False, None
+            _transition(r, "recovered")
         state.save()
     if not news:
         return 0
@@ -418,14 +499,22 @@ def alert(results: list[Result], *, now=None) -> int:
         + "\n".join(news)
         + f"\n\nDetails: {settings.PORTAL_BASE_URL}/ops/status/\n\n-- \n{settings.SITE_NAME}"
     )
+    subject = f"[{settings.SITE_NAME}] Health: {news[0].split(':')[0].strip()}"
+    sent = 0
     for address in recipients:
-        send_mail(
-            f"[{settings.SITE_NAME}] Health: {news[0].split(':')[0].strip()}",
-            body,
-            None,
-            [address],
-            fail_silently=True,
-        )
+        sent += send_mail(subject, body, None, [address], fail_silently=True)
+    headline = news[0].split(":")[0].strip()
+    problems = sum(1 for line in news if line.startswith("PROBLEM"))
+    recovered = sum(1 for line in news if line.startswith("RECOVERED"))
+    ops_timeline.record(
+        "alerts",
+        f"Health email: {headline}"
+        + (f" ({problems} problem(s), {recovered} recovered)" if problems + recovered > 1 else "")
+        + ("" if sent else ". It reached nobody (no sysadmin email, or sending failed)"),
+        key="health",
+        state="info" if sent else "problem",
+        count=sent,
+    )
     return len(recipients)
 
 

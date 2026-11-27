@@ -2115,6 +2115,82 @@ def payer_items(user) -> list:
     return out
 
 
+# How long a failed automatic payment stays on the board's My items while it
+# is still unresolved (D74).
+BOARD_FAILURE_DAYS = 30
+
+
+def _failure_open(lot_id, account, st: State) -> bool:
+    """The account's last failure still matters: paused, or its charge open."""
+    from ledger import allocation
+
+    if st.status == PAUSED:
+        return True
+    failure = st.last_failure
+    attempt = failure.attempt if failure else None
+    if attempt is None:
+        return False
+    if attempt.charge_id is None:
+        return any(
+            v.entry.kind == "assessment" for v in allocation.open_charges(lot_id, account=account)
+        )
+    return allocation.charge_status(attempt.charge) in ("open", "partial")
+
+
+def board_failure_items(user) -> list:
+    """My items for the board (D74): an automatic payment that didn't go
+    through, one per home, while it is unresolved (paused, or the charge is
+    still open) and at most BOARD_FAILURE_DAYS old. The payers were emailed;
+    the board sees it so a paused home is followed up. Never one's own home
+    (D65). Online payments lists the failures."""
+    from core import conflicts
+    from core.my_items import Item
+
+    if not autopay_enabled():
+        return []
+    since = timezone.now() - datetime.timedelta(days=BOARD_FAILURE_DAYS)
+    with system_access("autopay failures for the board"):
+        events = list(
+            AutopayEvent.objects.filter(kind=AutopayEventKind.FAILED, created_at__gte=since)
+            .select_related("lot", "attempt")
+            .order_by("-created_at", "-id")
+        )
+        out, seen = [], set()
+        for event in events:
+            if event.account_id in seen:
+                continue
+            seen.add(event.account_id)
+            st = state(event.account_id)
+            if st.status == OFF or st.last_failure is None or st.last_failure.pk != event.pk:
+                continue
+            current = _current_account(event.lot_id)
+            if current is None or current.pk != event.account_id:
+                continue
+            if not _failure_open(event.lot_id, event.account_id, st):
+                continue
+            if conflicts.own_matter(user, event):
+                continue
+            detail = "The payers were emailed"
+            detail += (
+                " · automatic payments are paused until a payment method is set up again"
+                if st.status == PAUSED
+                else " · the charge is still open"
+            )
+            out.append(
+                Item(
+                    "Finance",
+                    f"Automatic payment didn't go through for {event.lot.label}",
+                    detail,
+                    reverse("online_payments") + "#autopay-failures",
+                    "warning",
+                    timezone.localdate(event.created_at),
+                    nav="online_payments",
+                    side="board",
+                )
+            )
+    return out
+
+
 @internal("autopay board")
 def board_summary(limit: int = 30) -> dict:
     """For the board's Online payments page: every account with automatic

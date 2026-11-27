@@ -632,6 +632,10 @@ def items_for(user) -> list[Item]:
         from payments.autopay_review import board_items as autopay_review_items
 
         out.extend(autopay_review_items(user))
+        # Automatic payments that didn't go through and are unresolved (D74).
+        from payments.autopay import board_failure_items
+
+        out.extend(board_failure_items(user))
     # Disbursements (D52): approvals, checks to write, refunds owed, surplus.
     if can(user, "disbursement.propose") or can(user, "disbursement.approve"):
         from ledger.disbursements import board_items
@@ -991,6 +995,10 @@ def _paper_mail_items() -> list[Item]:
             )
         )
     out.extend(_usps_missing_items())
+    # Official notices that bounced (D74): a paper copy is needed.
+    from comms.bounces import paper_items
+
+    out.extend(paper_items())
     return out
 
 

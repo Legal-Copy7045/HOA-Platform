@@ -405,6 +405,19 @@ USPS_IV_PASSWORD = env("USPS_IV_PASSWORD", default="")
 USPS_IV_API_HOST = env("USPS_IV_API_HOST", default="")
 USPS_IV_AUTH_HOST = env("USPS_IV_AUTH_HOST", default="")
 
+# --- Bounced email: a bounce mailbox read over IMAP over TLS (D74) -----------------
+# Optional feature "bounce_tracking". The mailbox login goes into the server's
+# .env through infra/poc/set-bounce-mailbox.sh (never through the web app).
+# The portal connects only to BOUNCE_IMAP_HOST (TLS, certificate verified).
+# BOUNCE_RETURN_PATH (e.g. bounces@example.org, not a secret) makes outgoing
+# mail's envelope sender bounces+<token>@example.org so bounces land there.
+BOUNCE_IMAP_HOST = env("BOUNCE_IMAP_HOST", default="")
+BOUNCE_IMAP_PORT = env.int("BOUNCE_IMAP_PORT", default=993)
+BOUNCE_IMAP_USER = env("BOUNCE_IMAP_USER", default="")
+BOUNCE_IMAP_PASSWORD = env("BOUNCE_IMAP_PASSWORD", default="")
+BOUNCE_IMAP_FOLDER = env("BOUNCE_IMAP_FOLDER", default="INBOX")
+BOUNCE_RETURN_PATH = env("BOUNCE_RETURN_PATH", default="")
+
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).
 EMAIL_BACKEND = "core.email.RedirectingBackend"

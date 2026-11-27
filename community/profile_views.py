@@ -286,7 +286,15 @@ def _context(request, person, profile, forms) -> dict:
         "old_address": old,
         "address_check": bool(person) and services.needs_address_check(person.pk),
         "home_address": _home_address(person),
+        "bouncing": _bouncing(person),
     }
+
+
+def _bouncing(person) -> list[dict]:
+    """The person's own addresses that bounce (D74)."""
+    from comms import bounces
+
+    return bounces.bouncing(person) if person and bounces.feature_on() else []
 
 
 def _home_address(person) -> str:

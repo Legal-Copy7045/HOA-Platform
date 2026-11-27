@@ -108,6 +108,10 @@ GROUP_NOTES: dict[str, str] = {
         f"certificate. Refunding an owner's own credit (for example after a sale) is not a "
         f"surplus distribution."
     ),
+    "Server warnings": (
+        "Not set by the Act; an operations choice. Keeping the portal running protects the "
+        f"association's records, which it must keep ({ACT} § 5316)."
+    ),
     "Account recovery": (
         "Not set by the Act; a board security policy. The Act does not regulate how owners "
         "sign in. The waiting period and the lock afterwards protect votes, notices and "
@@ -404,6 +408,13 @@ GUIDES["disbursement.second_approval_cents"] = Guide(
     BOARD,
     "Not covered by the Act; an internal financial control like the invoice approval rule.",
     "Two approvals at $500 and over: Board resolution 2026-07 (spending controls).",
+)
+
+GUIDES["monitoring.disk_full_warn_days"] = Guide(
+    BOARD,
+    "Not covered by the Act. A full disk stops the portal and its backups; an early warning "
+    f"keeps the association's records ({ACT} § 5316) safe and available.",
+    "60 days: Board operations policy.",
 )
 
 GUIDES["recovery.wait_hours"] = Guide(

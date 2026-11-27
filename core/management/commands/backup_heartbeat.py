@@ -16,6 +16,14 @@ from core.health import RESTORE_DRILL_BEAT
 from core.models import Heartbeat
 
 NAMES = {"local": "backup_local", "offsite": "backup_offsite", "restore_drill": RESTORE_DRILL_BEAT}
+# What the incident timeline says (D74). A drill records its heartbeat only
+# after the signed backup's keyed checksum verified and the restore passed.
+WORDS = {
+    "local": "Backup taken: an encrypted copy of the database and the files on the server",
+    "offsite": "Off-site copy uploaded to the locked bucket",
+    "restore_drill": "Restore drill passed: the signed backup verified and restored into a "
+    "throwaway copy",
+}
 
 
 class Command(BaseCommand):
@@ -25,4 +33,7 @@ class Command(BaseCommand):
         parser.add_argument("--kind", required=True, choices=sorted(NAMES))
 
     def handle(self, *args, kind, **opts):
+        from core import ops_timeline
+
         Heartbeat.objects.update_or_create(name=NAMES[kind], defaults={"at": timezone.now()})
+        ops_timeline.record("backups", WORDS[kind], key=kind)

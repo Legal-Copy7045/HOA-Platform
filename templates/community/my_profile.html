@@ -37,6 +37,7 @@
         {# 2. Email #}
         <div class="reach-section" id="email">
           <h3>Email</h3>
+          {% if bouncing %}<div class="alert warning" role="status">{% icon "alert" %}<span>Our email to {% for b in bouncing %}{{ b.address }}{% if not forloop.last %} and {% endif %}{% endfor %} came back as undeliverable (since {{ bouncing.0.since|short_date }}). Check the address with your email provider, add another email below, or ask the board to change your sign-in email. The board has been told.</span></div>{% endif %}
           <div class="field"><span class="field-label">Sign-in email</span><div>{{ user.email }}</div><div class="help">You sign in with this. To change your sign-in email, ask the board.</div></div>
           {% if emails %}<ul class="list">{% for m in emails %}<li><div class="grow"><div class="title">{{ m.value }}</div>{% if m.label %}<div class="small muted">{{ m.label }}</div>{% endif %}
               {% if is_owner %}{% if consent %}<form method="post" action="{% url 'contact_method_notices' m.pk %}" class="inline-form">{% csrf_token %}<label class="small"><input type="checkbox" name="notices"{% if m.notices %} checked{% endif %}> Also send official notices here</label><button type="submit" class="secondary small">Save</button></form>

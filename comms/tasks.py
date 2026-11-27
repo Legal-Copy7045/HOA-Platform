@@ -76,3 +76,14 @@ def usps_tracking(timestamp: int) -> dict:
     from comms.usps_tracking import poll
 
     return poll()
+
+
+@app.periodic(cron="7,27,47 * * * *")  # every 20 minutes; only with "bounce_tracking" on and set up
+@app.task(queue="maintenance", queueing_lock="poll_bounces")
+def poll_bounces(timestamp: int) -> dict:
+    """Read bounced email from the bounce mailbox (D74): pull only, IMAP over TLS."""
+    from comms import bounces
+
+    if not bounces.active():
+        return {"state": "off"}
+    return bounces.poll()

@@ -103,6 +103,13 @@ x-app-env: &app-env
   USPS_IV_PASSWORD: ${USPS_IV_PASSWORD:-}
   USPS_IV_API_HOST: ${USPS_IV_API_HOST:-}
   USPS_IV_AUTH_HOST: ${USPS_IV_AUTH_HOST:-}
+  # Bounced email (optional feature "bounce_tracking"; infra/poc/set-bounce-mailbox.sh).
+  BOUNCE_IMAP_HOST: ${BOUNCE_IMAP_HOST:-}
+  BOUNCE_IMAP_PORT: ${BOUNCE_IMAP_PORT:-993}
+  BOUNCE_IMAP_USER: ${BOUNCE_IMAP_USER:-}
+  BOUNCE_IMAP_PASSWORD: ${BOUNCE_IMAP_PASSWORD:-}
+  BOUNCE_IMAP_FOLDER: ${BOUNCE_IMAP_FOLDER:-INBOX}
+  BOUNCE_RETURN_PATH: ${BOUNCE_RETURN_PATH:-}
 
 # Container logs rotate (10 MB x 3 per service) so they never fill the disk.
 x-logging: &logging

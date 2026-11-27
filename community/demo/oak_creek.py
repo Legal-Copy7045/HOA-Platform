@@ -137,6 +137,8 @@ def seed() -> SeedResult:
     from documents import demo_renewals  # D72: renewals and records retention
 
     demo_renewals.seed()
+
+    __import__("core.demo_monitoring", fromlist=["seed"]).seed()  # D74 monitoring demo data
     return SeedResult(
         summary=(
             "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "
