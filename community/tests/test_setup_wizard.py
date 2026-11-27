@@ -303,7 +303,7 @@ def test_back_links_to_the_previous_step(client, board):
     html = client.get(step_url("late_fees")).content.decode()
     assert f'href="{step_url("charge")}">Back' in html
     html = client.get(step_url("community")).content.decode()
-    assert f'href="{reverse("setup_home")}">Back' in html
+    assert f'href="{reverse("settings_hub")}#setup">Back' in html
 
 
 def test_progress_bar_and_sticky_actions(client, board):
@@ -424,7 +424,7 @@ def test_review_flags_defaults_missing_values_and_citations(client, board):
 
 def test_finish_marks_the_run_finished(client, board):
     response = client.post(step_url("review"))
-    assert response["Location"] == reverse("setup_home")
+    assert response["Location"] == reverse("settings_hub") + "#setup"
     assert setup.finished(1)
     assert events("setup.run_finished")[0].metadata == {"run": 1}
 

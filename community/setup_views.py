@@ -425,7 +425,9 @@ def _context(request, step, run, states, **extra):
         "number": setup.number(step.key),
         "total": len(setup.STEPS),
         "percent": round(setup.number(step.key) * 100 / len(setup.STEPS)),
-        "prev_url": reverse("setup_step", args=[prev]) if prev else reverse("setup_home"),
+        "prev_url": (
+            reverse("setup_step", args=[prev]) if prev else reverse("settings_hub") + "#setup"
+        ),
         "run": run,
         "state": states.get(step.key, ""),
         "links": _links(request, step),
@@ -765,7 +767,7 @@ def _review(request, s, run, states):
             request,
             f"Community setup finished (run {run}). Run it again at any time from Settings.",
         )
-        return redirect("setup_home")
+        return redirect(reverse("settings_hub") + "#setup")
     sections = _review_rows(request)
     for section in sections:
         section["state"] = states.get(section["step"].key, "")
