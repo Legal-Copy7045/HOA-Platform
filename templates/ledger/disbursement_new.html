@@ -18,15 +18,18 @@
     <div class="alert warning">{% icon "alert" %}<span>Under 68 Pa.C.S. § 5313, unless the Declaration says otherwise, surplus is paid to owners in proportion to their share of the common expenses or credited against future assessments. Counsel should confirm what the Declaration says and whether reserve funds count as surplus. Split rule: {% if equal_rule.0 is False %}not equal per home{% else %}equal per home{% endif %}{% if equal_rule.1 %} ({{ equal_rule.1 }}){% else %} (no citation recorded in Community settings){% endif %}.</span></div>
     <section class="card">
       {% include "partials/form_errors.html" %}
-      <form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="kind" value="surplus">{{ form }}
+      <form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="kind" value="surplus">
+        {% for field in form %}{% if field.name != "by_check" %}{{ field.as_field_group }}{% endif %}{% endfor %}
+        {# The homes to pay by check sit in a closed panel, so "Show the split" is near the top (WT-034). #}
+        {% with chosen=form.by_check.value|length %}<details class="panel" id="by-check"{% if form.by_check.errors %} open{% endif %} data-testid="by-check"><summary>Pay some homes by check instead ({{ chosen }} chosen)</summary><div class="panel-body">{{ form.by_check.as_field_group }}</div></details>{% endwith %}
         <div class="form-actions"><button type="submit" name="action" value="preview" class="secondary">Show the split</button>{% if preview %}<button type="submit" name="action" value="propose">Propose this distribution</button>{% endif %}</div>
       </form>
     </section>
     {% if preview %}<h2>The split</h2>
       <p class="small muted">Equal shares; the cents that do not divide evenly go one each to the first homes in address order. Total {{ preview_total|cents }} across {{ preview|length }} homes.</p>
-      <div class="table-card"><div class="table-wrap"><table>
+      <div class="table-card"><div class="table-wrap"><table class="stack-sm">
         <thead><tr><th scope="col">Home</th><th scope="col">Account</th><th scope="col">Paid by</th><th scope="col">Payee and address</th><th scope="col" class="num">Amount</th></tr></thead>
-        <tbody>{% for p in preview %}<tr><td>{{ p.lot.label }}</td><td>{{ p.account.number }}</td><td>{% if p.method == "check" %}Check{% else %}Statement credit{% endif %}</td><td class="small">{% if p.method == "check" %}{{ p.payee_name }}{% if p.mail_to %}<br>{{ p.mail_to|linebreaksbr }}{% else %}<br><span class="status tone-danger">No mailing address</span>{% endif %}{% endif %}</td><td class="num">{{ p.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
+        <tbody>{% for p in preview %}<tr><td class="cell-title">{{ p.lot.label }}</td><td data-label="Account">{{ p.account.number }}</td><td data-label="Paid by">{% if p.method == "check" %}Check{% else %}Statement credit{% endif %}</td><td class="small" data-label="Payee and address">{% if p.method == "check" %}{{ p.payee_name }}{% if p.mail_to %}<br>{{ p.mail_to|linebreaksbr }}{% else %}<br><span class="status tone-danger">No mailing address</span>{% endif %}{% endif %}</td><td class="num" data-label="Amount">{{ p.amount_cents|cents }}</td></tr>{% endfor %}</tbody>
       </table></div></div>
     {% endif %}
   {% endif %}

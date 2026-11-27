@@ -33,9 +33,9 @@
     <input type="hidden" name="rows" value="{{ row_count }}">
     <div class="table-card"><div class="table-wrap"><table class="batch-table stack-sm">
       <thead><tr><th scope="col">#</th><th scope="col">Home <span class="required-mark" aria-hidden="true">*</span></th><th scope="col">Amount ($) <span class="required-mark" aria-hidden="true">*</span></th><th scope="col">Check number</th><th scope="col">Date received</th></tr></thead>
-      <tbody>
+      <tbody data-batch-rows data-max="{{ max_rows }}">
       {% for row in rows %}{% with i=forloop.counter0 %}
-        <tr{% if row.errors %} class="row-error"{% endif %}>
+        <tr data-batch-row{% if row.errors %} class="row-error"{% endif %}>
           <td class="muted cell-title">Check {{ forloop.counter }}</td>
           <td data-label="Home"><label class="sr-only" for="lot_{{ i }}">Home, row {{ forloop.counter }}</label>
             <select id="lot_{{ i }}" name="lot_{{ i }}"{% if row.errors %} aria-describedby="err_{{ i }}" aria-invalid="true"{% endif %}>
@@ -51,9 +51,9 @@
       </tbody>
     </table></div></div>
     <p class="small muted">Check numbers only, never bank account numbers. Each payment appears on the owner's statement and in the audit log.</p>
-    <div class="form-actions">
+    <div class="save-bar">
       <button type="submit">Record these payments</button>
-      {% if row_count < 60 %}<a class="btn secondary" href="?rows={{ more_rows }}">Show more rows</a>{% endif %}
+      {% if row_count < max_rows %}<button type="submit" name="more" value="1" class="secondary" formnovalidate data-add-row>{% icon "plus" %} Add another row</button>{% endif %}
     </div>
   </form>
 {% endblock %}

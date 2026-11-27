@@ -1,6 +1,6 @@
 # Stable check IDs for the walkthrough stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: WALK-4836
+# highest issued: WALK-4845
 WALK-001: "owner phone: the menu opens from the Menu button"
 WALK-002: "owner phone: menu entries are at least 40x40 px"
 WALK-003: "owner desktop: / has no sideways scroll"
@@ -4321,7 +4321,16 @@ WALK-4833: "sysadmin phone: menu \"Invitations\" (/board/invitations/) matches i
 WALK-4834: "sysadmin phone: menu \"Settings\" (/board/setup/) matches its page heading"
 WALK-4835: "sysadmin phone: hub tile \"Branding\" (/board/branding/) matches its page heading"
 WALK-4836: "sysadmin phone: hub tile \"Demo data\" (/ops/demo-data/) matches its page heading"
+WALK-4837: "owner: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
+WALK-4838: "authorized: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
+WALK-4839: "view_only: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
 WALK-484: "authorized phone: /sign-in-help/ has no sideways scroll"
+WALK-4840: "tenant: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
+WALK-4841: "board: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
+WALK-4842: "officer: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
+WALK-4843: "manager: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
+WALK-4844: "arc_reviewer: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
+WALK-4845: "auditor: /meetings/{id}/packets/{id}/zip/ downloads a file (HTTP 200, application/zip)"
 WALK-485: "authorized phone: /sign-in-help/ nothing runs off screen or out of its box"
 WALK-486: "authorized phone: /sign-in-help/ tap targets at least 40x40 px"
 WALK-487: "authorized phone: /sign-in-help/ has no console or CSP errors"

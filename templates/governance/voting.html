@@ -29,13 +29,14 @@
     </li>{% endfor %}</ul></section>{% endif %}
 
   <div data-swap-region id="results" class="swap-anchor">
-  <nav class="filters" aria-label="Open or past" data-swap>
-    <a href="?{% if kind %}type={{ kind }}{% endif %}#results"{% if not past %} aria-current="true"{% endif %}>Open{% if open_count %} <span class="badge">{{ open_count }}</span>{% endif %}</a>
+  <nav class="filters" aria-label="Open, drafts or past" data-swap>
+    <a href="?{% if kind %}type={{ kind }}{% endif %}#results"{% if bucket == "open" %} aria-current="true"{% endif %}>Open{% if open_count %} <span class="badge">{{ open_count }}</span>{% endif %}</a>
+    {% if can_draft %}<a href="?status=drafts{% if kind %}&amp;type={{ kind }}{% endif %}#results"{% if bucket == "drafts" %} aria-current="true"{% endif %}>Drafts{% if draft_count %} <span class="badge">{{ draft_count }}</span>{% endif %}</a>{% endif %}
     <a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}#results"{% if past %} aria-current="true"{% endif %}>Past</a>
   </nav>
   {% if type_links|length > 1 %}<nav class="filters" aria-label="Type" data-swap>
-    <a href="?{% if past %}status=past{% endif %}#results"{% if not kind %} aria-current="true"{% endif %}>All</a>
-    {% for key, label in type_links %}<a href="?type={{ key }}{% if past %}&amp;status=past{% endif %}#results"{% if kind == key %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+    <a href="?{{ status_q }}#results"{% if not kind %} aria-current="true"{% endif %}>All</a>
+    {% for key, label in type_links %}<a href="?type={{ key }}{% if status_q %}&amp;{{ status_q }}{% endif %}#results"{% if kind == key %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
   </nav>{% endif %}
 
   <section class="card">
@@ -45,6 +46,7 @@
         {% status r.state r.label %}</li>
     {% endfor %}</ul>
     {% elif past %}{% include "partials/empty.html" with icon="vote" title="Nothing past yet" %}
+    {% elif bucket == "drafts" %}{% include "partials/empty.html" with icon="vote" title="No drafts" %}
     {% else %}{% include "partials/empty.html" with icon="vote" title="Nothing open right now" %}<p class="small link-row"><a href="?status=past{% if kind %}&amp;type={{ kind }}{% endif %}#results">See past ones</a></p>{% endif %}
   </section>
   </div>

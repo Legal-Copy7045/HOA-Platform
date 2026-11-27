@@ -32,13 +32,13 @@
   </section>
 
   <h2>Homes</h2>
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th scope="col">Home</th><th scope="col">Account</th><th scope="col">Paid by</th><th scope="col">Payee and address</th><th scope="col" class="num">Amount</th><th scope="col">Status</th></tr></thead>
     <tbody>{% for r in rows %}<tr>
-      <td>{{ r.line.lot.label }}</td><td>{{ r.line.account.number }}</td><td>{{ r.line.get_method_display }}</td>
-      <td class="small">{% if r.line.method == "check" %}{{ r.line.payee_name }}<br>{{ r.line.mail_to|linebreaksbr }}{% else %}<span class="muted">-</span>{% endif %}</td>
-      <td class="num">{{ r.line.amount_cents|cents }}</td>
-      <td>{{ r.label }}{% for c in r.checks %}<div class="small">Check #{{ c.number }} · {{ c.issued_on|short_date }} · {% if c.status == "voided" %}<span class="status tone-danger">Voided</span>{% elif c.status == "cleared" %}<span class="status tone-success">Cleared</span>{% else %}Outstanding{% endif %}</div>
+      <td class="cell-title">{{ r.line.lot.label }}</td><td data-label="Account">{{ r.line.account.number }}</td><td data-label="Paid by">{{ r.line.get_method_display }}</td>
+      <td class="small" data-label="Payee and address">{% if r.line.method == "check" %}{{ r.line.payee_name }}<br>{{ r.line.mail_to|linebreaksbr }}{% else %}<span class="muted">-</span>{% endif %}</td>
+      <td class="num" data-label="Amount">{{ r.line.amount_cents|cents }}</td>
+      <td data-label="Status">{{ r.label }}{% for c in r.checks %}<div class="small">Check #{{ c.number }} · {{ c.issued_on|short_date }} · {% if c.status == "voided" %}<span class="status tone-danger">Voided</span>{% elif c.status == "cleared" %}<span class="status tone-success">Cleared</span>{% else %}Outstanding{% endif %}</div>
         {% if c.status == "issued" %}
           {% if can_issue %}<form method="post" action="{% url 'disbursement_action' batch.pk 'clear' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}">{% if c.suggestion %}<input type="hidden" name="bank_line" value="{{ c.suggestion.pk }}"><span class="small">Bank line {{ c.suggestion.posted_on|short_date }} matches.</span>{% endif %}<input type="date" name="on" value="{% if c.suggestion %}{{ c.suggestion.posted_on|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" aria-label="Cleared on" required><button type="submit" class="secondary small">Mark cleared</button></form>{% endif %}
           {% if can_void %}<form method="post" action="{% url 'disbursement_action' batch.pk 'void' %}" class="inline-form" data-confirm="Void check #{{ c.number }}? {% if batch.kind == 'refund' %}The refund entry is reversed and the credit is back on the owner's account; {% endif %}a new check can then be written.">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}"><input name="reason" maxlength="150" required aria-label="Reason for voiding" placeholder="Reason"><button type="submit" class="secondary small">Void</button></form>{% endif %}

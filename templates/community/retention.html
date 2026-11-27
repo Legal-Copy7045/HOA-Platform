@@ -9,19 +9,19 @@
 
   <section class="card"><h2>Due at the next run ({{ due|length }})</h2>
     <p class="small muted">A preview: nothing has been cleared yet. People who still own a home, are still on an account, or hold a board seat, office or role are never included.</p>
-    {% if due %}<div class="table-wrap"><table>
+    {% if due %}<div class="table-wrap"><table class="stack-sm">
       <thead><tr><th>Person</th><th>Left on</th><th>Will clear</th></tr></thead>
-      <tbody>{% for c in due %}<tr><td><a href="{% url 'person_detail' c.person.pk %}">{{ c.person.display_name }}</a></td><td class="nowrap">{{ c.left_on|date:"M j, Y" }}</td>
-        <td class="small">{% if c.profile %}{% if c.profile.phone %}phone; {% endif %}{% if c.profile.mailing_address or c.profile.mail_street %}mailing address; {% endif %}{% if c.profile.in_directory or c.profile.directory_show_email or c.profile.directory_show_phone %}directory listing; {% endif %}{% endif %}{% if c.methods %}{{ c.methods|length }} contact method{{ c.methods|length|pluralize }}{% endif %}</td></tr>{% endfor %}</tbody>
+      <tbody>{% for c in due %}<tr><td class="cell-title"><a href="{% url 'person_detail' c.person.pk %}">{{ c.person.display_name }}</a></td><td class="nowrap" data-label="Left on">{{ c.left_on|date:"M j, Y" }}</td>
+        <td class="small" data-label="Will clear">{% if c.profile %}{% if c.profile.phone %}phone; {% endif %}{% if c.profile.mailing_address or c.profile.mail_street %}mailing address; {% endif %}{% if c.profile.in_directory or c.profile.directory_show_email or c.profile.directory_show_phone %}directory listing; {% endif %}{% endif %}{% if c.methods %}{{ c.methods|length }} contact method{{ c.methods|length|pluralize }}{% endif %}</td></tr>{% endfor %}</tbody>
     </table></div>
     {% if days %}<form method="post" action="{% url 'retention_run' %}" class="inline" data-confirm="Clear these contact details now? This cannot be undone.">{% csrf_token %}<button type="submit" class="danger">Clear now</button></form>{% endif %}
     {% else %}{% include "partials/empty.html" with icon="check-circle" title="Nobody is due" %}{% endif %}
   </section>
 
   <section class="card"><h2>Recent runs</h2>
-    {% if runs %}<div class="table-wrap"><table>
+    {% if runs %}<div class="table-wrap"><table class="stack-sm">
       <thead><tr><th>When</th><th>By</th><th class="num">Days</th><th class="num">People</th><th class="num">Profiles cleared</th><th class="num">Contact methods removed</th></tr></thead>
-      <tbody>{% for r in runs %}<tr><td class="nowrap">{{ r.ran_at|date:"M j, Y g:i A" }}</td><td>{% if r.ran_by %}{{ r.ran_by.email }}{% else %}Nightly task{% endif %}</td><td class="num">{{ r.days }}</td><td class="num">{{ r.people }}</td><td class="num">{{ r.profiles_cleared }}</td><td class="num">{{ r.methods_removed }}</td></tr>{% endfor %}</tbody>
+      <tbody>{% for r in runs %}<tr><td class="cell-title nowrap">{{ r.ran_at|date:"M j, Y g:i A" }}</td><td data-label="By">{% if r.ran_by %}{{ r.ran_by.email }}{% else %}Nightly task{% endif %}</td><td class="num" data-label="Days">{{ r.days }}</td><td class="num" data-label="People">{{ r.people }}</td><td class="num" data-label="Profiles cleared">{{ r.profiles_cleared }}</td><td class="num" data-label="Contact methods removed">{{ r.methods_removed }}</td></tr>{% endfor %}</tbody>
     </table></div>
     {% else %}{% include "partials/empty.html" with icon="clock" title="No runs yet" %}{% endif %}
   </section>

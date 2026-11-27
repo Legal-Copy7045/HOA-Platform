@@ -25,11 +25,11 @@
   </section>{% endif %}
 
   <h2>Disbursements</h2>
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th scope="col">Proposed</th><th scope="col">Disbursement</th><th scope="col" class="num">Total</th><th scope="col">Homes</th><th scope="col">Status</th></tr></thead>
     <tbody>{% for b in batches %}
-      <tr><td class="nowrap">{{ b.batch.created_at|short_date }}</td><td><a href="{% url 'disbursement_detail' b.batch.pk %}">{{ b.batch.title }}</a><div class="small muted">{{ b.batch.get_kind_display }}</div></td><td class="num">{{ b.batch.total_cents|cents }}</td><td>{{ b.lines }}</td>
-        <td><span class="status{% if b.state.status == 'declined' %} tone-danger{% elif b.state.status == 'awaiting' %} tone-warning{% else %} tone-success{% endif %}">{{ b.state.label }}</span>{% if b.state.status == "awaiting" %} <span class="small muted">{{ b.state.have }} of {{ b.state.needed }}</span>{% endif %}{% if b.to_issue %} <span class="small">{{ b.to_issue }} check{{ b.to_issue|pluralize }} to write</span>{% endif %}{% if b.issued %} <span class="small muted">{{ b.issued }} outstanding</span>{% endif %}</td></tr>
+      <tr><td class="cell-title nowrap">{{ b.batch.created_at|short_date }}</td><td data-label="Disbursement"><a href="{% url 'disbursement_detail' b.batch.pk %}">{{ b.batch.title }}</a><div class="small muted">{{ b.batch.get_kind_display }}</div></td><td class="num" data-label="Total">{{ b.batch.total_cents|cents }}</td><td data-label="Homes">{{ b.lines }}</td>
+        <td data-label="Status"><span class="status{% if b.state.status == 'declined' %} tone-danger{% elif b.state.status == 'awaiting' %} tone-warning{% else %} tone-success{% endif %}">{{ b.state.label }}</span>{% if b.state.status == "awaiting" %} <span class="small muted">{{ b.state.have }} of {{ b.state.needed }}</span>{% endif %}{% if b.to_issue %} <span class="small">{{ b.to_issue }} check{{ b.to_issue|pluralize }} to write</span>{% endif %}{% if b.issued %} <span class="small muted">{{ b.issued }} outstanding</span>{% endif %}</td></tr>
     {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="dollar" title="No disbursements yet" text="Surplus distributions and refunds of owners' credit appear here." %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
 {% endblock %}

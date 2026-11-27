@@ -8,6 +8,8 @@ audit events and confirmations. Board members only
 
 from __future__ import annotations
 
+import re
+
 from django import forms as djforms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -390,6 +392,23 @@ def setup_start(request):
     return redirect("setup_step", step=setup.KEYS[0])
 
 
+_SECTION = re.compile(r"§\s*(\d{4}(?:\([a-z0-9]+\))*)")
+
+
+def _same_act_entry(pa: list[dict], citation: str) -> dict | None:
+    """The PA Act entry whose text already cites every section of a
+    68 Pa.C.S. citation (WT-013), or None."""
+    if "68 Pa.C.S." not in citation:
+        return None
+    wanted = set(_SECTION.findall(citation))
+    if not wanted:
+        return None
+    for entry in pa:
+        if wanted <= set(_SECTION.findall(entry["text"])):
+            return entry
+    return None
+
+
 def law_panel(step) -> dict:
     """The step's "What the law says" panel: the Pennsylvania Act's notes for
     the rule groups it shows (community/pa_law.py) and the federal and other
@@ -401,12 +420,28 @@ def law_panel(step) -> dict:
         s.group for s in setup.rules_for(step.key) if s.group not in step.groups
     ]
     pa = []
+    seen_text = set()
     for group in dict.fromkeys(groups):
-        if group in pa_law.GROUP_NOTES:
-            pa.append({"title": group_title(group), "text": pa_law.GROUP_NOTES[group]})
+        text = pa_law.GROUP_NOTES.get(group)
+        if text and text not in seen_text:
+            seen_text.add(text)
+            pa.append({"title": group_title(group), "text": text})
+    notes = []
+    seen_citations = set()
+    for note in us_law.for_step(step.key):
+        if note.citation in seen_citations:
+            continue  # the same law twice in one step (WT-013)
+        seen_citations.add(note.citation)
+        same = _same_act_entry(pa, note.citation)
+        if same is not None and "citation" not in same:
+            # The Act's note already says this, citing the same sections:
+            # one block, keeping the citation, "For this choice" and caveat.
+            same.update(citation=note.citation, meaning=note.meaning, caveat=note.caveat)
+            continue
+        notes.append(note)
     return {
         "pa": pa,
-        "notes": us_law.for_step(step.key),
+        "notes": notes,
         "none": us_law.NO_SPECIFIC_LAW.get(step.key, ""),
         "footer": us_law.FOOTER,
     }

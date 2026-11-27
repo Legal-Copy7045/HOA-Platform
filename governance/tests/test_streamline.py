@@ -126,9 +126,10 @@ def test_one_list_with_open_and_past_filters(client, w):
     assert "2027 election" in only
     assert _page(client, reverse("voting") + "?type=votes&status=past").count("Old fountain") == 1
     assert "2027 election" not in _page(client, reverse("voting") + "?type=votes")
-    # The board sees its draft under Open.
+    # The board sees its draft under Drafts, never under Open (WT-012).
     client.force_login(board)
-    assert "Draft formal vote" in _page(client, reverse("voting"))
+    assert "Draft formal vote" not in _page(client, reverse("voting"))
+    assert "Draft formal vote" in _page(client, reverse("voting") + "?status=drafts")
     assert draft.status == "draft" and election.pk
 
 

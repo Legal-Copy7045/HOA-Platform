@@ -242,7 +242,9 @@ def _vote_row(v: Vote, user) -> dict:
         "meta": " · ".join(meta),
         "state": v.status,
         "label": v.get_status_display(),
-        "open": v.kind == VoteKind.FORMAL and v.status in (VoteStatus.DRAFT, VoteStatus.OPEN),
+        "bucket": "draft"
+        if v.status == VoteStatus.DRAFT
+        else ("open" if v.kind == VoteKind.FORMAL and v.status == VoteStatus.OPEN else "past"),
         "when": v.created_at,
     }
 
@@ -268,7 +270,9 @@ def _election_row(e: Election, user) -> dict:
         "meta": " · ".join(meta),
         "state": e.state,
         "label": e.get_state_display(),
-        "open": e.state in (ElectionState.NOMINATIONS, ElectionState.VOTING),
+        "bucket": "open"
+        if e.state in (ElectionState.NOMINATIONS, ElectionState.VOTING)
+        else "past",
         "when": e.created_at,
     }
 
@@ -293,7 +297,9 @@ def _survey_row(s, user) -> dict:
         "meta": " · ".join(meta),
         "state": s.phase,
         "label": s.phase_label,
-        "open": s.phase in ("open", "scheduled", "draft"),
+        "bucket": "draft"
+        if s.phase == "draft"
+        else ("open" if s.phase in ("open", "scheduled") else "past"),
         "when": s.created_at,
     }
 
@@ -352,9 +358,16 @@ def render_voting(request, *, open_panel: str = "", forms_: dict | None = None, 
     kind = request.GET.get("type", "")
     if kind not in TYPES or not shown[kind]:
         kind = ""
-    past = request.GET.get("status") == "past"
+    # Open = what people can act on now (or is scheduled to open); drafts are
+    # the board's own list, never under Open (WT-012).
+    can_draft = policy.can(user, "vote.manage") or surveys.can_manage(user)
+    bucket = request.GET.get("status") or "open"
+    if bucket not in ("open", "past") and not (bucket == "drafts" and can_draft):
+        bucket = "open"
+    past = bucket == "past"
     all_rows = _rows(request, {k: v and (not kind or k == kind) for k, v in shown.items()})
-    rows = [r for r in all_rows if r["open"] != past]
+    want = {"open": "open", "past": "past", "drafts": "draft"}[bucket]
+    rows = [r for r in all_rows if r["bucket"] == want]
     rows.sort(key=lambda r: (r["state"] not in ("open", "voting", "nominations"),))
     forms_ = forms_ or {}
     can_vote_manage = policy.can(user, "vote.manage")
@@ -369,7 +382,11 @@ def render_voting(request, *, open_panel: str = "", forms_: dict | None = None, 
         # Someone who can only answer surveys (a tenant) sees "Surveys", as
         # their menu does (WT-018).
         "heading": "Surveys" if [k for k, v in shown.items() if v] == ["surveys"] else "Voting",
-        "open_count": sum(1 for r in all_rows if r["open"]),
+        "open_count": sum(1 for r in all_rows if r["bucket"] == "open"),
+        "draft_count": sum(1 for r in all_rows if r["bucket"] == "draft"),
+        "can_draft": can_draft,
+        "bucket": bucket,
+        "status_q": "" if bucket == "open" else f"status={bucket}",
         "past": past,
         "kind": kind,
         "shown": shown,

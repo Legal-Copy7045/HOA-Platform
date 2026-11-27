@@ -17,5 +17,5 @@
     <div class="field"><label><input type="checkbox" name="flip" value="1"{% if flip %} checked{% endif %}> My bank shows money out as positive amounts in the Amount column</label></div>
     <div class="form-actions"><button type="submit">Import</button><a class="btn secondary" href="{% url 'bank_feed' %}">Cancel</a></div></section>
   </form>
-  <section class="card"><h2>First lines of the file</h2><div class="table-wrap"><table><thead><tr>{% for i, h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>{% for row in sample %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div></section>
+  <section class="card"><h2>First lines of the file</h2><div class="table-wrap">{# data-wide: the first lines of the uploaded file, its own columns (WT-029) #}<table data-wide><thead><tr>{% for i, h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>{% for row in sample %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div></section>
 {% endblock %}

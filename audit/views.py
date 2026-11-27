@@ -37,6 +37,31 @@ def _bounds(day: datetime.date) -> datetime.datetime:
     return timezone.make_aware(datetime.datetime.combine(day, datetime.time.min))
 
 
+ROWS_PER_PAGE = 100
+DETAILS_PER_ROW = 20
+
+
+def _collapse(events) -> list[dict]:
+    """Consecutive events (newest first) with the same actor, channel and
+    action on the same day become one row: count, first and last time, and
+    the first DETAILS_PER_ROW events' details (WT-028)."""
+    rows: list[dict] = []
+    for e in events:
+        day = timezone.localtime(e.occurred_at).date()
+        key = (day, e.actor_id, e.actor_type, e.channel, e.action)
+        if rows and rows[-1]["key"] == key:
+            row = rows[-1]
+            row["count"] += 1
+            row["first"] = e
+            if len(row["events"]) < DETAILS_PER_ROW:
+                row["events"].append(e)
+            continue
+        rows.append({"key": key, "day": day, "event": e, "first": e, "count": 1, "events": [e]})
+    for row in rows:
+        row["hidden"] = row["count"] - len(row["events"])
+    return rows
+
+
 @login_required
 def sysadmin_activity(request):
     """Sysadmin activity, a window of days at a time (the last 30 by
@@ -92,20 +117,35 @@ def sysadmin_activity(request):
             ),
             audit_kind="sysadmin_activity",
         )
+    # Runs of the same thing by the same actor on the same day are one row
+    # with a count (WT-028); the CSV export above stays one line per event.
+    rows = _collapse(events)
+    pages = max(1, -(-len(rows) // ROWS_PER_PAGE))
+    page = int(request.GET["page"]) if request.GET.get("page", "").isdigit() else 1
+    page = min(max(page, 1), pages)
+    shown = rows[(page - 1) * ROWS_PER_PAGE : page * ROWS_PER_PAGE]
     days: dict[datetime.date, list] = {}
-    for e in events:
-        days.setdefault(timezone.localtime(e.occurred_at).date(), []).append(e)
+    for row in shown:
+        days.setdefault(row["day"], []).append(row)
     span = (end - start).days + 1
+
+    def page_url(n):
+        query = request.GET.copy()
+        query.pop("export", None)
+        query["page"] = str(n)
+        return "?" + query.urlencode()
 
     def window(new_end):
         query = request.GET.copy()
         query.pop("from", None)
         query.pop("export", None)
+        query.pop("page", None)
         query["to"] = new_end.isoformat()
         return "?" + query.urlencode()
 
     newer_end = end + datetime.timedelta(days=span)
     export = request.GET.copy()
+    export.pop("page", None)
     export["from"], export["to"], export["export"] = start.isoformat(), end.isoformat(), "csv"
     return render(
         request,
@@ -113,6 +153,11 @@ def sysadmin_activity(request):
         {
             "days": days,
             "count": len(events),
+            "row_count": len(rows),
+            "page": page,
+            "pages": pages,
+            "prev_page_url": page_url(page - 1) if page > 1 else "",
+            "next_page_url": page_url(page + 1) if page < pages else "",
             "start": start,
             "end": end,
             "who": who,

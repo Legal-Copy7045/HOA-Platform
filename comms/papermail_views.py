@@ -111,7 +111,13 @@ def _source(request, data) -> tuple[dict, object]:
         stage = data.get("stage") or "proposed"
         return papermail.source_defaults(budget=budget, stage=stage), budget
     if template:
-        return papermail.source_defaults(template=template), None
+        # Delinquency notices go only from the home's collection case, one
+        # home at a time ("Also prepare a paper copy", WT-006), never to a
+        # group of homes from here.
+        raise papermail.PaperMailError(
+            "Delinquency notices are prepared from the home's collection case "
+            "(Finance, Collections), one home at a time."
+        )
     return papermail.source_defaults(), None
 
 
@@ -129,7 +135,6 @@ def paper_mail(request):
     _require(request)
     from governance.models import Meeting
     from ledger.models import Budget
-    from ledger.services import paper_letter_templates
 
     groups = papermail.who_gets_paper()
     mailings = list(Mailing.objects.for_user(request.user)[:50])
@@ -160,7 +165,6 @@ def paper_mail(request):
             "mailings": mailings,
             "meetings": meetings,
             "budgets": Budget.objects.all()[:5] if policy.can(request.user, "finance.view") else [],
-            "templates": paper_letter_templates(),
             "homes": _homes(request.user),
             "settings": papermail.settings(),
         },

@@ -1,0 +1,34 @@
+# Walkthrough 2, part A (D63): flow and phone fixes.
+- feature: "No template comment printed on a page: one-line {# #} only (guard), dashboard and Community settings clean"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(no_template_has_a_comment|dashboard_prints_no|community_settings_prints_no)"]
+- feature: "Board, executive and committee meetings take no owner proxies and show no owners' quorum; the service refuses; earlier proxies listed, never deleted"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(board_meeting_shows_no_proxy|owners_meeting_still_offers|grant_proxy_refuses|proxy_post_for_a_board|an_old_proxy_on_a_board)"]
+- feature: "Meeting packet .zip never fails: files missing from the store are left out and listed in NOT-INCLUDED.txt and on the meeting page; audit counts only"
+  since: M5
+  match: ["^unit:governance/tests/test_packets.py::test_(zip_skips_an_attachment_missing|zip_never_fails|zip_lists_a_file_that_vanishes|meeting_page_says_how_many)", "^walkthrough:.*packets/\\{id\\}/zip/ downloads a file"]
+- feature: "Delinquency notices only from the collection case: Paper mail offers no delinquency wording; the case prepares a one-home paper copy (board, manager)"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(paper_mail_offers_no_delinquency|collection_case_prepares|paper_copy_refused|paper_copy_service)", "^unit:core/tests/test_url_matrix.py::.*\\[collection_paper_copy\\]"]
+- feature: "Voting: Open lists only what people can act on; the board's drafts under Drafts"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(voting_open_excludes_drafts|owners_get_no_drafts)"]
+- feature: "Community setup: one law entry per citation in a step; the law panel closed on phones"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(setup_steps_never_show_the_same_law|merged_law_entry|setup_law_panel_is_closed)", "^manual:walkthrough 2 phone fixes"]
+- feature: "Phone CSS at the source: [hidden] wins, .kv one column, sticky bars above the tab bar, amounts never break, task rows wrap"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(site_css_fixes|kv_is_defined_once|summary_tiles_are_not)"]
+- feature: "Every table stacks on phones (stack-sm, data-label) or opts out with data-wide and a reason"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(every_table_stacks|access_review_and_disbursements)"]
+- feature: "Community settings on phones: Jump to section, only the first section needing attention open"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_settings_page_has_a_jump_select", "^unit:core/tests/test_walkthrough_flow.py::test_community_settings_has_an_index"]
+- feature: "Sysadmin activity: repeats on one row with a count, 100 rows a page; the CSV stays one line per event"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_sysadmin_activity_(collapses|pages)"]
+- feature: "Calendar, Home neighbors, Record payments, surplus form, Home account actions, People find box: one control per form and shorter phone pages"
+  since: M5
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(calendar_header_buttons|home_neighbors_has_one|record_payments_starts|add_another_row|add_row_script|surplus_homes_sit|reverse_is_inside|people_find)"]

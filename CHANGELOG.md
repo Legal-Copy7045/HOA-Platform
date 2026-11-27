@@ -6,6 +6,28 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.32.0 — 2026-11-27
+
+- Walkthrough 2 fixes, part A (D63). The dashboard and Community settings no
+  longer print a developer note. Board, executive and committee meetings no
+  longer offer owners a proxy or show an owners' quorum (owners may attend and
+  speak; they do not vote there), and the portal refuses such a proxy. The
+  meeting packet .zip downloads for everyone again: a file that cannot be read
+  is left out and listed in NOT-INCLUDED.txt. Delinquency notices are no
+  longer offered on Paper mail for every home: the collection case's letter
+  has "Also prepare a paper copy" for that one home. Voting's Open list no
+  longer shows drafts; the board has a Drafts filter. Community setup shows
+  each law once per step, with the law panel closed on phones.
+- Phones: every table reads as cards, "Unsaved changes" stays hidden until
+  something changes, amounts on the dashboard never break over two lines,
+  Save bars sit above the tab bar, Community settings has "Jump to section",
+  Sysadmin activity counts repeats on one row (100 rows a page), Record
+  payments starts with three rows and adds rows without losing what was
+  typed, the surplus form keeps the homes to pay by check in a closed panel,
+  a home's account has one small Actions menu per entry, Calendar's New
+  event and New meeting open in place, Home neighbors has one Save all, and
+  People has a find box and sign-up filters.
+
 ## 0.31.0 — 2026-11-26
 
 - Can't sign in? The sign-in page now has one help link instead of two. It

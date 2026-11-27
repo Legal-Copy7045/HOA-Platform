@@ -27,8 +27,8 @@
       <section class="card">
         <h2>{% icon "alert" %} {{ result.problems|length }} problem{{ result.problems|length|pluralize }} to fix</h2>
         <p>Nothing will be imported until every row is right. Fix these in your spreadsheet and upload it again.</p>
-        <div class="table-wrap"><table><thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
-          <tbody>{% for p in result.problems %}<tr><td class="nowrap">{% if p.row %}{{ p.row }}{% else %}Lot {{ p.lot }}{% endif %}</td><td>{% if p.column %}<code>{{ p.column }}</code>{% endif %}</td><td>{{ p.message|capfirst }}</td></tr>{% endfor %}</tbody></table></div>
+        <div class="table-wrap"><table class="stack-sm"><thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
+          <tbody>{% for p in result.problems %}<tr><td class="cell-title nowrap">{% if p.row %}{{ p.row }}{% else %}Lot {{ p.lot }}{% endif %}</td><td data-label="Column">{% if p.column %}<code>{{ p.column }}</code>{% endif %}</td><td data-label="Problem">{{ p.message|capfirst }}</td></tr>{% endfor %}</tbody></table></div>
       </section>
     {% else %}
       <section class="card">
@@ -52,13 +52,13 @@
           </form>
         {% endif %}
       </section>
-      <div class="table-card"><div class="table-wrap"><table>
+      <div class="table-card"><div class="table-wrap"><table class="stack-sm">
         <thead><tr><th>Home</th><th>Owners in the file</th><th>What happens</th></tr></thead>
         <tbody>{% for r in rows %}<tr>
-          <td>{{ r.address }}<div class="small muted">Lot {{ r.number }}</div></td>
-          <td>{% for o in r.owners %}<div>{{ o.name }}{% if o.email %} <span class="small muted">{{ o.email }}</span>{% endif %}{% if o.matched %} <span class="status tone-info">Already in the portal</span>{% endif %}<div class="small muted">Since {{ o.since|short_date }}{% if o.kind %} · {{ o.kind }}{% endif %}{% if o.extra %} · phone or mailing address{% endif %}</div></div>{% endfor %}
+          <td class="cell-title">{{ r.address }}<div class="small muted">Lot {{ r.number }}</div></td>
+          <td data-label="Owners in the file">{% for o in r.owners %}<div>{{ o.name }}{% if o.email %} <span class="small muted">{{ o.email }}</span>{% endif %}{% if o.matched %} <span class="status tone-info">Already in the portal</span>{% endif %}<div class="small muted">Since {{ o.since|short_date }}{% if o.kind %} · {{ o.kind }}{% endif %}{% if o.extra %} · phone or mailing address{% endif %}</div></div>{% endfor %}
             {% if r.current %}<div class="small muted">Current owners: {{ r.current|join:"; " }}</div>{% endif %}</td>
-          <td><span class="status tone-{{ r.tone }}">{{ r.status }}</span></td></tr>{% endfor %}</tbody>
+          <td data-label="What happens"><span class="status tone-{{ r.tone }}">{{ r.status }}</span></td></tr>{% endfor %}</tbody>
       </table></div></div>
     {% endif %}
   {% endif %}

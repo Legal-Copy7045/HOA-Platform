@@ -35,8 +35,8 @@
     </section>
   {% endwith %}{% endif %}
 
-  {# To-dos first (UX review): the same list as My items and the sidebar counts.
-     Roles that are never assigned anything get their usual pages instead (WT-016). #}
+  {% comment %} To-dos first (UX review): the same list as My items and the sidebar counts.
+     Roles that are never assigned anything get their usual pages instead (WT-016). {% endcomment %}
   {% if dash.shortcuts %}
   <section class="card" id="shortcuts">
     <h2>Your pages</h2>
