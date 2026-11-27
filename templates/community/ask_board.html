@@ -7,7 +7,7 @@
   <section class="card prose">
     {% if staff %}
       <p>You answer owners' requests on <a href="{% url 'requests' %}">Owner requests</a>. To raise something with the rest of the board, add a board task.</p>
-      {% if user|can:"task.manage" %}<p><a class="btn secondary" href="{% url 'tasks' %}">Board tasks</a></p>{% endif %}
+      {% if user|can:"task.manage" %}<p><a class="btn secondary" href="{% url 'tasks' %}">Tasks and deadlines</a></p>{% endif %}
     {% elif view_only %}
       <p>You can follow the requests on the account you're a contact for, but only its owners and authorized contacts can ask the board. Ask one of them to raise it, or ask them to have the board make you an authorized contact.</p>
       <p><a class="btn secondary" href="{% url 'requests' %}?mine=1">The account's requests</a></p>

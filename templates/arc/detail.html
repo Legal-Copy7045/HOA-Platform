@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load portal static %}
-{% block title %}{% if owner_view %}{{ obj.title }}{% else %}Request #{{ obj.pk }}{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block title %}{{ obj.title }} · Request #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs">{% if owner_view %}<a href="{% url 'arc_list' %}?mine=1">My home improvement requests (ARC)</a> / {{ obj.title|truncatechars:48 }}{% else %}<a href="{% url 'arc_list' %}">Architectural review</a> / Request #{{ obj.pk }}{% endif %}</div>
   <div class="page-head"><div><h1>{{ obj.title }}</h1>

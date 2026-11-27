@@ -260,7 +260,7 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
 
 
 def notice_deadlines(meeting: Meeting) -> tuple[list, int | None]:
-    """Recurring deadlines (Board tasks) that sending this meeting's notice can
+    """Recurring deadlines (Tasks and deadlines) that sending this meeting's notice can
     mark done: the active "Meetings and elections" items. For an annual
     meeting, the annual-meeting item is offered first."""
     if meeting.kind == MeetingKind.EXECUTIVE or meeting.status != MeetingStatus.SCHEDULED:

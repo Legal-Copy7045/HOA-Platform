@@ -1518,6 +1518,38 @@ def save_common_area(
     return area
 
 
+def set_common_area_in_use(*, area, in_use: bool, actor, request: HttpRequest | None = None):
+    """Take a common area out of use (the setup wizard's "Remove") or put it
+    back. Areas are never deleted (NeverDeleteMixin): their bookings and
+    history stay. Refused while the area has upcoming bookings that are
+    waiting or confirmed: those are cancelled first, on Reservations."""
+    from community.models import OPEN_RESERVATION_STATES, Reservation
+
+    _authorize(actor, "community.manage_rules")
+    if not in_use:
+        with system_access("common area bookings check"):
+            upcoming = Reservation.objects.filter(
+                area=area, state__in=OPEN_RESERVATION_STATES, ends_at__gt=timezone.now()
+            ).count()
+        if upcoming:
+            raise CommunityError(
+                f"{area.name} has {upcoming} upcoming booking{'s' if upcoming != 1 else ''} "
+                "waiting or confirmed. Cancel or decline them on Reservations first; the area "
+                "is kept until then."
+            )
+    if area.active == in_use:
+        return area
+    return save_common_area(
+        name=area.name,
+        kind=area.kind,
+        notes=area.notes,
+        active=in_use,
+        area=area,
+        actor=actor,
+        request=request,
+    )
+
+
 # --- Owner's own profile and the directory ----------------------------------------
 
 

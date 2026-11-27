@@ -351,7 +351,7 @@ def board_items(user) -> list:
             continue
         out.append(
             Item(
-                "Finance",
+                "Finance overview",
                 _item_text(review),
                 f"{what_text(review).capitalize()}: above the "
                 f"{format_cents(review.limit_cents)} review limit. Approve or decline by "

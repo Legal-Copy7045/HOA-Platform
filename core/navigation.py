@@ -325,7 +325,7 @@ SECTIONS = [
             ("Architectural review", "arc_list", "pencil", "arc.view_all"),
             ("Violations", "violations", "flag", "violation.view_all"),
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
-            ("Board tasks", "tasks", "list", "task.manage"),
+            ("Tasks and deadlines", "tasks", "list", "task.manage"),
             ("People", "people", "users", "person.manage"),
             # Sign-ups are a tab of it for the board (WT-002).
             ("Homes and owners", "lot_list", "map", "lot.view_all"),
@@ -427,7 +427,24 @@ ROLE_LABELS = {
     policy.ARC_REVIEWER: "ARC",
     policy.AUDITOR: "Auditor",
     policy.SYSADMIN: "Sysadmin",
+    # Contacts, tenants and former owners see their role too, never their
+    # email in its place (WT-015, WT-040).
+    policy.AUTHORIZED: "Account contact",
+    policy.VIEW_ONLY: "View-only contact",
+    policy.TENANT: "Tenant",
+    policy.FORMER_OWNER: "Former owner",
 }
+
+
+def role_labels(roles) -> list[str]:
+    """The menu foot's role line: "Owner · Board · Treasurer" (an office
+    follows the board seat, WT-040)."""
+    from community.models import Office
+
+    labels = [ROLE_LABELS[g] for g in ROLE_LABELS if g in roles.groups]
+    names = dict(Office.choices)
+    labels += [names.get(o, o.replace("_", " ").capitalize()) for o in sorted(roles.offices)]
+    return labels
 
 
 def allowed(groups: frozenset[str], permission) -> bool:
@@ -654,7 +671,7 @@ def build(request) -> dict:
         # "Board" (or "Staff") badge and the accent strip (D64).
         "board_page": board_page,
         "tabbar": tabbar(sections, roles.groups),
-        "roles": [ROLE_LABELS[g] for g in ROLE_LABELS if g in roles.groups],
+        "roles": role_labels(roles),
         "person_id": roles.person_id,
     }
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Insurance claim · {{ SITE_NAME }}{% endblock %}
+{% block title %}Insurance claim {% if obj.claim_number %}{{ obj.claim_number }}{% else %}#{{ obj.pk }}{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'insurance_claims' %}">Insurance claims</a> / {% if obj.claim_number %}{{ obj.claim_number }}{% else %}Claim #{{ obj.pk }}{% endif %}</div>
   <div class="page-head"><div><h1>Insurance claim {% if obj.claim_number %}{{ obj.claim_number }}{% else %}#{{ obj.pk }}{% endif %}</h1>

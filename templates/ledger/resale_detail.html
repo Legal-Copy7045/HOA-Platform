@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Resale #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block title %}Resale certificate #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% if can_manage %}{% include "ledger/finance_nav.html" %}{% endif %}
   <div class="crumbs"><a href="{% url 'resales' %}">Resale certificates</a> / #{{ obj.pk }}</div>

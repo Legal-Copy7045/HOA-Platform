@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}{% if owner_view %}Notice: {{ obj.get_category_display }}{% else %}Notice #{{ obj.pk }}{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block title %}{{ obj.get_category_display }} · Notice #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs">{% if owner_view %}<a href="{% url 'violations' %}?mine=1">Notices</a> / {{ obj.get_category_display }}{% else %}<a href="{% url 'violations' %}">Violations</a> / Notice #{{ obj.pk }}{% endif %}</div>
   <div class="page-head">

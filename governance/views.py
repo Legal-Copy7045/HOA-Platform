@@ -360,7 +360,7 @@ def meeting_action(request, pk, action):
                     lambda: services.complete_notice_deadline(
                         meeting, deadline_id, actor=request.user, request=request
                     ),
-                    "The deadline is marked done on Board tasks.",
+                    "The deadline is marked done on Tasks and deadlines.",
                 )
     elif action in ("held", "cancelled"):
         _flash(

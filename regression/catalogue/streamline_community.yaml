@@ -1,6 +1,6 @@
 # Community streamlining (owner-approved 2026-11-26): merged pages, the Board and committees page,
 # view-only and former owners' requests, areas with their booking rules, urgent texts from the
-# announcement form and Recurring deadlines on Board tasks. `match` runs over "<stage>:<check>".
+# announcement form and Recurring deadlines on Tasks and deadlines. `match` runs over "<stage>:<check>".
 - feature: "Homes and owners with the roster view (accounts, contacts, balances, audited CSV export); the old Roster URL redirects with its query"
   since: M5
   docs: docs/glossary.md
@@ -29,7 +29,7 @@
   since: M5
   docs: docs/glossary.md
   match: ["^unit:comms/tests/test_sms\\.py::test_(announcement_form_offers|board_publishes_and_texts|manager_cannot_text|a_text_that_cannot_go_out|no_one_opted_in)"]
-- feature: "Recurring deadlines tab of Board tasks (compliance.manage and the compliance feature); the old Compliance calendar URL redirects; My items links to the tab"
+- feature: "Recurring deadlines tab of Tasks and deadlines (compliance.manage and the compliance feature); the old Compliance calendar URL redirects; My items links to the tab"
   since: M5
   docs: docs/glossary.md
   match: ["^unit:operations/tests/test_compliance\\.py::test_(compliance_redirects|deadline_forms|deadlines_tab|due_deadlines|starter_items)"]

@@ -1183,7 +1183,7 @@ def board_items(user) -> list:
     for run_ in open_runs():
         out.append(
             MyItem(
-                "Finance",
+                "Finance overview",
                 f"{run_label(run_)} books: {run_.blocking} exception"
                 f"{'' if run_.blocking == 1 else 's'} to resolve",
                 "The automatic close found these; everything else balanced.",
@@ -1198,7 +1198,7 @@ def board_items(user) -> list:
         for note in pending_agreements(user):
             out.append(
                 MyItem(
-                    "Finance",
+                    "Finance overview",
                     f"Agree a books difference of {format_cents(note.amount_cents)}"
                     if note.amount_cents
                     else "Agree a note on the books",
@@ -1214,7 +1214,7 @@ def board_items(user) -> list:
                 continue
             out.append(
                 MyItem(
-                    "Finance",
+                    "Finance overview",
                     f"Approve or decline reopening {req.close.period}",
                     "Another board member asked to reopen a closed period.",
                     f"{url}?period={req.close.period}",

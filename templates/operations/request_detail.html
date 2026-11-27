@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}Request #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
+{% block title %}{{ obj.subject }} · Request #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs">{% if owner_view %}<a href="{% url 'requests' %}?mine=1">My requests</a>{% else %}<a href="{% url 'requests' %}">Owner requests</a>{% endif %} / {{ obj.subject|truncatechars:48 }}</div>
   <div class="page-head"><div><h1>{{ obj.subject }}</h1>

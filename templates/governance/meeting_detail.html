@@ -30,7 +30,7 @@
             {% if m.kind != "executive" and not m.notice_sent_at %}<form method="post" action="{% url 'meeting_action' m.pk 'notice' %}" class="stack" data-testid="step-notice" data-confirm="Email the notice to every owner who has consented? Owners who have not consented to email need a paper notice; the page lists how many.">{% csrf_token %}
               <h4>1. Send the notice</h4>
               {% if deadlines %}<p><label for="notice-deadline">Also mark this recurring deadline done</label><select id="notice-deadline" name="deadline" aria-describedby="notice-deadline-help"><option value="">(none)</option>{% for d in deadlines %}<option value="{{ d.pk }}"{% if d.pk == deadline_default %} selected{% endif %}>{{ d.title }} (due {{ d.due_on|short_date }})</option>{% endfor %}</select></p>
-              <p class="help" id="notice-deadline-help">From the recurring deadlines on Board tasks; marked done when the notice goes out.</p>{% endif %}
+              <p class="help" id="notice-deadline-help">From the recurring deadlines on Tasks and deadlines; marked done when the notice goes out.</p>{% endif %}
               <div><button type="submit">{% icon "mail" %} Send notice to owners</button></div></form>{% endif %}
             <h4>{% if m.kind != "executive" and not m.notice_sent_at %}2. {% endif %}After the meeting</h4>
             <div class="wf-actions" data-testid="step-held">

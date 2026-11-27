@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}FAQ · {{ SITE_NAME }}{% endblock %}
+{% block title %}Frequently asked questions · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "community_info" %}Frequently asked questions</nav>
   <div class="page-head"><div><h1>Frequently asked questions</h1><p class="subtitle">Quick answers about living here.{% if user|can:"request.submit" %} Can't find yours? <a href="{% url 'requests' %}?mine=1">Ask the board</a>.{% endif %}</p></div></div>

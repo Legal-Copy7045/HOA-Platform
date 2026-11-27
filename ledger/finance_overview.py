@@ -88,11 +88,29 @@ def _accounting(ctx) -> str:
     return f"Last reconciled to the statement of {last.statement_date:%b %-d, %Y}."
 
 
-def _bank_feed(ctx) -> str:
+def _bank_counts() -> tuple[int, int]:
+    """(bank feed connections, bank accounts set up in the books): one bank
+    status for every card, so the feed and the books never contradict each
+    other on the same page (WT-004)."""
+    from ledger.books.models import BankAccountSetup
     from ledger.models import BankConnection
 
-    n = BankConnection.objects.filter(status="active").count()
-    return f"{_n(n, 'bank account')} connected." if n else "No bank account connected."
+    return (
+        BankConnection.objects.filter(status="active").count(),
+        BankAccountSetup.objects.count(),
+    )
+
+
+def _bank_feed(ctx) -> str:
+    feed, books = _bank_counts()
+    if not feed:
+        return "No bank account connected."
+    if not books:
+        return (
+            f"{_n(feed, 'bank account')} connected, not yet set up in the books: "
+            "add it on Bank accounts and funds."
+        )
+    return f"{_n(feed, 'bank account')} connected; {_n(books, 'bank account')} in the books."
 
 
 def _budgets(ctx) -> str:
@@ -129,7 +147,7 @@ def _books_close(ctx) -> str:
     from ledger.books import close, periods
 
     if not close.books_in_use():
-        return "The books are not set up yet: start on Bank accounts and funds."
+        return "The books are not set up yet: add the bank account on Bank accounts and funds."
     last = periods.last_closed_month()
     closed = f"Closed through {_month(last)}" if last else "No month closed yet"
     exceptions = sum(r.blocking for r in close.open_runs())
@@ -146,10 +164,15 @@ def _financial_statements(ctx) -> str:
 
 
 def _books_accounts(ctx) -> str:
-    from ledger.books.models import BankAccountSetup
-
-    n = BankAccountSetup.objects.count()
-    return f"{_n(n, 'bank account')} in the books." if n else "No bank account in the books yet."
+    feed, books = _bank_counts()
+    if books:
+        return f"{_n(books, 'bank account')} in the books."
+    if feed:
+        return (
+            f"The bank feed has {_n(feed, 'account')} connected; set it up here so the books "
+            "and the close use it."
+        )
+    return "No bank account in the books yet."
 
 
 def _books_coding(ctx) -> str:
@@ -195,7 +218,7 @@ def _interest(ctx) -> str:
     policy = interest.current_policy()
     if not policy.rate_bp:
         return "No rate recorded: nothing is charged."
-    return f"{interest.monthly_rate_text(policy.rate_bp)} on balances past due."
+    return f"{interest.monthly_rate_text(policy.rate_bp)}% a month on balances past due."
 
 
 def _cashflow(ctx) -> str:

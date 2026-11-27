@@ -485,7 +485,7 @@ def board_items(user) -> list:
         if st["status"] == "awaiting" and approver and user.pk not in st["approvers"]:
             items.append(
                 Item(
-                    "Finance",
+                    "Finance overview",
                     f"Approve a reimbursement of {format_cents(claim.amount_cents)}",
                     f"{claim.payee} · {claim.spent_on:%B %-d}"
                     + (f" · {st['have']} of {st['need']} approvals" if st["need"] > 1 else ""),
@@ -497,7 +497,7 @@ def board_items(user) -> list:
         elif st["status"] == "approved" and payer and not payment_refusal(user, claim):
             items.append(
                 Item(
-                    "Finance",
+                    "Finance overview",
                     f"Pay an approved reimbursement of {format_cents(claim.amount_cents)}",
                     "By check from Checks, or record a bank transfer.",
                     url,

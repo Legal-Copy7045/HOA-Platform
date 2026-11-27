@@ -74,7 +74,7 @@ def test_starter_items_and_permissions(client, board):
     assert b"Form 1120-H" in client.get(reverse("compliance"), follow=True).content
 
 
-# --- Recurring deadlines tab of Board tasks (streamlining) -----------------------------
+# --- Recurring deadlines tab of Tasks and deadlines (streamlining) -----------------------------
 
 
 def _deadlines_url():
@@ -86,7 +86,7 @@ def test_compliance_redirects_to_the_recurring_deadlines_tab(client, board):
     response = client.get(reverse("compliance"))
     assert response.status_code == 302 and response["Location"] == _deadlines_url()
     page = client.get(_deadlines_url()).content.decode()
-    assert "<h1>Board tasks</h1>" in page and "Recurring deadlines" in page
+    assert "<h1>Tasks and deadlines</h1>" in page and "Recurring deadlines" in page
     assert 'aria-current="page">Recurring deadlines' in page
 
 

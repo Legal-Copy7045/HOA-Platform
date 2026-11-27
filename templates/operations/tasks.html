@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}{% if tab == "deadlines" %}Recurring deadlines · {% endif %}Board tasks · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if tab == "deadlines" %}Recurring deadlines · {% endif %}Tasks and deadlines · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Board tasks</h1><p class="subtitle">Follow-ups for the board and manager{% if deadlines_on %}, and the filings and renewals the association must not miss{% endif %}. Owners don't see these.</p></div></div>
-  {% if deadlines_on %}<nav class="subnav" aria-label="Board tasks">
+  <div class="page-head"><div><h1>Tasks and deadlines</h1><p class="subtitle">Follow-ups for the board and manager{% if deadlines_on %}, and the filings and renewals the association must not miss{% endif %}. Owners don't see these.</p></div></div>
+  {% if deadlines_on %}<nav class="subnav" aria-label="Tasks and deadlines">
     <a href="{% url 'tasks' %}"{% if tab == "tasks" %} aria-current="page"{% endif %}>Tasks</a>
     <a href="{% url 'tasks' %}?tab=deadlines"{% if tab == "deadlines" %} aria-current="page"{% endif %}>Recurring deadlines</a>
   </nav>{% endif %}
