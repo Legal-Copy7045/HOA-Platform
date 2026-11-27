@@ -283,8 +283,24 @@ def payment_alert_resolve(request, pk):
     alert = get_object_or_404(
         PaymentAlert.objects.for_user(request.user), pk=pk, resolved_at__isnull=True
     )
+    from core import conflicts
+    from ledger.services import LedgerError
+
+    try:
+        # Own matters (D65): a problem with one's own home's payment is
+        # another board member's to close.
+        conflicts.refuse(
+            request.user,
+            alert,
+            area="payments",
+            action="resolve",
+            request=request,
+            error=LedgerError,
+        )
+    except LedgerError as exc:
+        messages.error(request, str(exc))
+        return redirect("online_payments")
     if request.POST.get("record_refund") and alert.kind == AlertKind.REFUND:
-        from ledger.services import LedgerError
         from payments.services import record_refund
 
         try:

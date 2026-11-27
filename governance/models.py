@@ -178,6 +178,7 @@ class RecordsRequest(ScopedModel):
 
     objects = ScopedQuerySet.as_manager()
     scope_person_path = "requester"
+    conflict_noun = "records request"  # own matters (D65)
 
     class Meta:
         ordering = ["-submitted_at"]

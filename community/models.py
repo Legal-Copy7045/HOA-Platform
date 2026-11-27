@@ -56,6 +56,7 @@ class Lot(NeverDeleteMixin, ScopedModel):
 
     objects = ScopedQuerySet.as_manager()
     scope_lot_path = ""  # the lot itself
+    conflict_noun = "account"  # own matters (D65)
 
     class Meta:
         ordering = ["number"]
@@ -172,6 +173,7 @@ class Account(ScopedModel):
 
     objects = AccountQuerySet.as_manager()
     scope_lot_path = "lot"
+    conflict_noun = "account"  # own matters (D65)
 
     class Meta:
         ordering = ["lot__number", "-opened_on", "-id"]
@@ -231,6 +233,7 @@ class Ownership(NeverDeleteMixin, ScopedModel):
 
     objects = OwnershipQuerySet.as_manager()
     scope_lot_path = "lot"
+    conflict_noun = "account"  # own matters (D65)
 
     class Meta:
         ordering = ["lot__number", "start_date", "id"]
@@ -705,6 +708,7 @@ class AccountContact(NeverDeleteMixin, ScopedModel):
 
     objects = AccountContactQuerySet.as_manager()
     scope_lot_path = "account__lot"
+    conflict_noun = "account"  # own matters (D65)
 
     class Meta:
         ordering = ["account", "kind", "start_date"]
@@ -835,6 +839,10 @@ class AccountChangeRequest(NeverDeleteMixin, ScopedModel):
 
     objects = ScopedQuerySet.as_manager()
     scope_lot_path = "account__lot"
+    # Own matters (D65): the requester and whoever it removes.
+    conflict_user_fields = ("requested_by",)
+    conflict_person_fields = ("contact__person", "ownership__person")
+    conflict_noun = "account change"
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):
@@ -994,6 +1002,9 @@ class Reservation(NeverDeleteMixin, ScopedModel):
 
     objects = ScopedQuerySet.as_manager()
     scope_lot_path = "lot"
+    # Own matters (D65)
+    conflict_user_fields = ("requested_by",)
+    conflict_noun = "booking"
 
     class Meta:
         ordering = ["starts_at", "id"]

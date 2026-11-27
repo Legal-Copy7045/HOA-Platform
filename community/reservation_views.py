@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from community import reservations
 from community.models import CommonArea, CommonAreaKind, Lot, Reservation, ReservationSettings
-from core import policy
+from core import conflicts, policy
 from core.money import MoneyField, format_cents
 
 _DT = {"type": "datetime-local"}
@@ -174,12 +174,16 @@ def reservation_detail(request, pk):
     res = get_object_or_404(
         Reservation.objects.for_user(request.user).select_related("area", "lot"), pk=pk
     )
+    # Own matters (D65): one's own home's booking is another board member's
+    # to confirm or decline; the owner can still cancel it.
+    own = conflicts.page_context(request.user, res)
     staff = policy.can(request.user, "reservation.manage")
     rules = reservations.settings_for(res.area)
     return render(
         request,
         "community/reservation_detail.html",
         {
+            **own,
             "res": res,
             "is_staff": staff,
             "can_cancel": reservations.can_cancel(res, request.user),

@@ -196,6 +196,7 @@ def record_ownership(
     request: HttpRequest | None = None,
 ) -> Ownership:
     _authorize(actor, "ownership.manage")
+    _refuse_own_account(actor, lot, "record_ownership", request)
     if ownership_type not in OwnershipType.values:
         raise CommunityError("Unknown ownership type.")
     _refuse_self_grant(actor, person, "an ownership")
@@ -239,6 +240,7 @@ def end_ownership(
 ) -> Ownership:
     """End an ownership. With the default (today) access stops immediately."""
     _authorize(actor, "ownership.manage")
+    _refuse_own_account(actor, ownership, "end_ownership", request)
     end_date = end_date or today()
     with (
         transaction.atomic(),
@@ -282,6 +284,7 @@ def transfer_lot(
     immediately). History stays on the lot.
     """
     _authorize(actor, "ownership.manage")
+    _refuse_own_account(actor, lot, "transfer", request)
     transfer_date = transfer_date or today()
     if not new_owners:
         raise CommunityError("A transfer needs at least one new owner.")
@@ -427,6 +430,7 @@ def add_account_contact(
     if kind not in ContactKind.values:
         raise CommunityError("Choose what kind of contact this is.")
     _refuse_self_grant(actor, person, "an account contact")
+    _refuse_own_account(actor, account, "contact_add", request)
     if not account.is_active:
         raise CommunityError("This account is dormant; contacts go on the current account.")
     with system_access("add account contact"):
@@ -453,8 +457,21 @@ def add_account_contact(
     return contact
 
 
+def _refuse_own_account(actor, matter, action: str, request=None) -> None:
+    """Own matters (D65): the people on one's own home's account change only
+    through an owner request another board member decides (D41)."""
+    from core import conflicts
+
+    conflicts.refuse(
+        actor, matter, area="account", action=action, request=request, error=CommunityError
+    )
+
+
 def end_account_contact(contact: AccountContact, *, actor, request=None) -> AccountContact:
     _authorize(actor, "account.manage")
+    with system_access("own account check"):
+        account = contact.account
+    _refuse_own_account(actor, account, "contact_end", request)
     with system_access("end account contact"):
         AccountContact.objects.filter(pk=contact.pk, end_date__isnull=True).update(end_date=today())
         _invalidate_roles()
@@ -1879,6 +1896,11 @@ def own_change_refusal(change, actor) -> str:
         _refuse_own_owner_change(change, actor)
     except CommunityError as exc:
         return str(exc)
+    from core import conflicts
+
+    if conflicts.own_matter(actor, change):
+        # Own matters (D65): a change to one's own home's account.
+        return conflicts.note_for(change, actor)
     return ""
 
 
@@ -1888,6 +1910,7 @@ def set_ownership_type(
     """Correct how an owner holds the deed (e.g. a sole owner becomes a joint
     owner when a co-owner is added). Kept in the ownership's history."""
     _authorize(actor, "ownership.manage")
+    _refuse_own_account(actor, ownership, "ownership_type", request)
     if ownership_type not in OwnershipType.values:
         raise CommunityError("Unknown ownership type.")
     with transaction.atomic(), system_access("set ownership type"):
@@ -1962,6 +1985,22 @@ def decide_account_change(change, *, approve: bool, note: str = "", actor, reque
     from community.models import AccountChangeAction, AccountChangeRequest
 
     require(actor, "account.approve_change")
+    from core import conflicts
+
+    # Own matters (D65): a change to the account of the actor's own home, or
+    # one they asked for or that removes them, is another board member's.
+    refusal = own_change_refusal(change, actor)
+    if refusal:
+        conflicts.audit_refusal(
+            actor,
+            change,
+            area="account_change",
+            action="approve" if approve else "decline",
+            request=request,
+        )
+        if change.requested_by_id == getattr(actor, "pk", None):
+            refusal = "Another board member must decide a change you asked for."
+        raise CommunityError(refusal)
     person = None
     with transaction.atomic(), system_access("decide account change"):
         change = AccountChangeRequest.objects.select_for_update().get(pk=change.pk)

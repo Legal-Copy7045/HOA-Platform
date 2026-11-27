@@ -271,8 +271,20 @@ def _locked(res: Reservation) -> tuple[Reservation, ReservationSettings | None]:
     return res, rules
 
 
+def _refuse_own(actor, res: Reservation, action: str, request=None) -> None:
+    """Own matters (D65): a booking for one's own home (or one they made) is
+    another board member's to confirm or decline; they may still cancel it
+    as the owner."""
+    from core import conflicts
+
+    conflicts.refuse(
+        actor, res, area="reservation", action=action, request=request, error=ReservationError
+    )
+
+
 def approve(res: Reservation, *, actor, request=None) -> Reservation:
     require(actor, "reservation.manage")
+    _refuse_own(actor, res, "approve", request)
     with transaction.atomic():
         res, _rules = _locked(res)
         if res.state != ReservationState.PENDING:
@@ -298,6 +310,7 @@ def approve(res: Reservation, *, actor, request=None) -> Reservation:
 
 def decline(res: Reservation, *, note: str = "", actor, request=None) -> Reservation:
     require(actor, "reservation.manage")
+    _refuse_own(actor, res, "decline", request)
     with transaction.atomic():
         res, _rules = _locked(res)
         if res.state != ReservationState.PENDING:

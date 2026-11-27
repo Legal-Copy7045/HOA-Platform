@@ -13,7 +13,7 @@ from comms import threads
 from community.models import CommonArea, Person
 from community.services import staff_people
 from community.terms import term_text
-from core import policy
+from core import conflicts, policy
 from core.lists import paginate
 from core.workflow import WorkflowError
 from documents import attachments
@@ -177,12 +177,16 @@ def request_detail(request, pk):
         OwnerRequest.objects.for_user(request.user).select_related("lot", "assignee", "work_order"),
         pk=pk,
     )
-    staff = policy.can(request.user, "request.manage")
+    # Own matters (D65): on one's own home's request (or one they raised)
+    # the board member sees the homeowner's page: no staff controls.
+    own = conflicts.page_context(request.user, req, services.OWNER_REQUEST)
+    staff = policy.can(request.user, "request.manage") and not own["own_matter"]
     acc = threads.access("request", req, request.user)
     return render(
         request,
         "operations/request_detail.html",
         {
+            **own,
             "obj": req,
             "staff": staff,
             "actions": services.OWNER_REQUEST.available(req, request.user),
@@ -194,6 +198,7 @@ def request_detail(request, pk):
             "assignees": staff_people("request.manage") if staff else [],
             "can_make_work_order": (
                 policy.can(request.user, "workorder.manage")
+                and not own["own_matter"]
                 and req.work_order_id is None
                 and req.request_type in (RequestType.MAINTENANCE, RequestType.COMMON_AREA)
                 and req.is_open

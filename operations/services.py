@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.utils import timezone
 
 from audit.services import record_event
+from core import conflicts
 from core.policy import require
 from operations.models import BoardTask, TaskStatus
 
@@ -614,6 +615,9 @@ OWNER_REQUEST = Workflow(
 def assign_request(req: OwnerRequest, person, *, actor, request=None) -> OwnerRequest:
     """Assign to a board member or manager (``person`` None clears it)."""
     require(actor, "request.manage")
+    conflicts.refuse(
+        actor, req, area="request", action="assign", request=request, error=OperationsError
+    )
     if person is not None:
         from core.policy import can
 
@@ -639,7 +643,7 @@ def can_add_request_photos(actor, req: OwnerRequest) -> bool:
 
     if actor is SYSTEM or not getattr(actor, "is_authenticated", False):
         return False
-    if can(actor, "request.manage"):
+    if can(actor, "request.manage") and not conflicts.own_matter(actor, req):
         return req.state not in (RequestState.WITHDRAWN, RequestState.CLOSED)
     return (
         req.is_open
@@ -652,6 +656,9 @@ def can_add_request_photos(actor, req: OwnerRequest) -> bool:
 def request_to_work_order(req: OwnerRequest, *, actor, request=None) -> WorkOrder:
     """A maintenance or common-area report becomes a work order (once)."""
     require(actor, "workorder.manage")
+    conflicts.refuse(
+        actor, req, area="request", action="work_order", request=request, error=OperationsError
+    )
     if req.request_type not in (RequestType.MAINTENANCE, RequestType.COMMON_AREA):
         raise OperationsError("Only maintenance and common area reports become work orders.")
     with transaction.atomic():

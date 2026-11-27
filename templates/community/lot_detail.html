@@ -3,16 +3,17 @@
 {% block title %}{{ lot.label }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'lot_list' %}">Homes and owners</a> / {{ lot.label }}</div>
+  {% if own_matter %}<p class="board-note" data-testid="own-home-note">{{ own_note }}</p>{% endif %}
   <div class="page-head"><div>{% home_title lot %}</div>
     {% if user|can:"portal.preview_as_owner" %}<div class="actions"><form method="post" action="{% url 'owner_preview_start' %}">{% csrf_token %}<input type="hidden" name="lot" value="{{ lot.pk }}"><button type="submit" class="secondary">{% icon "home" %} Preview as owner</button></form></div>{% endif %}</div>
   <section class="card"><h2>Current owners</h2>
     {% if current %}<ul class="list">{% for o in current %}<li><div class="todo-icon">{% icon "user" %}</div>
       <div class="grow"><div class="title">{% if can_manage %}<a href="{% url 'person_detail' o.person_id %}">{{ o.person.display_name }}</a>{% else %}{{ o.person.display_name }}{% endif %}</div><div class="small muted">{{ o.get_ownership_type_display }} · since {{ o.start_date|date:"M j, Y" }}</div></div>
-      {% if can_manage %}<details class="row-menu"><summary>End ownership</summary><form method="post" action="{% url 'ownership_end' o.pk %}" class="inline-form" data-confirm="End this ownership? The person loses access to this home from that date.">{% csrf_token %}<input type="date" name="end_date" required aria-label="End date"><button type="submit" class="danger small">End</button></form></details>{% endif %}
+      {% if can_change %}<details class="row-menu"><summary>End ownership</summary><form method="post" action="{% url 'ownership_end' o.pk %}" class="inline-form" data-confirm="End this ownership? The person loses access to this home from that date.">{% csrf_token %}<input type="date" name="end_date" required aria-label="End date"><button type="submit" class="danger small">End</button></form></details>{% endif %}
     </li>{% endfor %}</ul>{% else %}<p class="muted">No current owner recorded.</p>{% endif %}
   </section>
   {% if can_manage_accounts %}{% include "community/_accounts.html" %}{% endif %}
-  {% if can_manage %}
+  {% if can_change %}
     <details class="panel"><summary>Transfer this home</summary><div class="panel-body">
       <p class="muted small">Ends every current ownership on the transfer date and records the new owners. Previous owners lose access from that date.</p>
       <form method="post" action="{% url 'lot_transfer' lot.pk %}" data-confirm="Record this transfer? Current owners lose access from the transfer date.">{% csrf_token %}{{ transfer_form }}<div class="form-actions"><button type="submit">Record transfer</button></div></form></div></details>

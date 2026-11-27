@@ -31,3 +31,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:core/tests/test_board_cues.py::test_(settings_breadcrumb|manager_reaches|more_finance|board_reads_server|committees_once|account_recovery_rules|my_items_groups|disbursement_checks|retention_still)", "^unit:core/tests/test_board_settings_ux.py::test_(features_has_one_page|switching_)", "^unit:community/tests/test_setup_wizard.py::test_(settings_hub_offers|my_items_until|board_may_open)", "^unit:core/tests/test_walkthrough_flow.py::test_staff_menu_opens"]
+- feature: "Own matters (D65): a board member never advances their own home's matter (requests, ARC, violations, records requests, resale, bookings, account changes and the people on the account, collections, ledger entries, payment problems, autopay reviews, refunds); refused in the services and audited; homeowner's page without the Board badge; internal notes hidden; My items coverage warning"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_own_matters.py::", "^unit:arc/tests/test_arc.py::test_(recusal|recused|board_member_applicant)", "^unit:ledger/tests/test_disbursements.py::test_an_owner_of_the_refunded", "^unit:community/tests/test_account_change_owners.py::test_the_requester_cannot", "^manual:own matters"]

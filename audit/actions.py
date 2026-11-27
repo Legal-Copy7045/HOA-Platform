@@ -173,6 +173,14 @@ _SPECS = [
     _spec("request.assigned", "Owner request assigned", "person_id"),
     _spec("request.work_order_created", "Work order created from a request", "work_order_id"),
     _spec("thread.message_posted", "Thread message posted", "kind", "object_id", "internal"),
+    # Own matters (D65): a staff step on the actor's own home's matter, refused.
+    _spec(
+        "policy.own_matter_refused",
+        "Staff step on one's own matter refused",
+        "area",
+        "object_id",
+        "action",
+    ),
     _spec("followup.set", "Follow-up date set", "kind", "object_id", "on"),
     _spec("account.change_requested", "Account change requested", "action", "kind"),
     _spec("account.change_decided", "Account change decided", "action", "decision"),

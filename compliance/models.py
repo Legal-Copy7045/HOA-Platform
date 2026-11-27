@@ -52,6 +52,7 @@ class Violation(ScopedModel):
 
     objects = ScopedQuerySet.as_manager()
     scope_lot_path = "lot"
+    conflict_noun = "violation"  # own matters (D65)
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):

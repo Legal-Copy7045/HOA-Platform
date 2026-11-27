@@ -72,6 +72,9 @@ class ArcRequest(ScopedModel):
 
     objects = ArcRequestQuerySet.as_manager()
     scope_lot_path = "lot"
+    # Own matters (D65): the applicant, and the recusal rule below.
+    conflict_person_fields = ("applicant",)
+    conflict_noun = "architectural request"
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):
@@ -90,6 +93,24 @@ class ArcRequest(ScopedModel):
 
     def __str__(self) -> str:
         return f"ARC #{self.pk}: {self.title}"
+
+    def conflict_of_interest(self, user) -> bool:
+        """Own matters (D65) include the ARC recusal rule: an owner of an
+        affected or neighboring home takes no staff step on it either."""
+        from arc.services import is_recused
+
+        return is_recused(user, self)
+
+    def conflict_message(self, user) -> str:
+        """The recusal wording ARC has always used, saying why."""
+        from core import conflicts
+
+        if conflicts.own_matter(user, self, hooks=False):
+            return (
+                "You are recused from this request: it is your own home's, so another board"
+                " member handles it."
+            )
+        return "You are recused from this request: your home is affected by it."
 
     def delete(self, *args, **kwargs):
         raise PermissionError("ARC requests are kept; withdraw instead.")

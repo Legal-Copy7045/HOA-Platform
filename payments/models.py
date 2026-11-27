@@ -496,6 +496,7 @@ class AutopayReview(ScopedAppendOnlyModel):
     ``AutopayReviewDecision`` (approved, declined or expired)."""
 
     scope_lot_path = "lot"
+    conflict_noun = "automatic payment"  # own matters (D65)
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
     account = models.ForeignKey("community.Account", on_delete=models.PROTECT, related_name="+")

@@ -286,12 +286,18 @@ def _detail_context(request, batch, **forms_):
         c.suggestion = suggestions.get(c.pk)
     user = request.user
     person_id = policy.roles_for(user).person_id
+    from core import conflicts
+
+    # Own matters (D65): a refund to this person's own home's account.
+    own = batch.kind == DisbursementKind.REFUND and (
+        person_id in recipients or any(conflicts.own_matter(user, r["line"]) for r in rows)
+    )
     can_approve = (
         state.status == "awaiting"
         and policy.can(user, "disbursement.approve")
         and batch.proposed_by_id != user.pk
         and not any(d.approver_id == user.pk for d in state.approvals)
-        and not (batch.kind == DisbursementKind.REFUND and person_id in recipients)
+        and not own
     )
     to_issue = [r for r in rows if r["status"] == "to_issue"]
     return {
@@ -302,14 +308,15 @@ def _detail_context(request, batch, **forms_):
         "is_recipient": person_id in recipients,
         # A refund to this board member: shown before any button (D64); the
         # service refuses the approval itself.
-        "own_refund": state.status == "awaiting"
-        and batch.kind == DisbursementKind.REFUND
-        and person_id in recipients
-        and policy.can(user, "disbursement.approve"),
+        "own_refund": own
+        and (policy.can(user, "disbursement.approve") or policy.can(user, "disbursement.issue")),
+        "own_matter": own,
         "can_approve": can_approve,
-        "can_decline": state.status == "awaiting" and policy.can(user, "disbursement.approve"),
-        "can_issue": policy.can(user, "disbursement.issue"),
-        "can_void": policy.can(user, "disbursement.void"),
+        "can_decline": state.status == "awaiting"
+        and policy.can(user, "disbursement.approve")
+        and not own,
+        "can_issue": policy.can(user, "disbursement.issue") and not own,
+        "can_void": policy.can(user, "disbursement.void") and not own,
         "decision_form": forms_.get("decision_form") or DecisionForm(),
         "issue_form": forms_.get("issue_form") or IssueForm(),
         "clear_form": ClearForm(),

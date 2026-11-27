@@ -136,11 +136,14 @@ def _owner_side_may_post(kind: str, obj, user) -> bool:
 
 
 def _recused(kind: str, obj, user) -> bool:
-    if kind != "arc":
+    """A recused ARC reviewer, and since D65 anyone on their own matter (a
+    request, ARC request or notice about their own home, or one they
+    raised), reads and posts on the owner side only: no internal notes."""
+    if kind not in ("request", "arc", "violation"):
         return False
-    from arc.services import is_recused
+    from core import conflicts
 
-    return is_recused(user, obj)
+    return conflicts.own_matter(user, obj)
 
 
 def access(kind: str, obj, user) -> Access:
