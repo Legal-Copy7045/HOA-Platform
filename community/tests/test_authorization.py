@@ -318,6 +318,11 @@ MEMBER_READS = {
                 "reserves.view_summary",
                 "bank_feed.view",
                 "disbursement.view",
+                # Books and close (D69-D71): read only, plus the package and tax.
+                "books.view",
+                "statements.view",
+                "books.package",
+                "tax.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

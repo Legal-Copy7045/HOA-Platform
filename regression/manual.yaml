@@ -338,3 +338,15 @@
   check: "As a demo board member who owns a home, with a second board member: your own home's request, notice, booking and account show no Board label, say 'another board member handles it' where the board's buttons would be, and the staff steps are greyed out; you can still reply, withdraw, respond, cancel and pay as the owner. Signed in as the other board member, the same pages carry the Board label and every step works. An internal note the other board member writes on your request is not shown to you (D65)."
   steps: "POC with fictional data: raise a request for your demo home, ask the other board member to post an internal note, open both views on a desktop and a phone; check Sysadmin activity or the audit log for 'own_matter_refused' after a crafted POST."
   last: ""
+- key: year-end package verifies on another machine
+  check: "Download a year-end package, copy it and BOOKS_PACKAGE_KEY to another computer, run the README.txt snippet: every file and the signature verify; change one byte and it fails."
+  steps: "Finance > Financial statements > Build the package; download; verify with the snippet; also `manage.py verify_books_package` on the server."
+  last: "not done yet"
+- key: real bank OFX month-end balance
+  check: "Import a real bank's OFX/QFX statement for a month: its ledger balance is used for the month end and the account reconciles with no difference."
+  steps: "Bank feed > Import a statement file (the association's own bank); Month and year close > that month."
+  last: "not done yet"
+- key: tax worksheet with the preparer
+  check: "The tax preparer reviews the Form 1120-H worksheet and the IRIS upload file against the current IRS forms and IRIS template (columns, rate, threshold) and confirms the PA annual report deadline."
+  steps: "Finance > More finance > Tax worksheet; download the PDF, CSV and IRIS file."
+  last: "not done yet"

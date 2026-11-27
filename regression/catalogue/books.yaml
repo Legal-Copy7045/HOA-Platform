@@ -1,0 +1,30 @@
+# Books and close (D69-D71): funds, coding, the automatic month and year close,
+# the period lock, statements, the year-end package and the tax documents.
+- feature: "Books and funds (D69): bank accounts by fund with opening balances, bank lines coded to categories by hand or by board rules (who coded them recorded), rule suggestions, undo by reversal, manager codes but never makes rules"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_books\\.py::test_(rules_code|manual_coding|manager_codes|uncode|save_account)"]
+- feature: "Automatic month-end close (D70): happy path as SYSTEM, close day, auto close off, each exception (uncoded line, missing balance, difference with second board member, unpaired transfer, undeposited payment, negative fund, earlier month open, late fees posted or waived, own home refused, warnings never block), My items"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_books\\.py::test_(auto_close|not_before|uncoded_line|missing_bank|difference_needs|unpaired|undeposited|negative_fund|late_fees|own_home|reserve_contribution)"]
+- feature: "Closed months are locked (D70): services refuse, the database trigger refuses, corrections post in the open month with a reference, reopening needs two board members"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_books\\.py::test_(services_refuse|trigger_refuses|corrections_post|reopen_needs)"]
+- feature: "Financial statements (D71): balance sheet balances by fund, income, reserve activity, annual accounting figure, journal export layout with bank lines and funds, QuickBooks layout without names, downloads and permissions, pages load"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_books\\.py::test_(balance_sheet|annual_accounting|journal_export|statement_downloads|board_pages)"]
+- feature: "Year close and the year-end package (D71): the year closes by itself after its months, builds the signed package with every part, tampering and a wrong key are detected, downloads board and auditor only and audited with counts"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_books\\.py::test_(year_closes|package_|year_waits)"]
+- feature: "Tax documents (D71-tax): Form 1120-H worksheet arithmetic, rate rule, 60% and 90% tests and the year-close exception, W-9 missing blocks the year, IRIS CSV without TINs, recipient copies, deadlines created once, board and auditor only, audit without personal data"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_books\\.py::test_(1120h|failed_test|w9_missing|tax_downloads|deadlines_are|audit_metadata)"]
+- feature: "Books pages in the URL matrix: owners refused, anonymous visitors sent to sign in"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_url_matrix\\.py::test_.*\\[(books_|financial_statements|year_end_package|tax_|accounting_quickbooks)"]

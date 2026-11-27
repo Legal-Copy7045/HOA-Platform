@@ -380,6 +380,9 @@ SMS_API_BASE = env("SMS_API_BASE", default="https://api.twilio.com")
 # Key that encrypts stored bank access tokens (any long random string; the
 # Fernet key is derived from it). Connecting a bank is refused while empty.
 BANK_FEED_TOKEN_KEY = env("BANK_FEED_TOKEN_KEY", default="")
+# Year-end packages (D71): the manifest's HMAC key. Empty: a key derived from
+# the Django secret (verifiable on the server only).
+BOOKS_PACKAGE_KEY = env("BOOKS_PACKAGE_KEY", default="")
 # Teller (teller.io), free developer tier. sandbox | development | production.
 # Development is the free tier for real accounts. The certificate and private
 # key from the Teller dashboard, each base64 of the PEM file (base64 -w0).
