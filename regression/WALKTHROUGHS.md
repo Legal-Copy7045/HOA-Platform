@@ -6,6 +6,21 @@ report is republished to the same URL each time; take it from the newest entry
 that has one). No real names, hosts or addresses. See `regression/README.md`
 ("Walkthrough") and `.claude/skills/walkthrough/SKILL.md`.
 
+## 2026-11-27 — third full walkthrough (release 0.34.0, with the regression)
+
+- Commit: d62bd1e (main after 0.34.0).
+- Walked: 11 roles, desktop 1280x900 and phone 390x844.
+- Checks: 4469 pass, 438 skip, 0 fail (second walkthrough: 46 fail). No sideways scroll, nothing off screen, no small tap targets, menu labels match page headings.
+- Findings (54; WT-001..032 desktop, WT-033..054 phone, two duplicates merged):
+  - merge: WT-001..005
+  - rename: WT-006..012
+  - move: WT-013, 014, 015, 045, 048
+  - remove: WT-016..018
+  - flow: WT-019..024, 044
+  - mobile: WT-033..043, 046, 047, 049..053
+  - keep_separate (do not merge): WT-025..032, 054
+- Report: https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8 (version 4). Regression: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 6)
+
 ## 2026-11-27 — second full walkthrough (release 0.31.0)
 
 - Commit: ee2007b (main 9ab1dec plus the walkthrough tool's download skip list).
