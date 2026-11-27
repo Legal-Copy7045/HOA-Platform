@@ -111,20 +111,22 @@ FINANCE = [
 MAINTENANCE = ["Work orders", "Vendors", "Contracts", "Renewals"]  # Renewals: D72
 # Every role's sidebar with the default features (reservations, online
 # payments and texts are off by default).
+# Help (D73) is in the first section for everyone who sees the community
+# pages; not for former owners or sysadmins.
 MENUS = {
-    "owner": {"": ["Dashboard"], "My home": MY_HOME, "Community": COMMUNITY},
-    "authorized": {"": ["Dashboard"], "My home": CONTACT_HOME, "Community": COMMUNITY},
-    "view_only": {"": ["Dashboard"], "My home": CONTACT_HOME, "Community": COMMUNITY},
+    "owner": {"": ["Dashboard", "Help"], "My home": MY_HOME, "Community": COMMUNITY},
+    "authorized": {"": ["Dashboard", "Help"], "My home": CONTACT_HOME, "Community": COMMUNITY},
+    "view_only": {"": ["Dashboard", "Help"], "My home": CONTACT_HOME, "Community": COMMUNITY},
     # A tenant can only answer surveys, so Voting is named Surveys (WT-018).
     "tenant": {
-        "": ["Dashboard"],
+        "": ["Dashboard", "Help"],
         "My home": ["My requests"],
         "Community": ["Surveys" if c == "Voting" else c for c in NOT_BUDGET],
     },
     # WT-014: the former owner's one section is titled after its one page.
     "former_owner": {"": ["Dashboard"], "My history": ["My history"]},
     "board": {
-        "": ["Dashboard", "My items"],
+        "": ["Dashboard", "My items", "Help"],
         "My home": MY_HOME,
         "Community": COMMUNITY,
         "Association": [
@@ -143,7 +145,7 @@ MENUS = {
         "Admin": ["Sysadmin activity", "Settings"],
     },
     "manager": {
-        "": ["Dashboard", "My items"],
+        "": ["Dashboard", "My items", "Help"],
         "Community": COMMUNITY,
         "Association": [
             "Owner requests",
@@ -161,12 +163,12 @@ MENUS = {
         "Admin": ["Community settings"],
     },
     "arc_reviewer": {
-        "": ["Dashboard", "My items"],
+        "": ["Dashboard", "My items", "Help"],
         "Community": NOT_BUDGET,
         "Association": ["Architectural review"],
     },
     "auditor": {
-        "": ["Dashboard"],
+        "": ["Dashboard", "Help"],
         "Community": COMMUNITY,
         "Association": ["Architectural review", "Violations", "Homes and owners"],
         "Maintenance": MAINTENANCE,

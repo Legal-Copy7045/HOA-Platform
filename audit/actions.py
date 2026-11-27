@@ -214,6 +214,8 @@ _SPECS = [
         "period",
     ),
     _spec("faq.saved", "FAQ entry saved", "published"),
+    # Owner help (D73): the board's own words on a help page (topic key only).
+    _spec("help.text_saved", "Board text on a help page saved", "topic", "cleared"),
     _spec(
         "ledger.late_fees_posted", "Late fees posted", "period", "lots", "amount_cents", "automatic"
     ),

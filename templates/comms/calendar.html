@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load help_tags portal %}
 {% block title %}Calendar · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Calendar</h1><p class="subtitle">Meetings, community events and maintenance dates.</p></div>
+  <div class="page-head"><div><h1>Calendar</h1><p class="subtitle">Meetings, community events and maintenance dates. {% how_it_works "voting-and-meetings" %}</p></div>
     {% if can_manage and not open_event or can_meet and not open_meeting %}<div class="actions">
       {% if can_manage and not open_event %}<a class="btn" href="?new=event#new-event" data-opens="new-event" data-testid="new-event">{% icon "plus" %} New event</a>{% endif %}
       {% if can_meet and not open_meeting %}<a class="btn{% if can_manage %} secondary{% endif %}" href="?new=meeting#new-meeting" data-opens="new-meeting" data-testid="new-meeting">{% icon "plus" %} New meeting</a>{% endif %}

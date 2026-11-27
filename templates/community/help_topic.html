@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ topic.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'help' %}">Help</a> / </nav>
+  <div class="page-head"><div><h1>{{ topic.title }}</h1>
+    <p class="subtitle">{{ summary }} The numbers are today's rules, each with where it comes from.</p></div>
+    <div class="actions">{% if section %}<a class="btn secondary" href="{{ section.1 }}">{{ section.0 }}</a>{% endif %}<a class="btn" href="{{ ask_url }}">{% icon "mail" %} Ask the board</a></div></div>
+
+  <div class="split">
+    <div>
+      {% for s in sections %}<section class="card prose help-section">
+        <h2>{{ s.heading }}</h2>
+        {% for p in s.paras %}<p>{{ p }}</p>{% endfor %}
+        {% if s.items %}<ul>{% for i in s.items %}<li>{{ i }}</li>{% endfor %}</ul>{% endif %}
+      </section>{% endfor %}
+
+      {% if extra_html %}<section class="card prose help-section" id="from-the-board">
+        <h2>From the board</h2>
+        {{ extra_html }}
+        <p class="small muted">Updated {{ extra.saved_at|short_date }}.</p>
+      </section>{% endif %}
+
+      {% if can_edit %}<details class="panel" id="edit-help"{% if edit_error %} open{% endif %}><summary>Add the board's own words to this page</summary><div class="panel-body">
+        <form method="post" action="{% url 'help_text_save' topic.slug %}">{% csrf_token %}
+          {% if edit_error %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ edit_error }}</span></div>{% endif %}
+          <div class="field"><label for="help-body">Text shown under "From the board"</label>
+            <textarea id="help-body" name="body" rows="8" maxlength="{{ max_text }}" aria-describedby="help-body-help">{{ form_body }}</textarea>
+            <p class="help" id="help-body-help">Plain text. A blank line starts a new paragraph; "- " starts a list item; "## " a heading; **bold**; [link text](https://...) or a portal page such as [Documents](/documents/). No HTML. Empty the box and save to remove it. Every version is kept.</p></div>
+          <div class="form-actions"><button type="submit">Save for owners</button></div>
+        </form>
+        {% if history %}<h3>Earlier versions</h3>
+        <ul class="list small">{% for h in history %}<li><span class="grow">{{ h.saved_at|short_date }} · {% if h.saved_by %}{% actor_label h.saved_by %}{% else %}System{% endif %}</span><span class="muted">{% if h.body %}{{ h.body|length }} characters{% else %}removed{% endif %}</span></li>{% endfor %}</ul>{% endif %}
+      </div></details>{% endif %}
+    </div>
+    <aside>
+      <section class="card"><h3>Still not sure?</h3>
+        <p class="small muted">{% if can_ask %}Ask the board: your question goes to them as a request, and the reply comes here and by email.{% else %}The board answers questions through requests from owners, authorized contacts and tenants.{% endif %}</p>
+        <a class="btn" href="{{ ask_url }}">{% icon "mail" %} Ask the board</a></section>
+      {% if others %}<section class="card"><h3>More help</h3>
+        <ul class="list">{% for c in others %}<li><a class="title" href="{{ c.url }}">{{ c.topic.title }}</a></li>{% endfor %}</ul></section>{% endif %}
+    </aside>
+  </div>
+{% endblock %}

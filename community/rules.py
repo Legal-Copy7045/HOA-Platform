@@ -398,6 +398,17 @@ REGISTRY: dict[str, RuleSpec] = {
             maximum=365,
             minimum=7,
         ),
+        # D73: how long a new login sees the getting-started checklist.
+        RuleSpec(
+            "help.welcome_days",
+            "Days a new owner, contact or tenant sees the getting-started checklist",
+            DAYS,
+            "90",
+            "Owner requests",
+            "Counted from the day they accept their invitation. The checklist also goes once "
+            "every step is done or they hide it. 0 turns the checklist off.",
+            maximum=365,
+        ),
         *[
             RuleSpec(
                 f"request.sla_days.{key}",

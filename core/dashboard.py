@@ -233,6 +233,13 @@ def build(user, request=None) -> dict:
     data = {"roles": roles}
     items = my_items.items_for_request(request) if request else my_items.items_for(user)
     items = sorted(items, key=lambda i: not i.overdue)  # overdue first, then by area
+    # Getting started (D73): the card replaces its own My items entry here.
+    from community import checklist
+
+    data["checklist"] = checklist.for_dashboard(user, request)
+    if data["checklist"] is not None:
+        started = reverse("getting_started")
+        items = [i for i in items if i.url != started]
     can_open_queue = any(policy.can(user, p) for p in my_items.MY_ITEMS_PERMISSIONS)
     data["todos"] = items[:TODO_LIMIT] if can_open_queue else items
     data["todos_more"] = len(items) - len(data["todos"])

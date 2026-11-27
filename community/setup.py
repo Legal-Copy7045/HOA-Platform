@@ -146,8 +146,10 @@ STEPS: list[Step] = [
     Step(
         "requests",
         "Owner requests",
-        "How quickly the board aims to answer each kind of owner request.",
+        "How quickly the board aims to answer each kind of owner request, and how long new "
+        "owners, contacts and tenants see their getting-started checklist (D73).",
         groups=("Owner requests",),
+        features=("owner_help",),
     ),
     Step(
         "governance",

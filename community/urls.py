@@ -4,6 +4,7 @@ from django.views.generic import RedirectView
 from community import (
     account_views,
     branding_views,
+    help_views,
     profile_views,
     register_views,
     reservation_views,
@@ -87,6 +88,13 @@ urlpatterns = [
         views.board_and_committees,
         name="board_and_committees",
     ),
+    # Owner help (D73)
+    path("help/", help_views.help_index, name="help"),
+    path("help/ask/", help_views.ask_board, name="ask_board"),
+    path("help/getting-started/", help_views.getting_started, name="getting_started"),
+    path("help/<slug:slug>/", help_views.help_topic, name="help_topic"),
+    path("help/<slug:slug>/text/", help_views.help_text_save, name="help_text_save"),
+    path("welcome/", help_views.welcome, name="welcome"),
     path("lots/", views.lot_list, name="lot_list"),
     # Import homes and owners (D54): board only.
     path("lots/import/", register_views.register_import, name="register_import"),

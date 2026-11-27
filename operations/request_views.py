@@ -126,7 +126,10 @@ def requests_list(request):
     if mine and policy.can(user, "request.submit"):
         lots = services.request_lots(user)
         if lots:
-            form = RequestForm(request.POST or None, lots=lots)
+            # "Ask the board" from a help page (D73) preselects its kind.
+            about = request.GET.get("about")
+            initial = {"request_type": about} if about in RequestType.values else None
+            form = RequestForm(request.POST or None, lots=lots, initial=initial)
             if request.method == "POST" and form.is_valid():
                 try:
                     req = services.submit_request(
@@ -164,7 +167,9 @@ def requests_list(request):
             "form": form,
             "types": RequestType.choices,
             "type": kind,
-            "open_form": bool(form and (form.errors or request.GET.get("new"))),
+            "open_form": bool(
+                form and (form.errors or request.GET.get("new") or request.GET.get("about"))
+            ),
             # View-only contacts: the account's requests, read-only.
             "read_only": mine and not policy.can(user, "request.submit"),
         },

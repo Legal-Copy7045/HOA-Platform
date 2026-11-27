@@ -1,0 +1,23 @@
+# Owner help (D73): getting started, welcome, How it works pages, help search, Ask the board.
+# `match` runs over "<stage>:<check>".
+- feature: "Getting started checklist: steps per role (owners, authorized and view-only contacts, tenants; none for staff without a home), each done from recorded state or the step's own button, optional steps dismissible, append-only per-login marks"
+  since: D73
+  match: ["^unit:community/tests/test_owner_help.py::test_(steps_follow_the_role|staff_without_a_home|optional_steps|steps_are_done_only|the_person_s_own_buttons|asking_the_board_counts|only_optional_steps|marks_are_append_only)"]
+- feature: "Getting started on the dashboard for help.welcome_days, until done or taken off, with one My items entry that does not repeat My items' own sign-in and notices to-dos; switched off with the feature"
+  since: D73
+  match: ["^unit:community/tests/test_owner_help.py::test_(dashboard_card|the_card_shows_only|feature_off)"]
+- feature: "Guided first sign-in ends on the Welcome page once (after recovery codes or the notices step), only for recent logins, never before an authenticator; never a blocking page"
+  since: D73
+  match: ["^unit:community/tests/test_owner_help.py::test_(setup_ends_on_the_welcome|old_logins|the_notices_step_leads|welcome_needs_sign_in)", "^unit:accounts/tests/test_signin_setup.py::test_full_setup_ends", "^unit:community/tests/test_notice_consent.py::test_people_without_an_ownership", "^manual:first sign-in and getting started on a phone"]
+- feature: "How it works pages read today's rules with citations and the charge's name; topics per role; section pages link How this works; Help explains each menu section"
+  since: D73
+  match: ["^unit:community/tests/test_owner_help.py::test_(paying_page|arc_and_violation_pages|unset_rules|topics_follow_the_role|section_pages_link|help_page_explains)"]
+- feature: "The board's own words on a help page: board only, escaped with a small markdown subset (no raw HTML, no javascript links), append-only versions, audited, invalid text shown again"
+  since: D73
+  match: ["^unit:community/tests/test_owner_help.py::test_(board_text|only_the_board_edits|invalid_text|render_text)"]
+- feature: "Help and the FAQ in portal search, scoped by role and switched off with the feature"
+  since: D73
+  match: ["^unit:community/tests/test_owner_help.py::test_(search_|faq_is_searchable)"]
+- feature: "Ask the board: opens a new request for owners, authorized contacts and tenants (kind preselected from the help page), explains what to do for view-only contacts and staff, linked on every page; no anonymous access to any help page"
+  since: D73
+  match: ["^unit:community/tests/test_owner_help.py::test_(ask_|view_only_contacts_and_staff|no_anonymous_access)", "^unit:core/tests/test_url_matrix.py::test_.*\\[(help|welcome|getting_started|ask_board|help_topic|help_text_save)\\]"]

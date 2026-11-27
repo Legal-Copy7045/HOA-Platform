@@ -2,7 +2,7 @@
 {% load static portal app_alerts %}
 {% block title %}My profile · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>My profile</h1>{% if person %}<div class="meta"><span>{% icon "user" %}{{ person.display_name }}</span><span>{% icon "mail" %}{{ user.email }}</span></div>{% endif %}</div>
+  <div class="page-head"><div><h1>My profile</h1><p class="subtitle">How the association reaches you, and your directory and email choices.</p>{% if person %}<div class="meta"><span>{% icon "user" %}{{ person.display_name }}</span><span>{% icon "mail" %}{{ user.email }}</span></div>{% endif %}</div>
     <div class="actions"><a class="btn secondary" href="{% url 'mfa_index' %}">{% icon "lock" %} Sign-in and security</a></div></div>
   <div class="split">
     <div>

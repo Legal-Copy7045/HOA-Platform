@@ -331,8 +331,12 @@ def notice_choice(request):
     answered = bool(profile and profile.consent_changed_at)
     if request.method == "GET" and request.GET.get("chosen") == "post" and answered:
         address, _source = services.postal_address(person)
+        from community.help import after_setup_url
+
         return render(
-            request, "community/notice_choice_done.html", {"address": address, "person": person}
+            request,
+            "community/notice_choice_done.html",
+            {"address": address, "person": person, "next_url": after_setup_url(user, request)},
         )
     if request.method == "GET" and answered:
         # Answered already (here or on My profile): never asked again.
@@ -351,7 +355,9 @@ def notice_choice(request):
         else:
             if form.cleaned_data["choice"] == "email":
                 messages.success(request, "Official notices will come to you by email.")
-                return redirect("home")
+                from community.help import after_setup_url
+
+                return redirect(after_setup_url(user, request))
             return redirect(reverse("notice_choice") + "?chosen=post")
     return render(
         request,

@@ -270,6 +270,7 @@ MEMBER_READS = {
     "reservation.view",
     "survey.view",  # Surveys (M5); each survey's audience narrows it further
     "board_committees.view",  # Board and committees: names and offices only
+    "help.view",  # Owner help pages (D73)
 }
 
 
@@ -297,6 +298,7 @@ MEMBER_READS = {
                 "event.rsvp",
                 "reserves.view_summary",
                 "payments.pay",
+                "help.checklist",  # Getting started (D73): residents
             },
         ),
         (

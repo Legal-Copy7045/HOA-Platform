@@ -38,6 +38,8 @@ SNIPPET_LENGTH = 180
 # the order of the groups on the results page.
 PROVIDER_MODULES = (
     "comms.search",
+    # Help pages (D73), next to the FAQ.
+    "community.help_search",
     "documents.search",
     "governance.search",
     "community.search",

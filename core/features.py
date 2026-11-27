@@ -53,6 +53,15 @@ FEATURES: list[Feature] = [
         },
     ),
     _f("faq", "FAQ", "Frequently asked questions page.", {"faq"}),
+    # Owner help (D73): help pages, the welcome page and the getting-started
+    # checklist. "Ask the board" (ask_board) stays on: it opens a request.
+    _f(
+        "owner_help",
+        "Help and getting started",
+        "Plain-language help pages that read today's rules, a welcome page after the first "
+        "sign-in and a getting-started checklist for new owners, contacts and tenants.",
+        {"help", "help_topic", "help_text_save", "welcome", "getting_started"},
+    ),
     _f(
         "directory",
         "Owner directory",

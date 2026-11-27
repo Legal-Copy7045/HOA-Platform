@@ -534,5 +534,12 @@ for _key in ("general", "billing", "maintenance", "common_area"):
     )
 
 
+GUIDES["help.welcome_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; a service choice of the board.",
+    "90 days: Board decision adopting the owner portal's help pages (D73).",
+)
+
+
 def guide(key: str) -> Guide | None:
     return GUIDES.get(key)
