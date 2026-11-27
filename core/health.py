@@ -155,15 +155,21 @@ def _errors():
 def _email():
     from django.core.cache import cache
 
+    from comms import smtp2go
     from core.email import FAILURE_CACHE_KEY
 
+    if smtp2go.selected() and not smtp2go.config().configured:
+        return False, smtp2go.config().problem
+    via = " (through SMTP2Go)" if smtp2go.selected() else ""
     failed = cache.get(FAILURE_CACHE_KEY)
     if not failed:
-        return True, "No send failures in the last day"
+        return True, f"No send failures in the last day{via}"
     when, kind = failed
+    words = smtp2go.FAILURE_WORDS.get(kind) if smtp2go.selected() else ""
     return (
         False,
-        f"Sending failed at {when[:16].replace('T', ' ')} UTC ({kind}): check EMAIL_* settings",
+        f"Sending failed at {when[:16].replace('T', ' ')} UTC: "
+        + (words if words else f"{kind}: check the EMAIL_ settings"),
     )
 
 
@@ -277,6 +283,12 @@ def _payment_failures():
     return health()
 
 
+def _email_delivery():
+    from comms.delivery import health
+
+    return health()
+
+
 def _bounce_mailbox():
     from comms.bounces import health
 
@@ -356,6 +368,7 @@ CHECKS = [
     ("errors", "Server errors", _errors),
     ("jobs", "Background jobs", _jobs),
     ("email", "Outgoing email", _email),
+    ("email_delivery", "Email delivery reports", _email_delivery),
     ("bounce_mailbox", "Bounce mailbox", _bounce_mailbox),
     ("backups", "Backups", _backups),
     ("memory", "Server memory", _memory),

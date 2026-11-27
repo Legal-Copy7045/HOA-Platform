@@ -19,7 +19,7 @@
 # any command line), restarts the portal with them, proves the lock refuses a
 # delete, and takes a backup that goes off-site.
 set -euo pipefail
-trap 'echo "ERROR: stopped at line $LINENO. .env.before-offsite has the old settings." >&2' ERR
+trap 'echo "ERROR: stopped at line $LINENO. Only the BACKUP_S3_ settings in .env may have changed." >&2' ERR
 
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -40,19 +40,21 @@ FILES_BUCKET="$(grep -E '^S3_BUCKET=' .env | tail -1 | cut -d= -f2-)"
 [ "$BUCKET" != "$FILES_BUCKET" ] || { echo "Use a separate bucket from the portal's files ($FILES_BUCKET)." >&2; exit 1; }
 
 echo "==> Saving the off-site settings"
-cp -p .env .env.before-offsite
-chmod 600 .env.before-offsite
-# set_env (infra/poc/lib.sh) uses bash builtins only: the secret never reaches
-# another program's command line.
-set_env .env BACKUP_S3_ENDPOINT_URL "https://${ACCOUNT_ID}.r2.cloudflarestorage.com"
-set_env .env BACKUP_S3_BUCKET "$BUCKET"
-set_env .env BACKUP_S3_ACCESS_KEY_ID "$KEY_ID"
-set_env .env BACKUP_S3_SECRET_ACCESS_KEY "$SECRET"
-set_env .env BACKUP_S3_REGION auto
+# env_update (infra/poc/lib.sh) changes only these keys and uses bash builtins
+# only: the secret never reaches another program's command line. The copy of
+# the old .env is removed when the script ends (it holds every old secret).
+BACKUP="$(env_backup .env offsite)"
+trap 'rm -f "${LOG:-}"; env_discard_backup "$BACKUP"' EXIT
+env_update .env \
+  BACKUP_S3_ENDPOINT_URL "https://${ACCOUNT_ID}.r2.cloudflarestorage.com" \
+  BACKUP_S3_BUCKET "$BUCKET" \
+  BACKUP_S3_ACCESS_KEY_ID "$KEY_ID" \
+  BACKUP_S3_SECRET_ACCESS_KEY "$SECRET" \
+  BACKUP_S3_REGION auto
 unset SECRET
 
 echo "==> Restarting the portal with them"
-LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
+LOG="$(mktemp)"
 bash "$APP_DIR/infra/poc/start-portal.sh" >"$LOG" 2>&1 || { tail -20 "$LOG" >&2; exit 1; }
 
 echo "==> Checking the bucket refuses to delete backups"
@@ -72,4 +74,4 @@ echo "Done. Nightly backups now go to R2 bucket '$BUCKET', where they cannot be"
 echo "deleted for the lock period. System status -> Health checks -> Backups shows"
 echo "the last off-site copy. Prove it restores with:"
 echo "  sudo bash $APP_DIR/infra/poc/restore-drill.sh --from-offsite"
-echo "Delete $APP_DIR/.env.before-offsite once you're happy (it has no new keys)."
+

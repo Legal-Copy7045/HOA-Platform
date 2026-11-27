@@ -229,6 +229,12 @@ def _for_version(form, version):
     return form
 
 
+def _notice_delivery(meeting):
+    from comms import delivery
+
+    return delivery.summary_for(f"meeting_notice:{meeting.pk}") if meeting.notice_sent_at else None
+
+
 def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, status=200):
     user = request.user
     can_manage = policy.can(user, "meeting.manage")
@@ -275,6 +281,8 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
             else None,
             "minutes_version": minutes_version,
             "deadlines": deadlines,
+            # How the emailed notice fared (counts only; meeting.manage).
+            "notice_delivery": _notice_delivery(meeting) if can_manage else None,
             "deadline_default": deadline_default,
             "can_record_resolution": policy.can(user, "resolution.record"),
             "attendance": meeting.attendance.select_related("person") if can_manage else [],

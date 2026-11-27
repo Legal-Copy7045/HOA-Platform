@@ -39,21 +39,23 @@ if [[ "$PASSWORD" == *"'"* || "$PASSWORD" =~ [[:cntrl:]] ]]; then
   exit 1
 fi
 
-cp -p .env .env.before-usps
-chmod 600 .env.before-usps
-set_env .env USPS_IV_ENVIRONMENT "$ENVIRONMENT"
-set_env .env USPS_IV_USERNAME "$USERNAME"
-set_env .env USPS_IV_PASSWORD "'$PASSWORD'"
+# Only these keys change (env_update, infra/poc/lib.sh).
+KEYS=(USPS_IV_ENVIRONMENT USPS_IV_USERNAME USPS_IV_PASSWORD)
+BACKUP="$(env_backup .env usps)"
+env_update .env USPS_IV_ENVIRONMENT "$ENVIRONMENT" USPS_IV_USERNAME "$USERNAME" USPS_IV_PASSWORD "'$PASSWORD'"
 unset PASSWORD
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Signing in to USPS (no mail is looked up)"
 # Only the worker container has the password (D87): check from there.
 if ! "${COMPOSE[@]}" exec -T worker python manage.py check_usps_iv; then
-  echo "The check failed (above). To undo: cp .env.before-usps .env && sudo bash infra/poc/start-portal.sh" >&2
+  env_restore_keys .env "$BACKUP" "${KEYS[@]}"
+  env_discard_backup "$BACKUP"
+  echo "The check failed (above). The previous USPS settings are back in .env (nothing else in it was changed); restarting." >&2
+  bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null || true
   exit 1
 fi
-shred -u .env.before-usps 2>/dev/null || rm -f .env.before-usps
+env_discard_backup "$BACKUP"
 echo "Removed .env.before-usps (the copy of the previous settings, with the old secret)."
 echo "Done. Switch on USPS tracking in Admin -> Features; Settings -> Paper mail settings shows the connection."
 echo "To change the login, run this script again."

@@ -1,5 +1,10 @@
 """Bounced email (D74): pull only, from a bounce mailbox over IMAP over TLS.
 
+With SMTP2Go as the relay (EMAIL_PROVIDER=smtp2go, 0.43.0) bounces, spam
+complaints and unsubscribes come from SMTP2Go's activity API instead
+(comms/delivery.py feeds them into ``record`` below) and no bounce mailbox
+is needed; the mailbox stays an optional fallback for plain SMTP.
+
 The project takes no inbound webhooks, so bounces are read, every 20
 minutes, from a mailbox the association owns (optional feature
 ``bounce_tracking``; the login only in the server's .env through
@@ -14,7 +19,14 @@ the envelope sender (VERP: ``bounces+<token>@domain``). The token names the
 kind of email (official notice, statement, digest...), when it was sent and
 the first 16 characters of the keyed hash of its one recipient; it carries
 no address. A bounce counts only when it carries a token whose signature
-checks (forged bounces cannot mark anyone's address as bouncing).
+checks, and it can only mark an address the message was sent to (BUG-002 /
+EXP-001: every recipient sees its own token, so a report naming any other
+address is a forgery): with one recipient, the reported address must hash
+to the token's prefix; with several (the prefix is zeros), the address must
+be one of the recipients recorded for that token when it was sent
+(``OutgoingEmail.address_hashes``), and a token with no such record counts
+for nobody. A report that names no address counts for the token's one
+recipient only. So a forged report can at most mark the forger's own address.
 
 Reading a bounce safely
 -----------------------
@@ -54,6 +66,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
 
+from comms.models import BLOCKING_BOUNCES
 from core.scoping import system_access
 
 logger = logging.getLogger(__name__)
@@ -137,7 +150,8 @@ def config() -> Config:
         return Config(host, port, "", "", folder, False, "BOUNCE_IMAP_HOST is not a host name.")
     if not 1 <= port <= 65535:
         return Config(host, port, "", "", folder, False, "BOUNCE_IMAP_PORT is not a port.")
-    if not (user and password):
+    # The password is in the worker only (EXP-003); elsewhere the flag says one is set.
+    if not (user and (password or getattr(settings, "BOUNCE_IMAP_PASSWORD_SET", False))):
         problem = "BOUNCE_IMAP_USER and BOUNCE_IMAP_PASSWORD are not set."
         return Config(host, port, "", "", folder, False, problem)
     return Config(host, port, user, password, folder, True)
@@ -198,6 +212,7 @@ class Ref:
     kind: str
     sent_at: datetime.datetime
     addr16: str
+    token: str = ""
 
 
 def read_ref(text: str, *, now=None) -> Ref | None:
@@ -216,7 +231,7 @@ def read_ref(text: str, *, now=None) -> Ref | None:
             continue
         if sent < now - datetime.timedelta(days=TOKEN_DAYS):
             continue
-        return Ref(CODE_KINDS[code], sent, addr)
+        return Ref(CODE_KINDS[code], sent, addr, f"{code}{stamp}.{addr}.{sig}")
     return None
 
 
@@ -242,6 +257,10 @@ class Parsed:
     mail_kind: str
     sent_at: datetime.datetime
     dedupe: str
+    # A several-recipient token: record() accepts the address only if it was
+    # one of that message's recipients (BUG-002).
+    ref: str = ""
+    check_recipients: bool = False
 
 
 def _text(value) -> str:
@@ -383,6 +402,8 @@ def _parse(raw: bytes, *, now=None) -> list[Parsed]:
         full = address_hash(address) if address else ""
         if not full and ref.addr16 == NO_ADDRESS:
             continue  # nothing names whose address failed
+        if full and ref.addr16 != NO_ADDRESS and not hmac.compare_digest(full[:16], ref.addr16):
+            continue  # not the address this message went to: a forged report (BUG-002)
         key = full or ref.addr16
         if key in seen:
             continue
@@ -397,6 +418,8 @@ def _parse(raw: bytes, *, now=None) -> list[Parsed]:
                 mail_kind=ref.kind,
                 sent_at=ref.sent_at,
                 dedupe=dedupe,
+                ref=ref.token,
+                check_recipients=ref.addr16 == NO_ADDRESS,
             )
         )
     return out
@@ -436,6 +459,18 @@ def _match(p: Parsed, known: dict) -> tuple[int | None, str]:
     return None, p.addr16
 
 
+def _was_recipient(ref: str, full_hash: str) -> bool:
+    """Whether the message sent with this token went to this address (the
+    recipients' hashes were recorded at send time, comms.delivery)."""
+    from comms.models import OutgoingEmail
+
+    if not (ref and full_hash):
+        return False
+    with system_access("bounce recipients"):
+        hashes = OutgoingEmail.objects.filter(ref=ref).values_list("address_hashes", flat=True)
+        return any(full_hash in (h or "").split() for h in hashes)
+
+
 def record(parsed: list[Parsed], *, known=None, now=None) -> tuple[int, int]:
     """Store each failed delivery once. Returns (recorded, of them hard)."""
     from comms.models import EmailBounce
@@ -443,6 +478,9 @@ def record(parsed: list[Parsed], *, known=None, now=None) -> tuple[int, int]:
     known = _known_addresses() if known is None else known
     recorded = hard = 0
     for p in parsed:
+        if p.check_recipients and not _was_recipient(p.ref, p.address_hash):
+            logger.warning("bounces.not_a_recipient")  # a forged report (BUG-002)
+            continue
         person_id, full = _match(p, known)
         try:
             with transaction.atomic():
@@ -668,17 +706,27 @@ def _ago(at, now) -> str:
     return f"{minutes // 60} h ago"
 
 
+def _smtp2go() -> bool:
+    from comms import smtp2go
+
+    return smtp2go.selected()
+
+
 def health():
-    """core.health "Bounce mailbox": hidden while not set up and off."""
+    """core.health "Bounce mailbox": hidden while not set up and off, and
+    while SMTP2Go reports the bounces."""
     from comms.models import BouncePollState, EmailBounce
 
     cfg = config()
     on = feature_on()
     if not cfg.configured:
+        if _smtp2go():
+            return None  # SMTP2Go reports bounces: no mailbox needed
         if on:
             return False, (
                 "Bounce tracking is switched on but no bounce mailbox is set up: a sysadmin "
-                "runs sudo bash infra/poc/set-bounce-mailbox.sh on the server"
+                "runs sudo bash infra/poc/set-bounce-mailbox.sh on the server (or switches "
+                "email to SMTP2Go with set-smtp2go.sh, which needs no mailbox)"
             )
         return None
     if not on:
@@ -713,6 +761,12 @@ def health():
 def setup_status() -> dict:
     """For the set-up wizard's server step."""
     cfg = config()
+    if not cfg.configured and _smtp2go():
+        return {
+            "state": "not_needed",
+            "text": "Not needed: SMTP2Go reports bounces, spam complaints and unsubscribes "
+            "to the portal (Email delivery reports).",
+        }
     if not cfg.configured:
         return {
             "state": "not_set_up",
@@ -746,7 +800,8 @@ def _person_addresses(person) -> list[str]:
 
 
 def bouncing(person) -> list[dict]:
-    """The person's addresses with a hard bounce not cleared since:
+    """The person's addresses with a hard bounce (or, from SMTP2Go, a spam
+    complaint or unsubscribe) not cleared since:
     [{"address", "since" (first), "last", "mail_kind"}]. For the board's
     person page and the person's own My profile only."""
     from comms.models import EmailBounce, EmailBounceClear
@@ -763,7 +818,7 @@ def bouncing(person) -> list[dict]:
                 .values_list("cleared_at", flat=True)
                 .first()
             )
-            rows = EmailBounce.objects.filter(address_hash=h, kind="hard")
+            rows = EmailBounce.objects.filter(address_hash=h, kind__in=BLOCKING_BOUNCES)
             if cleared:
                 rows = rows.filter(received_at__gt=cleared)
             rows = list(rows.order_by("received_at"))
@@ -774,6 +829,7 @@ def bouncing(person) -> list[dict]:
                         "since": rows[0].received_at,
                         "last": rows[-1].received_at,
                         "mail_kind": rows[-1].get_mail_kind_display(),
+                        "why": rows[-1].get_kind_display(),
                         "count": len(rows),
                     }
                 )
@@ -827,7 +883,10 @@ def paper_copies_needed(now=None) -> list[PaperCopy]:
     with system_access("bounced official notices"):
         rows = list(
             EmailBounce.objects.filter(
-                kind="hard", mail_kind="notice", person__isnull=False, received_at__gte=since
+                kind__in=BLOCKING_BOUNCES,
+                mail_kind="notice",
+                person__isnull=False,
+                received_at__gte=since,
             ).order_by("received_at")
         )
         if not rows:

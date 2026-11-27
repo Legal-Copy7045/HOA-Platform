@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from arc import notify as arc_notify
 from arc import services
 from arc.models import ArcRequest, ArcState, Decision, Position
 from arc.signoff_views import asked_of_me_waiting, panel_context
@@ -327,6 +328,7 @@ def arc_detail(request, pk):
             "history": services.ARC.history(req),
             "action_url_name": "arc_action",
             "decisions": req.decisions.all(),
+            "decision_delivery": arc_notify.delivery_for(req, user),
             "files": files,
             "revisions": req.revisions.all(),
             "can_attach": can_attach,

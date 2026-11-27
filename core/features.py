@@ -411,9 +411,10 @@ FEATURES: list[Feature] = [
     _f(
         "bounce_tracking",
         "Bounced email",
-        "Reads bounced email from the association's bounce mailbox every 20 minutes, marks "
-        "addresses that do not accept mail and asks for a paper copy when an official notice "
-        "bounces (needs the mailbox's login on the server).",
+        "Marks addresses that do not accept mail and asks for a paper copy when an official "
+        "notice bounces. The bounces come from SMTP2Go's delivery reports when email goes "
+        "through SMTP2Go, otherwise from the association's bounce mailbox every 20 minutes "
+        "(needs the mailbox's login on the server).",
         {"person_email_bounce_clear", "bounce_paper_done"},
         default=False,
     ),

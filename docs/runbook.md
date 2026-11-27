@@ -1180,20 +1180,24 @@ that bounced, until a mailing for that home is prepared or someone presses
 
    It asks the IMAP host (e.g. `imap.example.org`), the port (993), the user
    name, the folder (INBOX), the optional envelope sender and the password
-   (hidden), saves them in `.env` (the old file is kept as
-   `.env.before-bounce-mailbox`, mode 600, until the check passes, then
-   removed, D87), restarts the portal and signs in once with
-   `manage.py check_bounce_mailbox` (no message is read). It prints
-   `OK: signed in to ...` or what failed; a failed check says how to put the
-   old file back. To change the mailbox, run it again.
+   (hidden), changes only the BOUNCE_ keys in `.env` (D91-smtp2go; a copy is
+   kept as `.env.before-bounce-mailbox`, mode 600, while it runs and removed
+   afterwards), restarts the portal, signs in once with
+   `manage.py check_bounce_mailbox` in the worker (the only container with the
+   password; no message is read) and sends a test email. A failed check puts
+   back only the BOUNCE_ settings; if the test email fails with the envelope
+   sender, that one setting is switched off again (many SMTP relays refuse it).
+   With SMTP2Go (`set-smtp2go.sh`) no bounce mailbox is needed: SMTP2Go reports
+   bounces. To change the mailbox, run it again.
 4. **Switch it on:** Admin → Features → Bounced email. System status then has a
    "Bounce mailbox" check (last read, hard bounces in the last 7 days), and the
    Community setup's server step shows it as set up.
 
 **How a bounce is matched.** Every email the portal sends carries a signed
 token (an `X-Portal-Ref` header, inside its Message-ID, and in the envelope
-sender when set up). A report counts only if the token's signature checks and
-it is under 45 days old, so a forged bounce cannot mark anyone. The portal
+sender when set up). A report counts only if the token's signature checks, it
+is under 45 days old and the address it names is one the message went to, so a
+forged bounce can mark at most the forger's own address (BUG-002). The portal
 reads only the report's status lines and returned headers, never attachments,
 and keeps a keyed hash of the failed address, never the address or the text.
 Messages it read are marked as read in the mailbox; empty the folder now and
@@ -1236,7 +1240,7 @@ whatever their email choice) and mark the mailing as mailed as usual.
 
 ## Vendor onboarding (D79)
 
-**Key set-up (sysadmin, once, on the VM).** `sudo bash infra/poc/set-vendor-key.sh` makes the vendor document key on the server (nothing to type), saves it in `.env`, restarts the portal and runs `manage.py check_vendor_key`. Then copy the key into the HOA's password manager (`sudo grep -E '^VENDOR_DOCUMENT_KEY' /opt/hoa-portal/.env`) and `shred` the `.env.before-vendor-key` copy the script names. Keep that copy apart from the backups: the backups hold the encrypted documents only. The setup wizard's server step shows "Vendor document key: Set up".
+**Key set-up (sysadmin, once, on the VM).** `sudo bash infra/poc/set-vendor-key.sh` makes the vendor document key on the server (nothing to type), saves it in `.env`, restarts the portal and runs `manage.py check_vendor_key`. Then copy the key into the HOA's password manager (`sudo grep -E '^VENDOR_DOCUMENT_KEY' /opt/hoa-portal/.env`) (the script removes its `.env.before-vendor-key` copy itself, EXP-004). Keep that copy apart from the backups: the backups hold the encrypted documents only. The setup wizard's server step shows "Vendor document key: Set up".
 
 **Rotating the key.** `sudo bash infra/poc/set-vendor-key.sh --rotate` keeps the old key in `VENDOR_DOCUMENT_KEY_FALLBACKS`, makes a new one and re-encrypts every stored document; `check_vendor_key` then reports "0 under an old key". Remove the fallback only after that, and store the new key in the password manager. A restore needs the key that was current when the backup was taken (or the fallbacks).
 

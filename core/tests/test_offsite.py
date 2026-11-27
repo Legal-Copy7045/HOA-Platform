@@ -221,7 +221,7 @@ def test_scripts_record_backups_and_drill_from_offsite():
     assert drill.index("pull_backup --name") < drill.index('backup_mac.py" verify')
     setup = (POC / "setup-offsite-backups.sh").read_text()
     assert 'read -r -s -p "R2 Secret Access Key' in setup
-    assert "set_env .env BACKUP_S3_SECRET_ACCESS_KEY" in setup
+    assert 'BACKUP_S3_SECRET_ACCESS_KEY "$SECRET"' in setup and "env_update .env" in setup
     assert "check_offsite_lock" in setup and "Use a separate bucket" in setup
 
 

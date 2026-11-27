@@ -36,12 +36,16 @@ fi
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
 
 # Settings added since this .env was made (decision D21). Only missing keys
-# are added; anything already set is left as it is.
+# are added; anything already set is left as it is. Through env_add_missing
+# (infra/poc/lib.sh), not ">> .env": appending to a file whose last line has
+# no newline would glue the new setting onto that line (e.g. a password).
+# shellcheck source=infra/poc/lib.sh
+source "$APP_DIR/infra/poc/lib.sh"
 add_setting() {
   local key="$1" value="$2"
   if ! grep -q "^${key}=" .env; then
     echo "Adding ${key}=${value} to .env"
-    printf '%s=%s\n' "$key" "$value" >> .env
+    env_add_missing .env "$key" "$value"
   fi
 }
 if grep -q '^DEPLOYMENT_STAGE=poc' .env; then
