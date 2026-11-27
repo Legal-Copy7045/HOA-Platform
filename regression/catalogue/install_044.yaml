@@ -1,0 +1,17 @@
+# The one-command install in 0.44.0 (D94).
+- feature: "One-command install: install.sh, fetched from a release tag (never main), clones the newest release with lib.sh checkout_release (the update-portal.sh picker), checks the server first (Ubuntu 22.04+, CPUs, memory, disk, internet; an SSH session is not cut off without a choice) and changes nothing until that passes, then runs provision-vm.sh, make-env.sh, harden-host.sh, start-portal.sh and health-timer.sh in order"
+  since: "0.44"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_install\\.py::test_(a_fresh_install|preflight|an_ssh_session|curl_bootstrap|checkout_release|the_bootstrap_address|install_calls)", "^unit:core/tests/test_infra_scripts\\.py::test_agent_checks_the_branch"]
+- feature: "The install asks only for the tunnel token (hidden, or a file or stdin; a pasted Cloudflare command is reduced to the token; never on a command line, never on screen or in the log), optionally the public address and the first officer; .env only from make-env.sh, mode 600, COMPOSE_FILE set; make-env.sh still works by hand"
+  since: "0.44"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_install\\.py::test_(a_bad_token|without_a_terminal|the_whole_cloudflare|make_env)", "^unit:core/tests/test_install\\.py::test_a_fresh_install"]
+- feature: "Running the install again is safe: finished steps skipped (resume after a failure), no secret regenerated, an older .env gets only the generated secrets it lacks, --repair and --new-token"
+  since: "0.44"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_install\\.py::test_(a_second_run|an_interrupted_install|an_older_env|a_refused_token)"]
+- feature: "Install checks and first sign-in: containers healthy, migrations applied, cloudflared on edge only, tunnel connected (a refused token names the fix); bootstrap_first_officer --status and a one-time link on the screen only; new and changed scripts pass shellcheck"
+  since: "0.44"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_install\\.py::test_(the_checks|new_and_changed)", "^unit:community/tests/test_commands\\.py::test_bootstrap_(status|needs_a_name)"]

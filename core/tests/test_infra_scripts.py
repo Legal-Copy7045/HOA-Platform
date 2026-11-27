@@ -392,7 +392,10 @@ def test_agent_checks_the_branch_before_installing_and_vm_defaults_to_main():
     agent = Path(POC, "portal-agent.sh").read_text()
     refuse = agent.index('branch_allowed "$BRANCH" "$(env_value ALLOW_BRANCH)"')
     assert refuse < agent.index('update-portal.sh" "${UPDATE_ARGS[@]}" >>')
-    assert 'BRANCH="${BRANCH:-main}"' in Path(POC, "provision-vm.sh").read_text()
+    # The VM starts on main at the newest release tag (D90, D94); a branch only on purpose.
+    provision = Path(POC, "provision-vm.sh").read_text()
+    assert 'BRANCH="${BRANCH:-}"' in provision
+    assert 'checkout_release "$APP_DIR" "$APP_USER"' in provision
 
 
 def test_root_scripts_read_the_version_from_the_app_users_checkout():

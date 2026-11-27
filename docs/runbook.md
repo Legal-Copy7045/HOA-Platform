@@ -39,8 +39,10 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
 
 ## First-time setup of the POC (once)
 
-1. Infrastructure: `infra/poc/README.md` steps 1-4 (VLAN, VM, provisioning,
-   `.env`, `start-portal.sh`).
+1. Infrastructure: `infra/poc/README.md`, "Install in one command" (D94):
+   `install.sh` provisions the server, makes `.env`, hardens the host,
+   starts the portal and, if you give your name and email, does step 2 too,
+   showing the link on the screen.
 2. Create the first officer (you), who is also the initial sysadmin. This
    prints a single-use link instead of emailing it:
 

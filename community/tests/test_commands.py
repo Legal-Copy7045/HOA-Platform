@@ -56,6 +56,24 @@ def test_bootstrap_creates_officer_sysadmin_and_a_working_link(client):
     assert AuditEvent.objects.filter(action="system.bootstrap").exists()
 
 
+def test_bootstrap_status_for_the_installer_changes_nothing_and_names_nobody():
+    """install.sh (D94) asks whether to create the first officer or show a new link."""
+    assert run("bootstrap_first_officer", status=True).strip() == "none"
+    run("bootstrap_first_officer", name="First Officer", email="first@example.com")
+    events = AuditEvent.objects.count()
+    out = run("bootstrap_first_officer", status=True)
+    assert out.strip() == "invited"
+    assert "first@example.com" not in out and "First Officer" not in out
+    assert AuditEvent.objects.count() == events
+    make_member(board=True)  # a person with a login
+    assert run("bootstrap_first_officer", status=True).strip() == "done"
+
+
+def test_bootstrap_needs_a_name_and_email_without_status():
+    with pytest.raises(CommandError, match="--name and --email"):
+        run("bootstrap_first_officer", email="x@example.com")
+
+
 def test_bootstrap_refuses_once_a_board_exists():
     make_member(board=True)
     with pytest.raises(CommandError, match="already exists"):
