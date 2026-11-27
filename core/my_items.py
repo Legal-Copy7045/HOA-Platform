@@ -142,6 +142,11 @@ AREAS = [
 ]
 
 
+def own_matter_title(label: str, matter) -> str:
+    """'request #12', 'booking #3' ... for the own-matter coverage warning."""
+    return f"{label} #{matter.pk}"
+
+
 def _due_tone(due, today) -> str:
     if due is None:
         return "info"
@@ -156,6 +161,12 @@ def items_for(user) -> list[Item]:
     can = policy.can
     today = timezone.localdate()
     out: list[Item] = []
+    from core import conflicts
+
+    def own(obj) -> bool:
+        # Own matters (D65): staff work on one's own home's matter is another
+        # board member's, so it never waits on this person as staff.
+        return conflicts.own_matter(user, obj)
 
     # Owner requests: assigned to me, or nobody's yet; overdue first.
     if can(user, "request.manage"):
@@ -174,6 +185,8 @@ def items_for(user) -> list[Item]:
             .select_related("lot")
             .order_by("respond_by", "created_at")
         ):
+            if own(r):
+                continue
             if r.first_response_at is None and r.respond_by:
                 lead = "Response overdue since" if r.is_overdue else "Respond by"
                 detail = f"{lead} {short_date(r.respond_by)}"
@@ -288,6 +301,8 @@ def items_for(user) -> list[Item]:
             .exclude(requested_by=user)
             .select_related("account__lot")
         ):
+            if own(ch):
+                continue
             out.append(
                 Item(
                     "Homes and owners",
@@ -307,6 +322,8 @@ def items_for(user) -> list[Item]:
         arc = ArcRequest.objects.for_user(user)
         if can(user, "arc.intake"):
             for r in arc.filter(state="submitted"):
+                if is_recused(user, r):
+                    continue
                 out.append(
                     Item(
                         "Architectural review",
@@ -347,6 +364,8 @@ def items_for(user) -> list[Item]:
         for x in v.filter(follow_up_on__lte=today).exclude(
             state__in=["cured", "dismissed", "closed"]
         ):
+            if own(x):
+                continue
             out.append(
                 Item(
                     "Violations",
@@ -358,6 +377,8 @@ def items_for(user) -> list[Item]:
                 )
             )
         for x in v.filter(state="responded"):
+            if own(x):
+                continue
             out.append(
                 Item(
                     "Violations",
@@ -391,6 +412,8 @@ def items_for(user) -> list[Item]:
             .exclude(state="closed")
             .select_related("lot")
         ):
+            if own(c):
+                continue
             out.append(
                 Item(
                     "Collections",
@@ -461,6 +484,8 @@ def items_for(user) -> list[Item]:
         for r in RecordsRequest.objects.for_user(user).filter(
             state__in=["submitted", "in_progress"]
         ):
+            if own(r):
+                continue
             out.append(
                 Item(
                     "Records requests",
@@ -491,6 +516,8 @@ def items_for(user) -> list[Item]:
         from community.reservations import pending_for_staff
 
         for r in pending_for_staff(user):
+            if own(r):
+                continue
             out.append(
                 Item(
                     "Common area bookings",
@@ -657,6 +684,22 @@ def items_for(user) -> list[Item]:
                     nav="my_items",
                 )
             )
+    # Own matters (D65): a board member's own matter that no other person
+    # with two-step sign-in can take up waits for another board member.
+    for label, matter, url_name in conflicts.coverage_gaps(user):
+        url = reverse(url_name, args=[matter.pk]) if url_name else reverse("my_items") + "#coverage"
+        out.append(
+            Item(
+                "Setup",
+                f"Only you can act on {own_matter_title(label, matter)} and it's your own"
+                " \u2014 another board member is needed",
+                "Board members don't advance their own home's matters. Invite or seat another"
+                " board member (with two-step sign-in) to handle it.",
+                url,
+                "warning",
+                nav="my_items",
+            )
+        )
     if can(user, "person.manage"):
         from community.models import BoardSeat, Lot
 

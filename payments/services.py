@@ -221,12 +221,21 @@ def record_refund(alert, *, actor, request=None):
     from django.utils import timezone
 
     from audit.services import record_event
+    from core import conflicts
     from core.money import format_cents
     from core.policy import require
     from ledger import services as ledger
     from payments.models import AlertKind, EventKind, PaymentAlert, StripeEvent
 
     require(actor, "payments.manage")
+    conflicts.refuse(
+        actor,
+        alert,
+        area="payments",
+        action="record_refund",
+        request=request,
+        error=ledger.LedgerError,
+    )
     with transaction.atomic():
         alert = PaymentAlert.objects.unscoped("record refund").select_for_update().get(pk=alert.pk)
         if alert.kind != AlertKind.REFUND or alert.resolved_at is not None:

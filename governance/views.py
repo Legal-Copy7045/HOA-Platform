@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from core import policy
+from core import conflicts, policy
 from core.dashboard import proxy_meetings
 from core.workflow_views import transition_view
 from documents.models import Document
@@ -584,6 +584,8 @@ def records_request_detail(request, pk):
         request,
         "governance/records_request_detail.html",
         {
+            # Own matters (D65): one's own records request.
+            **conflicts.page_context(request.user, obj, services.RECORDS),
             "obj": obj,
             "actions": services.RECORDS.available(obj, request.user),
             "history": services.RECORDS.history(obj),

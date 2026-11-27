@@ -80,6 +80,14 @@ class Command(BaseCommand):
         seats = list(BoardSeat.objects.active().select_related("person")[:3])
         board = [_login_for(s.person, f"demo-board{i}@example.com") for i, s in enumerate(seats)]
         b1, b2 = board[0], board[1] if len(board) > 1 else board[0]
+
+        def staff_for(matter):
+            # Own matters (D65): a board member never takes a staff step on
+            # their own home's matter, so the demo has another one do it.
+            from core import conflicts
+
+            return next((u for u in board if not conflicts.own_matter(u, matter)), SYSTEM)
+
         lots = {lot.number: lot for lot in Lot.objects.all()}
         owner_of = {
             o.lot.number: o.person
@@ -239,7 +247,7 @@ class Command(BaseCommand):
                     amount_cents=4500 * 12,
                     received_on=t.replace(month=1, day=1) - datetime.timedelta(days=5),
                     reference="2001",
-                    actor=b1,
+                    actor=staff_for(lot),
                 )
             elif number in (15, 27):  # behind on dues
                 ledger.record_payment(
@@ -247,7 +255,7 @@ class Command(BaseCommand):
                     amount_cents=4500 * max(t.month - 3, 0) or 4500,
                     received_on=t.replace(day=1),
                     reference="3001",
-                    actor=b1,
+                    actor=staff_for(lot),
                 )
             else:
                 ledger.record_payment(
@@ -255,7 +263,7 @@ class Command(BaseCommand):
                     amount_cents=4500 * t.month,
                     received_on=t.replace(day=1),
                     reference="4001",
-                    actor=b1,
+                    actor=staff_for(lot),
                 )
         # Open-item accounting (D32-payments): an invoice partly paid and directed.
         gate = ledger.post_charge(
@@ -263,7 +271,7 @@ class Command(BaseCommand):
             kind="other_charge",
             amount_cents=6000,
             description="Gate remote replacement (demo)",
-            actor=b1,
+            actor=staff_for(lots[3]),
         )
         ledger.record_payment(
             lot=lots[3],
@@ -271,9 +279,9 @@ class Command(BaseCommand):
             received_on=t,
             reference="5001",
             apply_to=[gate.pk],
-            actor=b1,
+            actor=staff_for(lots[3]),
         )
-        ledger.open_case(lot=lots[27], actor=b1)
+        ledger.open_case(lot=lots[27], actor=staff_for(lots[27]))
 
         comms.publish_announcement(
             title="Pond outlet cleared (demo)",
@@ -392,14 +400,14 @@ class Command(BaseCommand):
             actor=owner3,
         )
         arc.ARC.apply(req, "submit", actor=owner3)
-        arc.ARC.apply(req, "accept", actor=b1)
+        arc.ARC.apply(req, "accept", actor=staff_for(req))
         v = compliance.report(
             lot=lots[12], category="trash", description="Cans at curb (demo)", actor=b1
         )
-        compliance.VIOLATION.apply(v, "send_notice", actor=b1)
+        compliance.VIOLATION.apply(v, "send_notice", actor=staff_for(v))
         ledger.request_resale(lot=lots[12], requester_name="Demo Seller", actor=owner12)
         ops.create_task(title="Get second pond maintenance quote (demo)", actor=b1)
-        compliance.set_follow_up(v, today() + datetime.timedelta(days=7), actor=b1)
+        compliance.set_follow_up(v, today() + datetime.timedelta(days=7), actor=staff_for(v))
         ops.set_work_order_follow_up(wo, today(), actor=b1)
 
         # Owner requests with threads (Milestone 3).
@@ -412,13 +420,16 @@ class Command(BaseCommand):
             description="The fountain has been off for a week.",
             actor=owner3,
         )
-        threads.post("request", leak, body="Thanks, we've called the vendor (demo).", actor=b1)
+        leak_staff = staff_for(leak)
+        threads.post(
+            "request", leak, body="Thanks, we've called the vendor (demo).", actor=leak_staff
+        )
         threads.post(
             "request",
             leak,
             body="Vendor quote pending (internal demo note).",
             internal=True,
-            actor=b1,
+            actor=leak_staff,
         )
         # A board-approved recurring contract (Milestone 3).
         mowing = ops.create_contract(

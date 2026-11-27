@@ -33,7 +33,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import record_event
-from core import policy
+from core import conflicts, policy
 from core.money import format_cents
 from core.scoping import internal, system_access
 from payments.models import (
@@ -216,7 +216,10 @@ def _audit(action: str, review: AutopayReview, *, user=None, request=None, code:
 
 def _check_decider(user, review: AutopayReview) -> None:
     policy.require(user, "payments.manage")
-    if pays_for(user, review):
+    # Own matters (D65): an owner or contact of the home (conflicts) or the
+    # person whose card pays it (pays_for) never decides; audited.
+    if pays_for(user, review) or conflicts.own_matter(user, review):
+        conflicts.audit_refusal(user, review, area="autopay_review", action="decide")
         raise PermissionDenied("You pay for this home, so another board member decides.")
     if status(review) != WAITING:
         raise ReviewError("This payment was already decided.")
@@ -344,7 +347,7 @@ def board_items(user) -> list:
     for review in AutopayReview.objects.filter(
         decision__isnull=True, expires_at__gt=now
     ).select_related("lot"):
-        if pays_for(user, review):
+        if pays_for(user, review) or conflicts.own_matter(user, review):
             continue
         out.append(
             Item(
@@ -376,7 +379,7 @@ def board_list(user, limit: int = 20) -> dict:
                 "review": review,
                 "title": _item_text(review),
                 "what": what_text(review),
-                "own": pays_for(user, review),
+                "own": pays_for(user, review) or conflicts.own_matter(user, review),
             }
         )
     decided = list(

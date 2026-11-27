@@ -19,7 +19,7 @@ from community.models import (
     Ownership,
     Person,
 )
-from core import policy
+from core import conflicts, policy
 from core.scoping import system_access
 
 
@@ -175,7 +175,11 @@ def account_context(user, lot) -> dict:
         "accounts": accounts,
         "contact_kinds": [(k.value, k.label, CONTACT_KIND_HELP[k]) for k in ContactKind],
         "people_choices": people,
+        # Own matters (D65): the people on one's own home's account change
+        # through an owner request another board member decides.
         "can_manage_accounts": policy.can(user, "account.manage"),
+        "can_edit_accounts": policy.can(user, "account.manage")
+        and not conflicts.own_matter(user, lot),
         "pending_changes": pending_changes_for_lot(user, lot),
         "can_approve_changes": policy.can(user, "account.approve_change"),
     }

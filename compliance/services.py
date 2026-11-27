@@ -9,7 +9,7 @@ from audit.services import record_event
 from community.models import CommunityProfile, Person
 from community.rules import rule, rule_with_citation
 from compliance.models import OwnerResponse, Violation, ViolationCategory, ViolationState
-from core import pdf
+from core import conflicts, pdf
 from core.policy import SYSTEM, require, roles_for
 from core.scoping import system_access
 from core.workflow import Transition, Workflow
@@ -200,6 +200,14 @@ def notice_letter(v: Violation) -> bytes:
 def set_follow_up(violation: Violation, on, *, actor, request=None) -> Violation:
     """Board or manager: the date to check on this violation next."""
     require(actor, "violation.manage")
+    conflicts.refuse(
+        actor,
+        violation,
+        area="violation",
+        action="follow_up",
+        request=request,
+        error=ComplianceError,
+    )
     Violation.objects.unscoped("follow-up").filter(pk=violation.pk).update(follow_up_on=on)
     violation.follow_up_on = on
     record_event(

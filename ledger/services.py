@@ -16,7 +16,7 @@ from audit.services import record_event
 from community.models import CommunityProfile, Lot
 from community.rules import rule, rule_with_citation
 from community.terms import charge_term, term_text
-from core import pdf
+from core import conflicts, pdf
 from core.money import format_cents
 from core.policy import SYSTEM, require
 from core.scoping import internal, system_access
@@ -54,6 +54,13 @@ def _allocation():
 def _authorize(actor, action):
     if actor is not SYSTEM:
         require(actor, action)
+
+
+def _refuse_own(actor, matter, action: str, request=None) -> None:
+    """Own matters (D65): no staff entry on one's own home's account."""
+    conflicts.refuse(
+        actor, matter, area="ledger", action=action, request=request, error=LedgerError
+    )
 
 
 # --- Balances -------------------------------------------------------------------------
@@ -426,6 +433,7 @@ def record_payment(
     Online (Stripe) payments are never entered here: only the Stripe sync
     records them, from what Stripe itself reports (D32-payments)."""
     _authorize(actor, "ledger.manage")
+    _refuse_own(actor, lot, "record_payment", request)
     if (method or "").strip().lower() in ONLINE_METHODS:
         raise LedgerError("Online payments are recorded automatically from Stripe.")
     if amount_cents <= 0:
@@ -531,6 +539,8 @@ def record_payments(payments: list[BatchPayment], *, actor, request=None) -> lis
     _authorize(actor, "ledger.manage")
     if not payments:
         raise LedgerError("Enter at least one payment.")
+    for p in payments:
+        _refuse_own(actor, p.lot, "record_payment", request)
     seen = set()
     for p in payments:
         if check_payment(p):
@@ -576,6 +586,7 @@ def post_charge(
     request=None,
 ) -> LedgerEntry:
     _authorize(actor, "ledger.manage")
+    _refuse_own(actor, lot, "post_charge", request)
     if kind not in (EntryKind.OTHER_CHARGE, EntryKind.LATE_FEE, EntryKind.RESALE_FEE):
         raise LedgerError(term_text("Use the monthly {term} posting for the {term}."))
     if kind == EntryKind.LATE_FEE:
@@ -616,6 +627,7 @@ def post_credit(
     request=None,
 ) -> LedgerEntry:
     _authorize(actor, "ledger.manage")
+    _refuse_own(actor, lot, "post_credit", request)
     if amount_cents <= 0 or not description.strip():
         raise LedgerError("A credit needs a positive amount and a reason.")
     entry = LedgerEntry.objects.create(
@@ -696,6 +708,7 @@ def record_online_refund(
 def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> LedgerEntry:
     """Corrections are new, opposite entries (CLAUDE.md rule 5)."""
     _authorize(actor, "ledger.manage")
+    _refuse_own(actor, entry, "reverse", request)
     if not reason.strip():
         raise LedgerError("Give the reason for the reversal.")
     if entry.kind == EntryKind.REVERSAL:
@@ -870,6 +883,7 @@ def reassign_entry(
     from ledger import allocation
 
     _authorize(actor, "ledger.reassign")
+    _refuse_own(actor, entry, "reassign", request)
     reason = reason.strip()
     if not reason:
         raise LedgerError("Give the reason for moving it.")
@@ -969,6 +983,7 @@ def check_move_notice(notice, *, actor, request=None):
     from ledger.models import EntryMoveNotice
 
     _authorize(actor, "ledger.manage")
+    _refuse_own(actor, notice, "check_moves", request)
     updated = (
         EntryMoveNotice.objects.unscoped("check move notice")
         .filter(pk=notice.pk, checked_at__isnull=True)
@@ -1169,6 +1184,9 @@ COLLECTION = Workflow(
 @internal("ledger service")
 def open_case(*, lot: Lot, notes: str = "", actor, request=None) -> CollectionCase:
     require(actor, "collections.manage")
+    conflicts.refuse(
+        actor, lot, area="collection", action="open", request=request, error=LedgerError
+    )
     if CollectionCase.objects.filter(lot=lot).exclude(state="closed").exists():
         raise LedgerError("This home already has an open collection case.")
     try:
@@ -1612,6 +1630,9 @@ def issued_certificate(obj: ResaleRequest):
 @internal("ledger service")
 def save_disclosures(obj: ResaleRequest, text: str, *, actor, request=None) -> None:
     require(actor, "resale.manage")
+    conflicts.refuse(
+        actor, obj, area="resale", action="disclosures", request=request, error=LedgerError
+    )
     with transaction.atomic():
         locked = ResaleRequest.objects.select_for_update().get(pk=obj.pk)
         if locked.state not in ("submitted", "in_progress"):
@@ -1623,6 +1644,9 @@ def save_disclosures(obj: ResaleRequest, text: str, *, actor, request=None) -> N
 def set_case_follow_up(case: CollectionCase, on, *, actor, request=None) -> CollectionCase:
     """Board or manager: the date to check on this collection case next."""
     _authorize(actor, "collections.manage")
+    conflicts.refuse(
+        actor, case, area="collection", action="follow_up", request=request, error=LedgerError
+    )
     CollectionCase.objects.unscoped("follow-up").filter(pk=case.pk).update(follow_up_on=on)
     case.follow_up_on = on
     record_event(
@@ -1911,6 +1935,7 @@ def generate_notice(lot: Lot, kind: str, *, actor, request=None) -> bytes:
     from ledger import letters
 
     _authorize(actor, "collections.manage")
+    conflicts.refuse(actor, lot, area="collection", action="notice", request=request)
     data = letters.statement_pdf(lot) if kind == "statement" else letters.notice_pdf(lot, kind)
     record_event(
         "ledger.notice_generated",

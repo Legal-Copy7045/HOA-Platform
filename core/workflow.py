@@ -81,8 +81,23 @@ class Workflow:
             return f"Not possible while {obj.state.replace('_', ' ')}."
         if actor is not SYSTEM and not can(actor, t.permission):
             return "You do not have permission for this step."
+        own = self._own_matter(obj, t, actor)
+        if own:
+            return own
         if t.guard is not None:
             return t.guard(obj, actor)
+        return None
+
+    @staticmethod
+    def _own_matter(obj, t: Transition, actor) -> str | None:
+        """Own matters (D65): a staff-only step on the actor's own home's
+        matter (or one they raised) is another board member's to take."""
+        from core import conflicts
+
+        if actor is SYSTEM or not conflicts.staff_permission(t.permission):
+            return None
+        if conflicts.own_matter(actor, obj):
+            return conflicts.OwnMatter(conflicts.note_for(obj, actor))
         return None
 
     def available(self, obj, actor) -> list[Transition]:
@@ -96,11 +111,14 @@ class Workflow:
         out, so "Next steps" shows only what they may do later (WT-015)."""
         out = []
         for t in self.transitions.values():
-            if obj.state not in t.sources or t.guard is None:
+            if obj.state not in t.sources:
                 continue
             if actor is not SYSTEM and not can(actor, t.permission):
                 continue
-            reason = t.guard(obj, actor)
+            # One's own matter (D65) shows the staff steps disabled, with why.
+            reason = self._own_matter(obj, t, actor)
+            if not reason and t.guard is not None:
+                reason = t.guard(obj, actor)
             if reason and not isinstance(reason, NotForYou):
                 out.append((t, reason))
         return out
@@ -111,6 +129,13 @@ class Workflow:
             raise WorkflowError("Unknown action.")
         if actor is not SYSTEM:
             require(actor, t.permission)
+        own = self._own_matter(obj, t, actor)
+        if own:
+            # Audited before the step's transaction, so the record stays (D65).
+            from core import conflicts
+
+            conflicts.audit_refusal(actor, obj, area=self.name, action=action, request=request)
+            raise WorkflowError(own)
         if t.note_required and not note.strip():
             raise WorkflowError("Please add a note explaining this step.")
         from core.models import WorkflowEvent

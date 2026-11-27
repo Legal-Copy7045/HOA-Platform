@@ -866,6 +866,11 @@ def generate_case_letter(case: CollectionCase, *, actor, request=None) -> tuple[
     from ledger.services import COLLECTION, past_due
 
     require(actor, "collections.manage")
+    from core import conflicts
+
+    conflicts.refuse(
+        actor, case, area="collection", action="letter", request=request, error=AccountingError
+    )
     if case.state in ("closed", "referred"):
         raise AccountingError("This case is closed or referred.")
     with transaction.atomic():

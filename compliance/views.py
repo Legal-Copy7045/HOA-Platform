@@ -8,7 +8,7 @@ from audit.services import record_event
 from community.models import Lot
 from compliance import services
 from compliance.models import Violation, ViolationCategory
-from core import policy
+from core import conflicts, policy
 from core.workflow import WorkflowError
 from documents import attachments
 
@@ -107,10 +107,13 @@ def violations(request):
 def violation_detail(request, pk):
     v = _get(request, pk)
     actions = [t for t in services.VIOLATION.available(v, request.user) if t.action != "respond"]
+    # Own matters (D65): a notice about one's own home reads as the owner's.
+    own = conflicts.page_context(request.user, v, services.VIOLATION)
     return render(
         request,
         "compliance/detail.html",
         {
+            **own,
             "obj": v,
             "actions": actions,
             "history": services.VIOLATION.history(v),
@@ -124,9 +127,10 @@ def violation_detail(request, pk):
             "can_respond": any(
                 t.action == "respond" for t in services.VIOLATION.available(v, request.user)
             ),
-            "can_manage": policy.can(request.user, "violation.manage"),
+            "can_manage": policy.can(request.user, "violation.manage") and not own["own_matter"],
             "can_add_fix_photo": services.owner_may_add_photo(request.user, v),
-            "owner_view": v.lot_id in policy.roles_for(request.user).account_lot_ids
+            "owner_view": own["own_matter"]
+            or v.lot_id in policy.roles_for(request.user).account_lot_ids
             or not policy.can(request.user, "violation.view_all"),
         },
     )
@@ -190,13 +194,16 @@ def violation_photo(request, pk):
     fix, while the notice is open."""
     v = _get(request, pk)
     owner = services.owner_may_add_photo(request.user, v)
+    # Own matters (D65): on one's own home's notice only the owner's path.
+    own = conflicts.own_matter(request.user, v)
     if not owner:
         policy.require(request.user, "violation.manage")
+        conflicts.refuse(request.user, v, area="violation", action="photo", request=request)
     uploads = request.FILES.getlist("file")
     if not uploads:
         messages.error(request, "Choose a photo first.")
     else:
-        by_owner = owner and not policy.can(request.user, "violation.manage")
+        by_owner = owner and (own or not policy.can(request.user, "violation.manage"))
         label = OWNER_FIX_LABEL if by_owner else request.POST.get("label", "")
         room = None
         if by_owner:

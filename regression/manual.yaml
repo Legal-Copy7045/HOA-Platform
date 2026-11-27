@@ -334,3 +334,7 @@
   check: "As a board member who owns a home: the Board heading in the menu and the Board badge and strip on board pages are easy to see but not loud, in light and dark mode, on a phone and a desktop; decision buttons read 'for the board'; a [Board] email sorts apart in a real mailbox."
   steps: "Open an invoice and the dashboard on a phone with dark mode on; check the menu's Board group and the strip; approve something; look at the subject of a board notice in the mailbox."
   last: ""
+- key: own matters
+  check: "As a demo board member who owns a home, with a second board member: your own home's request, notice, booking and account show no Board label, say 'another board member handles it' where the board's buttons would be, and the staff steps are greyed out; you can still reply, withdraw, respond, cancel and pay as the owner. Signed in as the other board member, the same pages carry the Board label and every step works. An internal note the other board member writes on your request is not shown to you (D65)."
+  steps: "POC with fictional data: raise a request for your demo home, ask the other board member to post an internal note, open both views on a desktop and a phone; check Sysadmin activity or the audit log for 'own_matter_refused' after a crafted POST."
+  last: ""

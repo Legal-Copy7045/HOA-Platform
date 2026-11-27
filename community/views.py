@@ -174,6 +174,11 @@ def lot_detail(request, pk):
     ownerships = Ownership.objects.for_user(request.user).filter(lot=lot).select_related("person")
     can_manage = policy.can(request.user, "ownership.manage")
     from community.account_views import account_context
+    from core import conflicts
+
+    # Own matters (D65): one's own home reads as the homeowner's page here;
+    # its ownership changes are another board member's to record.
+    own = conflicts.page_context(request.user, lot)
 
     accounts = (
         account_context(request.user, lot) if policy.can(request.user, "account.manage") else {}
@@ -183,10 +188,12 @@ def lot_detail(request, pk):
         "community/lot_detail.html",
         {
             **accounts,
+            **own,
             "lot": lot,
             "current": [o for o in ownerships if o.is_active()],
             "history": [o for o in ownerships if not o.is_active()] if can_manage else [],
             "can_manage": can_manage,
+            "can_change": can_manage and not own["own_matter"],
             "transfer_form": forms.TransferForm(user=request.user) if can_manage else None,
         },
     )

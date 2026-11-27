@@ -13,7 +13,7 @@ from arc.models import ArcRequest, ArcState, Decision, Position
 from arc.signoff_views import asked_of_me_waiting, panel_context
 from audit.services import record_event
 from community.models import Lot
-from core import policy
+from core import conflicts, policy
 from core.workflow import WorkflowError
 from documents import attachments
 
@@ -292,8 +292,13 @@ def arc_detail(request, pk):
         and policy.can(user, "arc.appeal_decide")
         and not services.is_recused(user, req)
     )
+    # Own matters (D65): a recused person (their own home's request, or an
+    # affected neighbor's) sees the homeowner's page, without the Board badge.
+    own = conflicts.page_context(user, req)
     can_attach = (services.owns_lot(user, req) and req.state == ArcState.DRAFT) or (
-        policy.can(user, "arc.intake") and req.state not in (ArcState.COMPLETED, ArcState.WITHDRAWN)
+        policy.can(user, "arc.intake")
+        and not own["own_matter"]
+        and req.state not in (ArcState.COMPLETED, ArcState.WITHDRAWN)
     )
     panel = panel_context(user, req)
     files = _files(req)
@@ -312,6 +317,7 @@ def arc_detail(request, pk):
         "arc/detail.html",
         {
             **panel,
+            **own,
             "obj": req,
             "actions": actions,
             "blocked_steps": blocked,
@@ -331,6 +337,7 @@ def arc_detail(request, pk):
             "decision_form": DecisionForm(),
             "positions": Position.choices,
             "can_set_affected": policy.can(user, "arc.intake")
+            and not own["own_matter"]
             and req.state in (ArcState.SUBMITTED, ArcState.IN_REVIEW),
             "affected": _affected_numbers(req),
             "affected_labels": _affected_labels(req),

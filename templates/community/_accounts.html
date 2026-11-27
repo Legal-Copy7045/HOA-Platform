@@ -13,7 +13,7 @@
     <div class="account-block">
       <h3>Account {{ account.number }} <span class="badge {% if account.is_active %}tone-success{% endif %}">{{ account.status_label }}</span></h3>
       <div class="small muted">Opened {{ account.opened_on|date:"M j, Y" }}{% if account.closed_on %} · closed {{ account.closed_on|date:"M j, Y" }}{% endif %}</div>
-      {% if account.is_active and can_manage_accounts %}
+      {% if account.is_active and can_edit_accounts %}
         <form method="post" action="{% url 'lot_account_number' account.pk %}" class="inline-form">{% csrf_token %}
           <label>Account number <input type="text" name="number" value="{{ account.number }}" maxlength="40" required></label>
           <button type="submit" class="secondary small">Save number</button>
@@ -22,10 +22,10 @@
       <ul class="list">
         {% for o in account.owner_rows %}<li><div class="todo-icon">{% icon "user" %}</div><div class="grow"><div class="title">{{ o.person.display_name }}</div><div class="small muted">Owner (on the deed) · {{ o.start_date|date:"M j, Y" }} – {{ o.end_date|date:"M j, Y"|default:"present" }}</div></div></li>{% endfor %}
         {% for c in account.contact_rows %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow"><div class="title">{{ c.person.display_name }}</div><div class="small muted">{{ c.get_kind_display }} · {{ c.start_date|date:"M j, Y" }} – {{ c.end_date|date:"M j, Y"|default:"present" }}</div></div>
-          {% if not c.end_date and can_manage_accounts %}<form method="post" action="{% url 'lot_account_contact_end' c.pk %}" data-confirm="Remove this person from the account? They lose access from today.">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form>{% endif %}
+          {% if not c.end_date and can_edit_accounts %}<form method="post" action="{% url 'lot_account_contact_end' c.pk %}" data-confirm="Remove this person from the account? They lose access from today.">{% csrf_token %}<button type="submit" class="danger small">Remove</button></form>{% endif %}
         </li>{% endfor %}
       </ul>
-      {% if account.is_active and can_manage_accounts %}
+      {% if account.is_active and can_edit_accounts %}
         <details class="panel"><summary>Add someone to this account</summary><div class="panel-body">
           <ul class="small muted">{% for value, label, help in contact_kinds %}<li><strong>{{ label }}</strong>: {{ help }}</li>{% endfor %}</ul>
           <form method="post" action="{% url 'lot_account_contact_add' account.pk %}">{% csrf_token %}

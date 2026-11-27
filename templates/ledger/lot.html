@@ -9,10 +9,11 @@
     <div class="actions">
       <a class="btn secondary" href="{% url 'lot_statement_pdf' lot.pk 'statement' %}">{% icon "download" %} Statement</a>
       {% if can_manage %}<a class="btn secondary" href="{% url 'record_payments' %}">{% icon "receipt" %} Record payments</a>{% endif %}
-      {% if user|can:"collections.manage" %}{% if open_case %}<a class="btn secondary" href="{% url 'collection_detail' open_case.pk %}" data-testid="open-collection-case">{% icon "alert" %} Open collection case</a>{% elif balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" class="inline-form" data-confirm="Open a collection case for this home? Delinquency letters are sent from the case, step by step.">{% csrf_token %}<button type="submit" class="secondary" data-testid="open-collection-case">{% icon "alert" %} Open collection case</button></form>{% endif %}{% endif %}
+      {% if user|can:"collections.manage" and not own_matter %}{% if open_case %}<a class="btn secondary" href="{% url 'collection_detail' open_case.pk %}" data-testid="open-collection-case">{% icon "alert" %} Open collection case</a>{% elif balance > 0 %}<form method="post" action="{% url 'lot_ledger_action' lot.pk 'collection' %}" class="inline-form" data-confirm="Open a collection case for this home? Delinquency letters are sent from the case, step by step.">{% csrf_token %}<button type="submit" class="secondary" data-testid="open-collection-case">{% icon "alert" %} Open collection case</button></form>{% endif %}{% endif %}
     </div>
   </div>
   {# The main actions come first, not after every entry (WT-043). #}
+  {% if own_matter %}<p class="board-note" data-testid="own-home-note">{{ own_note }}</p>{% endif %}
   {% if can_manage %}<div class="ledger-actions">
     <details class="panel"><summary>Record a payment</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'payment' %}" class="form-grid">{% csrf_token %}{{ payment_form }}<div class="form-actions"><button type="submit">Record payment</button></div></form></div></details>
     <details class="panel"><summary>Post a charge</summary><div class="panel-body"><form method="post" action="{% url 'lot_ledger_action' lot.pk 'charge' %}" class="form-grid">{% csrf_token %}{{ charge_form }}<div class="form-actions"><button type="submit">Post charge</button></div></form></div></details>
