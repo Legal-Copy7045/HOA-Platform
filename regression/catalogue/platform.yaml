@@ -80,7 +80,7 @@
 - feature: "Release numbers (D37): VERSION is MAJOR.MINOR.PATCH with a CHANGELOG entry; System status shows the release, the build and an update's number; the agent reads it safely"
   since: M5
   match: ["^unit:core/tests/test_versioning\\.py::test_"]
-- feature: "CI runs the suite in four parallel shards (pytest --shard K/N, round robin); every test lands in exactly one shard; one summary 'test' check"
+- feature: "CI runs the suite in two parallel shards (pytest --shard K/N, round robin); every test lands in exactly one shard; one summary test line, ci-result required"
   since: M5
   match: ["^unit:core/tests/test_ci_shards\\.py::test_"]
 - feature: "Install tonight (D38): System status schedules the update for the next 4:00 am Eastern (cancellable, audited); the agent turns a due schedule into a request, tolerant of an unmigrated database"
@@ -106,3 +106,19 @@
 - feature: "Regression ID files stay zero-padded, unique and stable across merges"
   since: M5
   match: ["^unit:regression/tests/test_ids_files.py::test_"]
+- feature: "Project standard 1.1.0 (D90): ci.yml with ci-result as the one required check, drafts run nothing, push to main only releases (tag v<VERSION>) and checks private terms, weekly full run; gitleaks and CodeQL through the standard's reusable workflows; Dependabot weekly and grouped with auto-merge; changes.yaml groups start only what a pull request can break"
+  since: "0.41"
+  docs: docs/decisions.md#d90
+  match: ["^unit:core/tests/test_image_pins.py::test_(ci_|every_job|secret_scan|privacy_guard|codeql|changes_start|release_path)", "^unit:core/tests/test_ci_shards"]
+- feature: "Regression suite on the standard's contract (D90): profile.yaml, claims.yaml, published.yaml, vendored standard.py; run.py answers check, brief, report, log, summary and manual; results carry key and prefix; manual results per version; reports read the standard reviewer files"
+  since: "0.41"
+  docs: regression/README.md
+  match: ["^unit:regression/tests/test_standard_contract"]
+- feature: "The VM installs only release tags (D90): update-portal.sh moves main to the newest v<MAJOR>.<MINOR>.<PATCH> tag (pre-releases skipped), --ref <branch> deploys a branch on purpose (names checked), the agent offers the newest release"
+  since: "0.41"
+  docs: docs/runbook.md
+  match: ["^unit:core/tests/test_infra_scripts.py::test_(pick_release_tag|update_script)"]
+- feature: "CLAUDE.md stays under 8 KB with the Never section verbatim; nothing of the old file was lost (every backticked name and decision reference is in CLAUDE.md or docs/claude/)"
+  since: "0.41"
+  docs: docs/claude/
+  match: ["^unit:core/tests/test_claude_md.py::test_"]

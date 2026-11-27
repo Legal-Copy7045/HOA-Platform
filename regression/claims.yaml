@@ -63,7 +63,7 @@
   code: ["core/conflicts.py", "core/workflow.py", "*/services.py", "ledger/*.py", "payments/*.py"]
 - id: CLM-016
   claim: ARC recusal - an applicant, a reviewer whose lot is affected, or an account contact or earlier owner of such a home cannot view deliberations or vote on that request; internal thread notes are hidden.
-  where: [docs/claude/authorization.md, docs/claude/workflows.md]
+  where: [docs/claude/authorization.md, docs/claude/governance.md]
   code: ["arc/*.py", "core/conflicts.py", "comms/threads.py"]
 - id: CLM-017
   claim: Payments to board members (D66) - nobody takes a step on a payment to an account they are or were on the deed of; checks to a board member's account are handled only by another board member, never the manager.

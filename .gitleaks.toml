@@ -1,4 +1,5 @@
-# Gitleaks configuration (.github/workflows/secrets.yml, D57).
+# Gitleaks configuration (D57): the secrets job of .github/workflows/ci.yml, through the
+# standard's reusable gitleaks.yml (D90). The privacy guard allows the same exact fixtures.
 #
 # The default rules, plus allowances for the repository's known synthetic
 # test values only. Each allowance names the marker the value carries or the

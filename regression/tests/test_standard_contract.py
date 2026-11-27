@@ -33,6 +33,10 @@ def test_profile_and_contract_files():
     assert len(ids) == len(set(ids)) and len(ids) >= 40
     for c in claims:
         assert c["claim"] and c["where"] and c["code"], c["id"]
+        for where in c["where"]:
+            path = where.split()[0]
+            if "/" in path or path.endswith(".md"):
+                assert (run.ROOT / path).is_file(), f"{c['id']}: {path}"
     # The global skills replace the project copies.
     assert not (run.ROOT / ".claude" / "skills" / "regression").exists()
 
