@@ -792,3 +792,6 @@ details.row-more > p { margin: .4rem 0 .2rem; }
 /* The dashboard's two parts for people with a home and board work (D64). */
 .dash-part-head { display: flex; align-items: center; gap: .5rem; margin-top: 1.5rem; }
 .dash-part-head .board-badge { font-size: .7rem; }
+
+/* Finance options (D84): bars on the owners finance summary. */
+meter.bar { width: 100%; max-width: 16rem; height: 1rem; vertical-align: middle; }

@@ -78,3 +78,12 @@ def send_statement_emails(year: int, month: int) -> int:
     from ledger.statement_email import send_monthly_statements
 
     return send_monthly_statements(year=year, month=month)["emails"]
+
+
+@app.periodic(cron="47 7 * * *")  # daily; only with "overdue_interest" on (D80)
+@app.task(queue="maintenance", queueing_lock="overdue_interest")
+def overdue_interest(timestamp: int) -> int:
+    """On or after the posting day, post the month's interest (once per account)."""
+    from ledger.interest import run_monthly
+
+    return run_monthly()

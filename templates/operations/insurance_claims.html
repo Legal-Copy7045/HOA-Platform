@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Insurance claims · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Insurance claims</h1><p class="subtitle">Claims on the association's own insurance: what happened, the adjuster, deadlines, the settlement and the money received.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th>Claim</th><th>Policy</th><th>Loss</th><th>Status</th><th class="num">Expected</th><th class="num">Received</th><th>Next deadline</th></tr></thead>
+    <tbody>{% for c, totals, due, label in rows %}<tr class="row-link">
+      <td class="cell-title"><a class="row-main" href="{% url 'insurance_claim_detail' c.pk %}">{% if c.claim_number %}{{ c.claim_number }}{% else %}Claim #{{ c.pk }}{% endif %}</a><br><span class="small muted">{{ c.description|truncatechars:60 }}</span></td>
+      <td data-label="Policy">{{ label }}</td><td data-label="Loss">{{ c.incident_on|short_date }}</td><td data-label="Status">{% status c.state c.get_state_display %}</td>
+      <td class="num" data-label="Expected">{{ totals.expected|cents }}</td><td class="num" data-label="Received">{{ totals.received|cents }}</td>
+      <td data-label="Next deadline">{% for name, d in due %}{{ name }} {{ d|short_date }}{% if not forloop.last %}; {% endif %}{% empty %}-{% endfor %}</td></tr>
+    {% empty %}<tr><td colspan="7">{% include "partials/empty.html" with icon="shield" title="No insurance claims" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  {% if can_record %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Record a claim</summary><div class="panel-body">
+    <form method="post" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Record claim</button></div></form></div></details>{% endif %}
+{% endblock %}
