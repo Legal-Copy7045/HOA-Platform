@@ -64,10 +64,12 @@ function readMenu() {
     const b = el && el.querySelector('.badge-count');
     return b && b.firstChild ? Number(b.firstChild.textContent.trim()) || 0 : 0;
   };
-  const sections = [...document.querySelectorAll('#sidebar .nav > .nav-section')].map((sec) => {
+  // The work sections sit inside one Board group (D64): .nav > .nav-work > .nav-section.
+  const sections = [...document.querySelectorAll('#sidebar .nav > .nav-section, #sidebar .nav > .nav-work > .nav-section')].map((sec) => {
     const summary = sec.querySelector(':scope > summary');
     return {
       key: sec.getAttribute('data-nav-group') || '',
+      work: !!sec.closest('.nav-work'),
       title: clean(summary),
       count: badge(summary),
       open: sec.tagName === 'DETAILS' ? sec.open : true,
@@ -120,6 +122,8 @@ function readPage() {
     forms,
     tables: main.querySelectorAll('table').length,
     tiles,
+    // D64: the page carries the Board (or Staff) badge from its menu entry.
+    board_badge: !!document.querySelector('[data-board-badge]'),
     height: document.documentElement.scrollHeight,
   };
 }

@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}ARC request types · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / ARC request types</nav>
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "settings_hub" %}ARC request types</nav>
   <div class="page-head"><div><h1>ARC request types</h1><p class="subtitle">The kinds of project owners choose from when they apply. Add what each one needs (drawings, materials, colors) and where that rule comes from.</p></div></div>
   {% for t in types %}
     {# One summary line per type, with its citation (or a "missing citation" badge); Edit opens it (WT-014). #}

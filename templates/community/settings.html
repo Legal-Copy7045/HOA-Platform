@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Community settings · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / Community settings</nav>
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "settings_hub" %}Community settings</nav>
   <div class="page-head"><div><h1>Community settings</h1><p class="subtitle">Numbers here come from the Declaration, the Bylaws, the Rules and Regulations or a recorded board decision. Each needs a citation. Money is entered in dollars (e.g. 6.00).</p></div></div>
   <div class="alert info">{% icon "book" %}<span>Each setting shows where it usually comes from, what Pennsylvania law says, and an example. Where the Act supplies a value when your documents are silent, it is used as a <strong>PA law fallback</strong> until you record your own. {{ pa_disclaimer }}</span></div>
 

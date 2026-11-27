@@ -23,3 +23,11 @@
 - feature: "Dashboards: sysadmin-only home is the System status summary; owner balance tile with Pay button; Record checks quick action; Preview as owner"
   since: M5
   match: ["^unit:core/tests/test_nav_streamline.py::test_(sysadmin_home|owner_dashboard|pay_button|record_checks|preview_as_owner)", "^unit:core/tests/test_owner_preview"]
+- feature: "Board cues, no workspace switch (D64): Board badge and strip on work-section pages, one Board heading in the menu, decisions 'for the board' with own-home notes, dashboard parts Board work / Your home, [Board] email subjects"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_board_cues.py::test_(board_badge|badge_on|owner_cannot|work_sections|board_colour|invoice_approval|arc_decision|workflow_decisions|account_change|disbursement_refund|board_member_with|your_home_first|owners_and_staff|items_say|board_notices|send_now|thread_updates|navigation_helper|acting_confirm)", "^unit:payments/tests/test_autopay_annual.py::test_no_self_approval", "^manual:board cues"]
+- feature: "Second walkthrough structure (WT-004/005/007/008/009/010/011/014/036/038/040): Settings opens on Community setup, one Features page, Account recovery rules, server task history on Sysadmin activity, committees once, no one-page hubs or crumbs, More finance, busiest section open, Record payments received, Write checks, My items jump links"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_board_cues.py::test_(settings_breadcrumb|manager_reaches|more_finance|board_reads_server|committees_once|account_recovery_rules|my_items_groups|disbursement_checks|retention_still)", "^unit:core/tests/test_board_settings_ux.py::test_(features_has_one_page|switching_)", "^unit:community/tests/test_setup_wizard.py::test_(settings_hub_offers|my_items_until|board_may_open)", "^unit:core/tests/test_walkthrough_flow.py::test_staff_menu_opens"]

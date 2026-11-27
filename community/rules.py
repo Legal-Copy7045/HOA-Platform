@@ -319,7 +319,7 @@ REGISTRY: dict[str, RuleSpec] = {
             "Hours an account recovery waits before the person can finish it",
             INT,
             "48",
-            "Sign-in and security",
+            "Account recovery",
             "Owners and residents who lost their phone and recovery codes can recover their "
             "sign-in themselves after this wait; they, the board and every address on file "
             "are told at once and anyone can cancel. At least 48, at most 336 (14 days). A "
@@ -333,7 +333,7 @@ REGISTRY: dict[str, RuleSpec] = {
             "payments can be changed",
             INT,
             "48",
-            "Sign-in and security",
+            "Account recovery",
             "For this long after a self-service recovery the account cannot vote, give a "
             "proxy, change email, phone, mailing address, notice or text choices, set up "
             "automatic payments or ask for account changes. At least 24, at most 336 (14 "

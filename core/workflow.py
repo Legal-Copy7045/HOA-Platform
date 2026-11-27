@@ -156,6 +156,61 @@ class Workflow:
         ).select_related("actor")
 
 
+# --- Who is acting (D64) ------------------------------------------------------------------
+# Decisions taken for the association: their buttons say "... for the board"
+# (for a board member) and their confirmation says the person acts for the
+# association. Used by partials/workflow.html and, through the
+# {% for_board %} / {% acting_confirm %} tags, by the pages with their own
+# decision forms (invoices, ARC, autopay review, disbursements, account
+# changes, second approvals), so the wording is the same everywhere.
+DECISION_ACTIONS = frozenset(
+    {
+        "approve",
+        "approve_with_conditions",
+        "deny",
+        "reject",
+        "decline",
+        "decide",
+        "decide_appeal",
+        "uphold",
+        "dismiss",
+        "mark_cured",
+        "void",
+        "adopt",
+        "certify",
+        "issue",
+    }
+)
+ACTING = "You're acting for the association."
+OWN_HOME_NOTE = (
+    "This is about your own home, so another board member must decide it. You can read it"
+    " and follow it like any owner."
+)
+
+
+def for_board(label: str, actor=None) -> str:
+    """A decision button's label: "Approve for the board" for a board member
+    (staff who are not on the board keep the plain label: they never act
+    for the board, policy.MANAGER)."""
+    from core import policy
+
+    # "Mark cured (board)" said the same thing in brackets.
+    label = label.removesuffix(" (board)")
+    if actor is not None and policy.BOARD not in policy.roles_for(actor).groups:
+        return label
+    return f"{label} for the board"
+
+
+def acting_confirm(text: str = "") -> str:
+    """A decision's confirmation text, ending with who is acting."""
+    text = (text or "").strip()
+    return f"{text} {ACTING}" if text else ACTING
+
+
+def is_decision(action: str) -> bool:
+    return action in DECISION_ACTIONS
+
+
 def not_by(field_name: str, message: str) -> Guard:
     """Guard: the actor must not be the user in ``obj.<field_name>``."""
 

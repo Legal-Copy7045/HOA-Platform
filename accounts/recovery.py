@@ -217,10 +217,10 @@ def _refuse(user: User, reason: str) -> None:
     )
 
 
-def _mail(emails, subject: str, body: str) -> None:
+def _mail(emails, subject: str, body: str, board: bool = False) -> None:
     from comms.notify import send_now
 
-    send_now(emails, subject=f"[{settings.SITE_NAME}] {subject}", body=body)
+    send_now(emails, subject=f"[{settings.SITE_NAME}] {subject}", body=body, board=board)
 
 
 def _status_url() -> str:
@@ -437,6 +437,7 @@ def _notify_started(user: User, recovery: AccountRecovery) -> tuple[int, bool, i
         f"They can finish it from {ready}.\n\nIf this looks wrong, cancel it from My items: "
         f"{_absolute(reverse('recovery_board', args=[recovery.pk]))}\n\n"
         f"-- \n{settings.SITE_NAME}",
+        board=True,
     )
     return len(emails), sent_sms, len(board)
 
@@ -574,6 +575,7 @@ def complete(link: RecoveryLink, *, request) -> User:
             f"{name}{where} recovered their sign-in after the waiting period. Review it if "
             f"you did not expect it: {_absolute(reverse('recovery_board', args=[recovery.pk]))}"
             f"\n\n-- \n{settings.SITE_NAME}",
+            board=True,
         )
     request.session.cycle_key()
     forget_session(request)

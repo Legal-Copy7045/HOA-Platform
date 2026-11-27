@@ -98,11 +98,15 @@ def test_rarely_used_setup_pages_move_to_settings(client, w):
         "arc_neighbors",
         "letters_settings",
         "branding_settings",
-        "feature_settings",
-        "retention",
         "reservation_settings",
     ):
         assert f'href="{reverse(name)}"' in page
+    # WT-004/WT-038: Community setup is the front; Features is its step and
+    # Contact retention opens from the Privacy step, so neither is a tile.
+    assert f'href="{reverse("setup_step", args=["features"])}"' in page
+    assert f'href="{reverse("setup_step", args=["privacy"])}"' in page
+    for name in ("feature_settings", "retention", "setup_home"):
+        assert f'href="{reverse(name)}"' not in page, name
     # Moved out (streamlining 2026-11-26): the compliance calendar is a tab of
     # Board tasks; the access review is a panel on People.
     assert f'href="{reverse("compliance")}"' not in page
@@ -130,8 +134,11 @@ def test_hub_entry_is_current_on_its_pages_and_its_group_opens(client, w):
     assert admin["open"] and [i["label"] for i in admin["items"] if i["current"]] == ["Settings"]
     response = client.get(reverse("home"))
     admin = section(response, "Admin")
-    # Collapsed unless the page is inside or (staff, WT-040) something waits there.
-    assert admin["open"] == bool(admin["count"])
+    # Collapsed unless the page is inside or (staff, WT-036) it is the work
+    # section with the most waiting.
+    work = [s for s in nav(response) if s["work"]]
+    assert [s for s in work if s["open"]] == [max(work, key=lambda s: s["count"])]
+    assert not admin["open"] or admin["count"]
     # Staff start with My home and Community closed (WT-040); owners keep them open.
     assert not section(response, "My home")["open"]
     assert not section(response, "Community")["open"]
@@ -216,10 +223,16 @@ def test_nav_labels_match_page_headings(client, w):
                 if item["label"] == "Dashboard":  # the greeting
                     continue
                 pairs = [(item["label"], item["url"])]
-                for hub in ("settings_hub", "community_info"):
+                for hub in ("settings_hub", "community_info", "finance_more"):
                     if item["url"] == reverse(hub):
                         links = navigation.hub_links(response.wsgi_request, hub)
-                        pairs += [(link["label"], link["url"]) for link in links]
+                        # The board's Settings front shows the setup steps
+                        # instead of these tiles (WT-004).
+                        pairs += [
+                            (link["label"], link["url"])
+                            for link in links
+                            if link["name"] not in navigation.COVERED_BY_SETUP
+                        ]
                 for label, url in pairs:
                     h1 = _h1(client, url)
                     if (
@@ -256,7 +269,8 @@ def test_nav_items_built_once_per_request(client, w):
 def test_dashboard_todos_come_before_tiles_and_use_mine(client, w):
     client.force_login(w["board"])
     html = client.get(reverse("home")).content.decode()
-    assert html.index("Needs your attention") < html.index('class="stat')
+    # A board member with a home: two headed parts, to-dos before tiles (D64).
+    assert html.index('id="part-') < html.index('class="stat')
     assert f'href="{reverse("arc_list")}?mine=1"' in html
     assert f'href="{reverse("violations")}?mine=1"' in html
     assert "My home improvement requests (ARC)" in html

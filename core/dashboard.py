@@ -78,9 +78,15 @@ def role_shortcuts(user, roles, request=None) -> list[dict]:
 
 def quick_actions(user, roles) -> list[dict]:
     out = []
-    # "Record checks" is also offered on My items ({% quick_actions %}).
+    # "Record payments received" is also offered on My items ({% quick_actions %}).
     if _can(roles.groups, "ledger.manage"):
-        out.append({"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"})
+        out.append(
+            {
+                "label": "Record payments received",
+                "url": reverse("record_payments"),
+                "icon": "receipt",
+            }
+        )
     if _can(roles.groups, "request.submit"):
         out.append(
             {
@@ -172,6 +178,50 @@ def staff_panel(user, roles) -> dict:
 
 # How many to-dos the dashboard lists before "See all in My items".
 TODO_LIMIT = 8
+# Roles whose work is the association's (D64): with a home as well, the
+# dashboard has two headed parts, "Your home" and "Board work".
+WORK_GROUPS = frozenset({policy.BOARD, policy.MANAGER, policy.AUDITOR, policy.ARC_REVIEWER})
+# Quick actions that are board work; the rest are the person's own.
+BOARD_QUICK = {"record_payments"}
+# Per part, as on the single list (phones show the first four of each).
+PART_LIMIT = 6
+
+
+def parts(items, quick, can_open_queue, groups=frozenset({policy.BOARD})) -> list[dict]:
+    """The dashboard of someone with a home and board work, in two parts:
+    "Board work" first when anything waits there (WT-040), "Your home"
+    otherwise first. Each holds its to-dos (overdue first) and its quick
+    actions; nothing is dropped, the rest is one tap away in My items."""
+    from core import navigation
+    from core.my_items import HOME
+
+    board_url = {reverse(n) for n in BOARD_QUICK}
+    home_items = [i for i in items if i.side == HOME]
+    board_items = [i for i in items if i.side != HOME]
+
+    def part(key, title, todos, quick_links):
+        shown = todos[:PART_LIMIT] if can_open_queue else todos
+        return {
+            "key": key,
+            "title": title,
+            "todos": shown,
+            "more": len(todos) - len(shown),
+            "quick": quick_links,
+        }
+
+    board = part(
+        "board",
+        f"{navigation.work_label(groups)} work",
+        board_items,
+        [q for q in quick if q["url"] in board_url],
+    )
+    home = part(
+        "home",
+        "Your home",
+        home_items,
+        [q for q in quick if q["url"] not in board_url],
+    )
+    return [board, home] if board_items else [home, board]
 
 
 def build(user, request=None) -> dict:
@@ -191,6 +241,8 @@ def build(user, request=None) -> dict:
     if roles.groups == {policy.SYSADMIN}:  # sysadmin-only login: operations first
         data["system"] = system_panel()
     data["quick"] = quick_actions(user, roles)
+    if (roles.groups & policy.RESIDENTS) and (roles.groups & WORK_GROUPS):
+        data["parts"] = parts(items, data["quick"], can_open_queue, roles.groups)
     # A sign-in to-do (backup method, new recovery codes, D58) is the
     # login's own, not role work: the role shortcuts still show beside it.
     if not [i for i in items if i.area != "Sign-in and security"]:

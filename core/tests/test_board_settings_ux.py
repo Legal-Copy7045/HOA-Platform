@@ -129,12 +129,35 @@ def test_remind_button_confirms_with_the_count(_defer, client, board):
 # --- Features ---------------------------------------------------------------------------------
 
 
+def _features_post(**overrides):
+    """The Features step's form with every feature as it is now, plus changes."""
+    from core import features
+
+    states = features.states()
+    data = {f"feature__{f.key}": "on" for f in features.FEATURES if states.get(f.key, f.default)}
+    for key, on in overrides.items():
+        data.pop(f"feature__{key}", None)
+        if on:
+            data[f"feature__{key}"] = "on"
+    return data
+
+
+def test_features_has_one_page_the_setup_step(client, board):
+    """WT-038: Settings -> Features and the setup step were two editors; the
+    old address opens the step."""
+    client.force_login(board)
+    response = client.get(reverse("feature_settings"))
+    assert response["Location"] == reverse("setup_step", args=["features"])
+
+
 def test_switching_a_feature_off_names_what_disappears(client, board):
     from governance.models import Vote
 
     Vote.objects.create(title="Pond fence", kind="informal", status="open", created_by=board)
     client.force_login(board)
-    page = client.get(reverse("feature_settings")).content.decode()
+    page = client.post(
+        reverse("setup_step", args=["features"]), _features_post(votes=False)
+    ).content.decode()
     assert "Switch off Votes? It leaves the menu for everyone" in page
     assert "1 vote is open." in page
     assert "Its records are kept" in page
@@ -145,8 +168,8 @@ def test_switching_on_needs_no_confirmation(client, board):
 
     features.set_feature("faq", False, actor=board)
     client.force_login(board)
-    page = client.get(reverse("feature_settings")).content.decode()
-    assert "Switch off FAQ?" not in page
+    response = client.post(reverse("setup_step", args=["features"]), _features_post(faq=True))
+    assert response.status_code == 302 and features.enabled("faq")
 
 
 # --- Home neighbors: Save all --------------------------------------------------------------------

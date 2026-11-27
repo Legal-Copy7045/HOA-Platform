@@ -602,7 +602,9 @@ def test_no_self_approval_and_the_manager_cannot_approve(client, aw):
     assert not [i for i in items_for(co_owner_on_board) if "Approve automatic" in i.title]
     client.force_login(co_owner_on_board)
     page = client.get(reverse("online_payments")).content.decode()
-    assert "You pay for this home, so another board member decides." in page
+    # D64: said before any button, in the board-note style; the service refuses too.
+    assert "You pay for this home. This is about your own home, so another board member" in page
+    assert 'data-testid="own-home-note"' in page
     assert client.post(url, {"decision": "approve"}).status_code == 403
     for user in (make_member(roles=[Role.MANAGER]), aw["owner"], aw["owner_b"]):
         client.force_login(user)

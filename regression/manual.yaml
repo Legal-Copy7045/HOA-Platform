@@ -330,3 +330,7 @@
   check: "On a phone (390 px): the dashboard shows no '{#' text and the balance tile's amount on one line; Community settings has 'Jump to section' (no sticky index) and one open section; a setup step opens with 'What the law says' closed and its Save bar above the tab bar; the setup Review cards stay inside their boxes; Home neighbors shows no 'Unsaved changes' until something is typed and no per-row Save; Record payments starts with three checks and 'Add another row' adds one in place keeping what was typed; Calendar's New event opens its panel at the top; a home's account shows one small 'Actions' menu per entry (D63)."
   steps: "POC with fictional data, as a demo board member, on an iPhone and an Android phone (or the browser's phone view)."
   last: ""
+- key: board cues
+  check: "As a board member who owns a home: the Board heading in the menu and the Board badge and strip on board pages are easy to see but not loud, in light and dark mode, on a phone and a desktop; decision buttons read 'for the board'; a [Board] email sorts apart in a real mailbox."
+  steps: "Open an invoice and the dashboard on a phone with dark mode on; check the menu's Board group and the strip; approve something; look at the subject of a board notice in the mailbox."
+  last: ""

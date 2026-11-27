@@ -168,5 +168,27 @@ def sysadmin_activity(request):
             "newer_url": window(min(newer_end, today)) if end < today else "",
             "export_url": "?" + export.urlencode(),
             "older_exists": everything.filter(occurred_at__lt=_bounds(start)).exists(),
+            **_server_tasks(request.user),
         },
     )
+
+
+SERVER_TASK_ROWS = 5
+
+
+def _server_tasks(user) -> dict:
+    """Server task history for the board (WT-007): who asked for what, when
+    and how it went, with the backups line. The board reads it here; only
+    sysadmins start tasks, on Server tasks."""
+    if not policy.can(user, "system.view_tasks"):
+        return {}
+    from core import host_tasks
+    from core.models import HostTask
+    from core.server_task_views import HistoryRow
+
+    rows = HostTask.objects.select_related("requested_by")[:SERVER_TASK_ROWS]
+    return {
+        "server_tasks": [HistoryRow(t) for t in rows],
+        "server_backups": host_tasks.backups_overview(),
+        "server_tasks_more": HostTask.objects.count() > SERVER_TASK_ROWS,
+    }

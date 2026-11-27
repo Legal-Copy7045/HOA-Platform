@@ -66,12 +66,39 @@ HUBS = {
             "directory.view",
             "Neighbors who chose to share their contact details.",
         ),
+        # Committees (the workspaces) open from Board and committees, where
+        # each committee's name links to it (WT-008); see SUBPAGES.
+    ],
+    # Finance pages the board opens now and then (WT-036): the Finance section
+    # keeps the daily ones.
+    "finance_more": [
         (
-            "Committees",
-            "committees",
-            "users",
-            "committee.view",
-            "Your committees' members, topics, tasks and files.",
+            "Reserve plan",
+            "reserve_plan",
+            "chart",
+            "reserves.view",
+            "The reserve study's components, the funding plan and what has been adopted.",
+        ),
+        (
+            "Online payments",
+            "online_payments",
+            "wallet",
+            "payments.manage",
+            "Card and bank payments through Stripe, payouts and automatic payments.",
+        ),
+        (
+            "Disbursements",
+            "disbursements",
+            "dollar",
+            "disbursement.view",
+            "Surplus distributions and refunds to owners, with their checks.",
+        ),
+        (
+            "Resale certificates",
+            "resales",
+            "file",
+            "resale.manage",
+            "Certificates for a home being sold, with the fee and the documents.",
         ),
     ],
     "settings_hub": [
@@ -164,6 +191,17 @@ def _demo_data_allowed() -> bool:
     return demo_reseed.allowed()
 
 
+# Hub pages shown only to some of the roles that may open them: the manager
+# reaches Paper mail settings from Paper mail (its first button), so the
+# manager's Settings has one page and the menu links straight to it (WT-009).
+TILE_GROUPS = {"paper_mail_settings": frozenset({policy.BOARD})}
+
+# Pages the board's Settings front (the Community setup steps, WT-004) already
+# covers: still part of the hub (the Settings entry is current on them) but
+# not repeated as tiles there. Features is the setup step (WT-038); Contact
+# retention is linked from the Privacy step.
+COVERED_BY_SETUP = frozenset({"setup_home", "feature_settings", "retention"})
+
 # Hub pages that exist only on some deployments: listed only while the check
 # passes (the page itself answers 404 otherwise). Demo data: D53.
 ONLY_WHEN = {"demo_data": _demo_data_allowed}
@@ -187,6 +225,12 @@ SUBPAGES = {
     "people": ["access_review"],
     "lot_list": ["invitations"],
     "tasks": ["compliance"],
+    # Committee workspaces open from Board and committees (WT-008).
+    "community_info": ["committees"],
+    "paper_mail": ["paper_mail_settings"],
+    # The board reads server task history on Sysadmin activity (WT-007);
+    # sysadmins, who cannot open that page, keep Server tasks in the menu.
+    "sysadmin_activity": ["server_tasks"],
 }
 
 # Entries shown only while an optional feature is off: Meetings is part of
@@ -265,24 +309,24 @@ SECTIONS = [
             ("Invoices", "invoices", "receipt", "finance.view"),
             ("Collections", "collections", "dollar", "finance.view"),
             ("Budgets", "budgets", "chart", "finance.view"),
-            ("Reserve plan", "reserve_plan", "chart", "reserves.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
-            ("Online payments", "online_payments", "wallet", "payments.manage"),
-            ("Disbursements", "disbursements", "dollar", "disbursement.view"),
-            ("Resale certificates", "resales", "file", "resale.manage"),
             ("Reports", "reports", "chart", "reports.view"),
+            # Reserve plan, Online payments, Disbursements, Resale certificates.
+            ("More finance", "finance_more", "dollar", HUB),
         ],
     ),
     (
         "Admin",
         [
             ("System status", "system_status", "activity", "system.view_status"),
-            # Backups, restore drills and other host tasks (D36); the board sees the history.
+            # Before Server tasks: for the board it holds the task history
+            # (SUBPAGES), so Server tasks is not a second entry (WT-007).
+            ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
+            # Backups, restore drills and other host tasks (D36): sysadmins.
             ("Server tasks", "server_tasks", "clock", "system.view_tasks"),
             # Sysadmins re-send and revoke (D9); the board has them on the
             # Sign-ups tab of Homes and owners, its SUBPAGE (WT-002, WT-018).
             ("Invitations", "invitations", "mail", "invite.resend"),
-            ("Sysadmin activity", "sysadmin_activity", "shield", "audit.view_sysadmin_activity"),
             ("Settings", "settings_hub", "sliders", HUB),
         ],
     ),
@@ -296,12 +340,25 @@ STAFF_GROUPS = frozenset(
     {policy.BOARD, policy.MANAGER, policy.ARC_REVIEWER, policy.AUDITOR, policy.SYSADMIN}
 )
 PERSONAL_SECTIONS = {"My home", "Community"}
+# The work sections, shown together under one "Board" heading in the accent
+# colour (D64): a page inside them is a board page (the "Board" badge and
+# strip, base.html). Owners never see these sections, so their pages never
+# carry the cue.
+WORK_SECTIONS = ("Association", "Maintenance", "Finance", "Admin")
+
+
+def work_label(groups: frozenset[str]) -> str:
+    """The heading over the work sections and the page badge: "Board" for a
+    board member; staff who are not on the board (manager, auditor, ARC
+    reviewer, sysadmin) read "Staff", since they do not act for the board."""
+    return "Board" if policy.BOARD in groups else "Staff"
 
 
 def _open_by_default(title: str, count: int, staff: bool) -> bool:
     if not staff:
         return title in OPEN_BY_DEFAULT
-    return title not in PERSONAL_SECTIONS and count > 0
+    # Staff: chosen in build() (only the busiest work section, WT-036).
+    return False
 
 
 ROLE_LABELS = {
@@ -360,6 +417,8 @@ def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[d
     for label, name, icon, permission, description in HUBS[hub]:
         if not allowed(groups, permission):
             continue
+        if name in TILE_GROUPS and not groups & TILE_GROUPS[name]:
+            continue
         if not features.url_name_enabled(name.partition("?")[0], request):
             continue
         if name in ONLY_WHEN and not ONLY_WHEN[name]():
@@ -391,6 +450,10 @@ def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict,
         children = hub_links(request, name, groups)
         if not children:
             return None
+        if len(children) > 1:
+            # Pages reached from the hub's pages (Committees from Board and
+            # committees) mark it current too.
+            children += [{"name": n, "url": u} for n in SUBPAGES.get(name, []) if (u := _url(n))]
     else:
         if not allowed(groups, permission):
             return None
@@ -458,6 +521,9 @@ def build(request) -> dict:
             visible.append(item)
         if visible:
             count = sum(i["count"] for i in visible)
+            if title == "My home" and not roles.groups & policy.RESIDENTS:
+                # A former owner's one section holds only My history (WT-014).
+                title = "My history"
             sections.append(
                 {
                     "title": title,
@@ -465,19 +531,33 @@ def build(request) -> dict:
                     "items": visible,
                     "open": _open_by_default(title, count, staff),
                     "count": count,
+                    "work": title in WORK_SECTIONS,
                 }
             )
-    if staff and not any(s["open"] for s in sections if s["title"]):
-        # Nothing waiting: open the first work section rather than none.
-        work = [s for s in sections if s["title"] and s["title"] not in PERSONAL_SECTIONS]
-        if work:
-            work[0]["open"] = True
+    work = [s for s in sections if s["work"]]
+    if staff and work:
+        # Staff: only the work section with the most waiting opens, else the
+        # first one, plus the current page's section below (WT-036: a short
+        # drawer on a phone; the browser remembers what the person opens).
+        busiest = max(work, key=lambda s: s["count"])
+        (busiest if busiest["count"] else work[0])["open"] = True
+    board_page = False
     if best[1]:
         best[1]["current"] = True
         sections[best[2]]["open"] = True
         sections[best[2]]["current"] = True
+        board_page = sections[best[2]]["work"]
     return {
         "sections": sections,
+        # The menu as drawn: personal sections, then the work sections under
+        # one heading in the accent colour (D64).
+        "personal_sections": [s for s in sections if not s["work"]],
+        "work_sections": work,
+        "work_label": work_label(roles.groups),
+        "work_count": sum(s["count"] for s in work),
+        # The page is one of the work sections' pages: base.html shows the
+        # "Board" (or "Staff") badge and the accent strip (D64).
+        "board_page": board_page,
         "tabbar": tabbar(sections, roles.groups),
         "roles": [ROLE_LABELS[g] for g in ROLE_LABELS if g in roles.groups],
         "person_id": roles.person_id,

@@ -23,18 +23,14 @@
       </a>
       <form class="nav-search" method="get" action="{% url 'search' %}" role="search"><label for="nav-search-q" class="sr-only">Search the portal</label><input id="nav-search-q" type="search" name="q" placeholder="Search" maxlength="100" autocomplete="off" value="{% if request.resolver_match.url_name == 'search' %}{{ request.GET.q|truncatechars:100 }}{% endif %}"><button type="submit" aria-label="Search">{% icon "search" %}</button></form>
       <nav class="nav">
-        {% for section in nav.sections %}
-          {% if section.title %}
-          <details class="nav-section nav-group" data-nav-group="{{ section.key }}"{% if section.open %} open{% endif %}{% if section.current %} data-nav-current{% endif %}>
-            <summary class="nav-heading"><span>{{ section.title }}</span>{% if section.count %}<span class="badge-count group-count">{{ section.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</summary>
-          {% else %}
-          <div class="nav-section">
-          {% endif %}
-            {% for item in section.items %}
-              <a href="{{ item.url }}"{% if item.current %} aria-current="page"{% endif %}>{% icon item.icon %}<span>{{ item.label }}</span>{% if item.count %}<span class="badge-count">{{ item.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</a>
-            {% endfor %}
-          {% if section.title %}</details>{% else %}</div>{% endif %}
-        {% endfor %}
+        {% for section in nav.personal_sections %}{% include "partials/nav_section.html" %}{% endfor %}
+        {% if nav.work_sections %}
+        {# The work sections under one heading in the accent colour (D64). #}
+        <div class="nav-work" role="group" aria-labelledby="nav-work-h">
+          <div class="nav-work-heading" id="nav-work-h">{{ nav.work_label }}</div>
+          {% for section in nav.work_sections %}{% include "partials/nav_section.html" %}{% endfor %}
+        </div>
+        {% endif %}
       </nav>
       <div class="sidebar-foot">
         <div class="who">{{ nav.display_name }}</div>
@@ -53,7 +49,10 @@
         <a class="brand" href="{% url 'home' %}"><span class="brand-mark"><svg aria-hidden="true"><use href="{% static 'img/icons.svg' %}#leaf"></use></svg></span><span>{{ SITE_NAME }}</span></a>
         <a class="topbar-search" href="{% url 'search' %}">{% icon "search" %}<span class="sr-only">Search</span></a>
       </header>
-      <main id="main" class="content {% block content_class %}{% endblock %}">
+      <main id="main" class="content{% if nav.board_page %} board-page{% endif %} {% block content_class %}{% endblock %}">
+        {% if nav.board_page %}{# D64: a work-section page; derived from the menu (core.navigation.build), never per template. static/js/app.js moves the badge beside the page's heading. #}
+          <p class="board-strip" data-board-cue><span class="board-badge" data-board-badge>{{ nav.work_label }}</span> <span class="board-strip-text">{% if nav.work_label == "Board" %}You're acting for the association on this page.{% else %}A staff page of the association.{% endif %}</span></p>
+        {% endif %}
         {% if nav.recovery_locked_until %}
           <div class="alert warning recovery-lock" role="status">{% icon "lock" %}<span><strong>Your sign-in was recently recovered.</strong> For your security, voting, proxies, contact details, notice and text choices, automatic payments and account change requests are available again on {{ nav.recovery_locked_until }}. <a href="{% url 'account_recovery_status' %}">Why?</a></span></div>
         {% endif %}

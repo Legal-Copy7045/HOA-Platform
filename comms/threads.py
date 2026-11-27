@@ -221,11 +221,14 @@ def _link(kind: str, obj) -> str:
     return settings.PORTAL_BASE_URL + reverse(DETAIL_URLS[kind], args=[obj.pk])
 
 
-def _send(kind: str, obj, emails: set[str]) -> None:
+def _send(kind: str, obj, emails: set[str], board: bool = False) -> None:
+    """``board``: to the staff who work on it ("[Board] Update on request
+    #12", D64); otherwise to the owner side ("Update on your request #12")."""
     if not emails:
         return
     label = LABELS[kind]
-    subject = f"[{settings.SITE_NAME}] Update on your {label} #{obj.pk}"
+    whose = "" if board else "your "
+    subject = f"[{settings.SITE_NAME}] Update on {whose}{label} #{obj.pk}"
     body = (
         f"There is an update on {label} #{obj.pk}.\n\n"
         f"Sign in to read it:\n{_link(kind, obj)}\n\n-- \n{settings.SITE_NAME}"
@@ -233,7 +236,7 @@ def _send(kind: str, obj, emails: set[str]) -> None:
 
     from comms.notify import send_update
 
-    send_update(emails, subject=subject, body=body, link=_link(kind, obj))
+    send_update(emails, subject=subject, body=body, link=_link(kind, obj), board=board)
 
 
 def _owner_side_emails(kind: str, obj) -> set[str]:
@@ -281,7 +284,7 @@ def notify_staff(kind: str, obj, exclude=None) -> None:
     emails = _staff_emails(kind, obj)
     if exclude is not None:
         emails.discard(exclude.email)
-    _send(kind, obj, emails)
+    _send(kind, obj, emails, board=True)
 
 
 def _notify_committee(topic, exclude=None) -> None:

@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.core.mail import send_mail
 from procrastinate.contrib.django import app
 
 from community.services import board_emails
@@ -38,10 +37,26 @@ def notify_board(kind: str) -> int:
         f"on the board pages.\n\nIf you did not expect this, check the sysadmin activity "
         f"page and talk to the other board members.\n\n-- \n{settings.SITE_NAME}"
     )
+    from comms.notify import mail_board
+
     recipients = board_emails()
-    for address in recipients:
-        send_mail(f"[{settings.SITE_NAME}] Board notice", body, None, [address])
+    mail_board(recipients, subject=SUBJECTS.get(kind, "Notice"), body=body, fail_silently=False)
     return len(recipients)
+
+
+# The subject of each notice, after "[Board] " (D64). As vague as the text.
+SUBJECTS = {
+    "sysadmin_nominated": "Sysadmin nomination waiting for approval",
+    "sysadmin_granted": "Sysadmin nomination approved",
+    "sysadmin_revoked": "Sysadmin role ended",
+    "mfa_reset_started": "Sign-in reset waiting for approval",
+    "mfa_reset_approved": "Sign-in reset approved",
+    "board_seat_recorded": "Board seat recorded",
+    "role_granted": "Role granted",
+    "board_seat_proposed": "Board seat waiting for approval",
+    "account_change_requested": "Account change waiting for approval",
+    "mfa_reset_code_locked": "Sign-in reset code locked",
+}
 
 
 @app.periodic(cron="47 3 * * *")  # daily, 03:47 server time

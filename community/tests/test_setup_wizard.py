@@ -58,7 +58,9 @@ def events(action):
 
 
 def test_board_may_open_every_step(client, board):
-    assert client.get(reverse("setup_home")).status_code == 200
+    # Community setup is the front of Settings (WT-004); its old address opens it.
+    assert client.get(reverse("setup_home"))["Location"] == reverse("settings_hub")
+    assert client.get(reverse("settings_hub")).status_code == 200
     for key in setup.KEYS:
         response = client.get(step_url(key))
         assert response.status_code == 200, key
@@ -109,8 +111,14 @@ def test_signed_out_visitors_go_to_sign_in(client):
 
 
 def test_settings_hub_offers_community_setup_to_the_board(client, board):
+    """WT-004: Settings opens on Community setup (where the run stands and
+    every step), then "Change one thing" links."""
     page = client.get(reverse("settings_hub")).content.decode()
-    assert f'href="{reverse("setup_home")}"' in page and "Community setup" in page
+    assert "<h1>Settings</h1>" in page and 'id="setup"' in page
+    assert page.index('id="setup"') < page.index("Change one thing")
+    for key in setup.KEYS:
+        assert f'href="{step_url(key)}"' in page, key
+    assert f'href="{reverse("community_settings")}"' in page
 
 
 # --- Steps save through the services ----------------------------------------------------
@@ -295,7 +303,7 @@ def test_back_links_to_the_previous_step(client, board):
     html = client.get(step_url("late_fees")).content.decode()
     assert f'href="{step_url("charge")}">Back' in html
     html = client.get(step_url("community")).content.decode()
-    assert f'href="{reverse("setup_home")}">Back' in html
+    assert f'href="{reverse("settings_hub")}#setup">Back' in html
 
 
 def test_progress_bar_and_sticky_actions(client, board):
@@ -325,7 +333,7 @@ def test_rerun_counts_up_and_prefills_current_values(client, board):
     assert setup.finished(1)
     # Changed after run 1 finished:
     services.set_rule(key="arc.appeal_days", value="15", citation="Decl §9.4", actor=SYSTEM)
-    page = client.get(reverse("setup_home")).content.decode()
+    page = client.get(reverse("settings_hub")).content.decode()
     assert "Run setup again" in page
     response = client.post(reverse("setup_start"))
     assert response["Location"] == step_url("community")
@@ -416,7 +424,7 @@ def test_review_flags_defaults_missing_values_and_citations(client, board):
 
 def test_finish_marks_the_run_finished(client, board):
     response = client.post(step_url("review"))
-    assert response["Location"] == reverse("setup_home")
+    assert response["Location"] == reverse("settings_hub") + "#setup"
     assert setup.finished(1)
     assert events("setup.run_finished")[0].metadata == {"run": 1}
 
@@ -433,13 +441,14 @@ def _setup_items(user):
 def test_my_items_until_setup_is_finished(client, board):
     items = _setup_items(board)
     assert len(items) == 1
-    assert items[0].title == f"Finish community setup ({len(setup.WORK_STEPS)} steps left)"
-    assert items[0].url == reverse("setup_home")
+    # One banner with the rules still missing a citation in it (WT-004).
+    assert items[0].title.startswith(f"Finish community setup: {len(setup.WORK_STEPS)} steps left")
+    assert items[0].url == reverse("settings_hub") + "#setup"
     client.post(reverse("setup_start"))
     client.post(step_url("branding"), {"action": "save"})
     client.post(step_url("people"), {"action": "skip"})
-    assert _setup_items(board)[0].title == (
-        f"Finish community setup ({len(setup.WORK_STEPS) - 1} steps left)"
+    assert _setup_items(board)[0].title.startswith(
+        f"Finish community setup: {len(setup.WORK_STEPS) - 1} steps left"
     )
     client.post(step_url("review"))
     assert _setup_items(board) == []

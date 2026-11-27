@@ -103,7 +103,7 @@ GROUP_NOTES: dict[str, str] = {
         f"and whether reserve funds count as surplus at all. Refunding an owner's own credit "
         f"(for example after a sale) is not a surplus distribution."
     ),
-    "Sign-in and security": (
+    "Account recovery": (
         "Not set by the Act; a board security policy. The Act does not regulate how owners "
         "sign in. The waiting period and the lock afterwards protect votes, notices and "
         "payments if someone else gets into an owner's email."

@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}{{ committee.name }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'committees' %}">Committees</a> / {{ committee.name }}</div>
+  <div class="crumbs"><a href="{% url 'board_and_committees' %}">Board and committees</a> / {{ committee.name }}</div>
   <div class="page-head"><div><h1>{{ committee.name }}</h1>
     <div class="meta">{% if committee.citation %}<span>{% icon "book" %}{{ committee.citation }}</span>{% endif %}{% if not committee.active %}<span class="badge">Retired</span>{% endif %}</div>
     {% if committee.purpose %}<p class="subtitle">{{ committee.purpose }}</p>{% endif %}</div>

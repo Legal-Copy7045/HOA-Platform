@@ -6,6 +6,34 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.33.0 — 2026-11-27
+
+- Acting for the board is now easy to see (D64). Pages in the board's
+  sections carry a "Board" label beside their heading and a coloured strip
+  at the top; in the menu, Association, Maintenance, Finance and Admin sit
+  under one "Board" heading in the same colour. Decision buttons say who is
+  acting ("Approve for the board") and their confirmation ends "You're
+  acting for the association."; where a decision is about your own home or
+  your own request, the page says another board member must decide before
+  you click. Board members with a home see their dashboard in two parts,
+  "Board work" (first when something waits there) and "Your home". Board
+  and staff notification emails start with "[Board]"; statements, notices
+  and receipts don't. Same login, same menu, no extra sign-in.
+- Settings opens on Community setup: where setup stands and every step,
+  then "Change one thing" links. Features is one page (the setup step), and
+  My items has one banner for setup and the rules still missing a citation.
+- Shorter board menu: Reserve plan, Online payments, Disbursements and
+  Resale certificates moved to More finance; only the busiest board section
+  starts open. Server task history is on Sysadmin activity for the board.
+  Committees open from Board and committees.
+- Clearer names: the setup step for recovery waiting times is "Account
+  recovery rules" ("Sign-in and security" is your own page); "Record payments
+  received" (owners' payments) and "Write checks" (the association's
+  checks); the My items group "Owner requests", with one line of links
+  instead of count tiles; a former owner's menu section is "My history".
+  The manager's Settings and the auditor's Community settings link straight
+  to the page.
+
 ## 0.32.0 — 2026-11-27
 
 - Walkthrough 2 fixes, part A (D63). The dashboard and Community settings no

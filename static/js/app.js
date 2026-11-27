@@ -442,3 +442,19 @@ portalButtonConfirm();
     });
   }
 })();
+
+// Board cue (D64): the "Board" badge rendered by base.html in the strip at
+// the top of a board page moves beside the page's heading (an eyebrow above
+// the <h1>, so the heading's own text stays the page name).
+(function () {
+  "use strict";
+  var badge = document.querySelector("[data-board-badge]");
+  var h1 = document.querySelector("main .page-head h1") || document.querySelector("main h1");
+  if (!badge || !h1 || !h1.parentNode) return;
+  var tag = badge.cloneNode(true);
+  tag.removeAttribute("data-board-badge");
+  tag.classList.add("board-badge-head");
+  tag.setAttribute("aria-hidden", "true"); // the strip already says it
+  h1.parentNode.insertBefore(tag, h1);
+  document.documentElement.classList.add("board-badge-moved");
+})();

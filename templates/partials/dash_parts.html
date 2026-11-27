@@ -1,0 +1,18 @@
+{% load portal %}{# D64: the dashboard of someone with a home and board work, in two headed parts. #}
+{% for p in dash.parts %}
+  <section class="card dash-part" id="part-{{ p.key }}" aria-labelledby="part-{{ p.key }}-h">
+    <div class="card-head"><h2 id="part-{{ p.key }}-h" class="dash-part-title">{% if p.key == "board" %}<span class="board-badge">{{ nav.work_label }}</span> {% endif %}{{ p.title }}</h2>{% if p.more %}<a class="small desktop-only" href="{% url 'my_items' %}">See all in My items</a>{% endif %}</div>
+    {% if p.todos %}
+      <ul class="list">{% for t in p.todos %}{% include "partials/todo.html" %}{% endfor %}</ul>
+      {% if p.todos|length > 4 or p.more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all in My items</a>{% endif %}
+    {% elif p.key == "board" %}
+      {% include "partials/empty.html" with icon="check-circle" title="No board work waiting" text="Requests, approvals and follow-ups for the association will appear here." %}
+    {% else %}
+      {% include "partials/empty.html" with icon="check-circle" title="Nothing needs you for your home" %}
+    {% endif %}
+    {% if p.quick %}<div class="form-actions">{% for q in p.quick %}<a class="btn secondary" href="{{ q.url }}">{% icon q.icon %} {{ q.label }}</a>{% endfor %}</div>{% endif %}
+    {% if p.key == "board" and dash.staff.stats %}
+      <div class="grid grid-4">{% for st in dash.staff.stats %}<a class="stat {% if st.tone %}tone-{{ st.tone }}{% endif %}" href="{{ st.url }}"><div class="label">{{ st.label }}</div><div class="value">{% if st.money %}{{ st.value|cents }}{% else %}{{ st.value }}{% endif %}</div>{% if st.hint %}<div class="hint">{{ st.hint }}</div>{% endif %}</a>{% endfor %}</div>
+    {% endif %}
+  </section>
+{% endfor %}

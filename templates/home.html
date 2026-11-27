@@ -37,6 +37,7 @@
 
   {% comment %} To-dos first (UX review): the same list as My items and the sidebar counts.
      Roles that are never assigned anything get their usual pages instead (WT-016). {% endcomment %}
+  {% if dash.parts %}{% include "partials/dash_parts.html" %}{% else %}
   {% if dash.shortcuts %}
   <section class="card" id="shortcuts">
     <h2>Your pages</h2>
@@ -60,7 +61,7 @@
       <h2 id="quick-actions-h">Quick actions</h2>
       <div class="form-actions">{% for q in dash.quick %}<a class="btn secondary" href="{{ q.url }}">{% icon q.icon %} {{ q.label }}</a>{% endfor %}</div>
     </nav>
-  {% endif %}
+  {% endif %}{% endif %}
 
   {% for m in o.proxy_meetings %}
     <div class="alert info">{% icon "vote" %}<span><strong>{{ m.title }}</strong>, {{ m.starts_at|date:"l, F j, Y" }}: owners vote at this meeting. Can't attend? <a href="{% url 'meeting_detail' m.pk %}#proxy">Give a proxy</a></span></div>
@@ -78,7 +79,7 @@
     </div>
   {% endif %}
 
-  {% if s and s.stats %}
+  {% if s and s.stats and not dash.parts %}
     <div class="grid grid-4">
       {% for st in s.stats %}
         <a class="stat {% if st.tone %}tone-{{ st.tone }}{% endif %}" href="{{ st.url }}"><div class="label">{{ st.label }}</div><div class="value">{% if st.money %}{{ st.value|cents }}{% else %}{{ st.value }}{% endif %}</div>{% if st.hint %}<div class="hint">{{ st.hint }}</div>{% endif %}</a>

@@ -62,7 +62,7 @@ def test_only_the_board_switches_and_it_is_audited(client, w):
         client.force_login(user)
         assert client.post(reverse("feature_settings"), {"feature": "faq"}).status_code == 403
     client.force_login(w["board"])
-    page = client.get(reverse("feature_settings")).content
+    page = client.get(reverse("feature_settings"), follow=True).content
     assert b"Common area reservations" in page
     client.post(reverse("feature_settings"), {"feature": "calendar"})
     assert features.enabled("calendar") is False
