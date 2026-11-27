@@ -734,7 +734,7 @@ def board_items(user) -> list:
                 "Owners who agreed to email get it at once; the others need a paper copy.",
                 reverse("special_assessment_detail", args=[sa.pk]),
                 "warning",
-                nav="finance_more",
+                nav="special_assessments",
             )
         )
     return items

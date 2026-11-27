@@ -457,7 +457,9 @@ def neighbors_page(request):
             raise Http404
         save(lot, *wanted(""))
         messages.success(request, f"Neighbors of {lot.label} saved.")
-        return redirect(f"{_neighbors_url()}#lot-{lot.number}")
+        # Back to the list it was opened from (WT-035: one home at a time).
+        back = "?show=missing" if request.POST.get("show") == "missing" else ""
+        return redirect(f"{_neighbors_url()}{back}#home-{lot.number}")
     names = signoffs.owner_names([lot.pk for lot in lots])
     rows = []
     for lot in lots:
@@ -471,9 +473,43 @@ def neighbors_page(request):
                 "others": sides["other"],
                 "left_name": names.get(sides["left"].pk, "") if sides["left"] else "",
                 "right_name": names.get(sides["right"].pk, "") if sides["right"] else "",
+                "missing": not (sides["left"] and sides["right"]),
             }
         )
-    return render(request, "arc/neighbors.html", {"rows": rows})
+    # WT-035: a find box, a Missing neighbors filter and one home at a time
+    # (?home=N: three fields and Save, the single-row POST above, the same
+    # service as Save all). Phones get the compact list; the bulk form stays
+    # for computers. Never logged or audited, like the other find boxes.
+    missing = sum(r["missing"] for r in rows)
+    total = len(rows)
+    show = request.GET.get("show", "")
+    if show != "missing":
+        show = ""
+    q = request.GET.get("q", "").strip()[:100]
+    shown = [r for r in rows if r["missing"]] if show else rows
+    if q:
+        needle = q.lower()
+        shown = [
+            r
+            for r in shown
+            if (q.isdigit() and r["lot"].number == int(q))
+            or needle in r["lot"].label.lower()
+            or needle in r["owners"].lower()
+        ]
+    edit = pick(request.GET.get("home"))
+    edit_row = next((r for r in rows if edit and r["lot"].pk == edit.pk), None)
+    return render(
+        request,
+        "arc/neighbors.html",
+        {
+            "rows": shown,
+            "total": total,
+            "missing": missing,
+            "show": show,
+            "q": q,
+            "edit": edit_row,
+        },
+    )
 
 
 def _neighbors_url():

@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Interest on overdue balances · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs">{% hub_crumb "finance_more" %}Interest on overdue balances</div>
+  <div class="crumbs">{% hub_crumb "finance_overview" %}Interest on overdue balances</div>
   <div class="page-head"><div><h1>Interest on overdue balances</h1>
     <p class="subtitle">Simple interest on past-due {% term "terms" %}, posted once a month on each account at the rate the Declaration allows. Never compounded.</p></div>
     {% if can_post and not policy.problem and due and candidates %}<div class="actions"><form method="post" data-confirm="Post this month's interest on {{ candidates|length }} account{{ candidates|length|pluralize }}? Each appears on the owner's statement with how it was worked out.">{% csrf_token %}<input type="hidden" name="do" value="post"><button type="submit">{% for_board "Post this month's interest" %}</button></form></div>{% endif %}

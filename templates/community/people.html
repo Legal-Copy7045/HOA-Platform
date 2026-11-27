@@ -9,17 +9,14 @@
         {% if access_review.due %}A review is due: the board checks every login's access each quarter.{% else %}The next review is due within 90 days of the last one.{% endif %}</p>
     </section>
   {% endif %}
-  <form method="get" class="inline-form list-search" role="search" action="#results">{% if login %}<input type="hidden" name="login" value="{{ login }}">{% endif %}<div class="grow"><label for="people-q">Find a person</label><input id="people-q" type="search" name="q" value="{{ q }}" maxlength="100" placeholder="Name, email or home address" autocomplete="off"></div><button type="submit" class="secondary">Find</button>{% if q %}<a class="btn secondary" href="{% url 'people' %}{% if login %}?login={{ login }}{% endif %}#results">Show all {{ total }}</a>{% endif %}</form>
+  {# Who has not signed up is answered in one place, by home: the Sign-ups view of Homes and owners (WT-001, D88). #}
+  {% if user|can:"invite.send" %}<p class="small muted" id="signups-link">Who has signed up, and invitations: <a href="{% url 'lot_list' %}?view=signups">Sign-ups (by home)</a>.</p>{% endif %}
+  <form method="get" class="inline-form list-search" role="search" action="#results"><div class="grow"><label for="people-q">Find a person</label><input id="people-q" type="search" name="q" value="{{ q }}" maxlength="100" placeholder="Name, email or home address" autocomplete="off"></div><button type="submit" class="secondary">Find</button>{% if q %}<a class="btn secondary" href="{% url 'people' %}#results">Show all {{ total }}</a>{% endif %}</form>
   <div data-swap-region id="results" class="swap-anchor">
-  <nav class="filters" aria-label="Sign-in" data-swap>
-    <a href="?{% if q %}q={{ q|urlencode }}{% endif %}#results"{% if not login %} aria-current="true"{% endif %}>Everyone</a>
-    <a href="?login=active{% if q %}&amp;q={{ q|urlencode }}{% endif %}#results"{% if login == "active" %} aria-current="true"{% endif %}>Signed up</a>
-    <a href="?login=none{% if q %}&amp;q={{ q|urlencode }}{% endif %}#results"{% if login == "none" %} aria-current="true"{% endif %}>Not signed up yet</a>
-  </nav>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Name</th><th>Login</th></tr></thead>
     <tbody>{% for p in people %}<tr><td class="cell-title"><a href="{% url 'person_detail' p.pk %}">{{ p.display_name }}</a></td><td data-label="Login">{% if p.user_id %}<span class="status tone-success">Active</span>{% else %}<span class="status tone-neutral">Not yet</span>{% endif %}</td></tr>
-    {% empty %}<tr><td colspan="2">{% if q or login %}{% include "partials/empty.html" with icon="users" title="Nobody matches" %}{% else %}{% include "partials/empty.html" with icon="users" title="No people yet" %}{% endif %}</td></tr>{% endfor %}</tbody>
+    {% empty %}<tr><td colspan="2">{% if q %}{% include "partials/empty.html" with icon="users" title="Nobody matches" %}{% else %}{% include "partials/empty.html" with icon="users" title="No people yet" %}{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   </div>
   <details class="panel"><summary>Add a person</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Add person</button></div></form></div></details>

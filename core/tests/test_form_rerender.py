@@ -5,6 +5,8 @@ page comes back with the bound form, a summary at the top naming the fields to
 fix, the errors beside each field, and its collapsed panel open.
 """
 
+import re
+
 import pytest
 from django.urls import reverse
 
@@ -47,7 +49,8 @@ def test_invalid_form_comes_back_with_the_input_and_errors(client, board, name):
     assert "Nothing has been saved yet" in page  # the summary at the top
     assert 'role="alert"' in page
     assert "has-error" in page  # the error beside the field
-    assert '<details class="panel" open' in page  # the form's panel opens itself
+    # The form's panel opens itself (a board panel carries board-panel too, D88).
+    assert re.search(r'<details class="panel[^"]*" open', page)
 
 
 def test_vendor_detail_invalid_edit_is_kept(client, board):

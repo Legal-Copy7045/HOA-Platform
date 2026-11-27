@@ -355,6 +355,10 @@ def ledger_home(request):
             ],
             "with_balance": with_balance,
             "home_count": len(lots),
+            # Counts on the filter links, and how many paid-up homes the
+            # "With a balance" view leaves out (WT-037).
+            "balance_count": (owing := sum(1 for lot in lots if bal.get(lot.pk, 0))),
+            "paid_up_count": len(lots) - owing,
             "total_owed": sum(v for v in bal.values() if v > 0),
             "total_credit": -sum(v for v in bal.values() if v < 0),
             "default_period": default_period,
@@ -1481,3 +1485,13 @@ def collection_letter(request, pk):
         messages.error(request, str(exc))
         return redirect("collection_detail", pk=case.pk)
     return pdf_response(data, f"{kind}-notice-lot-{case.lot.number}.pdf")
+
+
+@login_required
+def finance_overview(request):
+    """Finance overview (D89): every finance component this person may open,
+    with its status, its own waiting count and a link."""
+    policy.require(request.user, "finance.view")
+    from ledger import finance_overview as overview
+
+    return render(request, "ledger/finance_overview.html", overview.build(request))

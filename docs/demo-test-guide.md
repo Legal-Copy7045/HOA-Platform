@@ -96,7 +96,7 @@ treasurer and it works.
 |---|---|
 | Association -> Owner requests | "Tree limb over my driveway (demo)" (submitted) |
 | Association -> Architectural review | "Pergola over the patio (demo)" (submitted) |
-| Finance -> More finance -> Disbursements | Refund to 108 Fictional Meadow Lane (waiting for approval) |
+| Finance -> Finance overview -> Disbursements | Refund to 108 Fictional Meadow Lane (waiting for approval) |
 | Association -> Homes and owners -> 108 Fictional Meadow Lane | Add "Jordan Sitter (demo)" as an authorized contact (pending) |
 
 The ARC reviewer at 126 Fictional Meadow Lane is next door to 128 Fictional
@@ -240,14 +240,14 @@ approved in advance under the mowing contract (GL-M1).
 - Accounting: one deposit and a bank reconciliation; next year's budget is a
   draft (adopt it), this year's adopted; the reserve plan has an adopted
   snapshot.
-- Disbursements (More finance): refunds waiting for approval (108 Fictional
+- Disbursements (Finance overview): refunds waiting for approval (108 Fictional
   Meadow Lane, own matter; 169 Imaginary Orchard Way, fresh), approved and
   waiting for its check (116 Fictional Meadow Lane), check issued and waiting
   to clear (138 Fictional Meadow Lane), cleared (153 Imaginary Orchard Way),
   voided and ready for a new check (155 Imaginary Orchard Way), declined (161
   Imaginary Orchard Way), and a surplus distribution waiting for approval. 165
   Imaginary Orchard Way has a credit nobody has proposed to refund yet.
-- Bank feed (More finance; switched on for the demo): a statement-file account
+- Bank feed (Accounting and the Finance overview; switched on for the demo): a statement-file account
   with one line matched and the rest to match.
 
 ### Community (Community menu)

@@ -366,7 +366,7 @@
   last: "not done yet"
 - key: tax worksheet with the preparer
   check: "The tax preparer reviews the Form 1120-H worksheet and the IRIS upload file against the current IRS forms and IRIS template (columns, rate, threshold) and confirms the PA annual report deadline."
-  steps: "Finance > More finance > Tax worksheet; download the PDF, CSV and IRIS file."
+  steps: "Finance > Finance overview > Tax worksheet; download the PDF, CSV and IRIS file."
 - key: finance options read right on a phone
   check: "With the six finance options on (demo data), the Cash-flow forecast table, a capital project, an insurance claim, the legal panel of a referred collection case and the owners' Budget and reserves summary read without sideways scrolling on a phone, and the statement PDF shows the interest line in full."
   steps: "Settings, Features: switch on the finance options (the demo has them on); open each page on a phone as a board member and the owners' page as an owner; download a delinquent home's statement."
@@ -384,5 +384,12 @@
   steps: "VM console as hoa; run the script, then --rotate after uploading one demo document; open the document as a board member after each step."
 - key: vendor check alignment
   check: "Checks prints an approved invoice's check on the association's stock with the same positions as refund checks: date, payee, amount, amount in words, memo with the invoice number (or the reimbursement claim) and the payee's address in a #10 window envelope all line up; the check number on the stock matches the number recorded."
-  steps: "Sign in as a demo board member; Finance > More finance > Checks; tick an approved demo invoice; Print checks (PDF) at 100% onto a voided blank check; fold into a window envelope; Record as issued with the stock's number; confirm the invoice shows Paid and the register lists the check."
+  steps: "Sign in as a demo board member; Finance > Finance overview > Checks; tick an approved demo invoice; Print checks (PDF) at 100% onto a voided blank check; fold into a window envelope; Record as issued with the stock's number; confirm the invoice shows Paid and the register lists the check."
+- key: phone tab strips wrap
+  check: "On a 390 px phone, the Finance tabs (Owner accounts, Collections, Accounting, Reports) and the Homes and owners views (Homes, Accounts, Sign-ups) wrap onto a second line with every tab visible; nothing scrolls sideways; the dashboard's Latest news card is as wide as the cards above it; Owner accounts shows one line per home (D88)."
+  steps: "POC with fictional data, signed in as a demo board member on an iPhone and an Android phone (or the browser's 390 px phone view); open Owner accounts, Reports, Homes and owners and the dashboard."
+  last: ""
+- key: finance overview on a phone
+  check: "On a 390 px phone and on a desktop, a demo board member's Finance overview shows the cards (one column on the phone) with each card's number beside its title, and the Finance menu number equals the sum of the numbers on the cards; the dashboard's Record payments received button has clear space above the stat tiles; the demo manager's and auditor's overview shows only what they may open (D89)."
+  steps: "POC with fictional data (oak_creek), signed in as a demo board member, the demo manager and the demo auditor; compare the menu bubble with the cards; check the dashboard on both widths."
   last: ""

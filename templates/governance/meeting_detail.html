@@ -12,25 +12,20 @@
   <div class="split">
     <section class="card prose"><h2>Agenda</h2>{{ m.agenda|default:"No agenda yet."|linebreaks }}</section>
     <aside>
-      {% if packets or can_build_packet %}<section class="card" id="packet"><h3>Meeting packet</h3>
+      {% if packets %}<section class="card" id="packet"><h3>Meeting packet</h3>
         {% for variant, p in packets.items %}<div class="stack">
           <p class="small"><strong>{% if variant == "board" %}Board packet{% else %}Owner packet{% endif %}</strong>{% if variant == "board" %} <span class="badge tone-warning">Confidential – board only</span>{% endif %}<br><span class="muted">Built {{ p.built_at|short_date }}, version {{ p.version.number }}</span></p>
           <a class="btn secondary small" href="{% url 'document_download' p.document_id %}">{% icon "file" %} Packet (PDF)</a>
           <a class="btn secondary small" href="{% url 'meeting_packet_zip' m.pk p.pk %}">{% icon "file" %} Packet with attachments (.zip)</a>
           {% if p.not_in_zip %}<p class="small muted" data-testid="not-in-zip">{{ p.not_in_zip }} attachment{{ p.not_in_zip|pluralize }} {{ p.not_in_zip|pluralize:"is,are" }} not included in the .zip; NOT-INCLUDED.txt inside it says why.</p>{% endif %}
-        </div>{% empty %}<p class="muted small">No packet yet.</p>{% endfor %}
-        {% if can_build_packet and m.status != "cancelled" %}<p><a class="btn small" href="{% url 'meeting_packet' m.pk %}">Build packet</a></p>{% endif %}
+        </div>{% endfor %}
       </section>{% endif %}
       <section class="card"><h3>Notice</h3>{% if m.notice_sent_at %}<p>{% icon "check" %} Sent {{ m.notice_sent_at|date:"M j, Y" }}</p>{% elif m.kind == "executive" %}<p class="muted small">Executive sessions are not noticed to owners and are not on the community calendar.</p>{% else %}<p class="muted small">Not sent yet.</p>{% endif %}
-        {% if paper %}<div class="stack" data-testid="paper-notices">
-          {% if paper.paper_mailed %}<p class="small">{% icon "check" %} Paper notices mailed {{ paper.paper_mailed.1.mailed_on|date:"M j, Y" }} to {{ paper.paper_mailed.0.homes_count }} home{{ paper.paper_mailed.0.homes_count|pluralize }}{% if paper.paper_sorted is not None %} — {{ paper.paper_sorted }} sorted for delivery (<a href="{% url 'paper_mail_detail' paper.paper_mailed.0.pk %}#tracking">USPS tracking</a>){% endif %}.</p>
-          {% elif paper.paper_open %}<p class="small"><a href="{% url 'paper_mail_detail' paper.paper_open.pk %}">{% icon "mail" %} Paper notices prepared ({{ paper.paper_open.letters_count }} letter{{ paper.paper_open.letters_count|pluralize }}), not marked as mailed</a></p>
-          {% elif paper.paper_homes and m.status == "scheduled" %}<p class="small">{{ paper.paper_homes }} home{{ paper.paper_homes|pluralize }} need{{ paper.paper_homes|pluralize:"s," }} a paper notice{% if m.notice_sent_at %}{% else %} (once the notice is sent){% endif %}.</p><p><a class="btn secondary small" href="{% url 'paper_mail_new' %}?meeting={{ m.pk }}">{% icon "mail" %} Prepare paper notices</a></p>{% endif %}
-        </div>{% endif %}
         {% if m.calendar_event_id and m.kind != "executive" %}<p class="small"><a href="{% url 'event_detail' m.calendar_event_id %}">{% icon "calendar" %} On the community calendar</a></p>{% endif %}</section>
-      {% if can_manage %}
-        {# Board steps in the order they happen, only those that apply now (WT-008); collapsed on phones (WT-044, static/js/app.js). #}
-        <details class="panel board-actions" id="board-actions" open{% if not minutes_form.errors and not approve_form.errors %} data-collapse-narrow{% endif %}><summary>Board actions</summary><div class="panel-body stack">
+      {% if can_manage or paper or can_build_packet and m.status != "cancelled" or can_record_resolution and m.status != "cancelled" %}
+        {# Every board control on this page in one panel with the Board cue (WT-013, D88): the owner-facing part of the page has no board buttons. Steps in the order they happen, only those that apply now (WT-008); collapsed on phones (WT-044, static/js/app.js). #}
+        <details class="panel board-actions board-panel" id="board-actions" open{% if not minutes_form.errors and not approve_form.errors %} data-collapse-narrow{% endif %}><summary>{% include "partials/board_cue.html" %} Board actions</summary><div class="panel-body stack">
+        {% if can_manage %}
           {% if m.status == "scheduled" %}
             {% if m.kind != "executive" and not m.notice_sent_at %}<form method="post" action="{% url 'meeting_action' m.pk 'notice' %}" class="stack" data-testid="step-notice" data-confirm="Email the notice to every owner who has consented? Owners who have not consented to email need a paper notice; the page lists how many.">{% csrf_token %}
               <h4>1. Send the notice</h4>
@@ -55,12 +50,20 @@
             {% elif minutes_approval %}<p class="small muted">{% icon "check" %} Minutes approved {{ minutes_approval.approved_on|short_date }}{% if minutes_approval.note %}: {{ minutes_approval.note }}{% endif %}.</p>
             {% elif m.minutes_document_id %}<p class="small muted">Minutes attached. A board member marks them approved, usually at the next meeting.</p>{% endif %}
           {% else %}<p class="small muted">This meeting was cancelled.</p>{% endif %}
+        {% endif %}
+        {% if paper %}<div class="stack" data-testid="paper-notices"><h4>Paper notices</h4>
+          {% if paper.paper_mailed %}<p class="small">{% icon "check" %} Paper notices mailed {{ paper.paper_mailed.1.mailed_on|date:"M j, Y" }} to {{ paper.paper_mailed.0.homes_count }} home{{ paper.paper_mailed.0.homes_count|pluralize }}{% if paper.paper_sorted is not None %} — {{ paper.paper_sorted }} sorted for delivery (<a href="{% url 'paper_mail_detail' paper.paper_mailed.0.pk %}#tracking">USPS tracking</a>){% endif %}.</p>
+          {% elif paper.paper_open %}<p class="small"><a href="{% url 'paper_mail_detail' paper.paper_open.pk %}">{% icon "mail" %} Paper notices prepared ({{ paper.paper_open.letters_count }} letter{{ paper.paper_open.letters_count|pluralize }}), not marked as mailed</a></p>
+          {% elif paper.paper_homes and m.status == "scheduled" %}<p class="small">{{ paper.paper_homes }} home{{ paper.paper_homes|pluralize }} need{{ paper.paper_homes|pluralize:"s," }} a paper notice{% if m.notice_sent_at %}{% else %} (once the notice is sent){% endif %}.</p><p><a class="btn secondary small" href="{% url 'paper_mail_new' %}?meeting={{ m.pk }}">{% icon "mail" %} Prepare paper notices</a></p>
+          {% else %}<p class="small muted">No paper notices needed.</p>{% endif %}
+        </div>{% endif %}
+        {% if can_build_packet and m.status != "cancelled" %}<div class="stack" id="build-packet"><h4>Meeting packet</h4>{% if not packets %}<p class="small muted">No packet yet.</p>{% endif %}<p><a class="btn small" href="{% url 'meeting_packet' m.pk %}">Build packet</a></p></div>{% endif %}
+        {% if can_record_resolution and m.status != "cancelled" %}<div class="stack" id="record-resolution"><h4>Resolutions</h4><p><a class="btn secondary small" href="{% url 'resolutions' %}?meeting={{ m.pk }}#record">{% icon "plus" %} Record a resolution adopted at this meeting</a></p></div>{% endif %}
         </div></details>
       {% endif %}
     </aside>
   </div>
-  {% if linked_votes or linked_elections or linked_resolutions or can_record_resolution %}<section class="card" id="decisions"><div class="card-head"><h2>Votes, elections and resolutions</h2>
-    {% if can_record_resolution and m.status != "cancelled" %}<a class="btn secondary small" href="{% url 'resolutions' %}?meeting={{ m.pk }}#record">{% icon "plus" %} Record a resolution adopted at this meeting</a>{% endif %}</div>
+  {% if linked_votes or linked_elections or linked_resolutions %}<section class="card" id="decisions"><div class="card-head"><h2>Votes, elections and resolutions</h2></div>
     {% if linked_votes or linked_elections or linked_resolutions %}<ul class="list">
       {% for v in linked_votes %}<li><div class="todo-icon">{% icon "vote" %}</div><div class="grow"><a class="title" href="{% url 'vote_detail' v.pk %}">{{ v.title }}</a><div class="small muted">{{ v.get_kind_display }}{% if v.status == "open" and v.closes_at %} · vote by {{ v.closes_at|date:"M j, Y g:i A" }}{% endif %}</div></div>{% status v.status v.get_status_display %}</li>{% endfor %}
       {% for e in linked_elections %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow"><a class="title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a><div class="small muted">Board election · {{ e.seats }} seat{{ e.seats|pluralize }}{% if e.state == "voting" and e.voting_closes_at %} · vote by {{ e.voting_closes_at|date:"M j, Y g:i A" }}{% endif %}</div></div>{% status e.state e.get_state_display %}</li>{% endfor %}

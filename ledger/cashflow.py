@@ -475,7 +475,7 @@ def my_items(user) -> list:
             f"{what}; {len(rows)} month{'s' if len(rows) != 1 else ''} flagged",
             reverse("cashflow"),
             "warning",
-            nav="finance_more",
+            nav="cashflow",
         )
     ]
 

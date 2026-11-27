@@ -2,6 +2,7 @@
 {% load portal %}
 {% block title %}Board and committees · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "community_info" %}Board and committees</nav>
   <div class="page-head"><div><h1>Board and committees</h1>
     <p class="subtitle">Who serves the community.{% if user|can:"request.submit" %} To reach the board, <a href="{% url 'requests' %}?mine=1">send a request</a>.{% endif %}</p></div></div>
   <section class="card" aria-labelledby="board-h">

@@ -490,7 +490,7 @@ def board_items(user) -> list:
                     + (f" · {st['have']} of {st['need']} approvals" if st["need"] > 1 else ""),
                     url,
                     "warning",
-                    nav="finance_more",
+                    nav="reimbursements",
                 )
             )
         elif st["status"] == "approved" and payer and not payment_refusal(user, claim):
@@ -501,7 +501,7 @@ def board_items(user) -> list:
                     "By check from Checks, or record a bank transfer.",
                     url,
                     "info",
-                    nav="finance_more",
+                    nav="reimbursements",
                 )
             )
     return items

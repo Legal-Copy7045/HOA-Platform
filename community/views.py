@@ -288,14 +288,9 @@ def people(request):
         people_ = people_.filter(
             Q(display_name__icontains=q) | Q(email__icontains=q) | Q(pk__in=home_people)
         )
-    login = request.GET.get("login", "")
-    if login == "none":
-        people_ = people_.filter(user__isnull=True)
-    elif login == "active":
-        people_ = people_.filter(user__isnull=False)
-    else:
-        login = ""
-    context = {"people": people_, "form": form, "q": q, "login": login, "total": total}
+    # No sign-up filters here: Homes and owners' Sign-ups view is the one
+    # place that answers who has not signed up (WT-001, D88).
+    context = {"people": people_, "form": form, "q": q, "total": total}
     if policy.can(request.user, "access_review.record"):
         # The quarterly access review lives here, not in Settings (streamlining).
         from accounts import access_review

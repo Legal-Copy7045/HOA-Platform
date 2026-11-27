@@ -163,10 +163,10 @@ def test_voting_new_buttons_open_their_panel_with_no_second_heading(client, w):
     page = client.get(reverse("voting")).content.decode()
     assert 'data-opens="new-vote"' in page
     # The closed panel is not shown: only the header button offers "New vote".
-    assert '<details class="panel" hidden id="new-vote" data-hide-closed>' in page
+    assert '<details class="panel board-panel" hidden id="new-vote" data-hide-closed>' in page
     page = client.get(reverse("voting") + "?new=vote").content.decode()
     assert 'data-opens="new-vote"' not in page
-    assert '<details class="panel" open id="new-vote" data-hide-closed>' in page
+    assert '<details class="panel board-panel" open id="new-vote" data-hide-closed>' in page
     assert 'data-opens="new-election"' in page
 
 
@@ -384,7 +384,7 @@ def test_tab_bar_only_offers_pages_the_menu_offers(client, w):
         "input[type=file]::file-selector-button",
         ".split > aside .btn",
         ".tabbar {",
-        "@media (max-width: 640px) {\n  .subnav { flex-wrap: nowrap;",
+        "@media (max-width: 640px) {\n  .subnav { flex-wrap: wrap;",
     ],
 )
 def test_site_css_fixes_at_the_source(rule):

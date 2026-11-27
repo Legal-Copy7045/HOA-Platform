@@ -34,7 +34,7 @@ const WIDTHS = {
 };
 // Downloads (with or without a query string) are not pages; same list as pages.js.
 // /help/ask/ is the "Ask the board" shortcut: it forwards to a new owner request by design (D73).
-const SKIP = [/logout/, /\/help\/ask\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
+const SKIP = [/logout/, /\/help\/ask\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=(csv|pdf)/, /\/disbursements\/\d+\/register\//, /download/, /\/files?\//, /\/letters?\//, /statement/,
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 // Downloads checked as downloads (expect a file, not a page): the meeting
 // packet .zip (WT-003, WT-042).
@@ -106,7 +106,8 @@ function readPage() {
   const buttons = uniq([...main.querySelectorAll('.page-actions a, .page-actions button, a.btn, button, input[type=submit]')]
     .map((b) => clean(b) || b.value || b.getAttribute('aria-label'))).slice(0, 40);
   const links = [...main.querySelectorAll('a[href]')];
-  const tiles = [...main.querySelectorAll('ul.tiles a.tile')].map((a) => ({
+  // Hub tiles only: Welcome's tiles introduce pages that are also in the menu.
+  const tiles = [...main.querySelectorAll('ul.tiles:not(.welcome-tiles) a.tile')].map((a) => ({
     label: clean(a.querySelector('strong')), href: a.getAttribute('href'), text: clean(a.querySelector('span')),
   }));
   return {
@@ -192,7 +193,37 @@ function layoutChecks(args) {
       if (r.width < tap || r.height < tap) small.push(describe(el, `${Math.round(r.width)}x${Math.round(r.height)}px`));
     }
   }
-  return { scroll, overflow, small };
+  // Action rows that sit on, or touch, the boxes after them (D88: the
+  // dashboard's Record payments received sat on the stat tiles), and stat
+  // tiles or tiles that overlap a button. Cards in one column of the
+  // dashboard have one width (WT-033).
+  const touch = [];
+  const meets = (a, b) => a.left < b.right && b.left < a.right;
+  for (const row of all('.form-actions, .quick-row, .actions-row')) {
+    if (!visible(row)) continue;
+    const next = row.nextElementSibling;
+    if (!next || !visible(next)) continue;
+    const a = row.getBoundingClientRect();
+    const b = next.getBoundingClientRect();
+    if (meets(a, b) && b.top < a.bottom + 4) touch.push(describe(row, `touches the ${next.tagName.toLowerCase()}${typeof next.className === 'string' && next.className ? '.' + next.className.split(/\s+/)[0] : ''} below it (${Math.round(b.top - a.bottom)}px apart)`));
+  }
+  const boxes = all('.stat, .tiles .tile').filter(visible).map((el) => [el, el.getBoundingClientRect()]);
+  for (const btn of all('a.btn, button').filter(visible)) {
+    const r = btn.getBoundingClientRect();
+    for (const [box, b] of boxes) {
+      if (box.contains(btn) || btn.contains(box)) continue;
+      if (r.left < b.right - 1 && b.left < r.right - 1 && r.top < b.bottom - 1 && b.top < r.bottom - 1) {
+        touch.push(describe(btn, `overlaps ${describe(box, '')}`));
+        break;
+      }
+    }
+  }
+  const dash = document.querySelector('.split.dash');
+  if (phone && dash) {
+    const widths = all('.split.dash .card').filter(visible).map((el) => Math.round(el.getBoundingClientRect().width));
+    if (widths.length > 1 && Math.max(...widths) - Math.min(...widths) > 2) touch.push(`dashboard cards differ in width (${widths.join(', ')}px)`);
+  }
+  return { scroll, overflow, small, touch };
 }
 
 // --- Crawl ---------------------------------------------------------------------------
@@ -267,7 +298,7 @@ async function visit(view, role, width, p) {
   const u = new URL(page.url());
   const final = u.pathname + u.search;
   let info = {};
-  let layout = { scroll: 0, overflow: [], small: [] };
+  let layout = { scroll: 0, overflow: [], small: [], touch: [] };
   try {
     info = await page.evaluate(readPage);
     layout = await page.evaluate(layoutChecks, { phone: width === 'phone', tap: TAP });
@@ -322,6 +353,8 @@ async function walkRole(browser, role) {
       add(`${role} ${width}: ${key} has no sideways scroll`, rec.layout.scroll <= 1, `${rec.layout.scroll}px wider than the screen`, ev);
       add(`${role} ${width}: ${key} nothing runs off screen or out of its box`, rec.layout.overflow.length === 0,
         rec.layout.overflow.slice(0, 6).join('; '), ev);
+      add(`${role} ${width}: ${key} buttons and boxes do not overlap or touch`, (rec.layout.touch || []).length === 0,
+        (rec.layout.touch || []).slice(0, 6).join('; '), ev);
       if (width === 'phone') {
         add(`${role} phone: ${key} tap targets at least ${TAP}x${TAP} px`, rec.layout.small.length === 0,
           `${rec.layout.small.length} small: ${rec.layout.small.slice(0, 6).join('; ')}`, ev);

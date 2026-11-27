@@ -8,8 +8,9 @@ from django.utils import timezone
 from audit.models import AuditEvent
 from core import policy
 
-# Sysadmin activity shows one window of days at a time, newest first (WT-013).
-WINDOW_DAYS = 30
+# Sysadmin activity shows one window of days at a time, newest first (WT-013);
+# a week by default, with Older (WT-022: a month was a 7,500 px page).
+WINDOW_DAYS = 7
 
 
 def sysadmin_events():
@@ -37,7 +38,8 @@ def _bounds(day: datetime.date) -> datetime.datetime:
     return timezone.make_aware(datetime.datetime.combine(day, datetime.time.min))
 
 
-ROWS_PER_PAGE = 100
+# About 25 compact rows a page (WT-022).
+ROWS_PER_PAGE = 25
 DETAILS_PER_ROW = 20
 
 
@@ -64,7 +66,7 @@ def _collapse(events) -> list[dict]:
 
 @login_required
 def sysadmin_activity(request):
-    """Sysadmin activity, a window of days at a time (the last 30 by
+    """Sysadmin activity, a window of days at a time (the last 7 by
     default) with Older/Newer, grouped by day, filtered by person and
     action, and an audited CSV export of what is shown (WT-013)."""
     policy.require(request.user, "audit.view_sysadmin_activity")

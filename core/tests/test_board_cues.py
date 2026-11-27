@@ -343,16 +343,17 @@ def test_manager_reaches_paper_mail_settings_from_paper_mail(client):
 
 
 def test_more_finance_hub(client, board):
+    """More finance became the Finance overview (D89)."""
     client.force_login(board)
-    response = client.get(reverse("finance_more"))
+    response = client.get(reverse("finance_more"), follow=True)
     html = response.content.decode()
-    assert "<h1>More finance</h1>" in html
+    assert "<h1>Finance overview</h1>" in html
     for name in ("reserve_plan", "disbursements", "resales"):
         assert f'href="{reverse(name)}"' in html, name
     current = [i["label"] for _s, i in _entries(client.get(reverse("resales")))]
-    assert "Resale certificates" not in current and "More finance" in current
+    assert "Resale certificates" not in current and "Finance overview" in current
     marked = [i["label"] for _s, i in _entries(client.get(reverse("resales"))) if i["current"]]
-    assert marked == ["More finance"]
+    assert marked == ["Finance overview"]
 
 
 def test_board_reads_server_tasks_on_sysadmin_activity(client, board):

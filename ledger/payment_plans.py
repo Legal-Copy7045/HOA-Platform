@@ -549,6 +549,7 @@ def board_items(user) -> list:
                     "board member or the manager.",
                     url,
                     "warning",
+                    nav="payment_plans",  # the Finance overview card (D89)
                 )
             )
         elif st == "active" and can(user, "collections.manage"):
@@ -566,6 +567,7 @@ def board_items(user) -> list:
                         url,
                         "danger",
                         due=first["default_on"],
+                        nav="payment_plans",
                     )
                 )
     return items

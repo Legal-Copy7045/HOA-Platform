@@ -53,7 +53,7 @@
       </header>
       <main id="main" class="content{% if nav.board_page and not own_matter %} board-page{% endif %} {% block content_class %}{% endblock %}">
         {% if nav.board_page and not own_matter %}{# D64: a work-section page; derived from the menu (core.navigation.build), never per template. static/js/app.js moves the badge beside the page's heading. D65: a page about the viewer's own matter (views pass own_matter) is the homeowner's context, so no badge. #}
-          <p class="board-strip" data-board-cue><span class="board-badge" data-board-badge>{{ nav.work_label }}</span> <span class="board-strip-text">{% if nav.work_label == "Board" %}You're acting for the association on this page.{% else %}A staff page of the association.{% endif %}</span></p>
+          <p class="board-strip" data-board-cue><span class="board-badge" data-board-badge>{{ nav.work_label }}</span> <span class="board-strip-text">{% if nav.work_label == "Board" %}You're acting for the association on this page.{% elif nav.work_label == "ARC" %}You're acting for the Architectural Review Committee on this page.{% else %}A staff page of the association.{% endif %}</span></p>
         {% endif %}
         {% if nav.recovery_locked_until %}
           <div class="alert warning recovery-lock" role="status">{% icon "lock" %}<span><strong>Your sign-in was recently recovered.</strong> For your security, voting, proxies, contact details, notice and text choices, automatic payments and account change requests are available again on {{ nav.recovery_locked_until }}. <a href="{% url 'account_recovery_status' %}">Why?</a></span></div>
