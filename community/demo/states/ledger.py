@@ -76,10 +76,29 @@ def seed(c) -> None:
     )
     ledger.reverse_entry(wrong, reason="Wrong home (demo).", actor=manager)
 
-    # Not seeded: a payment or credit moved to another account of the home
-    # (reassign_entry). allocation.backfill does not replay the move's
-    # unwinding, so ledger/tests/test_allocation.py's rebuild of the seeded
-    # community would no longer match (reported with the demo work).
+    # A payment moved to another account of the home (reassign_entry): the
+    # seller of lot 31 paid their last bill after the sale, so the board
+    # moves it from the buyer's account back to the seller's (D87: the
+    # rebuild of history replays moves too).
+    from community.demo.oak_creek import TRANSFERRED_LOT
+    from community.models import Account
+
+    sold = lots[TRANSFERRED_LOT]
+    seller_account = Account.objects.filter(lot=sold, closed_on__isnull=False).first()
+    if seller_account is not None:
+        late = ledger.record_payment(
+            lot=sold,
+            amount_cents=4500,
+            received_on=c.days(-30),
+            reference="SETTLE-31",
+            actor=manager,
+        )
+        ledger.reassign_entry(
+            late,
+            account_id=seller_account.pk,
+            reason="The seller's last payment, sent after the sale (demo).",
+            actor=treas,
+        )
 
     # --- Collection cases at every step ------------------------------------------------
     C = ledger.COLLECTION

@@ -710,14 +710,6 @@ def propose_refund(
     _check_total(amount_cents)
     with system_access("refund proposal"):
         account = Account.objects.select_related("lot").get(pk=account.pk)
-    conflicts.refuse(
-        actor,
-        account,
-        area="disbursement",
-        action="propose",
-        request=request,
-        error=DisbursementError,
-    )
     person_id = roles_for(actor).person_id if actor is not SYSTEM else None
     if person_id is not None and person_id in {p.pk for p in account_owners(account.pk)}:
         conflicts.audit_refusal(
@@ -726,6 +718,14 @@ def propose_refund(
         raise DisbursementError(
             "You are or were an owner on this account; another board member proposes its refund."
         )
+    conflicts.refuse(
+        actor,
+        account,
+        area="disbursement",
+        action="propose",
+        request=request,
+        error=DisbursementError,
+    )
     defaults = refund_defaults(account)
     if amount_cents > defaults["available_cents"]:
         raise DisbursementError(
@@ -1422,18 +1422,19 @@ def _declined_batches() -> list:
 
 
 @internal("checks for owners")
-def checks_for_account(account_id: int | None) -> list[dict]:
+def checks_for_account(account_id: int | None, *, before=None) -> list[dict]:
     """The checks written to one ownership account's owners, for their own
     pages (My account, My history): number, date, amount, address, and
-    whether it was voided. Nothing about any other account."""
+    whether it was voided. Nothing about any other account. ``before``: only
+    checks issued before that date (a co-owner removed from an account that
+    stays open sees nothing from after they left, D87)."""
     if not account_id:
         return []
     out = []
-    for check in (
-        DisbursementCheck.objects.filter(line__account_id=account_id)
-        .select_related("line__batch")
-        .order_by("issued_on", "id")
-    ):
+    rows = DisbursementCheck.objects.filter(line__account_id=account_id)
+    if before is not None:
+        rows = rows.filter(issued_on__lt=before)
+    for check in rows.select_related("line__batch").order_by("issued_on", "id"):
         status = check_status(check)
         out.append(
             {

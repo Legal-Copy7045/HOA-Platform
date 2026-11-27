@@ -105,8 +105,11 @@ class TwilioProvider(SmsProvider):
                 "Content-Type": "application/x-www-form-urlencoded",
             },
         )
+        # Never follow a redirect: urllib would carry the Basic credentials to
+        # the new host (D87), as every other outbound client refuses.
+        opener = urllib.request.build_opener(_NoRedirect)
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310  # nosec B310
+            with opener.open(request, timeout=10) as response:  # nosec B310
                 return SendResult(ok=200 <= response.status < 300)
         except urllib.error.HTTPError as exc:
             code = None
@@ -117,6 +120,13 @@ class TwilioProvider(SmsProvider):
         except (urllib.error.URLError, TimeoutError, OSError):
             logger.warning("sms.send_failed", extra={"status": 0})
             return SendResult(ok=False)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A 3xx answer is returned as an error, never followed."""
+
+    def redirect_request(self, *args, **kwargs):
+        return None
 
 
 def provider() -> SmsProvider:

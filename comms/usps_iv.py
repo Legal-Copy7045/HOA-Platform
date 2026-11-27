@@ -114,7 +114,12 @@ def config() -> Config:
     auth = (getattr(settings, "USPS_IV_AUTH_HOST", "") or auth_default).strip().lower()
     if not (valid_host(api) and valid_host(auth)):
         return Config(env, "", "", False, "USPS hosts must be usps.com names.")
-    if not (settings.USPS_IV_USERNAME and settings.USPS_IV_PASSWORD):
+    # The password reaches the worker container only (it polls USPS); the
+    # web container is told that one is set, for the status lines (D87).
+    password_set = bool(settings.USPS_IV_PASSWORD) or bool(
+        getattr(settings, "USPS_IV_PASSWORD_SET", False)
+    )
+    if not (settings.USPS_IV_USERNAME and password_set):
         return Config(env, api, auth, False, "USPS_IV_USERNAME and USPS_IV_PASSWORD are not set.")
     return Config(env, api, auth, True)
 
@@ -271,6 +276,9 @@ def authenticate() -> None:
     """Sign in with the BCG login; keeps the tokens in memory."""
     cfg = config()
     if not cfg.configured:
+        raise UspsError(0, "not_configured")
+    if not settings.USPS_IV_PASSWORD:
+        # A container without the password (web): only the worker signs in.
         raise UspsError(0, "not_configured")
     payload = {
         "username": settings.USPS_IV_USERNAME,

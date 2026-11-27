@@ -9,12 +9,15 @@ class Command(BaseCommand):
     help = "Check the Stripe key: reachable, test or live mode, read rights in place."
 
     def handle(self, *args, **options):
-        from payments import stripe_api
+        from payments import providers, stripe_api
 
         try:
             stripe_api.secret_key()
         except Exception as exc:
-            raise CommandError("No usable Stripe key is set (STRIPE_SECRET_KEY).") from exc
+            problem = providers.config().problem  # never the key itself
+            raise CommandError(
+                f"No usable Stripe key is set (STRIPE_SECRET_KEY). {problem}".strip()
+            ) from exc
         checks = [
             ("balance", "/v1/balance", None),
             ("checkout_sessions", "/v1/checkout/sessions", {"limit": 1}),

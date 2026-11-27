@@ -1,5 +1,6 @@
 """Open-item accounting (D32-payments): each charge has its own open balance."""
 
+import contextlib
 import datetime
 import random
 
@@ -269,6 +270,61 @@ def test_seeded_community_rebuilds_to_the_same_balances(settings):
         a = services.aging(pk)
         total = sum(a[b] for b in services.BUCKETS) - a["credit"]
         assert total == before[pk]
+
+
+def test_rebuild_after_a_move_to_another_account_gives_the_same_balances(w):
+    """D87: a move (reassign_entry) made while allocation is suspended leaves
+    no rows of its own, so the rebuild replays the whole history, move
+    included, and every account ends as it does when posted live."""
+    from community.models import Account, Person
+
+    def scenario(suspend):
+        lot = LotFactory()
+        make_member(lots=[lot])
+        with allocation.suspended() if suspend else contextlib.nullcontext():
+            services.post_charge(
+                lot=lot, kind="other_charge", amount_cents=4500, description="Repair",
+                posted_on=D(2026, 3, 1), actor=w["board"],
+            )  # fmt: skip
+            pay = services.record_payment(
+                lot=lot, amount_cents=3000, received_on=D(2026, 4, 20), reference="9",
+                actor=w["board"],
+            )  # fmt: skip
+            with system_access("t"):
+                buyer = Person.objects.create(display_name="Buyer (test)")
+            community.transfer_lot(
+                lot, new_owners=[buyer], transfer_date=D(2026, 4, 10), actor=SYSTEM
+            )
+            services.post_charge(
+                lot=lot, kind="other_charge", amount_cents=1000, description="Key",
+                posted_on=D(2026, 5, 1), actor=w["board"],
+            )  # fmt: skip
+            with system_access("t"):
+                seller, buyer_account = Account.objects.filter(lot=lot).order_by("opened_on")
+                moved = LedgerEntry.objects.filter(moved_from=pay).first()
+            services.reassign_entry(
+                moved, account_id=seller.pk, reason="Seller's check", actor=w["board"]
+            )
+        return lot, [seller, buyer_account]
+
+    def state(lot, accounts):
+        return [
+            (
+                services.balance(lot.pk, account=a.pk),
+                allocation.unapplied_credit(lot.pk, account=a.pk),
+                sum(c.open_cents for c in allocation.open_charges(lot.pk, account=a.pk)),
+            )
+            for a in accounts
+        ]
+
+    live = state(*scenario(False))
+    lot, accounts = scenario(True)
+    with system_access("t"):
+        assert not PaymentApplication.objects.filter(lot=lot).exists()
+    qs = lambda m: m.objects.unscoped("test")  # noqa: E731
+    allocation.backfill(LedgerEntry, PaymentApplication, ChargeNumber, qs=qs)
+    assert state(lot, accounts) == live == [(1500, 0, 1500), (1000, 0, 1000)]
+    _invariant(lot.pk)
 
 
 def test_owner_sees_open_charges_with_payments_applied(client, w):

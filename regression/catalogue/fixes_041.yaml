@@ -1,0 +1,34 @@
+# Fixes for the 2026-11-27 full check findings (D87). `match` runs over "<stage>:<check>".
+- feature: "Own matters on a former ownership account (BUG-001, SEC-001): a seller's dormant account, or one a removed co-owner left, stays their own; no charge, credit, payment (backdated or batch), reversal, Move to account onto it or refund proposal by them; another board member may"
+  since: D87
+  match: ["^unit:ledger/tests/test_own_former_account.py::test_"]
+- feature: "A co-owner removed by a deed change sees on My history only checks from before they left (R2-001)"
+  since: D87
+  match: ["^unit:community/tests/test_removed_co_owner_history.py::test_"]
+- feature: "ARC recusal for affected and neighboring homes counts owners, authorized and view-only contacts, tenants, and whoever owned the home when the request arose (R2-003)"
+  since: D87
+  match: ["^unit:arc/tests/test_recusal_affected_homes.py::test_"]
+- feature: "A candidate does not open, extend or close their own election; refused and audited (BUG-003)"
+  since: D87
+  match: ["^unit:governance/tests/test_candidate_timing.py::test_"]
+- feature: "Account recovery: 'still waiting' notices capped at one a day per person (R2-004); statement emails and the weekly digest locked after a recovery (R2-005)"
+  since: D87
+  match: ["^unit:accounts/tests/test_recovery.py::test_(still_waiting_notices_are_capped_per_day|the_lock_blocks_every_listed_service|directory_choice_stays_open_during_the_lock)"]
+- feature: "Stripe: only a restricted key (rk_) is accepted anywhere, and check_stripe says why (SEC-002)"
+  since: D87
+  match: ["^unit:payments/tests/test_stripe.py::test_keys_are_refused_outside_their_mode", "^unit:core/tests/test_setup_scripts.py::test_(check_stripe_refuses_a_full_secret_key_and_says_why|stripe_script_refuses_a_full_secret_key)"]
+- feature: "check_db_role refuses a superuser, BYPASSRLS, CREATEROLE or CREATEDB runtime role (SEC-006)"
+  since: D87
+  match: ["^unit:community/tests/test_commands.py::test_check_db_role_refuses_a_powerful_runtime_role"]
+- feature: "The SMS client never follows a redirect (SEC-003)"
+  since: D87
+  match: ["^unit:comms/tests/test_sms.py::test_twilio_never_follows_a_redirect"]
+- feature: "Sign-in background pictures pass the malware scan gate before they are decoded (SEC-005)"
+  since: D87
+  match: ["^unit:community/tests/test_branding.py::test_the_picture_is_malware_scanned_before_it_is_decoded"]
+- feature: "Secrets on the server: the USPS password reaches only the worker; set-*.sh keep the old .env copy at mode 600 only until the check passes (R2-007)"
+  since: D87
+  match: ["^unit:core/tests/test_setup_scripts.py::test_(secret_scripts_remove_the_old_env_copy_after_a_passed_check|usps_password_reaches_only_the_worker)", "^unit:comms/tests/test_usps_tracking.py::test_web_container_knows_a_login_is_set_but_never_signs_in"]
+- feature: "Rebuilding allocations after a Move to account gives the same balances; the demo seeds a move (allocation fix)"
+  since: D87
+  match: ["^unit:ledger/tests/test_allocation.py::test_(rebuild_after_a_move_to_another_account_gives_the_same_balances|seeded_community_rebuilds_to_the_same_balances)", "^unit:community/tests/test_demo_coverage.py::test_special_cases_are_seeded\\[a payment moved"]

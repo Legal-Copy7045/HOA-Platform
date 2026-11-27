@@ -40,6 +40,7 @@ if [[ "$PASSWORD" == *"'"* || "$PASSWORD" =~ [[:cntrl:]] ]]; then
 fi
 
 cp -p .env .env.before-usps
+chmod 600 .env.before-usps
 set_env .env USPS_IV_ENVIRONMENT "$ENVIRONMENT"
 set_env .env USPS_IV_USERNAME "$USERNAME"
 set_env .env USPS_IV_PASSWORD "'$PASSWORD'"
@@ -47,9 +48,12 @@ unset PASSWORD
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Signing in to USPS (no mail is looked up)"
-if ! "${COMPOSE[@]}" exec -T web python manage.py check_usps_iv; then
+# Only the worker container has the password (D87): check from there.
+if ! "${COMPOSE[@]}" exec -T worker python manage.py check_usps_iv; then
   echo "The check failed (above). To undo: cp .env.before-usps .env && sudo bash infra/poc/start-portal.sh" >&2
   exit 1
 fi
+shred -u .env.before-usps 2>/dev/null || rm -f .env.before-usps
+echo "Removed .env.before-usps (the copy of the previous settings, with the old secret)."
 echo "Done. Switch on USPS tracking in Admin -> Features; Settings -> Paper mail settings shows the connection."
-echo "To undo: cp .env.before-usps .env && sudo bash infra/poc/start-portal.sh"
+echo "To change the login, run this script again."

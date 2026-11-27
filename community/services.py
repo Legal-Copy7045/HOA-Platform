@@ -1547,6 +1547,20 @@ def update_my_profile(
     from community.models import ContactProfile
     from community.notices import CONSENT_VERSION
 
+    if weekly_digest is not None or statement_emails is not None:
+        # Statement emails and the weekly digest decide what reaches the
+        # owner's inbox: locked after an account recovery too (D87).
+        with system_access("email choices before the lock check"):
+            current = (
+                ContactProfile.objects.filter(person__user=user)
+                .values("weekly_digest", "statement_emails")
+                .first()
+            ) or {"weekly_digest": False, "statement_emails": True}
+        if (weekly_digest is not None and weekly_digest != current["weekly_digest"]) or (
+            statement_emails is not None and statement_emails != current["statement_emails"]
+        ):
+            _refuse_if_locked(user, "email choices")
+
     with transaction.atomic(), system_access("update_my_profile"):
         person = Person.objects.filter(user=user).first()
         if person is None:

@@ -210,7 +210,7 @@ Goal: every login ends up with a strong second factor (passkey or authenticator 
 - **Accounts made by commands:** the first officer (`bootstrap_first_officer`) gets an invitation link and the same window. If they miss it, `breakglass_enrollment_code` covers them while fewer than two other board members can sign in. Seeded demo logins have no password, and if they sign in by code they are signed out like anyone else. There is no keep-logins flow at this commit. Django admin is refused in production (`core/settings/production.py:48`).
 - **Rate limits:** axes (5 failures per email and IP), allauth's login-by-code limits (3 tries per code, plus its request limits), and 5 tries per reset code, after which the board is told.
 - **Audit:** invitation created, sent, re-sent, revoked and accepted (now with `setup_again`); authenticator added and removed; recovery codes; reset steps; sign-out without a window (new).
-- **Logging:** paths are masked in Django's request loggers, gunicorn access logs are off, error signatures never hold the path, the referrer policy is same-origin, and the landing page redirects without rendering anything.
+- **Logging:** paths are masked in Django's request loggers, gunicorn access logs are off, error signatures never hold the path, the referrer policy is same-origin, and the landing page (`/`) shows a signed-out visitor only a static welcome (the site name and a Sign in button, `templates/home.html`): no portal data, nothing about any account (corrected 2026-11-27, SEC-004; it renders, it does not redirect).
 
 ### Note for the concurrent recovery work
 

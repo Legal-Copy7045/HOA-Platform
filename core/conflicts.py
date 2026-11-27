@@ -17,6 +17,9 @@ A matter is one's own when the actor's Person
 * is today an owner on the deed or an account contact (authorized,
   view-only or tenant) of the lot it concerns (``scope_lot_path``), or
 * owned that lot when the matter arose (a former owner's era), or
+* is or was ever on the deed of the ownership account it concerns (an
+  ``Account``, or a record whose ``account`` is one: a seller's dormant
+  account, or one a removed co-owner left, stays theirs; D87), or
 * the model says so (``conflict_of_interest(user)``, e.g. ARC recusal for
   an affected neighbor).
 
@@ -29,6 +32,7 @@ recused ARC reviewer (comms.threads).
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 
 from django.core.exceptions import PermissionDenied
@@ -148,6 +152,77 @@ def _roles_lots(roles) -> frozenset[int]:
     return roles.owned_lot_ids | roles.account_lot_ids | roles.tenant_lot_ids
 
 
+def party_to_lots(actor, lot_ids, on: datetime.date | None = None, *, roles=None) -> bool:
+    """Whether the actor is a party to any of ``lot_ids``: an owner on the
+    deed, an account contact (authorized, view-only) or a tenant today, or,
+    with ``on``, an owner on that date (the home's era). Used for a matter's
+    own home and, by ARC recusal, for affected and neighboring homes (D87)."""
+    lots = set(lot_ids)
+    if not lots:
+        return False
+    roles = roles or policy.roles_for(actor)
+    if lots & _roles_lots(roles):
+        return True
+    if on is not None:
+        for lot_id, start, end in roles.former_periods:
+            if lot_id in lots and start <= on < end:
+                return True
+    return False
+
+
+def matter_date(obj) -> datetime.date | None:
+    """When the matter arose (for the former owner's era)."""
+    return _matter_date(obj)
+
+
+def _account_id(obj) -> int | None:
+    """The ownership account ``obj`` concerns: the Account itself, or the
+    account of a record with an ``account`` foreign key to one."""
+    from django.core.exceptions import FieldDoesNotExist
+
+    from community.models import Account
+
+    if isinstance(obj, Account):
+        return obj.pk
+    meta = getattr(obj, "_meta", None)
+    if meta is None:
+        return None
+    try:
+        field = meta.get_field("account")
+    except FieldDoesNotExist:
+        return None
+    if getattr(field, "related_model", None) is not Account:
+        return None
+    return getattr(obj, "account_id", None)
+
+
+def deed_account_ids(actor) -> frozenset[int]:
+    """Every ownership account the actor's Person is or ever was on the deed
+    of (current, dormant, or left by a deed change). Remembered on the login
+    like its roles (core.policy invalidates both)."""
+    from community.models import Ownership
+    from core.scoping import system_access
+
+    roles = policy.roles_for(actor)
+    if roles.person_id is None:
+        return frozenset()
+    from django.utils import timezone
+
+    generation = (policy._ROLES_GENERATION[0], timezone.localdate(), roles.person_id)
+    cached = getattr(actor, "_deed_accounts_cache", None)
+    if cached is not None and cached[0] == generation:
+        return cached[1]
+    with system_access("own matter: accounts ever on the deed"):
+        ids = frozenset(
+            Ownership.objects.filter(
+                person_id=roles.person_id, account_id__isnull=False
+            ).values_list("account_id", flat=True)
+        )
+    with contextlib.suppress(AttributeError):
+        actor._deed_accounts_cache = (generation, ids)
+    return ids
+
+
 def own_matter(actor, obj, *, hooks: bool = True) -> bool:
     """Whether ``obj`` (a matter, a Lot or a Person) is ``actor``'s own.
     ``hooks=False`` leaves out the model's own rule (for that rule itself)."""
@@ -161,12 +236,11 @@ def own_matter(actor, obj, *, hooks: bool = True) -> bool:
         return True
     if roles.person_id is not None and roles.person_id in people:
         return True
-    if lots & _roles_lots(roles):
+    if party_to_lots(actor, lots, on, roles=roles):
         return True
-    if lots and on is not None:
-        for lot_id, start, end in roles.former_periods:
-            if lot_id in lots and start <= on < end:
-                return True
+    account_id = _account_id(obj)
+    if account_id is not None and account_id in deed_account_ids(actor):
+        return True
     hook = getattr(obj, "conflict_of_interest", None) if hooks else None
     return bool(hook and hook(actor))
 

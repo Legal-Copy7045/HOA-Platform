@@ -225,6 +225,12 @@ def _vote_extended():
     return Vote.objects.get(title=EXTENDED_VOTE).extended_at is not None
 
 
+def _payment_moved():
+    from audit.models import AuditEvent
+
+    return AuditEvent.objects.filter(action="ledger.entry_reassigned").exists()
+
+
 CHECKS = {
     "ARC deemed approval": _deemed,
     "invoice waiting for its second approval": _invoice_waiting_for_second_approval,
@@ -235,6 +241,7 @@ CHECKS = {
     "records requests overdue and due soon": _overdue_records,
     "documents with versions and an archived one": _versions,
     "an extended vote": _vote_extended,
+    "a payment moved to another account of the home": _payment_moved,
 }
 
 

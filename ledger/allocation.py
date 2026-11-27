@@ -265,9 +265,16 @@ def post_moved(lot_id: int, items: list) -> list:
     """Number and apply the copies ``move_entries`` posted (with
     ``_defer_allocation``), all at once: each payment copy first pays the
     copies of the charges its original paid (``items``: (copy, charge copy
-    ids)), then everything left follows the rule (fixres BUG-002)."""
+    ids)), then everything left follows the rule (fixres BUG-002).
+
+    Like ``after_post``, nothing is applied while allocation is suspended:
+    otherwise a move made then would leave the lot with only the move's rows,
+    and ``backfill`` (which skips lots that have applications) would never
+    replay the rest of its history (D87)."""
     from ledger.models import PaymentApplication
 
+    if _suspended.get():
+        return []
     with transaction.atomic():
         _lock(_LOCK_NAMESPACE, lot_id)
         for copy, _directed in items:

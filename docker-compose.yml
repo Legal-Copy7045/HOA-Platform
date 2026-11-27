@@ -100,7 +100,9 @@ x-app-env: &app-env
   # USPS tracking (optional feature "usps_tracking"; infra/poc/set-usps.sh).
   USPS_IV_ENVIRONMENT: ${USPS_IV_ENVIRONMENT:-cat}
   USPS_IV_USERNAME: ${USPS_IV_USERNAME:-}
-  USPS_IV_PASSWORD: ${USPS_IV_PASSWORD:-}
+  # The password goes to the worker alone (it polls USPS; D87); the others
+  # are only told whether one is set.
+  USPS_IV_PASSWORD_SET: ${USPS_IV_PASSWORD:+true}
   USPS_IV_API_HOST: ${USPS_IV_API_HOST:-}
   USPS_IV_AUTH_HOST: ${USPS_IV_AUTH_HOST:-}
   # Bounced email (optional feature "bounce_tracking"; infra/poc/set-bounce-mailbox.sh).
@@ -228,7 +230,9 @@ services:
     <<: *app
     command: ["worker"]
     mem_limit: 512m
-    environment: *app-env
+    environment:
+      <<: *app-env
+      USPS_IV_PASSWORD: ${USPS_IV_PASSWORD:-}
     depends_on:
       migrate: {condition: service_completed_successfully}
 

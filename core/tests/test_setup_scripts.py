@@ -28,6 +28,37 @@ def test_stripe_script_checks_the_key_after_saving_it():
     assert script.index("start-portal.sh") < script.index("manage.py check_stripe")
 
 
+@pytest.mark.parametrize(
+    "name", ["set-stripe-key.sh", "set-teller.sh", "set-usps.sh", "set-bounce-mailbox.sh"]
+)
+def test_secret_scripts_remove_the_old_env_copy_after_a_passed_check(name):
+    """D87 (R2-007): the .env.before-* copy holds the superseded secret; it is
+    mode 600 while the check runs and removed once it passes."""
+    script = (POC / name).read_text()
+    backup = script.split("cp -p .env ", 1)[1].split()[0]
+    assert f"chmod 600 {backup}" in script
+    after_check = script.split("manage.py check_", 1)[1]
+    assert f"shred -u {backup}" in after_check
+    # The failed-check branch (before the removal) still says how to undo.
+    assert after_check.index(f"cp {backup} .env") < after_check.index(f"shred -u {backup}")
+
+
+def test_stripe_script_refuses_a_full_secret_key():
+    script = (POC / "set-stripe-key.sh").read_text()
+    assert 'if [[ "$KEY" == sk_* ]]; then' in script
+    assert "^rk_(test|live)_" in script
+
+
+def test_usps_password_reaches_only_the_worker():
+    compose = Path("docker-compose.yml").read_text()
+    shared = compose.split("x-logging", 1)[0]
+    assert "  USPS_IV_PASSWORD: " not in shared
+    assert "USPS_IV_PASSWORD_SET: ${USPS_IV_PASSWORD:+true}" in shared
+    worker = compose.split("\n  worker:\n", 1)[1].split("\nvolumes:", 1)[0]
+    assert "USPS_IV_PASSWORD: ${USPS_IV_PASSWORD:-}" in worker
+    assert "exec -T worker python manage.py check_usps_iv" in (POC / "set-usps.sh").read_text()
+
+
 def test_check_teller_reports_what_is_missing(settings):
     settings.TELLER_APPLICATION_ID = ""
     settings.TELLER_ENVIRONMENT = "development"
@@ -85,6 +116,20 @@ def test_check_stripe_reports_mode_and_missing_rights(monkeypatch, capsys):
     monkeypatch.setattr(stripe_api, "get", refused)
     with pytest.raises(CommandError, match="refused the key"):
         call_command("check_stripe")
+
+
+def test_check_stripe_refuses_a_full_secret_key_and_says_why(settings):
+    """D87 (SEC-002): only a restricted key; the message names the fix, never the key."""
+    fake = "sk_live_" + "Q" * 24  # synthetic, never a real key
+    settings.PAYMENTS_PROVIDER = "stripe"
+    settings.STRIPE_SECRET_KEY = fake
+    settings.DEPLOYMENT_STAGE = "production"
+    settings.PAYMENTS_LIVE_ALLOWED = True
+    with pytest.raises(CommandError, match=r"restricted key \(rk_") as caught:
+        call_command("check_stripe")
+    assert fake not in str(caught.value)
+    script = Path("infra/poc/set-stripe-key.sh").read_text()
+    assert "sk_" in script and "restricted" in script
 
 
 def test_plain_secondary_buttons_get_the_full_button_style():

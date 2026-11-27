@@ -738,7 +738,10 @@ with `manage.py check_teller`, and offers to delete the copied files.
 trying it with fake banks; `production` is Teller's paid tier).
 `BANK_FEED_TOKEN_KEY` encrypts the stored access key: it is generated once and
 must never change (a new key means reconnecting the bank). Keep a copy in the
-password manager. To undo: `cp .env.before-teller .env` and restart.
+password manager. While the check runs the old file is kept as
+`.env.before-teller` (mode 600); a failed check says how to put it back, and a
+passed check removes it (it holds the old keys, D87). To change it, run the
+script again.
 
 **3. Connect.** A board member: Admin -> Settings -> Features, switch on
 **Bank feed**. Then Finance -> Accounting -> Bank feed -> **Connect a bank**
@@ -836,7 +839,9 @@ items.
    N (debit card)"; refund it in the Stripe dashboard and the portal closes
    the item when it sees the refund.)
 3. On the VM, put the key in `.env` (hidden prompt; never paste a key into a
-   chat, ticket or the repository):
+   chat, ticket or the repository). Only a restricted key (`rk_...`) is
+   accepted: the script and the portal refuse a full secret key (`sk_...`)
+   everywhere (D87), and `check_stripe` says so:
 
    ```bash
    sudo bash /opt/hoa-portal/infra/poc/set-stripe-key.sh
@@ -1078,7 +1083,7 @@ With USPS tracking on, the portal reads USPS scans of barcoded paper mail itself
    sudo bash /opt/hoa-portal/infra/poc/set-usps.sh
    ```
 
-   Choose `cat` (the default) or `production`, type the BCG user name and the password (hidden). The script saves them in `.env` (a copy of the old file is kept as `.env.before-usps`), restarts the portal and signs in once with `manage.py check_usps_iv` (no mail is looked up). It prints `OK: signed in to ...` or what failed. To undo: `cp .env.before-usps .env && sudo bash infra/poc/start-portal.sh`. When CAT works, run it again with `production`.
+   Choose `cat` (the default) or `production`, type the BCG user name and the password (hidden). The script saves them in `.env` (the old file is kept as `.env.before-usps`, mode 600, until the check passes, then removed, D87), restarts the portal and signs in once with `manage.py check_usps_iv` in the worker container, the only one given the password (no mail is looked up). It prints `OK: signed in to ...` or what failed; a failed check says how to put the old file back. To change the login, run it again. When CAT works, run it again with `production`.
 4. **Switch it on:** Admin → Features → USPS tracking. Settings → Paper mail settings then shows "Connected to the USPS test environment (CAT)" (or "Connected to USPS Informed Visibility") and when it last checked. The tracking barcode must be on for the mailing: only letters printed with it can be followed.
 
 **What the statuses mean** (mailing page, USPS tracking card):
@@ -1127,10 +1132,11 @@ that bounced, until a mailing for that home is prepared or someone presses
    It asks the IMAP host (e.g. `imap.example.org`), the port (993), the user
    name, the folder (INBOX), the optional envelope sender and the password
    (hidden), saves them in `.env` (the old file is kept as
-   `.env.before-bounce-mailbox`), restarts the portal and signs in once with
+   `.env.before-bounce-mailbox`, mode 600, until the check passes, then
+   removed, D87), restarts the portal and signs in once with
    `manage.py check_bounce_mailbox` (no message is read). It prints
-   `OK: signed in to ...` or what failed. To undo:
-   `cp .env.before-bounce-mailbox .env && sudo bash infra/poc/start-portal.sh`.
+   `OK: signed in to ...` or what failed; a failed check says how to put the
+   old file back. To change the mailbox, run it again.
 4. **Switch it on:** Admin → Features → Bounced email. System status then has a
    "Bounce mailbox" check (last read, hard bounces in the last 7 days), and the
    Community setup's server step shows it as set up.

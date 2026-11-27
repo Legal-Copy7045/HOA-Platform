@@ -938,3 +938,21 @@ Decided:
 8. **Process:** features are batched into few releases, one pull request each, pushed once after local checks.
 
 Trade-off accepted: CodeQL and the image scan of unchanged images move from every change to weekly, so a new finding can take up to a week to surface; the D57 gates otherwise stay. Expected cost: about 25 to 30 minutes per release plus about 40 a week for the scheduled runs. A self-hosted runner on a separate, isolated Proxmox VM would cost no minutes; not set up (the owner's choice).
+
+## D87. Fixes from the 2026-11-27 full check (2026-11-27)
+
+The owner (2026-11-27): "Fix the issues you've highlighted".
+
+1. **A former ownership account stays one's own** (BUG-001, SEC-001). `core.conflicts.own_matter` treats an `Account`, and any record whose `account` is one (ledger entries, disbursement lines, contacts), as the actor's own when they are or ever were on its deed (`conflicts.deed_account_ids`): a seller's dormant account, or the open account a removed co-owner left. The ledger refuses on the account an entry lands on, not only on the home: charges, credits, payments by hand (a backdated one lands on the seller's account by date), batches, reversals, and Move to account onto it (`ledger.services._refuse_own_account`). Refund proposals already refused (D66).
+2. **My history checks stop at the end of one's time** (R2-001) when the account stays open after a deed change, as the statement already did.
+3. **ARC recusal for affected and neighboring homes** (R2-003) uses the same party test as the request's own home (`conflicts.party_to_lots`): owners, authorized and view-only contacts and tenants today, and whoever owned the home when the request arose.
+4. **A candidate does not choose when their election runs** (BUG-003): opening, extending and closing (early or by hand) are refused and audited, as certifying was (`elections.refuse_candidate`).
+5. **Recovery** (R2-004, R2-005): at most one "your recovery is still waiting" email a day per person; statement emails and the weekly digest join the post-recovery lock (the directory stays open; resending unchanged choices is allowed).
+6. **Stripe accepts only a restricted key** (SEC-002): `sk_` keys are refused everywhere (`payments.providers.FULL_KEY_REFUSED`, `check_stripe`, `set-stripe-key.sh`). An existing `sk_test_` key on the POC stops working until replaced with an `rk_test_` key.
+7. **Database role** (SEC-006): `check_db_role` refuses a runtime role with SUPERUSER, BYPASSRLS, CREATEROLE or CREATEDB.
+8. **Outbound and uploads** (SEC-003, SEC-005): the SMS client refuses redirects like the other clients; the sign-in background picture passes the malware scan gate before Pillow decodes it.
+9. **Secrets on the server** (R2-007): the USPS password goes to the worker container only (web is told one is set, `USPS_IV_PASSWORD_SET`, and never signs in; `set-usps.sh` checks from the worker); `set-stripe-key.sh`, `set-teller.sh`, `set-usps.sh` and `set-bounce-mailbox.sh` keep the old `.env` as `.env.before-*` at mode 600 only until the check passes, then shred it.
+10. **Allocation rebuild after a move**: `allocation.post_moved` applies nothing while allocation is suspended (as `after_post`), so `backfill` replays the whole history, moves included; the demo seeds a move again.
+11. **Documentation** (SEC-004): the security review now says the landing page renders a static welcome for signed-out visitors.
+
+Already fixed in D66 and verified: BUG-002 and R2-006 (refund checks: issue, void, decline, clear refused for anyone ever on the account's deed), R2-002 (payee is today's owners, or the owners at the sale).
