@@ -1,0 +1,20 @@
+{% load portal %}{% if show %}
+<section class="card" id="legal" aria-labelledby="legal-h">
+  <h2 id="legal-h">Legal collection <span class="small muted">(board only)</span></h2>
+  {% if release_due %}<div class="alert warning">{% icon "alert" %}<span>The account is paid and a lien was filed: ask counsel to record the satisfaction or release, then record it here.</span></div>{% endif %}
+  <div class="grid grid-3">
+    <div class="stat"><div class="label">Lien</div><div class="value">{% if info.open_lien %}Filed{% elif info.lien %}Released{% else %}Statutory only{% endif %}</div><div class="hint">{% if info.lien %}{{ info.lien.get_lien_filing_display }}{% if info.lien.reference %} · {{ info.lien.reference }}{% endif %}{% else %}68 Pa.C.S. § 5315: the lien arises without filing{% endif %}</div></div>
+    <div class="stat"><div class="label">Costs and fees</div><div class="value">{{ info.costs_cents|cents }}</div><div class="hint">{{ info.chargeable_cents|cents }} chargeable · {{ info.posted_cents|cents }} charged to the account</div></div>
+    <div class="stat"><div class="label">Recovered</div><div class="value">{{ info.recovered_cents|cents }}</div>{% if info.next_hearing %}<div class="hint">Next hearing {{ info.next_hearing|short_date }}</div>{% endif %}</div>
+  </div>
+  {% if rows %}<ol class="list timeline">{% for e in rows %}<li><span class="muted nowrap">{{ e.occurred_on|short_date }}</span><span class="grow"><strong>{{ e.get_kind_display }}</strong>{% if e.firm %} · {{ e.firm }}{% endif %}{% if e.attorney %} ({{ e.attorney }}){% endif %}{% if e.court %} · {{ e.get_court_display }}{% endif %}{% if e.lien_filing %} · {{ e.get_lien_filing_display }}{% endif %}{% if e.reference %} · {{ e.reference }}{% endif %}{% if e.fee_arrangement %} · fee: {{ e.fee_arrangement }}{% endif %}{% if e.due_on %} · on {{ e.due_on|short_date }}{% endif %}{% if e.amount_cents is not None %} · {{ e.amount_cents|cents }}{% endif %}{% if e.kind == "cost" %} · {% if e.chargeable %}chargeable to the owner{% else %}association's own cost{% endif %}{% endif %}{% if e.detail %}<br><span class="small">{{ e.detail }}</span>{% endif %}<br><span class="small muted">Recorded by {{ e.recorded_by }}</span></span>
+    {% if can_post and e.kind == "cost" and e.chargeable and e in info.unposted %}<form method="post" action="{% url 'collection_legal' case.pk %}" class="inline" data-confirm="Charge {{ e.amount_cents|cents }} to the owner's account? It appears on their statement as collection costs.">{% csrf_token %}<input type="hidden" name="do" value="post_cost"><input type="hidden" name="cost" value="{{ e.pk }}"><button type="submit" class="secondary small">Charge to the owner's account</button></form>{% endif %}</li>{% endfor %}</ol>
+  {% else %}<p class="muted">{% if with_counsel %}Nothing recorded yet.{% else %}Once the board refers this case for legal collection, record the attorney referral here.{% endif %}</p>{% endif %}
+  {% if files %}<h3>Documents</h3><ul class="list">{% for f in files %}<li><a class="grow" href="{% url 'collection_legal_file' case.pk f.pk %}">{% icon "download" %} {{ f.original_filename }}</a><span class="small muted">{{ f.label }}</span></li>{% endfor %}</ul>{% endif %}
+  {% if own_matter %}<p class="board-note small">This is your own home's matter: another board member records its legal steps.</p>
+  {% elif can_record %}<details class="panel"><summary>Record a legal step</summary><div class="panel-body">
+    <form method="post" action="{% url 'collection_legal' case.pk %}" enctype="multipart/form-data" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="record">{{ form }}
+      <div class="field"><label for="legal-file">Document (recorded lien, release, letter)</label><input id="legal-file" type="file" name="file" multiple accept=".pdf,.png,.jpg,.jpeg"></div>
+      <div class="form-actions"><button type="submit">Record</button></div></form>
+    <p class="small muted">Each step is kept as recorded; correct one with a note. Owners never see these records, only charges on their account and letters sent to them.</p></div></details>{% endif %}
+</section>{% endif %}

@@ -971,6 +971,19 @@ def owner_budget(request):
     from core import features
 
     policy.require(request.user, "budget.view_owner")
+    if features.enabled("owner_finance_dashboard", request):
+        # Owners' finance summary (D84): just operating vs reserve and the
+        # budget against actual (ledger/owner_finance.py).
+        from ledger import owner_finance
+
+        return render(
+            request,
+            "ledger/owner_finance.html",
+            {
+                **owner_finance.context(request),
+                "kinds": [("income", "Money in"), ("expense", "Money out")],
+            },
+        )
     show_budget = features.enabled("owner_budget", request)
     show_reserves = features.enabled("reserves", request) and policy.can(
         request.user, "reserves.view_summary"
@@ -991,8 +1004,21 @@ def owner_budget(request):
             "summary": services.budget_summary(budget) if budget else None,
             "dues": rule_with_citation("dues.monthly_cents"),
             "snapshot": snapshot,
+            # The annual accounting of closed fiscal years (D71): the figures
+            # the Declaration has owners receive; nothing per home.
+            "annual_accounting": _owner_annual_accounting(request),
         },
     )
+
+
+def _owner_annual_accounting(request) -> list:
+    from core import features
+
+    if not features.enabled("financial_statements", request):
+        return []
+    from ledger.books import statements
+
+    return statements.owner_annual_accounting()
 
 
 # --- Letters and certificates (Milestone 4) ----------------------------------------------
@@ -1184,6 +1210,7 @@ def accounting(request):
         "ledger/accounting.html",
         {
             "can_manage": can_manage,
+            "books_on": features.enabled("books", request),
             "bank_feed_on": features.enabled("bank_feeds", request)
             and policy.can(request.user, "bank_feed.view"),
             "undeposited": undeposited,

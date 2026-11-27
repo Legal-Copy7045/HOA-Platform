@@ -348,6 +348,118 @@ REGISTRY: dict[str, RuleSpec] = {
             "approve. A surplus distribution approved by an owner who receives part of it "
             "always needs two.",
         ),
+        # Books and close (D69-D71): the association's own books.
+        RuleSpec(
+            "books.auto_close",
+            "Close a month by itself when every check passes",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: from the close day, last month closes by itself once every bank line is "
+            "matched or coded, every account reconciles and nothing else needs the treasurer. "
+            "Off: a board member presses Close.",
+        ),
+        RuleSpec(
+            "books.auto_close_year",
+            "Close a fiscal year by itself once its twelve months are closed",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: the year closes when its checks pass, and the year-end package is built.",
+        ),
+        RuleSpec(
+            "books.close_day",
+            "Day of the month the automatic close starts on last month",
+            DAYS,
+            "3",
+            "Books and close",
+            "Gives the bank time to post the month's last lines. 1 to 28.",
+            maximum=28,
+            minimum=1,
+        ),
+        RuleSpec(
+            "books.undeposited_days",
+            "Days a received payment may wait to be deposited",
+            DAYS,
+            "5",
+            "Books and close",
+            "Older undeposited checks are an exception at month end.",
+        ),
+        RuleSpec(
+            "books.stale_check_days",
+            "Days after which an uncleared check is flagged",
+            DAYS,
+            "90",
+            "Books and close",
+            "A warning on the close, not a block.",
+        ),
+        RuleSpec(
+            "books.reserve_monthly_cents",
+            "Monthly reserve contribution",
+            CENTS,
+            None,
+            "Books and close",
+            "What is transferred to the reserve account each month (the reserve the board "
+            "determines). Blank: the reserve plan's annual contribution divided by 12. A "
+            "shortfall is a warning on the close.",
+        ),
+        RuleSpec(
+            "books.surplus_from_reserve",
+            "Surplus distributions are paid from the reserve fund",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: the statements show a surplus distribution as paid out of the reserve fund "
+            '(the "Surplus distributions paid from" account). Off: from the operating fund.',
+        ),
+        RuleSpec(
+            "books.auto_match",
+            "Confirm unambiguous bank matches by itself",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: a deposit, payout or check that is the only one fitting a bank line (amount, "
+            "date, check number) is matched without waiting for a person.",
+        ),
+        RuleSpec(
+            "books.rule_suggest_after",
+            "Suggest a coding rule after this many lines coded the same way",
+            INT,
+            "3",
+            "Books and close",
+            "Lines coded by hand with the same words and category.",
+            minimum=2,
+        ),
+        # Year-end tax documents (D71-tax).
+        RuleSpec(
+            "tax.hoa_rate_bp",
+            "Federal tax rate on a homeowners association's taxable income (Form 1120-H)",
+            BASIS_POINTS,
+            "3000",
+            "Books and close",
+            "30% for homeowners associations (32% applies only to timeshare associations). "
+            "Used on the Form 1120-H worksheet; confirm with your tax preparer.",
+            maximum=10000,
+        ),
+        RuleSpec(
+            "tax.nonqualifying_accounts",
+            "Expense accounts that are not spending on association property (90% test)",
+            TEXT,
+            "6400 6900",
+            "Books and close",
+            "Account numbers (or their first digits), separated by spaces: e.g. income taxes "
+            "and penalties. Everything else spent, and money set aside in reserves, counts "
+            "towards the 90% test.",
+        ),
+        RuleSpec(
+            "tax.1099_misc_categories",
+            "Expense category codes reported on Form 1099-MISC instead of 1099-NEC",
+            TEXT,
+            "",
+            "Books and close",
+            "For example rent paid for a meeting room. Separated by spaces; blank: all on "
+            "1099-NEC (services).",
+        ),
         RuleSpec(
             "retention.former_owner_contact_days",
             "Days after someone leaves before their contact details are cleared",
@@ -408,6 +520,44 @@ REGISTRY: dict[str, RuleSpec] = {
             "Counted from the day they accept their invitation. The checklist also goes once "
             "every step is done or they hide it. 0 turns the checklist off.",
             maximum=365,
+        ),
+        # D79: vendor onboarding (board vendor policy).
+        RuleSpec(
+            "vendor.onboarding_link_days",
+            "Days a vendor's onboarding link stays open",
+            DAYS,
+            "14",
+            "Vendors",
+            "The emailed link to the vendor information form ends after this many days, or "
+            "when the vendor submits, whichever comes first. 1 to 60.",
+            maximum=60,
+            minimum=1,
+        ),
+        RuleSpec(
+            "vendor.min_general_liability_cents",
+            "Least general liability insurance a vendor should carry",
+            CENTS,
+            "100000000",
+            "Vendors",
+            "Board reviewers see a warning when a certificate shows less. Blank: no warning.",
+        ),
+        RuleSpec(
+            "vendor.min_auto_liability_cents",
+            "Least auto liability insurance a vendor should carry",
+            CENTS,
+            "100000000",
+            "Vendors",
+            "For vendors who bring vehicles onto the property. Blank: no warning.",
+        ),
+        RuleSpec(
+            "vendor.w9_retention_years",
+            "Years a W-9 is kept after the last 1099 year it supports",
+            INT,
+            "4",
+            "Vendors",
+            "After this, the W-9 is listed for two board members to dispose of. At least 3.",
+            maximum=20,
+            minimum=3,
         ),
         *[
             RuleSpec(
@@ -472,6 +622,118 @@ REGISTRY: dict[str, RuleSpec] = {
     ]
 }
 
+# --- Finance options (D80-D85): each belongs to an optional feature and is
+# shown on the setup wizard's "Interest, forecast, legal, projects and
+# claims" step (community/setup.py). Interest is simple interest only: the
+# portal never compounds it.
+INTEREST_GROUP = "Interest on overdue balances"
+LEGAL_GROUP = "Collections legal"
+FORECAST_GROUP = "Cash-flow forecast"
+PROJECTS_GROUP = "Capital projects"
+CLAIMS_GROUP = "Insurance claims"
+REGISTRY.update(
+    {
+        spec.key: spec
+        for spec in [
+            RuleSpec(
+                "interest.annual_rate_bp",
+                "Yearly interest rate on overdue {terms}",
+                BASIS_POINTS,
+                None,
+                INTEREST_GROUP,
+                "Only if the Declaration allows interest. Simple interest, posted monthly at "
+                "one twelfth of this rate on what is past due; never compounded. Blank: no "
+                "interest is charged even with the feature on.",
+                maximum=2400,
+            ),
+            RuleSpec(
+                "interest.max_annual_rate_bp",
+                "Highest yearly interest rate the Declaration allows",
+                BASIS_POINTS,
+                None,
+                INTEREST_GROUP,
+                "Interest is never posted at a rate above this. Blank: only the rate above.",
+                maximum=2400,
+            ),
+            RuleSpec(
+                "interest.grace_days",
+                "Days past due before a {term} earns interest",
+                DAYS,
+                "30",
+                INTEREST_GROUP,
+            ),
+            RuleSpec(
+                "interest.min_balance_cents",
+                "Smallest past-due amount that earns interest",
+                CENTS,
+                "0",
+                INTEREST_GROUP,
+            ),
+            RuleSpec(
+                "interest.include_fees",
+                "Charge interest on late fees and earlier interest too",
+                BOOL,
+                "false",
+                INTEREST_GROUP,
+                "Off (the default): interest only on the past-due {term} itself.",
+            ),
+            RuleSpec(
+                "interest.posting_day",
+                "Day of the month interest is posted",
+                DAYS,
+                "15",
+                INTEREST_GROUP,
+                maximum=28,
+                minimum=1,
+            ),
+            RuleSpec(
+                "interest.suspend_on_payment_plan",
+                "No interest while an owner keeps to a payment plan",
+                BOOL,
+                "true",
+                INTEREST_GROUP,
+            ),
+            RuleSpec(
+                "legal.costs_chargeable",
+                "Collection costs and attorney fees can be charged to the owner",
+                BOOL,
+                None,
+                LEGAL_GROUP,
+                "Only where the Declaration says so. Each cost is still charged by a board "
+                "member, one at a time.",
+            ),
+            RuleSpec(
+                "cashflow.collection_rate_percent",
+                "Share of the {terms} expected to be collected each month (forecast)",
+                PERCENT,
+                None,
+                FORECAST_GROUP,
+                "Blank: worked out from the last 12 months' payments.",
+            ),
+            RuleSpec(
+                "cashflow.min_operating_cents",
+                "Lowest operating cash the forecast should show before it warns",
+                CENTS,
+                "0",
+                FORECAST_GROUP,
+            ),
+            RuleSpec(
+                "capital.second_approval_cents",
+                "Capital project or change order amount needing two board approvals",
+                CENTS,
+                "500000",
+                PROJECTS_GROUP,
+            ),
+            RuleSpec(
+                "insurance.second_approval_cents",
+                "Insurance settlement needing two board approvals to accept",
+                CENTS,
+                "500000",
+                CLAIMS_GROUP,
+            ),
+        ]
+    }
+)
 
 # Keys no longer in use. A value the board recorded for one stays in the
 # database (rules are never deleted, their history is kept) but nothing reads

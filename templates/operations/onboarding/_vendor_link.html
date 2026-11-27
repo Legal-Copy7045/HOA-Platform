@@ -1,0 +1,1 @@
+{% load vendor_onboarding %}{% vendor_onboarding_on as on %}{% if on %}<span>{% vendor_status vendor %}</span> <a href="{% url 'vendor_onboarding_vendor' vendor.pk %}">Onboarding record</a>{% endif %}

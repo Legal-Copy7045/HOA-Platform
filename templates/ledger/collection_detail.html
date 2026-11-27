@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load portal finance_options %}
 {% block title %}Collection case #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
@@ -21,6 +21,7 @@
         </form>
       </section>{% endif %}
       {% include "partials/workflow.html" with obj=obj actions=None %}
+      {% legal_panel obj %}{# D82: board only, with the feature on #}
     </div>
     <aside>{% follow_up_form "collection" obj %}<section class="card"><h3>Letters</h3>
       {% if next_letter and can_collect %}<form method="post" action="{% url 'collection_letter' obj.pk %}">{% csrf_token %}<p class="small">Next: <strong>{{ next_letter.label }}</strong>{% if next_letter.due_on %}, due {{ next_letter.due_on|date:"M j, Y" }}{% endif %}.</p><button type="submit">{% icon "download" %} Generate {{ next_letter.label|lower }}</button></form><p class="small muted">Downloads the letter with the statement to print and mail, logs it, and moves the case on.</p>{% endif %}

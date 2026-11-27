@@ -98,6 +98,58 @@ STEPS: list[Step] = [
         groups=("Disbursements",),
         features=("disbursements",),
     ),
+    # Finance options (D80-D85): each is an optional feature with its rules.
+    Step(
+        "finance_options",
+        "Interest, forecast, legal, projects and claims",
+        "Interest on overdue balances (only if your Declaration allows it), the cash-flow "
+        "forecast's assumptions, whether collection costs and attorney fees can be charged "
+        "to owners, and the amounts at which a capital project, change order or insurance "
+        "settlement needs two board approvals. Also the owners' simple finance view.",
+        groups=(
+            "Interest on overdue balances",
+            "Collections legal",
+            "Cash-flow forecast",
+            "Capital projects",
+            "Insurance claims",
+        ),
+        features=(
+            "overdue_interest",
+            "cashflow_forecast",
+            "collections_legal",
+            "capital_projects",
+            "owner_finance_dashboard",
+            "insurance_claims",
+        ),
+    ),
+    Step(
+        "books",
+        "Books and close",
+        "The association's own books: whether months and years close by themselves when "
+        "everything balances, the close day, the deposit and check limits, the monthly "
+        "reserve contribution and how bank lines are coded. Bank accounts, their funds and "
+        "the categories are set on the linked pages.",
+        groups=("Books and close",),
+        features=("books", "financial_statements"),
+        links=(
+            ("Bank accounts and funds", "books_accounts", "books.setup"),
+            ("Bank categories and rules", "books_coding", "books.view"),
+            ("Month and year close", "books_close", "books.view"),
+        ),
+    ),
+    Step(
+        "vendors",
+        "Vendors",
+        "How vendors are onboarded (D79): the emailed form's link life, the insurance the "
+        "board expects, how long W-9s are kept, which documents each kind of vendor provides "
+        "and the association's vendor terms. Two board members approve every new vendor.",
+        groups=("Vendors",),
+        features=("vendor_onboarding",),
+        links=(
+            ("Vendor requirements and terms", "vendor_requirements", "vendor.onboarding_configure"),
+            ("W-9 retention", "vendor_w9_retention", "vendor.w9_dispose"),
+        ),
+    ),
     Step(
         "payments",
         "Online payments and automatic payments",
@@ -218,7 +270,7 @@ STEPS: list[Step] = [
         "server",
         "Server and email",
         "Outgoing email, the bounce mailbox, backups, the off-site copy, the payment and bank "
-        "keys and the USPS tracking login. These "
+        "keys, the vendor document key and the USPS tracking login. These "
         "are done on the server by a sysadmin; this step shows where things stand.",
         kind=SERVER,
     ),

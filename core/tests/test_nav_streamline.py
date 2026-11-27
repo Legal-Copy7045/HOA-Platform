@@ -105,6 +105,9 @@ FINANCE = [
     "Collections",
     "Budgets",
     "Accounting",
+    # Books and close (D70, D71).
+    "Month and year close",
+    "Financial statements",
     "Reports",
     "More finance",
 ]

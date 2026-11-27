@@ -508,6 +508,10 @@ def items_for(user) -> list[Item]:
         from documents import retention
 
         out.extend(retention.my_items(user, today))
+    # Vendor onboarding (D79): reviews, expired links, older vendors to complete.
+    from operations.vendor_onboarding import my_items as vendor_onboarding_items
+
+    out.extend(vendor_onboarding_items(user))
     # Recurring deadlines (Board tasks tab): hidden with the "compliance" feature.
     from core.features import enabled as feature_on
 
@@ -641,6 +645,11 @@ def items_for(user) -> list[Item]:
         from ledger.disbursements import board_items
 
         out.extend(board_items(user))
+    # Books and close (D70): exceptions, second agreements and reopens.
+    if can(user, "books.code") or can(user, "books.close"):
+        from ledger.books.close import board_items as books_items
+
+        out.extend(books_items(user))
     # Entries moved between ownership accounts, to check (fixres BUG-003).
     if can(user, "ledger.manage"):
         from ledger.models import EntryMoveNotice
@@ -970,12 +979,40 @@ def items_for(user) -> list[Item]:
 
         out.extend(payer_items(user))
 
+    # Finance options (D81-D85): each module's own items, only with its
+    # feature on (the path check below hides them too).
+    out.extend(_finance_option_items(user))
+
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
     from core import features
 
     states = features.states()  # one query, not one per item (optimization A9)
     return [i for i in out if features.path_enabled(i.url, states_=states)]
+
+
+def _finance_option_items(user) -> list[Item]:
+    from core import features
+
+    out: list[Item] = []
+    on = features.states()  # one query for all four
+    if on.get("cashflow_forecast"):
+        from ledger import cashflow
+
+        out.extend(cashflow.my_items(user))
+    if on.get("collections_legal"):
+        from ledger import legal
+
+        out.extend(legal.my_items(user))
+    if on.get("capital_projects"):
+        from operations import capital_projects
+
+        out.extend(capital_projects.my_items(user))
+    if on.get("insurance_claims"):
+        from operations import insurance_claims
+
+        out.extend(insurance_claims.my_items(user))
+    return out
 
 
 def _paper_mail_items() -> list[Item]:

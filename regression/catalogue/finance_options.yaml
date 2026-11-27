@@ -1,0 +1,30 @@
+# Finance options (D80-D85): each an optional feature, off by default.
+# `match` runs over "<stage>:<check>".
+- feature: "Interest on overdue balances (D80): only with a cited rate and under the Declaration's ceiling; simple interest monthly on past-due assessments after the grace days, one per account and month (constraint, idempotent task and button), late fees and earlier interest excluded unless the rule says, minimum balance and payment-plan exclusions, calculation on the statement line, open charge for payments, board posts (own home skipped) and reverses with a reason, never the manager, policy line on My account"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_finance_options\\.py::test_(interest|nothing_is_posted|rate_above|late_fees_and|minimum_balance|charges_not_yet|manager_never|board_reverses|board_members_own|owner_sees_the_policy)"]
+- feature: "Cash-flow forecast (D81): pure 12-month projection by fund, collection rate from the rule or the last 12 months, what-if scenarios never saved, warnings on My items only while on, CSV and PDF exports audited, board/manager/auditor only"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_finance_options\\.py::test_(forecast|spread_and|collection_rate)"]
+- feature: "Liens and legal collection on a collection case (D82): append-only legal events only on a referred case, board only (panel hidden from the manager, owners 403/404), costs charged to the owner only with the cited Declaration rule, by a board member, never one's own home, once; release reminder on My items when a filed lien is paid; audit metadata ids only"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_finance_options\\.py::test_(legal|charging_a_cost|release_reminder)"]
+- feature: "Owners' finance summary (D84): Budget and reserves shows only operating vs reserve and budget vs actual for finished months, no home or delinquency data; off, the page is unchanged"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:ledger/tests/test_finance_options\\.py::test_(owner_budget_page|budget_vs_actual)"]
+- feature: "Capital projects (D83): manager records, board approves with a resolution (two members at the threshold), change orders by another board member (two at the threshold, decline with a reason), append-only links, spent from linked paid invoices, cancel by the board, owners' Community projects summary only for shared projects"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:operations/tests/test_finance_options\\.py::test_(manager_records|large_projects|change_orders|spent_is|cancel_is|owners_see|capital_pages)"]
+- feature: "Insurance claims (D85): claim states and who takes each step, settlements accepted by the board (two at the threshold, latest offer only), money expected and received, deadlines and settlements on My items only while on, staff-only pages"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:operations/tests/test_finance_options\\.py::test_(claim|settlement)", "^unit:operations/tests/test_finance_options\\.py::test_every_finance_option"]
+- feature: "Finance options pages refuse other owners and anonymous visitors on every URL"
+  since: M5
+  docs: core/tests/test_url_matrix.py
+  match: ["^unit:core/tests/test_url_matrix\\.py::test_(owner_a_cannot_reach_owner_b_data|anonymous_visitors_are_sent_to_sign_in)\\[(interest|cashflow|cashflow_export|collection_legal|collection_legal_file|capital_project.*|insurance_claim.*)\\]", "^unit:core/tests/test_url_matrix\\.py::test_member_pages_.*\\[community_projects\\]"]

@@ -54,6 +54,15 @@ PUBLIC = {
     "recovery_request",
     "recovery_link",
     "recovery_continue",
+    # Vendor onboarding (D79, owner-approved exception): the public vendor
+    # form. Only a valid emailed link opens a session, bound to one round;
+    # that session reaches nothing else (operations/tests/
+    # test_vendor_onboarding_public.py iterates every URL).
+    "vendor_onboarding_start",
+    "vendor_onboarding_form",
+    "vendor_onboarding_upload",
+    "vendor_onboarding_submit",
+    "vendor_onboarding_done",
 }
 # Links emailed before sign-in became mandatory (D24): sign-in first, then
 # only the neighboring lot's owner is sent on to their review page.
@@ -136,6 +145,9 @@ MEMBER_PAGES = {
     "welcome",
     "getting_started",
     "ask_board",
+    # Capital projects shared with owners (D83): title, status, budget and
+    # spent only (ledger/tests/test_finance_options.py checks the rest).
+    "community_projects",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -430,6 +442,44 @@ PROTECTED = {
     "records_disposal_decide": ("POST", None),
     "records_hold_place": ("POST", None),
     "records_hold_release": ("POST", None),
+    # Books and close, statements and tax (D69-D71): board, manager, auditor.
+    "books_close": ("GET", None),
+    "books_action": ("POST", None),
+    "books_accounts": ("GET", None),
+    "books_coding": ("GET", None),
+    "accounting_quickbooks": ("GET", None),
+    "financial_statements": ("GET", None),
+    "financial_statements_csv": ("GET", None),
+    "financial_statements_pdf": ("GET", None),
+    "year_end_package": ("GET", None),
+    "tax_worksheet": ("GET", None),
+    "tax_download": ("GET", None),
+    # Finance options (D80-D85): board, manager and auditor pages only (each
+    # feature on or off; owners get 403/404 either way). Feature-on cross-owner
+    # tests: ledger/tests/test_finance_options.py.
+    "interest": ("POST", None),
+    "cashflow": ("GET", None),
+    "cashflow_export": ("GET", None),
+    "collection_legal": ("POST", "collection"),
+    "collection_legal_file": ("GET", "collection"),
+    "capital_projects": ("POST", None),
+    "capital_project_detail": ("GET", "lot"),
+    "capital_project_file": ("GET", "lot"),
+    "insurance_claims": ("POST", None),
+    "insurance_claim_detail": ("GET", "lot"),
+    "insurance_claim_file": ("GET", "lot"),
+    # Vendor onboarding (D79): board and manager pages; owners get 403.
+    "vendor_onboarding_list": ("GET", None),
+    "vendor_onboarding_invite": ("POST", None),
+    "vendor_onboarding_review": ("GET", "vendor_round"),
+    "vendor_onboarding_action": ("POST", "vendor_round"),
+    "vendor_onboarding_file": ("GET", "vendor_round"),
+    "vendor_onboarding_vendor": ("GET", "vendor"),
+    "vendor_onboarding_vendor_action": ("POST", "vendor"),
+    "vendor_file_summary": ("GET", "vendor"),
+    "vendor_requirements": ("GET", None),
+    "vendor_w9_retention": ("GET", None),
+    "vendor_w9_disposal": ("POST", None),
 }
 # Pages refused before their record is looked up: any id will do (D72).
 PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
@@ -465,8 +515,21 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        # Off by default; checked here.
-        for key in ("push", "sms", "bank_feeds", "usps_tracking", "bounce_tracking"):
+        for key in (  # off by default; checked here
+            "push",
+            "sms",
+            "bank_feeds",
+            "usps_tracking",
+            "bounce_tracking",
+            # Finance options (D80-D85)
+            "overdue_interest",
+            "cashflow_forecast",
+            "collections_legal",
+            "capital_projects",
+            "owner_finance_dashboard",
+            "insurance_claims",
+            "vendor_onboarding",
+        ):
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
@@ -574,7 +637,7 @@ def world():
         )
         violation_b_file = attach(violation_b, pdf("boat.pdf"), actor=board)
         from operations import services as operations
-        from operations.models import ExpenseCategory
+        from operations.models import ExpenseCategory, OnboardingRound
 
         vendor = operations.save_vendor(name="Pond Pros (demo)", actor=board)
         work_order = operations.create_work_order(title="Fix pond pump", actor=board)
@@ -868,6 +931,7 @@ def world():
         "violation_b": violation_b.pk,
         "violation_b_file": violation_b_file.pk,
         "vendor": vendor.pk,
+        "vendor_round": OnboardingRound.objects.create(vendor=vendor, created_by=board).pk,
         "work_order": work_order.pk,
         "invoice": invoice.pk,
         "invoice_file": invoice_file.pk,
@@ -1003,10 +1067,20 @@ def _url(name, key, targets):
         kwargs["slug"] = "paying"
     elif name == "disbursement_action":
         kwargs["action"] = "approve"
+    elif name in ("collection_legal_file", "capital_project_file", "insurance_claim_file"):
+        kwargs["file_id"] = 1
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
     elif name.startswith("register_import_") or name in PK_ONE:
         kwargs["pk"] = 1
+    elif name == "vendor_onboarding_action":
+        kwargs["action"] = "approve"
+    elif name == "vendor_onboarding_file":
+        kwargs["file_id"] = 1
+    elif name == "vendor_onboarding_vendor_action":
+        kwargs["action"] = "update"
+    elif name == "vendor_w9_disposal":
+        kwargs = {"pk": 1, "step": "propose"}
     return reverse(name, kwargs=kwargs)
 
 

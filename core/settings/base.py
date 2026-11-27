@@ -386,6 +386,9 @@ SMS_API_BASE = env("SMS_API_BASE", default="https://api.twilio.com")
 # Key that encrypts stored bank access tokens (any long random string; the
 # Fernet key is derived from it). Connecting a bank is refused while empty.
 BANK_FEED_TOKEN_KEY = env("BANK_FEED_TOKEN_KEY", default="")
+# Year-end packages (D71): the manifest's HMAC key. Empty: a key derived from
+# the Django secret (verifiable on the server only).
+BOOKS_PACKAGE_KEY = env("BOOKS_PACKAGE_KEY", default="")
 # Teller (teller.io), free developer tier. sandbox | development | production.
 # Development is the free tier for real accounts. The certificate and private
 # key from the Teller dashboard, each base64 of the PEM file (base64 -w0).
@@ -393,6 +396,16 @@ TELLER_APPLICATION_ID = env("TELLER_APPLICATION_ID", default="")
 TELLER_ENVIRONMENT = env("TELLER_ENVIRONMENT", default="sandbox")
 TELLER_CERTIFICATE_B64 = env("TELLER_CERTIFICATE_B64", default="")
 TELLER_PRIVATE_KEY_B64 = env("TELLER_PRIVATE_KEY_B64", default="")
+
+# --- Vendor onboarding (optional feature "vendor_onboarding", D79) -------------------
+# Key that encrypts vendors' uploaded documents (W-9s, insurance certificates)
+# at the application layer (AES-256-GCM, key derived with HKDF). Generated on
+# the server by infra/poc/set-vendor-key.sh, never typed or put in the
+# repository; keep a copy apart from the backups (D79). Old keys go in the
+# fallbacks (comma-separated) while files are re-encrypted. Without a key the
+# feature refuses uploads and viewing.
+VENDOR_DOCUMENT_KEY = env("VENDOR_DOCUMENT_KEY", default="")
+VENDOR_DOCUMENT_KEY_FALLBACKS = env.list("VENDOR_DOCUMENT_KEY_FALLBACKS", default=[])
 
 # --- USPS tracking: Informed Visibility scans (optional feature "usps_tracking", D60) ----
 # The HOA's Business Customer Gateway login, put into the server's .env by

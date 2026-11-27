@@ -1157,3 +1157,39 @@ if the next email bounces too, it shows again. For a bounced official notice,
 use "Prepare the letter" on Paper mail (it prepares a letter for that one home,
 whatever their email choice) and mark the mailing as mailed as usual.
 
+
+## Month-end and year-end close (D70, D71)
+
+**What happens by itself.** Every day the portal codes new bank lines by the board's rules, confirms bank matches that can only be one thing, and from the close day (rule `books.close_day`, the 3rd) checks last month. If every bank line is matched or coded, every account's balance at month end is known and reconciles, the month's assessments and late fees are posted (or waived), no payment waits to be deposited, the Stripe payouts are matched, transfers have both sides and no fund is below zero, the month closes by itself. Once a fiscal year's twelve months are closed the year closes too, the tax filings are put on Recurring deadlines and the year-end package is built.
+
+**First time.** Accounting → Setup: the opening date (the books start the next day). More finance → Bank accounts and funds: each account's fund (operating, reserve), chart account and balance on that date; tick the primary operating account. More finance → Bank categories and rules: check the categories, add rules for lines that repeat ("INTEREST" → Interest income, "SERVICE CHARGE" → Bank fees, "TRANSFER TO SAVINGS" money out and "TRANSFER FROM CHECKING" money in → Transfer between the association's accounts).
+
+**When My items says "<Month> books: N exceptions".** Open Finance → Month and year close. What each means:
+- *A bank line is not matched or coded*: code it to a category (tick "lines like this" to make a rule), or match it on the Bank feed (a deposit, payout or check).
+- *Enter the balance on <date>*: the bank did not report a month-end balance. Import the month's OFX/QFX file (it carries the ledger balance) or type the statement's ending balance.
+- *Off by $X*: usually a missing bank line, a wrong opening balance or an item matched to the wrong account. If it is genuinely right (a bank error corrected next month), explain it; another board member must agree.
+- *No late fee*: post the month's late fees, or waive one with the reason (a board decision; never your own home).
+- *Payment waiting to be deposited*: record the deposit on Accounting.
+- *Payout not matched or not arrived*: match it on the Bank feed; one Stripe has not paid yet stays until it arrives.
+- *Transfer with no matching line*: code the other account's line as a transfer too; a transfer in transit at month end can be explained.
+- *Fund below zero*: money was spent from the wrong fund or an entry is missing.
+- Warnings (stale checks, reserve contribution short) never stop the close.
+
+**Mistakes in a closed month.** Post the correction in the open month (coding a line again, a reversal): the portal adds the reference to the original date. Reopening needs a board member's request and a different board member's approval; only the latest closed month, and only while its year is open.
+
+**Year end.** Finance → Financial statements → the fiscal year: the statements (PDF, CSV) and the year-end package. The package's manifest.json is signed with `BOOKS_PACKAGE_KEY` (set it in the server's .env and keep a copy with the treasurer's records); on the server `python manage.py verify_books_package <file.zip>` checks it; elsewhere use the snippet in the package's README.txt with the key. More finance → Tax worksheet: Form 1120-H line by line with the 60%/90% tests, the 1099 IRIS upload (add each vendor's TIN from the W-9 in IRIS; the portal keeps none) and recipient copies. Nothing is filed by the portal; the preparer confirms the form and the figures.
+
+## Vendor onboarding (D79)
+
+**Key set-up (sysadmin, once, on the VM).** `sudo bash infra/poc/set-vendor-key.sh` makes the vendor document key on the server (nothing to type), saves it in `.env`, restarts the portal and runs `manage.py check_vendor_key`. Then copy the key into the HOA's password manager (`sudo grep -E '^VENDOR_DOCUMENT_KEY' /opt/hoa-portal/.env`) and `shred` the `.env.before-vendor-key` copy the script names. Keep that copy apart from the backups: the backups hold the encrypted documents only. The setup wizard's server step shows "Vendor document key: Set up".
+
+**Rotating the key.** `sudo bash infra/poc/set-vendor-key.sh --rotate` keeps the old key in `VENDOR_DOCUMENT_KEY_FALLBACKS`, makes a new one and re-encrypts every stored document; `check_vendor_key` then reports "0 under an old key". Remove the fallback only after that, and store the new key in the password manager. A restore needs the key that was current when the backup was taken (or the fallbacks).
+
+**Switching it on.** Admin → Features → Vendor onboarding (or the Vendors step of Community setup, where the link life, insurance minimums and W-9 retention are set with citations). Finance → Vendors → Vendor requirements and terms: the board ticks what each kind of vendor provides (with a citation) and edits the terms.
+
+**Sending a link (board or manager).** Finance → Vendors → Vendor onboarding → Invite a vendor: name, email, services and kind of work. The vendor is created inactive and gets an email with the link (it works until it expires or they submit). "Send a new link" on the request ends the old one. For a vendor added before onboarding, open its Onboarding record → Complete onboarding; for an expired certificate or a new W-9, Ask for updated documents (the link shows only those items).
+
+**Reviewing (board).** My items lists "Review vendor onboarding: <vendor>". Check the answers, the warnings (insurance below the minimum, expired certificates), the documents (W-9s open for board members only; every view is logged) and any conflict disclosure; link anyone it names (they cannot approve the vendor or its invoices). Approve, Return to the vendor (say what to change: they get a new link), or Decline. Two different board members approve; the one who sent the link does not. Until then the vendor's invoices cannot be approved or paid.
+
+**W-9 retention.** My items shows "W-9s past retention" when any are due; Finance → Vendors → W-9 retention: one board member proposes disposal, a different one confirms.
+

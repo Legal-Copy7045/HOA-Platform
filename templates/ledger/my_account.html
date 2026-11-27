@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% load help_tags portal %}
+{% load help_tags portal finance_options %}
 {% block title %}My account · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>My account</h1><p class="subtitle">{% term "Terms" %} are charged on the 1st of each month. Payments made in advance are kept as a credit and used up month by month. {% how_it_works "paying" %}</p></div></div>
   {% include "payments/_test_banner.html" %}
+  {% interest_notice %}{# D80: the interest policy, only with the feature on #}
   {% for a in accounts %}
     <section class="card">
       <div class="card-head"><div>{% home_title a.lot "h2" %}</div>

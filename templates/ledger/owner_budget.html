@@ -42,4 +42,9 @@
     {% else %}<section class="card">{% include "partials/empty.html" with icon="chart" title="No reserve plan adopted yet" text="The board will publish a summary here once it adopts one." %}</section>{% endif %}
   </section>
   {% endif %}
+  {% if annual_accounting %}<section class="card" data-testid="owner-annual-accounting"><h2>Annual accounting</h2>
+    <p class="small muted">Each closed fiscal year: what came in, what was spent, what was set aside in reserves, and the difference.</p>
+    <div class="table-wrap"><table class="stack-sm"><thead><tr><th>Fiscal year</th><th class="num">Income</th><th class="num">Expenditures</th><th class="num">Reserves</th><th class="num">Excess (deficit)</th></tr></thead><tbody>
+    {% for a in annual_accounting %}<tr><td class="cell-title">{{ a.fiscal_year }}</td><td class="num" data-label="Income">{{ a.income_cents|cents }}</td><td class="num" data-label="Expenditures">{{ a.expenditures_cents|cents }}</td><td class="num" data-label="Reserves">{{ a.reserves_cents|cents }}</td><td class="num" data-label="Excess (deficit)">{{ a.net_cents|cents }}</td></tr>{% endfor %}
+    </tbody></table></div></section>{% endif %}
 {% endblock %}

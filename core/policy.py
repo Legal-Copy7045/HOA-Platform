@@ -119,6 +119,14 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "violation.decide": frozenset({BOARD}),
     # Operations and money
     "vendor.manage": frozenset({BOARD, MANAGER}),
+    # Vendor onboarding (D79): the manager invites and reads submissions; only
+    # board members approve, configure, open W-9s (tax IDs) and dispose of them.
+    "vendor.onboarding_invite": frozenset({BOARD, MANAGER}),
+    "vendor.onboarding_review": frozenset({BOARD, MANAGER}),
+    "vendor.onboarding_approve": frozenset({BOARD}),
+    "vendor.onboarding_configure": frozenset({BOARD}),
+    "vendor.w9_view": frozenset({BOARD}),
+    "vendor.w9_dispose": frozenset({BOARD}),
     # Owner requests: owners, authorized contacts and tenants raise them
     # (view-only contacts and former owners cannot).
     "request.submit": frozenset({OWNER, AUTHORIZED, TENANT}),
@@ -263,6 +271,48 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "help.view": COMMUNITY,
     "help.edit": frozenset({BOARD}),
     "help.checklist": RESIDENTS,
+    # --- Books and close (D69-D71, features "books", "financial_statements") ---
+    # The manager codes bank lines, enters statement balances and notes
+    # differences (preparing); rules, money differences, waivers, closing
+    # and reopening are board decisions, and a reopen or a money difference
+    # needs a second board member.
+    "books.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "books.setup": frozenset({BOARD}),
+    "books.code": frozenset({BOARD, MANAGER}),
+    "books.rules": frozenset({BOARD}),
+    "books.balance": frozenset({BOARD, MANAGER}),
+    "books.difference": frozenset({BOARD, MANAGER}),
+    "books.difference_agree": frozenset({BOARD}),
+    "books.waive_late_fee": frozenset({BOARD}),
+    "books.close": frozenset({BOARD}),
+    "books.reopen_request": frozenset({BOARD}),
+    "books.reopen_approve": frozenset({BOARD}),
+    "statements.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "books.package": frozenset({BOARD, AUDITOR}),
+    # Tax worksheet, 1099 files and copies (D71-tax).
+    "tax.view": frozenset({BOARD, AUDITOR}),
+    # --- Finance options (D80-D85), each an optional feature ---
+    # Interest on overdue balances (D80): posting by hand and reversing an
+    # interest charge are board decisions; the task posts as SYSTEM.
+    "interest.post": frozenset({BOARD}),
+    "interest.reverse": frozenset({BOARD}),
+    # Collections legal tracking (D82): legal matters are board-only records,
+    # and charging costs to an owner's account is a board decision.
+    "legal.view": frozenset({BOARD}),
+    "legal.record": frozenset({BOARD}),
+    "legal.post_costs": frozenset({BOARD}),
+    # Capital projects (D83): the manager keeps the record; approving a
+    # project or a change order is the board's. Owners see a summary of the
+    # projects the board shows them.
+    "capital_project.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "capital_project.manage": frozenset({BOARD, MANAGER}),
+    "capital_project.approve": frozenset({BOARD}),
+    "capital_project.view_summary": RESIDENTS | {BOARD, MANAGER, AUDITOR},
+    # Insurance claims (D85): board and manager record; accepting a
+    # settlement and closing a claim are board decisions. Never owners.
+    "insurance.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "insurance.record": frozenset({BOARD, MANAGER}),
+    "insurance.decide": frozenset({BOARD}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

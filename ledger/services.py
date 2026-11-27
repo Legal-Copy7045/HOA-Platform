@@ -56,6 +56,19 @@ def _authorize(actor, action):
         require(actor, action)
 
 
+def _closed(day) -> bool:
+    from ledger.books.periods import is_closed
+
+    return is_closed(day)
+
+
+def _refuse_closed(day, what: str = "This date") -> None:
+    """No posting into a closed month (D70)."""
+    from ledger.books.periods import refuse_closed
+
+    refuse_closed(day, error=LedgerError, what=what)
+
+
 def _refuse_own(actor, matter, action: str, request=None) -> None:
     """Own matters (D65): no staff entry on one's own home's account."""
     conflicts.refuse(
@@ -438,6 +451,7 @@ def record_payment(
         raise LedgerError("Online payments are recorded automatically from Stripe.")
     if amount_cents <= 0:
         raise LedgerError("A payment must be a positive amount.")
+    _refuse_closed(received_on, "The date received")
     if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
         raise LedgerError("Enter a check number or short reference, never an account number.")
     if _duplicate_reference(lot, reference):
@@ -490,11 +504,13 @@ def record_online_payment(
     if account_id is None:
         account_id = accounts.account_on(lot.pk, received_on)
     open_ids = {c.entry.pk for c in _allocation().open_charges(lot.pk, account=account_id)}
+    from ledger.books.periods import open_date
+
     entry = _post_payment(
         lot,
         account_id=account_id,
         amount_cents=amount_cents,
-        received_on=received_on,
+        received_on=open_date(received_on),  # a closed month: today (D70)
         method="online",
         reference=payment_intent_id,
         apply_to=[int(c) for c in (apply_to or []) if int(c) in open_ids],
@@ -525,6 +541,8 @@ def check_payment(p: BatchPayment, *, today: datetime.date | None = None) -> lis
         errors.append("Enter an amount above $0.00.")
     if p.received_on > today:
         errors.append("The date received cannot be in the future.")
+    elif _closed(p.received_on):
+        errors.append(f"{p.received_on:%B %Y} is closed: enter it with today's date.")
     if _ACCOUNT_NUMBER.search(p.reference.replace(" ", "").replace("-", "")):
         errors.append("Enter a check number, never an account number.")
     elif _duplicate_reference(p.lot, p.reference):
@@ -597,6 +615,7 @@ def post_charge(
             )
     if amount_cents <= 0 or not description.strip():
         raise LedgerError("A charge needs a positive amount and a description.")
+    _refuse_closed(posted_on or timezone.localdate(), "The charge date")
     entry = LedgerEntry.objects.create(
         lot=lot,
         account_id=accounts.check_account(lot.pk, account_id),
@@ -708,6 +727,12 @@ def record_online_refund(
 def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> LedgerEntry:
     """Corrections are new, opposite entries (CLAUDE.md rule 5)."""
     _authorize(actor, "ledger.manage")
+    # Interest (D80) and charged collection costs (D82) are board decisions,
+    # and so is taking one back: never the manager.
+    if entry.kind == EntryKind.INTEREST:
+        _authorize(actor, "interest.reverse")
+    elif entry.kind == EntryKind.LEGAL_COST:
+        _authorize(actor, "legal.post_costs")
     _refuse_own(actor, entry, "reverse", request)
     if not reason.strip():
         raise LedgerError("Give the reason for the reversal.")
@@ -805,11 +830,13 @@ def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[Ledg
         for entry, _t in plan
         if entry.amount_cents < 0
     }
+    from ledger.books.periods import open_date
+
     with transaction.atomic():
         for entry, target in plan:
             LedgerEntry.objects.create(
                 lot_id=lot_id,
-                posted_on=entry.posted_on,
+                posted_on=open_date(entry.posted_on),  # never into a closed month (D70)
                 kind=EntryKind.REVERSAL,
                 amount_cents=-entry.amount_cents,
                 reverses=entry,
@@ -821,7 +848,7 @@ def move_entries(lot_id: int, before: list, *, actor, request=None) -> list[Ledg
             copy = LedgerEntry(
                 lot_id=lot_id,
                 account_id=target,
-                posted_on=entry.posted_on,
+                posted_on=open_date(entry.posted_on),
                 kind=entry.kind,
                 amount_cents=entry.amount_cents,
                 description=entry.description,

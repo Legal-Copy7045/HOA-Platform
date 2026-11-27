@@ -46,6 +46,12 @@ GROUP_NOTES: dict[str, str] = {
         "lots as the Declaration says (§ 5207, § 5314). Unpaid assessments, late charges, fines "
         "and interest are a lien on the lot (§ 5315)."
     ),
+    "Books and close": (
+        f"The association keeps financial records sufficiently detailed for its resale "
+        f"certificates and makes them reasonably available to owners ({ACT} § 5316, § 5407). "
+        f"How the books are kept and closed is for the board, the Bylaws and the Declaration "
+        f"(the annual accounting, the reserves)."
+    ),
     "Invoices": (
         "The Act does not regulate how the board approves spending; these are internal "
         "controls the board sets by resolution."
@@ -116,6 +122,14 @@ GROUP_NOTES: dict[str, str] = {
         "Not set by the Act; a board security policy. The Act does not regulate how owners "
         "sign in. The waiting period and the lock afterwards protect votes, notices and "
         "payments if someone else gets into an owner's email."
+    ),
+    "Vendors": (
+        "The Act does not regulate how the association onboards vendors; these are board "
+        f"policy and internal controls. The association keeps its financial records ({ACT} "
+        "§ 5316), which include what supports payments to vendors. Federal tax rules (Form W-9, "
+        "Form 1099) and Pennsylvania's Home Improvement Consumer Protection Act and Workers' "
+        "Compensation Act are summarised under What the law says; the tax preparer and counsel "
+        "should confirm them."
     ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
@@ -417,6 +431,86 @@ GUIDES["monitoring.disk_full_warn_days"] = Guide(
     "60 days: Board operations policy.",
 )
 
+GUIDES["books.auto_close"] = Guide(
+    BOARD,
+    f"The Act requires financial records sufficiently detailed to enable the association to "
+    f"comply with its resale certificate duty, and that they be available to owners ({ACT} "
+    f"§ 5316, § 5407). It does not say how or when the books are closed; an internal control "
+    f"the board sets.",
+    "On: Board resolution 2027-01 (financial controls), closing each month when it balances.",
+)
+GUIDES["books.auto_close_year"] = Guide(
+    BYLAWS,
+    f"The Act does not set the fiscal year or a closing procedure; the Bylaws usually name "
+    f"the fiscal year and the annual accounting. Records stay available to owners ({ACT} "
+    f"§ 5316).",
+    "On: Bylaws §6.4 (fiscal year), Board resolution 2027-01.",
+)
+GUIDES["books.close_day"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal timetable.",
+    "3: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.undeposited_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal control (money received is deposited promptly).",
+    "5 days: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.stale_check_days"] = Guide(
+    BOARD,
+    "Not covered by the Act. Pennsylvania's unclaimed property law applies to long-uncashed "
+    "checks; the treasurer confirms the dormancy period with the PA Treasury.",
+    "90 days: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.reserve_monthly_cents"] = Guide(
+    DECLARATION,
+    f"The budget the board adopts includes the reserves ({ACT} § 5302(a)); many Declarations "
+    f"require a reserve for replacement of common elements in an amount the board "
+    f"determines, collected as part of the assessments.",
+    "$500.00 a month: Declaration §8.7 (reserves as the board determines), budget 2027.",
+)
+GUIDES["books.surplus_from_reserve"] = Guide(
+    DECLARATION,
+    f"Unless the Declaration provides otherwise, surplus is paid or credited to owners ({ACT} "
+    f"§ 5313). Whether reserve funds may be treated as surplus is for counsel; this setting "
+    f"only says which fund the statements show it paid from.",
+    "On: Declaration §8.10 (surplus); D52 surplus fund account 3100.",
+)
+GUIDES["books.auto_match"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal control. Only exact amounts with one possible item "
+    "are matched by themselves.",
+    "On: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.rule_suggest_after"] = Guide(
+    BOARD,
+    "Not covered by the Act; a convenience for the treasurer.",
+    "3: Board resolution 2027-01.",
+)
+
+GUIDES["tax.hoa_rate_bp"] = Guide(
+    BOARD,
+    "Federal, not the Act: IRC § 528(b) taxes a qualifying homeowners association's taxable "
+    "income at 30% (32% for timeshare associations); see the Form 1120-H instructions. Have "
+    "the tax preparer confirm the rate each year.",
+    "30%: IRC § 528(b); Instructions for Form 1120-H.",
+)
+GUIDES["tax.nonqualifying_accounts"] = Guide(
+    BOARD,
+    "Federal, not the Act: IRC § 528(c)(1)(C) and Treas. Reg. § 1.528-6 require at least 90% "
+    "of expenditures to be for acquiring, constructing, managing, maintaining and caring for "
+    "association property; amounts put in reserves for that purpose count. The preparer "
+    "decides which accounts do not qualify.",
+    "6400 6900: tax preparer's advice, 2027 (income taxes and penalties).",
+)
+GUIDES["tax.1099_misc_categories"] = Guide(
+    BOARD,
+    "Federal, not the Act: the IRS Instructions for Forms 1099-MISC and 1099-NEC say which "
+    "payments go on which form (services on 1099-NEC; rents and some other payments on "
+    "1099-MISC). Filed through IRIS or on paper; the preparer confirms.",
+    "Blank (all services): tax preparer's advice, 2027.",
+)
+
 GUIDES["recovery.wait_hours"] = Guide(
     BOARD,
     "Not set by the Act; a board security policy. While the request waits, the person, every "
@@ -538,6 +632,144 @@ GUIDES["help.welcome_days"] = Guide(
     BOARD,
     "Not covered by the Act; a service choice of the board.",
     "90 days: Board decision adopting the owner portal's help pages (D73).",
+)
+
+# --- Finance options (D80-D85) --------------------------------------------------------
+
+GROUP_NOTES["Interest on overdue balances"] = (
+    f"Unpaid assessments, late charges, fines and interest are a lien on the lot ({ACT} § 5315), "
+    f"and the association may impose charges for late payment ({ACT} § 5302(a)(11)). The Act sets "
+    "no interest rate: interest may be charged only if the Declaration (or Bylaws) provides for "
+    "it, at the rate it states. Pennsylvania's usury law (Loan Interest and Protection Law, 41 "
+    "P.S. § 101 et seq., 6% legal rate) is written for loans; whether it reaches assessment "
+    "interest is a question for counsel, so many associations stay at or below the "
+    "Declaration's rate and never compound. Confirm with counsel before switching it on."
+)
+GROUP_NOTES["Collections legal"] = (
+    f"The association's lien for assessments arises automatically when an assessment is due "
+    f"({ACT} § 5315(a)); recording the Declaration is notice of it, and no further filing is "
+    f"required to perfect it. It is enforced like a mortgage foreclosure or by an action for the "
+    f"debt, and costs and reasonable attorney fees are recoverable when the Declaration provides "
+    f"for them (§ 5315). The lien is extinguished unless proceedings are begun within three years "
+    f"after the assessments become due (§ 5315(d)). Counsel collecting the debt is subject to the "
+    f"federal Fair Debt Collection Practices Act and the Pennsylvania Fair Credit Extension "
+    f"Uniformity Act. The association's attorney should confirm every step."
+)
+GROUP_NOTES["Cash-flow forecast"] = (
+    "No law governs the forecast; it is a planning tool for the board. The Act requires the "
+    f"board to adopt budgets and reserves as the Declaration and Bylaws say ({ACT} § 5302(a))."
+)
+GROUP_NOTES["Capital projects"] = (
+    f"The board acts for the association in contracting for and maintaining the common elements "
+    f"({ACT} § 5302(a), § 5303). Spending reserve funds on the components they were set aside for "
+    f"is a board decision recorded by resolution; the Declaration or Bylaws may require an owner "
+    f"vote above an amount, and a special assessment follows § 5302 and the Declaration."
+)
+GROUP_NOTES["Insurance claims"] = (
+    f"The association must carry the insurance § 5312 of the Act and the Declaration require, and "
+    f"insurance proceeds for damage to the common elements are used to repair it unless the "
+    f"Declaration provides otherwise ({ACT} § 5312). The policy sets the claim deadlines (notice, "
+    f"proof of loss, suit limitation); the board should read them with the agent or counsel."
+)
+
+GUIDES["interest.annual_rate_bp"] = Guide(
+    DECLARATION,
+    "The Act sets no rate; interest forms part of the lien (§ 5315) only where the Declaration "
+    "provides for it. Pennsylvania's usury law (41 P.S. § 101 et seq.) is aimed at loans; ask "
+    "counsel whether it limits assessment interest before choosing a rate above 6%.",
+    "10% a year: Declaration §6.6 (interest on unpaid assessments).",
+)
+GUIDES["interest.max_annual_rate_bp"] = Guide(
+    DECLARATION,
+    "Not set by the Act. A ceiling from the Declaration, or one the board chooses on counsel's "
+    "advice, stops a typing mistake from charging more than allowed.",
+    "15% a year: Declaration §6.6 (the highest rate permitted by law, as confirmed by counsel).",
+)
+GUIDES["interest.grace_days"] = Guide(
+    DECLARATION,
+    "Not set by the Act.",
+    "30 days after the due date: Declaration §6.6, collection policy resolution 2027-02.",
+)
+GUIDES["interest.min_balance_cents"] = Guide(
+    BOARD,
+    "Not set by the Act; a collection policy choice to avoid charging cents of interest.",
+    "$50.00: collection policy, Board resolution 2027-02.",
+)
+GUIDES["interest.include_fees"] = Guide(
+    DECLARATION,
+    "The Act lists interest and late charges separately as part of the lien (§ 5315); it does "
+    "not say interest may be charged on fees or on earlier interest. Charging interest on "
+    "interest compounds it: leave this off unless the Declaration clearly allows it.",
+    "Off: Declaration §6.6 (interest on the unpaid assessment only).",
+)
+GUIDES["interest.posting_day"] = Guide(
+    BOARD,
+    "Not set by the Act; a bookkeeping choice.",
+    "The 15th: collection policy, Board resolution 2027-02.",
+)
+GUIDES["interest.suspend_on_payment_plan"] = Guide(
+    BOARD,
+    "Not set by the Act. Payment plans are a collection policy choice; the plan agreement "
+    "should say whether interest stops while the owner keeps to it.",
+    "On: payment plan policy, Board resolution 2027-04.",
+)
+GUIDES["legal.costs_chargeable"] = Guide(
+    DECLARATION,
+    f"Costs and reasonable attorney fees of collecting are part of the lien and recoverable when "
+    f"the Declaration provides for them ({ACT} § 5315). Without such a clause they generally stay "
+    f"with the association; counsel should confirm before any is charged.",
+    "Yes: Declaration §6.7 (costs of collection, including reasonable attorney fees).",
+)
+GUIDES["cashflow.collection_rate_percent"] = Guide(
+    BOARD,
+    "Not covered by the Act; a planning assumption.",
+    "95%: Treasurer's forecast assumption, budget workshop 2027.",
+)
+GUIDES["cashflow.min_operating_cents"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal financial control.",
+    "$10,000.00: operating cash floor, Board resolution 2027-06 (financial controls).",
+)
+GUIDES["capital.second_approval_cents"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal control like the invoice approval rule. The Bylaws or "
+    "Declaration may also require an owner vote above an amount.",
+    "Two approvals at $5,000 and over: Board resolution 2026-07 (spending controls).",
+)
+GUIDES["insurance.second_approval_cents"] = Guide(
+    BOARD,
+    f"Not covered by the Act; proceeds must still go to repair the common elements unless the "
+    f"Declaration says otherwise ({ACT} § 5312).",
+    "Two approvals at $5,000 and over: Board resolution 2026-07 (spending controls).",
+)
+
+GUIDES["vendor.onboarding_link_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; a board security choice. The link is the only way into the "
+    "public vendor form, so a short life limits what a forwarded or leaked email exposes.",
+    "14 days: Board vendor policy, resolution 2027-02.",
+)
+GUIDES["vendor.min_general_liability_cents"] = Guide(
+    BOARD,
+    "Not set by the Act. Check the Declaration's insurance article and the association's own "
+    "policy; Pennsylvania's Home Improvement Consumer Protection Act requires registered home "
+    "improvement contractors to carry liability insurance (73 P.S. § 517.1 et seq.). Counsel and "
+    "the association's insurance agent should confirm the amount.",
+    "$1,000,000 per occurrence: Board vendor policy, resolution 2027-02.",
+)
+GUIDES["vendor.min_auto_liability_cents"] = Guide(
+    BOARD,
+    "Not set by the Act; Pennsylvania's own minimum auto insurance is far lower than what an "
+    "association usually asks of vendors on its property. The insurance agent should advise.",
+    "$1,000,000 combined single limit: Board vendor policy, resolution 2027-02.",
+)
+GUIDES["vendor.w9_retention_years"] = Guide(
+    BOARD,
+    f"Not set by the Act ({ACT} § 5316 only requires the association to keep its records). "
+    "IRS record-keeping guidance asks payers to keep information-return records for at least "
+    "3 years and employment tax records for 4; the tax preparer should confirm the period. W-9s "
+    "carry tax identification numbers, so keeping them no longer than needed reduces risk.",
+    "4 years after the last 1099 year: Board records retention policy, resolution 2027-02.",
 )
 
 

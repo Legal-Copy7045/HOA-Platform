@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Budget and reserves · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Budget and reserves</h1>
+    <p class="subtitle">The association's money in two views: what is in the operating and reserve funds, and how this year is going against the budget.</p></div></div>
+  <section id="funds" aria-labelledby="funds-h">
+    <h2 id="funds-h">Operating and reserve</h2>
+    <p class="muted small">{% if funds.closed %}At the end of {{ funds.as_of|date:"F Y" }} (books closed).{% else %}As of {{ funds.as_of|date:"F j, Y" }}: not a closed month, so figures may still change.{% endif %}</p>
+    <div class="grid grid-2">
+      <div class="stat"><div class="label">Operating fund</div><div class="value">{{ funds.operating|cents }}</div><div class="hint">Pays the year's running costs</div></div>
+      <div class="stat"><div class="label">Reserve fund</div><div class="value">{{ funds.reserve|cents }}</div><div class="hint">Saved for big replacements</div></div>
+    </div>
+    {% if funds.reserve_target %}<div class="card">
+      <p><strong>Reserve compared with the plan:</strong> {{ funds.percent_funded }}% funded ({{ funds.reserve|cents }} of {{ funds.reserve_target|cents }}, the fully funded balance in the reserve plan adopted {{ funds.plan_adopted_on|date:"F j, Y" }}).</p>
+      <meter class="bar" min="0" max="100" low="30" high="70" optimum="100" value="{{ funds.percent_funded }}" aria-label="Reserve {{ funds.percent_funded }}% funded">{{ funds.percent_funded }}%</meter>
+    </div>{% else %}<p class="muted">No reserve plan has been adopted yet, so there is no target to compare with.</p>{% endif %}
+  </section>
+  <section id="budget" aria-labelledby="bva-h">
+    <h2 id="bva-h">Budget and actual{% if bva.fiscal_year %}, {{ bva.fiscal_year }} so far{% endif %}</h2>
+    {% if bva.fiscal_year %}
+      <p class="muted small">{% if bva.through %}Through the end of {{ bva.through|date:"F Y" }} ({{ bva.closed_months }} month{{ bva.closed_months|pluralize }} of the year), from the association's records.{% else %}The year has just started: no full month to compare yet.{% endif %}</p>
+      {% for kind, title in kinds %}
+      <h3>{{ title }}</h3>
+      <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+        <thead><tr><th scope="col">Line</th><th scope="col" class="num">Budget so far</th><th scope="col" class="num">Actual so far</th><th scope="col">Compared</th></tr></thead>
+        <tbody>{% for l in bva.lines %}{% if l.kind == kind %}<tr><td class="cell-title">{{ l.name }}</td><td class="num" data-label="Budget so far">{{ l.budget_ytd|cents }}</td><td class="num" data-label="Actual so far">{{ l.actual_ytd|cents }}</td>
+          <td data-label="Compared"><meter class="bar" min="0" max="150" value="{{ l.percent }}" aria-label="{{ l.percent }}% of the budget so far">{{ l.percent }}%</meter><span class="small muted">{{ l.percent }}%</span></td></tr>{% endif %}{% endfor %}</tbody>
+      </table></div></div>
+      {% endfor %}
+    {% else %}<section class="card">{% include "partials/empty.html" with icon="chart" title="No budget adopted yet" %}</section>{% endif %}
+  </section>
+  {% if user|can:"request.submit" %}<p class="link-row"><a href="{% url 'requests' %}?mine=1">Ask the board a question about the association's money</a></p>{% endif %}
+{% endblock %}

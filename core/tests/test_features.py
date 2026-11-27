@@ -30,6 +30,7 @@ OFF_BY_DEFAULT = {
     "autopay",
     "usps_tracking",
     "bounce_tracking",
+    "vendor_onboarding",
 }
 
 

@@ -245,6 +245,8 @@ def sync(conn: BankConnection, *, actor, request=None, provider: Provider | None
         conn.last_error_status = None
         conn.status = BankConnectionStatus.ACTIVE
         conn.save(update_fields=["last_synced_at", "last_error_status", "status"])
+    if new:
+        _apply_coding_rules()
     record_event(
         "bank_feed.synced",
         actor=_user(actor),
@@ -319,7 +321,18 @@ def import_csv(conn: BankConnection, text: str, mapping, *, actor, request=None)
     return _imported(conn, "csv", new, seen, skipped, actor, request)
 
 
+def _apply_coding_rules() -> None:
+    """Books (D69): code the new lines by the board's rules at once."""
+    if not features.enabled("books"):
+        return
+    from ledger.books.coding import apply_rules
+
+    transaction.on_commit(apply_rules)
+
+
 def _imported(conn, source, new, seen, skipped, actor, request) -> dict:
+    if new:
+        _apply_coding_rules()
     record_event(
         "bank_feed.imported",
         actor=_user(actor),

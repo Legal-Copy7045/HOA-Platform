@@ -30,6 +30,12 @@ class EntryKind(models.TextChoices):
     # Part of an online payment the board refunded at Stripe, recorded on the
     # account (positive: the owner has that money back). D33-acctfix-5.
     REFUND = "refund", "Payment refunded"
+    # Finance options (D80, D82): simple interest on overdue assessments,
+    # posted monthly by ledger/interest.py; collection costs and attorney
+    # fees the Declaration lets the association charge (ledger/legal.py).
+    # Books branch: map "interest" to interest income on the operating fund.
+    INTEREST = "interest", "Interest on overdue balance"
+    LEGAL_COST = "legal_cost", "Collection costs and attorney fees"
 
 
 CHARGE_KINDS = {
@@ -38,6 +44,8 @@ CHARGE_KINDS = {
     EntryKind.OTHER_CHARGE,
     EntryKind.RESALE_FEE,
     EntryKind.REFUND,
+    EntryKind.INTEREST,  # D80
+    EntryKind.LEGAL_COST,  # D82
 }
 
 
@@ -92,6 +100,13 @@ class LedgerEntry(ScopedAppendOnlyModel):
             ),
             models.CheckConstraint(
                 condition=~models.Q(amount_cents=0), name="ledger_entry_nonzero"
+            ),
+            # Interest on overdue balances (D80): one posting per ownership
+            # account and month, whatever runs the task or presses the button.
+            models.UniqueConstraint(
+                fields=["account", "period"],
+                condition=models.Q(kind="interest", moved_from__isnull=True) & ~models.Q(period=""),
+                name="one_interest_per_account_per_month",
             ),
         ]
 
@@ -738,6 +753,8 @@ class BankTransactionSource(models.TextChoices):
     TELLER = "teller", "Teller"
     OFX = "ofx", "OFX/QFX file"
     CSV = "csv", "CSV file"
+    # A month-end statement balance typed by the treasurer (D70).
+    ENTERED = "entered", "Entered from the statement"
 
 
 class BankTransaction(AppendOnlyModel):
@@ -797,8 +814,9 @@ class BankMatch(AppendOnlyModel):
     undoes = models.OneToOneField(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="undone_by"
     )
+    # Empty when the automatic close confirmed an unambiguous match (D70).
     confirmed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     confirmed_at = models.DateTimeField(default=timezone.now)
 
@@ -1138,3 +1156,11 @@ class CheckPrintSettings(models.Model):
     def get(cls) -> CheckPrintSettings:
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# --- Books and close (D69-D71): ledger/books/models.py ---------------------------------
+from ledger.books.models import *  # noqa: E402, F403
+
+# Finance options (D80-D85): collections legal records live in their own
+# module; imported here so Django registers them with the ledger app.
+from ledger.models_options import LegalEvent  # noqa: E402, F401
