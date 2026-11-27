@@ -207,6 +207,10 @@ def _contract_period(invoice) -> str:
     if not invoice.contract_id:
         return ""
     contract = Contract.objects.get(pk=invoice.contract_id)
+    from operations.vendor_onboarding import is_active as vendor_is_active
+
+    if not vendor_is_active(invoice.vendor_id):
+        return ""  # D79: an unapproved vendor's invoice is never pre-approved
     if (
         contract.state != "active"
         or contract.vendor_id != invoice.vendor_id
@@ -351,8 +355,21 @@ def create_invoice(
     return invoice
 
 
+def _vendor_may_be_paid(invoice: Invoice, actor, request=None) -> None:
+    """D79: an unapproved or inactive vendor's invoices are neither approved
+    nor paid (older vendors are grandfathered as active), and a board member
+    the vendor's conflict disclosure names takes no step on them (D65)."""
+    from operations.vendor_onboarding import invoice_block_reason
+
+    problem = invoice_block_reason(invoice.vendor)
+    if problem:
+        raise OperationsError(problem)
+    conflicts.refuse(actor, invoice, area="invoice", request=request, error=OperationsError)
+
+
 def approve(invoice: Invoice, *, note: str = "", actor, request=None) -> Invoice:
     require(actor, "invoice.approve")
+    _vendor_may_be_paid(invoice, actor, request)
     with transaction.atomic():
         invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if invoice.state != "pending_approval":
@@ -421,6 +438,7 @@ def record_payment(
         raise OperationsError("Choose a payment method.")
     if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):
         raise OperationsError("Enter a check number or short reference, never an account number.")
+    _vendor_may_be_paid(invoice, actor, request)
     with transaction.atomic():
         invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if invoice.state != "approved":

@@ -99,6 +99,19 @@ STEPS: list[Step] = [
         features=("disbursements",),
     ),
     Step(
+        "vendors",
+        "Vendors",
+        "How vendors are onboarded (D79): the emailed form's link life, the insurance the "
+        "board expects, how long W-9s are kept, which documents each kind of vendor provides "
+        "and the association's vendor terms. Two board members approve every new vendor.",
+        groups=("Vendors",),
+        features=("vendor_onboarding",),
+        links=(
+            ("Vendor requirements and terms", "vendor_requirements", "vendor.onboarding_configure"),
+            ("W-9 retention", "vendor_w9_retention", "vendor.w9_dispose"),
+        ),
+    ),
+    Step(
         "payments",
         "Online payments and automatic payments",
         "Whether owners can pay online (Stripe's hosted page) and set up automatic "
@@ -195,8 +208,8 @@ STEPS: list[Step] = [
     Step(
         "server",
         "Server and email",
-        "Outgoing email, backups, the off-site copy, the payment and bank keys and the USPS "
-        "tracking login. These "
+        "Outgoing email, backups, the off-site copy, the payment and bank keys, the vendor "
+        "document key and the USPS tracking login. These "
         "are done on the server by a sysadmin; this step shows where things stand.",
         kind=SERVER,
     ),

@@ -303,9 +303,17 @@ def _server_status():
         "teller": teller.configured(),
         "push": push_ready,
         "usps": usps,
+        "vendor_key": _vendor_key_ready(),
         "sms": getattr(settings, "SMS_PROVIDER", "none") != "none",
         "file_store_r2": _file_store_is_r2(),
     }
+
+
+def _vendor_key_ready() -> bool:
+    """Whether the vendor document key is set (D79). Never the key."""
+    from operations import vendor_crypto
+
+    return vendor_crypto.configured()
 
 
 def _file_store_is_r2() -> bool:

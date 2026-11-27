@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}W-9 retention · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'vendors' %}">Vendors</a> / W-9 retention</div>
+  <div class="page-head"><div><h1>W-9 retention</h1><div class="meta"><span>W-9s are kept {{ years }} years after the last 1099 year they support, then two board members dispose of them.</span></div></div></div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm"><thead><tr><th>Vendor</th><th>Last 1099 year</th><th>Kept until</th><th></th></tr></thead><tbody>
+    {% for r in due %}<tr><td class="cell-title">{{ r.vendor.name }}</td><td data-label="Last 1099 year">{{ r.support_year }}</td><td data-label="Kept until">{{ r.keep_until|date:"M j, Y" }}</td>
+      <td>{% if r.proposal %}<form method="post" action="{% url 'vendor_w9_disposal' r.file.pk 'confirm' %}">{% csrf_token %}<span class="small muted">Proposed {{ r.proposal.created_at|date:"M j" }}.</span> <button type="submit" class="danger">Confirm disposal</button></form>
+      {% else %}<form method="post" action="{% url 'vendor_w9_disposal' r.file.pk 'propose' %}">{% csrf_token %}<label for="why-{{ r.file.pk }}" class="sr-only">Reason</label><input id="why-{{ r.file.pk }}" name="reason" value="Retention period ended" maxlength="200"><button type="submit" class="secondary">Propose disposal</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="muted">No W-9 is past its retention period.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

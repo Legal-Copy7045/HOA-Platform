@@ -394,6 +394,16 @@ TELLER_ENVIRONMENT = env("TELLER_ENVIRONMENT", default="sandbox")
 TELLER_CERTIFICATE_B64 = env("TELLER_CERTIFICATE_B64", default="")
 TELLER_PRIVATE_KEY_B64 = env("TELLER_PRIVATE_KEY_B64", default="")
 
+# --- Vendor onboarding (optional feature "vendor_onboarding", D79) -------------------
+# Key that encrypts vendors' uploaded documents (W-9s, insurance certificates)
+# at the application layer (AES-256-GCM, key derived with HKDF). Generated on
+# the server by infra/poc/set-vendor-key.sh, never typed or put in the
+# repository; keep a copy apart from the backups (D79). Old keys go in the
+# fallbacks (comma-separated) while files are re-encrypted. Without a key the
+# feature refuses uploads and viewing.
+VENDOR_DOCUMENT_KEY = env("VENDOR_DOCUMENT_KEY", default="")
+VENDOR_DOCUMENT_KEY_FALLBACKS = env.list("VENDOR_DOCUMENT_KEY_FALLBACKS", default=[])
+
 # --- USPS tracking: Informed Visibility scans (optional feature "usps_tracking", D60) ----
 # The HOA's Business Customer Gateway login, put into the server's .env by
 # infra/poc/set-usps.sh (never through the web app). "cat" is USPS's test

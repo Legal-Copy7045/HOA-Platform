@@ -1,0 +1,6 @@
+{% extends "operations/onboarding/public_base.html" %}
+{% block content %}
+  <h1>This link can't be used</h1>
+  {% if signed_in %}<p class="muted">You're signed in to the portal in this browser. Sign out, or open the link in a private window.</p>
+  {% else %}<p class="muted">It may have expired, been replaced by a newer link, or the form was already submitted. Ask the association for a new link.</p>{% endif %}
+{% endblock %}

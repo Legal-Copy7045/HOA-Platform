@@ -289,6 +289,34 @@ FEATURES: list[Feature] = [
         {"paper_mail_piece_checked"},
         default=False,
     ),
+    _f(
+        "vendor_onboarding",
+        "Vendor onboarding",
+        "New vendors fill in an emailed form (W-9, insurance, licences, conflicts) and two board "
+        "members approve them before they can be paid; documents are encrypted in the portal "
+        "(needs the vendor document key on the server).",
+        {
+            # The public form (D79): the only pages besides sign-in without sign-in.
+            "vendor_onboarding_start",
+            "vendor_onboarding_form",
+            "vendor_onboarding_upload",
+            "vendor_onboarding_submit",
+            "vendor_onboarding_done",
+            # Board and manager pages.
+            "vendor_onboarding_list",
+            "vendor_onboarding_invite",
+            "vendor_onboarding_review",
+            "vendor_onboarding_action",
+            "vendor_onboarding_file",
+            "vendor_onboarding_vendor",
+            "vendor_onboarding_vendor_action",
+            "vendor_file_summary",
+            "vendor_requirements",
+            "vendor_w9_retention",
+            "vendor_w9_disposal",
+        },
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"
