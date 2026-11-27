@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from arc.models import DECIDED, ArcRequest, ArcState, Decision, Position, ReviewerVote
 from audit.services import record_event
-from community.models import CommunityProfile, Lot, Ownership, Person
+from community.models import CommunityProfile, Lot, Person
 from community.rules import rule, rule_with_citation
 from core import pdf
 from core.policy import SYSTEM, can, require, roles_for
@@ -26,7 +26,9 @@ def _person_id(user) -> int | None:
 def is_recused(user, req: ArcRequest) -> bool:
     """Applicant, or owner of the request's lot or an affected lot (CLAUDE.md);
     since D65 also anyone whose own matter it is (an account contact of the
-    home, or its owner when the request was made)."""
+    home, or its owner when the request was made), and since D87 the same
+    for every affected and neighboring home: its owners, account contacts
+    and tenants today, and whoever owned it when the request arose."""
     if user is SYSTEM:
         return False
     person_id = _person_id(user)
@@ -45,7 +47,7 @@ def is_recused(user, req: ArcRequest) -> bool:
         # The lot's recorded neighbors are affected from the start, not only
         # once submitted (BUG-007).
         lots |= {lot.pk for lot in neighbors_of(req.lot)}
-        return Ownership.objects.active().filter(person_id=person_id, lot_id__in=lots).exists()
+    return conflicts.party_to_lots(user, lots, conflicts.matter_date(req))
 
 
 def owns_lot(user, req: ArcRequest) -> bool:

@@ -176,6 +176,12 @@ def extend(target, *, closes_at, reason: str, actor, request=None):
     people who can vote are emailed at once (never held for a digest). Never
     shorter."""
     require(actor, "vote.manage")
+    if isinstance(target, Election):
+        from governance import elections
+
+        elections.refuse_candidate(
+            actor, target, action="extend", request=request, error=WindowError
+        )
     reason = clean_reason(reason)
     if not reason:
         raise WindowError("Say why the deadline is being extended.")

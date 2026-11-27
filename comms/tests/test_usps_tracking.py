@@ -750,3 +750,16 @@ def test_a_network_hiccup_fails_the_health_check_only_after_a_day(w, usps, monke
     state.save()
     ok, detail = usps_tracking.health()
     assert not ok and detail.startswith("No successful check for 30 h")
+
+
+def test_web_container_knows_a_login_is_set_but_never_signs_in(usps, settings):
+    """D87 (R2-007): only the worker gets the password; the web container is
+    told one is set (status lines) and refuses to sign in without it."""
+    settings.USPS_IV_PASSWORD = ""  # nosec B105  # the web container has none
+    settings.USPS_IV_PASSWORD_SET = True
+    assert usps_iv.config().configured
+    with pytest.raises(usps_iv.UspsError):
+        usps_iv.authenticate()
+    assert usps.calls == []
+    settings.USPS_IV_PASSWORD_SET = False
+    assert not usps_iv.config().configured

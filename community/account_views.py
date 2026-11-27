@@ -541,9 +541,14 @@ def my_history(request):
         period = _former_period(roles, lot_id, start, end)
         period["index"] = index
         period["rows"] = statement_rows(period["statement"])
-        # Refund checks written to them for this period (D52).
+        # Refund checks written to them for this period (D52). An account
+        # that stays open (a co-owner removed by a deed change) shows only
+        # checks from before they left, like its statement (D87).
         account = period["account"]
-        period["checks"] = checks_for_account(account.pk if account else None)
+        dormant = account is not None and not account.is_active
+        period["checks"] = checks_for_account(
+            account.pk if account else None, before=None if dormant else end
+        )
         periods.append(period)
     from django.db.models import Q
 

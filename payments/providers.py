@@ -11,8 +11,13 @@ Mode safety:
 * Every object fetched from Stripe must carry the same ``livemode`` (checked
   in payments.checkout).
 
+* Only a restricted key (``rk_test_``/``rk_live_``) is accepted, with the
+  rights in docs/runbook.md "Online payments (Stripe)" and no refund rights
+  (D87): a full secret key (``sk_``) is refused everywhere, so a
+  compromised server cannot refund, transfer or change payouts.
+
 The key itself is never logged, shown or stored anywhere but the server's
-environment. A restricted key (``rk_``) is recommended (runbook).
+environment.
 """
 
 from __future__ import annotations
@@ -39,12 +44,21 @@ class Config:
         return "Live" if self.livemode else "Test mode"
 
 
+FULL_KEY_REFUSED = (
+    "STRIPE_SECRET_KEY is a full secret key (sk_...), which is refused. Only a restricted "
+    'key (rk_...) with the rights in docs/runbook.md "Online payments (Stripe)" is '
+    "accepted: create one in Stripe and set it with sudo bash infra/poc/set-stripe-key.sh."
+)
+
+
 def config() -> Config:
     if settings.PAYMENTS_PROVIDER != "stripe":
         return Config(False, "none", False, False, "Online payments are not set up.")
     key = settings.STRIPE_SECRET_KEY or ""
     stage = getattr(settings, "DEPLOYMENT_STAGE", "local")
     restricted = key.startswith("rk_")
+    if key.startswith(("sk_test_", "sk_live_")):
+        return Config(False, "stripe", key.startswith("sk_live_"), False, FULL_KEY_REFUSED)
     if key.startswith(("sk_test_", "rk_test_")):
         if stage == "production":
             return Config(

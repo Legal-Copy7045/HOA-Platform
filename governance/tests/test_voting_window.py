@@ -85,7 +85,7 @@ def _cast(vote, user, label="Yes"):
 
 def _election(w, days=8):
     e = elections.create_election(title="2027 board election", seats=1, actor=w["board"])
-    elections.nominate(e, person=w["board"].person, actor=w["board"])
+    elections.nominate(e, person=w["owners"][2].person, actor=w["owners"][2])
     return elections.open_voting(
         e, opens_at=timezone.now(), closes_at=timezone.now() + days * DAY, actor=w["board"]
     )
@@ -210,7 +210,7 @@ def test_opening_from_the_page_takes_the_window(client, w):
 
 def test_an_election_needs_a_window_to_open(w):
     e = elections.create_election(title="2027", seats=1, actor=w["board"])
-    elections.nominate(e, person=w["board"].person, actor=w["board"])
+    elections.nominate(e, person=w["owners"][2].person, actor=w["owners"][2])
     with pytest.raises(elections.ElectionError, match="opens and when it closes"):
         elections.open_voting(e, actor=w["board"])
     now = timezone.now()

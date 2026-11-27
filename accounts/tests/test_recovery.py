@@ -334,6 +334,22 @@ def test_asking_again_during_the_wait_sends_no_link(client, django_capture_on_co
     assert "still waiting" in mail.outbox[-1].subject
 
 
+def test_still_waiting_notices_are_capped_per_day(client, django_capture_on_commit_callbacks):
+    """D87 (R2-004): asking again and again cannot flood the person's inboxes."""
+    owner = _owner()
+    _start(client, owner, django_capture_on_commit_callbacks)
+    assert _send(owner, django_capture_on_commit_callbacks) == "waiting"
+    assert len(mail.outbox) >= 1
+    for _ in range(5):
+        assert _send(owner, django_capture_on_commit_callbacks) == "waiting_limit"
+        assert mail.outbox == []
+    # A day later (the recovery still waits) one more notice may go.
+    later = timezone.now() + datetime.timedelta(hours=25)
+    with mock.patch.object(recovery.timezone, "now", return_value=later):
+        assert _send(owner, django_capture_on_commit_callbacks) == "waiting"
+    assert mail.outbox and "still waiting" in mail.outbox[-1].subject
+
+
 def test_cannot_finish_before_the_wait_is_over(client, django_capture_on_commit_callbacks):
     owner = _owner()
     row = _start(client, owner, django_capture_on_commit_callbacks)
@@ -637,6 +653,9 @@ def _locked_calls(user):
         "mailing address": lambda: community.set_mailing_address(user=user, to_home=True),
         "notice choice": lambda: community.record_notice_choice(user=user, consent=True),
         "old profile phone": lambda: community.update_my_profile(user=user, phone="215-555-0101"),
+        # D87 (R2-005): what reaches the owner's inbox is locked too.
+        "statement emails": lambda: community.update_my_profile(user=user, statement_emails=False),
+        "weekly digest": lambda: community.update_my_profile(user=user, weekly_digest=True),
         "text number": lambda: community.set_sms_number(user=user, number="+12155550100"),
         "texts start": lambda: sms.start_verification(user=user, number="215-555-0100"),
         "texts confirm": lambda: sms.confirm(user=user, code="123456"),
@@ -667,9 +686,14 @@ def test_the_lock_message_says_when(locked):
     assert str(caught.value).startswith("For your security, this is available again on ")
 
 
-def test_directory_and_digest_choices_stay_open_during_the_lock(locked):
+def test_directory_choice_stays_open_during_the_lock(locked):
+    """The directory stays open; the email choices may be resent unchanged
+    (the form always posts them) but not changed (D87)."""
     owner, _row = locked
-    community.update_my_profile(user=owner, in_directory=True, weekly_digest=True)
+    profile = community.update_my_profile(
+        user=owner, in_directory=True, weekly_digest=False, statement_emails=True
+    )
+    assert profile.in_directory and profile.statement_emails and not profile.weekly_digest
 
 
 def test_the_lock_ends_after_48_hours(locked):

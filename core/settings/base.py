@@ -415,6 +415,9 @@ VENDOR_DOCUMENT_KEY_FALLBACKS = env.list("VENDOR_DOCUMENT_KEY_FALLBACKS", defaul
 USPS_IV_ENVIRONMENT = env("USPS_IV_ENVIRONMENT", default="cat")
 USPS_IV_USERNAME = env("USPS_IV_USERNAME", default="")
 USPS_IV_PASSWORD = env("USPS_IV_PASSWORD", default="")
+# Only the worker container receives the password (docker-compose.yml); the
+# web container gets this flag so its status lines know one is set (D87).
+USPS_IV_PASSWORD_SET = env.bool("USPS_IV_PASSWORD_SET", default=False)
 USPS_IV_API_HOST = env("USPS_IV_API_HOST", default="")
 USPS_IV_AUTH_HOST = env("USPS_IV_AUTH_HOST", default="")
 

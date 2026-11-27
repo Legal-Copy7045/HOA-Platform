@@ -23,7 +23,8 @@ The flow:
    app and recovery code is removed, they are signed out everywhere else,
    and the enrollment window of accounts.enrollment opens in this session.
 5. For ``recovery.lock_hours`` afterwards (never under 24) the account
-   cannot vote, give proxies, change contact details or notices, set up
+   cannot vote, give proxies, change contact details, notices, statement
+   emails or the weekly digest choice (D87), set up
    automatic payments or ask for account changes: services call
    ``refuse_if_locked``.
 
@@ -65,6 +66,9 @@ MAX_PER_30_DAYS = 3
 # Emailed links: short-lived and few.
 LINK_TTL = datetime.timedelta(hours=1)
 MAX_LINKS_PER_DAY = 5
+# "Your recovery is still waiting" notices: at most this many per person a
+# day (D87): asking again cannot flood their inboxes.
+MAX_WAITING_NOTICES_PER_DAY = 1
 # After the wait the person has this long to finish before it expires.
 FINISH_WITHIN = datetime.timedelta(days=7)
 # The board's My items entry after a completed recovery.
@@ -209,6 +213,20 @@ def _new_link(user: User, purpose: str, recovery: AccountRecovery | None = None)
     return token
 
 
+def _waiting_notices_since(user: User, since) -> int:
+    """ "Still waiting" notices emailed to this person since ``since`` (each
+    one is the audited refusal with reason "waiting")."""
+    from audit.models import AuditEvent
+
+    return AuditEvent.objects.filter(
+        action="account_recovery.link_refused",
+        target_type=user._meta.label_lower,
+        target_id=str(user.pk),
+        occurred_at__gte=since,
+        metadata__reason="waiting",
+    ).count()
+
+
 def _refuse(user: User, reason: str) -> None:
     record_event(
         "account_recovery.link_refused",
@@ -251,6 +269,9 @@ def send_link(user_id: int) -> str:
         current = open_recovery(user)
         emails, _number = _contacts(user)
         if current is not None and current.status == "waiting":
+            if _waiting_notices_since(user, since) >= MAX_WAITING_NOTICES_PER_DAY:
+                _refuse(user, "waiting_limit")
+                return "waiting_limit"
             _mail(
                 emails,
                 "Your account recovery is still waiting",

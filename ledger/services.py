@@ -76,6 +76,24 @@ def _refuse_own(actor, matter, action: str, request=None) -> None:
     )
 
 
+def _refuse_own_account(actor, account_id, action: str, request=None) -> None:
+    """Own matters on the account the entry lands on (D87): a seller's
+    dormant account, or one a removed co-owner left, is still theirs, though
+    the home no longer is."""
+    from community.models import Account
+
+    if account_id in (None, "") or actor is SYSTEM:
+        return
+    try:
+        account_id = int(account_id)
+    except (TypeError, ValueError):
+        return  # not an account: the step itself refuses it
+    with system_access("own matter: target account"):
+        account = Account.objects.filter(pk=account_id).first()
+    if account is not None:
+        _refuse_own(actor, account, action, request)
+
+
 # --- Balances -------------------------------------------------------------------------
 
 
@@ -459,6 +477,7 @@ def record_payment(
     account_id = accounts.check_account(lot.pk, account_id)
     if account_id is None:
         account_id = accounts.account_on(lot.pk, received_on)
+    _refuse_own_account(actor, account_id, "record_payment", request)
     entry = _post_payment(
         lot,
         amount_cents=amount_cents,
@@ -559,6 +578,9 @@ def record_payments(payments: list[BatchPayment], *, actor, request=None) -> lis
         raise LedgerError("Enter at least one payment.")
     for p in payments:
         _refuse_own(actor, p.lot, "record_payment", request)
+        _refuse_own_account(
+            actor, accounts.account_on(p.lot.pk, p.received_on), "record_payment", request
+        )
     seen = set()
     for p in payments:
         if check_payment(p):
@@ -615,11 +637,16 @@ def post_charge(
             )
     if amount_cents <= 0 or not description.strip():
         raise LedgerError("A charge needs a positive amount and a description.")
-    _refuse_closed(posted_on or timezone.localdate(), "The charge date")
+    posted_on = posted_on or timezone.localdate()
+    _refuse_closed(posted_on, "The charge date")
+    account_id = accounts.check_account(lot.pk, account_id)
+    _refuse_own_account(
+        actor, account_id or accounts.account_on(lot.pk, posted_on), "post_charge", request
+    )
     entry = LedgerEntry.objects.create(
         lot=lot,
-        account_id=accounts.check_account(lot.pk, account_id),
-        posted_on=posted_on or timezone.localdate(),
+        account_id=account_id,
+        posted_on=posted_on,
         kind=kind,
         amount_cents=amount_cents,
         description=description.strip()[:200],
@@ -649,9 +676,16 @@ def post_credit(
     _refuse_own(actor, lot, "post_credit", request)
     if amount_cents <= 0 or not description.strip():
         raise LedgerError("A credit needs a positive amount and a reason.")
+    account_id = accounts.check_account(lot.pk, account_id)
+    _refuse_own_account(
+        actor,
+        account_id or accounts.account_on(lot.pk, timezone.localdate()),
+        "post_credit",
+        request,
+    )
     entry = LedgerEntry.objects.create(
         lot=lot,
-        account_id=accounts.check_account(lot.pk, account_id),
+        account_id=account_id,
         posted_on=timezone.localdate(),
         kind=EntryKind.CREDIT,
         amount_cents=-amount_cents,
@@ -916,6 +950,9 @@ def reassign_entry(
         raise LedgerError("Give the reason for moving it.")
     if entry.kind not in REASSIGNABLE:
         raise LedgerError("Only a payment or a credit can be moved to another account.")
+    # The account it would land on counts too (D87): nobody moves money onto
+    # an account they are or were on the deed of.
+    _refuse_own_account(actor, account_id, "reassign", request)
     # Authorized above (board only); the entry came from the caller's scoped
     # lookup, and the target account must belong to the same lot.
     with transaction.atomic(), system_access("board moves an entry to another account"):
