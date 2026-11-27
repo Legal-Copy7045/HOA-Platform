@@ -72,7 +72,7 @@ PUBLIC_CSP = {
 }
 # (per hour) opening links per client and per link; form posts per client and
 # per round.
-LIMITS = {"open_ip": 30, "open_token": 10, "post_ip": 240, "post_round": 120}
+LIMITS = {"open_ip": 30, "open_token": 10, "post_ip": 240, "post_round": 120}  # nosec B105
 INVALID = "operations/onboarding/public_invalid.html"
 
 

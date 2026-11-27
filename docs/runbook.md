@@ -1053,3 +1053,18 @@ With USPS tracking on, the portal reads USPS scans of barcoded paper mail itself
 | USPS would not show it | USPS answered "not yours": the barcode's Mailer ID is not on this BCG account. |
 
 **Problems.** System status → "USPS tracking" fails when USPS refuses the sign-in (the sysadmins also get one email a day: re-run `set-usps.sh`, check the password has not expired and the user still has IV-MTR access), when USPS refuses every letter (check that the Mailer ID on Paper mail settings belongs to this account), or when no check has worked for a day (the worker, or USPS, is down). The portal keeps under 400 requests a minute (USPS allows 500).
+
+## Vendor onboarding (D79)
+
+**Key set-up (sysadmin, once, on the VM).** `sudo bash infra/poc/set-vendor-key.sh` makes the vendor document key on the server (nothing to type), saves it in `.env`, restarts the portal and runs `manage.py check_vendor_key`. Then copy the key into the HOA's password manager (`sudo grep -E '^VENDOR_DOCUMENT_KEY' /opt/hoa-portal/.env`) and `shred` the `.env.before-vendor-key` copy the script names. Keep that copy apart from the backups: the backups hold the encrypted documents only. The setup wizard's server step shows "Vendor document key: Set up".
+
+**Rotating the key.** `sudo bash infra/poc/set-vendor-key.sh --rotate` keeps the old key in `VENDOR_DOCUMENT_KEY_FALLBACKS`, makes a new one and re-encrypts every stored document; `check_vendor_key` then reports "0 under an old key". Remove the fallback only after that, and store the new key in the password manager. A restore needs the key that was current when the backup was taken (or the fallbacks).
+
+**Switching it on.** Admin → Features → Vendor onboarding (or the Vendors step of Community setup, where the link life, insurance minimums and W-9 retention are set with citations). Finance → Vendors → Vendor requirements and terms: the board ticks what each kind of vendor provides (with a citation) and edits the terms.
+
+**Sending a link (board or manager).** Finance → Vendors → Vendor onboarding → Invite a vendor: name, email, services and kind of work. The vendor is created inactive and gets an email with the link (it works until it expires or they submit). "Send a new link" on the request ends the old one. For a vendor added before onboarding, open its Onboarding record → Complete onboarding; for an expired certificate or a new W-9, Ask for updated documents (the link shows only those items).
+
+**Reviewing (board).** My items lists "Review vendor onboarding: <vendor>". Check the answers, the warnings (insurance below the minimum, expired certificates), the documents (W-9s open for board members only; every view is logged) and any conflict disclosure; link anyone it names (they cannot approve the vendor or its invoices). Approve, Return to the vendor (say what to change: they get a new link), or Decline. Two different board members approve; the one who sent the link does not. Until then the vendor's invoices cannot be approved or paid.
+
+**W-9 retention.** My items shows "W-9s past retention" when any are due; Finance → Vendors → W-9 retention: one board member proposes disposal, a different one confirms.
+

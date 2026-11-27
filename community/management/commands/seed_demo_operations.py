@@ -637,3 +637,7 @@ class Command(BaseCommand):
             source="csv",
             actor=b1,
         )
+        # Vendor onboarding (D79): every state, in its own module.
+        from operations.demo_vendor_onboarding import seed as seed_vendor_onboarding
+
+        seed_vendor_onboarding(board)

@@ -515,7 +515,7 @@ def find_open_link(token: str) -> OnboardingLink | None:
     link = (
         OnboardingLink.objects.select_related("round")
         .filter(token_hash__in=_candidate_hashes(token))
-        .exclude(token_hash="")
+        .exclude(token_hash="")  # nosec B106 - not a password: unsent links
         .first()
     )
     if link is None or not link_usable(link):
