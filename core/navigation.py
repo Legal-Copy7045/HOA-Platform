@@ -175,6 +175,13 @@ HUBS = {
             "Former owners' contact details cleared after the retention period.",
         ),
         (
+            "Records retention",
+            "records_retention",
+            "clock",
+            "records_retention.manage",
+            "How long each kind of document is kept, disposal by two board members, legal holds.",
+        ),
+        (
             "Demo data",
             "demo_data",
             "leaf",
@@ -228,9 +235,13 @@ SUBPAGES = {
     # Committee workspaces open from Board and committees (WT-008).
     "community_info": ["committees"],
     "paper_mail": ["paper_mail_settings"],
+    # The incident timeline opens from System status (D74).
+    "system_status": ["ops_timeline"],
     # The board reads server task history on Sysadmin activity (WT-007);
     # sysadmins, who cannot open that page, keep Server tasks in the menu.
     "sysadmin_activity": ["server_tasks"],
+    # Help pages (D73): the topics, Getting started and Welcome mark Help.
+    "help": ["welcome"],
 }
 
 # Entries shown only while an optional feature is off: Meetings is part of
@@ -249,6 +260,8 @@ SECTIONS = [
         [
             ("Dashboard", "home", "home", None),
             ("My items", "my_items", "inbox", MY_ITEMS_PERMISSIONS),
+            # Owner help (D73): how it works, getting started, Ask the board.
+            ("Help", "help", "help", "help.view"),
         ],
     ),
     (
@@ -300,6 +313,8 @@ SECTIONS = [
             ("Work orders", "work_orders", "wrench", "finance.view"),
             ("Vendors", "vendors", "users", "finance.view"),
             ("Contracts", "contracts", "file", "finance.view"),
+            # Insurance, vendor certificates and contract deadlines (D72).
+            ("Renewals", "renewals", "shield", "renewals.view"),
         ],
     ),
     (

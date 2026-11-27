@@ -130,6 +130,12 @@ MEMBER_PAGES = {
     # Reserve plan (reserves): the adopted plan's summary (now a redirect to
     # Budget and reserves, streamlining).
     "reserve_summary",
+    # Owner help (D73): Help, Welcome, Getting started (the signed-in login's
+    # own steps only) and Ask the board (opens the login's own new request).
+    "help",
+    "welcome",
+    "getting_started",
+    "ask_board",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -145,6 +151,9 @@ VOTING_REDIRECTS = {
 COMMUNITY_DETAIL = {
     "election_detail": ("GET", "election"),
     "election_action": ("POST", "election"),
+    # Owner help (D73): a "How it works" page and the board's text on it.
+    "help_topic": ("GET", None),
+    "help_text_save": ("POST", None),
 }
 
 # Board and committees (streamlining, owner decision 2026-11-26): every
@@ -235,6 +244,11 @@ PROTECTED = {
     "sysadmin_activity": ("GET", None),
     "system_status": ("GET", None),
     "server_tasks": ("GET", None),
+    # D74: the incident timeline (sysadmins); bounced email actions (board,
+    # and board or manager for the paper copy).
+    "ops_timeline": ("GET", None),
+    "person_email_bounce_clear": ("POST", "person"),
+    "bounce_paper_done": ("POST", "lot"),
     "demo_data": ("POST", None),  # 404 unless demo data is allowed; sysadmins only (D53)
     "community_settings": ("GET", None),
     # Community setup wizard (D51): board only.
@@ -399,7 +413,26 @@ PROTECTED = {
     "paper_mail_labels": ("GET", "mailing"),
     "paper_mail_mark": ("POST", "mailing"),
     "paper_mail_piece_checked": ("POST", "mailing"),
+    # Renewals and records retention (D72): board, manager and auditor pages
+    # (disposal and holds board only); a document's date, access history and
+    # version comparison are scoped like the document (lot B's is 404).
+    "document_set_date": ("POST", "lot_b_document"),
+    "document_access": ("GET", "lot_b_document"),
+    "document_compare": ("GET", "lot_b_document"),
+    "renewals": ("GET", None),
+    "renewal_policy_new": ("GET", None),
+    "renewal_policy": ("GET", None),
+    "renewal_vendor": ("GET", "vendor"),
+    "renewal_contract": ("GET", "contract"),
+    "renewal_contract_decide": ("POST", "contract"),
+    "records_retention": ("GET", None),
+    "records_disposal_propose": ("POST", None),
+    "records_disposal_decide": ("POST", None),
+    "records_hold_place": ("POST", None),
+    "records_hold_release": ("POST", None),
 }
+# Pages refused before their record is looked up: any id will do (D72).
+PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
 
 
 def _named_urls() -> set[str]:
@@ -432,7 +465,8 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        for key in ("push", "sms", "bank_feeds", "usps_tracking"):  # off by default; checked here
+        # Off by default; checked here.
+        for key in ("push", "sms", "bank_feeds", "usps_tracking", "bounce_tracking"):
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
@@ -965,11 +999,13 @@ def _url(name, key, targets):
         kwargs["action"] = "join"
     elif name == "setup_step":
         kwargs["step"] = "charge"
+    elif name in ("help_topic", "help_text_save"):
+        kwargs["slug"] = "paying"
     elif name == "disbursement_action":
         kwargs["action"] = "approve"
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
-    elif name.startswith("register_import_"):
+    elif name.startswith("register_import_") or name in PK_ONE:
         kwargs["pk"] = 1
     return reverse(name, kwargs=kwargs)
 

@@ -53,6 +53,15 @@ FEATURES: list[Feature] = [
         },
     ),
     _f("faq", "FAQ", "Frequently asked questions page.", {"faq"}),
+    # Owner help (D73): help pages, the welcome page and the getting-started
+    # checklist. "Ask the board" (ask_board) stays on: it opens a request.
+    _f(
+        "owner_help",
+        "Help and getting started",
+        "Plain-language help pages that read today's rules, a welcome page after the first "
+        "sign-in and a getting-started checklist for new owners, contacts and tenants.",
+        {"help", "help_topic", "help_text_save", "welcome", "getting_started"},
+    ),
     _f(
         "directory",
         "Owner directory",
@@ -153,6 +162,34 @@ FEATURES: list[Feature] = [
         "Contracts",
         "Vendor contracts and renewal dates.",
         {"contracts", "contract_detail", "contract_action"},
+    ),
+    # --- Renewals and records retention (D72) ---
+    _f(
+        "renewals",
+        "Renewals",
+        "Reminders before the association's insurance policies, vendors' insurance "
+        "certificates and contract notice deadlines run out.",
+        {
+            "renewals",
+            "renewal_policy_new",
+            "renewal_policy",
+            "renewal_vendor",
+            "renewal_contract",
+            "renewal_contract_decide",
+        },
+    ),
+    _f(
+        "records_retention",
+        "Records retention",
+        "Each kind of document kept for its retention period, then listed for two board "
+        "members to dispose of; legal holds stop disposal.",
+        {
+            "records_retention",
+            "records_disposal_propose",
+            "records_disposal_decide",
+            "records_hold_place",
+            "records_hold_release",
+        },
     ),
     _f(
         "resale",
@@ -287,6 +324,17 @@ FEATURES: list[Feature] = [
         "Reads USPS scans of barcoded paper mail a few times a day and flags letters with no "
         "scan after 5 days (needs a USPS login on the server).",
         {"paper_mail_piece_checked"},
+        default=False,
+    ),
+    # Bounced email (D74): also needs the bounce mailbox's login on the server
+    # (infra/poc/set-bounce-mailbox.sh).
+    _f(
+        "bounce_tracking",
+        "Bounced email",
+        "Reads bounced email from the association's bounce mailbox every 20 minutes, marks "
+        "addresses that do not accept mail and asks for a paper copy when an official notice "
+        "bounces (needs the mailbox's login on the server).",
+        {"person_email_bounce_clear", "bounce_paper_done"},
         default=False,
     ),
 ]

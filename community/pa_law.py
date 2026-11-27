@@ -108,6 +108,10 @@ GROUP_NOTES: dict[str, str] = {
         f"certificate. Refunding an owner's own credit (for example after a sale) is not a "
         f"surplus distribution."
     ),
+    "Server warnings": (
+        "Not set by the Act; an operations choice. Keeping the portal running protects the "
+        f"association's records, which it must keep ({ACT} § 5316)."
+    ),
     "Account recovery": (
         "Not set by the Act; a board security policy. The Act does not regulate how owners "
         "sign in. The waiting period and the lock afterwards protect votes, notices and "
@@ -116,6 +120,23 @@ GROUP_NOTES: dict[str, str] = {
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
+    ),
+    # D72
+    "Renewals": (
+        f"The Act requires the association to carry property insurance on the common "
+        f"facilities and commercial general liability insurance, to the extent reasonably "
+        f"available, and to tell owners promptly if it cannot be obtained or is cancelled "
+        f"({ACT} § 5312). The Declaration often adds fidelity (crime) coverage and directors' "
+        f"and officers' insurance. Reminder periods are a board decision."
+    ),
+    "Document retention": (
+        f"The association must keep financial and other records sufficiently detailed to "
+        f"answer resale certificates and make them reasonably available to owners "
+        f"({ACT} § 5316, § 5407); the Nonprofit Corporation Law adds minutes of members' and "
+        f"board meetings and the membership register (15 Pa.C.S. § 5508). The Acts set no "
+        f"number of years: the defaults (governing documents, minutes and the home records "
+        f"forever, financial records 7 years, contracts 7 years after they end) are common "
+        f"practice. Counsel should confirm the schedule before anything is disposed of."
     ),
 }
 
@@ -389,6 +410,13 @@ GUIDES["disbursement.second_approval_cents"] = Guide(
     "Two approvals at $500 and over: Board resolution 2026-07 (spending controls).",
 )
 
+GUIDES["monitoring.disk_full_warn_days"] = Guide(
+    BOARD,
+    "Not covered by the Act. A full disk stops the portal and its backups; an early warning "
+    f"keeps the association's records ({ACT} § 5316) safe and available.",
+    "60 days: Board operations policy.",
+)
+
 GUIDES["recovery.wait_hours"] = Guide(
     BOARD,
     "Not set by the Act; a board security policy. While the request waits, the person, every "
@@ -406,12 +434,111 @@ GUIDES["recovery.lock_hours"] = Guide(
     "48 hours: Board security policy (sign-in recovery), resolution 2026-12.",
 )
 
+# D72: renewals and records retention.
+GUIDES["renewals.insurance_reminder_days"] = Guide(
+    BOARD,
+    f"The Act requires property insurance on the common facilities and general liability "
+    f"insurance to the extent reasonably available, and prompt notice to owners if coverage "
+    f"cannot be obtained or is cancelled ({ACT} § 5312). It sets no reminder period.",
+    "60 days: Board resolution 2027-02 (insurance renewals).",
+)
+
+GUIDES["renewals.vendor_certificate_reminder_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; a risk-management practice. Contracts usually require vendors "
+    "to carry liability (and workers' compensation) insurance naming the association as "
+    "certificate holder.",
+    "30 days: Board resolution 2027-02 (vendor insurance).",
+)
+
+GUIDES["renewals.contract_notice_lead_days"] = Guide(
+    BOARD,
+    "Not covered by the Act. A contract's own terms set the notice needed to cancel an "
+    "automatic renewal; the board needs time to meet and decide before that date.",
+    "30 days before the notice deadline: Board resolution 2027-02 (contract renewals).",
+)
+
+_RETENTION_GUIDES = {
+    "governing": (
+        DECLARATION,
+        f"The Declaration, Bylaws and their amendments are the community's founding records "
+        f"({ACT} § 5205, § 5219); superseded versions show what applied when. Keep forever.",
+        "0 (forever): Board records policy, resolution 2027-03.",
+    ),
+    "policies": (
+        BOARD,
+        f"Rules and policies in force at a past date may matter in a dispute or a resale "
+        f"certificate ({ACT} § 5407). Common practice keeps superseded versions permanently.",
+        "0 (forever): Board records policy, resolution 2027-03.",
+    ),
+    "minutes": (
+        BOARD,
+        f"Minutes of members' and board meetings are corporate records kept permanently "
+        f"(15 Pa.C.S. § 5508; {ACT} § 5316 makes records available to owners).",
+        "0 (forever): Board records policy, resolution 2027-03.",
+    ),
+    "financial": (
+        BOARD,
+        f"Financial records must be detailed enough for resale certificates and available to "
+        f"owners ({ACT} § 5316, § 5407). The Act sets no period; 7 years covers federal tax "
+        f"assessment periods and audits and is common practice. Budgets and audited "
+        f"statements are often kept forever: file them under Governing or set a hold.",
+        "7 years after the statement or record date: Board records policy, resolution 2027-03.",
+    ),
+    "forms": (
+        BOARD,
+        "Not covered by the Act. Old blank forms have little value; submitted forms live with "
+        "the request they belong to.",
+        "3 years after replaced: Board records policy, resolution 2027-03.",
+    ),
+    "arc": (
+        DECLARATION,
+        "Architectural guidelines adopted under the Declaration decide past approvals; keep "
+        "superseded versions permanently.",
+        "0 (forever): Board records policy, resolution 2027-03.",
+    ),
+    "lot": (
+        BOARD,
+        f"Records about one home (approvals, surveys, notices) answer resale certificates "
+        f"({ACT} § 5407) for as long as the home stands. Keep forever.",
+        "0 (forever): Board records policy, resolution 2027-03.",
+    ),
+    "insurance": (
+        BOARD,
+        f"The Act requires the coverage ({ACT} § 5312) but no retention period. Claims under an "
+        f"occurrence policy can be made years later, so common practice keeps old policies "
+        f"permanently.",
+        "0 (forever): Board records policy, resolution 2027-03.",
+    ),
+    "contracts": (
+        BOARD,
+        "Not covered by the Act. Pennsylvania's limitation period for a written contract claim "
+        "is 4 years (42 Pa.C.S. § 5525); 7 years after the contract ends is common practice.",
+        "7 years after the contract ends: Board records policy, resolution 2027-03.",
+    ),
+    "other": (
+        BOARD,
+        "Not covered by the Act. Old versions of other documents are kept unless the board "
+        "sets a period.",
+        "0 (forever): Board records policy, resolution 2027-03.",
+    ),
+}
+for _category, (_source, _law, _example) in _RETENTION_GUIDES.items():
+    GUIDES[f"records.keep_years.{_category}"] = Guide(_source, _law, _example)
+
 for _key in ("general", "billing", "maintenance", "common_area"):
     GUIDES[f"request.sla_days.{_key}"] = Guide(
         BOARD,
         "Not covered by the Act; a service target.",
         "5 business days for questions, 3 for maintenance: Board resolution 2027-05.",
     )
+
+
+GUIDES["help.welcome_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; a service choice of the board.",
+    "90 days: Board decision adopting the owner portal's help pages (D73).",
+)
 
 
 def guide(key: str) -> Guide | None:

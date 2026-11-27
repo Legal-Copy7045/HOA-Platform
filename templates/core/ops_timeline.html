@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Incident timeline · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'system_status' %}">System status</a> / Incident timeline</div>
+  <div class="page-head"><div><h1>Incident timeline</h1><p class="subtitle">What happened to the portal as a system in the last {{ window_days }} days, newest first. Operations only: no names, addresses or messages.</p></div></div>
+  <nav class="filters" aria-label="Show" data-swap>
+    <a href="{% url 'ops_timeline' %}#results"{% if not kind %} aria-current="true"{% endif %}>Everything</a>
+    {% for key, label in filters %}<a href="{% url 'ops_timeline' %}?kind={{ key }}#results"{% if kind == key %} aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+  </nav>
+  <div data-swap-region id="results">
+    <section class="card">
+      {% if rows %}<ul class="list health-list timeline-list">{% for e in rows %}<li><div class="todo-icon tone-{% if e.state == 'problem' %}danger{% elif e.state == 'recovered' %}success{% else %}neutral{% endif %}">{% if e.state == 'problem' %}{% icon "alert" %}{% elif e.state == 'recovered' %}{% icon "check" %}{% else %}{% icon "clock" %}{% endif %}</div>
+        <div class="grow"><div class="title">{{ e.title }}</div><div class="small muted">{{ e.at|date:"M j, Y, g:i A" }} · {{ e.label }}{% if e.detail %} · {{ e.detail }}{% endif %}</div></div></li>{% endfor %}</ul>
+      {% else %}<p class="muted">Nothing recorded{% if kind %} of this kind{% endif %} in the last {{ window_days }} days.</p>{% endif %}
+      <div class="inline-form">
+        {% if page > 1 %}<a class="btn secondary small" href="{% url 'ops_timeline' %}?{% if kind %}kind={{ kind }}&amp;{% endif %}page={{ page|add:'-1' }}#results">Newer</a>{% endif %}
+        {% if more %}<a class="btn secondary small" href="{% url 'ops_timeline' %}?{% if kind %}kind={{ kind }}&amp;{% endif %}page={{ page|add:'1' }}#results">Older</a>{% endif %}
+      </div>
+      <p class="small muted">Times in {{ site_tz }}. Health checks are listed when they start failing and when they recover; each server error kind once, when first seen; server tasks when they finish. Alert emails go to the sysadmins.</p>
+    </section>
+  </div>
+{% endblock %}

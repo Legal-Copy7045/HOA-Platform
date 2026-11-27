@@ -5,14 +5,16 @@
   <div class="crumbs"><a href="{% url 'documents' %}">Documents</a> / {{ document.get_category_display }}</div>
   <div class="page-head">
     <div><h1>{{ document.title }}</h1><div class="meta"><span>{{ document.get_category_display }}</span><span>{% icon "lock" %}{{ document.get_visibility_display }}{% if document.lot %} ({{ document.lot.label }}){% endif %}</span>{% if document.archived %}<span class="status tone-neutral">Archived</span>{% endif %}</div></div>
-    {% if document.current_version %}<div class="actions"><a class="btn" href="{% url 'document_download' document.pk %}">{% icon "download" %} Download</a></div>{% endif %}
+    <div class="actions">{% if document.current_version and not current_disposed %}<a class="btn" href="{% url 'document_download' document.pk %}">{% icon "download" %} Download</a>{% endif %}{% if can_access_history %}<a class="btn secondary" href="{% url 'document_access' document.pk %}">{% icon "clock" %} Access history</a>{% endif %}{% if comparable %}<a class="btn secondary" href="{% url 'document_compare' document.pk %}">Compare versions</a>{% endif %}</div>
   </div>
+  {% if current_disposed %}<div class="alert warning" role="status">{% icon "info" %}<span>The current file was disposed of under the records retention schedule. Its record is kept below.</span></div>{% endif %}
+  {% if holds %}<div class="alert info" role="status">{% icon "lock" %}<span>Under a legal hold: none of its files can be disposed of.{% for h in holds %} {{ h.reason }}{% endfor %}</span></div>{% endif %}
   {% if document.description %}<section class="card prose">{{ document.description|linebreaks }}</section>{% endif %}
   {% if versions %}
     <h2>Version history</h2>
     <div class="table-card"><div class="table-wrap"><table class="stack-sm">
       <thead><tr><th>Version</th><th>File</th><th>Uploaded</th><th class="num">Size</th><th><span class="sr-only">Download</span></th></tr></thead>
-      <tbody>{% for v in versions %}<tr><td class="cell-title">Version {{ v.number }}</td><td data-label="File">{{ v.original_filename }}{% if v.note %}<div class="small muted">{{ v.note }}</div>{% endif %}</td><td class="nowrap" data-label="Uploaded">{{ v.uploaded_at|date:"M j, Y" }}</td><td class="num" data-label="Size">{{ v.size|filesizeformat }}</td><td class="actions" data-label="Download"><a href="{% url 'document_version_download' document.pk v.number %}">Download</a></td></tr>{% endfor %}</tbody>
+      <tbody>{% for v in versions %}<tr><td class="cell-title">Version {{ v.number }}</td><td data-label="File">{{ v.original_filename }}{% if v.note %}<div class="small muted">{{ v.note }}</div>{% endif %}</td><td class="nowrap" data-label="Uploaded">{{ v.uploaded_at|date:"M j, Y" }}</td><td class="num" data-label="Size">{{ v.size|filesizeformat }}</td><td class="actions" data-label="Download">{% if v.disposal_record %}<span class="small muted">Disposed of {{ v.disposal_record.disposed_at|date:"M j, Y" }}</span>{% else %}<a href="{% url 'document_version_download' document.pk v.number %}">Download</a>{% endif %}</td></tr>{% endfor %}</tbody>
     </table></div></div>
   {% endif %}
   {% if can_manage and document.visibility != "lot" %}
@@ -20,6 +22,16 @@
       <form method="post" action="{% url 'document_move' document.pk %}" class="inline-form" data-confirm="The document takes the folder's visibility. Continue?">{% csrf_token %}
         <select name="folder" aria-label="Folder"><option value="">(no folder)</option>{% for f in folders %}<option value="{{ f.pk }}"{% if f.pk == document.folder_id %} selected{% endif %}>{{ f.name }} · {{ f.get_visibility_display }}</option>{% endfor %}</select>
         <button type="submit" class="secondary">File</button></form></div></details>
+  {% endif %}
+  {% if can_manage %}
+    <details class="panel"><summary>Document date{% if document.dated_on %} (now: {{ document.dated_on|date:"M j, Y" }}){% endif %}</summary><div class="panel-body">
+      <form method="post" action="{% url 'document_set_date' document.pk %}" class="inline-form">{% csrf_token %}<input type="date" name="dated_on" value="{{ document.dated_on|date:'Y-m-d' }}" aria-label="Document date"><button type="submit" class="secondary">Save</button></form>
+      <p class="small muted">Its own date (a statement's period end, a signing date). Retention periods "after the document's date" count from it; blank means the day it was added.</p></div></details>
+  {% endif %}
+  {% if can_hold %}
+    <details class="panel"><summary>Place a legal hold</summary><div class="panel-body">
+      <form method="post" action="{% url 'records_hold_place' %}">{% csrf_token %}<input type="hidden" name="document" value="{{ document.pk }}"><label for="hold-reason">Reason</label><input id="hold-reason" name="reason" required maxlength="300" placeholder="e.g. Claim against the association, 2027"><div class="form-actions"><button type="submit">Place hold</button></div></form>
+      <p class="small muted">While a hold is in place none of this document's files can be disposed of. Holds are released on Records retention.</p></div></details>
   {% endif %}
   {% if can_manage %}
     <details class="panel"><summary>Publish a new version</summary><div class="panel-body"><form method="post" action="{% url 'document_add_version' document.pk %}" enctype="multipart/form-data">{% csrf_token %}{{ version_form }}<div class="form-actions"><button type="submit">Publish</button></div></form></div></details>

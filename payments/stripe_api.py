@@ -136,6 +136,18 @@ def _headers(idempotency_key: str | None = None) -> dict:
     return headers
 
 
+# Answers that mean Stripe is unreachable or refuses the key, rather than
+# a payment problem: counted per hour for the Payment processing check (D74).
+TROUBLE_STATUSES = frozenset({0, 401, 403, 429})
+
+
+def _note_trouble(status: int, code: str = "") -> None:
+    if status in TROUBLE_STATUSES or status >= 500:
+        from core.ops_timeline import bump
+
+        bump("stripe", code or f"http_{status}")
+
+
 def _result(status: int, body: bytes, what: str) -> dict:
     data: dict = {}
     with contextlib.suppress(ValueError):
@@ -151,6 +163,7 @@ def _result(status: int, body: bytes, what: str) -> dict:
         pi_id = pi.get("id") if isinstance(pi, dict) else ""
         object_id = pi_id if isinstance(pi_id, str) and _ID.match(pi_id) else ""
     logger.warning("payments.stripe_error", extra={"what": what, "status": status, "code": code})
+    _note_trouble(status, code)
     raise StripeError(status, code, decline_code=decline, object_id=object_id)
 
 
@@ -160,6 +173,7 @@ def get(path: str, params: dict | None = None, *, what: str = "get") -> dict:
         status, body = transport("GET", f"{API_BASE}{path}{query}", None, _headers())
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         logger.warning("payments.stripe_error", extra={"what": what, "status": 0, "code": ""})
+        _note_trouble(0, "network")
         raise StripeError(0, "network") from exc
     return _result(status, body, what)
 
@@ -180,6 +194,7 @@ def post(path: str, params: dict, *, idempotency_key: str, what: str = "post") -
             continue
         return _result(status, body, what)
     logger.warning("payments.stripe_error", extra={"what": what, "status": 0, "code": "retries"})
+    _note_trouble(0, "retries")
     raise StripeError(getattr(last, "status", 0), "retries")
 
 

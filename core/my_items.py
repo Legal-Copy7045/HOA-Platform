@@ -87,6 +87,8 @@ AREA_NAV = {
     "Records requests": "records_requests",
     "Tasks": "tasks",
     "Vendors": "vendors",
+    "Renewals": "renewals",
+    "Records retention": "records_retention",
     "Setup": "community_settings",
     "Paper mail": "paper_mail",
     # Not in the sidebar: counted only in My items' own total.
@@ -109,6 +111,8 @@ AREA_ICONS = {
     "Finance": "receipt",
     "Work orders": "wrench",
     "Vendors": "shield",
+    "Renewals": "shield",
+    "Records retention": "clock",
     "Records requests": "inbox",
     "Recurring deadlines": "calendar",
     "Tasks": "list",
@@ -132,7 +136,9 @@ AREAS = [
     "Finance",
     "Work orders",
     "Vendors",
+    "Renewals",
     "Records requests",
+    "Records retention",
     "Recurring deadlines",
     "Tasks",
     "People",
@@ -469,7 +475,16 @@ def items_for(user) -> list[Item]:
                     w.follow_up_on,
                 )
             )
-    if can(user, "vendor.manage"):
+    # Renewals (D72): policies, vendors' certificates and contract deadlines
+    # within their reminder rules; with the feature off, vendors' insurance
+    # stays on Vendors as before.
+    from core.features import enabled as _feature_on
+
+    if _feature_on("renewals"):
+        from documents import renewals
+
+        out.extend(renewals.my_items(user, today))
+    elif can(user, "vendor.manage"):
         from operations.models import Vendor
 
         for vendor in Vendor.objects.filter(
@@ -489,6 +504,10 @@ def items_for(user) -> list[Item]:
                     vendor.insurance_expires_on,
                 )
             )
+    if _feature_on("records_retention"):
+        from documents import retention
+
+        out.extend(retention.my_items(user, today))
     # Recurring deadlines (Board tasks tab): hidden with the "compliance" feature.
     from core.features import enabled as feature_on
 
@@ -613,6 +632,10 @@ def items_for(user) -> list[Item]:
         from payments.autopay_review import board_items as autopay_review_items
 
         out.extend(autopay_review_items(user))
+        # Automatic payments that didn't go through and are unresolved (D74).
+        from payments.autopay import board_failure_items
+
+        out.extend(board_failure_items(user))
     # Disbursements (D52): approvals, checks to write, refunds owed, surplus.
     if can(user, "disbursement.propose") or can(user, "disbursement.approve"):
         from ledger.disbursements import board_items
@@ -934,6 +957,11 @@ def items_for(user) -> list[Item]:
         out.extend(_balance_items(user, roles))
     out.extend(_contact_items(user, roles))
     out.extend(_signin_items(user))
+    # Getting started (D73): one entry for the steps nothing above asks for.
+    if g & policy.RESIDENTS:
+        from community import checklist
+
+        out.extend(checklist.my_items(user))
     if can(user, "account_recovery.cancel"):
         out.extend(_recovery_items(user))
     # An automatic payment that didn't go through (D46).
@@ -972,6 +1000,10 @@ def _paper_mail_items() -> list[Item]:
             )
         )
     out.extend(_usps_missing_items())
+    # Official notices that bounced (D74): a paper copy is needed.
+    from comms.bounces import paper_items
+
+    out.extend(paper_items())
     return out
 
 

@@ -348,8 +348,16 @@ def person_detail(request, pk):
             "end_form": forms.EndDateForm(),
             "reset_form": StartResetForm(),
             "contact": _person_contact(user, person),
+            "bouncing": _bouncing(person),
         },
     )
+
+
+def _bouncing(person) -> list[dict]:
+    """Addresses of this person that bounce (D74), while the feature is on."""
+    from comms import bounces
+
+    return bounces.bouncing(person) if bounces.feature_on() else []
 
 
 def _person_contact(user, person) -> dict:

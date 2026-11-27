@@ -6,6 +6,30 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.39.0 — 2026-11-27
+
+- Renewals (D72, Maintenance → Renewals): the association's insurance
+  policies, vendors' insurance certificates and contracts' renewal and
+  cancellation-notice deadlines, with My items and one board email per
+  reminder; the board decides contract renewals. The resale certificate reads
+  the current liability policy.
+- Records retention (D72, Settings → Records retention): keeping periods by
+  document category, records past their period listed for the board, removed
+  only when two board members agree and never under a legal hold; the record
+  of what was disposed of stays. Each document shows who opened or downloaded
+  it. Plain-text versions can be compared side by side.
+- Monitoring (D74): System status now warns about failed or stuck background
+  jobs, payment processing failures (and the board gets a to-do when an
+  automatic payment fails), and the server's disk and database growth with
+  a "disk full in N days" estimate; an incident timeline lists what happened.
+  Optional: bounced emails read from a bounce mailbox (set up with
+  `set-bounce-mailbox.sh`); a bounced official notice asks the board to send
+  a paper copy.
+- Owner help (D73): a getting-started checklist that follows what each owner
+  has actually done, a welcome page after first sign-in, "How it works" pages
+  for paying, architectural review, violations, voting and requests that show
+  your current rules, help in portal search, and "Ask the board" on every page.
+
 ## 0.38.0 — 2026-11-27
 
 - The demo community now has records in every state of every section, with

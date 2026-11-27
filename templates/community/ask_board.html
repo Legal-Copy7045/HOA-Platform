@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Ask the board · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Ask the board</h1>
+    <p class="subtitle">Questions and problems go to the board as a request, with the reply on the portal and by email.</p></div></div>
+  <section class="card prose">
+    {% if staff %}
+      <p>You answer owners' requests on <a href="{% url 'requests' %}">Owner requests</a>. To raise something with the rest of the board, add a board task.</p>
+      {% if user|can:"task.manage" %}<p><a class="btn secondary" href="{% url 'tasks' %}">Board tasks</a></p>{% endif %}
+    {% elif view_only %}
+      <p>You can follow the requests on the account you're a contact for, but only its owners and authorized contacts can ask the board. Ask one of them to raise it, or ask them to have the board make you an authorized contact.</p>
+      <p><a class="btn secondary" href="{% url 'requests' %}?mine=1">The account's requests</a></p>
+    {% elif former %}
+      <p>Your login is read-only now that you no longer own a home here. Your old requests are on <a href="{% url 'my_history' %}">My history</a>. For anything else, write to the association at the address on your last statement.</p>
+    {% else %}
+      <p>Your login can't raise requests. If you think it should, tell a board member.</p>
+    {% endif %}
+  </section>
+  {% if board %}<section class="card"><h2>The board</h2>
+    <ul class="list">{% for m in board %}<li><span class="grow">{{ m.name }}</span><span class="small muted">{% if m.offices %}{{ m.offices|join:", " }}{% else %}Director{% endif %}</span></li>{% endfor %}</ul></section>{% endif %}
+  {% if help_on %}<p><a href="{% url 'help' %}">{% icon "info" %} Help: how the portal works</a></p>{% endif %}
+{% endblock %}

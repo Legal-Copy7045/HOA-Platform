@@ -10,7 +10,7 @@
     <p class="small muted">Is this right? You can change where post goes, or switch to email, at any time.</p>
     <div class="form-actions">
       <a class="btn secondary" href="{% url 'my_profile' %}#mailing">Change my mailing address on My profile</a>
-      <a class="btn" href="{% url 'home' %}">Continue</a>
+      <a class="btn" href="{{ next_url|default:'/' }}">Continue</a>
     </div>
   </section>
 {% endblock %}

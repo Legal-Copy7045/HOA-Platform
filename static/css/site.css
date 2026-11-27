@@ -505,6 +505,18 @@ fieldset.choices legend { padding: 0; margin-bottom: .4rem; }
 .nav-search input:focus-visible, .nav-search button:focus-visible { outline-color: #f2c14e; }
 .topbar-search { margin-left: auto; color: #fff; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 8px; }
 .topbar-search:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+/* Help (D73): the phone header's help button beside Search, the "How this works" link, the checklist. */
+.topbar-help { color: #fff; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 8px; }
+.topbar-help:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.how-link { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; font-weight: 600; }
+.how-link .icon { width: 1em; height: 1em; }
+.checklist-step { flex-wrap: wrap; }
+.checklist-step.is-done .title { color: var(--muted); }
+.checklist-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.checklist-actions form.inline { margin: 0; }
+.checklist-progress { width: 100%; height: .6rem; margin-bottom: .75rem; accent-color: var(--green-700); }
+.guide-section h3 { margin-bottom: .25rem; }
+@media (max-width: 640px) { .checklist-actions { width: 100%; } .checklist-actions .btn, .checklist-actions button { min-height: 44px; } }
 .search-results mark { background: var(--warning-bg); color: inherit; padding: 0 .1em; border-radius: 3px; }
 .search-snippet { color: var(--ink-2); overflow-wrap: anywhere; margin-top: .15rem; }
 .search-results .title { overflow-wrap: anywhere; }
@@ -792,3 +804,7 @@ details.row-more > p { margin: .4rem 0 .2rem; }
 /* The dashboard's two parts for people with a home and board work (D64). */
 .dash-part-head { display: flex; align-items: center; gap: .5rem; margin-top: 1.5rem; }
 .dash-part-head .board-badge { font-size: .7rem; }
+/* Version comparison (D72): side by side, wraps long lines, no inline styles. */
+table.diff td { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
+table.diff tr.diff-replace .diff-old, table.diff tr.diff-delete .diff-old { background: var(--danger-bg); }
+table.diff tr.diff-replace .diff-new, table.diff tr.diff-insert .diff-new { background: var(--success-bg); }

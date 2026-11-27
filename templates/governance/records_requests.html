@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load help_tags portal %}
 {% block title %}Records requests · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{% if mine %}My records requests{% else %}Records requests{% endif %}</h1><p class="subtitle">{% if mine %}Pennsylvania law lets owners inspect the association's records. Ask here and follow your request to its due date.{% else %}Owners may ask to inspect association records. Requests and responses are tracked with their due dates.{% endif %}</p></div>
+  <div class="page-head"><div><h1>{% if mine %}My records requests{% else %}Records requests{% endif %}</h1><p class="subtitle">{% if mine %}Pennsylvania law lets owners inspect the association's records. Ask here and follow your request to its due date.{% else %}Owners may ask to inspect association records. Requests and responses are tracked with their due dates.{% endif %} {% how_it_works "requests" %}</p></div>
     {% if can_submit and user|can:"records_request.manage" %}<div class="actions">{% if mine %}<a class="btn secondary" href="{% url 'records_requests' %}">All requests (board)</a>{% else %}<a class="btn secondary" href="{% url 'records_requests' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}</div>{% endif %}</div>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>#</th>{% if can_manage %}<th>From</th>{% endif %}<th>Request</th><th>Status</th><th>Due</th></tr></thead>

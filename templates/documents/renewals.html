@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Renewals · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Renewals</h1>
+    <p class="subtitle">The association's insurance policies, vendors' insurance certificates and contract deadlines, soonest first. The board is reminded {{ rules.policy }} days before a policy ends, {{ rules.vendor }} days before a certificate expires and {{ rules.contract }} days before a contract's notice deadline (Community setup, Renewals and records retention), and emailed again 30 and 7 days before and on the day.</p></div>
+    {% if can_record %}<div class="actions"><a class="btn" href="{% url 'renewal_policy_new' %}">{% icon "plus" %} Record a policy</a></div>{% endif %}</div>
+
+  {% if expired or due %}<div class="alert {% if expired %}danger{% else %}warning{% endif %}" role="status">{% icon "alert" %}<span>{% if expired %}{{ expired }} past {{ expired|pluralize:"its,their" }} deadline. {% endif %}{% if due %}{{ due }} coming up.{% endif %}</span></div>{% endif %}
+
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th>Item</th><th>Deadline</th><th>Status</th></tr></thead>
+    <tbody>{% for r in items %}<tr class="row-link">
+      <td class="cell-title"><a class="row-main" href="{{ r.url }}">{{ r.title }}</a><div class="small muted">{{ r.what }}</div></td>
+      <td class="nowrap" data-label="Deadline">{{ r.deadline|date:"M j, Y" }}</td>
+      <td data-label="Status"><span class="status tone-{{ r.tone }}">{{ r.status }}</span></td></tr>
+    {% empty %}<tr><td colspan="3">{% include "partials/empty.html" with icon="shield" title="Nothing tracked yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+
+  {% if no_certificate %}<section class="card"><h2>Active vendors with no insurance certificate</h2>
+    <ul class="list">{% for v in no_certificate %}<li><a class="grow" href="{% url 'renewal_vendor' v.pk %}">{{ v.name }}</a>{% if v.services %}<span class="small muted">{{ v.services }}</span>{% endif %}</li>{% endfor %}</ul></section>{% endif %}
+
+  <section class="card"><h2>Insurance policies</h2>
+    {% if policies %}<div class="table-wrap"><table class="stack-sm">
+      <thead><tr><th>Policy</th><th>Term</th><th class="num">Coverage</th><th class="num">Premium</th></tr></thead>
+      <tbody>{% for p in policies %}<tr><td class="cell-title"><a href="{% url 'renewal_policy' p.pk %}">{{ p.get_kind_display }}</a><div class="small muted">{{ p.carrier }}{% if p.policy_number %} · {{ p.policy_number }}{% endif %}</div></td>
+        <td class="nowrap" data-label="Term">{{ p.starts_on|date:"M j, Y" }} – {{ p.ends_on|date:"M j, Y" }}</td>
+        <td class="num" data-label="Coverage">{{ p.coverage_cents|cents }}</td><td class="num" data-label="Premium">{% if p.premium_cents is not None %}{{ p.premium_cents|cents }}{% else %}<span class="muted">–</span>{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{% include "partials/empty.html" with icon="shield" title="No policies recorded" %}{% endif %}
+  </section>
+  <p class="small muted">Vendors' certificates are recorded from each vendor's renewal page, and contracts' renewal terms from each contract's (links above, and on the Vendors and Contracts pages).</p>
+{% endblock %}

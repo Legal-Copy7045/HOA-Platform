@@ -234,6 +234,32 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "Keeping fewer contact details for fewer years reduces what a breach could expose.",
         ),
     ],
+    # D72: renewals and records retention.
+    "records": [
+        LawNote(
+            "26 U.S.C. § 6501; IRS Publication 583",
+            "Federal tax records",
+            "The IRS can generally assess more tax for 3 years after a return is filed (6 years "
+            "if income was substantially understated, without limit for a false return); "
+            "records supporting the association's returns (Form 1120-H or 1120) should be kept "
+            "at least that long.",
+            "Seven years for financial records covers these periods with room to spare.",
+        ),
+        LawNote(
+            "42 Pa.C.S. § 5525",
+            "Pennsylvania limitation period for contracts",
+            "A claim on a written contract must generally be brought within 4 years.",
+            "Keeping contracts 7 years after they end covers that period and late-found problems.",
+        ),
+        LawNote(
+            "Federal Rules of Civil Procedure 37(e); Pennsylvania case law on spoliation",
+            "Legal holds",
+            "Once litigation or a claim is reasonably expected, records that may be relevant "
+            "must be preserved; destroying them can lead to sanctions.",
+            "Place a legal hold on the documents (or the whole category) as soon as a dispute "
+            "or claim is expected; nothing under a hold can be disposed of.",
+        ),
+    ],
     "server": [
         LawNote(
             "73 P.S. § 2301 et seq.",
@@ -255,6 +281,8 @@ NO_SPECIFIC_LAW: dict[str, str] = {
     "people": "Board seats, offices and terms come from the Bylaws and the Nonprofit "
     "Corporation Law; this step only shows who holds them.",
     "review": "Each step's law notes apply to the decisions listed here.",
+    "monitoring": "No specific law sets how early the server's disk warning comes; it is an "
+    "operations choice.",
 }
 
 

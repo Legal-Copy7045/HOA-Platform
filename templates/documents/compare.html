@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Compare versions · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'documents' %}">Documents</a> / <a href="{% url 'document_detail' document.pk %}">{{ document.title }}</a> / Compare versions</div>
+  <div class="page-head"><div><h1>Compare versions</h1>
+    <p class="subtitle">Plain text files only, side by side. Word and PDF files are not compared.</p></div></div>
+  <form method="get" class="inline-form">
+    <label for="cmp-a">From</label><select id="cmp-a" name="a">{% for v in versions %}<option value="{{ v.number }}"{% if v.number == old.number %} selected{% endif %}>Version {{ v.number }}</option>{% endfor %}</select>
+    <label for="cmp-b">To</label><select id="cmp-b" name="b">{% for v in versions %}<option value="{{ v.number }}"{% if v.number == new.number %} selected{% endif %}>Version {{ v.number }}</option>{% endfor %}</select>
+    <button type="submit" class="secondary">Compare</button></form>
+  {% if rows is None %}<div class="alert warning" role="status">{% icon "alert" %}<span>One of these versions can't be read: it is waiting for a clean malware scan, was disposed of, or is too large to compare.</span></div>
+  {% else %}
+    <p class="small muted">{% if changed %}{{ changed }} line{{ changed|pluralize }} changed, added or removed.{% else %}The two versions are the same.{% endif %}</p>
+    <div class="table-card"><div class="table-wrap">{# data-wide: two versions side by side, line for line (D72) #}<table data-wide class="diff">
+      <thead><tr><th class="num">#</th><th>Version {{ old.number }}</th><th class="num">#</th><th>Version {{ new.number }}</th></tr></thead>
+      <tbody>{% for r in rows %}<tr class="diff-{{ r.kind }}"><td class="num muted small">{{ r.old_no|default_if_none:"" }}</td><td class="diff-old">{% if r.old is not None %}{% if r.kind != "same" %}<span class="sr-only">removed: </span>{% endif %}{{ r.old }}{% endif %}</td><td class="num muted small">{{ r.new_no|default_if_none:"" }}</td><td class="diff-new">{% if r.new is not None %}{% if r.kind != "same" %}<span class="sr-only">added: </span>{% endif %}{{ r.new }}{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+  {% endif %}
+{% endblock %}

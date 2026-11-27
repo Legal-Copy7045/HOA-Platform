@@ -115,7 +115,8 @@ def test_choosing_email_is_recorded_with_the_version_and_audited(client):
     owner = make_member(lots=[LotFactory()], email="yes@example.com")
     client.force_login(owner)
     response = client.post(reverse("notice_choice"), {"choice": "email"})
-    assert response["Location"] == reverse("home")
+    # D73: a new login goes on to the Welcome page once.
+    assert response["Location"] == reverse("welcome")
     profile = _profile(owner)
     assert profile.electronic_notice_consent and profile.consent_changed_at
     assert profile.notice_consent_version == notices.CONSENT_VERSION

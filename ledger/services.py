@@ -1559,6 +1559,11 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
     for amount, project in designations:
         body.append(("normal", f"     Amount {b(amount)}     Project: {b(project)}"))
     budget = Budget.objects.filter(status=BudgetStatus.ADOPTED).first()
+    # D72: the current general liability policy (Renewals) when one is
+    # recorded, else the amounts typed on Letters and certificates.
+    from documents.renewals import resale_insurance
+
+    insurance_cents, insurance_company = resale_insurance(profile)
     body += [
         (
             "normal",
@@ -1583,13 +1588,9 @@ def resale_certificate(obj: ResaleRequest) -> bytes:
             "9. Pursuant to the requirements of the Uniform Planned Community Act, the "
             "Association maintains public liability insurance of the common facilities in the "
             "amount of "
-            + (
-                b(format_cents(profile.resale_insurance_cents))
-                if profile.resale_insurance_cents is not None
-                else b("not stated")
-            )
+            + (b(format_cents(insurance_cents)) if insurance_cents is not None else b("not stated"))
             + ". Such insurance is maintained with "
-            + b(profile.resale_insurance_company or "not stated")
+            + b(insurance_company or "not stated")
             + ".",
         ),
         (
@@ -1803,8 +1804,11 @@ def send_budget_notice(budget: Budget, *, stage: str, actor, request=None) -> di
         )
     body += f"\n-- \n{settings.SITE_NAME}"
     emails, paper = owner_notice_recipients()
-    for address in emails:
-        send_mail(subject, body, None, [address], fail_silently=True)
+    from core.email import NOTICE, mail_kind
+
+    with mail_kind(NOTICE):  # official notices: a bounce asks for a paper copy (D74)
+        for address in emails:
+            send_mail(subject, body, None, [address], fail_silently=True)
     field = "proposed_notice_sent_at" if stage == "proposed" else "adopted_notice_sent_at"
     Budget.objects.filter(pk=budget.pk).update(**{field: timezone.now()})
     record_event(

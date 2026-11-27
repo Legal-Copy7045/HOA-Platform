@@ -13,7 +13,8 @@ const [base, sessionsFile, outFile] = process.argv.slice(2);
 const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf8'));
 // Downloads (PDF, CSV, spreadsheets, calendar files, packet zips) are not pages,
 // with or without a query string (test.pdf?kind=letter).
-const SKIP = [/logout/, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=(csv|pdf)/, /download/, /\/files?\//, /\/letters?\//, /statement/,
+// /help/ask/ is the "Ask the board" shortcut: it forwards to a new owner request by design (D73).
+const SKIP = [/logout/, /\/help\/ask\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=(csv|pdf)/, /download/, /\/files?\//, /\/letters?\//, /statement/,
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 const MAX_PAGES = 120;
 

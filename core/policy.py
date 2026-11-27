@@ -243,6 +243,26 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "disbursement.approve": frozenset({BOARD}),
     "disbursement.issue": frozenset({BOARD, MANAGER}),
     "disbursement.void": frozenset({BOARD}),
+    # --- Renewals and records retention (D72) ---
+    # Renewals: board, manager and auditor see them; recording a policy, a
+    # vendor certificate or a contract's renewal terms is data entry (manager
+    # too); deciding whether a contract is renewed is the board's.
+    "renewals.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "renewals.record": frozenset({BOARD, MANAGER}),
+    "renewals.decide": frozenset({BOARD}),
+    # Disposing of records past their retention period (two board members)
+    # and legal holds: the board only.
+    "records_retention.manage": frozenset({BOARD}),
+    # Who opened or downloaded a document, from the audit trail (no IPs).
+    "document.access_history": frozenset({BOARD, AUDITOR}),
+    # --- Owner help (D73, optional feature "owner_help") ---
+    # Help pages and the welcome page: everyone who sees the community pages
+    # (not former owners: their login shows their own history only). The
+    # board adds its own words to a help page. The getting-started checklist
+    # is for residents (owners, account contacts, tenants).
+    "help.view": COMMUNITY,
+    "help.edit": frozenset({BOARD}),
+    "help.checklist": RESIDENTS,
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

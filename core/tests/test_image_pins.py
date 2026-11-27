@@ -129,7 +129,7 @@ def test_ci_keeps_the_summary_test_check_and_adds_separate_gates():
 def test_secret_scan_covers_the_whole_history_and_fails_on_findings():
     wf = _workflow("secrets.yml")
     triggers = wf[True] if True in wf else wf["on"]  # YAML 1.1 reads "on" as True
-    assert {"pull_request", "push", "schedule", "workflow_dispatch"} <= set(triggers)
+    assert {"pull_request", "schedule", "workflow_dispatch"} <= set(triggers)
     (job,) = wf["jobs"].values()
     checkout = job["steps"][0]
     assert checkout["with"]["fetch-depth"] == 0  # every commit, not just the tip
@@ -144,10 +144,35 @@ def test_secret_scan_covers_the_whole_history_and_fails_on_findings():
             assert allow.get("condition") == "AND" and allow.get("regexes")
 
 
-def test_codeql_scans_python_and_javascript_weekly_and_on_pull_requests():
+def test_codeql_scans_python_and_javascript_weekly():
+    # D86 (the owner: "Schedule codeQL weekly"): weekly and on demand only.
     wf = _workflow("codeql.yml")
     triggers = wf[True] if True in wf else wf["on"]
-    assert "pull_request" in triggers and "schedule" in triggers
+    assert "schedule" in triggers and "workflow_dispatch" in triggers
+    assert "pull_request" not in triggers and "push" not in triggers
     (job,) = wf["jobs"].values()
     assert set(job["strategy"]["matrix"]["language"]) == {"python", "javascript-typescript"}
     assert job["permissions"]["security-events"] == "write"
+
+
+def test_ci_is_economical():
+    """D86: no second run on merge to main, nothing on drafts, the image and
+    the page crawl only when a pull request touches what they test, a weekly
+    full run on main, two test shards."""
+    ci = _workflow("ci.yml")
+    triggers = ci[True] if True in ci else ci["on"]
+    assert "push" not in triggers
+    assert {"pull_request", "schedule", "workflow_dispatch"} <= set(triggers)
+    jobs = ci["jobs"]
+    for name in ("lint", "audit", "test-shard", "docker", "changes"):
+        assert "draft" in jobs[name]["if"], name
+    for name in ("image-scan", "pages"):
+        assert jobs[name]["needs"] == ["changes"]
+        assert "needs.changes.outputs" in jobs[name]["if"]
+    assert len(jobs["test-shard"]["strategy"]["matrix"]["shard"]) == 2
+    docker = " ".join(s.get("run", "") for s in jobs["docker"]["steps"])
+    assert "docker build" not in docker  # built once, in image-scan
+    deps = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text())
+    for update in deps["updates"]:
+        assert update["schedule"]["interval"] == "monthly"
+        assert update.get("groups"), update["package-ecosystem"]

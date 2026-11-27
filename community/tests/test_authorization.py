@@ -270,6 +270,7 @@ MEMBER_READS = {
     "reservation.view",
     "survey.view",  # Surveys (M5); each survey's audience narrows it further
     "board_committees.view",  # Board and committees: names and offices only
+    "help.view",  # Owner help pages (D73)
 }
 
 
@@ -297,6 +298,7 @@ MEMBER_READS = {
                 "event.rsvp",
                 "reserves.view_summary",
                 "payments.pay",
+                "help.checklist",  # Getting started (D73): residents
             },
         ),
         (
@@ -318,6 +320,9 @@ MEMBER_READS = {
                 "reserves.view_summary",
                 "bank_feed.view",
                 "disbursement.view",
+                # D72: Renewals (read only) and document access history.
+                "renewals.view",
+                "document.access_history",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

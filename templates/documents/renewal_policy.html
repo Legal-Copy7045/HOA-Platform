@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ obj.get_kind_display }} insurance · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'renewals' %}">Renewals</a> / {{ obj.get_kind_display }}</div>
+  <div class="page-head"><div><h1>{{ obj.get_kind_display }} insurance</h1>
+    <div class="meta"><span>{{ obj.carrier }}</span>{% if obj.policy_number %}<span>Policy {{ obj.policy_number }}</span>{% endif %}<span>{{ obj.starts_on|date:"M j, Y" }} – {{ obj.ends_on|date:"M j, Y" }}</span>{% if item %}<span class="status tone-{{ item.tone }}">{{ item.status }}</span>{% elif renewed_by %}<span class="status tone-neutral">Renewed</span>{% endif %}</div></div>
+    {% if can_record and not renewed_by %}<div class="actions"><a class="btn" href="{% url 'renewal_policy_new' %}?renews={{ obj.pk }}">{% icon "plus" %} Record the next term</a></div>{% endif %}</div>
+  <div class="split">
+    <div>
+      <section class="card"><h2>Coverage</h2><dl class="kv">
+        <dt>Coverage</dt><dd>{{ obj.coverage_cents|cents }}</dd>
+        {% if obj.aggregate_cents is not None %}<dt>Aggregate</dt><dd>{{ obj.aggregate_cents|cents }}</dd>{% endif %}
+        {% if obj.deductible_cents is not None %}<dt>Deductible</dt><dd>{{ obj.deductible_cents|cents }}</dd>{% endif %}
+        {% if obj.premium_cents is not None %}<dt>Premium</dt><dd>{{ obj.premium_cents|cents }}</dd>{% endif %}
+        <dt>Document</dt><dd>{% if obj.document %}<a href="{% url 'document_detail' obj.document.pk %}">{{ obj.document.title }}</a>{% else %}<span class="muted">None attached</span>{% endif %}</dd>
+        {% if obj.notes %}<dt>Notes</dt><dd>{{ obj.notes|linebreaksbr }}</dd>{% endif %}
+      </dl></section>
+      {% if renewed_by or earlier %}<section class="card"><h2>Terms</h2><ul class="list">
+        {% if renewed_by %}<li><a class="grow" href="{% url 'renewal_policy' renewed_by.pk %}">Next term: {{ renewed_by.starts_on|date:"M j, Y" }} – {{ renewed_by.ends_on|date:"M j, Y" }}</a><span class="small muted">{{ renewed_by.carrier }}</span></li>{% endif %}
+        {% for p in earlier %}<li><a class="grow" href="{% url 'renewal_policy' p.pk %}">{{ p.starts_on|date:"M j, Y" }} – {{ p.ends_on|date:"M j, Y" }}</a><span class="small muted">{{ p.carrier }}</span></li>{% endfor %}
+      </ul></section>{% endif %}
+      {% if history|length > 1 %}<section class="card"><h2>Changes</h2><ul class="list">{% for h in history %}<li><div class="grow small">{{ h.history_date|date:"M j, Y g:i A" }}{% if h.history_user %} · {% actor_label h.history_user %}{% endif %}</div><span class="small muted">{% if h.history_type == "+" %}Recorded{% else %}Changed{% endif %}</span></li>{% endfor %}</ul></section>{% endif %}
+    </div>
+    <aside>{% if can_record %}<details class="panel"{% if form.errors %} open{% endif %}><summary>Correct this term or attach its document</summary><div class="panel-body">
+      <form method="post" enctype="multipart/form-data">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form>
+      <p class="small muted">A renewal is a new term (Record the next term), not a change here. Earlier values stay in the change history.</p></div></details>{% endif %}</aside>
+  </div>
+{% endblock %}

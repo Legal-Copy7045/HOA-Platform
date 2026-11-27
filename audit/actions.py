@@ -214,6 +214,8 @@ _SPECS = [
         "period",
     ),
     _spec("faq.saved", "FAQ entry saved", "published"),
+    # Owner help (D73): the board's own words on a help page (topic key only).
+    _spec("help.text_saved", "Board text on a help page saved", "topic", "cleared"),
     _spec(
         "ledger.late_fees_posted", "Late fees posted", "period", "lots", "amount_cents", "automatic"
     ),
@@ -254,6 +256,23 @@ _SPECS = [
     _spec("collections.courtesy_sent", "Courtesy payment reminders sent", "count"),
     _spec("system.test_email_sent", "Test email sent", "ok"),
     _spec("system.host_alert", "Host security alert emailed", "kind", "lines", "sent"),
+    # Bounced email (D74): counts and ids only, never an address.
+    _spec(
+        "comms.bounces_read",
+        "Bounce mailbox read",
+        "read",
+        "recorded",
+        "hard",
+        "unmatched",
+        "skipped",
+    ),
+    _spec("comms.bounce_cleared", "Bouncing email address marked fixed", "person_id", "addresses"),
+    _spec(
+        "comms.bounce_paper_sent",
+        "Paper copy of a bounced official notice sent another way",
+        "lot_id",
+        "bounces",
+    ),
     _spec("system.offsite_lock_checked", "Off-site backup lock checked", "locked"),
     _spec("system.health_check_cleared", "Health check cleared", "check"),
     _spec(
@@ -819,6 +838,45 @@ _SPECS = [
     _spec("setup.step_completed", "Community setup step completed", "step", "run"),
     _spec("setup.step_skipped", "Community setup step skipped", "step", "run"),
     _spec("setup.run_finished", "Community setup finished", "run"),
+    # Renewals and records retention (D72): ids, kinds, dates and counts only.
+    _spec("renewals.policy_recorded", "Insurance policy recorded", "kind", "ends_on", "renews"),
+    _spec("renewals.policy_changed", "Insurance policy corrected", "fields"),
+    _spec(
+        "renewals.certificate_recorded",
+        "Vendor insurance certificate recorded",
+        "vendor_id",
+        "expires_on",
+    ),
+    _spec(
+        "renewals.contract_terms_saved",
+        "Contract renewal terms saved",
+        "contract_id",
+        "renewal",
+        "notice_days",
+    ),
+    _spec(
+        "renewals.contract_decided",
+        "Contract renewal decided",
+        "contract_id",
+        "term_ends_on",
+        "decision",
+    ),
+    _spec("renewals.reminders_sent", "Renewal reminders emailed to the board", "items"),
+    _spec("document.dated", "Document date set", "dated_on"),
+    _spec("document.access_history_viewed", "Document access history viewed", "events"),
+    _spec("document.compared", "Two document versions compared", "from_version", "to_version"),
+    _spec("records.hold_placed", "Legal hold placed", "hold_id", "document_id", "category"),
+    _spec("records.hold_released", "Legal hold released", "hold_id"),
+    _spec("records.disposal_proposed", "Records disposal proposed", "request_id", "files"),
+    _spec(
+        "records.disposal_confirmed",
+        "Records disposal confirmed by a second board member",
+        "request_id",
+        "disposed",
+        "skipped",
+    ),
+    _spec("records.disposal_declined", "Records disposal declined", "request_id"),
+    _spec("records.retention_scan", "Nightly records retention check", "due", "held", "removed"),
 ]
 
 ACTIONS: dict[str, ActionSpec] = {spec.name: spec for spec in _SPECS}

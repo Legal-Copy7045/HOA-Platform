@@ -219,7 +219,7 @@ def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
 
     settings.SEED_DEMO_ALLOWED = True
     run("seed_demo")
-    assert Vendor.objects.count() == 4  # three, and one with lapsed insurance (demo states)
+    assert Vendor.objects.count() == 8  # demo states (4) + documents/demo_renewals.py (4, D72)
     assert Invoice.objects.filter(state="paid").exists()
     with system_access("t"):
         assert LedgerEntry.objects.filter(kind="assessment").exists()

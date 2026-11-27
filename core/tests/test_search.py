@@ -244,7 +244,9 @@ OWNER_B_OR_BOARD_ONLY = [
 
 # Community-wide by design (every member sees every row): checked below for
 # who may search them at all (former owners may not).
-COMMUNITY_WIDE = {"resolutions"}
+# Help pages (D73): the same for everyone allowed; per-role topics are
+# checked in community/tests/test_owner_help.py.
+COMMUNITY_WIDE = {"resolutions", "help"}
 
 
 def test_every_provider_is_covered_here():

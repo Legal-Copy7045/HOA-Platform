@@ -63,6 +63,16 @@ class Command(BaseCommand):
                 )
             except Exception:  # counted below; no address or error text in the log
                 logger.warning("Host alert email could not be sent (kind %s).", kind)
+        from core import ops_timeline
+
+        ops_timeline.record(
+            "host",
+            f"Host security alert: {KINDS[kind]} ({lines} line{'s' if lines != 1 else ''})"
+            + ("" if sent else ". It reached nobody; it is sent again on the next run"),
+            key=kind,
+            state="problem",
+            count=sent,
+        )
         record_event(
             "system.host_alert",
             actor=None,

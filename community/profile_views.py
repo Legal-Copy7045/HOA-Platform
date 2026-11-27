@@ -286,7 +286,15 @@ def _context(request, person, profile, forms) -> dict:
         "old_address": old,
         "address_check": bool(person) and services.needs_address_check(person.pk),
         "home_address": _home_address(person),
+        "bouncing": _bouncing(person),
     }
+
+
+def _bouncing(person) -> list[dict]:
+    """The person's own addresses that bounce (D74)."""
+    from comms import bounces
+
+    return bounces.bouncing(person) if person and bounces.feature_on() else []
 
 
 def _home_address(person) -> str:
@@ -323,8 +331,12 @@ def notice_choice(request):
     answered = bool(profile and profile.consent_changed_at)
     if request.method == "GET" and request.GET.get("chosen") == "post" and answered:
         address, _source = services.postal_address(person)
+        from community.help import after_setup_url
+
         return render(
-            request, "community/notice_choice_done.html", {"address": address, "person": person}
+            request,
+            "community/notice_choice_done.html",
+            {"address": address, "person": person, "next_url": after_setup_url(user, request)},
         )
     if request.method == "GET" and answered:
         # Answered already (here or on My profile): never asked again.
@@ -343,7 +355,9 @@ def notice_choice(request):
         else:
             if form.cleaned_data["choice"] == "email":
                 messages.success(request, "Official notices will come to you by email.")
-                return redirect("home")
+                from community.help import after_setup_url
+
+                return redirect(after_setup_url(user, request))
             return redirect(reverse("notice_choice") + "?chosen=post")
     return render(
         request,

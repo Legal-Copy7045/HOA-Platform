@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Records retention · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "settings_hub" %}Records retention</nav>
+  <div class="page-head"><div><h1>Records retention</h1>
+    <p class="subtitle">How long each kind of document is kept. Nothing is removed by itself: files past their period are listed here every night, a board member proposes disposal, and a different board member confirms it. Disposal removes the stored file only; the record of the document, every version's name, size and checksum, and the disposal itself (what, when, who and why) are kept. A legal hold stops disposal. Backups made earlier still hold the file until they age out.</p></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'setup_step' 'records' %}">{% icon "sliders" %} Change the schedule</a></div></div>
+
+  {% for e in errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ e }}</span></div>{% endfor %}
+
+  <section class="card"><h2>Schedule</h2>
+    <div class="table-wrap"><table class="stack-sm">
+      <thead><tr><th>Category</th><th>Kept</th></tr></thead>
+      <tbody>{% for s in schedule %}<tr><td class="cell-title">{{ s.label }}</td><td data-label="Kept">{% if s.years %}{{ s.years }} year{{ s.years|pluralize }} {{ s.basis }}{% else %}Forever{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if last_scan %}<p class="small muted">Last nightly check {{ last_scan.ran_at|date:"M j, Y g:i A" }}: {{ last_scan.due }} due, {{ last_scan.held }} under a legal hold.</p>{% endif %}
+  </section>
+
+  {% for req in requests %}<section class="card" id="request-{{ req.pk }}"><h2>Waiting for a second board member</h2>
+    <p>Proposed by {% actor_label req.proposed_by %} on {{ req.proposed_at|date:"M j, Y" }}: {{ req.reason }}</p>
+    <ul class="list">{% for item in req.items.all %}<li><a class="grow" href="{% url 'document_detail' item.version.document.pk %}">{{ item.version.document.title }}</a><span class="small muted">version {{ item.version.number }} · {{ item.version.original_filename }}</span></li>{% endfor %}</ul>
+    <div class="wf-actions">
+      {% if req.proposed_by_id != user.pk %}<form method="post" action="{% url 'records_disposal_decide' req.pk %}" class="wf-action" data-confirm="Dispose of these files now? The stored files are removed for good; their records are kept.">{% csrf_token %}<input type="hidden" name="decision" value="confirm"><label class="wf-label" for="note-{{ req.pk }}">Note (optional)</label><div class="wf-row"><input id="note-{{ req.pk }}" name="note" maxlength="300"><button type="submit" class="danger">Confirm disposal</button></div></form>{% else %}<p class="small muted">A different board member must confirm a disposal you proposed.</p>{% endif %}
+      <form method="post" action="{% url 'records_disposal_decide' req.pk %}" class="wf-action" data-confirm="Decline this disposal? Nothing is removed; the files can be proposed again.">{% csrf_token %}<input type="hidden" name="decision" value="decline"><button type="submit" class="secondary">{% if req.proposed_by_id == user.pk %}Withdraw{% else %}Decline{% endif %}</button></form>
+    </div></section>{% endfor %}
+
+  <section class="card"><h2>Past the retention period ({{ preview.ready|length }})</h2>
+    {% if preview.ready %}<form method="post" action="{% url 'records_disposal_propose' %}">{% csrf_token %}
+      <div class="table-wrap"><table class="stack-sm">
+        <thead><tr><th><span class="sr-only">Choose</span></th><th>Document</th><th>Version</th><th>Kept until</th></tr></thead>
+        <tbody>{% for d in preview.ready %}<tr><td data-label="Choose"><input type="checkbox" name="version" value="{{ d.version.pk }}" checked aria-label="Dispose of {{ d.document.title }} version {{ d.version.number }}"></td>
+          <td class="cell-title"><a href="{% url 'document_detail' d.document.pk %}">{{ d.document.title }}</a><div class="small muted">{{ d.document.get_category_display }}: {{ d.years }} year{{ d.years|pluralize }} {{ d.basis_phrase }}</div></td>
+          <td data-label="Version">{{ d.version.number }} · {{ d.version.original_filename }}</td><td class="nowrap" data-label="Kept until">{{ d.kept_until|date:"M j, Y" }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      <label for="reason">Reason (required)</label><input id="reason" name="reason" required maxlength="300" value="{{ reason }}" placeholder="e.g. Records retention schedule, resolution 2027-03">
+      <div class="form-actions"><button type="submit" class="danger">Propose disposal</button></div>
+      <p class="small muted">Proposing removes nothing. A different board member confirms on this page (it is on their My items).</p>
+    </form>
+    {% else %}{% include "partials/empty.html" with icon="check-circle" title="Nothing is past its retention period" %}{% endif %}
+  </section>
+
+  {% if preview.pending %}<p class="small muted">{{ preview.pending|length }} more file{{ preview.pending|length|pluralize }} already wait{{ preview.pending|length|pluralize:"s," }} for a second board member (above).</p>{% endif %}
+
+  <section class="card"><h2>Legal holds</h2>
+    {% if preview.held %}<p class="small">{{ preview.held|length }} file{{ preview.held|length|pluralize }} past the retention period {{ preview.held|length|pluralize:"is,are" }} kept because of a hold.</p>{% endif %}
+    {% if holds %}<ul class="list">{% for h in holds %}<li>{% icon "lock" %}<div class="grow"><div>{% if h.document %}<a href="{% url 'document_detail' h.document.pk %}">{{ h.document.title }}</a>{% else %}Every document in {{ h.category_label }}{% endif %}</div><div class="small muted">{{ h.placed_at|date:"M j, Y" }} · {% actor_label h.placed_by %} · {{ h.reason }}</div></div>
+      <form method="post" action="{% url 'records_hold_release' h.pk %}" class="inline-form" data-confirm="Release this hold? Files it covers can then be disposed of under the schedule.">{% csrf_token %}<input name="reason" required maxlength="300" aria-label="Why the hold can end" placeholder="Why it can end"><button type="submit" class="secondary small">Release</button></form></li>{% endfor %}</ul>
+    {% else %}<p class="muted small">No holds. Place one on a single document from its page, or on a whole category here.</p>{% endif %}
+    <details class="panel"><summary>Place a hold on a category</summary><div class="panel-body">
+      <form method="post" action="{% url 'records_hold_place' %}">{% csrf_token %}
+        <label for="hold-category">Category</label><select id="hold-category" name="category">{% for value, label in categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+        <label for="hold-reason">Reason</label><input id="hold-reason" name="reason" required maxlength="300" placeholder="e.g. Claim against the association, 2027">
+        <div class="form-actions"><button type="submit">Place hold</button></div></form></div></details>
+  </section>
+
+  <section class="card"><h2>Disposed of</h2>
+    {% if disposals %}<div class="table-wrap"><table class="stack-sm">
+      <thead><tr><th>Document</th><th>When</th><th>Proposed and confirmed by</th><th>Why</th></tr></thead>
+      <tbody>{% for d in disposals %}<tr><td class="cell-title"><a href="{% url 'document_detail' d.document.pk %}">{{ d.document.title }}</a><div class="small muted">version {{ d.version.number }} · {{ d.version.original_filename }} · kept until {{ d.kept_until|date:"M j, Y" }}</div></td>
+        <td class="nowrap" data-label="When">{{ d.disposed_at|date:"M j, Y" }}</td><td data-label="By">{% actor_label d.proposed_by %}, {% actor_label d.confirmed_by %}</td><td data-label="Why">{{ d.reason }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="muted small">Nothing has been disposed of.</p>{% endif %}
+  </section>
+{% endblock %}

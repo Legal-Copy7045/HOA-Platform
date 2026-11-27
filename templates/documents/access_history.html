@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Access history · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'documents' %}">Documents</a> / <a href="{% url 'document_detail' document.pk %}">{{ document.title }}</a> / Access history</div>
+  <div class="page-head"><div><h1>Access history</h1>
+    <p class="subtitle">Who opened the page of {{ document.title }} or downloaded one of its versions, newest first, from the audit trail{% if events|length >= limit %} (the latest {{ limit }}){% endif %}. Network addresses are not shown.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead>
+    <tbody>{% for e in events %}<tr><td class="cell-title nowrap">{{ e.occurred_at|date:"M j, Y g:i A" }}</td><td data-label="Who">{% actor_label e.actor %}</td>
+      <td data-label="What">{% if e.action == "document.downloaded" %}Downloaded version {{ e.metadata.version }}{% else %}Opened the page{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="3">{% include "partials/empty.html" with icon="clock" title="Nobody has opened it yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

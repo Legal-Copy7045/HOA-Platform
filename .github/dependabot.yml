@@ -1,8 +1,13 @@
 version: 2
+# Monthly and grouped (D86): about one pull request per ecosystem a month, so
+# each costs one CI run. Security updates still arrive as soon as published.
 updates:
   - package-ecosystem: pip
     directory: /requirements
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
+    groups:
+      pip-all:
+        patterns: ["*"]
     ignore:
       # Stay on the Django LTS line (CLAUDE.md). Patch releases still arrive;
       # moving to the next LTS (6.2, April 2027) is a deliberate decision.
@@ -10,18 +15,27 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: github-actions
     directory: /
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
+    groups:
+      github-actions-all:
+        patterns: ["*"]
   # The portal image's base (Dockerfile).
   - package-ecosystem: docker
     directory: /
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
+    groups:
+      docker-all:
+        patterns: ["*"]
   # Infrastructure images in docker-compose.yml and docker-compose.tunnel.yml
   # (cloudflared, ClamAV, Postgres, SeaweedFS, Mailpit), pinned to a version
   # and digest (D57). Each update arrives as a pull request that CI tests:
   # compose validation, the image build and the Trivy scan of the images.
   - package-ecosystem: docker-compose
     directory: /
-    schedule: {interval: weekly}
+    schedule: {interval: monthly}
+    groups:
+      docker-compose-all:
+        patterns: ["*"]
     ignore:
       # A new Postgres major version needs a dump and restore (pg_upgrade),
       # so it is a planned change, not a weekly pull request. Minor releases

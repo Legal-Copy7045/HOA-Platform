@@ -72,12 +72,15 @@ MEM_TOTAL="$(meminfo MemTotal)"; MEM_AVAIL="$(meminfo MemAvailable)"
 SWAP_TOTAL="$(meminfo SwapTotal)"; SWAP_FREE="$(meminfo SwapFree)"
 read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
 CPUS="$(nproc 2>/dev/null || echo 1)"
+# The root file system's size and free space in KB (D74: storage growth).
+read -r DISK_TOTAL DISK_AVAIL <<<"$(df -Pk / 2>/dev/null | awk 'NR == 2 { print $2, $4 }')" || true
+DISK_TOTAL="${DISK_TOTAL//[^0-9]/}"; DISK_AVAIL="${DISK_AVAIL//[^0-9]/}"
 LOW=0
 [ "${MEM_TOTAL:-0}" -gt 0 ] && [ $(( ${MEM_AVAIL:-0} * 100 / MEM_TOTAL )) -lt 10 ] && LOW=1
-HOST_RESOURCES="$(printf '{"mem_total_kb":%d,"mem_available_kb":%d,"swap_total_kb":%d,"swap_free_kb":%d,"load1":%s,"load5":%s,"load15":%s,"cpus":%d}' \
+HOST_RESOURCES="$(printf '{"mem_total_kb":%d,"mem_available_kb":%d,"swap_total_kb":%d,"swap_free_kb":%d,"load1":%s,"load5":%s,"load15":%s,"cpus":%d,"disk_total_kb":%d,"disk_avail_kb":%d}' \
   "${MEM_TOTAL:-0}" "${MEM_AVAIL:-0}" "${SWAP_TOTAL:-0}" "${SWAP_FREE:-0}" \
   "$(printf '%s' "$LOAD1" | tr -cd '0-9.')" "$(printf '%s' "$LOAD5" | tr -cd '0-9.')" \
-  "$(printf '%s' "$LOAD15" | tr -cd '0-9.')" "${CPUS//[^0-9]/}")"
+  "$(printf '%s' "$LOAD15" | tr -cd '0-9.')" "${CPUS//[^0-9]/}" "${DISK_TOTAL:-0}" "${DISK_AVAIL:-0}")"
 psql_run -v hr="$HOST_RESOURCES" -v low="$LOW" >/dev/null 2>&1 <<'SQL' || true
 UPDATE core_updatestatus
    SET host_resources = :'hr'::jsonb || jsonb_build_object(
@@ -156,6 +159,13 @@ SQL
   psql_run -v result="$RESULT" -v message="$MESSAGE" >/dev/null <<'SQL'
 UPDATE core_updatestatus SET state = :'result', state_changed_at = now(), message = :'message'
  WHERE id = 1;
+SQL
+  # The incident timeline (D74). Tolerant of a database without the table.
+  if [ "$RESULT" = succeeded ]; then TL_STATE=info; TL_TEXT="Update installed: $MESSAGE"
+  else TL_STATE=problem; TL_TEXT="Update failed: see /var/log/hoa-portal-update.log on the server"; fi
+  psql_run -v state="$TL_STATE" -v text="${TL_TEXT:0:300}" >/dev/null 2>&1 <<'SQL' || true
+INSERT INTO core_opsevent (at, kind, key, state, message, count)
+VALUES (now(), 'updates', 'update', :'state', :'text', 0);
 SQL
 elif [ "$DUE" = "t" ]; then
   check

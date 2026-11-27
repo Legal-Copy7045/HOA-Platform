@@ -146,8 +146,10 @@ STEPS: list[Step] = [
     Step(
         "requests",
         "Owner requests",
-        "How quickly the board aims to answer each kind of owner request.",
+        "How quickly the board aims to answer each kind of owner request, and how long new "
+        "owners, contacts and tenants see their getting-started checklist (D73).",
         groups=("Owner requests",),
+        features=("owner_help",),
     ),
     Step(
         "governance",
@@ -169,6 +171,19 @@ STEPS: list[Step] = [
         links=(("Contact retention", "retention", "retention.manage"),),
     ),
     Step(
+        "records",
+        "Renewals and records retention",
+        "When the board is reminded of insurance renewals, vendors' insurance certificates "
+        "and contract notice deadlines, and how long each kind of document is kept before "
+        "two board members may dispose of it (D72).",
+        groups=("Renewals", "Document retention"),
+        features=("renewals", "records_retention"),
+        links=(
+            ("Renewals", "renewals", "renewals.view"),
+            ("Records retention", "records_retention", "records_retention.manage"),
+        ),
+    ),
+    Step(
         "signin",
         # Not "Sign-in and security": that is each person's own page (WT-005).
         "Account recovery rules",
@@ -176,6 +191,13 @@ STEPS: list[Step] = [
         "and how long votes, proxies, contact details and automatic payments stay locked "
         "afterwards. Staff roles always use the two-board-member reset.",
         groups=("Account recovery",),
+    ),
+    Step(
+        "monitoring",
+        "Server warnings",
+        "How early the sysadmins are warned that the server's disk is filling up (D74). "
+        "Everything else about the server is on the Server and email step.",
+        groups=("Server warnings",),
     ),
     Step(
         "features",
@@ -195,8 +217,8 @@ STEPS: list[Step] = [
     Step(
         "server",
         "Server and email",
-        "Outgoing email, backups, the off-site copy, the payment and bank keys and the USPS "
-        "tracking login. These "
+        "Outgoing email, the bounce mailbox, backups, the off-site copy, the payment and bank "
+        "keys and the USPS tracking login. These "
         "are done on the server by a sysadmin; this step shows where things stand.",
         kind=SERVER,
     ),
