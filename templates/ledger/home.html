@@ -10,9 +10,22 @@
     <div class="stat tone-success"><div class="label">Prepayment credits</div><div class="value">{{ total_credit|cents|cut:"-" }}</div></div>
     <div class="stat"><div class="label">Homes</div><div class="value">{{ home_count }}</div></div>
   </div>
+  {# The list first, one line per home on phones; posting and the late list in closed panels below (WT-037, D88). #}
+  <div data-swap-region id="results" class="swap-anchor">
+  <nav class="filters" aria-label="Which homes" data-swap>
+    <a href="{% url 'ledger_home' %}#results"{% if not with_balance %} aria-current="true"{% endif %}>All homes ({{ home_count }})</a>
+    <a href="{% url 'ledger_home' %}?balance=1#results"{% if with_balance %} aria-current="true"{% endif %}>With a balance ({{ balance_count }})</a>
+  </nav>
+  {% if with_balance and paid_up_count %}<p class="small muted" data-testid="hidden-paid-up">{{ paid_up_count }} paid-up home{{ paid_up_count|pluralize }} not shown.</p>{% endif %}
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm one-line">
+    <thead><tr><th>Home</th><th class="num">Balance</th></tr></thead>
+    <tbody>{% for lot, bal in rows %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'lot_ledger' lot.pk %}">{{ lot.label }}</a></td><td class="num">{% if bal > 0 %}<span class="status tone-warning">{{ bal|cents }} due</span>{% elif bal < 0 %}<span class="status tone-success">{{ bal|cents|cut:"-" }} credit</span>{% else %}<span class="muted">Paid up</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="2">{% include "partials/empty.html" with icon="check-circle" title="Every home is paid up" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  </div>
   {% if can_manage %}
-    <section class="card" id="post-monthly">
-      <h2>Post the monthly {% term "term" %}</h2>
+    <details class="panel" id="post-monthly-panel"{% if auto.missed %} open{% endif %}><summary>Post the monthly {% term "term" %}</summary><div class="panel-body">
+    <section id="post-monthly" aria-label="Post the monthly {% term "term" %}">
       {% if dues_cents and auto_post %}
       <div data-testid="auto-post">
       <p>Posted automatically on the 1st of each month{% if can_change_settings %} (<a href="{% url 'community_settings' %}#rule-dues.auto_post">Community settings → change</a>){% else %} (Community settings){% endif %}.</p>
@@ -33,9 +46,11 @@
       <p class="muted small">No monthly {% term "term" %} amount is set. Set it in <a href="{% url 'community_settings' %}">Community settings</a> first.</p>
       {% endif %}
     </section>
+    </div></details>
   {% endif %}
   {% if can_manage or can_post_late_fees %}
-    <section class="card"><h2>Late this month</h2>
+    <details class="panel" id="late-this-month"><summary>Late this month{% if late_fee.0 %} ({{ late|length }}){% endif %}</summary><div class="panel-body">
+    <section aria-label="Late this month">
       {% if not late_fee.0 %}<p class="muted small">No late fee is set. Set its amount, grace period and citation in <a href="{% url 'community_settings' %}">Community settings</a>.</p>
       {% else %}
         <p class="small">Late fee {{ late_fee.0|cents }}{% if late_fee.1 %} ({{ late_fee.1 }}){% endif %}. Automatic posting is <strong>{% if late_auto %}on{% else %}off{% endif %}</strong>{% if not late_auto %}: the board reviews this list and posts{% endif %}.</p>
@@ -44,16 +59,6 @@
         {% else %}<p class="muted small">Nobody is late for this month's {% term "term" %}.</p>{% endif %}
       {% endif %}
     </section>
+    </div></details>
   {% endif %}
-  <div data-swap-region id="results" class="swap-anchor">
-  <nav class="filters" aria-label="Which homes" data-swap>
-    <a href="{% url 'ledger_home' %}#results"{% if not with_balance %} aria-current="true"{% endif %}>All homes</a>
-    <a href="{% url 'ledger_home' %}?balance=1#results"{% if with_balance %} aria-current="true"{% endif %}>With a balance</a>
-  </nav>
-  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
-    <thead><tr><th>Home</th><th class="num">Balance</th></tr></thead>
-    <tbody>{% for lot, bal in rows %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'lot_ledger' lot.pk %}">{{ lot.label }}</a></td><td class="num">{% if bal > 0 %}<span class="status tone-warning">{{ bal|cents }} due</span>{% elif bal < 0 %}<span class="status tone-success">{{ bal|cents|cut:"-" }} credit</span>{% else %}<span class="muted">Paid up</span>{% endif %}</td></tr>
-    {% empty %}<tr><td colspan="2">{% include "partials/empty.html" with icon="check-circle" title="Every home is paid up" %}</td></tr>{% endfor %}</tbody>
-  </table></div></div>
-  </div>
 {% endblock %}

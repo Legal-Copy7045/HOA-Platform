@@ -356,3 +356,7 @@
   check: "On a phone, a newly invited demo owner opens the invitation, chooses a password, adds a passkey (or the app), saves the recovery codes, answers the official notices step and lands on Welcome (once: signing out and in again goes to the dashboard). Welcome's tiles and the checklist are easy to read and tap; the dashboard shows Getting started with the waiting steps; the help button in the header opens Help; How paying works shows this community's amount, due day and late fee with their citations; Ask the board opens a new request with the kind chosen; a demo tenant and a view-only contact see the steps and Ask the board answers that fit them (D73)."
   steps: "POC with fictional data: invite a demo owner, a demo tenant and a view-only contact from Homes and owners, Sign-ups; complete each sign-up on an iPhone and an Android phone (or the browser's phone view); check VoiceOver or TalkBack reads the checklist's done steps as Done."
   last: ""
+- key: phone tab strips wrap
+  check: "On a 390 px phone, the Finance tabs (Owner accounts, Collections, Accounting, Reports) and the Homes and owners views (Homes, Accounts, Sign-ups) wrap onto a second line with every tab visible; nothing scrolls sideways; the dashboard's Latest news card is as wide as the cards above it; Owner accounts shows one line per home (D88)."
+  steps: "POC with fictional data, signed in as a demo board member on an iPhone and an Android phone (or the browser's 390 px phone view); open Owner accounts, Reports, Homes and owners and the dashboard."
+  last: ""

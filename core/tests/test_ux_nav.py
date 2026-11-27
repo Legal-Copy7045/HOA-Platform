@@ -97,7 +97,6 @@ def test_rarely_used_setup_pages_move_to_settings(client, w):
         "arc_project_types",
         "arc_neighbors",
         "letters_settings",
-        "branding_settings",
         "reservation_settings",
     ):
         assert f'href="{reverse(name)}"' in page

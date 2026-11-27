@@ -55,6 +55,28 @@ class Item:
 
 
 HOME, BOARD_SIDE = "home", "board"
+# Areas whose items carry a deadline set by law or the governing documents
+# (records requests under the Act, statutory recurring deadlines, official
+# notices that need a paper copy): a shortened list (the dashboard) never
+# leaves them out (WT-023).
+LEGAL_AREAS = frozenset({"Records requests", "Recurring deadlines", "Paper mail"})
+
+
+def priority(item: Item) -> tuple:
+    """Sort key for a shortened list: overdue first, then items with a legal
+    deadline, then anything else with a due date, soonest first; the rest
+    keep their order (sorted() is stable)."""
+    if item.overdue:
+        rank = 0
+    elif item.area in LEGAL_AREAS:
+        rank = 1
+    elif item.due:
+        rank = 2
+    else:
+        rank = 3
+    return (rank, item.due or datetime.date.max)
+
+
 # Areas that are always the person's own (Voting items say per item: a
 # ballot is the voter's own, the turnout of a closing vote is board work).
 HOME_AREAS = frozenset({"My home", "Sign-in and security"})

@@ -1,0 +1,34 @@
+# Walkthrough 0.41 usability fixes (D88).
+- feature: "Board cue on board panels of Community pages: a meeting's one Board actions panel, the event page's RSVP settings and names, Voting's New vote/election/survey (WT-013)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_(meeting_board_buttons|owner_meeting_page|event_board_panels|voting_new_forms|board_cue_follows)", "^unit:core/tests/test_phone_layout.py::test_voting_new_buttons"]
+- feature: "ARC reviewers read ARC, not Staff; the dashboard's part heading never doubles the word (WT-006)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_(arc_reviewer|board_dashboard_heading)"]
+- feature: "My items in Board work and Your home parts; the dashboard says Showing N of M and never drops a legal deadline (WT-003, WT-023)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_(my_items_|dashboard_never_drops|priority_puts)"]
+- feature: "Phones: tab strips wrap instead of hiding tabs; dashboard cards full width (WT-033, WT-034)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_(subnav_wraps|dashboard_cards_stretch)", "^manual:phone tab strips wrap"]
+- feature: "Sysadmin activity: 7 days, 25 compact rows a page in plain words, details behind a tap (WT-022)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_sysadmin_activity_is_compact"]
+- feature: "Reserve plan: components and settings first, only the years that matter, all years one tap away (WT-036)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_reserve_plan_settings_before"]
+- feature: "Home neighbors: find a home, missing filter, one home at a time on phones (WT-035)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_home_neighbors", "^unit:core/tests/test_board_settings_ux.py::test_neighbors"]
+- feature: "Owner accounts: the list first, one line per home on phones, posting and the late list in closed panels (WT-037)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_owner_accounts_list_first"]
+- feature: "Breadcrumbs on hub pages, owner resale, the event page and Import (WT-019)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_(hub_children_have_a_way_back|faq_crumb|owner_resale_crumb|event_board_panels)"]
+- feature: "Settings: a tile never repeats a setup step (Branding, Community settings) (WT-002)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_settings_tiles", "^unit:core/tests/test_ux_nav.py::test_rarely_used_setup_pages"]
+- feature: "One sign-up view: People links to Homes and owners → Sign-ups (WT-001)"
+  since: "0.41"
+  match: ["^unit:core/tests/test_walkthrough_041.py::test_people_links_to_sign_ups", "^unit:core/tests/test_walkthrough2_fixes.py::test_people_find"]

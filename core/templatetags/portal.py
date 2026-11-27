@@ -234,6 +234,16 @@ def humanize_action(action: str) -> str:
 
 
 @register.filter
+def audit_label(action: str) -> str:
+    """An audit action in plain words, from its registered description
+    ("Person added to the community register"), else humanized (WT-022)."""
+    from audit.actions import ACTIONS
+
+    spec = ACTIONS.get(action or "")
+    return spec.description if spec else humanize_action(action)
+
+
+@register.filter
 def step_label(event) -> str:
     """A workflow history entry as people see it: the step's own label
     ("Submit for review"), not its code name ("submit")."""

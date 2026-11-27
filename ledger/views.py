@@ -330,6 +330,10 @@ def ledger_home(request):
             ],
             "with_balance": with_balance,
             "home_count": len(lots),
+            # Counts on the filter links, and how many paid-up homes the
+            # "With a balance" view leaves out (WT-037).
+            "balance_count": (owing := sum(1 for lot in lots if bal.get(lot.pk, 0))),
+            "paid_up_count": len(lots) - owing,
             "total_owed": sum(v for v in bal.values() if v > 0),
             "total_credit": -sum(v for v in bal.values() if v < 0),
             "default_period": default_period,

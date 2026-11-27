@@ -2,9 +2,10 @@
 {% load portal %}
 {% block title %}Import homes and owners · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'lot_list' %}">Homes and owners</a> / Import</nav>
   <div class="page-head"><div><h1>Import homes and owners</h1>
     <p class="subtitle">Load the list of homes, their addresses and their owners from a spreadsheet. You see what would change before anything is written.</p></div>
-    <div class="actions"><a class="btn secondary" href="{% url 'lot_list' %}">Homes and owners</a></div></div>
+    </div>
   <ol class="steps" aria-label="Importing the register"><li class="current" aria-current="step">Upload</li><li>Check</li><li>Import</li></ol>
 
   <section class="card">

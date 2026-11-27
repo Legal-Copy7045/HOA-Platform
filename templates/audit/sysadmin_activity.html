@@ -7,7 +7,7 @@
   <details class="list-filter"{% if who or action %} open{% endif %}><summary>Filter by person, action or dates</summary>
   <form method="get" class="inline-form filters-form" aria-label="Filter sysadmin activity">
     <div><label for="sa-who">Person</label><select id="sa-who" name="who"><option value="">Everyone</option>{% for pk, email in people %}<option value="{{ pk }}"{% if who == pk|stringformat:"s" %} selected{% endif %}>{{ email }}</option>{% endfor %}</select></div>
-    <div><label for="sa-action">Action</label><select id="sa-action" name="action"><option value="">Every action</option>{% for a in actions %}<option value="{{ a }}"{% if a == action %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+    <div><label for="sa-action">Action</label><select id="sa-action" name="action"><option value="">Every action</option>{% for a in actions %}<option value="{{ a }}"{% if a == action %} selected{% endif %}>{{ a|audit_label }}</option>{% endfor %}</select></div>
     <div><label for="sa-from">From</label><input id="sa-from" type="date" name="from" value="{{ start|date:'Y-m-d' }}"></div>
     <div><label for="sa-to">To</label><input id="sa-to" type="date" name="to" value="{{ end|date:'Y-m-d' }}"></div>
     <button type="submit" class="secondary">Show</button>{% if who or action %}<a class="small" href="?from={{ start|date:'Y-m-d' }}&amp;to={{ end|date:'Y-m-d' }}">Clear filters</a>{% endif %}
@@ -21,15 +21,18 @@
     {% else %}<p class="small muted">No server tasks yet. Sysadmins start backups, restore drills and other upkeep; each one is listed here.</p>{% endif %}
   </section>
   {% endif %}
+  {# One compact line per row: time, plain words for the action (its audit label), who; the code and details behind a tap (WT-022). Each day collapses. #}
   {% for day, events in days.items %}
-    <section class="card">
-      <h2>{{ day|date:"l, F j, Y" }}</h2>
-      <div class="table-wrap"><table class="stack-sm">
-        <thead><tr><th>Time</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
-        <tbody>{% for row in events %}{% with e=row.event %}<tr><td class="nowrap muted-sm" data-label="Time">{% if row.count > 1 %}{{ row.first.occurred_at|date:"H:i" }}–{% endif %}{{ e.occurred_at|date:"H:i" }}</td><td class="cell-title">{% if e.actor %}{{ e.actor.email }}{% else %}{{ e.get_actor_type_display }}{% endif %}{% if e.channel != "web" %} <span class="status tone-warning">{{ e.get_channel_display }}</span>{% endif %}</td>
-          <td data-label="What"><code>{{ e.action }}</code>{% if row.count > 1 %} <span class="badge" data-testid="run-count">×{{ row.count }}</span>{% endif %}</td><td class="small muted" data-label="Details">{% if row.count > 1 %}<details><summary class="small">Show the {{ row.count }} events</summary><ul class="small">{% for x in row.events %}<li>{{ x.occurred_at|date:"H:i" }} {% for k, v in x.metadata.items %}{{ k }}={{ v }} {% endfor %}</li>{% endfor %}</ul>{% if row.hidden %}<p class="small">and {{ row.hidden }} more: every event is in the CSV export.</p>{% endif %}</details>{% else %}{% for k, v in e.metadata.items %}{{ k }}={{ v }} {% endfor %}{% endif %}</td></tr>{% endwith %}{% endfor %}</tbody>
-      </table></div>
-    </section>
+    <details class="card activity-day" open>
+      <summary><h2>{{ day|date:"l, F j, Y" }}</h2> <span class="small muted">{{ events|length }} row{{ events|length|pluralize }}</span></summary>
+      <ul class="activity-rows">{% for row in events %}{% with e=row.event %}<li class="activity-row">
+        <span class="activity-time nowrap muted-sm">{% if row.count > 1 %}{{ row.first.occurred_at|date:"H:i" }}–{% endif %}{{ e.occurred_at|date:"H:i" }}</span>
+        <span class="activity-what">{{ e.action|audit_label }}{% if row.count > 1 %} <span class="badge" data-testid="run-count">×{{ row.count }}</span>{% endif %}</span>
+        <span class="activity-who small muted">{% if e.actor %}{{ e.actor.email }}{% else %}{{ e.get_actor_type_display }}{% endif %}{% if e.channel != "web" %} <span class="status tone-warning">{{ e.get_channel_display }}</span>{% endif %}</span>
+        <details class="activity-details"><summary class="small">{% if row.count > 1 %}Show the {{ row.count }} events{% else %}Details{% endif %}</summary><div class="small muted"><code>{{ e.action }}</code>
+          {% if row.count > 1 %}<ul class="small">{% for x in row.events %}<li>{{ x.occurred_at|date:"H:i" }} {% for k, v in x.metadata.items %}{{ k }}={{ v }} {% endfor %}</li>{% endfor %}</ul>{% if row.hidden %}<p class="small">and {{ row.hidden }} more: every event is in the CSV export.</p>{% endif %}{% else %} {% for k, v in e.metadata.items %}{{ k }}={{ v }} {% endfor %}{% endif %}</div></details>
+      </li>{% endwith %}{% endfor %}</ul>
+    </details>
   {% empty %}<section class="card">{% include "partials/empty.html" with icon="activity" title="No sysadmin activity in these days" %}</section>{% endfor %}
   {% if pages > 1 %}<nav class="pager" aria-label="Pages of these days">
     {% if prev_page_url %}<a class="btn secondary" href="{{ prev_page_url }}">Previous page</a>{% endif %}

@@ -206,8 +206,13 @@ TILE_GROUPS = {"paper_mail_settings": frozenset({policy.BOARD})}
 # Pages the board's Settings front (the Community setup steps, WT-004) already
 # covers: still part of the hub (the Settings entry is current on them) but
 # not repeated as tiles there. Features is the setup step (WT-038); Contact
-# retention is linked from the Privacy step.
-COVERED_BY_SETUP = frozenset({"setup_home", "feature_settings", "retention"})
+# retention is linked from the Privacy step. Branding is setup step 2 (its
+# "Open Branding" link) and Community settings holds the same rules as the
+# rule steps, so neither is a tile either: a tile never repeats a step
+# (WT-002, D88). The sysadmin's plain Settings hub keeps Branding.
+COVERED_BY_SETUP = frozenset(
+    {"setup_home", "feature_settings", "retention", "branding_settings", "community_settings"}
+)
 
 # Hub pages that exist only on some deployments: listed only while the check
 # passes (the page itself answers 404 otherwise). Demo data: D53.
@@ -362,11 +367,22 @@ PERSONAL_SECTIONS = {"My home", "Community"}
 WORK_SECTIONS = ("Association", "Maintenance", "Finance", "Admin")
 
 
+# Roles that make someone association staff (management company, auditor,
+# sysadmin). An ARC reviewer alone is an owner volunteer on a committee, not
+# staff (WT-006, D88): their cue reads "ARC".
+STAFF_ONLY_GROUPS = frozenset({policy.MANAGER, policy.AUDITOR, policy.SYSADMIN})
+
+
 def work_label(groups: frozenset[str]) -> str:
     """The heading over the work sections and the page badge: "Board" for a
-    board member; staff who are not on the board (manager, auditor, ARC
-    reviewer, sysadmin) read "Staff", since they do not act for the board."""
-    return "Board" if policy.BOARD in groups else "Staff"
+    board member; "ARC" for an ARC reviewer who is neither on the board nor
+    staff (an owner volunteer, WT-006); other staff (manager, auditor,
+    sysadmin) read "Staff", since they do not act for the board."""
+    if policy.BOARD in groups:
+        return "Board"
+    if policy.ARC_REVIEWER in groups and not groups & STAFF_ONLY_GROUPS:
+        return "ARC"
+    return "Staff"
 
 
 def _open_by_default(title: str, count: int, staff: bool) -> bool:

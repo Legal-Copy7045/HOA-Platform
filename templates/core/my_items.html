@@ -13,11 +13,15 @@
     <div class="alert warning">{% icon a.icon %}<span><strong>{{ a.title }}.</strong> {{ a.detail }} <a href="{{ a.url }}">Open</a></span></div>
   {% endif %}{% endfor %}
   {# One line of jump links instead of a tile per group (WT-011). #}
-  {% if counts|length > 1 %}<nav class="jump-links small" aria-label="Groups on this page" data-testid="my-items-summary">{% for c in counts %}<a href="#area-{{ forloop.counter }}">{{ c.area }} {{ c.count }}{% if c.overdue %} <span class="status tone-danger">{{ c.overdue }} overdue</span>{% endif %}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</nav>{% endif %}
-  {% regroup items by area as areas %}
-  {% for group in areas %}
-    <section class="card" id="area-{{ forloop.counter }}"><h2>{{ group.grouper }}</h2>
-      <ul class="list">{% for t in group.list %}{% include "partials/todo.html" %}{% endfor %}</ul>
-    </section>
+  {# Ordered by part for someone with a home and board work (WT-003). #}
+  {% if counts|length > 1 %}<nav class="jump-links small" aria-label="Groups on this page" data-testid="my-items-summary">{% for p in parts %}{% if split %}<span class="jump-part">{% if p.key == "board" %}{{ nav.work_label }} work{% else %}{{ p.title }}{% endif %}:</span> {% endif %}{% for c in p.counts %}<a href="#area-{{ p.key }}-{{ c.area|slugify }}">{{ c.area }} {{ c.count }}{% if c.overdue %} <span class="status tone-danger">{{ c.overdue }} overdue</span>{% endif %}</a>{% if not forloop.last %} · {% endif %}{% endfor %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</nav>{% endif %}
+  {% for p in parts %}
+    {% if split %}<h2 class="my-items-part" id="part-{{ p.key }}">{% if p.key == "board" %}<span class="board-badge">{{ nav.work_label }}</span> {% endif %}{{ p.title }}</h2>{% endif %}
+    {% regroup p.items by area as areas %}
+    {% for group in areas %}
+      <section class="card" id="area-{{ p.key }}-{{ group.grouper|slugify }}">{% if split %}<h3>{{ group.grouper }}</h3>{% else %}<h2>{{ group.grouper }}</h2>{% endif %}
+        <ul class="list">{% for t in group.list %}{% include "partials/todo.html" %}{% endfor %}</ul>
+      </section>
+    {% endfor %}
   {% empty %}{% if not alerts %}{% include "partials/empty.html" with icon="check-circle" title="Nothing waiting on you" text="New requests, approvals and follow-ups will appear here." %}{% endif %}{% endfor %}
 {% endblock %}

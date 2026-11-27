@@ -2,6 +2,7 @@
 {% load portal %}
 {% block title %}Online payments · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "finance_more" %}Online payments</nav>
   {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Online payments</h1><p class="subtitle">Payments made on Stripe's hosted page, confirmed by the portal asking Stripe (no webhooks).</p></div></div>
   <section class="card" data-testid="payments-config">

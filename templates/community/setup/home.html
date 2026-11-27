@@ -22,6 +22,8 @@
       <div class="grow"><a class="title" href="{{ s.url }}">{{ s.number }}. {{ s.step.title }}</a></div>
       {% if s.state == "completed" %}<span class="status tone-success">Done</span>{% elif s.state == "skipped" %}<span class="status tone-warning">Skipped</span>{% elif run and not finished %}<span class="status tone-neutral">Not yet</span>{% endif %}
     </li>{% endfor %}</ol>
+    {# The same rules as the steps, on one page (not a second tile, WT-002). #}
+    <p class="small muted" id="all-rules">Every rule from these steps is also listed on one page, with its citation: <a href="{% url 'community_settings' %}">Community settings</a>.</p>
   </section>
 
   {% if links %}

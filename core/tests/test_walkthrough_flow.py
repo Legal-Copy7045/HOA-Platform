@@ -183,9 +183,9 @@ def _event(action, days_ago, actor=None):
     )
 
 
-def test_sysadmin_activity_shows_30_days_by_day_with_older(client, w):
+def test_sysadmin_activity_shows_7_days_by_day_with_older(client, w):
     _event("system.update_requested", 1, w["sysadmin"])
-    _event("backup.files_exported", 45, w["sysadmin"])
+    _event("backup.files_exported", 10, w["sysadmin"])  # before the 7-day window (WT-022)
     client.force_login(w["board"])
     response = client.get(reverse("sysadmin_activity"))
     html = response.content.decode()

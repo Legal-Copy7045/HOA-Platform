@@ -192,7 +192,6 @@ def parts(items, quick, can_open_queue, groups=frozenset({policy.BOARD})) -> lis
     "Board work" first when anything waits there (WT-040), "Your home"
     otherwise first. Each holds its to-dos (overdue first) and its quick
     actions; nothing is dropped, the rest is one tap away in My items."""
-    from core import navigation
     from core.my_items import HOME
 
     board_url = {reverse(n) for n in BOARD_QUICK}
@@ -206,6 +205,7 @@ def parts(items, quick, can_open_queue, groups=frozenset({policy.BOARD})) -> lis
             "title": title,
             "todos": shown,
             "more": len(todos) - len(shown),
+            "total": len(todos),
             # Only staff can open the My items page (owners see every to-do).
             "queue": can_open_queue,
             "quick": quick_links,
@@ -213,7 +213,9 @@ def parts(items, quick, can_open_queue, groups=frozenset({policy.BOARD})) -> lis
 
     board = part(
         "board",
-        f"{navigation.work_label(groups)} work",
+        # The badge before it carries the label (dash_parts.html), so the
+        # heading reads "Board work" once, never "Staff Staff work" (WT-006).
+        "work",
         board_items,
         [q for q in quick if q["url"] in board_url],
     )
@@ -232,7 +234,9 @@ def build(user, request=None) -> dict:
     roles = policy.roles_for(user)
     data = {"roles": roles}
     items = my_items.items_for_request(request) if request else my_items.items_for(user)
-    items = sorted(items, key=lambda i: not i.overdue)  # overdue first, then by area
+    # Overdue first, then legal deadlines, then dated items (WT-023): a
+    # shortened list never leaves out a records request with a legal due date.
+    items = sorted(items, key=my_items.priority)
     # Getting started (D73): the card replaces its own My items entry here.
     from community import checklist
 
