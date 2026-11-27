@@ -919,3 +919,22 @@ Decided (optional feature `owner_help`, on by default; `community/help.py`, `com
 7. **A clear explanation of each section.** The Help page's "What's where" lists the person's own menu, each section and page with a one-line description from the glossary; the Help menu entry (and a help button in the phone header) opens it. My profile got its missing subtitle.
 
 Not changed: nothing about sign-in, MFA, invitations or who may see what; help pages show no personal data.
+
+## D86. Economical CI: Actions minutes (2026-11-27)
+
+The owner (2026-11-27): "I'm running out of action minutes on GitHub, we should rethink the process to be more economical with this." Then, approving the proposal: "Yes make the changes. Schedule codeQL weekly".
+
+Before, a release cost about 80 to 90 billed runner-minutes: every pull request ran about 13 jobs (four test shards each repeating set-up, CodeQL for two languages, the page crawl, two separate image builds, lint, audit, gitleaks) and the merge to main ran all of it again.
+
+Decided:
+
+1. **No run on push to main.** The pull request already tested the code that merges (releases merge one at a time). A full run of everything on main every Sunday, and any workflow by hand (`workflow_dispatch`).
+2. **Nothing on draft pull requests.** A pull request is opened as a draft and marked ready once the local full suite, lint and page stage pass, so CI runs once.
+3. **The image is built once, in `image-scan`, and only when the Dockerfile, requirements, `docker/`, the compose files or the CI workflow change** (job `changes`); `docker` keeps the quick compose checks on every pull request. The weekly run scans all images for newly published vulnerabilities.
+4. **The page crawl runs on a pull request only when it touches templates, static files, views, URLs, forms, models, migrations, navigation, features or permissions**; weekly on main.
+5. **Two test shards instead of four** (each shard repeats about a minute and a half of billed set-up); the summary `test` check is unchanged.
+6. **CodeQL weekly and on demand only.** It cannot upload results on this plan and nobody reviewed them per pull request.
+7. **Dependabot monthly and grouped per ecosystem** (security updates still come at once).
+8. **Process:** features are batched into few releases, one pull request each, pushed once after local checks.
+
+Trade-off accepted: CodeQL and the image scan of unchanged images move from every change to weekly, so a new finding can take up to a week to surface; the D57 gates otherwise stay. Expected cost: about 25 to 30 minutes per release plus about 40 a week for the scheduled runs. A self-hosted runner on a separate, isolated Proxmox VM would cost no minutes; not set up (the owner's choice).

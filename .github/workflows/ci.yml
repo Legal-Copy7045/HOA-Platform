@@ -1,11 +1,16 @@
 name: CI
 
-# Pull requests run once per commit; pushes to main run after a merge. (Before,
-# every commit on a PR branch ran twice: once for the push, once for the PR.)
+# Economical CI (D86): pull requests run once per commit and never while still
+# a draft; a merge to main does not run again (the pull request already tested
+# that code). Main gets a full weekly run of everything, and any run can be
+# started by hand. The image build/scan and the page crawl run on a pull
+# request only when it touches what they test (job "changes").
 on:
-  push:
-    branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: "23 8 * * 0"  # Sundays: everything on main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,8 +20,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Which of the slower checks this pull request needs. Scheduled and manual
+  # runs do everything.
+  changes:
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    outputs:
+      image: ${{ steps.files.outputs.image }}
+      pages: ${{ steps.files.outputs.pages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with: {persist-credentials: false, fetch-depth: 0}
+      - id: files
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "image=true" >> "$GITHUB_OUTPUT"; echo "pages=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files=$(git diff --name-only "$BASE"...HEAD)
+          if echo "$files" | grep -qE '^(Dockerfile|\.dockerignore|requirements/|docker/|docker-compose[^/]*\.yml|\.github/workflows/ci\.yml)'; then
+            echo "image=true" >> "$GITHUB_OUTPUT"; else echo "image=false" >> "$GITHUB_OUTPUT"; fi
+          if echo "$files" | grep -qE '^(templates/|static/|regression/(run|pages|passkey|page_settings|page_setup)\.|requirements/|\.github/workflows/ci\.yml)|(urls|views|_views|models|navigation|features|policy|middleware|forms)\.py$|/migrations/|/templatetags/'; then
+            echo "pages=true" >> "$GITHUB_OUTPUT"; else echo "pages=false" >> "$GITHUB_OUTPUT"; fi
+          echo "Changed files decide: $(grep -h . "$GITHUB_OUTPUT" | tr '\n' ' ')"
+
   lint:
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -30,6 +62,7 @@ jobs:
 
   audit:
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -40,16 +73,18 @@ jobs:
         # Every requirement is pinned with hashes, so nothing needs resolving.
         run: pip-audit --strict --disable-pip --no-deps -r requirements/base.txt -r requirements/dev.txt
 
-  # The suite runs in four parallel shards (conftest.py --shard): each job
-  # takes every fourth test, so the slow cross-owner URL matrix is shared out
-  # too. Wall time drops from about 8 minutes to about 3.
+  # The suite runs in two parallel shards (conftest.py --shard): each job
+  # takes every second test, so the slow cross-owner URL matrix is shared out
+  # too. Two rather than four (D86): each shard repeats about a minute and a
+  # half of set-up, which is billed; the wait is a few minutes longer.
   test-shard:
     name: test (shard ${{ matrix.shard }})
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1]
     services:
       postgres:
         image: postgres:16-alpine
@@ -90,20 +125,23 @@ jobs:
         if: matrix.shard == 0
         run: python manage.py makemigrations --check --dry-run --settings=core.settings.test
       - name: pytest
-        run: pytest -p no:cacheprovider --shard ${{ matrix.shard }}/4
+        run: pytest -p no:cacheprovider --shard ${{ matrix.shard }}/2
 
   # One "test" check for the pull request, green only when every shard is.
   test:
     runs-on: ubuntu-24.04
     needs: [test-shard]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     steps:
       - name: All shards passed
         run: |
           [ "${{ needs.test-shard.result }}" = "success" ] || { echo "A test shard failed or was cancelled."; exit 1; }
 
+  # Compose files are checked on every pull request (seconds); the image is
+  # built once, in image-scan, and only when it can have changed (D86).
   docker:
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -112,15 +150,18 @@ jobs:
       - name: Validate the POC/production overlay
         # A dummy tunnel token: config only interpolates it, nothing connects.
         run: TUNNEL_TOKEN=ci-not-a-token docker compose -f docker-compose.yml -f docker-compose.tunnel.yml config -q
-      - name: Build image
-        run: docker build -t oak-creek-portal:ci .
 
   # Vulnerability scan of the portal image (D57). Fails on HIGH or CRITICAL
   # findings that have a fixed version (nothing to do about the others but
   # wait); the infrastructure images from the compose files are scanned too
   # and listed in the summary, so a Dependabot bump shows what it fixes.
+  # Builds the image (the build check) and scans it. On a pull request only
+  # when the Dockerfile, requirements, docker/ or compose files changed; the
+  # weekly run on main scans everything again for newly published CVEs (D86).
   image-scan:
     runs-on: ubuntu-24.04
+    needs: [changes]
+    if: needs.changes.outputs.image == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -168,8 +209,12 @@ jobs:
   # community, every page for six roles on a desktop and a phone, the
   # cross-role refusals and a passkey sign-in, in a real browser. About 3
   # minutes locally; well under 15 with set-up on a runner (D57).
+  # On a pull request only when it touches pages, views, URLs, templates,
+  # static files, models or permissions; weekly on main (D86).
   pages:
     runs-on: ubuntu-24.04
+    needs: [changes]
+    if: needs.changes.outputs.pages == 'true'
     timeout-minutes: 15
     services:
       postgres:

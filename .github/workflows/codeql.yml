@@ -3,15 +3,15 @@ name: CodeQL
 # Static analysis of the Python and JavaScript code with CodeQL's default
 # queries (D57). Code scanning is not enabled for this private repository
 # (it needs GitHub Advanced Security), so the action refuses to upload. The
-# analysis still runs on every pull request: the findings are listed in the
+# analysis still runs every week: the findings are listed in the
 # log and the step summary and kept as a SARIF artifact. Once code scanning
 # is enabled, set upload back to "always" to get alerts in the Security tab.
+# Weekly and on demand only (D86, the owner: "Schedule codeQL weekly"), to
+# save Actions minutes; nobody reviews per-pull-request results today.
 on:
-  push:
-    branches: [main]
-  pull_request:
   schedule:
     - cron: "17 7 * * 3"  # weekly, Wednesdays
+  workflow_dispatch:
 
 permissions:
   contents: read

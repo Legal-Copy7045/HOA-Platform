@@ -107,9 +107,10 @@ States: draft, neighbors (awaiting neighbor acknowledgements), submitted, comple
 - Run locally: `docker compose up` (site http://localhost:8000, mail http://localhost:8025)
 - All CI checks, stopping at the first failure: `scripts/check.sh`
 - CI security gates (D57), each its own check beside the unchanged `test`: `secrets.yml` (gitleaks, `.gitleaks.toml` allows only marked throwaway values and exact fixtures), `image-scan` (Trivy, fails on fixable HIGH/CRITICAL in the portal image; compose images report only), `codeql.yml` (Python, JavaScript), `pages` (the regression page crawl). Actions pinned by commit with a `# vX` comment
+- Economical CI (D86, Actions minutes are limited): pull requests only (never on drafts; open as a draft, mark ready once the local full suite, lint and page stage pass), no second run on merge to main, a full weekly run on main (Sundays) and `workflow_dispatch`; `changes` decides per pull request whether `image-scan` (the one image build) and `pages` run; two test shards; CodeQL weekly only; Dependabot monthly and grouped. Batch features into few releases, one pull request each, pushed once (`core/tests/test_image_pins.py::test_ci_is_economical`)
 - Full regression (stages, stable IDs, report): `python3 regression/run.py` then `python3 regression/report.py` (the `/regression` skill does the whole run)
 - Walkthrough: /walkthrough; regression and walkthrough together: /full-check (`python3 regression/run.py --stage walkthrough` or `--with-walkthrough`, report `regression/walkthrough_report.py`)
-- Tests (needs Postgres with the two roles from `docker/postgres/init-roles.sh`): `pytest` (CI runs four shards in parallel with `pytest --shard K/4`, conftest.py; a summary job keeps the single `test` check)
+- Tests (needs Postgres with the two roles from `docker/postgres/init-roles.sh`): `pytest` (CI runs two shards in parallel with `pytest --shard K/2`, conftest.py; a summary job keeps the single `test` check; locally use four with separate databases)
 - Lint: `ruff check . && ruff format --check .`
 - Security: `bandit -q -c pyproject.toml -r .` and `pip-audit --strict -r requirements/base.txt -r requirements/dev.txt`
 - Update dependencies: edit `requirements/*.in`, then `pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements/base.txt requirements/base.in` (and the same for dev)
