@@ -129,10 +129,10 @@ a.title:hover { color: var(--green-700); text-decoration: underline; }
 .todo-icon.tone-warning { background: var(--warning-bg); color: var(--warning); }
 .todo-icon.tone-danger { background: var(--danger-bg); color: var(--danger); }
 .tiles { list-style: none; padding: 0; margin: 0; display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
-.tiles a.tile { display: flex; gap: .75rem; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; text-decoration: none; color: var(--ink); box-shadow: var(--shadow); height: 100%; }
-.tiles a.tile:hover { border-color: #b9d3c4; }
-.tiles .tile strong { display: block; }
-.tiles .tile span { color: var(--muted); font-size: .87rem; }
+.tiles a.tile, .tiles a.finance-card { display: flex; gap: .75rem; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; text-decoration: none; color: var(--ink); box-shadow: var(--shadow); height: 100%; }
+.tiles a.tile:hover, .tiles a.finance-card:hover { border-color: #b9d3c4; }
+.tiles .tile strong, .tiles .finance-card strong { display: block; }
+.tiles .tile span, .tiles .finance-card span { color: var(--muted); font-size: .87rem; }
 
 /* ---------- Buttons ---------- */
 .btn, :where(button[type=submit]:not(.link)), input[type=submit], button.primary, button.secondary, button.danger {
@@ -205,6 +205,7 @@ input[type=file] { font: inherit; font-size: 1rem; padding: .45rem; border: 1px 
 /* An action row followed by stat tiles or a grid never touches them (the
    dashboard's Record payments received sat on the tiles, D88). */
 .form-actions + .grid, .form-actions + .stat, .quick-row + .grid, .card > .form-actions + * { margin-top: 1rem; }
+.form-actions + p { margin-top: .6rem; }
 .card > .grid:not(:first-child) { margin-top: 1rem; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; }
 .form-grid .field.wide { grid-column: 1 / -1; }
@@ -835,7 +836,7 @@ li.activity-row .activity-details > summary { display: inline-flex; align-items:
 @media (max-width: 820px) { li.activity-row .activity-details > summary { min-height: 44px; } }
 /* A hub tile's or overview card's own waiting count (D89); the menu bubble
    is their sum. Cards stack on phones (.tiles is one column there). */
-.tiles .tile .badge-count, .card h2 .badge-count { display: inline-block; margin-left: .35rem; background: #f2c14e; color: #3a2a00; font-size: .72rem; font-weight: 700; padding: 0 .45rem; border-radius: 99px; line-height: 1.6; vertical-align: middle; }
+.tiles .tile .badge-count, .tiles .finance-card .badge-count, .card h2 .badge-count { display: inline-block; margin-left: .35rem; background: #f2c14e; color: #3a2a00; font-size: .72rem; font-weight: 700; padding: 0 .45rem; border-radius: 99px; line-height: 1.6; vertical-align: middle; }
 .finance-group > h2 { margin: 1.5rem 0 .6rem; }
 .finance-card span { overflow-wrap: anywhere; }
 /* My items in two parts, like the dashboard (WT-003). */

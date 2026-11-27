@@ -9,7 +9,7 @@
   {% for g in groups %}
     <section class="finance-group" aria-labelledby="fg-{{ forloop.counter }}"><h2 id="fg-{{ forloop.counter }}">{{ g.title }}</h2>
       <ul class="tiles finance-cards">
-        {% for c in g.cards %}<li><a class="tile finance-card" href="{{ c.url }}" data-testid="finance-card">{% icon c.icon %}<div><strong>{{ c.label }}{% if c.count %} <span class="badge-count" data-testid="card-count">{{ c.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</strong><span>{{ c.status }}</span></div></a></li>{% endfor %}
+        {% for c in g.cards %}<li><a class="finance-card" href="{{ c.url }}" data-testid="finance-card">{% icon c.icon %}<div><strong>{{ c.label }}{% if c.count %} <span class="badge-count" data-testid="card-count">{{ c.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</strong><span>{{ c.status }}</span></div></a></li>{% endfor %}
       </ul>
     </section>
   {% empty %}{% include "partials/empty.html" with icon="wallet" title="No finance pages are open to you" %}{% endfor %}
