@@ -1,6 +1,6 @@
 # Stable check IDs for the page stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: PAGE-1218
+# highest issued: PAGE-1228
 PAGE-001: "board: / loads"
 PAGE-002: "board: / has no console or CSP errors"
 PAGE-003: "board: / fits a phone screen"
@@ -338,7 +338,17 @@ PAGE-1215: "manager: /account/recovery/ fits a phone screen"
 PAGE-1216: "auditor: /account/recovery/ loads"
 PAGE-1217: "auditor: /account/recovery/ has no console or CSP errors"
 PAGE-1218: "auditor: /account/recovery/ fits a phone screen"
+PAGE-1219: "board: /finance/more/ loads"
 PAGE-122: "board: /lots/{id}/ has no console or CSP errors"
+PAGE-1220: "board: /finance/more/ has no console or CSP errors"
+PAGE-1221: "board: /finance/more/ fits a phone screen"
+PAGE-1222: "manager: /finance/more/ loads"
+PAGE-1223: "manager: /finance/more/ has no console or CSP errors"
+PAGE-1224: "manager: /finance/more/ fits a phone screen"
+PAGE-1225: "auditor: /finance/more/ loads"
+PAGE-1226: "auditor: /finance/more/ has no console or CSP errors"
+PAGE-1227: "auditor: /finance/more/ fits a phone screen"
+PAGE-1228: "owner is refused board page /finance/more/"
 PAGE-123: "board: /lots/{id}/ fits a phone screen"
 PAGE-124: "board: /finance/ledger/lot/{id}/ loads"
 PAGE-125: "board: /finance/ledger/lot/{id}/ has no console or CSP errors"
