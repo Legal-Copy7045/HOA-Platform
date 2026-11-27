@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Common area booking rules · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / Common area booking rules</nav>
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "settings_hub" %}Common area booking rules</nav>
   <div class="page-head"><div><h1>Common area booking rules</h1><p class="subtitle">Each common area and its booking rules, edited together. Record where the rules come from (Declaration, Rules and Regulations or a board resolution). Fees and deposits are shown to owners only; the portal does not charge them.</p></div>
     <div class="actions"><a class="btn secondary" href="{% url 'reservations' %}">Bookings</a></div></div>
   {% for area, rules, form in rows %}<details class="panel" id="area-{{ area.pk }}"{% if form.is_bound or rules.bookable and area.active %} open{% endif %}><summary>{{ area.name }} · {% if not area.active %}not in use{% elif rules.bookable %}bookable{% else %}not bookable{% endif %}{% if rules.citation %} · {{ rules.citation }}{% endif %}</summary>

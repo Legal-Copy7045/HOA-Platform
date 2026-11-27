@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Branding · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / Branding</nav>
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "settings_hub" %}Branding</nav>
   <div class="page-head"><div><h1>Branding</h1><p class="subtitle">Pictures behind the sign-in page. Everyone sees them before signing in, so use community photos with no faces, house numbers or car plates.</p></div></div>
   <div class="grid grid-2">
     {% for slot in slots %}

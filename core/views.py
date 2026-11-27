@@ -406,18 +406,10 @@ def feature_settings(request):
             label = features.BY_KEY[key].label
             messages.success(request, f"{label} switched {'on' if on else 'off'}.")
         return redirect("feature_settings")
-    states = features.states(request)
-    open_items = _feature_open_items()
-    return render(
-        request,
-        "core/features.html",
-        {
-            "rows": [
-                (f, states[f.key], _switch_off_warning(f, open_items.get(f.key)))
-                for f in features.FEATURES
-            ],
-        },
-    )
+    # One Features page (WT-038): the Community setup step, with every
+    # feature's description and the switch-off warnings. This address (and a
+    # single switch posted to it, above) keeps working.
+    return redirect("setup_step", step="features")
 
 
 def _feature_open_items() -> dict[str, tuple[int, str, str]]:

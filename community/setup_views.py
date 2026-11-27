@@ -352,29 +352,30 @@ def _step_list(states):
     ]
 
 
-@login_required
-def setup_home(request):
-    """Community setup: the list of steps, where this run stands, and Start,
-    Continue or Run setup again."""
-    _require(request)
+def setup_front() -> dict:
+    """Where setup stands and every step: the front of Settings for the
+    board (core.hub_views.settings_hub, WT-004)."""
     run = setup.current_run()
     done = setup.finished(run)
     states = setup.step_states(run) if run and not done else {}
     resume = next((k for k in setup.WORK_STEPS if states.get(k) != "completed"), "review")
-    last = setup.last_finished()
-    return render(
-        request,
-        "community/setup/home.html",
-        {
-            "run": run,
-            "finished": done,
-            "steps": _step_list(states),
-            "left": setup.steps_left(run) if run and not done else len(setup.WORK_STEPS),
-            "resume_url": reverse("setup_step", args=[resume]),
-            "last": last,
-            "total": len(setup.STEPS),
-        },
-    )
+    return {
+        "run": run,
+        "finished": done,
+        "steps": _step_list(states),
+        "left": setup.steps_left(run) if run and not done else len(setup.WORK_STEPS),
+        "resume_url": reverse("setup_step", args=[resume]),
+        "last": setup.last_finished(),
+        "total": len(setup.STEPS),
+    }
+
+
+@login_required
+def setup_home(request):
+    """Community setup is the front of Settings (WT-004): the old address
+    (My items, bookmarks, the steps' Back) opens it there."""
+    _require(request)
+    return redirect("settings_hub")
 
 
 @login_required

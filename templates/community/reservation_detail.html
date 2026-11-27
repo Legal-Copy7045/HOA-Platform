@@ -18,9 +18,9 @@
   </section>
   {% if is_staff and res.state == "pending" %}<section class="card"><h2>Decide</h2>
     <form method="post" action="{% url 'reservation_action' res.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit">Confirm booking</button></form>
-    <form method="post" action="{% url 'reservation_action' res.pk 'decline' %}" class="form-grid" data-confirm="Decline this booking?">{% csrf_token %}
+    <form method="post" action="{% url 'reservation_action' res.pk 'decline' %}" class="form-grid" data-confirm="Decline this booking? You're acting for the association.">{% csrf_token %}
       <div><label for="decline-note">Reason (the owner sees it on this page)</label><textarea id="decline-note" name="note" rows="2"></textarea></div>
-      <div class="form-actions"><button type="submit" class="danger">Decline</button></div></form>
+      <div class="form-actions"><button type="submit" class="danger">{% for_board "Decline" %}</button></div></form>
   </section>{% endif %}
   {% if can_cancel %}<section class="card"><h2>Cancel</h2>
     <form method="post" action="{% url 'reservation_action' res.pk 'cancel' %}" class="form-grid" data-confirm="Cancel this booking?">{% csrf_token %}

@@ -642,7 +642,7 @@ def test_invoice_file_is_shown_above_the_approval_buttons(client, w):
     assert "Ask for the invoice before approving." in page
 
 
-# --- Record checks quick action (streamlining) --------------------------------------------------
+# --- Record payments received quick action (WT-010) ----------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -657,8 +657,12 @@ def test_record_checks_quick_action_is_for_board_and_manager(w, who, shown):
     html = Template("{% load portal %}{% quick_actions %}").render(Context({"user": w[who]}))
     if shown:
         assert actions == [
-            {"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"}
+            {
+                "label": "Record payments received",
+                "url": reverse("record_payments"),
+                "icon": "receipt",
+            }
         ]
-        assert f'href="{reverse("record_payments")}"' in html and "Record checks" in html
+        assert f'href="{reverse("record_payments")}"' in html and "Record payments received" in html
     else:
         assert actions == [] and html.strip() == ""

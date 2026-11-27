@@ -2,8 +2,8 @@
 {% load portal %}
 {% block title %}Server tasks · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Server tasks</h1><p class="subtitle">Backups, restore drills and other upkeep on the server. The portal only asks; the server's own agent runs each task from a fixed list and reports back here (decision D35).{% if not can_run %} Sysadmins start tasks; the board sees the history.{% endif %}</p></div></div>
-  {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> {% if agent_seen %}The server's agent was last seen {{ agent_seen|timesince }} ago: it may be stopped, or busy installing an update.{% else %}The server's agent has not reported yet: it is installed by start-portal.sh on the VM.{% endif %} Requests wait until it is back.</span></div>{% endif %}
+  <div class="page-head"><div><h1>Server tasks</h1><p class="subtitle">Backups, restore drills and other upkeep on the server. The portal only asks; the server's own agent runs each task from a fixed list and reports back here.{% if not can_run %} Sysadmins start tasks; the board sees the history.{% endif %}</p></div></div>
+  {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> {% if agent_seen %}The server's agent was last seen {{ agent_seen|timesince }} ago: it may be stopped, or busy installing an update.{% else %}The server's agent has not reported yet: it is installed when the server is set up.{% endif %} Requests wait until it is back.</span></div>{% endif %}
   {% if current %}<section class="card" id="current-task"><h2>Now</h2>
     <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email }} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
     <p class="small muted">Refresh the page to see the result. Another task can start once this one has finished.</p></section>{% endif %}

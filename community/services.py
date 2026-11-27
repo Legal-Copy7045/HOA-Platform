@@ -1869,6 +1869,19 @@ def _refuse_own_owner_change(change, actor) -> None:
             raise CommunityError("Another board member must decide a change that adds you.")
 
 
+def own_change_refusal(change, actor) -> str:
+    """Why this board member may not decide this account change (they asked
+    for it, or it adds or removes them), or "": shown on the page before any
+    button (D64). decide_account_change refuses the same cases itself."""
+    if actor is not SYSTEM and change.requested_by_id == getattr(actor, "pk", None):
+        return "You asked for this change, so another board member must decide it."
+    try:
+        _refuse_own_owner_change(change, actor)
+    except CommunityError as exc:
+        return str(exc)
+    return ""
+
+
 def set_ownership_type(
     ownership: Ownership, ownership_type: str, *, actor, request: HttpRequest | None = None
 ) -> Ownership:

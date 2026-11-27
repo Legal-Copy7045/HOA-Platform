@@ -34,6 +34,7 @@ urlpatterns = [
     path("board/setup/", hub_views.settings_hub, name="settings_hub"),
     path("ops/demo-data/", demo_data, name="demo_data"),
     path("community-info/", hub_views.community_info, name="community_info"),
+    path("finance/more/", hub_views.finance_more, name="finance_more"),
     re_path(
         r"^follow-up/(?P<kind>violation|collection|work_order)/(?P<pk>[0-9]+)/$",
         set_follow_up,

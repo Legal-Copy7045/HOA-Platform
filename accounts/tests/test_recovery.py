@@ -577,7 +577,7 @@ def test_a_change_applies_only_to_requests_started_afterwards(
 def test_settings_show_on_community_settings(client):
     client.force_login(make_member(board=True))
     page = client.get(reverse("community_settings")).content.decode()
-    assert "Sign-in and security" in page and "recovery.wait_hours" in page
+    assert "Account recovery" in page and "recovery.wait_hours" in page
 
 
 # --- The lock after a recovery ---------------------------------------------------------

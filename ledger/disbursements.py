@@ -1057,6 +1057,11 @@ def board_items(user) -> list:
                             reverse("disbursement_detail", args=[batch.pk]),
                             "warning",
                             nav="disbursements",
+                            # Outgoing checks; "Record payments received" is
+                            # for owners' checks coming in (WT-010).
+                            action_label="Write checks",
+                            action_url=reverse("disbursement_detail", args=[batch.pk])
+                            + "#write-checks",
                         )
                     )
         if can(user, "disbursement.approve"):

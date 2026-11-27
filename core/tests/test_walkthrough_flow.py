@@ -131,7 +131,6 @@ def test_report_names_are_plain():
         ("community_settings", "settings_hub"),
         ("arc_project_types", "settings_hub"),
         ("arc_neighbors", "settings_hub"),
-        ("feature_settings", "settings_hub"),
         ("retention", "settings_hub"),
         ("branding_settings", "settings_hub"),
         ("letters_settings", "settings_hub"),
@@ -328,7 +327,12 @@ def test_staff_menu_opens_work_with_waiting_items(rf, w):
         return {s["title"]: s for s in navigation.build(request)["sections"]}
 
     board = sections(w["board"])
-    assert board["Finance"]["open"] and board["Finance"]["count"]
+    # WT-036: only the work section with the most waiting opens (a short
+    # phone drawer); the others show their count on the closed heading.
+    work = [s for s in board.values() if s["work"]]
+    opened = [s for s in work if s["open"]]
+    assert board["Finance"]["count"]
+    assert len(opened) == 1 and opened[0]["count"] == max(s["count"] for s in work)
     assert not board["My home"]["open"] if "My home" in board else True
     assert not board["Community"]["open"]
     owner = sections(w["owner"])

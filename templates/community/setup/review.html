@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Review · Community setup · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'setup_home' %}">Community setup</a></div>
+  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'settings_hub' %}#setup">Community setup</a></div>
   <div class="setup-progress">
     <p class="small muted" id="setup-progress-label">Step {{ number }} of {{ total }}{% if run %} · setup run {{ run }}{% endif %}</p>
     <progress max="{{ total }}" value="{{ number }}" aria-labelledby="setup-progress-label">Step {{ number }} of {{ total }}</progress>

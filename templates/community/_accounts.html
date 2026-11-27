@@ -3,8 +3,9 @@
   <ul class="list">{% for ch in pending_changes %}<li><div class="grow"><div class="title">{{ ch.get_action_display }}: {% include "community/_change_subject.html" with board=True %}</div>
     <div class="small muted">Asked {{ ch.created_at|date:"M j, Y" }}{% if ch.reason %} · {{ ch.reason }}{% endif %}</div>
     {% include "community/_change_details.html" with board=True %}</div>
-    {% if can_approve_changes and ch.requested_by_id != user.pk %}<form method="post" action="{% url 'account_change_decide' ch.pk 'approve' %}">{% csrf_token %}<button type="submit" class="small">Approve</button></form>
-    <form method="post" action="{% url 'account_change_decide' ch.pk 'decline' %}" class="inline-form">{% csrf_token %}<div class="grow"><label for="decline-note-{{ ch.pk }}">Reason for declining</label><input id="decline-note-{{ ch.pk }}" type="text" name="note" maxlength="500"></div><button type="submit" class="secondary small">Decline</button></form>{% elif ch.requested_by_id == user.pk %}<span class="small muted">Another board member must decide</span>{% endif %}</li>{% endfor %}</ul>
+    {% if ch.own_note %}<p class="board-note" data-testid="own-home-note">{{ ch.own_note }}</p>
+    {% elif can_approve_changes %}<form method="post" action="{% url 'account_change_decide' ch.pk 'approve' %}" data-confirm="{% acting_confirm "Approve this change to the account?" %}">{% csrf_token %}<button type="submit" class="small">{% for_board "Approve" %}</button></form>
+    <form method="post" action="{% url 'account_change_decide' ch.pk 'decline' %}" class="inline-form" data-confirm="{% acting_confirm "Decline this change?" %}">{% csrf_token %}<div class="grow"><label for="decline-note-{{ ch.pk }}">Reason for declining</label><input id="decline-note-{{ ch.pk }}" type="text" name="note" maxlength="500"></div><button type="submit" class="secondary small">{% for_board "Decline" %}</button></form>{% endif %}</li>{% endfor %}</ul>
 </section>{% endif %}
 <section class="card" id="accounts"><h2>Accounts</h2>
   <p class="muted small">An account is one ownership period of this home. It goes dormant when the home is sold; its history stays here.</p>

@@ -111,7 +111,7 @@ def check_and_alert(now=None) -> bool:
         "This email is sent once a month; the item stays in My items until the month is posted.",
         term,
     )
-    send_now(board_emails(), subject=m["title"], body=body)
+    send_now(board_emails(), subject=m["title"], body=body, board=True)
     row.emailed_at = now or timezone.now()
     row.save(update_fields=["emailed_at"])
     return True

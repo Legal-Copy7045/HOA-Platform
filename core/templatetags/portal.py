@@ -1,4 +1,5 @@
 from django import template
+from django.urls import reverse
 
 from core import policy
 
@@ -310,7 +311,7 @@ def follow_up_form(context, kind, obj):
 
 @register.inclusion_tag("partials/quick_actions.html", takes_context=True)
 def quick_actions(context):
-    """Staff shortcuts (core.my_items.quick_actions), e.g. "Record checks"."""
+    """Staff shortcuts (core.my_items.quick_actions), e.g. "Record payments received"."""
     from core.my_items import quick_actions as actions_for
 
     return {"actions": actions_for(context["user"])}
@@ -356,3 +357,75 @@ def with_term(context, text: str) -> str:
     from community.terms import term_text
 
     return term_text(str(text), _charge_term(context))
+
+
+@register.simple_tag(takes_context=True)
+def hub_crumb(context, hub):
+    """The breadcrumb link to a hub ("Settings / "), or nothing when the hub
+    would show this person only the page they are on: the menu links straight
+    to a one-page hub, so the crumb does too (WT-009)."""
+    from django.utils.html import format_html
+
+    from core import navigation
+    from core.hub_views import PAGES
+
+    request = context.get("request")
+    if request is None:
+        return ""
+    if len(navigation.hub_links(request, hub)) < 2 and not (
+        hub == "settings_hub" and policy.can(request.user, "community.manage_rules")
+    ):
+        return ""
+    return format_html('<a href="{}">{}</a> / ', reverse(hub), PAGES[hub][0])
+
+
+# --- Who is acting (D64): decision buttons and confirmations ------------------------------
+
+
+@register.simple_tag(takes_context=True)
+def for_board(context, label):
+    """{% for_board "Approve" %}: "Approve for the board" for a board member."""
+    from core import workflow
+
+    return workflow.for_board(label, context.get("user"))
+
+
+@register.simple_tag
+def acting_confirm(text=""):
+    """{% acting_confirm "Approve this invoice for payment?" %}: the text plus
+    "You're acting for the association." """
+    from core import workflow
+
+    return workflow.acting_confirm(text)
+
+
+@register.simple_tag
+def own_home_note():
+    """The note shown, before any button, on a decision about the board
+    member's own home: another board member must decide (the service still
+    refuses it)."""
+    from core import workflow
+
+    return workflow.OWN_HOME_NOTE
+
+
+@register.simple_tag(takes_context=True)
+def step_button(context, t):
+    """A workflow step's button label (partials/workflow.html)."""
+    from core import workflow
+
+    if workflow.is_decision(t.action):
+        return workflow.for_board(t.label, context.get("user"))
+    return t.label
+
+
+@register.simple_tag
+def step_confirm(t):
+    """A workflow step's confirmation: its own text, the generic one for a
+    step that closes or refuses something, and for a decision who is acting."""
+    from core import workflow
+
+    text = t.confirm or (f"{t.label}? This can't be undone." if is_danger(t.action) else "")
+    if workflow.is_decision(t.action):
+        return workflow.acting_confirm(text or f"{t.label}?")
+    return text

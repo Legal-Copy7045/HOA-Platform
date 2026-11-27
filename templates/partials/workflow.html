@@ -4,12 +4,13 @@
   <h2>Next steps</h2>
   <div class="wf-actions">
     {% for t in actions %}
-      <form method="post" action="{% url action_url_name obj.pk t.action %}" class="wf-action"{% if t.confirm %} data-confirm="{{ t.confirm }}"{% elif t.action|is_danger %} data-confirm="{{ t.label }}? This can't be undone."{% endif %}>
+      {% step_confirm t as confirm_text %}
+      <form method="post" action="{% url action_url_name obj.pk t.action %}" class="wf-action"{% if confirm_text %} data-confirm="{{ confirm_text }}"{% endif %}>
         {% csrf_token %}
         <label for="wf-note-{{ t.action }}" class="wf-label">Note for &ldquo;{{ t.label }}&rdquo;{% if t.note_required %}<span class="required-mark" aria-hidden="true">*</span><span class="sr-only"> (required)</span>{% else %} <span class="muted">(optional)</span>{% endif %}</label>
         <div class="wf-row">
           <input id="wf-note-{{ t.action }}" name="note"{% if t.note_required %} required{% endif %}>
-          <button type="submit" class="{% if t.action|is_danger %}danger{% elif not forloop.first %}secondary{% endif %}">{{ t.label }}</button>
+          <button type="submit" class="{% if t.action|is_danger %}danger{% elif not forloop.first %}secondary{% endif %}">{% step_button t %}</button>
         </div>
       </form>
     {% endfor %}

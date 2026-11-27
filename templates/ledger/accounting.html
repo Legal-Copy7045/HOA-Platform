@@ -26,7 +26,7 @@
         </form>{% else %}<p class="muted small">Every recorded payment is in a deposit.</p>{% endif %}</section>{% endif %}
       <section class="card"><h2>Deposits</h2>
         {% if batches %}<ul class="list">{% for b in batches %}<li><span class="grow">{{ b.deposited_on|date:"M j, Y" }}{% if b.bank_reference %} · {{ b.bank_reference }}{% endif %}{% if b.voids_id %} <span class="small muted">(voids #{{ b.voids_id }})</span>{% endif %}</span><span>{{ b.total_cents|cents }}</span>
-          {% if can_manage and not b.voids_id %}<form method="post" data-confirm="Void this deposit? Its payments become undeposited again.">{% csrf_token %}<input type="hidden" name="section" value="void"><input type="hidden" name="batch" value="{{ b.pk }}"><button type="submit" class="secondary small">Void</button></form>{% endif %}</li>{% endfor %}</ul>
+          {% if can_manage and not b.voids_id %}<form method="post" data-confirm="Void this deposit? Its payments become undeposited again. You're acting for the association.">{% csrf_token %}<input type="hidden" name="section" value="void"><input type="hidden" name="batch" value="{{ b.pk }}"><button type="submit" class="secondary small">{% for_board "Void" %}</button></form>{% endif %}</li>{% endfor %}</ul>
         {% else %}<p class="muted small">No deposits recorded yet.</p>{% endif %}</section>
     </div>
     <div>

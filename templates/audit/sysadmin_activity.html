@@ -12,6 +12,14 @@
     <button type="submit" class="secondary">Show</button>{% if who or action %}<a class="small" href="?from={{ start|date:'Y-m-d' }}&amp;to={{ end|date:'Y-m-d' }}">Clear filters</a>{% endif %}
   </form>
   <p class="small muted" data-testid="activity-window">Showing {{ start|date:"M j, Y" }} to {{ end|date:"M j, Y" }}{% if who or action %}, filtered{% endif %}: {{ count }} event{{ count|pluralize }}. Older activity is kept and shown with Older.</p>
+  {% if server_backups %}{# The board's view of server tasks (WT-007): read-only; sysadmins start them. #}
+  <section class="card" id="server-tasks" aria-labelledby="server-tasks-h">
+    <div class="card-head"><h2 id="server-tasks-h">Server tasks</h2>{% if server_tasks_more %}<a class="small" href="{% url 'server_tasks' %}">All server tasks</a>{% endif %}</div>
+    <p class="small"><span class="status tone-{% if server_backups.ok %}success{% else %}danger{% endif %}">Backups {% if server_backups.ok %}OK{% else %}need attention{% endif %}</span> {{ server_backups.detail }}</p>
+    {% if server_tasks %}<ul class="list">{% for row in server_tasks %}<li><div class="grow"><div class="title">{{ row.label }} {% status row.task.state row.task.get_state_display %}</div><div class="small muted">Asked by {{ row.task.requested_by.email }} · {{ row.task.requested_at|date:"M j, Y g:i A" }}{% if row.summary %} · {{ row.summary }}{% endif %}</div></div></li>{% endfor %}</ul>
+    {% else %}<p class="small muted">No server tasks yet. Sysadmins start backups, restore drills and other upkeep; each one is listed here.</p>{% endif %}
+  </section>
+  {% endif %}
   {% for day, events in days.items %}
     <section class="card">
       <h2>{{ day|date:"l, F j, Y" }}</h2>

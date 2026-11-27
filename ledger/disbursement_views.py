@@ -300,6 +300,12 @@ def _detail_context(request, batch, **forms_):
         "rows": rows,
         "to_issue": to_issue,
         "is_recipient": person_id in recipients,
+        # A refund to this board member: shown before any button (D64); the
+        # service refuses the approval itself.
+        "own_refund": state.status == "awaiting"
+        and batch.kind == DisbursementKind.REFUND
+        and person_id in recipients
+        and policy.can(user, "disbursement.approve"),
         "can_approve": can_approve,
         "can_decline": state.status == "awaiting" and policy.can(user, "disbursement.approve"),
         "can_issue": policy.can(user, "disbursement.issue"),
