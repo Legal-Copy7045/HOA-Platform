@@ -43,7 +43,14 @@ from ledger.accounts import ALL, account_q, resolve
 
 ORDER_RULE = "ledger.assessments_before_fees"
 AUTO, DIRECTED, REVERSAL, UNWIND, MIGRATION = "auto", "directed", "reversal", "unwind", "migration"
-CHARGE_KIND_VALUES = ("assessment", "late_fee", "other_charge", "resale_fee", "refund")
+CHARGE_KIND_VALUES = (
+    "assessment",
+    "late_fee",
+    "other_charge",
+    "resale_fee",
+    "refund",
+    "special_assess",  # special assessment installments (D75)
+)
 _LOCK_NAMESPACE = 5_320_001  # pg advisory lock namespace for lot allocation
 _NUMBER_LOCK = 5_320_002
 

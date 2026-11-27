@@ -122,3 +122,49 @@ urlpatterns += [
         name="check_alignment_pdf",
     ),
 ]
+
+# Finance gaps (D75 special assessments, D76 payment plans, D78 budget preparation).
+from ledger import finance_gaps_views as fg  # noqa: E402
+
+urlpatterns += [
+    path("finance/special-assessments/", fg.special_assessments_page, name="special_assessments"),
+    path(
+        "finance/special-assessments/new/",
+        fg.special_assessment_new,
+        name="special_assessment_new",
+    ),
+    path(
+        "finance/special-assessments/<int:pk>/",
+        fg.special_assessment_detail,
+        name="special_assessment_detail",
+    ),
+    re_path(
+        r"^finance/special-assessments/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
+        fg.special_assessment_action,
+        name="special_assessment_action",
+    ),
+    path("finance/payment-plans/", fg.payment_plans_page, name="payment_plans"),
+    path(
+        "finance/collections/<int:pk>/payment-plan/",
+        fg.payment_plan_new,
+        name="payment_plan_new",
+    ),
+    path("finance/payment-plans/<int:pk>/", fg.payment_plan_detail, name="payment_plan_detail"),
+    re_path(
+        r"^finance/payment-plans/(?P<pk>[0-9]+)/do/(?P<action>[a-z]+)/$",
+        fg.payment_plan_action,
+        name="payment_plan_action",
+    ),
+    path(
+        "my-account/payment-plan/<int:pk>/agreement.pdf",
+        fg.payment_plan_letter,
+        name="payment_plan_letter",
+    ),
+    path(
+        "my-account/payment-plan/<int:pk>/agree/",
+        fg.payment_plan_acknowledge,
+        name="payment_plan_acknowledge",
+    ),
+    path("finance/budgets/prepare/", fg.budget_prepare, name="budget_prepare"),
+    path("finance/budgets/<int:pk>/compare/", fg.budget_compare, name="budget_compare"),
+]

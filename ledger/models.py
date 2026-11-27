@@ -30,6 +30,10 @@ class EntryKind(models.TextChoices):
     # Part of an online payment the board refunded at Stripe, recorded on the
     # account (positive: the owner has that money back). D33-acctfix-5.
     REFUND = "refund", "Payment refunded"
+    # A special assessment installment (D75, ledger/special_assessments.py).
+    # Books branch: map to income of the assessment's fund
+    # (SpecialAssessment.fund, operating or reserve).
+    SPECIAL_ASSESSMENT = "special_assess", "Special assessment"
 
 
 CHARGE_KINDS = {
@@ -38,6 +42,7 @@ CHARGE_KINDS = {
     EntryKind.OTHER_CHARGE,
     EntryKind.RESALE_FEE,
     EntryKind.REFUND,
+    EntryKind.SPECIAL_ASSESSMENT,  # D75
 }
 
 
@@ -342,6 +347,9 @@ ONLINE_GL = {
 }
 # Disbursements (D52): where a surplus distribution is paid from.
 DISBURSEMENT_GL = {"surplus_fund": "3100 Reserve and surplus fund"}
+# Special assessments (D75): their income account (the books branch maps it
+# to the fund of SpecialAssessment.fund).
+SPECIAL_ASSESSMENT_GL = {"special_assess": "4400 Special assessment income"}
 
 
 class AccountingSetup(models.Model):
@@ -374,7 +382,7 @@ class AccountingSetup(models.Model):
             k.strip(): v.strip()
             for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
         }
-        return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **out}
+        return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **SPECIAL_ASSESSMENT_GL, **out}
 
 
 class DepositBatch(AppendOnlyModel):
@@ -1138,3 +1146,8 @@ class CheckPrintSettings(models.Model):
     def get(cls) -> CheckPrintSettings:
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# Special assessments (D75) and payment plans (D76): their own module, so the
+# models merge cleanly with other ledger work.
+from ledger.models_finance_gaps import *  # noqa: E402, F403

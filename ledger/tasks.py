@@ -1,3 +1,5 @@
+import contextlib
+
 from django.utils import timezone
 from procrastinate.contrib.django import app
 
@@ -78,3 +80,30 @@ def send_statement_emails(year: int, month: int) -> int:
     from ledger.statement_email import send_monthly_statements
 
     return send_monthly_statements(year=year, month=month)["emails"]
+
+
+# --- Finance gaps (D75, D76) --------------------------------------------------------------
+
+
+@app.periodic(cron="29 10 * * *")  # daily, about 05:29 site time
+@app.task(queue="maintenance", queueing_lock="special_assessments")
+def special_assessments(timestamp: int) -> int:
+    """Post special assessment installments due today (or missed earlier);
+    once per home and installment, so re-runs are harmless (D75). Late fees
+    on them only when late fees post by themselves."""
+    from ledger import special_assessments as sa
+
+    posted = sa.post_due()
+    if rule("late_fee.auto_apply"):
+        with contextlib.suppress(sa.SpecialAssessmentError):
+            posted += sa.post_late_fees(actor=SYSTEM)
+    return posted
+
+
+@app.periodic(cron="37 11 * * *")  # daily, about 06:37 site time
+@app.task(queue="maintenance", queueing_lock="payment_plans")
+def payment_plans(timestamp: int) -> dict:
+    """Complete paid payment plans; default plans past their default date (D76)."""
+    from ledger.payment_plans import check_plans
+
+    return check_plans()

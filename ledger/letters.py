@@ -704,3 +704,87 @@ def notice_pdf(lot: Lot, kind: str) -> bytes:
         title=f"{tpl.get_kind_display()} {lot.legal_label}",
         margin=STATEMENT_MARGIN,
     )
+
+
+# --- Payment plan agreement letter (D76) --------------------------------------------------
+
+
+def payment_plan_pdf(plan) -> bytes:
+    """The agreement letter for a payment plan: the letterhead, the owners,
+    the amount the plan covers, the schedule, what happens to late fees and
+    when the plan defaults, and a line to sign and return. The caller checks
+    who may download it (ledger/payment_plan_views.py)."""
+    from ledger import payment_plans
+
+    profile = CommunityProfile.get()
+    lot = plan.lot
+    names, salutation, address, account = _recipients(lot)
+    facts = payment_plans.agreement_values(plan)
+    letter = [
+        *_letterhead(profile),
+        ("normal", ""),
+        ("normal", _long(timezone.localdate())),
+        ("normal", ""),
+        ("normal", f"**{names}**"),
+    ]
+    letter += [("normal", f"**{line}**") for line in address.splitlines() if line.strip()]
+    letter += [
+        ("normal", ""),
+        ("normal", f"RE:    **Payment plan agreement, {lot.legal_label}, account {account}**"),
+        ("normal", ""),
+        ("normal", f"Dear {salutation}:"),
+        ("normal", ""),
+        (
+            "normal",
+            f"This letter sets out the payment plan for the {format_cents(plan.total_cents)} "
+            f"that was open on your account on {_long(plan.start_on)}. Please pay these "
+            "installments on or before their due dates, in addition to each new monthly "
+            + term_text("{term}")
+            + " as it falls due:",
+        ),
+        ("normal", ""),
+    ]
+    for row in facts["schedule"]:
+        inst = row["installment"]
+        letter.append(
+            (
+                "normal",
+                f"    {inst.number}.  {_long(inst.due_on)}    {format_cents(inst.amount_cents)}",
+            )
+        )
+    letter.append(("normal", ""))
+    if plan.suspend_late_fees:
+        letter.append(
+            ("normal", "While you keep to this plan, no late fees are charged on your account.")
+        )
+    letter += [
+        (
+            "normal",
+            f"An installment not paid within {plan.grace_days} days of its due date is missed. If "
+            f"it is still unpaid {plan.default_days} days after its due date, the plan ends and "
+            "the association's normal collection steps resume. The association's lien for the "
+            "unpaid amounts stays in place until they are paid.",
+        ),
+        ("normal", ""),
+    ]
+    if plan.rule_citation:
+        letter += [("normal", f"Authority: {plan.rule_citation}."), ("normal", "")]
+    letter += [
+        (
+            "normal",
+            "You can also record your agreement on My account in the owners' portal. If you "
+            "have questions, please contact us.",
+        ),
+        ("normal", ""),
+        ("normal", "Sincerely,"),
+    ]
+    signature = list((profile.letter_signature or "").splitlines())
+    letter += [
+        ("normal", line) for line in (signature or [profile.legal_name, "Board of Directors"])
+    ]
+    letter += [
+        ("normal", ""),
+        ("normal", "Agreed:  ______________________________    Date: ______________"),
+        ("normal", f"         {names}"),
+    ]
+    return pdf.render(letter, title=f"Payment plan {lot.legal_label}", margin=STATEMENT_MARGIN)

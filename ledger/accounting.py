@@ -76,6 +76,8 @@ GL_LABELS = {
     "processing_fees": "Payment processing fees",
     # Disbursements (D52)
     "surplus_fund": "Surplus distributions paid from (reserve or surplus fund)",
+    # Special assessments (D75)
+    "special_assess": "Special assessment income",
 }
 
 
@@ -97,6 +99,7 @@ GL_GROUPS = [
             ("late_fee", "Late fees posted on overdue accounts."),
             ("resale_fee", "Fees for resale certificates when a home is sold."),
             ("other_charge", "Any other charge posted to an owner's account."),
+            ("special_assess", "Special assessment installments (D75)."),
             ("card_surcharge", "The surcharge owners pay when they pay by credit card."),
         ],
     ),
@@ -129,13 +132,13 @@ GL_GROUPS = [
 
 def standard_accounts() -> dict[str, str]:
     """The account each key uses when its box is left empty."""
-    from ledger.models import DEFAULT_GL, DISBURSEMENT_GL, ONLINE_GL
+    from ledger.models import DEFAULT_GL, DISBURSEMENT_GL, ONLINE_GL, SPECIAL_ASSESSMENT_GL
 
     defaults = {
         k.strip(): v.strip()
         for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
     }
-    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL}
+    return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **SPECIAL_ASSESSMENT_GL}
 
 
 def setup_groups(setup: AccountingSetup, values: dict[str, str] | None = None) -> list[dict]:
@@ -741,6 +744,8 @@ def vendor_1099_totals(year: int) -> list[dict]:
     threshold = rule("accounting.1099_threshold_cents") or 0
     totals = dict(
         InvoicePayment.objects.filter(paid_on__year=year)
+        # Expense reimbursements (D77) repay a volunteer, not a vendor: not 1099.
+        .filter(invoice__reimbursement__isnull=True)
         .values("invoice__vendor_id")
         .annotate(t=Sum("amount_cents"))
         .values_list("invoice__vendor_id", "t")

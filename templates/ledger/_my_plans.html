@@ -1,0 +1,13 @@
+{% load portal %}{# My account: payment plans (D76) and special assessments (D75) of one home. Expects: a (the account dict) #}
+{% for p in a.payment_plans %}<section class="card" id="payment-plan"><h2>Your payment plan</h2>
+  <p>{{ p.plan.total_cents|cents }} in {{ p.schedule|length }} installment{{ p.schedule|length|pluralize }}, paid so far {{ p.paid_cents|cents }}. {{ p.status_label }}.{% if p.plan.suspend_late_fees %} While you keep to it, no late fees are charged.{% endif %}</p>
+  {% if p.next %}<p><strong>Next installment: {{ p.next.installment.amount_cents|cents }}, due {{ p.next.installment.due_on|date:"F j, Y" }}.</strong></p>{% endif %}
+  <ul class="list small">{% for r in p.schedule %}<li><span class="grow">{{ r.installment.due_on|short_date }} · {{ r.installment.amount_cents|cents }}</span><span>{% if r.status == "met" %}Paid{% elif r.status == "missed" %}Missed{% elif r.status == "due" %}Due{% else %}Upcoming{% endif %}</span></li>{% endfor %}</ul>
+  <div class="actions"><a class="btn secondary" href="{% url 'payment_plan_letter' p.plan.pk %}">{% icon "download" %} Agreement letter</a>
+  {% if p.can_acknowledge %}<form method="post" action="{% url 'payment_plan_acknowledge' p.plan.pk %}" data-confirm="Record that you agree to this payment plan?">{% csrf_token %}<button type="submit">{% icon "check" %} I agree to this plan</button></form>{% elif p.acknowledged %}<span class="small muted">You agreed on {{ p.acknowledged.created_at|short_date }}.</span>{% endif %}</div>
+</section>{% endfor %}
+{% for s in a.special_assessments %}<section class="card"><h2>Special assessment: {{ s.assessment.title }}</h2>
+  <p class="small">{{ s.assessment.purpose|linebreaksbr }}</p>
+  <p>Your home's share: <strong>{{ s.share_cents|cents }}</strong>{% if s.installments|length > 1 %} in {{ s.installments|length }} installments{% endif %}.</p>
+  <ul class="list small">{% for r in s.installments %}<li><span class="grow">{{ r.due_on|short_date }} · {{ r.amount_cents|cents }}</span><span>{{ r.status|capfirst }}</span></li>{% endfor %}</ul>
+</section>{% endfor %}
