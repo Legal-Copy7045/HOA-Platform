@@ -192,6 +192,38 @@ class PaymentAlert(ScopedModel):
     def delete(self, *args, **kwargs):
         raise PermissionError("Payment alerts are closed, not deleted.")
 
+    def account_ids(self) -> set[int]:
+        """The ownership accounts of the payment this alert concerns (its
+        Stripe reference: the payment, refund or checkout)."""
+        ids: set[int] = set()
+        refs = {r for r in (self.stripe_ref, self.key) if r}
+        if not refs:
+            return ids
+        ids.update(
+            StripePayment.objects.unscoped("alert: payment's account")
+            .filter(payment_intent_id__in=refs)
+            .values_list("entry__account_id", flat=True)
+        )
+        ids.update(
+            StripeEvent.objects.unscoped("alert: refund's account")
+            .filter(stripe_id__in=refs)
+            .values_list("payment__entry__account_id", flat=True)
+        )
+        ids.update(
+            PendingCheckout.objects.unscoped("alert: checkout's account")
+            .filter(models.Q(session_id__in=refs) | models.Q(payment_intent_id__in=refs))
+            .values_list("account_id", flat=True)
+        )
+        ids.discard(None)
+        return ids
+
+    def conflict_of_interest(self, user) -> bool:
+        """Own matters (D65, D87, SEC-001): the payment was on an account the
+        user is or ever was on the deed of, such as a seller's dormant one."""
+        from core.conflicts import deed_account_ids
+
+        return bool(self.account_ids() & deed_account_ids(user))
+
 
 class StripeBalanceTransaction(AppendOnlyModel):
     """A line of the HOA's Stripe balance (charge, refund, fee, payout...),

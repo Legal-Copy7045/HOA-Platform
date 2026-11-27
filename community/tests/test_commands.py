@@ -222,6 +222,25 @@ def test_check_db_role_refuses_a_powerful_runtime_role(settings):
         call_command("check_db_role")
 
 
+def test_check_db_role_refuses_membership_in_a_powerful_role(settings, app_role_connection):
+    """SEC-002: membership (recursive) in a role that owns tables or has
+    powers, or in pg_write_all_data / pg_database_owner, is refused. The
+    test connection owns the test database, so it is a member of
+    pg_database_owner; the shipped runtime role is a member of nothing."""
+    from django.db import connection
+
+    from core.management.commands.check_db_role import MEMBERSHIP_SQL
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_user")
+        settings.DB_APP_ROLE = cursor.fetchone()[0]
+    with pytest.raises(CommandError, match="member of pg_database_owner"):
+        call_command("check_db_role")
+    with app_role_connection.cursor() as cursor:
+        cursor.execute(MEMBERSHIP_SQL)
+        assert cursor.fetchall() == []
+
+
 def test_seed_demo_includes_operations_and_every_page_loads(client, settings):
     """The whole demo community renders on every board and owner page."""
     from django.urls import reverse

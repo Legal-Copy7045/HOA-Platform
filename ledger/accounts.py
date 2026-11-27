@@ -78,6 +78,13 @@ def pick(accounts: list[tuple[int, datetime.date, datetime.date | None]], on) ->
     return None  # no account yet, or after the last one closed with no owner since
 
 
+def case_account_id(case) -> int | None:
+    """The ownership account a collection case concerns (BUG-004): the one
+    open when the case was opened. A sale while the case is open leaves its
+    arrears, costs and any plan with the seller's account, never the buyer's."""
+    return account_on(case.lot_id, timezone.localtime(case.opened_at).date())
+
+
 def current_account_id(lot_id: int) -> int | None:
     """The account current owners and contacts see: the one open today."""
     return account_on(lot_id, timezone.localdate())

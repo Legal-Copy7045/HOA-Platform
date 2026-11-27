@@ -406,9 +406,47 @@ def test_a_conflicted_board_member_cannot_approve_the_vendor_or_its_invoices(w):
         services.approve(inv, actor=w["b1"])
     inv = services.approve(inv, actor=w["b2"])
     assert inv.state == "approved"
-    # Removing the link lets them act again.
-    vo.link_conflict(vendor, person_b1, removed=True, actor=w["manager"])
+    # Another board member may end the link, with a reason; then they act again.
+    vo.link_conflict(vendor, person_b1, removed=True, note="Son sold the firm", actor=w["b2"])
     assert not vo.person_conflicted(w["b1"], vendor.pk)
+
+
+def test_nobody_removes_their_own_conflict_link_and_the_manager_removes_none(client, w):
+    """EXP-002 (D65, D79): the conflicted board member cannot end their own
+    link (service or page), nor can another conflicted member or the manager;
+    another board member can, with a reason; the rows stay (append-only)."""
+    from operations.onboarding_models import VendorConflict
+
+    vendor, rnd = invite(w)
+    fill_and_submit(rnd, {"conflict": "yes", "conflict_details": "Board members' firm"})
+    person_b1 = Person.objects.unscoped("t").get(user=w["b1"])
+    person_b3 = Person.objects.unscoped("t").get(user=w["b3"])
+    vo.link_conflict(vendor, person_b1, note="Disclosed", actor=w["manager"])
+    vo.link_conflict(vendor, person_b3, note="Disclosed", actor=w["b1"])
+    with pytest.raises(vo.OnboardingError, match="names you"):
+        vo.link_conflict(vendor, person_b1, removed=True, note="x", actor=w["b1"])
+    with pytest.raises(vo.OnboardingError, match="conflict-of-interest"):
+        vo.link_conflict(vendor, person_b1, removed=True, note="x", actor=w["b3"])
+    assert AuditEvent.objects.filter(
+        action="policy.own_matter_refused", metadata__action="conflict_remove"
+    ).exists()
+    with pytest.raises(PermissionDenied):
+        vo.link_conflict(vendor, person_b1, removed=True, note="x", actor=w["manager"])
+    with pytest.raises(vo.OnboardingError, match="why"):
+        vo.link_conflict(vendor, person_b1, removed=True, actor=w["b2"])
+    client.force_login(w["b1"])
+    url = reverse("vendor_onboarding_action", args=[rnd.pk, "conflict_remove"])
+    client.post(url, {"person": person_b1.pk, "note": "Not conflicted"})
+    assert vo.person_conflicted(w["b1"], vendor.pk)
+    with pytest.raises(vo.OnboardingError, match="conflict"):
+        vo.approve(rnd, actor=w["b1"])
+    row = vo.link_conflict(vendor, person_b1, removed=True, note="Resolved", actor=w["b2"])
+    assert not vo.person_conflicted(w["b1"], vendor.pk)
+    assert VendorConflict.objects.filter(vendor=vendor, person=person_b1).count() == 2
+    with pytest.raises(AppendOnlyError):
+        row.delete()
+    event = AuditEvent.objects.filter(action="vendor.conflict_linked").latest("id")
+    assert event.metadata == {"person_id": person_b1.pk, "removed": True}
 
 
 # --- Invoices ---------------------------------------------------------------------------------

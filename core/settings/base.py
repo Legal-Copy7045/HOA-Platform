@@ -282,8 +282,12 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Uploads never touch local disk (CLAUDE.md): private S3-compatible bucket,
-# served only through short-lived signed URLs.
+# Uploads never touch local disk (CLAUDE.md): private S3-compatible bucket
+# under random keys, streamed only through the app after an authorization
+# check (D57, docs/claude/security.md), never handed out as a signed URL.
+# Signed-URL generation is off (SEC-003): a stray ``.url`` call yields a
+# plain address the private bucket refuses, never a working bearer link.
+# S3_SIGNED_URL_TTL_SECONDS is no longer read.
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3.S3Storage",
@@ -296,8 +300,7 @@ STORAGES = {
             "signature_version": "s3v4",
             "addressing_style": "path",
             "default_acl": None,
-            "querystring_auth": True,
-            "querystring_expire": env.int("S3_SIGNED_URL_TTL_SECONDS", default=300),
+            "querystring_auth": False,
             "file_overwrite": False,
             # Send upload checksums only when the store requires them. Newer
             # boto3 adds one to every upload by default, which S3-compatible

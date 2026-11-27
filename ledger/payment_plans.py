@@ -193,12 +193,23 @@ def overview(plan: PaymentPlan, today=None) -> dict:
 
 @internal("payment plan charges")
 def covered_charges(case: CollectionCase) -> tuple[list, int, int | None]:
-    """(open charges of the home's current account, their total, account id)."""
+    """(open charges of the case's account, their total, account id): the
+    account open when the case was opened (BUG-004), never a later buyer's."""
     from ledger import allocation
-    from ledger.accounts import CURRENT, current_account_id
+    from ledger.accounts import case_account_id
 
-    charges = allocation.open_charges(case.lot_id, account=CURRENT)
-    return charges, sum(c.open_cents for c in charges), current_account_id(case.lot_id)
+    account_id = case_account_id(case)
+    if account_id is None:
+        return [], 0, None
+    charges = allocation.open_charges(case.lot_id, account=account_id)
+    return charges, sum(c.open_cents for c in charges), account_id
+
+
+def sold_since_opened(case: CollectionCase) -> bool:
+    """Whether the home changed hands after the case was opened."""
+    from ledger.accounts import case_account_id, current_account_id
+
+    return case_account_id(case) != current_account_id(case.lot_id)
 
 
 def even_installments(total_cents: int, count: int, first_due: datetime.date) -> list[tuple]:
@@ -246,6 +257,12 @@ def prepare(
         raise PaymentPlanError("The first installment cannot be due before the plan starts.")
     if any(not isinstance(c, int) or c <= 0 for _d, c in items):
         raise PaymentPlanError("Each installment is more than zero.")
+    if sold_since_opened(case):
+        raise PaymentPlanError(
+            "The home has been sold since this case was opened: its arrears stay on the "
+            "former owners' account, and a payment plan is made with today's owners only. "
+            "Close this case; open a new one if the new account falls behind."
+        )
     charges, total, account_id = covered_charges(case)
     if total <= 0 or account_id is None:
         raise PaymentPlanError("Nothing is open on this home's account: no plan is needed.")

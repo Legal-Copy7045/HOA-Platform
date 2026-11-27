@@ -204,6 +204,7 @@ def issue(
                     note=f"Check #{number}",
                     actor=actor,
                     request=request,
+                    from_claim=True,
                 )
             except ops.OperationsError as exc:
                 raise VendorCheckError(str(exc)) from exc
