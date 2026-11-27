@@ -6,6 +6,24 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.34.0 — 2026-11-27
+
+- Board members' own homes are handled by another board member (D65). Your
+  requests, architectural requests, notices, bookings, account, collection
+  case, resale certificate and refunds are homeowners' matters like anyone
+  else's: every board member can read them, but you can't take the board's
+  steps on your own (assign, start, decide, close, waive, post a charge or
+  credit, record a payment, write a letter, approve a booking or a change to
+  your account...). The page shows it as your home's page, without the Board
+  label: "This is your own home's request: another board member handles it."
+  You still reply, withdraw, respond, add photos, cancel or pay as the
+  homeowner. Internal staff notes on your own matter are hidden from you, as
+  for an ARC reviewer who is recused. Your own matters leave your board work
+  in My items; if no other board member or the manager (with two-step
+  sign-in) can act on one, My items says "Only you can act on … and it's
+  your own — another board member is needed". Refused attempts are in the
+  audit log.
+
 ## 0.33.0 — 2026-11-27
 
 - Acting for the board is now easy to see (D64). Pages in the board's

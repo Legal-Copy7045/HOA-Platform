@@ -43,6 +43,7 @@ CHARGE_KINDS = {
 
 class LedgerEntry(ScopedAppendOnlyModel):
     scope_lot_path = "lot"
+    conflict_noun = "account"  # own matters (D65)
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
     # The ownership account this entry belongs to (D33-acctfix-1): set when
@@ -221,6 +222,7 @@ class BudgetLine(models.Model):
 
 class CollectionCase(ScopedModel):
     scope_lot_path = "lot"
+    conflict_noun = "collection case"  # own matters (D65)
     objects = ScopedQuerySet.as_manager()
 
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
@@ -256,6 +258,7 @@ class CollectionCase(ScopedModel):
 
 class ResaleRequest(ScopedModel):
     scope_lot_path = "lot"
+    conflict_noun = "resale certificate"  # own matters (D65)
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):
@@ -957,6 +960,7 @@ class DisbursementLine(ScopedAppendOnlyModel):
     for a check the payee and mailing address as proposed."""
 
     scope_lot_path = "lot"
+    conflict_noun = "refund"  # own matters (D65)
 
     batch = models.ForeignKey(DisbursementBatch, on_delete=models.PROTECT, related_name="lines")
     lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")

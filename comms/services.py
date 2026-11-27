@@ -230,7 +230,21 @@ def paper_copy_of_case_letter(letter, *, actor, request=None):
     collection case's letter; returns the mailing. Raises ValueError
     (PaperMailError) when it cannot be prepared."""
     from comms import papermail
+    from comms.papermail import PaperMailError
+    from core import conflicts
+    from core.scoping import system_access
 
+    with system_access("own matter: case of the letter"):
+        case = letter.case
+    # Own matters (D65): a letter about one's own home's arrears.
+    conflicts.refuse(
+        actor,
+        case,
+        area="collection",
+        action="paper_copy",
+        request=request,
+        error=PaperMailError,
+    )
     return papermail.prepare_case_copy(letter, actor=actor, request=request)
 
 

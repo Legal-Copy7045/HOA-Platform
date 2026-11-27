@@ -14,7 +14,7 @@ from community.account_views import my_account_people
 from community.models import Lot
 from community.rules import rule, rule_with_citation
 from community.terms import term_text
-from core import features, policy
+from core import conflicts, features, policy
 from core.money import MoneyField, format_cents
 from core.workflow import WorkflowError
 from documents import attachments
@@ -361,17 +361,24 @@ def lot_ledger(request, pk):
         e.moved_note = notes.get(e.pk, "")
     open_charges = allocation.open_charges(lot.pk)
     lot_accounts = ledger_accounts.lot_accounts(lot.pk)
+    # Own matters (D65): one's own home's account is read here like any
+    # other, but entries on it are another board member's to make.
+    own = conflicts.own_matter(request.user, lot)
     return render(
         request,
         "ledger/lot.html",
         {
             "lot": lot,
+            "own_matter": own,
+            "own_note": conflicts.note_for(lot, request.user),
             "entries": entries,
             "balance": services.balance(lot.pk),
             "aging": (aging := services.aging(lot.pk)),
             "aging_columns": services.aging_columns(aging),
-            "can_manage": policy.can(request.user, "ledger.manage"),
-            "can_reassign": policy.can(request.user, "ledger.reassign") and len(lot_accounts) > 1,
+            "can_manage": policy.can(request.user, "ledger.manage") and not own,
+            "can_reassign": policy.can(request.user, "ledger.reassign")
+            and len(lot_accounts) > 1
+            and not own,
             "lot_accounts": lot_accounts,
             "open_charges": open_charges,
             # Former owners' accounts with money still owed either way.
@@ -669,10 +676,14 @@ def collection_detail(request, pk):
         for t in services.COLLECTION.available(case, request.user)
         if t.action not in ("send_reminder", "send_second_reminder", "send_final_notice")
     ]
+    # Own matters (D65): one's own home's collection case is read-only here.
+    own = conflicts.page_context(request.user, case, services.COLLECTION)
     return render(
         request,
         "ledger/collection_detail.html",
         {
+            **own,
+            "can_collect": policy.can(request.user, "collections.manage") and not own["own_matter"],
             "obj": case,
             "balance": services.balance(case.lot_id),
             "actions": actions,
@@ -681,6 +692,7 @@ def collection_detail(request, pk):
             "next_letter": _next_letter(case),
             "letters": CollectionLetter.objects.for_user(request.user).filter(case=case),
             "can_paper_copy": case.state not in ("closed", "referred")
+            and not own["own_matter"]
             and policy.can(request.user, "collections.manage")
             and policy.can(request.user, "mail.print"),
             "action_url_name": "collection_action",
@@ -888,8 +900,11 @@ def resales(request):
 @login_required
 def resale_detail(request, pk):
     obj = get_object_or_404(ResaleRequest.objects.for_user(request.user), pk=pk)
-    can_manage = policy.can(request.user, "resale.manage")
-    if request.method == "POST" and can_manage:
+    # Own matters (D65): the certificate for one's own home is another board
+    # member's (or the manager's) to prepare and issue.
+    own = conflicts.page_context(request.user, obj, services.RESALE)
+    can_manage = policy.can(request.user, "resale.manage") and not own["own_matter"]
+    if request.method == "POST" and policy.can(request.user, "resale.manage"):
         _flash(
             request,
             lambda: services.save_disclosures(
@@ -902,6 +917,7 @@ def resale_detail(request, pk):
         request,
         "ledger/resale_detail.html",
         {
+            **own,
             "obj": obj,
             "can_manage": can_manage,
             "actions": services.RESALE.available(obj, request.user),

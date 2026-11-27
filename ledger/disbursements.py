@@ -57,7 +57,7 @@ from django.utils import timezone
 from audit.services import record_event
 from community.models import Account, Ownership, home_sort_key
 from community.rules import rule, rule_with_citation
-from core import pdf
+from core import conflicts, pdf
 from core.lists import safe_cell
 from core.money import format_cents
 from core.policy import SYSTEM, can, require, roles_for
@@ -354,6 +354,26 @@ LINE_LABELS = {
 # --- Proposing -------------------------------------------------------------------------
 
 
+def _refuse_own_refund(actor, batch: DisbursementBatch, action: str, request=None) -> None:
+    """Own matters (D65): a refund to one's own home's account is another
+    board member's to propose, approve, decline, write or void. A surplus
+    distribution pays every home, so its rule stays (a recipient may
+    approve, and then two approvals are needed)."""
+    if batch.kind != DisbursementKind.REFUND:
+        return
+    with system_access("own refund check"):
+        lines = list(DisbursementLine.objects.filter(batch=batch))
+    conflicts.refuse_any(
+        actor,
+        lines,
+        area="disbursement",
+        action=action,
+        request=request,
+        error=DisbursementError,
+        message="You are an owner on the account this refunds; another board member handles it.",
+    )
+
+
 def _clean_text(value: str, limit: int) -> str:
     """One field typed by a person: printable characters only, collapsed."""
     text = "".join(c if c.isprintable() or c == "\n" else " " for c in (value or ""))
@@ -492,6 +512,14 @@ def propose_refund(
     _check_total(amount_cents)
     with system_access("refund proposal"):
         account = Account.objects.select_related("lot").get(pk=account.pk)
+    conflicts.refuse(
+        actor,
+        account,
+        area="disbursement",
+        action="propose",
+        request=request,
+        error=DisbursementError,
+    )
     defaults = refund_defaults(account)
     if amount_cents > defaults["available_cents"]:
         raise DisbursementError(
@@ -597,6 +625,7 @@ def approve(batch: DisbursementBatch, *, note: str = "", actor, request=None) ->
     """One board member's approval. The last one needed posts the statement
     credits in the same transaction."""
     require(actor, "disbursement.approve")
+    _refuse_own_refund(actor, batch, "approve", request)
     person_id = roles_for(actor).person_id
     with transaction.atomic(), system_access("disbursement approval"):
         _lock(_BATCH_LOCK, batch.pk)
@@ -712,6 +741,7 @@ def decline(batch: DisbursementBatch, *, note: str, actor, request=None) -> Batc
     """A board member declines (the proposer may withdraw this way). A reason
     is required; nothing was posted, so nothing is undone."""
     require(actor, "disbursement.approve")
+    _refuse_own_refund(actor, batch, "decline", request)
     note = _clean_text(note, 1000)
     if not note:
         raise DisbursementError("Give the reason for declining.")
@@ -782,6 +812,7 @@ def issue_checks(
     or ``line_ids``), numbered from ``first_number`` in address order. A
     refund check posts its refund entry now, taking up the credit."""
     require(actor, "disbursement.issue")
+    _refuse_own_refund(actor, batch, "issue", request)
     today = timezone.localdate()
     if issued_on > today:
         raise DisbursementError("The issue date cannot be in the future.")
@@ -908,6 +939,9 @@ def void_check(
     """Void an issued, uncleared check: a refund's entry is reversed (the
     owner's credit is open again) and the line can get a new check."""
     require(actor, "disbursement.void")
+    with system_access("own refund check"):
+        own_batch = DisbursementBatch.objects.get(pk=check.line.batch_id)
+    _refuse_own_refund(actor, own_batch, "void", request)
     reason = _clean_text(reason, 150).replace("\n", " ")
     if not reason:
         raise DisbursementError("Give the reason for voiding the check.")

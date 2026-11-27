@@ -16,7 +16,8 @@
     </dl>
     {% if rule_lines %}<p class="small muted">{% for line in rule_lines %}{{ line }} {% endfor %}{% if rules.citation %}({{ rules.citation }}){% endif %}</p>{% endif %}
   </section>
-  {% if is_staff and res.state == "pending" %}<section class="card"><h2>Decide</h2>
+  {% if is_staff and res.state == "pending" and own_matter %}<section class="card"><h2>Decide</h2><p class="board-note" data-testid="own-home-note">{{ own_note }}</p></section>
+  {% elif is_staff and res.state == "pending" %}<section class="card"><h2>Decide</h2>
     <form method="post" action="{% url 'reservation_action' res.pk 'approve' %}" class="inline">{% csrf_token %}<button type="submit">Confirm booking</button></form>
     <form method="post" action="{% url 'reservation_action' res.pk 'decline' %}" class="form-grid" data-confirm="Decline this booking? You're acting for the association.">{% csrf_token %}
       <div><label for="decline-note">Reason (the owner sees it on this page)</label><textarea id="decline-note" name="note" rows="2"></textarea></div>

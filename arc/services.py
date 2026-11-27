@@ -24,13 +24,19 @@ def _person_id(user) -> int | None:
 
 
 def is_recused(user, req: ArcRequest) -> bool:
-    """Applicant, or owner of the request's lot or an affected lot (CLAUDE.md)."""
+    """Applicant, or owner of the request's lot or an affected lot (CLAUDE.md);
+    since D65 also anyone whose own matter it is (an account contact of the
+    home, or its owner when the request was made)."""
     if user is SYSTEM:
         return False
     person_id = _person_id(user)
     if person_id is None:
         return False
     if person_id == req.applicant_id:
+        return True
+    from core import conflicts
+
+    if conflicts.own_matter(user, req, hooks=False):
         return True
     from arc.signoffs import neighbors_of
 
@@ -44,6 +50,16 @@ def is_recused(user, req: ArcRequest) -> bool:
 
 def owns_lot(user, req: ArcRequest) -> bool:
     return user is not SYSTEM and req.lot_id in roles_for(user).owned_lot_ids
+
+
+def _refuse_recused(actor, req: ArcRequest, action: str, request=None, error=None) -> None:
+    """Own matters (D65): a recused person's staff step, refused and audited
+    before the step's transaction opens."""
+    from core import conflicts
+
+    conflicts.refuse(
+        actor, req, area="arc", action=action, request=request, error=error or ArcError
+    )
 
 
 def _not_recused(obj, actor):
@@ -475,6 +491,7 @@ def set_affected_lots(req: ArcRequest, lots, *, actor, request=None) -> None:
     started lots can only be added (removing one could un-recuse someone).
     """
     require(actor, "arc.intake")
+    _refuse_recused(actor, req, "affected_lots", request)
     with transaction.atomic(), system_access("set affected lots"):
         req = ArcRequest.objects.select_for_update().get(pk=req.pk)
         if req.state not in AFFECTED_LOTS_STATES:
@@ -503,11 +520,18 @@ def set_affected_lots(req: ArcRequest, lots, *, actor, request=None) -> None:
     )
 
 
-@transaction.atomic
 def record_position(
     req: ArcRequest, *, position: str, comment: str = "", actor, request=None
 ) -> ReviewerVote:
     require(actor, "arc.decide")
+    _refuse_recused(actor, req, "position", request)
+    with transaction.atomic():
+        return _record_position(
+            req, position=position, comment=comment, actor=actor, request=request
+        )
+
+
+def _record_position(req, *, position, comment, actor, request) -> ReviewerVote:
     with system_access("lock arc request"):
         req = ArcRequest.objects.select_for_update().get(pk=req.pk)
     if req.state != ArcState.IN_REVIEW:
@@ -565,6 +589,7 @@ def decide(
     citation = citation.strip() or _default_citation()
     if not citation:
         raise ArcError("Cite the governing section (e.g. Declaration §9.3).")
+    _refuse_recused(actor, req, action, request, WorkflowError)
     with transaction.atomic():
         req = ARC.apply(req, action, actor=actor, note=reasons, request=request)
         return _record_decision(
@@ -610,6 +635,7 @@ def decide_appeal(
     citation = citation.strip() or _default_citation()
     if not citation:
         raise ArcError("Cite the governing section.")
+    _refuse_recused(actor, req, "decide_appeal", request, WorkflowError)
     with transaction.atomic():
         req = ARC.apply(req, "decide_appeal", actor=actor, note=reasons, request=request)
         return _record_decision(

@@ -370,6 +370,9 @@ class OwnerRequest(ScopedModel):
 
     objects = ScopedQuerySet.as_manager()
     scope_lot_path = "lot"
+    # Own matters (D65)
+    conflict_user_fields = ("requested_by",)
+    conflict_noun = "request"
 
     @classmethod
     def scope_for_owner(cls, queryset, roles):

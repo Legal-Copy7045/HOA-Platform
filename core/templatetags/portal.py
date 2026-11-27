@@ -1,7 +1,7 @@
 from django import template
 from django.urls import reverse
 
-from core import policy
+from core import conflicts, policy
 
 register = template.Library()
 
@@ -304,7 +304,8 @@ def follow_up_form(context, kind, obj):
     return {
         "kind": kind,
         "obj": obj,
-        "allowed": policy.can(user, perms[kind]),
+        # Own matters (D65): no staff follow-up date on one's own home's matter.
+        "allowed": conflicts.acting_as_staff(user, obj, perms[kind]),
         "csrf_token": context.get("csrf_token"),
     }
 
@@ -397,6 +398,13 @@ def acting_confirm(text=""):
     from core import workflow
 
     return workflow.acting_confirm(text)
+
+
+@register.filter
+def is_own_matter(reason) -> bool:
+    """A blocked step's reason is the own-matter rule (D65): the step is
+    shown disabled under the one own-home note, without repeating it."""
+    return isinstance(reason, conflicts.OwnMatter)
 
 
 @register.simple_tag

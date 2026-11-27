@@ -49,8 +49,8 @@
         <a class="brand" href="{% url 'home' %}"><span class="brand-mark"><svg aria-hidden="true"><use href="{% static 'img/icons.svg' %}#leaf"></use></svg></span><span>{{ SITE_NAME }}</span></a>
         <a class="topbar-search" href="{% url 'search' %}">{% icon "search" %}<span class="sr-only">Search</span></a>
       </header>
-      <main id="main" class="content{% if nav.board_page %} board-page{% endif %} {% block content_class %}{% endblock %}">
-        {% if nav.board_page %}{# D64: a work-section page; derived from the menu (core.navigation.build), never per template. static/js/app.js moves the badge beside the page's heading. #}
+      <main id="main" class="content{% if nav.board_page and not own_matter %} board-page{% endif %} {% block content_class %}{% endblock %}">
+        {% if nav.board_page and not own_matter %}{# D64: a work-section page; derived from the menu (core.navigation.build), never per template. static/js/app.js moves the badge beside the page's heading. D65: a page about the viewer's own matter (views pass own_matter) is the homeowner's context, so no badge. #}
           <p class="board-strip" data-board-cue><span class="board-badge" data-board-badge>{{ nav.work_label }}</span> <span class="board-strip-text">{% if nav.work_label == "Board" %}You're acting for the association on this page.{% else %}A staff page of the association.{% endif %}</span></p>
         {% endif %}
         {% if nav.recovery_locked_until %}

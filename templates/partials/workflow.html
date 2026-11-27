@@ -1,7 +1,8 @@
-{% load portal %}{# Expects: actions (Transitions), history (WorkflowEvents), action_url_name, obj. Optional: blocked_steps [(Transition, reason)] shown disabled with the reason. #}
+{% load portal %}{# Expects: actions (Transitions), history (WorkflowEvents), action_url_name, obj. Optional: blocked_steps [(Transition, reason)] shown disabled with the reason; own_matter / own_note (D65): the viewer's own matter, staff steps disabled under one note. #}
 {% if actions or blocked_steps %}
 <section class="card">
   <h2>Next steps</h2>
+  {% if own_matter %}<p class="board-note" id="own-home-note" data-testid="own-home-note">{{ own_note }}</p>{% endif %}
   <div class="wf-actions">
     {% for t in actions %}
       {% step_confirm t as confirm_text %}
@@ -15,7 +16,8 @@
       </form>
     {% endfor %}
     {% for t, reason in blocked_steps %}
-      <div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="blocked-{{ t.action }}">{{ t.label }}</button><p class="help" id="blocked-{{ t.action }}">{{ reason }}</p></div>
+      {% if own_matter and reason|is_own_matter %}<div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="own-home-note">{{ t.label }}</button></div>
+      {% else %}<div class="wf-action is-blocked"><button type="button" class="secondary" disabled aria-describedby="blocked-{{ t.action }}">{{ t.label }}</button><p class="help" id="blocked-{{ t.action }}">{{ reason }}</p></div>{% endif %}
     {% endfor %}
   </div>
 </section>
