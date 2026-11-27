@@ -297,6 +297,8 @@ MEMBER_READS = {
                 "event.rsvp",
                 "reserves.view_summary",
                 "payments.pay",
+                # Capital projects the board shares with owners (D83).
+                "capital_project.view_summary",
             },
         ),
         (
@@ -318,6 +320,10 @@ MEMBER_READS = {
                 "reserves.view_summary",
                 "bank_feed.view",
                 "disbursement.view",
+                # Finance options (D83, D85): read-only.
+                "capital_project.view",
+                "capital_project.view_summary",
+                "insurance.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

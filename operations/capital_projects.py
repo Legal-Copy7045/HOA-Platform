@@ -416,6 +416,7 @@ def propose_change(
     project: CapitalProject, *, amount_cents: int, reason: str, actor, request=None
 ) -> ChangeOrder:
     require(actor, "capital_project.manage")
+    project.refresh_from_db()
     if project.state not in (ProjectState.APPROVED, ProjectState.IN_PROGRESS):
         raise ProjectError(
             "Change orders are for approved projects; change a planned project's budget."

@@ -85,6 +85,9 @@ class Inputs:
     reserve_out: tuple[int, ...] = ()
     reserve_transfer: tuple[int, ...] = ()  # operating -> reserve
     reserve_interest_bp: int = 0  # yearly, on the month's opening reserve
+    # The reserve plan's interest by month, when known (used instead of the
+    # rate, so the forecast follows the plan's own arithmetic).
+    reserve_interest: tuple[int, ...] = ()
     min_operating: int = 0
     reserve_target: tuple[int | None, ...] = ()
     months: int = MONTHS
@@ -142,9 +145,12 @@ def project(inputs: Inputs) -> list[Row]:
         transfer = inputs.at(inputs.reserve_transfer, i)
         op_close = op + collected + interest_in - out - transfer
         special = inputs.at(inputs.special, i)
-        res_interest = (
-            round_half_up(Fraction(res * inputs.reserve_interest_bp, 10000 * 12)) if res > 0 else 0
-        )
+        if inputs.reserve_interest:
+            res_interest = inputs.at(inputs.reserve_interest, i)
+        elif res > 0:
+            res_interest = round_half_up(Fraction(res * inputs.reserve_interest_bp, 10000 * 12))
+        else:
+            res_interest = 0
         res_out = inputs.at(inputs.reserve_out, i)
         res_close = res + transfer + special + res_interest - res_out
         target = inputs.at(inputs.reserve_target, i, None)
@@ -217,14 +223,45 @@ class Opening:
 
 def opening_balances(today: datetime.date) -> Opening:
     """Switch to claude/books-and-close at merge: the operating and reserve fund
-    balances at the last closed month. Interim: the cash book's balance for
-    operating (ledger.accounting.book_balance) and the reserve plan's starting
-    balance (ledger.reserve_plan.starting_balance) for reserve."""
+    balances at the last closed month. Interim, today's open figures: for
+    operating, the cash book (ledger.accounting.book_balance) plus owner
+    payments received and not yet deposited; for reserve, the reserve plan's
+    own path (its starting balance moved by the plan's contribution, interest
+    and replacements month by month to the end of this month), or its starting
+    balance when the plan is not in use."""
     from ledger import accounting, reserve_plan
 
-    operating = accounting.book_balance(today)
-    reserve = reserve_plan.starting_balance()
-    return Opening(operating, reserve.cents, today, False, "cash book and reserve plan")
+    undeposited = -sum(e.amount_cents for e in accounting.undeposited_payments())
+    operating = accounting.book_balance(today) + undeposited
+    reserve = reserve_plan.starting_balance().cents
+    source = "cash book and reserve plan"
+    rows = _plan_rows()
+    row = rows.get(today.year) if rows else None
+    if row is not None:
+        reserve = row.begin_cents + sum(
+            sum(part[m] for part in _plan_parts(row)) for m in range(today.month)
+        )
+    return Opening(operating, reserve, today, False, source)
+
+
+def _plan_rows() -> dict:
+    """The reserve plan's projection by year, while the reserve plan is in use."""
+    from core import features
+    from ledger import reserve_plan
+
+    if not features.enabled("reserves"):
+        return {}
+    projection, _balance = reserve_plan.current_projection()
+    return {r.year: r for r in projection.rows}
+
+
+def _plan_parts(row) -> tuple[list[int], list[int], list[int]]:
+    """One plan year by month: contribution, interest, minus replacements."""
+    return (
+        spread(row.contribution_cents, 12),
+        spread(row.interest_cents, 12),
+        [-v for v in spread(row.expense_cents, 12)],
+    )
 
 
 def special_installments(months: list[datetime.date]) -> list[int]:
@@ -258,9 +295,13 @@ def collection_rate_bp(today: datetime.date) -> tuple[int, str]:
 def _billed_per_month() -> int:
     from community.models import Account
     from community.rules import rule
+    from core.scoping import system_access
 
     monthly = rule("dues.monthly_cents") or 0
-    with_owner = Account.objects.filter(closed_on__isnull=True).values("lot_id").distinct().count()
+    with system_access("cash-flow homes billed"):
+        with_owner = (
+            Account.objects.filter(closed_on__isnull=True).values("lot_id").distinct().count()
+        )
     return monthly * with_owner
 
 
@@ -311,30 +352,23 @@ def _operating_out(months: list[datetime.date]) -> list[int]:
 
 
 def _reserve_plan_parts(months: list[datetime.date]):
-    """(transfer, reserve_out, targets, interest_bp) from the reserve plan."""
-    from core import features
-    from ledger import reserve_plan
-    from ledger.models import ReservePlanSettings
-
+    """(transfer, interest, reserve_out, targets) by month from the reserve
+    plan: its contribution moves from operating to reserve, its interest and
+    replacements spread evenly over each year, and the target is the lower of
+    the plan's balances at the start and end of that year."""
     n = len(months)
-    if not features.enabled("reserves"):
-        return [0] * n, [0] * n, [None] * n, 0
-    plan = ReservePlanSettings.get()
-    transfer = []
-    for month in months:
-        transfer.append(spread(plan.annual_contribution_cents, 12)[month.month - 1])
-    projection, _balance = reserve_plan.current_projection()
-    by_year = {r.year: r for r in projection.rows}
-    out, targets = [], []
-    for month in months:
+    by_year = _plan_rows()
+    transfer, interest, out, targets = [0] * n, [0] * n, [0] * n, [None] * n
+    for i, month in enumerate(months):
         row = by_year.get(month.year)
         if row is None:
-            out.append(0)
-            targets.append(None)
             continue
-        out.append(spread(row.expense_cents, 12)[month.month - 1])
-        targets.append(min(row.begin_cents, row.end_cents))
-    return transfer, out, targets, plan.interest_bp
+        contribution, earned, spent = _plan_parts(row)
+        transfer[i] = contribution[month.month - 1]
+        interest[i] = earned[month.month - 1]
+        out[i] = -spent[month.month - 1]
+        targets[i] = min(row.begin_cents, row.end_cents)
+    return transfer, interest, out, targets
 
 
 def build(today: datetime.date | None = None, scenario: Scenario | None = None) -> Forecast:
@@ -345,7 +379,7 @@ def build(today: datetime.date | None = None, scenario: Scenario | None = None) 
     months = [add_months(start, i) for i in range(MONTHS)]
     opening = opening_balances(today)
     rate, rate_source = collection_rate_bp(today)
-    transfer, reserve_out, targets, reserve_bp = _reserve_plan_parts(months)
+    transfer, reserve_interest, reserve_out, targets = _reserve_plan_parts(months)
     billed = _billed_per_month()
     interest = _interest_income(today)
     inputs = Inputs(
@@ -359,7 +393,7 @@ def build(today: datetime.date | None = None, scenario: Scenario | None = None) 
         operating_out=tuple(_operating_out(months)),
         reserve_out=tuple(reserve_out),
         reserve_transfer=tuple(transfer),
-        reserve_interest_bp=reserve_bp,
+        reserve_interest=tuple(reserve_interest),
         min_operating=rule("cashflow.min_operating_cents") or 0,
         reserve_target=tuple(targets),
     )

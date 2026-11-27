@@ -342,3 +342,11 @@
   check: "As a demo board member who owns a home, with a second board member: your own home's request, notice, booking and account show no Board label, say 'another board member handles it' where the board's buttons would be, and the staff steps are greyed out; you can still reply, withdraw, respond, cancel and pay as the owner. Signed in as the other board member, the same pages carry the Board label and every step works. An internal note the other board member writes on your request is not shown to you (D65)."
   steps: "POC with fictional data: raise a request for your demo home, ask the other board member to post an internal note, open both views on a desktop and a phone; check Sysadmin activity or the audit log for 'own_matter_refused' after a crafted POST."
   last: ""
+- key: finance options read right on a phone
+  check: "With the six finance options on (demo data), the Cash-flow forecast table, a capital project, an insurance claim, the legal panel of a referred collection case and the owners' Budget and reserves summary read without sideways scrolling on a phone, and the statement PDF shows the interest line in full."
+  steps: "Settings, Features: switch on the finance options (the demo has them on); open each page on a phone as a board member and the owners' page as an owner; download a delinquent home's statement."
+  last: "not done yet"
+- key: interest and legal costs reviewed by counsel
+  check: "Counsel confirmed the Declaration allows interest (rate, grace, no compounding) and charging collection costs before the features are switched on with real data (D80, D82)."
+  steps: "Show counsel the Interest on overdue balances page, a statement line, and the setup step's law notes; record the citations they give."
+  last: "not done yet"

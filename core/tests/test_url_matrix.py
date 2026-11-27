@@ -130,6 +130,9 @@ MEMBER_PAGES = {
     # Reserve plan (reserves): the adopted plan's summary (now a redirect to
     # Budget and reserves, streamlining).
     "reserve_summary",
+    # Capital projects shared with owners (D83): title, status, budget and
+    # spent only (ledger/tests/test_finance_options.py checks the rest).
+    "community_projects",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -399,6 +402,20 @@ PROTECTED = {
     "paper_mail_labels": ("GET", "mailing"),
     "paper_mail_mark": ("POST", "mailing"),
     "paper_mail_piece_checked": ("POST", "mailing"),
+    # Finance options (D80-D85): board, manager and auditor pages only (each
+    # feature on or off; owners get 403/404 either way). Feature-on cross-owner
+    # tests: ledger/tests/test_finance_options.py.
+    "interest": ("POST", None),
+    "cashflow": ("GET", None),
+    "cashflow_export": ("GET", None),
+    "collection_legal": ("POST", "collection"),
+    "collection_legal_file": ("GET", "collection"),
+    "capital_projects": ("POST", None),
+    "capital_project_detail": ("GET", "lot"),
+    "capital_project_file": ("GET", "lot"),
+    "insurance_claims": ("POST", None),
+    "insurance_claim_detail": ("GET", "lot"),
+    "insurance_claim_file": ("GET", "lot"),
 }
 
 
@@ -967,6 +984,8 @@ def _url(name, key, targets):
         kwargs["step"] = "charge"
     elif name == "disbursement_action":
         kwargs["action"] = "approve"
+    elif name in ("collection_legal_file", "capital_project_file", "insurance_claim_file"):
+        kwargs["file_id"] = 1
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
     elif name.startswith("register_import_"):

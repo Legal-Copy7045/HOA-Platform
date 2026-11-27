@@ -134,6 +134,9 @@ def seed() -> SeedResult:
 
     # seed_demo prints one summary for the whole dataset.
     call_command("seed_demo_operations", stdout=io.StringIO())
+    from ledger import demo_finance_options  # finance options (D80-D85)
+
+    demo_finance_options.seed()
     return SeedResult(
         summary=(
             "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "
