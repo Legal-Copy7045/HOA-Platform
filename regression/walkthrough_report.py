@@ -66,6 +66,50 @@ def load(out: Path, name: str, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
 
 
+# The standard reviewers' groups (STANDARD.md 3.4, standard.py schema walkthrough) in this report's terms.
+STANDARD_GROUPS = {
+    "duplicate": "merge",
+    "naming": "rename",
+    "placement": "move",
+    "dead-end": "flow",
+    "long-flow": "flow",
+    "keep-separate": "keep_separate",
+    "layout": "mobile",
+    "other": "other",
+}
+
+
+def merged_findings(out: Path) -> dict:
+    """The reviewers' findings: out/walkthrough-findings.json when a run merged them by
+    hand (the format above), else the standard reviewers' files
+    out/findings/walkthrough-desktop.json and walkthrough-phone.json, mapped to it."""
+    merged = load(out, "walkthrough-findings.json", None)
+    if merged is not None:
+        return merged
+    merged = {"summary": "", "roles": [], "findings": [], "proposed_menus": {}}
+    for who in ("desktop", "phone"):
+        data = load(out / "findings", f"walkthrough-{who}.json", None)
+        if not data:
+            continue
+        for f in data.get("findings", []):
+            merged["findings"].append(
+                {
+                    "id": f.get("id", ""),
+                    "group": STANDARD_GROUPS.get(f.get("group", ""), f.get("group", "")),
+                    "title": f.get("title", ""),
+                    "now": f.get("detail", ""),
+                    "proposal": f.get("proposal", ""),
+                    "who": ", ".join(f.get("roles", [])),
+                    "effort": f.get("value", "?"),
+                    "risk": "",
+                    "evidence": f.get("screenshots", []) or f.get("pages", []),
+                }
+            )
+        if who == "desktop" or not merged["proposed_menus"]:
+            merged["proposed_menus"] = data.get("proposed_menus") or merged["proposed_menus"]
+    return merged
+
+
 def kind_of(check: str) -> str:
     return next((label for needle, label in KINDS if needle in check), "Other")
 
@@ -119,11 +163,7 @@ class Thumbs:
 def render(out: Path, *, tz: ZoneInfo, thumbs: bool = True, commit: str = "") -> str:
     inventory = load(out, "walkthrough.json", {"roles": {}})
     stage = load(out, "walkthrough-checks.json", {"results": []})
-    findings = load(
-        out,
-        "walkthrough-findings.json",
-        {"summary": "", "roles": [], "findings": [], "proposed_menus": {}},
-    )
+    findings = merged_findings(out)
     results = stage.get("results", [])
     totals = Counter(r["status"] for r in results)
     failing = [r for r in results if r["status"] == "fail"]

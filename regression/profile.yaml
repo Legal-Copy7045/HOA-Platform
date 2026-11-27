@@ -1,0 +1,103 @@
+# The portal's regression profile (STANDARD.md 3.1, D90). The global /regression, /walkthrough and /full-check
+# skills read this file and regression/README.md; nothing project-specific lives in the skills.
+name: Oak Creek Farms HOA portal
+type: server                # self-hosted Docker server: the VM builds its image from the release tag
+ui: true
+report_tz: America/New_York
+version_file: VERSION
+changelog: CHANGELOG.md
+security_tools: "bandit -q -c pyproject.toml -r ., pip-audit --strict -r requirements/base.txt -r requirements/dev.txt"
+# The walkthrough's roles (regression/page_setup.py walk-sessions); the page stage signs in as six of them
+# (board, owner, manager, auditor, tenant, former owner).
+roles: [owner, authorized contact, view-only contact, tenant, former owner, board member, officer, manager,
+        ARC reviewer, auditor, sysadmin]
+
+# The stages are this project's own code in regression/run.py (not profile commands); `commands` below only say what
+# each runs. Plain `run.py` runs ci, unit, page (three lanes side by side) and manual; live only with --stage live.
+stages:
+  ci:
+    prefix: CI
+    runner: regression/run.py (stage_ci)
+    commands:
+      - {key: ruff, run: "ruff check . && ruff format --check ."}
+      - {key: bandit, run: "bandit -q -c pyproject.toml -r ."}
+      - {key: migrations, run: "python manage.py makemigrations --check --dry-run --settings=core.settings.test"}
+      - {key: pip-audit, run: "pip-audit --strict -r requirements/base.txt -r requirements/dev.txt"}
+      - {key: check-deploy, run: "python manage.py check --deploy (dummy production settings)"}
+      - {key: versions, run: "python3 .github/scripts/check_versions.py"}
+      - {key: privacy, run: "python3 .github/scripts/privacy_guard.py"}
+      - {key: hygiene, run: "no .env tracked, actions pinned, workflow permissions, no pull_request_target, out/ ignored"}
+  unit:
+    prefix: UNIT
+    runner: regression/run.py (stage_unit)
+    commands:
+      # Three pytest lanes, each on its own database (<REGRESSION_DATABASE_URL>_reg0..2, default
+      # postgres://hoa_owner:hoa_owner@localhost:5432/hoa); the cross-owner URL matrix has a lane of its own.
+      - {key: pytest, run: "pytest -q -p no:cacheprovider --junitxml <lane> <test files>", junit: true}
+  page:
+    prefix: PAGE
+    runner: regression/run.py (stage_page)
+    # Seeds the fictional demo community into a fresh database (REGRESSION_PAGES_DB, default hoa_reg_pages), serves
+    # it on port REGRESSION_PAGE_PORT (default 8011) and crawls it in Chromium (pages.js), plus a passkey sign-in
+    # (passkey.js). Needs Node with Playwright and Chromium (preinstalled in cloud sessions).
+    commands:
+      - {key: pages, run: "node regression/pages.js; node regression/passkey.js"}
+  live:
+    prefix: LIVE
+    runner: regression/run.py (stage_live)
+    env: [LIVE_HOST]          # the POC host name, from docs/runbook.md; never stored in the repository
+    # Read-only: HTTPS, Cloudflare Access in front, no plain HTTP, DNS proxied, TLS 1.2+, tunnel healthy, an Access
+    # application covers the host (Cloudflare API GETs, credentials injected by the session's proxy). Skips when
+    # unreachable from the session.
+  manual:
+    prefix: MAN
+    # regression/manual.yaml (key, check, steps, last); results for a version: run.py manual KEY pass|fail --note
+  walkthrough:
+    prefix: WALK
+    runner: regression/run.py (stage_walkthrough)
+    # Own database (REGRESSION_WALK_DB, default hoa_reg_walk) and port (REGRESSION_WALK_PORT, default 8012), so it
+    # runs beside the page stage. WALK_CONCURRENCY (default 3 roles at a time), WALK_MAX_PAGES (default 160 per role).
+    commands:
+      - {key: crawl, run: "node regression/walkthrough.js"}
+
+walkthrough:
+  # Inventory shape (out/walkthrough.json): {"roles": {role: {"desktop"|"phone": {"menu", "pages"}}}};
+  # screenshots out/walkthrough/<role>/<desktop|phone>/<slug>.png (menu.png: the menu with every group open).
+  ui_paths: ['^templates/', '^static/', '^core/navigation\.py$', '(^|/)(urls|views|[a-z_]*_views|forms)\.py$',
+             '/templatetags/', '^core/features\.py$', '^core/policy\.py$', '^docs/glossary\.md$']
+
+# Where each run's report lives and how it is logged: regression/published.yaml (republished to the same URL every
+# run), RUNS.md and WALKTHROUGHS.md (one row per run, newest first; IDs and counts only, never finding details, names,
+# hosts or addresses). A run fixes nothing in product code; new tests, catalogue entries, claims, manual checks and
+# the IDs in regression/ids/ are committed.
+reviewers:                  # where this project's risk lives (each reviewer also gets its standard brief)
+  bugs: >-
+    What changed since the last run, then the risky paths: money (ledger, open-item allocation, invoices, aging,
+    disbursements, books and month-end close), votes and secret ballots, the ARC clock and recusal, ownership
+    transfer and account periods, own matters (core/conflicts.py), append-only records (model, DB trigger, runtime
+    role grants), workflows (core/workflow.py). New pages must be in core/tests/test_url_matrix.py.
+    Severity follows docs/security-review-2026-11.md: high = account takeover or a decision someone must not take;
+    medium = data to the wrong person, quietly wrong records, or an attacker can block the site.
+  claims: >-
+    Claims are in CLAUDE.md, docs/claude/*.md, docs/decisions.md and docs/security-review-2026-11.md (regression/claims.yaml
+    lists them): cross-owner access on every URL and download, no anonymous access except the sign-in steps and the
+    vendor onboarding form (D79), MFA everywhere and the enrollment window, re-auth never by emailed code,
+    invitations, recusal and own matters, two-person rules, manager never decides, append-only, audit without
+    personal data, file handling and malware scanning, trusted proxy, CSP/HSTS/cookies, sysadmin scope and
+    break-glass, personal ballot links, feature switches; earlier fixes not regressed.
+  exposure: >-
+    Attack the code changed since the previous run as an outsider, an owner reaching another owner's data, a
+    recused or former member, and a manager acting beyond their role; plus the deployment surface: Dockerfile,
+    compose files, docker/, infra/poc/*.sh (secrets handling, the update agent and release tags, backups, server
+    tasks), .github/workflows and .github/scripts, settings, CSP, outbound calls (push, SMS, AI, storage, Stripe,
+    Teller, USPS) and anything newly reachable without signing in.
+  desktop: >-
+    Read CLAUDE.md, docs/glossary.md, docs/decisions.md, core/navigation.py (menus, hubs, SUBPAGES), core/policy.py
+    and core/features.py. Redundancy, naming (labels that differ from the page heading or the glossary), placement,
+    dead ends, long flows, and the separations that must stay for legal or role reasons (binding votes vs surveys,
+    secret ballots, recusal, manager never decides, board-only records, former owners read-only, executive
+    sessions) as keep-separate. Propose a sidebar for each role.
+  phone: >-
+    Everything worse on a phone: layout that breaks or crowds, tap targets (the portal's rule is 40x40 px outside
+    running text, D48), the menu (length, groups, above the fold), very long pages (height), forms, tables that need
+    sideways scrolling or should become cards (class stack-sm), actions hard to reach.

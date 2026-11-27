@@ -4,7 +4,16 @@ One entry per independent walkthrough (newest first): date, commit, roles and
 page types walked, automated checks, finding IDs by group, report link (the
 report is republished to the same URL each time; take it from the newest entry
 that has one). No real names, hosts or addresses. See `regression/README.md`
-("Walkthrough") and `.claude/skills/walkthrough/SKILL.md`.
+("Walkthrough") and the global `/walkthrough` skill (`~/.claude/skills/walkthrough/SKILL.md`).
+
+From the standard (D90), `python3 regression/run.py log --walkthrough` (or
+`--full-check`) adds one row to this table per walkthrough; the older entries
+below it keep their own format. `/walkthrough` skips itself when no UI file
+(`walkthrough.ui_paths` in `profile.yaml`) changed since the newest row.
+
+| Date (UTC) | Commit | Version | Roles | Pages | UX checks failing | Findings | Report |
+|---|---|---|---|---|---|---|---|
+| 2026-11-27 | `d62bd1e` | 0.34.0 | 11 | not recorded | 0 | 54 | [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) · [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) |
 
 ## 2026-11-27 — third full walkthrough (release 0.34.0, with the regression)
 

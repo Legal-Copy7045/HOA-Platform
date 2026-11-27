@@ -5,7 +5,8 @@
 #   sudo bash /opt/hoa-portal/infra/poc/portal-agent.sh
 #
 # Every 15 minutes, or when "Check now" is pressed on System status, it asks
-# GitHub whether the branch has newer commits and records the answer in the
+# GitHub whether a newer release exists (a v<VERSION> tag on main, D90; on the
+# ALLOW_BRANCH branch, newer commits) and records the answer in the
 # portal's database. When "Install update" is pressed, it runs
 # update-portal.sh and records the outcome. Then it runs the oldest server
 # task requested on Admin -> Server tasks (a backup, a restore drill...; D36)
@@ -94,15 +95,28 @@ REPO_OWNER="$(stat -c %U "$APP_DIR")"
 g() { if [ "$REPO_OWNER" = "root" ]; then git -C "$APP_DIR" "$@"; else sudo -u "$REPO_OWNER" -H git -C "$APP_DIR" "$@"; fi; }
 BRANCH="$(g rev-parse --abbrev-ref HEAD)"
 
+# What an update would install (D90): on main, the newest release tag
+# (v<VERSION>, created when a version bump merges); on the one other branch
+# ALLOW_BRANCH names, that branch's tip. Empty when main has no release yet.
+update_target() {
+  if [ "$BRANCH" = "main" ]; then
+    g tag --merged origin/main --list 'v*' | pick_release_tag || true
+  else
+    echo "origin/$BRANCH"
+  fi
+}
+
 check() {
-  g fetch --quiet origin "$BRANCH" || return 0
-  local running latest behind changes version
+  g fetch --quiet --tags origin "$BRANCH" || return 0
+  local running latest behind changes version TARGET
+  TARGET="$(update_target)"
+  [ -n "$TARGET" ] || TARGET=HEAD  # no release yet: nothing to offer
   running="$(g rev-parse --short HEAD)"
-  latest="$(g rev-parse --short "origin/$BRANCH")"
+  latest="$(g rev-parse --short "$TARGET^{commit}")"
   # The release number of the newer code (D37): digits and dots only.
-  version="$(g show "origin/$BRANCH:VERSION" 2>/dev/null | head -1 | tr -cd '0-9.' | cut -c1-20)"
-  behind="$(g rev-list --count "HEAD..origin/$BRANCH")"
-  changes="$(g log --format='%s' "HEAD..origin/$BRANCH" | head -20 | cut -c1-150)"
+  version="$(g show "$TARGET:VERSION" 2>/dev/null | head -1 | tr -cd '0-9.' | cut -c1-20)"
+  behind="$(g rev-list --count "HEAD..$TARGET")"
+  changes="$(g log --format='%s' "HEAD..$TARGET" | head -20 | cut -c1-150)"
   psql_run -v branch="$BRANCH" -v running="$running" -v latest="$latest" \
     -v behind="$behind" -v changes="$changes" -v version="$version" >/dev/null <<'SQL'
 UPDATE core_updatestatus
@@ -148,7 +162,10 @@ SQL
   {
     echo "=== $(date -u +%FT%TZ) update requested from System status (now or scheduled)"
   } >>"$LOG"
-  if bash "$APP_DIR/infra/poc/update-portal.sh" >>"$LOG" 2>&1; then
+  # main installs the newest release tag; the ALLOW_BRANCH branch its tip (D90).
+  UPDATE_ARGS=()
+  [ "$BRANCH" = "main" ] || UPDATE_ARGS=(--ref "$BRANCH")
+  if bash "$APP_DIR/infra/poc/update-portal.sh" "${UPDATE_ARGS[@]}" >>"$LOG" 2>&1; then
     RESULT=succeeded; MESSAGE="Running $(g rev-parse --short HEAD)"
   else
     RESULT=failed; MESSAGE="See $LOG on the VM"

@@ -8,6 +8,7 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -109,10 +110,30 @@ def test_every_action_is_pinned_by_commit_with_a_version_comment():
         assert "permissions:" in text
 
 
-def test_ci_keeps_the_summary_test_check_and_adds_separate_gates():
+STANDARDS = "Legal-Copy7045/project-standards/.github/workflows/"
+
+
+def _triggers(workflow):
+    return workflow[True] if True in workflow else workflow["on"]  # YAML 1.1 reads "on" as True
+
+
+def _reusable(workflow, name):
+    """The job calling the standard's reusable workflow `name`, pinned by commit."""
+    jobs = [
+        job
+        for job in workflow["jobs"].values()
+        if job.get("uses", "").startswith(STANDARDS + name + "@")
+    ]
+    assert jobs, f"no job uses the standard's {name}"
+    for job in jobs:
+        assert re.fullmatch(STANDARDS + re.escape(name) + r"@[0-9a-f]{40}", job["uses"])
+    return jobs
+
+
+def test_ci_keeps_the_known_gates_and_ci_result_needs_them_all():
     ci = _workflow("ci.yml")
     jobs = ci["jobs"]
-    assert jobs["test"]["needs"] == ["test-shard"]  # the one required "test" check
+    assert jobs["test"]["needs"] == ["changes", "test-shard"]  # the familiar "test" line
     assert {"lint", "audit", "test-shard", "test", "docker", "image-scan", "pages"} <= set(jobs)
     scan = jobs["image-scan"]["steps"]
     trivy = next(s for s in scan if "aquasecurity/trivy-action" in s.get("uses", ""))
@@ -124,16 +145,35 @@ def test_ci_keeps_the_summary_test_check_and_adds_separate_gates():
     assert any("run.py --stage page" in s.get("run", "") for s in pages["steps"])
     docker = " ".join(s.get("run", "") for s in jobs["docker"]["steps"])
     assert "docker-compose.tunnel.yml config" in docker
+    # D90: ci-result is the one required check; it needs every other job and
+    # fails when any of them failed or was cancelled.
+    gate = jobs["ci-result"]
+    assert set(gate["needs"]) == set(jobs) - {"ci-result"}
+    assert gate["if"].startswith("always()")
+    assert "failure|cancelled" in gate["steps"][0]["run"]
+    lint = " ".join(s.get("run", "") for s in jobs["lint"]["steps"])
+    assert "check_versions.py" in lint and "ruff check" in lint and "bandit" in lint
 
 
-def test_secret_scan_covers_the_whole_history_and_fails_on_findings():
-    wf = _workflow("secrets.yml")
-    triggers = wf[True] if True in wf else wf["on"]  # YAML 1.1 reads "on" as True
-    assert {"pull_request", "schedule", "workflow_dispatch"} <= set(triggers)
-    (job,) = wf["jobs"].values()
-    checkout = job["steps"][0]
-    assert checkout["with"]["fetch-depth"] == 0  # every commit, not just the tip
-    assert any("gitleaks/gitleaks-action" in u for u in _uses(wf))
+def test_every_job_has_a_timeout_and_the_workflows_least_permissions():
+    for path in WORKFLOWS.glob("*.yml"):
+        wf = yaml.safe_load(path.read_text())
+        assert wf["permissions"] == {"contents": "read"}, path.name
+        for name, job in wf["jobs"].items():
+            if "uses" not in job:  # reusable workflows set their own timeouts
+                assert job.get("timeout-minutes"), f"{path.name}: {name}"
+    jobs = _workflow("ci.yml")["jobs"]
+    widened = {n for n, j in jobs.items() if j.get("permissions")}
+    assert widened == {"release"} and jobs["release"]["permissions"] == {"contents": "write"}
+
+
+def test_secret_scan_covers_the_whole_history_weekly_and_fails_on_findings():
+    # D57 gitleaks, folded into ci.yml through the standard's reusable workflow (D90):
+    # a pull request's commits; the whole history on the weekly and manual runs.
+    ci = _workflow("ci.yml")
+    (job,) = _reusable(ci, "gitleaks.yml")
+    assert "needs.changes.outputs.full" in job["with"]["full-history"]
+    assert not (WORKFLOWS / "secrets.yml").exists()
     config = tomllib.loads((ROOT / ".gitleaks.toml").read_text())
     assert config["extend"]["useDefault"] is True
     # Allowances are markers or exact fixtures, never whole directories.
@@ -144,35 +184,111 @@ def test_secret_scan_covers_the_whole_history_and_fails_on_findings():
             assert allow.get("condition") == "AND" and allow.get("regexes")
 
 
-def test_codeql_scans_python_and_javascript_weekly():
+def test_privacy_guard_runs_on_pull_requests_and_the_private_terms_on_main():
+    ci = _workflow("ci.yml")
+    jobs = {job.get("with", {}).get("denylist", False): job for job in _reusable(ci, "privacy.yml")}
+    assert jobs[False]["if"] == "github.event_name != 'push'"
+    assert "github.event_name == 'push'" in jobs[True]["if"]
+    assert jobs[True]["secrets"] == "inherit"
+    assert (ROOT / ".github" / "scripts" / "privacy_guard.py").is_file()
+
+
+def test_codeql_scans_actions_python_and_javascript_weekly():
     # D86 (the owner: "Schedule codeQL weekly"): weekly and on demand only.
     wf = _workflow("codeql.yml")
-    triggers = wf[True] if True in wf else wf["on"]
+    triggers = _triggers(wf)
     assert "schedule" in triggers and "workflow_dispatch" in triggers
     assert "pull_request" not in triggers and "push" not in triggers
-    (job,) = wf["jobs"].values()
-    assert set(job["strategy"]["matrix"]["language"]) == {"python", "javascript-typescript"}
+    assert triggers["schedule"] == [{"cron": "17 5 * * 0"}]  # Sunday, two hours after CI
+    (job,) = _reusable(wf, "codeql.yml")
+    languages = set(yaml.safe_load(job["with"]["languages"]))
+    assert languages == {"actions", "python", "javascript-typescript"}
     assert job["permissions"]["security-events"] == "write"
 
 
 def test_ci_is_economical():
-    """D86: no second run on merge to main, nothing on drafts, the image and
-    the page crawl only when a pull request touches what they test, a weekly
-    full run on main, two test shards."""
+    """D86, kept by D90: nothing on drafts, no re-test on merge to main (only
+    the private-terms check and the release path), the slow groups only when a
+    pull request touches what they test, a weekly full run, two test shards,
+    one image build per run."""
     ci = _workflow("ci.yml")
-    triggers = ci[True] if True in ci else ci["on"]
-    assert "push" not in triggers
-    assert {"pull_request", "schedule", "workflow_dispatch"} <= set(triggers)
+    triggers = _triggers(ci)
+    assert set(triggers) == {"pull_request", "push", "schedule", "workflow_dispatch"}
+    assert triggers["push"] == {"branches": ["main"]}
+    assert triggers["schedule"] == [{"cron": "17 3 * * 0"}]  # Sunday 03:17 UTC
     jobs = ci["jobs"]
-    for name in ("lint", "audit", "test-shard", "docker", "changes"):
-        assert "draft" in jobs[name]["if"], name
-    for name in ("image-scan", "pages"):
-        assert jobs[name]["needs"] == ["changes"]
-        assert "needs.changes.outputs" in jobs[name]["if"]
+    assert "draft" in jobs["changes"]["if"] and "draft" in jobs["ci-result"]["if"]
+    # Every other job waits for "changes", so a draft (changes skipped) runs nothing.
+    for name, job in jobs.items():
+        if name not in ("changes", "ci-result"):
+            needs = job["needs"] if isinstance(job["needs"], list) else [job["needs"]]
+            assert "changes" in needs, name
+    # On a push to main only the private-terms check and the release run.
+    for name in ("lint", "privacy", "secrets", "docker"):
+        assert jobs[name]["if"] == "github.event_name != 'push'", name
+    for name, group in (("test-shard", "tests"), ("image-scan", "image"), ("pages", "pages")):
+        assert jobs[name]["if"] == f"needs.changes.outputs.{group} == 'true'", name
+    assert "needs.changes.outputs.lockfiles" in jobs["audit"]["if"]
+    assert jobs["release"]["if"] == "needs.changes.outputs.release == 'true'"
     assert len(jobs["test-shard"]["strategy"]["matrix"]["shard"]) == 2
-    docker = " ".join(s.get("run", "") for s in jobs["docker"]["steps"])
-    assert "docker build" not in docker  # built once, in image-scan
+    builds = [
+        n for n, j in jobs.items() for s in j.get("steps", []) if "docker build" in s.get("run", "")
+    ]
+    assert builds == ["image-scan"]  # built once, in image-scan
+    assert ci["concurrency"]["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
     deps = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text())
     for update in deps["updates"]:
-        assert update["schedule"]["interval"] == "monthly"
-        assert update.get("groups"), update["package-ecosystem"]
+        assert update["schedule"] == {"interval": "weekly", "day": "sunday", "time": "00:30"}
+        (group,) = update["groups"].values()
+        assert group["update-types"] == ["minor", "patch"], update["package-ecosystem"]
+    auto = _workflow("dependabot-automerge.yml")
+    (job,) = _reusable(auto, "dependabot-automerge.yml")
+    assert job["if"] == "github.event.pull_request.user.login == 'dependabot[bot]'"
+
+
+def _groups(path: str) -> set[str]:
+    cfg = yaml.safe_load((ROOT / ".github" / "changes.yaml").read_text())
+
+    def hit(patterns):
+        return any(re.search(p, path) for p in patterns or [])
+
+    if hit(cfg["ignore"]):
+        return set()
+    found = {g for g, pats in cfg["groups"].items() if hit(pats)}
+    return set(cfg["groups"]) if hit(cfg["shared"]) or not found else found
+
+
+@pytest.mark.parametrize(
+    ("path", "groups"),
+    [
+        ("docs/decisions.md", set()),
+        ("regression/RUNS.md", set()),
+        ("README.md", set()),
+        ("docs/claude/ledger.md", {"tests"}),  # CLAUDE.md's move check reads it
+        ("CLAUDE.md", {"tests"}),
+        ("ledger/services.py", {"tests"}),
+        ("templates/base.html", {"tests", "pages"}),
+        ("core/navigation.py", {"tests", "pages"}),
+        ("Dockerfile", {"tests", "image"}),
+        ("docker-compose.yml", {"tests", "image"}),
+        ("requirements/base.txt", {"tests", "image", "pages", "lockfiles"}),
+        (".github/workflows/ci.yml", {"tests", "image", "pages", "lockfiles"}),
+        ("somewhere/new.unknown", {"tests", "image", "pages", "lockfiles"}),
+    ],
+)
+def test_changes_start_the_right_groups(path, groups):
+    assert _groups(path) == groups
+
+
+def test_release_path_and_versions_files():
+    """STANDARD.md 2: the release notes come from CHANGELOG.md; the version
+    check and the upstream list the weekly maintenance reads exist."""
+    for name in ("changes.py", "check_versions.py", "release_notes.py", "privacy_guard.py"):
+        assert (ROOT / ".github" / "scripts" / name).is_file(), name
+    assert yaml.safe_load((ROOT / ".github" / "versions.yaml").read_text()) == []
+    ups = yaml.safe_load((ROOT / ".github" / "upstreams.yaml").read_text())
+    assert {"Playwright (page crawl and walkthrough browser)", "PostgreSQL major line"} <= {
+        u["name"] for u in ups
+    }
+    std = yaml.safe_load((ROOT / ".github" / "standard.yaml").read_text())
+    assert std["standard"] == "1.1.0" and std["beyond"] and std["exceptions"]

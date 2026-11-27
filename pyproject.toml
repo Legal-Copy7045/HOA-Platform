@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = [".venv", "staticfiles", ".claude"]
+extend-exclude = [".venv", "staticfiles", ".claude", "regression/standard.py", ".github/scripts"]  # standard templates, vendored unchanged (D90)
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "DJ", "C4", "SIM", "RUF"]
@@ -33,7 +33,7 @@ source = ["."]
 omit = [".venv/*", ".claude/*", "*/migrations/*", "*/tests/*", "manage.py", "core/asgi.py", "core/wsgi.py"]
 
 [tool.bandit]
-exclude_dirs = [".venv", "staticfiles", ".claude"]
+exclude_dirs = [".venv", "staticfiles", ".claude", "regression/standard.py", ".github/scripts"]  # vendored (D90)
 skips = []
 
 [tool.bandit.assert_used]

@@ -1,13 +1,17 @@
 version: 2
-# Monthly and grouped (D86): about one pull request per ecosystem a month, so
-# each costs one CI run. Security updates still arrive as soon as published.
+# Weekly on Sunday 00:30 UTC (STANDARD.md 1.5 and 1.6, D90; monthly under D86 before): one grouped pull request per
+# ecosystem for minor and patch updates, which merge themselves when ci-result passes
+# (dependabot-automerge.yml); each major update on its own pull request for the Monday maintenance session to judge.
+# Security updates still arrive as soon as an advisory is published.
 updates:
   - package-ecosystem: pip
     directory: /requirements
-    schedule: {interval: monthly}
+    schedule: {interval: weekly, day: sunday, time: "00:30"}
+    open-pull-requests-limit: 3
     groups:
       pip-all:
         patterns: ["*"]
+        update-types: [minor, patch]
     ignore:
       # Stay on the Django LTS line (CLAUDE.md). Patch releases still arrive;
       # moving to the next LTS (6.2, April 2027) is a deliberate decision.
@@ -15,27 +19,33 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: github-actions
     directory: /
-    schedule: {interval: monthly}
+    schedule: {interval: weekly, day: sunday, time: "00:30"}
+    open-pull-requests-limit: 3
     groups:
       github-actions-all:
         patterns: ["*"]
+        update-types: [minor, patch]
   # The portal image's base (Dockerfile).
   - package-ecosystem: docker
     directory: /
-    schedule: {interval: monthly}
+    schedule: {interval: weekly, day: sunday, time: "00:30"}
+    open-pull-requests-limit: 3
     groups:
       docker-all:
         patterns: ["*"]
+        update-types: [minor, patch]
   # Infrastructure images in docker-compose.yml and docker-compose.tunnel.yml
   # (cloudflared, ClamAV, Postgres, SeaweedFS, Mailpit), pinned to a version
   # and digest (D57). Each update arrives as a pull request that CI tests:
   # compose validation, the image build and the Trivy scan of the images.
   - package-ecosystem: docker-compose
     directory: /
-    schedule: {interval: monthly}
+    schedule: {interval: weekly, day: sunday, time: "00:30"}
+    open-pull-requests-limit: 3
     groups:
       docker-compose-all:
         patterns: ["*"]
+        update-types: [minor, patch]
     ignore:
       # A new Postgres major version needs a dump and restore (pg_upgrade),
       # so it is a planned change, not a weekly pull request. Minor releases

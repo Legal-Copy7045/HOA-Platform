@@ -3,8 +3,10 @@
 
     REPORT_TZ=America/New_York python3 regression/report.py
 
-Reads the stage results, the feature catalogue, out/findings-bugs.json,
-out/findings-security.json and out/notes.json (all optional).
+Reads the stage results, the feature catalogue, the reviewers' findings
+(out/findings/{bugs,claims,exposure}.json per the standard, or the older
+out/findings-bugs.json and out/findings-security.json), out/brief.json (audit
+depth) and out/notes.json (all optional). `run.py report` runs this.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import yaml
 from catalogue import claims, load_catalogue
 
 HERE = Path(__file__).resolve().parent
@@ -63,15 +66,62 @@ def load(name: str, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
 
 
+def review_findings() -> tuple[list, dict]:
+    """The reviewers' findings: the standard files out/findings/{bugs,claims,exposure}.json
+    (STANDARD.md 3.4; claim ids resolved from regression/claims.yaml) and, from runs
+    before the standard, out/findings-bugs.json and out/findings-security.json."""
+    bugs = list(load("findings-bugs.json", []))
+    security = load("findings-security.json", {"findings": [], "claims": []})
+    security = {
+        "findings": list(security.get("findings", [])),
+        "claims": list(security.get("claims", [])),
+    }
+    claims_file = HERE / "claims.yaml"
+    known = (
+        {c["id"]: c for c in (yaml.safe_load(claims_file.read_text()) or [])}
+        if claims_file.exists()
+        else {}
+    )
+    for reviewer in ("bugs", "claims", "exposure"):
+        data = load(f"findings/{reviewer}.json", None)
+        if not data:
+            continue
+        found = [{**f, "reviewer": reviewer} for f in data.get("findings", [])]
+        if reviewer == "claims":
+            security["findings"] += found
+        else:
+            bugs += found
+        for c in data.get("claims", []):
+            claim = known.get(c.get("id"), {})
+            security["claims"].append(
+                {
+                    "claim": f"{c.get('id')}: {claim.get('claim', '')}".strip(": "),
+                    "where": ", ".join(claim.get("where", [])),
+                    "held": c.get("held"),
+                    "note": c.get("note", ""),
+                }
+            )
+    return bugs, security
+
+
 def main() -> None:
     tz = ZoneInfo(os.environ.get("REPORT_TZ", "UTC"))
     stages = {s: load(f"{s}.json", None) for s in STAGE_ORDER}
     stages = {k: v for k, v in stages.items() if v}
     results = [(s, r) for s, d in stages.items() for r in d["results"]]
     catalogue = load_catalogue()
-    bugs = load("findings-bugs.json", [])
-    security = load("findings-security.json", {"findings": [], "claims": []})
-    notes = load("notes.json", {"summary": "", "observations": []})
+    bugs, security = review_findings()
+    notes = load("notes.json", None)
+    if notes is None:  # the standard's out/notes.yaml
+        path = OUT / "notes.yaml"
+        notes = (yaml.safe_load(path.read_text()) if path.exists() else None) or {}
+    notes = {"summary": notes.get("summary", ""), "observations": notes.get("observations", [])}
+    brief = load("brief.json", {})
+    audit = (
+        f" · security audit: {brief['audit']} ({brief.get('why', '')})"
+        if brief.get("audit")
+        else ""
+    )
     commit = subprocess.run(  # nosec B603 B607
         ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=False
     ).stdout.strip()
@@ -202,7 +252,7 @@ def main() -> None:
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 {CSS}</style><main>
-<h1>Portal regression report</h1><div class=m>{e(when)} · commit {e(commit)}</div>
+<h1>Portal regression report</h1><div class=m>{e(when)} · commit {e(commit)}{e(audit)}</div>
 {f"<p>{e(notes['summary'])}</p>" if notes.get("summary") else ""}
 <div class=grid style="margin-top:14px">
 <div class=card><div class=m>Passing</div><div class=big>{totals["pass"]}</div></div>

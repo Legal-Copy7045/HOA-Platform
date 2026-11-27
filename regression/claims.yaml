@@ -1,0 +1,179 @@
+# Every security and privacy claim the portal makes (STANDARD.md 3.4), from CLAUDE.md, docs/claude/*.md,
+# docs/decisions.md and docs/security-review-2026-11.md. The claims reviewer checks each one whose code changed
+# (delta audit) or all of them (full audit). code: globs of the files that keep it. Append; never renumber.
+- id: CLM-001
+  claim: No anonymous access - every page needs sign-in except the sign-in steps (login, invitation, reset code, "Can't sign in?") and the vendor onboarding form.
+  where: [CLAUDE.md, docs/claude/security.md, docs/decisions.md D62 D79]
+  code: ["core/urls.py", "*/urls.py", "core/middleware.py", "accounts/*.py", "core/tests/test_url_matrix.py"]
+- id: CLM-002
+  claim: Owner A gets 403/404 for owner B's lot, documents, requests and files on every URL and download path; views never fetch by bare primary key without scoping.
+  where: [CLAUDE.md, docs/claude/authorization.md]
+  code: ["core/scoping.py", "core/mixins.py", "*/views.py", "*/*_views.py", "core/tests/test_url_matrix.py"]
+- id: CLM-003
+  claim: Unscoped queries on lot/person models raise UnscopedQueryError; services use .unscoped(reason) or system_access(reason).
+  where: [docs/claude/authorization.md]
+  code: ["core/scoping.py", "*/models.py", "*/services.py"]
+- id: CLM-004
+  claim: Strong authentication for every account - passkey, or password/emailed code followed by TOTP or passkey; never password-only; emailed codes never a second factor.
+  where: [CLAUDE.md, docs/claude/security.md]
+  code: ["accounts/*.py", "core/settings/*.py", "core/middleware.py"]
+- id: CLM-005
+  claim: A login with no authenticator may enroll one only in the browser session that accepted its invitation, redeemed a reset code or finished a recovery, within MFA_ENROLLMENT_WINDOW_SECONDS.
+  where: [docs/claude/security.md]
+  code: ["accounts/*.py", "accounts/tests/test_enrollment_review.py"]
+- id: CLM-006
+  claim: Re-authentication accepts a password or an authenticator, never an emailed code; casting a vote needs recent re-authentication (D24).
+  where: [docs/claude/security.md, docs/decisions.md D24]
+  code: ["accounts/*.py", "governance/*.py"]
+- id: CLM-007
+  claim: Lost authenticators - staff roles only through the two-board-member assisted reset with a single-use enrollment code; self-service recovery waits at least 48 hours, alerts every channel and the board, and locks sensitive actions afterwards.
+  where: [docs/claude/security.md, docs/decisions.md D58]
+  code: ["accounts/recovery.py", "accounts/services.py", "accounts/*.py"]
+- id: CLM-008
+  claim: The sign-in help pages and "Ask the board" never reveal whether an account exists or any portal data.
+  where: [docs/claude/security.md, docs/decisions.md D62]
+  code: ["accounts/signin_help.py", "accounts/setup_requests.py"]
+- id: CLM-009
+  claim: Invite-only accounts; invitations go only to the Person record's email, are created only by the board and grant nothing.
+  where: [CLAUDE.md, docs/claude/security.md]
+  code: ["accounts/*.py", "community/services.py"]
+- id: CLM-010
+  claim: Passwords are 12+ characters with common-password and breached-password (HIBP k-anonymity, fail-open) checks.
+  where: [docs/claude/security.md]
+  code: ["core/settings/*.py", "accounts/*.py"]
+- id: CLM-011
+  claim: Login throttling (django-axes); failed logins for unknown emails store a keyed hash, never the address.
+  where: [CLAUDE.md, docs/claude/security.md]
+  code: ["core/settings/*.py", "audit/*.py", "accounts/*.py"]
+- id: CLM-012
+  claim: Permissions live in one map in core/policy.py; services take an explicit actor and call policy.require(); a manager never approves invoices, decides ARC or violations, changes rules or votes.
+  where: [CLAUDE.md, docs/claude/authorization.md]
+  code: ["core/policy.py", "*/services.py", "core/workflow.py"]
+- id: CLM-013
+  claim: No self-grants; granting sysadmin needs a nominator and a different approving board member; board seats after start-up need a second board member (D66).
+  where: [docs/claude/authorization.md, docs/decisions.md D66]
+  code: ["community/services.py", "accounts/services.py", "core/policy.py"]
+- id: CLM-014
+  claim: Every action stays performable by at least two people with MFA; the app warns when not (check_coverage, My items).
+  where: [CLAUDE.md, docs/claude/authorization.md]
+  code: ["core/policy.py", "core/my_items.py", "core/conflicts.py", "core/management/commands/check_coverage.py"]
+- id: CLM-015
+  claim: Own matters - nobody advances their own matter with board or staff powers (requests, ARC, violations, ledger entries, refunds, collections, bookings, account changes ...); refusals are audited with ids only.
+  where: [CLAUDE.md, docs/claude/authorization.md, docs/decisions.md D65]
+  code: ["core/conflicts.py", "core/workflow.py", "*/services.py", "ledger/*.py", "payments/*.py"]
+- id: CLM-016
+  claim: ARC recusal - an applicant, a reviewer whose lot is affected, or an account contact or earlier owner of such a home cannot view deliberations or vote on that request; internal thread notes are hidden.
+  where: [docs/claude/authorization.md, docs/claude/workflows.md]
+  code: ["arc/*.py", "core/conflicts.py", "comms/threads.py"]
+- id: CLM-017
+  claim: Payments to board members (D66) - nobody takes a step on a payment to an account they are or were on the deed of; checks to a board member's account are handled only by another board member, never the manager.
+  where: [docs/claude/authorization.md, docs/decisions.md D66]
+  code: ["ledger/disbursements.py", "operations/vendor_checks.py", "operations/reimbursements.py"]
+- id: CLM-018
+  claim: Former owners keep a read-only login showing only their own records from their ownership period; services refuse any change from them.
+  where: [docs/claude/authorization.md]
+  code: ["community/services.py", "core/scoping.py", "*/views.py"]
+- id: CLM-019
+  claim: Owner-facing lot records (ARC, violations, resale) are limited to the owner's own era (owner_era_q).
+  where: [docs/claude/ui-navigation.md]
+  code: ["core/scoping.py", "arc/*.py", "compliance/*.py", "ledger/*.py"]
+- id: CLM-020
+  claim: Financial, legal and audit records are append-only - no update/delete paths in the model, a DB trigger, and UPDATE/DELETE/TRUNCATE revoked from the runtime role; corrections are reversing records.
+  where: [CLAUDE.md, docs/claude/architecture.md]
+  code: ["core/db_roles.py", "core/append_only*.py", "*/models.py", "*/migrations/*.py"]
+- id: CLM-021
+  claim: Web and worker never run with the database owner's credentials (check_db_role); the runtime role has no DDL or TRUNCATE.
+  where: [CLAUDE.md, docs/claude/architecture.md]
+  code: ["core/db_roles.py", "core/management/commands/check_db_role.py", "docker/**", "core/management/commands/apply_db_grants.py"]
+- id: CLM-022
+  claim: Money is integer cents, never floats.
+  where: [CLAUDE.md]
+  code: ["ledger/*.py", "payments/*.py", "operations/*.py"]
+- id: CLM-023
+  claim: The audit log records logins, MFA and role changes, document views and downloads, ARC actions, exports and sysadmin access; append-only; metadata checked against a per-action field allowlist; IP addresses in a separate table purged after AUDIT_IP_RETENTION_DAYS; no user-agent strings.
+  where: [CLAUDE.md]
+  code: ["audit/*.py"]
+- id: CLM-024
+  claim: Logs carry structured events without personal data - no request bodies, exception messages or token URLs; gunicorn access logs are off; error signatures never hold the path, query, message or user.
+  where: [docs/claude/security.md, docs/claude/operations.md, docs/decisions.md D45]
+  code: ["core/errors.py", "core/logging*.py", "core/settings/*.py", "docker/**"]
+- id: CLM-025
+  claim: Uploads - content-based type allowlist with Office macro/embedded-object/remote-template checks, size limits before buffering, malware scan (clean scan required in production), private bucket under random keys, streamed only through the app after an authorization check, never signed URLs.
+  where: [docs/claude/security.md, docs/decisions.md D57]
+  code: ["documents/*.py", "core/uploads.py", "core/settings/*.py"]
+- id: CLM-026
+  claim: Secure cookies, CSRF, HSTS (at least a year in production), CSP, strict ALLOWED_HOSTS, DEBUG off outside local dev; production refuses to start without ClamAV and clean-scan downloads.
+  where: [docs/claude/security.md, docs/decisions.md D57]
+  code: ["core/settings/*.py", "core/middleware.py"]
+- id: CLM-027
+  claim: Proxy headers (client IP, scheme) are trusted only from TRUSTED_PROXY_CIDRS.
+  where: [docs/claude/security.md]
+  code: ["core/middleware.py", "core/settings/*.py"]
+- id: CLM-028
+  claim: The application never handles card or bank account numbers; Stripe hosted pages only, pull only (no webhooks), restricted key without refund rights; bank-feed descriptions mask long digit runs; no TIN or bank number is a field.
+  where: [CLAUDE.md, docs/decisions.md D32-payments D34-fixinfra-1 D79]
+  code: ["payments/*.py", "ledger/bankfeeds/*.py", "operations/vendor_onboarding.py"]
+- id: CLM-029
+  claim: Secret ballots and anonymous surveys are stored unlinkable - sealed into an identity-free pool, flushed shuffled in another transaction; no per-option tallies while open.
+  where: [docs/claude/governance.md, docs/decisions.md D56 D68 D61]
+  code: ["governance/*.py"]
+- id: CLM-030
+  claim: Vote links in emails are personal and single-use; casting needs recent re-authentication.
+  where: [docs/claude/security.md, docs/decisions.md D24]
+  code: ["governance/*.py", "comms/*.py"]
+- id: CLM-031
+  claim: Sysadmins get operations pages only, no owner data by virtue of the role; their actions are audited and visible to the board; no Django admin in production; break-glass commands need --actor and --reason and are audited.
+  where: [CLAUDE.md, docs/claude/authorization.md]
+  code: ["core/policy.py", "core/urls.py", "*/management/commands/breakglass_*.py", "core/settings/production.py"]
+- id: CLM-032
+  claim: The web app never gets access to the VM - it only inserts a server-task or update-request row; the agent maps it to a fixed command and writes back through psql variables; updates install only release tags (or the one ALLOW_BRANCH).
+  where: [docs/claude/deployment.md, docs/decisions.md D25 D36 D90]
+  code: ["core/host_tasks.py", "infra/poc/portal-agent.sh", "infra/poc/host-tasks.sh", "infra/poc/update-portal.sh", "infra/poc/lib.sh"]
+- id: CLM-033
+  claim: Secrets never pass through the web app, the repository or chat - set on the server with guided scripts (Stripe, Teller, USPS, bounce mailbox, vendor key, off-site backups).
+  where: [CLAUDE.md, docs/claude/deployment.md]
+  code: ["infra/poc/set-*.sh", "infra/poc/setup-offsite-backups.sh", "community/setup*.py", ".gitleaks.toml"]
+- id: CLM-034
+  claim: Backups are signed with a keyed checksum and the restore drill refuses unsigned backups; off-site copies go to a locked R2 bucket.
+  where: [docs/claude/operations.md, docs/decisions.md D31 D57]
+  code: ["infra/poc/backup.sh", "infra/poc/backup_mac.py", "infra/poc/restore-drill.sh", "core/offsite.py"]
+- id: CLM-035
+  claim: Postgres and the object store are never exposed to the public internet; the POC is reachable only through a Cloudflare Tunnel behind Cloudflare Access; web publishes no port.
+  where: [CLAUDE.md, docs/claude/deployment.md]
+  code: ["docker-compose.yml", "docker-compose.tunnel.yml", "infra/poc/*.sh"]
+- id: CLM-036
+  claim: Infrastructure images are pinned by tag and digest, updated only by Dependabot pull requests that CI tests; CI actions pinned by commit; no pull_request_target.
+  where: [docs/claude/deployment.md, docs/decisions.md D57 D90]
+  code: ["docker-compose*.yml", ".github/workflows/*.yml", ".github/dependabot.yml", "core/tests/test_image_pins.py"]
+- id: CLM-037
+  claim: Vendor onboarding form - one emailed 256-bit link per round stored as a keyed hash, swapped for a 2-hour session bound to that round, rate-limited, neutral answers, strict CSP without script, reaches nothing else; W-9s encrypted (AES-256-GCM) and opened only by board members, audited.
+  where: [CLAUDE.md, docs/claude/finance.md, docs/decisions.md D79]
+  code: ["operations/onboarding_views.py", "operations/vendor_onboarding.py", "operations/vendor_crypto.py", "operations/onboarding_models.py"]
+- id: CLM-038
+  claim: Bank-feed tokens are Fernet-encrypted under BANK_FEED_TOKEN_KEY; the Teller client talks only to api.teller.io with mTLS; Teller's CSP only on bank_connect.
+  where: [docs/claude/finance.md, docs/decisions.md D32-bankfeeds]
+  code: ["ledger/bankfeeds/*.py", "core/csp*.py", "core/settings/*.py"]
+- id: CLM-039
+  claim: Push posts only to PUSH_ALLOWED_HOSTS; USPS client https only to the configured usps.com hosts with redirects refused; bounce mailbox over IMAP with verified TLS, addresses hashed at once.
+  where: [docs/claude/comms.md, docs/decisions.md D60 D74]
+  code: ["comms/push.py", "comms/webpush.py", "comms/usps_iv.py", "comms/bounces.py"]
+- id: CLM-040
+  claim: Help text written by the board is escaped first and rendered with a small markdown subset, never raw HTML.
+  where: [docs/claude/comms.md, docs/decisions.md D73]
+  code: ["community/help.py"]
+- id: CLM-041
+  claim: Switched-off optional features 404 and leave the menu.
+  where: [docs/claude/ui-navigation.md]
+  code: ["core/features.py", "core/navigation.py", "core/middleware.py"]
+- id: CLM-042
+  claim: Portal search never logs or audits the query and each provider reuses its list page's permission and scoped queryset.
+  where: [docs/claude/ui-navigation.md]
+  code: ["core/search.py", "*/search.py"]
+- id: CLM-043
+  claim: Demo data is fictional and seeding needs SEED_DEMO_ALLOWED (and, with production settings, DEPLOYMENT_STAGE=poc); reseeding keeps non-demo logins with their MFA.
+  where: [docs/claude/operations.md, docs/decisions.md D53]
+  code: ["community/demo/*.py", "community/management/commands/seed_demo*.py", "infra/poc/reseed-demo.sh"]
+- id: CLM-044
+  claim: No personal details, credentials or real data in the repository; commits use no-reply addresses; the privacy guard and gitleaks check every pull request, the private terms every push to main.
+  where: [CLAUDE.md, docs/decisions.md D90]
+  code: [".github/scripts/privacy_guard.py", ".gitleaks.toml", ".github/workflows/ci.yml"]

@@ -390,7 +390,7 @@ def test_updates_install_only_from_main_unless_allowed(branch, allow, ok):
 def test_agent_checks_the_branch_before_installing_and_vm_defaults_to_main():
     agent = Path(POC, "portal-agent.sh").read_text()
     refuse = agent.index('branch_allowed "$BRANCH" "$(env_value ALLOW_BRANCH)"')
-    assert refuse < agent.index('update-portal.sh" >>')
+    assert refuse < agent.index('update-portal.sh" "${UPDATE_ARGS[@]}" >>')
     assert 'BRANCH="${BRANCH:-main}"' in Path(POC, "provision-vm.sh").read_text()
 
 
@@ -652,3 +652,49 @@ def test_falco_rerun_keeps_the_pinned_keyring_without_downloading(tmp_path):
     for keyring in (other, tmp_path / "missing.gpg"):
         result = _run_falco_step(tmp_path, keyring, fpr)
         assert result.returncode != 0 and "DOWNLOAD" in result.stderr
+
+
+# --- D90: the VM installs release tags, not the tip of main ----------------------------------
+
+
+@pytestmark_bash
+@pytest.mark.parametrize(
+    ("tags", "expected"),
+    [
+        ("v0.9.0\nv0.10.0\nv0.40.0\n", "v0.40.0"),
+        ("v1.2.0\nv1.10.0\nv1.9.9\n", "v1.10.0"),
+        ("v2.0.0-beta.1\nv1.0.0\nnot-a-tag\nv3\n", "v1.0.0"),
+        ("v0.41.0\nv0.41.0\n", "v0.41.0"),
+    ],
+)
+def test_pick_release_tag_takes_the_newest_plain_release(tags, expected):
+    result = _lib("pick_release_tag", stdin=tags)
+    assert result.returncode == 0 and result.stdout.strip() == expected
+
+
+@pytestmark_bash
+def test_pick_release_tag_fails_without_a_release():
+    result = _lib("pick_release_tag", stdin="v1.0.0-rc.1\nmain\n")
+    assert result.returncode != 0 and result.stdout == ""
+
+
+@pytestmark_bash
+@pytest.mark.parametrize(
+    "args", [["--ref"], ["--ref", "../etc"], ["--ref", "-x"], ["--ref", "a..b"]]
+)
+def test_update_script_refuses_anything_but_a_branch_name(args):
+    result = subprocess.run(  # noqa: S603  # nosec B603
+        [BASH, str(POC / "update-portal.sh"), *args], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 2, result.stderr
+
+
+def test_update_script_and_agent_follow_release_tags():
+    update = (POC / "update-portal.sh").read_text()
+    assert "g tag --merged \"origin/main\" --list 'v*' | pick_release_tag" in update
+    assert 'g fetch --quiet --tags origin "$WANT"' in update
+    assert 'g merge --ff-only --quiet "$TARGET"' in update  # never past the tag, never a reset
+    agent = (POC / "portal-agent.sh").read_text()
+    assert "g tag --merged origin/main --list 'v*' | pick_release_tag" in agent
+    assert 'g rev-list --count "HEAD..$TARGET"' in agent
+    assert '[ "$BRANCH" = "main" ] || UPDATE_ARGS=(--ref "$BRANCH")' in agent
