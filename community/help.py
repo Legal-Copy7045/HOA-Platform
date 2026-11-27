@@ -18,11 +18,14 @@ to https:// or portal paths). Raw HTML is never passed through.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 from django.db import transaction
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import escape
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 
 from community.terms import term_text
@@ -608,7 +611,7 @@ def _inline(line: str) -> str:
     for m in _LINK.finditer(line):
         out.append(_bold(escape(line[pos : m.start()])))
         href = m.group(2)
-        if href.startswith("//"):
+        if not _safe_href(href):
             out.append(_bold(escape(m.group(0))))
         else:
             rel = ' rel="noopener noreferrer"' if href.startswith("https://") else ""
@@ -616,6 +619,23 @@ def _inline(line: str) -> str:
         pos = m.end()
     out.append(_bold(escape(line[pos:])))
     return "".join(out)
+
+
+def _safe_href(href: str) -> bool:
+    """A link the help text may carry (EXP-005): an https:// address with a
+    host, or a path on this site. Never scheme-relative (``//host``), never
+    a backslash (browsers read ``/\\host`` as ``//host``), never whitespace,
+    control or invisible formatting characters."""
+    if not href or "\\" in href:
+        return False
+    if any(ch.isspace() or unicodedata.category(ch) in ("Cc", "Cf") for ch in href):
+        return False
+    if href.startswith("https://"):
+        parts = urlsplit(href)
+        return parts.scheme == "https" and bool(parts.hostname)
+    if href.startswith("/") and not href.startswith("//"):
+        return url_has_allowed_host_and_scheme(href, allowed_hosts=None)
+    return False
 
 
 def _bold(escaped: str) -> str:

@@ -185,7 +185,14 @@ def post_cost(cost: LegalEvent, *, actor, request=None) -> LedgerEntry:
         )
     if cost.kind != LegalKind.COST or not cost.chargeable or not cost.amount_cents:
         raise LegalError("Only a cost marked chargeable to the owner can be charged.")
-    account_id = accounts.account_on(case.lot_id, timezone.localdate())
+    # The account whose arrears the case is about, even after a sale (BUG-004).
+    account_id = accounts.case_account_id(case)
+    from ledger.services import LedgerError, _refuse_own_account
+
+    try:
+        _refuse_own_account(actor, account_id, "post_cost", request)  # D87
+    except LedgerError as exc:
+        raise LegalError(str(exc)) from exc
     description = f"Collection costs: {cost.detail} ({citation})"[:200]
     try:
         with transaction.atomic():

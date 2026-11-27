@@ -377,6 +377,28 @@ def _vendor_may_be_paid(invoice: Invoice, actor, request=None) -> None:
     conflicts.refuse(actor, invoice, area="invoice", request=request, error=OperationsError)
 
 
+def _claim_may_be_paid(invoice: Invoice, actor, request=None, *, from_claim: bool) -> None:
+    """D66, D77 (BUG-001): an expense reimbursement is paid only from its
+    claim (bank transfer or vendor check), never with the generic invoice Pay
+    action, and every path applies the claim's payment rule: the claimant
+    never pays their own claim, and a board member's claim is paid only by
+    another board member, never the manager."""
+    from operations.reimbursements import ReimbursementError, claim_for_invoice, refuse_payment
+
+    claim = claim_for_invoice(invoice)
+    if claim is None:
+        return
+    try:
+        refuse_payment(actor, claim, "pay", request)
+    except ReimbursementError as exc:
+        raise OperationsError(str(exc)) from exc
+    if not from_claim:
+        raise OperationsError(
+            f"This invoice pays expense reimbursement claim #{claim.pk}: "
+            "pay it from the claim's page (bank transfer or vendor check)."
+        )
+
+
 def payment_block_reason(invoice: Invoice) -> str | None:
     """Why the invoice's vendor may not be paid (D79), or None. An expense
     reimbursement (D77) is paid to the system payee "Expense reimbursements",
@@ -455,8 +477,10 @@ def record_payment(
     note: str = "",
     actor,
     request=None,
+    from_claim: bool = False,
 ) -> InvoicePayment:
     require(actor, "invoice.record_payment")
+    _claim_may_be_paid(invoice, actor, request, from_claim=from_claim)
     if method not in PaymentMethod.values:
         raise OperationsError("Choose a payment method.")
     if _ACCOUNT_NUMBER.search(reference.replace(" ", "").replace("-", "")):

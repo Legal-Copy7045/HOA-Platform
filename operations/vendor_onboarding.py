@@ -1398,8 +1398,18 @@ def decline(rnd: OnboardingRound, *, reason: str, actor, request=None) -> None:
 
 
 def link_conflict(vendor, person, *, note: str = "", removed: bool = False, actor, request=None):
+    """Link (or end the link of) a person to a vendor's conflict disclosure.
+    Anyone who invites vendors may add a link. Ending one (EXP-002, D65) is a
+    board decision with a reason, taken by a board member who is neither the
+    person named nor conflicted on that vendor, never the manager; the rows
+    are append-only, so the earlier link stays on record."""
     require(actor, "vendor.onboarding_invite")
     vendor = _vendor(vendor)
+    if removed:
+        require(actor, "vendor.onboarding_approve")
+        _refuse_conflict_removal(actor, vendor, person, request)
+        if not (note or "").strip():
+            raise OnboardingError("Say why the conflict link no longer applies.")
     row = VendorConflict.objects.create(
         vendor=vendor, person=person, removed=removed, note=(note or "")[:200], recorded_by=actor
     )
@@ -1411,6 +1421,24 @@ def link_conflict(vendor, person, *, note: str = "", removed: bool = False, acto
         metadata={"person_id": person.pk, "removed": removed},
     )
     return row
+
+
+def _refuse_conflict_removal(actor, vendor, person, request) -> None:
+    if actor is SYSTEM:
+        return
+    own = policy.roles_for(actor).person_id == person.pk
+    if own or person_conflicted(actor, vendor.pk):
+        from core import conflicts
+
+        conflicts.audit_refusal(
+            actor, vendor, area="vendor onboarding", action="conflict_remove", request=request
+        )
+        reason = (
+            "You cannot end a conflict link that names you"
+            if own
+            else "You are named in this vendor's conflict-of-interest disclosure"
+        )
+        raise OnboardingError(reason + ": another board member decides.")
 
 
 def possible_conflict_people(text: str):

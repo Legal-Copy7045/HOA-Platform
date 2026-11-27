@@ -111,6 +111,54 @@ def test_vote_required_above_threshold(w):
     assert _levy(w, total=5000).vote_required is False
 
 
+def _closed_vote(
+    w, *, yes, no, title="Approve the Pond dredging special assessment of $200.00", **kw
+):
+    """A closed formal vote with ``yes`` and ``no`` ballots, one per home."""
+    from community.models import Lot
+    from governance.models import Ballot, Vote, VoteOption
+
+    with system_access("t"):
+        lots = w["lots"] + [Lot.objects.get(street_address="4 Bravo Way")]
+    voters = w["owners"] + [w["board_owner"]]
+    fields = {"quorum_percent": 50, "pass_percent": 50, "eligible_lots": 4, "kind": "formal"}
+    fields.update(kw)
+    vote = Vote.objects.create(title=title, status="closed", created_by=w["board"], **fields)
+    options = [
+        VoteOption.objects.create(vote=vote, label=lbl, position=i)
+        for i, lbl in enumerate(("Yes", "No"))
+    ]
+    picks = [options[0]] * yes + [options[1]] * no
+    for user, lot, option in zip(voters, lots, picks, strict=False):
+        Ballot.objects.create(vote=vote, option=option, person=user.person, lot=lot, cast_by=user)
+    return vote
+
+
+def test_levy_needs_a_vote_that_passed_on_this_assessment(w):
+    """BUG-003: a closed vote approves the levy only when it passed, reached
+    quorum, met the rule's percent and was about this assessment."""
+    _rule("special_assessment.vote_required_cents", "10000")
+    _rule("special_assessment.vote_percent", "67")
+    err = sa_service.SpecialAssessmentError
+    with pytest.raises(err, match="did not approve"):
+        _levy(w, total=20000, vote=_closed_vote(w, yes=1, no=3))  # failed
+    with pytest.raises(err, match="did not approve"):
+        _levy(w, total=20000, vote=_closed_vote(w, yes=2, no=2))  # tie
+    with pytest.raises(err, match="quorum"):
+        _levy(w, total=20000, vote=_closed_vote(w, yes=1, no=0))  # 1 of 4 homes
+    with pytest.raises(err, match="below the 67%"):
+        _levy(w, total=20000, vote=_closed_vote(w, yes=2, no=1))  # 2 of 3, under 67%
+    with pytest.raises(err, match="on this special assessment"):
+        _levy(w, total=20000, vote=_closed_vote(w, yes=4, no=0, title="Pool hours poll"))
+    with pytest.raises(err, match="on this special assessment"):  # another amount
+        _levy(w, total=20000, vote=_closed_vote(w, yes=4, no=0, title="Pond dredging, $900.00"))
+    with pytest.raises(err, match="formal"):
+        _levy(w, total=20000, vote=_closed_vote(w, yes=4, no=0, kind="informal"))
+    assert not SpecialAssessment.objects.exists()
+    sa = _levy(w, total=20000, vote=_closed_vote(w, yes=3, no=1))
+    assert sa.vote_required and sa.vote_id
+
+
 def test_installments_post_once_on_due_date_and_allocate(w):
     _levy(w, total=40000)  # 4 homes: 10000 each, 5000 per installment
     assert not _entries(kind=EntryKind.SPECIAL_ASSESSMENT)
@@ -407,6 +455,95 @@ def test_late_fees_suspended_while_plan_is_current(w, settings):
     plan2 = _plan(w, case2)
     payment_plans.approve(plan2, actor=w["board"])
     assert w["lots"][1].pk not in payment_plans.late_fee_suspended_lots()
+
+
+def test_special_assessment_late_fees_suspended_while_plan_is_kept(w, settings):
+    """BUG-005 (D76): a kept plan that suspends late fees stops the special
+    assessment's late fee too."""
+    settings.LEDGER_LATE_FEES_ENABLED = True
+    _rule("late_fee.cents", "2500")
+    _rule("late_fee.grace_days", "10")
+    _rule("special_assessment.late_fees", "true")
+    sa_service.levy(
+        title="Roof",
+        purpose="x",
+        total_cents=4000,
+        due_dates=[TODAY - D(days=30)],
+        resolution_ref="R",
+        actor=SYSTEM,
+    )
+    case = _arrears(w)
+    _charges, total, _account = payment_plans.covered_charges(case)
+    plan = payment_plans.prepare(
+        case, installments=[(TODAY + D(days=5), total)], actor=w["manager"]
+    )
+    assert any(c.entry.kind == EntryKind.SPECIAL_ASSESSMENT for c in _charges)
+    payment_plans.approve(plan, actor=w["board"])
+    candidates = {r["lot"].pk for r in sa_service.late_fee_candidates()}
+    assert w["lots"][0].pk not in candidates and len(candidates) == 3
+    assert sa_service.post_late_fees(actor=w["board"]) == 3
+    with system_access("t"):
+        assert not LedgerEntry.objects.filter(lot=w["lots"][0], kind=EntryKind.LATE_FEE).exists()
+
+
+def _sell(lot, *, case=None):
+    """Sell ``lot`` today; an open case dates from ten days before the sale."""
+    from community.models import Person
+
+    if case is not None:
+        CollectionCase.objects.unscoped("t").filter(pk=case.pk).update(
+            opened_at=timezone.now() - D(days=10)
+        )
+        case.refresh_from_db()
+    buyer = make_member()
+    with system_access("t"):
+        person = Person.objects.get(user=buyer)
+    community.transfer_lot(lot, new_owners=[person], actor=SYSTEM)
+    return buyer
+
+
+def test_plan_on_a_case_opened_before_a_sale_never_covers_the_buyer(w):
+    """BUG-004: the case's arrears stay on the seller's account; a plan is
+    not prepared on the buyer's account from the seller's case."""
+    from ledger import accounts
+
+    case = _arrears(w)
+    seller_account = accounts.current_account_id(w["lots"][0].pk)
+    _sell(w["lots"][0], case=case)
+    services.post_charge(
+        lot=w["lots"][0],
+        kind="other_charge",
+        amount_cents=700,
+        description="Buyer's own charge",
+        posted_on=TODAY,
+        actor=w["board"],
+    )
+    charges, total, account_id = payment_plans.covered_charges(case)
+    assert account_id == seller_account and total == 30000
+    assert all(c.entry.account_id == seller_account for c in charges)
+    with pytest.raises(payment_plans.PaymentPlanError, match="sold"):
+        _plan(w, case)
+
+
+def test_buyer_sees_only_their_own_special_assessment_installments(client, w):
+    """BUG-006: installments posted on the seller's account show no paid or
+    due status to the buyer."""
+    sa_service.levy(
+        title="Bridge",
+        purpose="x",
+        total_cents=8000,
+        due_dates=[TODAY - D(days=20), TODAY + D(days=10)],
+        resolution_ref="R",
+        actor=SYSTEM,
+    )
+    lot = w["lots"][0]
+    buyer = _sell(lot)
+    sa_service.post_due(today=TODAY + D(days=10))
+    statuses = [r["status"] for r in sa_service.for_lot(lot.pk)[0]["installments"]]
+    assert statuses == [sa_service.BEFORE_YOUR_OWNERSHIP, "due"]
+    client.force_login(buyer)
+    page = client.get(reverse("my_account")).content.decode()
+    assert "Before your ownership" in page
 
 
 def test_owner_acknowledges_and_sees_plan(client, w):

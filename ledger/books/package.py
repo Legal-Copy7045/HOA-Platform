@@ -773,11 +773,7 @@ def build(fiscal_year: int, *, actor, automatic: bool = False, request=None) -> 
     files["statements/financial-statements.pdf"] = pdf.render(
         statements.pdf_paragraphs(s), title=f"Financial statements FY{fiscal_year}"
     )
-    stmt_csv = io.StringIO()
-    w = csv.writer(stmt_csv)
-    for row in statements.csv_rows(s):
-        w.writerow(row)
-    files["statements/financial-statements.csv"] = stmt_csv.getvalue().encode()
+    files["statements/financial-statements.csv"] = statements.csv_bytes(s)
     a = s["annual"]
     files["statements/annual-accounting.csv"] = _csv(
         ["Fiscal year", "Income", "Expenditures", "Reserves set aside", "Net excess (deficit)"],

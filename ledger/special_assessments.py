@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import datetime
 import itertools
+import re
 
 from django.conf import settings
 from django.db import IntegrityError, connection, transaction
@@ -127,6 +128,65 @@ def _clean(text: str, limit: int) -> str:
     return " ".join((text or "").split())[:limit]
 
 
+# The labels an approving option of an owners' vote may carry (case-insensitive).
+APPROVING_LABELS = ("yes", "approve", "approved", "for", "in favor", "in favour")
+
+
+def _approving(label: str) -> bool:
+    words = " ".join((label or "").lower().replace(",", " ").split())
+    return any(words == w or words.startswith(w + " ") for w in APPROVING_LABELS)
+
+
+def _amount_named(text: str, total_cents: int) -> bool:
+    """Whether ``text`` names the amount (``$90,000.00``, ``$90,000`` or
+    ``90000``), compared as whole numbers, never as floats."""
+    plain = text.replace(",", "")
+    dollars, cents = divmod(total_cents, 100)
+    forms = [rf"{dollars}\.{cents:02d}"] + ([rf"{dollars}(?:\.00)?"] if cents == 0 else [])
+    return any(re.search(rf"(?<![\d.]){f}(?![\d]|\.\d)", plain) for f in forms)
+
+
+def vote_approval_problem(vote, *, title: str, total_cents: int, percent: int | None) -> str:
+    """Why the linked owners' vote does not approve this special assessment
+    ("" when it does, BUG-003): a closed formal vote on this assessment (its
+    title and amount in the vote's question), quorum met and an approving
+    option leading at or above the vote's own pass percent and the rule
+    ``special_assessment.vote_percent`` (exact integer comparisons, as
+    ``governance.services.results`` does)."""
+    from governance import services as governance
+
+    if vote.status != "closed":
+        return "Link the owners' vote once it has closed."
+    if vote.kind != "formal":
+        return "Link a formal owners' vote (one per home); a poll approves nothing."
+    question = " ".join(f"{vote.title} {vote.description}".split())
+    if _clean(title, 100).lower() not in question.lower() or not _amount_named(
+        question, total_cents
+    ):
+        return (
+            f"The linked vote must be on this special assessment: its question names "
+            f"“{title}” and the total of {format_cents(total_cents)}."
+        )
+    res = governance.results(vote)
+    outcome = res["outcome"]
+    if not outcome or not outcome["quorum_met"]:
+        return "The linked vote did not reach its quorum, so it approves nothing."
+    leader = max(res["rows"], key=lambda r: r["count"], default=None)
+    if (
+        not outcome["meets_threshold"]
+        or leader is None
+        or outcome["leading"] != leader["option"].label
+        or not _approving(leader["option"].label)
+    ):
+        return "The owners did not approve this special assessment in the linked vote."
+    if percent is not None and leader["count"] * 100 < int(percent) * res["total"]:
+        return (
+            f"The approving option has {leader['count']} of {res['total']} votes, below the "
+            f"{percent}% the community's rule requires."
+        )
+    return ""
+
+
 # --- Levy --------------------------------------------------------------------------------
 
 
@@ -175,6 +235,10 @@ def levy(
     vote_ref = _clean(vote_ref, 120)
     if vote is not None and vote.status != "closed":
         raise SpecialAssessmentError("Link the owners' vote once it has closed.")
+    if vote is not None:
+        problem = vote_approval_problem(vote, title=title, total_cents=total_cents, percent=percent)
+        if problem:
+            raise SpecialAssessmentError(problem)
     if needed and vote is None and not vote_ref:
         raise SpecialAssessmentError(
             f"Above {format_cents(_threshold)} the owners must approve a special assessment"
@@ -599,6 +663,11 @@ def late_fee_candidates(on: datetime.date | None = None) -> list[dict]:
         return []
     late_from = on - datetime.timedelta(days=int(grace) + 1)
     done = set(SpecialAssessmentLateFee.objects.values_list("installment_id", "lot_id"))
+    # D76 (BUG-005): no late fee while the home keeps a payment plan that
+    # suspends them, as for the monthly assessment (ledger.services).
+    from ledger.payment_plans import late_fee_suspended_lots
+
+    suspended = late_fee_suspended_lots(on)
     out = []
     for c in (
         SpecialAssessmentCharge.objects.filter(
@@ -607,7 +676,7 @@ def late_fee_candidates(on: datetime.date | None = None) -> list[dict]:
         .select_related("installment__assessment", "entry", "lot")
         .order_by("id")
     ):
-        if (c.installment_id, c.lot_id) in done:
+        if (c.installment_id, c.lot_id) in done or c.lot_id in suspended:
             continue
         if allocation.load_book(c.lot_id).remaining(c.entry_id) <= 0:
             continue
@@ -675,13 +744,20 @@ def post_late_fees(*, actor, request=None, on: datetime.date | None = None) -> i
 # --- Owner view ---------------------------------------------------------------------------
 
 
+BEFORE_YOUR_OWNERSHIP = "before your ownership"
+
+
 @internal("special assessments for an owner")
-def for_lot(lot_id: int) -> list[dict]:
+def for_lot(lot_id: int, account="current") -> list[dict]:
     """The special assessments with a share for this home: the home's share,
     each installment's amount, due date and status for the owner (posted
-    charges are on the account like any charge)."""
+    charges are on the account like any charge). Only ``account`` (today's,
+    by default) shows paid or due: an installment posted on an earlier
+    owner's account reads "before your ownership" with no status (BUG-006)."""
     from ledger import allocation
+    from ledger.accounts import ALL, resolve
 
+    account_id = resolve(lot_id, account)
     out = []
     for share in SpecialAssessmentShare.objects.filter(lot_id=lot_id).select_related("assessment"):
         sa = share.assessment
@@ -690,14 +766,16 @@ def for_lot(lot_id: int) -> list[dict]:
             c.installment_id: c
             for c in SpecialAssessmentCharge.objects.filter(
                 installment__assessment=sa, lot_id=lot_id
-            )
+            ).select_related("entry")
         }
         book = allocation.load_book(lot_id) if posted else None
         rows = []
         for inst in SpecialAssessmentInstallment.objects.filter(assessment=sa).order_by("number"):
             amount = installment_amounts(share.amount_cents, sa.installments)[inst.number - 1]
             charge = posted.get(inst.pk)
-            if charge is not None:
+            if charge is not None and account_id != ALL and charge.entry.account_id != account_id:
+                status = BEFORE_YOUR_OWNERSHIP
+            elif charge is not None:
                 status = "paid" if book.remaining(charge.entry_id) <= 0 else "due"
             elif stop is not None and inst.number >= stop:
                 status = "cancelled"

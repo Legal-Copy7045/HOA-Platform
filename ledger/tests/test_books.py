@@ -664,6 +664,23 @@ def test_package_download_is_audited_and_board_auditor_only(client, fy):
     assert set(ev.metadata) <= {"fiscal_year", "files", "size"}
 
 
+def test_package_statements_csv_escapes_formulas(fy, monkeypatch):
+    """BUG-007: the package's financial-statements.csv escapes text cells
+    against spreadsheet formulas, like the direct download."""
+    from ledger.books import statements as st
+
+    real = st.csv_rows
+    monkeypatch.setattr(
+        st, "csv_rows", lambda s: [*real(s), ["=HYPERLINK(1)", "-12.50", "+cmd", "1000"]]
+    )
+    pkg = package.build(2025, actor=fy["board"])
+    data = pkg.file.open("rb").read()
+    text = zipfile.ZipFile(io.BytesIO(data)).read("statements/financial-statements.csv").decode()
+    last = text.strip().splitlines()[-1]
+    assert last == "'=HYPERLINK(1),-12.50,'+cmd,1000"
+    assert package.verify(data) == []
+
+
 def test_year_waits_for_its_months(fy):
     ev = close.evaluate_year(2025)
     assert _check(ev, "months").open_items

@@ -724,6 +724,8 @@ def record_online_refund(
     against Stripe clearing. A full refund may instead reverse the payment,
     which also reopens the charges it paid."""
     _authorize(actor, "ledger.manage")
+    # D87 (SEC-001): never on an account the actor is or was on the deed of.
+    _refuse_own_account(actor, payment.account_id, "record_refund", request)
     if payment.kind != EntryKind.PAYMENT or not payment.reference or amount_cents <= 0:
         raise LedgerError("Only part of an online payment can be recorded as refunded.")
     description = f"Refund at Stripe {refund_id}"[:200]

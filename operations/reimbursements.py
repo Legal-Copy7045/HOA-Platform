@@ -426,6 +426,7 @@ def pay_by_transfer(claim, *, paid_on: datetime.date, reference: str, actor, req
             note=f"Reimbursement claim #{claim.pk}",
             actor=actor,
             request=request,
+            from_claim=True,
         )
     except ops.OperationsError as exc:
         raise ReimbursementError(str(exc)) from exc

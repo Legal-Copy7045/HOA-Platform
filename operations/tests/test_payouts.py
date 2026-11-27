@@ -307,3 +307,43 @@ def test_vendor_checks_page(client, w):
     client.force_login(owner)
     assert client.get(reverse("vendor_checks")).status_code == 403
     assert Invoice.objects.get(pk=inv.pk).state == "approved"
+
+
+def test_reimbursement_invoice_is_never_paid_through_the_generic_pay_action(client, w):
+    """BUG-001 (D66, D77): the generic invoice Pay action refuses an expense
+    reimbursement for every role, and the claim's own rule still applies to
+    anyone calling the service directly."""
+    claim = _claim(w, who="board")
+    rb.approve(claim, actor=w["board2"])
+    invoice = rb.state(claim)["invoice"]
+    pay = {
+        "paid_on": TODAY.isoformat(),
+        "method": "ach",
+        "amount_cents": "42.50",
+        "reference": "T1",
+    }
+    for who in ("board", "manager", "board2"):
+        client.force_login(w[who])
+        page = client.get(reverse("invoice_detail", args=[invoice.pk])).content.decode()
+        assert reverse("invoice_action", args=[invoice.pk, "pay"]) not in page
+        assert reverse("reimbursement_detail", args=[claim.pk]) in page
+        client.post(reverse("invoice_action", args=[invoice.pk, "pay"]), pay)
+        assert not InvoicePayment.objects.filter(invoice=invoice).exists(), who
+    assert rb.state(claim)["status"] == "approved"
+    # The service applies the claim's rule before the "pay it from the claim" refusal.
+    with pytest.raises(ops.OperationsError, match="own claim"):
+        ops.record_payment(
+            invoice, paid_on=TODAY, method="ach", amount_cents=4250, actor=w["board"]
+        )
+    assert AuditEvent.objects.filter(action="policy.own_matter_refused").exists()
+    with pytest.raises(ops.OperationsError, match="board member"):
+        ops.record_payment(
+            invoice, paid_on=TODAY, method="ach", amount_cents=4250, actor=w["manager"]
+        )
+    with pytest.raises(ops.OperationsError, match="claim's page"):
+        ops.record_payment(
+            invoice, paid_on=TODAY, method="ach", amount_cents=4250, actor=w["board2"]
+        )
+    # The claim's own path still works for another board member.
+    rb.pay_by_transfer(claim, paid_on=TODAY, reference="X1", actor=w["board2"])
+    assert rb.state(claim)["status"] == "paid"

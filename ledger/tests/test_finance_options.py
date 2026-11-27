@@ -20,6 +20,7 @@ from community.tests.factories import LotFactory, make_member
 from core import features
 from core.my_items import items_for
 from core.policy import SYSTEM
+from core.scoping import system_access
 from ledger import allocation, cashflow, interest, legal
 from ledger import services as ledger
 from ledger.cashflow import Inputs, Scenario, add_months, apply_scenario, project, spread
@@ -465,6 +466,59 @@ def test_charging_a_cost_needs_the_rule_a_board_member_and_not_ones_own_home(w):
         legal.post_cost(not_chargeable, actor=w["board"])
     audit = AuditEvent.objects.get(action="legal.cost_posted")
     assert set(audit.metadata) == {"case_id", "lot_id", "amount_cents"}
+
+
+def _sell(lot, *, case=None, days_before=10):
+    """Sell ``lot`` today to a new owner; the open case dates from before the sale."""
+    from community.models import Person
+    from ledger.models import CollectionCase
+
+    if case is not None:
+        CollectionCase.objects.unscoped("t").filter(pk=case.pk).update(
+            opened_at=timezone.now() - datetime.timedelta(days=days_before)
+        )
+        case.refresh_from_db()
+    buyer = make_member()
+    with system_access("t"):
+        person = Person.objects.get(user=buyer)
+    community.transfer_lot(lot, new_owners=[person], actor=SYSTEM)
+    return buyer
+
+
+def test_collection_costs_stay_on_the_sellers_account_after_a_sale(w):
+    """BUG-004: a cost charged on a case opened before the sale posts on the
+    seller's account (the arrears it is about), never on the buyer's."""
+    from ledger import accounts
+
+    _rule("legal.costs_chargeable", "true", "Declaration §6.7 (test)")
+    case = _referred_case(w)
+    seller_account = accounts.current_account_id(w["lot_b"].pk)
+    legal.record(case, kind="referral", firm="Example LLP", actor=w["board"])
+    cost = legal.record(
+        case, kind="cost", amount_cents=35000, chargeable=True, detail="Fee", actor=w["board"]
+    )
+    _sell(w["lot_b"], case=case)
+    buyer_account = accounts.current_account_id(w["lot_b"].pk)
+    assert buyer_account != seller_account
+    assert accounts.case_account_id(case) == seller_account
+    # The seller, now on the board, still may not charge their former account (D87).
+    from community.models import SeatType
+    from community.tests.factories import days_ago
+
+    community.record_board_seat(
+        person=w["owner_b"].person,
+        seat_type=SeatType.OWNER_ELECTED,
+        term_start=days_ago(5),
+        actor=SYSTEM,
+    )
+    with pytest.raises(legal.LegalError):
+        legal.post_cost(cost, actor=w["owner_b"])
+    entry = legal.post_cost(cost, actor=w["board"])
+    assert entry.account_id == seller_account
+    with system_access("t"):
+        assert not LedgerEntry.objects.filter(
+            account_id=buyer_account, kind=EntryKind.LEGAL_COST
+        ).exists()
 
 
 def test_release_reminder_when_a_referred_case_is_paid(w):

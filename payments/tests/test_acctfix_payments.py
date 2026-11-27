@@ -263,3 +263,59 @@ def test_refund_surcharge_parts_never_exceed_the_surcharge(client, w, refunds, e
     parts = pay_services.refund_portions(payment)
     assert [s for _e, s, _b in parts] == expected
     assert all(s + b == e.amount_cents for e, s, b in parts)
+
+
+def test_seller_on_the_board_takes_no_step_on_a_refund_of_their_former_account(client, w, books):
+    """SEC-001 (D65, D87): a board member who sold the home neither records
+    nor closes a refund alert for a payment on their former account, even
+    when the alert arose after the sale; another board member does."""
+    from django.utils import timezone
+
+    from audit.models import AuditEvent
+    from community import services as community
+    from community.models import Person, SeatType
+    from community.tests.factories import days_ago
+    from core.policy import SYSTEM
+    from payments.models import PaymentAlert
+
+    payment, ch_id = _credit_card_payment(client, w)
+    seller_account = payment.entry.account_id
+    buyer = make_member()
+    with system_access("t"):
+        person = Person.objects.get(user=buyer)
+    community.transfer_lot(w["lot"], new_owners=[person], actor=SYSTEM)
+    seller = w["owner"]
+    community.record_board_seat(
+        person=seller.person,
+        seat_type=SeatType.OWNER_ELECTED,
+        term_start=days_ago(1),
+        actor=SYSTEM,
+    )
+    _refund(w, ch_id, "re_qa000099", 1_030)
+    (alert,) = _alerts(AlertKind.REFUND)
+    # The alert arose well after the sale: only the account links it to the seller.
+    PaymentAlert.objects.unscoped("t").filter(pk=alert.pk).update(
+        created_at=timezone.now() + datetime.timedelta(days=40)
+    )
+    alert.refresh_from_db()
+    assert seller_account in alert.account_ids()
+    with pytest.raises(ledger.LedgerError):
+        pay_services.record_refund(alert, actor=seller)
+    with pytest.raises(ledger.LedgerError):
+        ledger.record_online_refund(
+            payment=payment.entry, amount_cents=100, refund_id="re_x", actor=seller
+        )
+    client.force_login(seller)
+    url = reverse("payment_alert_resolve", args=[alert.pk])
+    client.post(url, {"record_refund": "1"})
+    client.post(url, {"note": "Done"})
+    (alert,) = _alerts(AlertKind.REFUND)
+    assert alert.resolved_at is None
+    with system_access("t"):
+        assert not LedgerEntry.objects.filter(kind="refund").exists()
+    assert AuditEvent.objects.filter(
+        action="policy.own_matter_refused", metadata__area="payments"
+    ).exists()
+    # Another board member records it, on the seller's account.
+    entry = pay_services.record_refund(alert, actor=w["board"])
+    assert entry.account_id == seller_account
