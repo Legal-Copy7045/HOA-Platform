@@ -94,11 +94,11 @@ OAK_CREEK_COUNTS = {
     "community.Person": 51,
     "community.RoleAssignment": 3,
     "compliance.Violation": 1,
-    "documents.Document": 4,
+    "documents.Document": 14,  # 10 from documents/demo_renewals.py (D72)
     "governance.Meeting": 3,
     "governance.Vote": 1,
     "operations.Invoice": 4,
-    "operations.Vendor": 3,
+    "operations.Vendor": 7,  # 4 from documents/demo_renewals.py (D72)
 }
 
 

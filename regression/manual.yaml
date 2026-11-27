@@ -338,3 +338,11 @@
   check: "As a demo board member who owns a home, with a second board member: your own home's request, notice, booking and account show no Board label, say 'another board member handles it' where the board's buttons would be, and the staff steps are greyed out; you can still reply, withdraw, respond, cancel and pay as the owner. Signed in as the other board member, the same pages carry the Board label and every step works. An internal note the other board member writes on your request is not shown to you (D65)."
   steps: "POC with fictional data: raise a request for your demo home, ask the other board member to post an internal note, open both views on a desktop and a phone; check Sysadmin activity or the audit log for 'own_matter_refused' after a crafted POST."
   last: ""
+- key: renewals on a phone and in a real mailbox
+  check: "On the POC with fictional data, Maintenance → Renewals lists the demo policies, certificates and contracts soonest first with red for past deadlines and amber for coming up, readable on a phone; a demo board member's My items shows them; the next morning one '[Board] Renewals coming up' email arrives listing them, and no second email comes for the same items the day after; the manager can record a certificate but sees no Board decision on a contract (D72)."
+  steps: "POC reseeded with oak_creek; sign in as a demo board member and as the demo manager on a phone and a desktop; check the mail catcher or the redirected inbox on two mornings."
+  last: ""
+- key: records disposal by two board members
+  check: "On the POC with fictional data, Settings → Records retention shows the schedule, the demo records past their period, one disposal waiting for a second board member, one legal hold and one disposed file; a second demo board member confirms the waiting disposal, the file is gone from the file store (download says it was disposed of) while its document page still lists the version with its name and the disposal; a hold placed on a document stops it being proposed (D72)."
+  steps: "POC reseeded with oak_creek; two demo board members in two browsers; check the file store object count before and after with check_storage or the SeaweedFS console."
+  last: ""

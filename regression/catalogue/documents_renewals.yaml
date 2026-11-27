@@ -1,0 +1,17 @@
+# Renewals, records retention, access history and version comparison (D72).
+# `match` runs over "<stage>:<check>".
+- feature: "Renewals: association insurance policies (next term renews the last and versions its document), vendors' certificates (append-only, set the vendor's expiry), contract renewal terms (notice deadline for self-renewing contracts, rolling terms); reminder windows from rules with citations; red when past the deadline; one board email per item and threshold (rule days, 30, 7, on the day); board and manager record, only the board decides a contract term; My items; resale certificate reads the current liability policy; counts-only audit; feature switch"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:documents/tests/test_renewals\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[renewal", "^manual:renewals on a phone and in a real mailbox"]
+- feature: "Records retention: per-category rules (forever, years after the document date, after supersession, after the contract ends); nightly scan lists only and tells the board when the list grows; disposal proposed by one board member and confirmed by a different one; stored file removed while the version row, document and append-only disposal record stay; disposed files never downloadable; legal holds on a document or a category block proposal and confirmation; board only; counts-only audit"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:documents/tests/test_retention\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[records_", "^manual:records disposal by two board members"]
+- feature: "Document access history (board and auditor, from audit events, no network addresses, scoped like the document), document date, and plain-text version comparison (escaped, PDF and Word refused)"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:documents/tests/test_access_history\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[document_(access|compare|set_date)\\]"]
+- feature: "Renewals and retention demo data: policies, certificates and contracts current, due soon and expired; records due, waiting for a second board member, under a hold and disposed of"
+  since: M5
+  match: ["^unit:documents/tests/test_demo_renewals\\.py::test_"]

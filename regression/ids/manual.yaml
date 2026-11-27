@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-085
+# highest issued: MAN-087
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -85,3 +85,5 @@ MAN-082: "can't sign in on a phone"
 MAN-083: "walkthrough 2 phone fixes"
 MAN-084: "board cues"
 MAN-085: "own matters"
+MAN-086: "renewals on a phone and in a real mailbox"
+MAN-087: "records disposal by two board members"

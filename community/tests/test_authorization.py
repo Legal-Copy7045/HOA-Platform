@@ -318,6 +318,9 @@ MEMBER_READS = {
                 "reserves.view_summary",
                 "bank_feed.view",
                 "disbursement.view",
+                # D72: Renewals (read only) and document access history.
+                "renewals.view",
+                "document.access_history",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ contract.title }}: renewal · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'renewals' %}">Renewals</a> / {{ contract.title }}</div>
+  <div class="page-head"><div><h1>{{ contract.title }}: renewal</h1>
+    <div class="meta"><span>{{ contract.vendor.name }}</span><span>{{ contract.starts_on|date:"M j, Y" }} – {{ contract.ends_on|date:"M j, Y"|default:"open-ended" }}</span>{% if term %}<span class="status tone-{{ term.tone }}">{{ term.status }}</span>{% endif %}<a href="{% url 'contract_detail' contract.pk %}">Contract details</a></div></div></div>
+  <div class="split">
+    <div>
+      <section class="card"><h2>This term</h2>
+        {% if term %}<dl class="kv">
+          <dt>Term ends</dt><dd>{{ term.term_ends_on|date:"M j, Y" }}</dd>
+          <dt>{{ term.what }}</dt><dd>{{ term.deadline|date:"M j, Y" }}</dd>
+          <dt>Renewal</dt><dd>{% if terms %}{{ terms.get_renewal_display }}{% if terms.notice_days %}; {{ terms.notice_days }} days' notice to cancel{% endif %}{% if terms.renews_for_months %}; each renewal {{ terms.renews_for_months }} months{% endif %}{% else %}Not recorded (treated as ending unless renewed){% endif %}</dd>
+          {% if terms.document %}<dt>Document</dt><dd><a href="{% url 'document_detail' terms.document.pk %}">{{ terms.document.title }}</a></dd>{% endif %}
+        </dl>
+        {% if can_decide and not term.decision %}
+          <h3>Board decision</h3>
+          <form method="post" action="{% url 'renewal_contract_decide' contract.pk %}" data-confirm="Record this decision for the term ending {{ term.term_ends_on|date:'M j, Y' }}? It can't be changed afterwards; reminders for this term stop.">{% csrf_token %}{% include "partials/form_errors.html" with form=decision_form %}{{ decision_form }}<div class="form-actions"><button type="submit">Record decision</button></div></form>
+        {% elif not can_decide and not term.decision %}<p class="small muted">Whether to renew, cancel or let it end is the board's decision.</p>{% endif %}
+        {% else %}<p class="muted">This contract has no end date, so there is nothing to renew. Give it an end date on the contract's page.</p>{% endif %}
+      </section>
+      {% if decisions %}<section class="card"><h2>Decisions</h2><ul class="list">{% for d in decisions %}<li>{% icon "check-circle" %}<div class="grow"><div>{{ d.get_decision_display }} · term ending {{ d.term_ends_on|date:"M j, Y" }}</div><div class="small muted">{{ d.decided_at|date:"M j, Y" }} · {% actor_label d.decided_by %} · {{ d.note }}</div></div></li>{% endfor %}</ul></section>{% endif %}
+    </div>
+    <aside>{% if can_record %}<section class="card"><h3>Renewal terms</h3>
+      <form method="post" enctype="multipart/form-data">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Save terms</button></div></form>
+      <p class="small muted">From the contract's renewal and cancellation clauses. The signed contract goes to the document library (Contracts, board only).</p></section>{% endif %}</aside>
+  </div>
+{% endblock %}

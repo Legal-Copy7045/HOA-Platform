@@ -792,3 +792,7 @@ details.row-more > p { margin: .4rem 0 .2rem; }
 /* The dashboard's two parts for people with a home and board work (D64). */
 .dash-part-head { display: flex; align-items: center; gap: .5rem; margin-top: 1.5rem; }
 .dash-part-head .board-badge { font-size: .7rem; }
+/* Version comparison (D72): side by side, wraps long lines, no inline styles. */
+table.diff td { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
+table.diff tr.diff-replace .diff-old, table.diff tr.diff-delete .diff-old { background: var(--danger-bg); }
+table.diff tr.diff-replace .diff-new, table.diff tr.diff-insert .diff-new { background: var(--success-bg); }

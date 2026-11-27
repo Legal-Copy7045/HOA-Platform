@@ -25,6 +25,10 @@ class Category(models.TextChoices):
     FORMS = "forms", "Forms"
     ARC = "arc", "Architectural guidelines"
     LOT = "lot", "About one home"
+    # D72: the association's insurance policies and certificates, and its
+    # contracts (each has its own retention rule).
+    INSURANCE = "insurance", "Insurance"
+    CONTRACTS = "contracts", "Contracts"
     OTHER = "other", "Other"
 
 
@@ -99,6 +103,10 @@ class Document(ScopedModel):
         "governance.Committee", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     description = models.TextField(blank=True)
+    # The document's own date (a statement's period end, a contract's signing
+    # date): what "N years after the document date" counts from (D72). Blank
+    # means the day it was added to the library.
+    dated_on = models.DateField(null=True, blank=True)
     current_version = models.ForeignKey(
         "DocumentVersion", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
@@ -244,3 +252,10 @@ class AttachmentScan(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"scan {self.result}"
+
+
+# --- Renewals and records retention (D72) -----------------------------------------------
+# Kept with the document library: each policy, certificate and contract term
+# points at its document (a library version), and retention works on versions.
+
+from documents.renewal_models import *  # noqa: E402, F403

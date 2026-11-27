@@ -175,6 +175,13 @@ HUBS = {
             "Former owners' contact details cleared after the retention period.",
         ),
         (
+            "Records retention",
+            "records_retention",
+            "clock",
+            "records_retention.manage",
+            "How long each kind of document is kept, disposal by two board members, legal holds.",
+        ),
+        (
             "Demo data",
             "demo_data",
             "leaf",
@@ -300,6 +307,8 @@ SECTIONS = [
             ("Work orders", "work_orders", "wrench", "finance.view"),
             ("Vendors", "vendors", "users", "finance.view"),
             ("Contracts", "contracts", "file", "finance.view"),
+            # Insurance, vendor certificates and contract deadlines (D72).
+            ("Renewals", "renewals", "shield", "renewals.view"),
         ],
     ),
     (
