@@ -6,6 +6,26 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.42.0 — 2026-11-27
+
+- Finance overview (D89): the first page of Finance, one card per part of the
+  money side (money in, money out, books, planning, year end and tax), each
+  with its status, its own waiting count and a link, and the funds' cash at
+  the last closed month on top. It replaces "More finance"; every hub tile now
+  shows its own count, so the menu bubble always matches what the page shows.
+- Walkthrough fixes (D88): Board cues on board panels of Community pages (one
+  Board actions panel on a meeting); My items split into Board work and Your
+  home; the dashboard says when it shows part of the board queue; tab strips
+  wrap on phones; Sysadmin activity, Reserve plan, Home neighbors and Owner
+  accounts are shorter and clearer; breadcrumbs back from hub pages; no more
+  duplicate settings tiles or sign-up filters; buttons no longer sit on the
+  tiles below them.
+- Project standard 1.1.0 (D90): one required CI check (ci-result), releases
+  tagged and published from a merged version bump, the server installs the
+  latest release tag, weekly Dependabot with auto-merge of small updates,
+  weekly CodeQL, a privacy guard, and the standard regression commands. The
+  project's instructions for Claude are split into short topic files.
+
 ## 0.41.0 — 2026-11-27
 
 Fixes from the full check (D87):
