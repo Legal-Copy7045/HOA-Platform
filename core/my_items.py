@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from core import policy
 from core.dates import short_date
-from core.scoping import own_records
+from core.scoping import own_records, system_access
 
 
 @dataclass
@@ -243,6 +243,35 @@ def items_for(user) -> list[Item]:
                         reverse("approvals"),
                         "warning",
                         nav="approvals",
+                    )
+                )
+    if can(user, "seat.manage"):
+        # Board members selling their home resign first (D66): an
+        # owner-elected seat whose holder no longer owns a home here.
+        from community.models import BoardSeat, Ownership, SeatType
+
+        with system_access("seats without a home"):
+            seats = list(
+                BoardSeat.objects.active()
+                .filter(seat_type=SeatType.OWNER_ELECTED)
+                .select_related("person")
+            )
+            owning = set(
+                Ownership.objects.active()
+                .filter(person_id__in=[s.person_id for s in seats])
+                .values_list("person_id", flat=True)
+            )
+        for seat in seats:
+            if seat.person_id not in owning:
+                out.append(
+                    Item(
+                        "People",
+                        f"End {seat.person.display_name}'s board seat",
+                        "They no longer own a home here; a board member selling their home "
+                        "resigns from the board first",
+                        reverse("person_detail", args=[seat.person_id]),
+                        "warning",
+                        nav="people",
                     )
                 )
     if can(user, "role.sysadmin.approve"):

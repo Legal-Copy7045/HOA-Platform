@@ -103,3 +103,6 @@
   since: M5
   docs: docs/runbook.md
   match: ["^unit:core/tests/test_setup_scripts\\.py::test_", "^unit:core/tests/test_host_tasks\\.py::test_test_email_starts_from_server_tasks"]
+- feature: "Regression ID files stay zero-padded, unique and stable across merges"
+  since: M5
+  match: ["^unit:regression/tests/test_ids_files.py::test_"]

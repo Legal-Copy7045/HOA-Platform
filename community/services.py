@@ -1020,6 +1020,7 @@ def record_board_seat(
     actor,
     request: HttpRequest | None = None,
     _second_approval: bool = False,
+    _elected: bool = False,
 ) -> BoardSeat:
     _authorize(actor, "seat.manage")
     if seat_type not in SeatType.values:
@@ -1027,7 +1028,7 @@ def record_board_seat(
     if term_end is not None and term_end < term_start:
         raise CommunityError("A term cannot end before it starts.")
     _refuse_self_grant(actor, person, "a board seat")
-    if seat_needs_second_approval(actor) and not _second_approval:
+    if seat_needs_second_approval(actor, elected=_elected) and not _second_approval:
         raise CommunityError(
             "A new board seat needs a second board member's approval: propose it instead."
         )
@@ -2124,13 +2125,22 @@ def roster_rows(*, actor, include_dormant: bool = False) -> list[dict]:
 # --- Board seats with a second approval (decision D21) ------------------------------------
 
 
-def seat_needs_second_approval(actor) -> bool:
-    """On in production. Exempt: trusted internal code, and the start-up phase
-    while fewer than two board members hold seats (nobody to approve)."""
+def seat_needs_second_approval(actor, *, elected: bool = False) -> bool:
+    """On in production. Exempt: trusted internal code, and the one-time
+    start-up, before a second board seat has ever been recorded (nobody to
+    approve). Seats that later end, by resignation or by another board
+    member ending them, never reopen it (D66): once the board has had two
+    seats, a new seat always needs a second board member. The one other
+    exemption is an owners' election certified while fewer than two seats
+    are active: the owners' vote is the second approval."""
     if actor is SYSTEM or not settings.BOARD_SEAT_SECOND_APPROVAL:
         return False
     with system_access("count board seats"):
-        return BoardSeat.objects.active().count() >= 2
+        if BoardSeat.objects.count() < 2:
+            return False
+        if elected and BoardSeat.objects.active().count() < 2:
+            return False
+    return True
 
 
 def propose_board_seat(
@@ -2142,15 +2152,18 @@ def propose_board_seat(
     citation: str = "",
     actor,
     request: HttpRequest | None = None,
+    elected: bool = False,
 ):
     """Record the seat now if no second approval is needed, otherwise create a
     nomination for another board member. Returns ("recorded", seat) or
-    ("proposed", nomination)."""
+    ("proposed", nomination). ``elected``: from a certified owners' election
+    (``governance.elections``)."""
     from community.models import BoardSeatNomination
 
     _authorize(actor, "seat.manage")
-    if not seat_needs_second_approval(actor):
+    if not seat_needs_second_approval(actor, elected=elected):
         return "recorded", record_board_seat(
+            _elected=elected,
             person=person,
             seat_type=seat_type,
             term_start=term_start,

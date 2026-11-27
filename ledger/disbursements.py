@@ -60,7 +60,7 @@ from community.rules import rule, rule_with_citation
 from core import conflicts, pdf
 from core.lists import safe_cell
 from core.money import format_cents
-from core.policy import SYSTEM, can, require, roles_for
+from core.policy import BOARD, SYSTEM, can, require, roles_for
 from core.scoping import internal, system_access
 from ledger.models import (
     CheckEventKind,
@@ -196,7 +196,8 @@ def amount_in_words(cents: int) -> str:
 
 @internal("disbursement payee")
 def account_owners(account_id: int) -> list:
-    """The people on the deed of an ownership account (current or past)."""
+    """Everyone ever on the deed of an ownership account (current or past,
+    removed co-owners included). Used to refuse steps, never for a payee."""
     seen, out = set(), []
     for o in (
         Ownership.objects.filter(account_id=account_id)
@@ -209,13 +210,34 @@ def account_owners(account_id: int) -> list:
     return out
 
 
+@internal("disbursement payee")
+def payee_owners(account: Account) -> list:
+    """Who a check to this account is made out to: the owners on the deed
+    today while the account is open, or the owners at the sale once it is
+    dormant. A co-owner removed from the deed earlier is never named."""
+    rows = Ownership.objects.filter(account_id=account.pk).select_related("person")
+    if account.is_active:
+        rows = rows.active()
+    elif account.closed_on is not None:
+        at_sale = rows.filter(start_date__lt=account.closed_on, end_date=account.closed_on)
+        last_day = account.closed_on - datetime.timedelta(days=1)
+        rows = at_sale if at_sale.exists() else rows.active(last_day)
+    seen, out = set(), []
+    for o in rows.order_by("start_date", "id"):
+        if o.person_id not in seen:
+            seen.add(o.person_id)
+            out.append(o.person)
+    return out
+
+
 def payee_for(account: Account) -> tuple[str, str, str]:
     """(payee name, mailing address, source) for a check to an account's
-    owners. A former owner's address is where they get mail now (their
-    profile, or another home they own), never the home they sold."""
+    owners (``payee_owners``). A former owner's address is where they get
+    mail now (their profile, or another home they own), never the home
+    they sold."""
     from community.services import postal_address
 
-    people = account_owners(account.pk)
+    people = payee_owners(account)
     if not people:
         return "", "", "none"
     name = " and ".join(p.display_name for p in people)[:120]
@@ -226,11 +248,70 @@ def payee_for(account: Account) -> tuple[str, str, str]:
 
 @internal("disbursement recipients")
 def recipient_person_ids(batch: DisbursementBatch) -> set[int]:
-    """Everyone on the deed of an account the batch pays."""
+    """Everyone ever on the deed of an account the batch pays."""
     accounts = DisbursementLine.objects.filter(batch=batch).values_list("account_id", flat=True)
     return set(
         Ownership.objects.filter(account_id__in=list(accounts)).values_list("person_id", flat=True)
     )
+
+
+@internal("disbursement recipients")
+def line_recipient_ids(line: DisbursementLine) -> set[int]:
+    """Everyone ever on the deed of the account one line pays."""
+    return set(
+        Ownership.objects.filter(account_id=line.account_id).values_list("person_id", flat=True)
+    )
+
+
+@internal("disbursement recipients")
+def board_person_ids() -> set[int]:
+    """People holding a board seat today."""
+    from community.models import BoardSeat
+
+    return set(BoardSeat.objects.active().values_list("person_id", flat=True))
+
+
+def payment_refusal(actor, line: DisbursementLine, recipients=None, board=None) -> str:
+    """Why ``actor`` may not write, void or clear the check for ``line``
+    ("" when they may). Nobody processes a payment to an account they were
+    ever on the deed of (removed co-owners and sellers included), and a
+    payment to a board member's account is processed by another board
+    member, never the manager (D66)."""
+    if actor is SYSTEM:
+        return ""
+    recipients = line_recipient_ids(line) if recipients is None else recipients
+    roles = roles_for(actor)
+    if roles.person_id is not None and roles.person_id in recipients:
+        return (
+            f"The check for {line.lot.label} pays an account you are or were on the deed of; "
+            "another board member handles it."
+        )
+    board = board_person_ids() if board is None else board
+    if recipients & board and BOARD not in roles.groups:
+        return (
+            f"The check for {line.lot.label} pays a board member; another board member handles it."
+        )
+    return ""
+
+
+def _refuse_payment(actor, lines, action: str, request=None) -> None:
+    """Refuse writing, voiding or clearing any of these lines' checks that
+    ``actor`` may not process (``payment_refusal``), audited as an own
+    matter when it is their own."""
+    if actor is SYSTEM:
+        return
+    with system_access("payment refusal"):
+        board = board_person_ids()
+        person_id = roles_for(actor).person_id
+        for line in lines:
+            recipients = line_recipient_ids(line)
+            reason = payment_refusal(actor, line, recipients, board)
+            if reason:
+                if person_id is not None and person_id in recipients:
+                    conflicts.audit_refusal(
+                        actor, line, area="disbursement", action=action, request=request
+                    )
+                raise DisbursementError(reason)
 
 
 @internal("disbursement credit")
@@ -363,6 +444,9 @@ def _refuse_own_refund(actor, batch: DisbursementBatch, action: str, request=Non
         return
     with system_access("own refund check"):
         lines = list(DisbursementLine.objects.filter(batch=batch))
+    message = (
+        "You are or were an owner on the account this refunds; another board member handles it."
+    )
     conflicts.refuse_any(
         actor,
         lines,
@@ -370,8 +454,19 @@ def _refuse_own_refund(actor, batch: DisbursementBatch, action: str, request=Non
         action=action,
         request=request,
         error=DisbursementError,
-        message="You are an owner on the account this refunds; another board member handles it.",
+        message=message,
     )
+    # A seller or a removed co-owner is no longer an owner of the home, so
+    # the account's deed is checked too (D66).
+    person_id = roles_for(actor).person_id if actor is not SYSTEM else None
+    if person_id is not None:
+        with system_access("own refund check"):
+            ever = person_id in recipient_person_ids(batch)
+        if ever:
+            conflicts.audit_refusal(
+                actor, lines[0], area="disbursement", action=action, request=request
+            )
+            raise DisbursementError(message)
 
 
 def _clean_text(value: str, limit: int) -> str:
@@ -520,6 +615,14 @@ def propose_refund(
         request=request,
         error=DisbursementError,
     )
+    person_id = roles_for(actor).person_id if actor is not SYSTEM else None
+    if person_id is not None and person_id in {p.pk for p in account_owners(account.pk)}:
+        conflicts.audit_refusal(
+            actor, account, area="disbursement", action="propose", request=request
+        )
+        raise DisbursementError(
+            "You are or were an owner on this account; another board member proposes its refund."
+        )
     defaults = refund_defaults(account)
     if amount_cents > defaults["available_cents"]:
         raise DisbursementError(
@@ -799,6 +902,22 @@ def lines_to_issue(batch: DisbursementBatch, line_ids=None) -> list[Disbursement
     return lines
 
 
+def lines_for_actor(
+    actor, batch: DisbursementBatch, line_ids=None
+) -> tuple[list[DisbursementLine], list[DisbursementLine]]:
+    """(lines ``actor`` may write checks for, lines left for another board
+    member) among those still to write (``payment_refusal``, D66)."""
+    lines = lines_to_issue(batch, line_ids)
+    if actor is SYSTEM:
+        return lines, []
+    ok, left = [], []
+    with system_access("checks for this person"):
+        board = board_person_ids()
+        for line in lines:
+            (left if payment_refusal(actor, line, board=board) else ok).append(line)
+    return ok, left
+
+
 def issue_checks(
     batch: DisbursementBatch,
     *,
@@ -813,6 +932,16 @@ def issue_checks(
     refund check posts its refund entry now, taking up the credit."""
     require(actor, "disbursement.issue")
     _refuse_own_refund(actor, batch, "issue", request)
+    if line_ids is None:
+        # "Mark as issued" for the whole batch writes the checks this person
+        # may write; the rest stay for another board member (D66).
+        mine, left = lines_for_actor(actor, batch)
+        if left and not mine:
+            _refuse_payment(actor, left, "issue", request)
+        line_ids = [line.pk for line in mine] if left else None
+    else:
+        with system_access("checks to write"):
+            _refuse_payment(actor, lines_to_issue(batch, line_ids), "issue", request)
     today = timezone.localdate()
     if issued_on > today:
         raise DisbursementError("The issue date cannot be in the future.")
@@ -903,6 +1032,9 @@ def mark_cleared(
     """The check cleared the bank (typed from the statement, or confirmed
     from a bank feed line of the same amount and number)."""
     require(actor, "disbursement.issue")
+    with system_access("check to clear"):
+        line = DisbursementLine.objects.select_related("lot").get(pk=check.line_id)
+    _refuse_payment(actor, [line], "clear", request)
     on = _event_date(on, check, "cleared")
     if bank_transaction is not None and bank_transaction.amount_cents != -check.amount_cents:
         raise DisbursementError("That bank line is not this check's amount.")
@@ -942,6 +1074,9 @@ def void_check(
     with system_access("own refund check"):
         own_batch = DisbursementBatch.objects.get(pk=check.line.batch_id)
     _refuse_own_refund(actor, own_batch, "void", request)
+    with system_access("check to void"):
+        line = DisbursementLine.objects.select_related("lot").get(pk=check.line_id)
+    _refuse_payment(actor, [line], "void", request)
     reason = _clean_text(reason, 150).replace("\n", " ")
     if not reason:
         raise DisbursementError("Give the reason for voiding the check.")
@@ -1081,7 +1216,7 @@ def board_items(user) -> list:
             if state.status == "awaiting":
                 open_batches.append((batch, state))
             elif state.status == "approved" and can(user, "disbursement.issue"):
-                waiting = len(lines_to_issue(batch))
+                waiting = len(lines_for_actor(user, batch)[0])
                 if waiting:
                     out.append(
                         Item(
@@ -1552,7 +1687,14 @@ def checks_pdf(
     pre-printed check stock. The stock already carries the bank's numbers;
     nothing here is a bank number. Audited."""
     require(actor, "disbursement.issue")
-    lines = lines_to_issue(batch, line_ids)
+    _refuse_own_refund(actor, batch, "print", request)
+    if line_ids is None:
+        lines, left = lines_for_actor(actor, batch)
+        if left and not lines:
+            _refuse_payment(actor, left, "print", request)
+    else:
+        lines = lines_to_issue(batch, line_ids)
+        _refuse_payment(actor, lines, "print", request)
     if not lines:
         raise DisbursementError("There are no checks to print for this disbursement.")
     settings = CheckPrintSettings.get()

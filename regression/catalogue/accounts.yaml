@@ -47,3 +47,6 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:accounts/tests/test_cant_sign_in.py::test_", "^unit:core/tests/test_url_matrix.py::test_signin_help_pages_", "^manual:can't sign in on a phone"]
+- feature: "Board seat start-up exemption is one-time (D66): ended or resigned seats never reopen it; an owners' election seats its winner on a board of one"
+  since: M5
+  match: ["^unit:community/tests/test_seat_approval.py::test_(first_seats_are_exempt|the_start_up_exemption_is_one_time|a_resignation_does_not|an_owners_election)"]

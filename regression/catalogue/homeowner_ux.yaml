@@ -17,3 +17,6 @@
 - feature: "Documents: Governing documents pinned first, 'Updated <date>', breadcrumb above the title, link to ask for a records inspection"
   since: M4
   match: ["^unit:documents/tests/test_library_ux.py::test_"]
+- feature: "My profile grouped with plain legends (consent, email, export) and still saves every choice; reset approvals name the person, email, home and who started it; declining a seat nomination asks first"
+  since: M4
+  match: ["^unit:community/tests/test_profile_and_approvals_ux.py::test_"]

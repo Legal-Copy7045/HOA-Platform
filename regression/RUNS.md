@@ -3,6 +3,13 @@
 One entry per full run (newest first): date, commit, totals, failing check IDs,
 finding IDs, report link. No real names, hosts or addresses.
 
+## 2026-11-27 — full check on release 0.34.0 (with the walkthrough)
+
+- Commit: d62bd1e (main after 0.34.0, own matters). Totals: 4615 pass, 0 fail, 84 manual, 215 skip (retired IDs; LIVE-001 HTTPS and one live check not reachable from the cloud session).
+- Stages: ci 11 pass; unit 3615 pass; page 985 pass; live 4 pass, 2 skip; manual 84. Walkthrough beside it: 4469 pass, 0 fail.
+- Findings (16, none critical or high): BUG-001..003, R2-001..007, SEC-001..006. Medium: BUG-001/SEC-001 (own-matter check on ledger writes and Move to account misses a board member's former account for a home they sold), BUG-002 (refund check issue/void/decline/cleared on one's own former account; R2-006 overlaps), R2-001 (removed co-owner's My history lists later checks), R2-002 (refund payee and address include a removed owner), R2-003 (ARC recusal for affected homes counts only current owners). Security audit: 43 of 47 claims held; bandit and pip-audit clean.
+- Report: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 6). Walkthrough: https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8 (version 4)
+
 ## 2026-11-26 (late night) — verification after fixing every finding
 
 - Commit: d919d44. Totals: 3238 pass, 0 fail, 50 manual, 117 skip (retired IDs from the streamlining merges; live not run: no LIVE_HOST).

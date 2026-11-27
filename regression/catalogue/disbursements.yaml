@@ -29,3 +29,6 @@
 - feature: "PA guidance for disbursements cites 68 Pa.C.S. § 5313 (surplus funds) and asks counsel to confirm"
   since: M5
   match: ["^unit:ledger/tests/test_disbursements.py::test_pa_guidance"]
+- feature: "Payments to board members (D66): refund payee is today's owners or the owners at the sale, never a removed co-owner; nobody processes a payment to an account they were ever on; checks to board members only by another board member; Mark as issued leaves the rest; resign reminder"
+  since: M5
+  match: ["^unit:ledger/tests/test_disbursements.py::test_(refund_payee|a_seller_on_the_board|a_payment_to_a_board_member|surplus_checks_to_board|the_disbursement_page_hides|a_board_member_who_sold)"]
