@@ -229,17 +229,22 @@ def worksheet_paragraphs(w: dict) -> list[tuple[str, str]]:
 
 
 def w9_on_file(vendor) -> bool:
-    """Is the vendor's W-9 on file? The one place the 1099 checks ask.
-    Interim: the vendor's "W-9 on file" tick. To be switched to vendor
-    onboarding's ``operations.vendor_onboarding.w9_on_file`` (D79)."""
-    return bool(vendor.w9_on_file)
+    """Is the vendor's W-9 on file? The one place the 1099 checks ask: vendor
+    onboarding's answer (D79), which falls back to the vendor's own "W-9 on
+    file" tick for vendors older than onboarding."""
+    from operations import vendor_onboarding
+
+    return vendor_onboarding.w9_on_file(vendor)
 
 
 def needs_1099(vendor) -> bool:
-    """Is the vendor one that gets a 1099 at all? Interim: every vendor (the
-    treasurer decides; corporations are generally exempt). To be switched to
-    vendor onboarding's entity type (D79)."""
-    return True
+    """Is the vendor one that gets a 1099 at all? Vendor onboarding's entity
+    type decides (D79); unknown (a vendor older than onboarding, or no entity
+    type given) counts as yes, so the treasurer reviews it."""
+    from operations import vendor_onboarding
+
+    eligible = vendor_onboarding.eligible_for_1099(vendor)
+    return True if eligible is None else bool(eligible)
 
 
 @internal("books: vendor_1099s")

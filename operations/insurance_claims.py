@@ -61,13 +61,48 @@ class ClaimError(ValueError):
     """A refusal the page shows."""
 
 
-# --- Adapter (switch at merge) -------------------------------------------------------------
+# --- The association policy (document renewals, D72) -------------------------------------
+
+
+def _norm(text: str) -> str:
+    return "".join((text or "").split()).casefold()
+
+
+def policy_for(claim: InsuranceClaim):
+    """The association's policy (documents renewals ``InsurancePolicy``) the
+    claim is against, read from the carrier and policy number typed on the
+    claim: the term with that number (or, without a number, with that
+    carrier) in force on the incident date, else the latest such term. None
+    when nothing matches."""
+    from documents.renewal_models import InsurancePolicy
+
+    number, carrier = _norm(claim.policy_number), _norm(claim.carrier)
+    if not number and not carrier:
+        return None
+    candidates = [
+        p
+        for p in InsurancePolicy.objects.order_by("-starts_on", "-id")
+        if (number and _norm(p.policy_number) == number)
+        or (not number and carrier and _norm(p.carrier) == carrier)
+    ]
+    for p in candidates:
+        if p.starts_on <= claim.incident_on <= p.ends_on:
+            return p
+    return candidates[0] if candidates else None
 
 
 def policy_label(claim: InsuranceClaim) -> str:
-    """Switch to claude/document-renewals at merge: the association Policy
-    record (carrier, number, coverage, renewal). Interim: the carrier and
-    policy number typed on the claim."""
+    """The policy as people read it: the matching association policy record
+    (kind, carrier, number), else the carrier and policy number typed on the
+    claim."""
+    policy = policy_for(claim)
+    if policy is not None:
+        parts = (
+            f"{policy.get_kind_display()} insurance",
+            policy.carrier,
+            policy.policy_number,
+        )
+        return " · ".join(p for p in parts if p)
     return " · ".join(p for p in (claim.carrier, claim.policy_number) if p)
 
 

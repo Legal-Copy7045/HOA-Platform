@@ -199,8 +199,8 @@ class ClaimState(models.TextChoices):
 
 
 class InsuranceClaim(models.Model):
-    # The association's policy: free text until claude/document-renewals adds
-    # its Policy model (operations.insurance_claims.policy_label adapter).
+    # The association's policy as typed; operations.insurance_claims.policy_for
+    # reads the matching documents renewals InsurancePolicy from these.
     carrier = models.CharField(max_length=200)
     policy_number = models.CharField(max_length=80, blank=True)
     incident_on = models.DateField()
