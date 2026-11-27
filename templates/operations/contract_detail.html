@@ -27,7 +27,8 @@
       <section class="card"><h3>Terms</h3><dl class="kv small">
         <dt>Category</dt><dd>{{ obj.category }}</dd>
         <dt>Covers</dt><dd>{{ obj.starts_on|date:"M j, Y" }} – {{ obj.ends_on|date:"M j, Y"|default:"open-ended" }}</dd>
-        <dt>Approved by</dt><dd>{{ obj.citation }}</dd></dl></section>
+        <dt>Approved by</dt><dd>{{ obj.citation }}</dd></dl>
+        {% feature_on "renewal_contract" as renewals_on %}{% if renewals_on and user|can:"renewals.view" %}<p class="small"><a href="{% url 'renewal_contract' obj.pk %}">Renewal and notice deadline</a></p>{% endif %}</section>
       <section class="card"><h3>Board approvals <span class="muted small">({{ needed }} needed)</span></h3>
         {% if approvals %}<ul class="list">{% for a in approvals %}<li>{% icon "check-circle" %}<div class="grow"><div>{{ a.approver.email }}</div><div class="small muted">{{ a.created_at|date:"M j" }}{% if a.note %} · {{ a.note }}{% endif %}</div></div></li>{% endfor %}</ul>
         {% else %}<p class="muted small">None yet.</p>{% endif %}</section>

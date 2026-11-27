@@ -108,7 +108,7 @@ FINANCE = [
     "Reports",
     "More finance",
 ]
-MAINTENANCE = ["Work orders", "Vendors", "Contracts"]
+MAINTENANCE = ["Work orders", "Vendors", "Contracts", "Renewals"]  # Renewals: D72
 # Every role's sidebar with the default features (reservations, online
 # payments and texts are off by default).
 MENUS = {
@@ -225,7 +225,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Homes and owners",
         "Paper mail",
     ]
-    assert sections["Maintenance"] == ["Work orders", "Vendors", "Contracts"]
+    assert sections["Maintenance"] == MAINTENANCE
     assert sections["Finance"] == FINANCE
     assert sections["Admin"] == ["Sysadmin activity", "Settings"]
     everything = [label for labels in sections.values() for label in labels]

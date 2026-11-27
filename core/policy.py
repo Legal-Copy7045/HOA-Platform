@@ -243,6 +243,18 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "disbursement.approve": frozenset({BOARD}),
     "disbursement.issue": frozenset({BOARD, MANAGER}),
     "disbursement.void": frozenset({BOARD}),
+    # --- Renewals and records retention (D72) ---
+    # Renewals: board, manager and auditor see them; recording a policy, a
+    # vendor certificate or a contract's renewal terms is data entry (manager
+    # too); deciding whether a contract is renewed is the board's.
+    "renewals.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "renewals.record": frozenset({BOARD, MANAGER}),
+    "renewals.decide": frozenset({BOARD}),
+    # Disposing of records past their retention period (two board members)
+    # and legal holds: the board only.
+    "records_retention.manage": frozenset({BOARD}),
+    # Who opened or downloaded a document, from the audit trail (no IPs).
+    "document.access_history": frozenset({BOARD, AUDITOR}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

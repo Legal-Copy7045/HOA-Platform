@@ -399,7 +399,26 @@ PROTECTED = {
     "paper_mail_labels": ("GET", "mailing"),
     "paper_mail_mark": ("POST", "mailing"),
     "paper_mail_piece_checked": ("POST", "mailing"),
+    # Renewals and records retention (D72): board, manager and auditor pages
+    # (disposal and holds board only); a document's date, access history and
+    # version comparison are scoped like the document (lot B's is 404).
+    "document_set_date": ("POST", "lot_b_document"),
+    "document_access": ("GET", "lot_b_document"),
+    "document_compare": ("GET", "lot_b_document"),
+    "renewals": ("GET", None),
+    "renewal_policy_new": ("GET", None),
+    "renewal_policy": ("GET", None),
+    "renewal_vendor": ("GET", "vendor"),
+    "renewal_contract": ("GET", "contract"),
+    "renewal_contract_decide": ("POST", "contract"),
+    "records_retention": ("GET", None),
+    "records_disposal_propose": ("POST", None),
+    "records_disposal_decide": ("POST", None),
+    "records_hold_place": ("POST", None),
+    "records_hold_release": ("POST", None),
 }
+# Pages refused before their record is looked up: any id will do (D72).
+PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
 
 
 def _named_urls() -> set[str]:
@@ -969,7 +988,7 @@ def _url(name, key, targets):
         kwargs["action"] = "approve"
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
-    elif name.startswith("register_import_"):
+    elif name.startswith("register_import_") or name in PK_ONE:
         kwargs["pk"] = 1
     return reverse(name, kwargs=kwargs)
 

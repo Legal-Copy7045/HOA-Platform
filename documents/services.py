@@ -104,6 +104,7 @@ def create_document(
     lot=None,
     folder=None,
     description: str = "",
+    dated_on=None,
     actor,
     request=None,
 ) -> Document:
@@ -131,6 +132,7 @@ def create_document(
             folder=folder,
             committee=committee,
             description=description,
+            dated_on=dated_on,
             created_by=actor,
         )
         _store_version(document, file, actor=actor, request=request)
@@ -177,8 +179,34 @@ def scan_allows_download(result: str | None) -> bool:
 
 
 def downloadable(version: DocumentVersion) -> bool:
+    """The file may be sent: it passes the scan rule and has not been
+    disposed of under the retention schedule (D72)."""
+    if disposed(version):
+        return False
     latest = version.scans.first()
     return scan_allows_download(latest.result if latest else None)
+
+
+def disposed(version: DocumentVersion) -> bool:
+    from documents.models import DocumentDisposal
+
+    return DocumentDisposal.objects.filter(version_id=version.pk).exists()
+
+
+def set_dated_on(document: Document, *, dated_on, actor, request=None) -> Document:
+    """The document's own date, which "N years after the document date"
+    retention counts from (D72)."""
+    require(actor, "document.manage")
+    Document.objects.unscoped("set document date").filter(pk=document.pk).update(dated_on=dated_on)
+    document.dated_on = dated_on
+    record_event(
+        "document.dated",
+        actor=actor,
+        request=request,
+        target=document,
+        metadata={"dated_on": dated_on.isoformat() if dated_on else None},
+    )
+    return document
 
 
 # --- Folders and search (Milestone 3) --------------------------------------------------

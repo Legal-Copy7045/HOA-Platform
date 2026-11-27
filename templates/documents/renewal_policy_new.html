@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Record a policy · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'renewals' %}">Renewals</a> / {% if renews %}Next term{% else %}New policy{% endif %}</div>
+  <div class="page-head"><div><h1>{% if renews %}Record the next term{% else %}Record a policy{% endif %}</h1>
+    <p class="subtitle">{% if renews %}Renews {{ renews.get_kind_display }} ({{ renews.carrier }}), ending {{ renews.ends_on|date:"M j, Y" }}. Its file becomes a new version of the same document; the earlier term stops being tracked.{% else %}One of the association's own insurance policies. Amounts are in dollars.{% endif %}</p></div></div>
+  <section class="card"><form method="post" enctype="multipart/form-data" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}
+    {% if renews %}<input type="hidden" name="renews" value="{{ renews.pk }}">{% endif %}
+    {{ form }}<div class="form-actions"><button type="submit">Record policy</button></div></form></section>
+{% endblock %}

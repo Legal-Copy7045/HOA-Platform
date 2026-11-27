@@ -169,6 +169,19 @@ STEPS: list[Step] = [
         links=(("Contact retention", "retention", "retention.manage"),),
     ),
     Step(
+        "records",
+        "Renewals and records retention",
+        "When the board is reminded of insurance renewals, vendors' insurance certificates "
+        "and contract notice deadlines, and how long each kind of document is kept before "
+        "two board members may dispose of it (D72).",
+        groups=("Renewals", "Document retention"),
+        features=("renewals", "records_retention"),
+        links=(
+            ("Renewals", "renewals", "renewals.view"),
+            ("Records retention", "records_retention", "records_retention.manage"),
+        ),
+    ),
+    Step(
         "signin",
         # Not "Sign-in and security": that is each person's own page (WT-005).
         "Account recovery rules",

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ vendor.name }}: insurance · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'renewals' %}">Renewals</a> / {{ vendor.name }}</div>
+  <div class="page-head"><div><h1>{{ vendor.name }}: insurance</h1>
+    <div class="meta">{% if expires %}<span>Expires {{ expires|date:"M j, Y" }}</span>{% else %}<span>No certificate on file</span>{% endif %}{% if item %}<span class="status tone-{{ item.tone }}">{{ item.status }}</span>{% endif %}<a href="{% url 'vendor_detail' vendor.pk %}">Vendor details</a></div></div></div>
+  <div class="split">
+    <div><section class="card"><h2>Certificates</h2>
+      {% if certificates %}<div class="table-wrap"><table class="stack-sm">
+        <thead><tr><th>Expires</th><th>Insurer</th><th class="num">Coverage</th><th>File</th></tr></thead>
+        <tbody>{% for c in certificates %}<tr><td class="cell-title nowrap">{{ c.expires_on|date:"M j, Y" }}{% if c.expires_on < today %} <span class="status tone-danger">Expired</span>{% endif %}</td><td data-label="Insurer">{{ c.insurer|default:"–" }}</td><td class="num" data-label="Coverage">{% if c.coverage_cents is not None %}{{ c.coverage_cents|cents }}{% else %}–{% endif %}</td>
+          <td data-label="File">{% if c.document %}<a href="{% url 'document_detail' c.document.pk %}">Document</a>{% else %}<span class="muted">None</span>{% endif %}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}{% include "partials/empty.html" with icon="shield" title="No certificates recorded" %}{% endif %}</section></div>
+    <aside>{% if can_record %}<section class="card"><h3>Record a new certificate</h3>
+      <form method="post" enctype="multipart/form-data">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Record certificate</button></div></form>
+      <p class="small muted">Its expiry becomes the vendor's. The file goes to the document library (Insurance, board only) as a new version of this vendor's certificate.</p></section>{% endif %}</aside>
+  </div>
+{% endblock %}

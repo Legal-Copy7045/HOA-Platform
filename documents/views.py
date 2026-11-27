@@ -1,3 +1,5 @@
+import datetime
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -33,6 +35,13 @@ class NewDocumentForm(forms.Form):
         help_text="Only for documents about one home.",
     )
     description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    dated_on = forms.DateField(
+        required=False,
+        label="Document date",
+        widget=forms.DateInput(attrs={"type": "date"}),
+        help_text="Its own date (a statement's period end, a signing date). Blank: today. "
+        "Retention periods count from it.",
+    )
     file = forms.FileField()
 
     def __init__(self, *args, user, **kwargs):
@@ -194,7 +203,21 @@ def detail(request, pk):
     can_manage = policy.can(request.user, "document.manage")
     see_history = policy.can(request.user, "document.view_board")
     record_event("document.viewed", request=request, actor=request.user, target=document)
-    versions = document.versions.select_related("uploaded_by") if see_history else []
+    versions = list(document.versions.select_related("uploaded_by")) if see_history else []
+    from documents import retention
+    from documents.models import DocumentDisposal
+
+    disposals = {
+        d.version_id: d
+        for d in DocumentDisposal.objects.filter(document=document).select_related(
+            "confirmed_by", "proposed_by"
+        )
+    }
+    for v in versions:
+        v.disposal_record = disposals.get(v.pk)
+    can_hold = policy.can(request.user, retention.PERMISSION) and features.enabled(
+        "records_retention", request
+    )
     return render(
         request,
         "documents/detail.html",
@@ -204,11 +227,165 @@ def detail(request, pk):
             "can_manage": can_manage,
             "version_form": VersionForm(),
             "folders": services.folders_for(request.user) if can_manage else [],
+            "current_disposed": document.current_version_id in disposals,
+            "can_access_history": policy.can(request.user, "document.access_history"),
+            "comparable": see_history and sum(1 for v in versions if comparable(v)) >= 2,
+            "can_hold": can_hold,
+            "holds": retention.holds_for(document) if can_hold else [],
+        },
+    )
+
+
+@login_required
+@require_POST
+def set_date(request, pk):
+    policy.require(request.user, "document.manage")
+    document = get_object_or_404(Document.objects.for_user(request.user), pk=pk)
+    raw = request.POST.get("dated_on", "")
+    try:
+        dated_on = datetime.date.fromisoformat(raw) if raw else None
+    except ValueError:
+        messages.error(request, "Enter a date.")
+    else:
+        services.set_dated_on(document, dated_on=dated_on, actor=request.user, request=request)
+        messages.success(request, "Document date saved.")
+    return redirect("document_detail", pk=document.pk)
+
+
+ACCESS_ACTIONS = ("document.viewed", "document.downloaded")
+ACCESS_LIMIT = 500
+
+
+@login_required
+def access_history(request, pk):
+    """Who opened or downloaded this document, from the audit trail (D72).
+    Board and auditor; never the network address."""
+    policy.require(request.user, "document.access_history")
+    document = get_object_or_404(Document.objects.for_user(request.user), pk=pk)
+    from audit.models import AuditEvent
+
+    events = list(
+        AuditEvent.objects.filter(
+            target_type=Document._meta.label_lower,
+            target_id=str(document.pk),
+            action__in=ACCESS_ACTIONS,
+        ).select_related("actor")[:ACCESS_LIMIT]
+    )
+    record_event(
+        "document.access_history_viewed",
+        request=request,
+        actor=request.user,
+        target=document,
+        metadata={"events": len(events)},
+    )
+    return render(
+        request,
+        "documents/access_history.html",
+        {"document": document, "events": events, "limit": ACCESS_LIMIT},
+    )
+
+
+# Version comparison (D72): plain text files only. Word and PDF files would
+# need a parser the portal does not ship (and parsing hostile files is a
+# risk of its own), so they are not compared.
+COMPARE_TYPES = frozenset({"text/plain", "text/csv"})
+COMPARE_MAX_BYTES = 512 * 1024
+
+
+def comparable(version) -> bool:
+    return version.content_type in COMPARE_TYPES and version.size <= COMPARE_MAX_BYTES
+
+
+def _text(version) -> list[str] | None:
+    if not (comparable(version) and services.downloadable(version)):
+        return None
+    try:
+        with version.file.open("rb") as fh:
+            raw = fh.read(COMPARE_MAX_BYTES + 1)
+    except (OSError, ValueError):
+        return None
+    if len(raw) > COMPARE_MAX_BYTES:
+        return None
+    return raw.decode("utf-8", errors="replace").splitlines()
+
+
+def side_by_side(a: list[str], b: list[str]) -> list[dict]:
+    """Rows of the old and new line with their numbers and the kind of
+    change, from difflib (the template escapes everything)."""
+    import difflib
+
+    rows = []
+    matcher = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        old, new = a[i1:i2], b[j1:j2]
+        for k in range(max(len(old), len(new))):
+            rows.append(
+                {
+                    "kind": "same" if tag == "equal" else tag,
+                    "old": old[k] if k < len(old) else None,
+                    "new": new[k] if k < len(new) else None,
+                    "old_no": i1 + k + 1 if k < len(old) else None,
+                    "new_no": j1 + k + 1 if k < len(new) else None,
+                }
+            )
+    return rows
+
+
+@login_required
+def compare(request, pk):
+    """Two versions of a plain-text document side by side (board, manager
+    and auditor, who see every version)."""
+    policy.require(request.user, "document.view_board")
+    document = get_object_or_404(Document.objects.for_user(request.user), pk=pk)
+    versions = [v for v in document.versions.all() if comparable(v)]
+    if len(versions) < 2:
+        raise Http404
+
+    def pick(name, default):
+        try:
+            number = int(request.GET.get(name, default))
+        except ValueError:
+            raise Http404 from None
+        found = next((v for v in versions if v.number == number), None)
+        if found is None:
+            raise Http404
+        return found
+
+    new = pick("b", versions[0].number)
+    older = [v.number for v in versions if v.number < new.number]
+    old = pick("a", older[0] if older else versions[-1].number)
+    old_text, new_text = _text(old), _text(new)
+    rows = None
+    if old_text is not None and new_text is not None:
+        rows = side_by_side(old_text, new_text)
+        record_event(
+            "document.compared",
+            request=request,
+            actor=request.user,
+            target=document,
+            metadata={"from_version": old.number, "to_version": new.number},
+        )
+    return render(
+        request,
+        "documents/compare.html",
+        {
+            "document": document,
+            "versions": versions,
+            "old": old,
+            "new": new,
+            "rows": rows,
+            "changed": sum(1 for r in rows or [] if r["kind"] != "same"),
         },
     )
 
 
 def _send(request, document, version):
+    if services.disposed(version):
+        messages.error(
+            request,
+            "This file was disposed of under the records retention schedule. Its record is kept.",
+        )
+        return redirect("document_detail", pk=document.pk)
     if not services.downloadable(version):
         messages.error(request, "This file can't be downloaded until it passes a malware scan.")
         return redirect("document_detail", pk=document.pk)

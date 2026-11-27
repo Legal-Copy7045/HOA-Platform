@@ -154,6 +154,34 @@ FEATURES: list[Feature] = [
         "Vendor contracts and renewal dates.",
         {"contracts", "contract_detail", "contract_action"},
     ),
+    # --- Renewals and records retention (D72) ---
+    _f(
+        "renewals",
+        "Renewals",
+        "Reminders before the association's insurance policies, vendors' insurance "
+        "certificates and contract notice deadlines run out.",
+        {
+            "renewals",
+            "renewal_policy_new",
+            "renewal_policy",
+            "renewal_vendor",
+            "renewal_contract",
+            "renewal_contract_decide",
+        },
+    ),
+    _f(
+        "records_retention",
+        "Records retention",
+        "Each kind of document kept for its retention period, then listed for two board "
+        "members to dispose of; legal holds stop disposal.",
+        {
+            "records_retention",
+            "records_disposal_propose",
+            "records_disposal_decide",
+            "records_hold_place",
+            "records_hold_release",
+        },
+    ),
     _f(
         "resale",
         "Resale certificates",

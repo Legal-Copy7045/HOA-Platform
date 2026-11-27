@@ -87,6 +87,8 @@ AREA_NAV = {
     "Records requests": "records_requests",
     "Tasks": "tasks",
     "Vendors": "vendors",
+    "Renewals": "renewals",
+    "Records retention": "records_retention",
     "Setup": "community_settings",
     "Paper mail": "paper_mail",
     # Not in the sidebar: counted only in My items' own total.
@@ -109,6 +111,8 @@ AREA_ICONS = {
     "Finance": "receipt",
     "Work orders": "wrench",
     "Vendors": "shield",
+    "Renewals": "shield",
+    "Records retention": "clock",
     "Records requests": "inbox",
     "Recurring deadlines": "calendar",
     "Tasks": "list",
@@ -132,7 +136,9 @@ AREAS = [
     "Finance",
     "Work orders",
     "Vendors",
+    "Renewals",
     "Records requests",
+    "Records retention",
     "Recurring deadlines",
     "Tasks",
     "People",
@@ -469,7 +475,16 @@ def items_for(user) -> list[Item]:
                     w.follow_up_on,
                 )
             )
-    if can(user, "vendor.manage"):
+    # Renewals (D72): policies, vendors' certificates and contract deadlines
+    # within their reminder rules; with the feature off, vendors' insurance
+    # stays on Vendors as before.
+    from core.features import enabled as _feature_on
+
+    if _feature_on("renewals"):
+        from documents import renewals
+
+        out.extend(renewals.my_items(user, today))
+    elif can(user, "vendor.manage"):
         from operations.models import Vendor
 
         for vendor in Vendor.objects.filter(
@@ -489,6 +504,10 @@ def items_for(user) -> list[Item]:
                     vendor.insurance_expires_on,
                 )
             )
+    if _feature_on("records_retention"):
+        from documents import retention
+
+        out.extend(retention.my_items(user, today))
     # Recurring deadlines (Board tasks tab): hidden with the "compliance" feature.
     from core.features import enabled as feature_on
 

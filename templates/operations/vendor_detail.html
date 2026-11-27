@@ -12,6 +12,6 @@
         {% for i in invoices %}<tr><td class="cell-title"><a href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td data-label="Date">{{ i.invoice_date|date:"M j, Y" }}</td><td class="num" data-label="Amount">{{ i.amount_cents|cents }}</td><td data-label="Status">{% status i.state i.get_state_display %}</td></tr>{% empty %}<tr><td colspan="4" class="muted">No invoices.</td></tr>{% endfor %}
       </tbody></table></div></div>
     </div>
-    <aside>{% if can_manage %}<section class="card"><h3>Details</h3><form method="post">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form></section>{% endif %}</aside>
+    <aside>{% feature_on "renewal_vendor" as renewals_on %}{% if renewals_on and user|can:"renewals.view" %}<section class="card"><h3>Insurance certificate</h3><p class="small">{% if vendor.insurance_expires_on %}Expires {{ vendor.insurance_expires_on|date:"M j, Y" }}.{% else %}None on file.{% endif %} <a href="{% url 'renewal_vendor' vendor.pk %}">Certificates and renewal</a></p></section>{% endif %}{% if can_manage %}<section class="card"><h3>Details</h3><form method="post">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Save</button></div></form></section>{% endif %}</aside>
   </div>
 {% endblock %}

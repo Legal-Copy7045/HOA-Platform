@@ -54,6 +54,29 @@ def group_title(group: str, term=None) -> str:
     return group
 
 
+# D72: records retention by document category (documents/retention.py):
+# (category, what people call it, what the period counts from, default
+# years; 0 keeps forever). Defaults and their basis: community/pa_law.py.
+AFTER_DATE, AFTER_SUPERSEDED, AFTER_CONTRACT_END = "date", "superseded", "contract_end"
+BASIS_PHRASES = {
+    AFTER_DATE: "after the document's date",
+    AFTER_SUPERSEDED: "after a newer version replaces them",
+    AFTER_CONTRACT_END: "after the contract ends",
+}
+RECORDS_SCHEDULE: tuple[tuple[str, str, str, str], ...] = (
+    ("governing", "governing documents (old versions)", AFTER_SUPERSEDED, "0"),
+    ("policies", "rules and policies (old versions)", AFTER_SUPERSEDED, "0"),
+    ("minutes", "meeting minutes", AFTER_DATE, "0"),
+    ("financial", "financial records", AFTER_DATE, "7"),
+    ("forms", "forms (old versions)", AFTER_SUPERSEDED, "3"),
+    ("arc", "architectural guidelines (old versions)", AFTER_SUPERSEDED, "0"),
+    ("lot", "documents about one home", AFTER_DATE, "0"),
+    ("insurance", "insurance policies and certificates (old versions)", AFTER_SUPERSEDED, "0"),
+    ("contracts", "contracts", AFTER_CONTRACT_END, "7"),
+    ("other", "other documents (old versions)", AFTER_SUPERSEDED, "0"),
+)
+
+
 REGISTRY: dict[str, RuleSpec] = {
     spec.key: spec
     for spec in [
@@ -378,6 +401,50 @@ REGISTRY: dict[str, RuleSpec] = {
                 ("maintenance", "Maintenance report", "3"),
                 ("common_area", "Common area issue", "3"),
             )
+        ],
+        # D72: renewal reminders (documents/renewals.py). Board decisions.
+        RuleSpec(
+            "renewals.insurance_reminder_days",
+            "Days before an association insurance policy ends to start reminding the board",
+            DAYS,
+            "60",
+            "Renewals",
+            "My items and an email to the board from then on, again 30 and 7 days before and "
+            "on the day. Renewal quotes take time: 60 days is usual.",
+            maximum=365,
+        ),
+        RuleSpec(
+            "renewals.vendor_certificate_reminder_days",
+            "Days before a vendor's insurance certificate expires to start reminding",
+            DAYS,
+            "30",
+            "Renewals",
+            "Ask the vendor for a new certificate before it lapses; a vendor working without "
+            "insurance puts the association at risk.",
+            maximum=365,
+        ),
+        RuleSpec(
+            "renewals.contract_notice_lead_days",
+            "Days before a contract's cancellation-notice deadline to start reminding",
+            DAYS,
+            "30",
+            "Renewals",
+            "For a contract that renews by itself, the deadline is its end less the notice it "
+            "needs to cancel; for one that does not, its end.",
+            maximum=365,
+        ),
+        *[
+            RuleSpec(
+                f"records.keep_years.{category}",
+                f"Years to keep {label} {BASIS_PHRASES[basis]}",
+                INT,
+                default,
+                "Document retention",
+                "0 keeps them forever. Files past the period are listed for the board; nothing "
+                "is removed until two board members confirm it, and never under a legal hold.",
+                maximum=100,
+            )
+            for category, label, basis, default in RECORDS_SCHEDULE
         ],
     ]
 }
