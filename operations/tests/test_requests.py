@@ -362,7 +362,12 @@ def test_owner_sees_requests_waiting_on_them(w):
 
     record_notice_choice(user=w["owner"], consent=True)
     # Sign-in to-dos (a backup method, D58) are the login's own, not the request's.
-    items = [i for i in my_items.items_for(w["owner"]) if i.area != "Sign-in and security"]
+    # ...and so is the getting-started checklist entry (D73).
+    items = [
+        i
+        for i in my_items.items_for(w["owner"])
+        if i.area != "Sign-in and security" and i.title != "Finish getting started"
+    ]
     assert [i.area for i in items] == ["My home"]
     assert items[0].nav == "requests?mine=1"
     from core.dashboard import build
