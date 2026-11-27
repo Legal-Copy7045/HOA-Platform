@@ -25,8 +25,8 @@
           <h2>Your approval</h2>
           <p class="muted">{{ approvals|length }} of {{ needed }} approval{{ needed|pluralize }} recorded.</p>
           <div class="wf-actions">
-            <form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="wf-action" data-confirm="Approve this invoice for payment?">{% csrf_token %}<label for="approve-note" class="wf-label">Note for &ldquo;Approve&rdquo; <span class="muted">(optional)</span></label><div class="wf-row"><input id="approve-note" name="note"><button type="submit">{% icon "check" %} Approve</button></div></form>
-            <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="wf-action" data-confirm="Reject this invoice? It will not be paid.">{% csrf_token %}<label for="reject-note" class="wf-label">Reason for rejecting<span class="required-mark" aria-hidden="true">*</span></label><div class="wf-row"><input id="reject-note" name="note" required><button type="submit" class="danger">Reject</button></div></form>
+            <form method="post" action="{% url 'invoice_action' obj.pk 'approve' %}" class="wf-action" data-confirm="{% acting_confirm "Approve this invoice for payment?" %}">{% csrf_token %}<label for="approve-note" class="wf-label">Note for &ldquo;Approve&rdquo; <span class="muted">(optional)</span></label><div class="wf-row"><input id="approve-note" name="note"><button type="submit">{% icon "check" %} {% for_board "Approve" %}</button></div></form>
+            <form method="post" action="{% url 'invoice_action' obj.pk 'reject' %}" class="wf-action" data-confirm="{% acting_confirm "Reject this invoice? It will not be paid." %}">{% csrf_token %}<label for="reject-note" class="wf-label">Reason for rejecting<span class="required-mark" aria-hidden="true">*</span></label><div class="wf-row"><input id="reject-note" name="note" required><button type="submit" class="danger">{% for_board "Reject" %}</button></div></form>
           </div>
         </section>
       {% endif %}

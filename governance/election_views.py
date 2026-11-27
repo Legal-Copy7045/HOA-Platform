@@ -14,6 +14,7 @@ from core import policy
 from core.scoping import system_access
 from governance import elections
 from governance.models import (
+    OWNER_MEETING_KINDS,
     Candidate,
     ConsentRequest,
     Election,
@@ -253,6 +254,24 @@ def election_action(request, pk, action):
 
 def meeting_extras(user, meeting) -> dict:
     roles = policy.roles_for(user)
+    if meeting.kind not in OWNER_MEETING_KINDS:
+        # Owners do not vote at board, executive or committee meetings: no
+        # proxy form and no owners' quorum (WT-002). A proxy recorded before
+        # this rule stays on record (append-only) and is listed so its owner
+        # can revoke it and the board can see it has no effect.
+        stray = []
+        if policy.can(user, "vote.cast") or policy.can(user, "meeting.manage"):
+            stray = list(
+                Proxy.objects.for_user(user)
+                .filter(meeting=meeting, revoked_at__isnull=True)
+                .select_related("lot", "holder")
+            )
+        return {
+            "owners_do_not_vote": True,
+            "proxies_mine": [p for p in stray if p.lot_id in roles.owned_lot_ids],
+            "proxies_without_effect": len(stray) if policy.can(user, "meeting.manage") else 0,
+            "quorum": None,
+        }
     mine = []
     if policy.can(user, "vote.cast"):
         mine = list(

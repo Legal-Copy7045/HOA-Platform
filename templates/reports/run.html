@@ -11,7 +11,7 @@
     {% if params.fiscal_year %}<div><label for="rf">Fiscal year</label><input id="rf" name="fiscal_year" value="{{ params.fiscal_year }}" size="6" inputmode="numeric"></div>{% endif %}
     <button type="submit">Run</button><button type="submit" name="format" value="csv" class="secondary">{% icon "download" %} Download CSV</button>
   </form>
-  <div class="table-card"><div class="table-wrap"><table class="dense">
+  <div class="table-card"><div class="table-wrap">{# data-wide: a report's columns come from the report; the CSV export is the phone path (WT-029) #}<table data-wide class="dense">
     <thead><tr>{% for h in head %}<th>{{ h }}</th>{% endfor %}</tr></thead>
     <tbody>{% for row in rows %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% empty %}<tr><td colspan="{{ head|length }}" class="muted">Nothing in this period.</td></tr>{% endfor %}</tbody>
   </table></div></div>

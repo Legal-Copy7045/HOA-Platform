@@ -4,9 +4,12 @@
 {% block content %}
   <div class="page-head"><div><h1>Calendar</h1><p class="subtitle">Meetings, community events and maintenance dates.</p></div>
     {% if can_manage and not open_event or can_meet and not open_meeting %}<div class="actions">
-      {% if can_manage and not open_event %}<a class="btn" href="?new=event#new-event" data-testid="new-event">{% icon "plus" %} New event</a>{% endif %}
-      {% if can_meet and not open_meeting %}<a class="btn{% if can_manage %} secondary{% endif %}" href="?new=meeting#new-meeting" data-testid="new-meeting">{% icon "plus" %} New meeting</a>{% endif %}
+      {% if can_manage and not open_event %}<a class="btn" href="?new=event#new-event" data-opens="new-event" data-testid="new-event">{% icon "plus" %} New event</a>{% endif %}
+      {% if can_meet and not open_meeting %}<a class="btn{% if can_manage %} secondary{% endif %}" href="?new=meeting#new-meeting" data-opens="new-meeting" data-testid="new-meeting">{% icon "plus" %} New meeting</a>{% endif %}
     </div>{% endif %}</div>
+  {# One control per form (WT-030): the header button opens its panel here; a closed panel is not shown. #}
+  {% if can_manage %}<details class="panel"{% if open_event %} open{% else %} hidden{% endif %} id="new-event" data-hide-closed><summary>New event</summary><div class="panel-body"><form method="post" action="{% url 'calendar' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Add event</button></div></form></div></details>{% endif %}
+  {% if meeting_form %}<details class="panel"{% if open_meeting %} open{% else %} hidden{% endif %} id="new-meeting" data-hide-closed><summary>New meeting</summary><div class="panel-body"><p class="small muted">The meeting goes on the community calendar by itself, and comes off it if you cancel the meeting. Executive sessions never appear on the owners' calendar. Give a place, a link to join online, or both.</p><form method="post" action="{% url 'meetings' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=meeting_form %}{{ meeting_form }}<div class="form-actions"><button type="submit">Schedule meeting</button></div></form></div></details>{% endif %}
   <nav class="subnav" aria-label="Show" data-swap>{% for key, label in filters %}<a href="?type={{ key }}#results"{% if shown == key %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
   <div id="results" data-swap-region>
   {% if shown == "past" %}
@@ -38,6 +41,4 @@
     </li>{% endfor %}</ul><p class="small"><a href="{% url 'reservations' %}">Book a common area</a></p></section>{% endif %}
   {% endif %}
   </div>
-  {% if can_manage %}<details class="panel"{% if open_event %} open{% endif %} id="new-event"><summary>New event</summary><div class="panel-body"><form method="post" action="{% url 'calendar' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" %}{{ form }}<div class="form-actions"><button type="submit">Add event</button></div></form></div></details>{% endif %}
-  {% if meeting_form %}<details class="panel"{% if open_meeting %} open{% endif %} id="new-meeting"><summary>New meeting</summary><div class="panel-body"><p class="small muted">The meeting goes on the community calendar by itself, and comes off it if you cancel the meeting. Executive sessions never appear on the owners' calendar. Give a place, a link to join online, or both.</p><form method="post" action="{% url 'meetings' %}" class="form-grid">{% csrf_token %}{% include "partials/form_errors.html" with form=meeting_form %}{{ meeting_form }}<div class="form-actions"><button type="submit">Schedule meeting</button></div></form></div></details>{% endif %}
 {% endblock %}

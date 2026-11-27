@@ -588,8 +588,23 @@ def visible_packets(user, meeting: Meeting) -> dict[str, MeetingPacket]:
             .first()
         )
         if packet and Document.objects.for_user(user).filter(pk=packet.document_id).exists():
+            packet.not_in_zip = _not_in_zip(packet)
             out[variant] = packet
     return out
+
+
+def _not_in_zip(packet: MeetingPacket) -> int:
+    """How many attachments the .zip leaves out for a reason known without
+    opening the file store (skipped at build, or not passing the scan rule);
+    the meeting page says so next to the button (WT-003). Files missing from
+    the store are found while downloading and listed in NOT-INCLUDED.txt."""
+    from documents.services import downloadable
+
+    return sum(
+        1
+        for item in packet.items.select_related("version")
+        if item.skipped_reason or not downloadable(item.version)
+    )
 
 
 def packet_for(user, meeting: Meeting, packet_id) -> MeetingPacket | None:
@@ -697,6 +712,19 @@ class _Sink:
         return data
 
 
+_NOTICE_HEAD = "These files are listed in the index but not in this .zip:\r\n\r\n"
+UNREADABLE = "the stored file could not be read; ask the board for a copy"
+
+
+def _readable(version: DocumentVersion) -> bool:
+    """The stored file is there (WT-003): a version whose file is missing from
+    the file store is left out of the .zip and listed, never a server error."""
+    try:
+        return bool(version.file.name) and version.file.storage.exists(version.file.name)
+    except (OSError, ValueError):
+        return False
+
+
 class PacketZipStream:
     """Iterator of the .zip's bytes for a StreamingHttpResponse. ``close()``
     (called by Django when the response ends, even if never iterated) frees the
@@ -705,6 +733,9 @@ class PacketZipStream:
     def __init__(self, entries, notice: str, stamp, user):
         self._entries = entries
         self._notice = notice
+        # Files that could not be opened while streaming (WT-003): listed in
+        # NOT-INCLUDED.txt at the end of the archive, never a server error.
+        self.unreadable: list[str] = []
         self._stamp = stamp
         self._user = user
         self.sink = _Sink()
@@ -743,16 +774,31 @@ class PacketZipStream:
             for name, version in self._entries:
                 info = zipfile.ZipInfo(name, date_time=self._stamp)
                 info.compress_type = zipfile.ZIP_DEFLATED
-                with version.file.open("rb") as src, archive.open(info, "w") as dst:
+                try:
+                    src = version.file.open("rb")
+                except (OSError, ValueError):
+                    # Gone from the file store since the check in packet_zip:
+                    # opened before the entry starts, so the archive stays whole.
+                    self.unreadable.append(name)
+                    continue
+                with src, archive.open(info, "w") as dst:
                     while chunk := src.read(ZIP_CHUNK_BYTES):
                         dst.write(chunk)
                         if sink.held:
                             yield sink.drain()
                 if sink.held:
                     yield sink.drain()
-            if self._notice:
+            notice = self._notice
+            if self.unreadable:
+                if not notice:
+                    notice = _NOTICE_HEAD
+                notice += "".join(
+                    f"{name}: Not included: the stored file could not be read.\r\n"
+                    for name in self.unreadable
+                )
+            if notice:
                 info = zipfile.ZipInfo("NOT-INCLUDED.txt", date_time=self._stamp)
-                archive.writestr(info, self._notice)
+                archive.writestr(info, notice)
         if sink.held:
             yield sink.drain()
 
@@ -779,8 +825,12 @@ def packet_zip(packet: MeetingPacket, *, user, request=None) -> tuple[PacketZipS
         visible = set(Document.objects.for_user(user).values_list("pk", flat=True))
         when = timezone.localdate(packet.meeting.starts_at)
         stamp = timezone.localtime(packet.built_at).timetuple()[:6]
-        entries = [(_zip_name(0, packet.version), packet.version)]
         included, skipped = [], []
+        entries = []
+        if _readable(packet.version):
+            entries.append((_zip_name(0, packet.version), packet.version))
+        else:
+            skipped.append(("The packet PDF", UNREADABLE + " or download the PDF again later"))
         total = packet.version.size
         for item in packet.items.select_related("document", "version"):
             reason = item.skipped_reason
@@ -793,6 +843,8 @@ def packet_zip(packet: MeetingPacket, *, user, request=None) -> tuple[PacketZipS
                     reason = _skip_reason(item.version) or "not available"
                 elif total + item.version.size > ZIP_MAX_BYTES:
                     reason = "too large to bundle; download it from Documents"
+                elif not _readable(item.version):
+                    reason = UNREADABLE
             if reason:
                 skipped.append((item.position, reason))
                 continue
@@ -801,9 +853,8 @@ def packet_zip(packet: MeetingPacket, *, user, request=None) -> tuple[PacketZipS
             included.append(item)
         notice = ""
         if skipped:
-            lines = ["These attachments are listed in the index but not in this .zip:", ""]
-            lines += [f"{pos}. Not included: {why}." for pos, why in skipped]
-            notice = "\r\n".join(lines) + "\r\n"
+            lines = [f"{pos}. Not included: {why}." for pos, why in skipped]
+            notice = _NOTICE_HEAD + "\r\n".join(lines) + "\r\n"
         for item in included:
             record_event(
                 "document.downloaded",
@@ -820,7 +871,7 @@ def packet_zip(packet: MeetingPacket, *, user, request=None) -> tuple[PacketZipS
             metadata={
                 "variant": packet.variant,
                 "packet_id": packet.pk,
-                "files": len(included) + 1,
+                "files": len(entries),
                 "skipped": len(skipped),
             },
         )

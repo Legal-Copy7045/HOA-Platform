@@ -6,6 +6,20 @@ report is republished to the same URL each time; take it from the newest entry
 that has one). No real names, hosts or addresses. See `regression/README.md`
 ("Walkthrough") and `.claude/skills/walkthrough/SKILL.md`.
 
+## 2026-11-27 — second full walkthrough (release 0.31.0)
+
+- Commit: ee2007b (main 9ab1dec plus the walkthrough tool's download skip list).
+- Walked: 11 roles, desktop 1280x900 and phone 390x844. Stage time 3.0 min.
+- Checks: 4612 pass, 178 skip, 46 fail (first walkthrough: 138 fail). By kind: meeting packet .zip returns HTTP 500 for every role (33); two download links crawled as pages, a tooling artefact fixed in this commit (10); /board/community-setup/review/ spills out of its cards on phones (2); duplicate "Community settings" label in the auditor's menu (2, counted in the menu checks). No tap-target failures and no sideways scroll.
+- Findings (42; WT-001..021 desktop, WT-022..042 phone):
+  - flow: WT-001, 002, 003, 006, 012, 013, 033, 042
+  - merge: WT-004, 007, 008, 038
+  - rename: WT-005, 010, 011, 014
+  - move: WT-009
+  - mobile: WT-015, 022..032, 034..037, 039, 040
+  - keep_separate (do not merge): WT-016..021, 041
+- Report: https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8 (version 2).
+
 ## 2026-11-26 — full walkthrough with desktop and phone review
 
 - Commit: 6b85d42 (release 0.8.0).

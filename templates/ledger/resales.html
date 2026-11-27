@@ -4,9 +4,9 @@
 {% block content %}
   {% if can_manage %}{% include "ledger/finance_nav.html" %}{% endif %}
   <div class="page-head"><div><h1>Resale certificates</h1><p class="subtitle">When a home is sold, the buyer must receive a certificate from the association. Request one here.</p></div></div>
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Request</th><th>Home</th><th>Requested by</th><th>Status</th><th>Due</th></tr></thead>
-    <tbody>{% for r in rows %}<tr><td><a href="{% url 'resale_detail' r.pk %}">#{{ r.pk }}</a></td><td>{{ r.lot.label }}</td><td>{{ r.requester_name }}</td><td>{% status r.state r.get_state_display %}</td><td class="nowrap">{{ r.due_on|date:"M j, Y"|default:"" }}</td></tr>
+    <tbody>{% for r in rows %}<tr><td class="cell-title"><a href="{% url 'resale_detail' r.pk %}">#{{ r.pk }}</a></td><td data-label="Home">{{ r.lot.label }}</td><td data-label="Requested by">{{ r.requester_name }}</td><td data-label="Status">{% status r.state r.get_state_display %}</td><td class="nowrap" data-label="Due">{{ r.due_on|date:"M j, Y"|default:"" }}</td></tr>
     {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="home" title="No resale requests" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
   <details class="panel"{% if not rows %} open{% endif %}><summary>Request a certificate</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}{{ form }}<div class="form-actions"><button type="submit">Request</button></div></form></div></details>

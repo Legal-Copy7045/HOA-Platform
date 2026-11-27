@@ -777,3 +777,79 @@ def test_slow_reader_holds_one_slot_for_the_whole_stream(world, monkeypatch):
         next(stream)
     again, _ = packets.packet_zip(packet, user=world["board"])
     again.close()
+
+
+# --- Files missing from the store (WT-003 / WT-042) -------------------------------------
+
+
+def _owner_packet(world):
+    return packets.build_packet(
+        world["meeting"],
+        variant="owner",
+        attachment_ids=[world["owner_doc"].pk],
+        actor=world["board"],
+    )
+
+
+def _drop(version):
+    version.file.storage.delete(version.file.name)
+
+
+def test_zip_skips_an_attachment_missing_from_the_store(client, world):
+    packet = _owner_packet(world)
+    missing = packet.items.get(document=world["owner_doc"])
+    _drop(missing.version)
+    client.force_login(world["owner"])
+    archive = _zip(client, packet)
+    names = archive.namelist()
+    assert names[0].startswith("00-owner-packet-")
+    assert "NOT-INCLUDED.txt" in names
+    note = archive.read("NOT-INCLUDED.txt").decode()
+    assert f"{missing.position}. Not included: the stored file could not be read" in note
+    assert not any(n.startswith(f"{missing.position:02d}-") for n in names)
+    event = AuditEvent.objects.filter(action="meeting.packet_zip_downloaded").get()
+    assert event.metadata["skipped"] == 1 and event.metadata["files"] == len(names) - 1
+    # Audited by counts only: no file names or reasons.
+    assert set(event.metadata) == {"variant", "packet_id", "files", "skipped"}
+
+
+@pytest.mark.parametrize("who", ["owner", "board"])
+def test_zip_never_fails_when_even_the_packet_pdf_is_missing(client, world, who):
+    """The walkthrough's demo store had none of the seeded files: a 500 for
+    every role. Now the .zip still downloads and says what is missing."""
+    packet = _owner_packet(world)
+    _drop(packet.version)
+    for item in packet.items.all():
+        _drop(item.version)
+    client.force_login(world[who])
+    archive = _zip(client, packet)
+    assert archive.namelist() == ["NOT-INCLUDED.txt"]
+    note = archive.read("NOT-INCLUDED.txt").decode()
+    assert "The packet PDF. Not included" in note
+
+
+def test_zip_lists_a_file_that_vanishes_while_streaming(world):
+    packet = _owner_packet(world)
+    stream, _ = packets.packet_zip(packet, user=world["owner"])
+    try:
+        item = packet.items.get(document=world["owner_doc"])
+        _drop(item.version)  # gone after the check, before the copy
+        data = b"".join(stream)
+    finally:
+        stream.close()
+    archive = zipfile.ZipFile(io.BytesIO(data))
+    assert archive.testzip() is None
+    note = archive.read("NOT-INCLUDED.txt").decode()
+    assert "the stored file could not be read" in note
+    assert len(stream.unreadable) == 1
+
+
+def test_meeting_page_says_how_many_attachments_the_zip_leaves_out(client, world):
+    packet = _owner_packet(world)
+    client.force_login(world["board"])
+    page = client.get(reverse("meeting_detail", args=[world["meeting"].pk])).content.decode()
+    assert 'data-testid="not-in-zip"' not in page
+    item = packet.items.get(document=world["owner_doc"])
+    VersionScan.objects.create(version=item.version, result=ScanResult.INFECTED, scanner="test")
+    page = client.get(reverse("meeting_detail", args=[world["meeting"].pk])).content.decode()
+    assert "1 attachment is not included in the .zip" in page

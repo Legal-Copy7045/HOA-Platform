@@ -35,17 +35,29 @@ class Item:
     # An optional shortcut shown beside the item (e.g. "Pay $150.00").
     action_label: str = ""
     action_url: str = ""
+    # Whose work it is (D64): "home" for the person's own home and login
+    # (their account, requests, ballots, sign-in), "board" for work done for
+    # the association. Defaults from the area; the dashboard of someone with
+    # both shows them under "Your home" and "Board work".
+    side: str = ""
 
     def __post_init__(self):
         if not self.nav:
             self.nav = AREA_NAV.get(self.area, "")
         if not self.icon:
             self.icon = AREA_ICONS.get(self.area, "clock")
+        if not self.side:
+            self.side = HOME if self.area in HOME_AREAS else BOARD_SIDE
 
     @property
     def overdue(self) -> bool:
         return bool(self.due and self.due < timezone.localdate())
 
+
+HOME, BOARD_SIDE = "home", "board"
+# Areas that are always the person's own (Voting items say per item: a
+# ballot is the voter's own, the turnout of a closing vote is board work).
+HOME_AREAS = frozenset({"My home", "Sign-in and security"})
 
 # Who has a queue page (staff); owners see items waiting on them on Home.
 MY_ITEMS_PERMISSIONS = (
@@ -67,7 +79,7 @@ AREA_NAV = {
     "Recurring deadlines": "tasks",
     "People": "people",
     "Voting": "voting",
-    "Requests": "requests",
+    "Owner requests": "requests",
     "Architectural review": "arc_list",
     "Violations": "violations",
     "Collections": "collections",
@@ -84,7 +96,7 @@ AREA_NAV = {
 AREA_ICONS = {
     "Written consent": "pencil",
     "My home": "home",
-    "Requests": "mail",
+    "Owner requests": "mail",
     "Second approvals": "check-circle",
     "Invoices": "receipt",
     "Homes and owners": "map",
@@ -109,7 +121,7 @@ AREA_ICONS = {
 AREAS = [
     "My home",
     "Voting",
-    "Requests",
+    "Owner requests",
     "Second approvals",
     "Invoices",
     "Homes and owners",
@@ -171,7 +183,7 @@ def items_for(user) -> list[Item]:
             who = "unassigned" if r.assignee_id is None else "assigned to you"
             out.append(
                 Item(
-                    "Requests",
+                    "Owner requests",
                     f"#{r.pk} {r.subject} ({r.lot.label})",
                     f"{r.get_request_type_display()} · {who} · {detail}",
                     reverse("request_detail", args=[r.pk]),
@@ -597,24 +609,31 @@ def items_for(user) -> list[Item]:
         from community import setup
         from community.rules import rules_needing_attention
 
-        # The setup wizard (D51) until a run is finished, and while a rerun is open.
+        # The setup wizard (D51) until a run is finished, and while a rerun is
+        # open: one banner for the one job, with the rules still missing a
+        # value or citation in it (WT-004).
+        missing = len(rules_needing_attention())
+        rules_text = (
+            f"{missing} rule{'' if missing == 1 else 's'} missing a value or citation"
+            if missing
+            else ""
+        )
         if setup.needs_finishing():
             left = setup.steps_left(setup.current_run())
+            parts = [f"{left} step{'' if left == 1 else 's'} left" if left else "review and finish"]
+            if rules_text:
+                parts.append(rules_text)
             out.append(
                 Item(
                     "Setup",
-                    f"Finish community setup ({left} step{'' if left == 1 else 's'} left)"
-                    if left
-                    else "Finish community setup (review and finish)",
-                    "Community setup",
-                    reverse("setup_home"),
+                    "Finish community setup: " + ", ".join(parts),
+                    "Settings",
+                    reverse("settings_hub") + "#setup",
                     "warning",
                     nav="settings_hub",
                 )
             )
-
-        missing = len(rules_needing_attention())
-        if missing:
+        elif missing:
             out.append(
                 Item(
                     "Setup",
@@ -772,6 +791,7 @@ def items_for(user) -> list[Item]:
                         timezone.localdate(vote.closes_at) if vote.closes_at else None,
                         nav="voting",
                         icon="vote",
+                        side=HOME,
                     )
                 )
     if can(user, "vote.view") and roles.person_id:
@@ -796,6 +816,7 @@ def items_for(user) -> list[Item]:
                         timezone.localdate(deadline) if deadline else None,
                         nav="voting",
                         icon="vote",
+                        side=HOME,
                     )
                 )
     # --- Votes and elections closing within 48 hours, with their turnout
@@ -831,6 +852,7 @@ def items_for(user) -> list[Item]:
                     survey.closes_on,
                     nav="voting",
                     icon="list",
+                    side=HOME,
                 )
             )
     # Paper mail (D55): mailings prepared but not marked as mailed.
@@ -1139,7 +1161,13 @@ def quick_actions(user) -> list[dict]:
     permission itself."""
     out = []
     if policy.can(user, "ledger.manage"):
-        out.append({"label": "Record checks", "url": reverse("record_payments"), "icon": "receipt"})
+        out.append(
+            {
+                "label": "Record payments received",
+                "url": reverse("record_payments"),
+                "icon": "receipt",
+            }
+        )
     return out
 
 

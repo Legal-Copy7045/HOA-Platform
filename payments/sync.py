@@ -540,6 +540,7 @@ def _email_board_and_sysadmins(count: int) -> None:
             f"payments:\n{settings.PORTAL_BASE_URL}/finance/online-payments/\n\n-- \n"
             f"{settings.SITE_NAME}"
         ),
+        board=True,
     )
 
 

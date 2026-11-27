@@ -236,6 +236,49 @@ portalButtonConfirm();
   }, true);
 })();
 
+// Record payments (WT-033): "Add another row" copies an empty row in place, so
+// nothing typed is lost; without JavaScript the button re-posts the form and
+// the server adds the row.
+(function () {
+  "use strict";
+  Array.prototype.forEach.call(document.querySelectorAll("[data-add-row]"), function (button) {
+    var form = button.form;
+    var body = form && form.querySelector("[data-batch-rows]");
+    var count = form && form.querySelector("input[name=rows]");
+    if (!body || !count) return;
+    var max = parseInt(body.getAttribute("data-max"), 10) || 60;
+    button.addEventListener("click", function (e) {
+      var rows = body.querySelectorAll("tr[data-batch-row]");
+      var n = parseInt(count.value, 10) || rows.length;
+      if (!rows.length || n >= max) return;
+      e.preventDefault();
+      var row = rows[0].cloneNode(true);
+      row.classList.remove("row-error");
+      row.removeAttribute("id");
+      Array.prototype.forEach.call(row.querySelectorAll("[id], [for], [name]"), function (el) {
+        ["id", "for", "name"].forEach(function (attr) {
+          var v = el.getAttribute(attr);
+          if (v) el.setAttribute(attr, v.replace(/_\d+$/, "_" + n));
+        });
+        el.removeAttribute("aria-invalid");
+        el.removeAttribute("aria-describedby");
+        if (el.tagName === "SELECT") el.selectedIndex = 0;
+        else if (el.tagName === "INPUT" && el.type !== "date") el.value = "";
+      });
+      Array.prototype.forEach.call(row.querySelectorAll("label.sr-only"), function (l) {
+        l.textContent = l.textContent.replace(/row \d+$/, "row " + (n + 1));
+      });
+      var title = row.querySelector(".cell-title");
+      if (title) title.textContent = "Check " + (n + 1);
+      body.appendChild(row);
+      count.value = n + 1;
+      if (n + 1 >= max) button.hidden = true;
+      var first = row.querySelector("select, input");
+      if (first) first.focus();
+    });
+  });
+})();
+
 // <details data-collapse-narrow open> starts closed on a phone (board
 // controls that would push the page's own content down, WT-044). Without
 // JavaScript it stays open.
@@ -363,7 +406,9 @@ portalButtonConfirm();
   if (main) {
     Array.prototype.forEach.call(main.querySelectorAll("p > a, dd > a, li > a, div > a, span > a"), function (a) {
       var parent = a.parentElement;
-      if (a.classList.contains("btn") || parent.children.length !== 1) return;
+      // Summary tiles (.stat) are cards, not text links: they keep their
+      // stacked label, amount and hint (WT-026).
+      if (a.classList.contains("btn") || a.classList.contains("stat") || parent.children.length !== 1) return;
       var around = parent.textContent.replace(/\s+/g, " ").trim().length - a.textContent.replace(/\s+/g, " ").trim().length;
       if (around <= 3) a.classList.add("tap");
     });
@@ -382,6 +427,12 @@ portalButtonConfirm();
     if (target) target.scrollIntoView({ block: "start" });
   }
   if (window.location.hash) openTo(window.location.hash);
+  // "Jump to section" on a phone (WT-027): the same as following the link.
+  Array.prototype.forEach.call(document.querySelectorAll("select[data-jump]"), function (sel) {
+    sel.addEventListener("change", function () {
+      if (sel.value && sel.value.charAt(0) === "#") window.location.hash = sel.value;
+    });
+  });
   window.addEventListener("hashchange", function () { openTo(window.location.hash); });
   var wide = window.matchMedia && window.matchMedia("(min-width: 821px)").matches;
   if (wide) {
@@ -390,4 +441,20 @@ portalButtonConfirm();
       d.classList.add("js-open");
     });
   }
+})();
+
+// Board cue (D64): the "Board" badge rendered by base.html in the strip at
+// the top of a board page moves beside the page's heading (an eyebrow above
+// the <h1>, so the heading's own text stays the page name).
+(function () {
+  "use strict";
+  var badge = document.querySelector("[data-board-badge]");
+  var h1 = document.querySelector("main .page-head h1") || document.querySelector("main h1");
+  if (!badge || !h1 || !h1.parentNode) return;
+  var tag = badge.cloneNode(true);
+  tag.removeAttribute("data-board-badge");
+  tag.classList.add("board-badge-head");
+  tag.setAttribute("aria-hidden", "true"); // the strip already says it
+  h1.parentNode.insertBefore(tag, h1);
+  document.documentElement.classList.add("board-badge-moved");
 })();

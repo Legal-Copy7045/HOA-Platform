@@ -22,6 +22,12 @@ class MeetingKind(models.TextChoices):
     COMMITTEE = "committee", "Committee meeting"
 
 
+# Meetings where owners vote: only these take owner proxies and count an
+# owners' quorum of homes (WT-002; 68 Pa.C.S. § 5310). Directors never act by
+# proxy, so board, executive and committee meetings take none.
+OWNER_MEETING_KINDS = (MeetingKind.ANNUAL, MeetingKind.SPECIAL)
+
+
 class MeetingStatus(models.TextChoices):
     SCHEDULED = "scheduled", "Scheduled"
     HELD = "held", "Held"

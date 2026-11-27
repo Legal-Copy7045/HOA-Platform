@@ -225,6 +225,15 @@ def paper_notice_status(meeting, user) -> dict:
     }
 
 
+def paper_copy_of_case_letter(letter, *, actor, request=None):
+    """Collections hook (WT-006): prepare a one-home paper mailing from a
+    collection case's letter; returns the mailing. Raises ValueError
+    (PaperMailError) when it cannot be prepared."""
+    from comms import papermail
+
+    return papermail.prepare_case_copy(letter, actor=actor, request=request)
+
+
 def paper_homes_count(user) -> int | None:
     """Homes that get paper now, for hooks on other pages (None when
     ``user`` may not print paper mail)."""

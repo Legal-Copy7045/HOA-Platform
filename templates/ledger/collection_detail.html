@@ -24,13 +24,12 @@
     </div>
     <aside>{% follow_up_form "collection" obj %}<section class="card"><h3>Letters</h3>
       {% if next_letter and user|can:"collections.manage" %}<form method="post" action="{% url 'collection_letter' obj.pk %}">{% csrf_token %}<p class="small">Next: <strong>{{ next_letter.label }}</strong>{% if next_letter.due_on %}, due {{ next_letter.due_on|date:"M j, Y" }}{% endif %}.</p><button type="submit">{% icon "download" %} Generate {{ next_letter.label|lower }}</button></form><p class="small muted">Downloads the letter with the statement to print and mail, logs it, and moves the case on.</p>{% endif %}
-      {% if letters %}<ul class="list">{% for l in letters %}<li><span class="grow">{{ l.get_kind_display }}</span><span class="small muted">{{ l.generated_on|date:"M j, Y" }} · {{ l.amount_cents|cents }}</span></li>{% endfor %}</ul>{% endif %}
+      {% if letters %}<ul class="list">{% for l in letters %}<li><span class="grow">{{ l.get_kind_display }}<br><span class="small muted">{{ l.generated_on|date:"M j, Y" }} · {{ l.amount_cents|cents }}</span></span>{% if can_paper_copy %}<form method="post" action="{% url 'collection_paper_copy' obj.pk %}" class="inline" data-confirm="Prepare a paper copy of the {{ l.get_kind_display|lower }} for {{ obj.lot.label }}? It goes to every owner on the deed of this home only, through Paper mail, where you print it and mark it mailed.">{% csrf_token %}<input type="hidden" name="letter" value="{{ l.pk }}"><button type="submit" class="secondary small">{% icon "mail" %} Also prepare a paper copy</button></form>{% endif %}</li>{% endfor %}</ul>{% endif %}
       {% if user|can:"collections.manage" %}<h3>Reprint</h3><ul class="list">
       <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'statement' %}">{% icon "download" %} Statement of account</a></li>
       <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'first' %}">{% icon "download" %} First notice + statement</a></li>
       <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'second' %}">{% icon "download" %} Second notice + statement (certified)</a></li>
       <li><a class="grow" href="{% url 'collection_notice_pdf' obj.pk 'final' %}">{% icon "download" %} Final notice + statement (certified)</a></li></ul>{% endif %}
-      <p class="small muted">Printed and mailed by the board. Wording: Finance, Letters.</p>
-      {% if user|can:"mail.print" %}<p class="small"><a href="{% url 'paper_mail_new' %}?template=first&amp;home={{ obj.lot_id }}&amp;everyone=1">{% icon "mail" %} Envelope or label for this home (Paper mail)</a></p>{% endif %}</section></aside>
+      <p class="small muted">Printed and mailed by the board. Wording: Finance, Letters.</p></section></aside>
   </div>
 {% endblock %}

@@ -160,11 +160,12 @@ STEPS: list[Step] = [
     ),
     Step(
         "signin",
-        "Sign-in and security",
+        # Not "Sign-in and security": that is each person's own page (WT-005).
+        "Account recovery rules",
         "How long a self-service account recovery waits before the person can finish it, "
         "and how long votes, proxies, contact details and automatic payments stay locked "
-        "afterwards (D58). Staff roles always use the two-board-member reset.",
-        groups=("Sign-in and security",),
+        "afterwards. Staff roles always use the two-board-member reset.",
+        groups=("Account recovery",),
     ),
     Step(
         "features",

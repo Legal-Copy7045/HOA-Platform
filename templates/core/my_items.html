@@ -12,7 +12,8 @@
   {% for a in alerts %}{% if "#coverage" not in a.url %}
     <div class="alert warning">{% icon a.icon %}<span><strong>{{ a.title }}.</strong> {{ a.detail }} <a href="{{ a.url }}">Open</a></span></div>
   {% endif %}{% endfor %}
-  {% if counts %}<div class="grid grid-4">{% for c in counts %}<a class="stat {% if c.overdue %}tone-danger{% endif %}" href="#area-{{ forloop.counter }}"><div class="label">{{ c.area }}</div><div class="value">{{ c.count }}</div><div class="hint">{% if c.overdue %}{{ c.overdue }} overdue{% else %}waiting{% endif %}</div></a>{% endfor %}</div>{% endif %}
+  {# One line of jump links instead of a tile per group (WT-011). #}
+  {% if counts|length > 1 %}<nav class="jump-links small" aria-label="Groups on this page" data-testid="my-items-summary">{% for c in counts %}<a href="#area-{{ forloop.counter }}">{{ c.area }} {{ c.count }}{% if c.overdue %} <span class="status tone-danger">{{ c.overdue }} overdue</span>{% endif %}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</nav>{% endif %}
   {% regroup items by area as areas %}
   {% for group in areas %}
     <section class="card" id="area-{{ forloop.counter }}"><h2>{{ group.grouper }}</h2>

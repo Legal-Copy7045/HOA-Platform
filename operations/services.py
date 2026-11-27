@@ -1006,7 +1006,6 @@ def due_soon(on=None):
 def send_compliance_reminders(on=None) -> int:
     """Email the board once per due date when an item enters its window."""
     from django.conf import settings
-    from django.core.mail import send_mail
 
     from community.services import board_emails
 
@@ -1022,14 +1021,9 @@ def send_compliance_reminders(on=None) -> int:
         f"Coming up on the compliance calendar:\n\n{lines}\n\n"
         f"{settings.PORTAL_BASE_URL}/board/compliance/\n\n-- \n{settings.SITE_NAME}"
     )
-    for address in board_emails():
-        send_mail(
-            f"[{settings.SITE_NAME}] Compliance reminders",
-            body,
-            None,
-            [address],
-            fail_silently=True,
-        )
+    from comms.notify import mail_board
+
+    mail_board(board_emails(), subject="Compliance reminders", body=body)
     for i in fresh:
         ComplianceItem.objects.filter(pk=i.pk).update(reminded_for=i.due_on)
     return len(fresh)

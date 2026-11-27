@@ -10,7 +10,7 @@
     {% else %}{% include "partials/empty.html" with icon="users" title="No board members recorded yet" %}{% endif %}
   </section>
   {% if show_committees %}
-  <h2>Committees</h2>
+  <div class="card-head"><h2>Committees</h2>{% if user|can:"committee.manage" %}<a class="btn secondary small" href="{% url 'committees' %}#new-committee">{% icon "plus" %} New committee</a>{% endif %}</div>
   {% for c in committees %}
     <section class="card" aria-labelledby="committee-{{ c.committee.pk }}">
       <h3 id="committee-{{ c.committee.pk }}">{% if c.can_open %}<a href="{% url 'committee_detail' c.committee.pk %}">{{ c.committee.name }}</a>{% else %}{{ c.committee.name }}{% endif %}</h3>

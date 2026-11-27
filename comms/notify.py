@@ -29,8 +29,40 @@ def _wants_digest(emails: set[str]) -> dict[str, object]:
         }
 
 
-def send_update(emails, *, subject: str, body: str, link: str) -> None:
-    """Send now, after the current transaction commits, or hold for the digest."""
+# Board and staff notification emails start with this (D64), so board work
+# never reads like mail about the person's own home. Personal emails
+# (statements, notices to owners, receipts, sign-in mail) never carry it.
+BOARD_PREFIX = "[Board] "
+
+
+def board_subject(subject: str) -> str:
+    """ "[Board] <subject>": the site-name prefix gives way to it (the sender
+    already names the portal), and it is never added twice."""
+    subject = subject.strip()
+    if subject.startswith(BOARD_PREFIX):
+        return subject
+    site = f"[{settings.SITE_NAME}]"
+    if subject.startswith(site):
+        subject = subject[len(site) :].strip()
+    return BOARD_PREFIX + subject
+
+
+def mail_board(emails, *, subject: str, body: str, fail_silently: bool = True) -> int:
+    """Send a board or staff notification now, one message per address (the
+    worker's tasks, which run outside a request). Returns how many went."""
+    sent = 0
+    for address in sorted({e for e in emails if e}):
+        sent += send_mail(
+            board_subject(subject), body, None, [address], fail_silently=fail_silently
+        )
+    return sent
+
+
+def send_update(emails, *, subject: str, body: str, link: str, board: bool = False) -> None:
+    """Send now, after the current transaction commits, or hold for the digest.
+    ``board``: a board or staff notification ("[Board] ", D64)."""
+    if board:
+        subject = board_subject(subject)
     emails = {e for e in emails if e}
     if not emails:
         return
@@ -66,9 +98,11 @@ def _push(emails, *, subject: str, link: str) -> None:
     push.queue_for_users(user_ids, title=title, link=link)
 
 
-def send_now(emails, *, subject: str, body: str) -> None:
+def send_now(emails, *, subject: str, body: str, board: bool = False) -> None:
     """Account notices that must not wait for a weekly digest: sent after the
-    current transaction commits."""
+    current transaction commits. ``board``: a board or staff notification."""
+    if board:
+        subject = board_subject(subject)
     emails = sorted({e for e in emails if e})
 
     def go():

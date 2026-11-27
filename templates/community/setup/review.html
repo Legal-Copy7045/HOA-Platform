@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Review · Community setup · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'setup_home' %}">Community setup</a></div>
+  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'settings_hub' %}#setup">Community setup</a></div>
   <div class="setup-progress">
     <p class="small muted" id="setup-progress-label">Step {{ number }} of {{ total }}{% if run %} · setup run {{ run }}{% endif %}</p>
     <progress max="{{ total }}" value="{{ number }}" aria-labelledby="setup-progress-label">Step {{ number }} of {{ total }}</progress>
@@ -23,7 +23,7 @@
 
   <form method="post" class="setup-form">{% csrf_token %}
     <div class="setup-actions">
-      {% if finished %}<a class="btn setup-save" href="{% url 'setup_home' %}">Done</a>{% else %}<button type="submit" class="setup-save">Finish setup</button>{% endif %}
+      {% if finished %}<a class="btn setup-save" href="{% url 'settings_hub' %}#setup">Done</a>{% else %}<button type="submit" class="setup-save">Finish setup</button>{% endif %}
       <a class="btn secondary" href="{{ prev_url }}">Back</a>
     </div>
   </form>

@@ -1,6 +1,10 @@
 /* Oak Creek Farms HOA portal - design system.
    Self-hosted, no inline styles or scripts (strict CSP). System font stack. */
 
+/* The hidden attribute always wins over a component's display (WT-025),
+   e.g. the "Unsaved changes" status or a closed data-hide-closed panel. */
+[hidden] { display: none !important; }
+
 /* ---------- Tokens ---------- */
 :root {
   --green-900: #12392b; --green-800: #184a38; --green-700: #1f5a43; --green-600: #2a6f53;
@@ -234,7 +238,12 @@ details:not(.panel) > summary { cursor: pointer; color: var(--green-700); font-w
 .prose p { margin-bottom: .9rem; }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.25rem; margin: 0; }
 .kv dt { color: var(--muted); font-size: .9rem; }
-.kv dd { margin: 0; }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: break-word; }
+/* Phones: the label above its value, one column (WT-015, WT-023). */
+@media (max-width: 640px) {
+  .kv { grid-template-columns: minmax(0, 1fr); gap: .1rem 0; }
+  .kv dd { margin-bottom: .55rem; }
+}
 .secret { font-family: var(--mono); font-size: 1.5rem; letter-spacing: .08em; padding: .75rem 1rem; background: #fff; border: 2px dashed var(--green-600); border-radius: var(--radius); display: inline-block; }
 .overdue { color: var(--danger); font-weight: 600; }
 .amount-big { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -319,9 +328,6 @@ details.row-menu[open] summary { margin-bottom: .35rem; }
 table.dense th, table.dense td { padding: .4rem .55rem; font-size: .85rem; }
 tr.group-start th, tr.group-start td { border-top: 2px solid var(--line); }
 tbody th[scope=row] { text-align: left; font-weight: 600; }
-.kv { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1rem; margin: 0; }
-.kv dt { color: var(--muted); font-size: .88rem; }
-.kv dd { margin: 0; }
 .thumbs { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; padding: 0; margin: 0; }
 .notice { border-left: 3px solid var(--line); padding: .25rem 0 .25rem .9rem; margin: .75rem 0; }
 .date-chip { width: 44px; flex: none; text-align: center; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); }
@@ -639,7 +645,9 @@ tr.row-link:hover .row-main { text-decoration: underline; }
   /* Two summary tiles per row, not one (WT-042). */
   .grid-3:has(> .stat), .grid-4:has(> .stat), .grid-2:has(> .stat) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
   .grid:has(> .stat) > .stat:only-child { grid-column: 1 / -1; }
-  .stat .value { font-size: 1.2rem; overflow-wrap: anywhere; }
+  /* Amounts never break mid-number (WT-026): one line, sized to fit. */
+  .stat .value { font-size: clamp(1rem, 5vw, 1.2rem); white-space: nowrap; }
+  .stat .value.text { white-space: normal; overflow-wrap: anywhere; }
 }
 
 /* In-page filters and tabs (owner feedback): one row that scrolls sideways
@@ -695,7 +703,8 @@ details.list-filter > summary { width: max-content; }
 /* Sticky save bar for bulk editors (WT-032). */
 .save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem;
   background: var(--surface); border-top: 1px solid var(--line); padding: .6rem 0; margin-top: .5rem; }
-@media (max-width: 820px) { .shell:has(.tabbar) .save-bar { bottom: calc(56px + env(safe-area-inset-bottom)); } }
+/* Every sticky bottom bar sits above the phone tab bar (WT-022). */
+@media (max-width: 820px) { .shell:has(.tabbar) .save-bar, .shell:has(.tabbar) .setup-actions { bottom: calc(56px + env(safe-area-inset-bottom)); } }
 
 /* Error pages in the portal layout (WT-048). */
 .error-page { max-width: 36rem; }
@@ -713,7 +722,7 @@ details.list-filter > summary { width: max-content; }
 .setup-flags:empty { display: none; }
 .setup-features li { display: block; }
 .setup-links { display: flex; flex-wrap: wrap; gap: .5rem 1rem; padding: 0; list-style: none; margin: .5rem 0 1rem; }
-.setup-actions { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .5rem; padding: .75rem 0; background: var(--bg, #fff); border-top: 1px solid var(--line-2); }
+.setup-actions { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .5rem; padding: .75rem 0; background: var(--surface); border-top: 1px solid var(--line-2); }
 .setup-actions .setup-save { order: 3; }
 .setup-law { border-left: 4px solid var(--green-700); }
 .setup-law h2 { display: flex; align-items: center; gap: .4rem; font-size: 1.05rem; }
@@ -730,3 +739,56 @@ details.list-filter > summary { width: max-content; }
 /* Live turnout (D61) */
 .turnout progress { width: 100%; max-width: 32rem; height: 12px; accent-color: var(--green-700); }
 .turnout-line { font-weight: 600; margin: 0 0 .25rem; }
+
+/* Walkthrough 2, part A (D63). */
+/* Setup wizard law panel as a disclosure: open on a computer, closed on a
+   phone (WT-032). */
+details.setup-law > summary { list-style: none; color: inherit; }
+details.setup-law > summary::-webkit-details-marker { display: none; }
+details.setup-law > summary h2 { margin: 0; flex: 1 1 auto; }
+details.setup-law > summary h2::after { content: "+"; margin-left: auto; color: var(--green-700); font-weight: 700; }
+details.setup-law[open] > summary h2::after { content: "\2212"; }
+details.setup-law[open] > summary { margin-bottom: .4rem; }
+/* Community settings: "Jump to section" on a phone instead of the sticky
+   index (WT-027). */
+.jump-section { margin: 0 0 1rem; }
+.jump-section select { width: 100%; }
+/* Task rows (Server tasks, Demo data): the button goes under the text on a
+   phone (WT-039). */
+@media (max-width: 640px) {
+  .list.task-rows > li { flex-wrap: wrap; }
+  .list.task-rows > li > .grow { flex: 1 1 100%; }
+  .list.task-rows > li > form, .list.task-rows > li > .btn { margin-left: auto; }
+}
+/* Home account: one small "Actions" menu per entry, not a red button on
+   every row (WT-035). */
+details.row-more > summary { border-color: var(--line); color: var(--ink-2); font-weight: 600; min-height: 36px; padding: .2rem .6rem; font-size: .85rem; }
+details.row-more > summary:hover { background: var(--surface-2); border-color: var(--line); }
+details.row-more[open] { display: block; padding: .4rem 0; }
+details.row-more > p { margin: .4rem 0 .2rem; }
+@media (max-width: 820px) { details.row-more > summary { min-height: 44px; } }
+/* ---------- Board cues (D64) ----------
+   Work-section pages and the sidebar's work group carry one accent colour,
+   distinct from the community green. Contrast: --board-ink on --board-bg
+   about 9:1, white on --board about 8:1, --board-nav on the green sidebar
+   about 10:1; dark: #e7defd on #2e2350 about 11:1. */
+:root { --board: #5b3fa0; --board-ink: #3f2a78; --board-bg: #efe9fb; --board-line: #b9a6ea; --board-nav: #d9ccff; }
+.board-page { border-top: 4px solid var(--board); }
+.board-strip { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 0 0 1rem; padding: .35rem .7rem; border-left: 4px solid var(--board); background: var(--board-bg); color: var(--board-ink); border-radius: var(--radius-sm); font-size: .87rem; }
+.board-badge { display: inline-block; background: var(--board); color: #fff; font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: .05rem .5rem; border-radius: 99px; line-height: 1.6; }
+.board-badge-head { margin: 0 0 .3rem; }
+.board-badge-moved .board-strip .board-badge { display: none; }
+.nav-work { margin-top: 1.1rem; padding: .35rem 0 .2rem .4rem; border-left: 3px solid var(--board-line); border-radius: 2px; }
+.nav-work-heading { font-size: .74rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--board-nav); padding: 0 .55rem .1rem; }
+.nav-work details.nav-group:not(.panel) { margin-top: .5rem; }
+.board-note { border-left: 4px solid var(--board); background: var(--board-bg); color: var(--board-ink); padding: .4rem .7rem; border-radius: var(--radius-sm); font-size: .87rem; }
+@media (prefers-color-scheme: dark) {
+  :root { --board-ink: #e7defd; --board-bg: #2e2350; }
+}
+@media print { .board-strip, .board-badge-head { display: none; } .board-page { border-top: 0; } }
+/* My items: the groups as one line of jump links (WT-011). */
+.jump-links { margin: 0 0 1rem; color: var(--muted); }
+.jump-links a { display: inline-flex; align-items: center; gap: .3rem; min-height: 44px; }
+/* The dashboard's two parts for people with a home and board work (D64). */
+.dash-part-head { display: flex; align-items: center; gap: .5rem; margin-top: 1.5rem; }
+.dash-part-head .board-badge { font-size: .7rem; }

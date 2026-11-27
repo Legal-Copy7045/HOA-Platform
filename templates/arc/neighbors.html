@@ -2,19 +2,18 @@
 {% load portal %}
 {% block title %}Home neighbors · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'settings_hub' %}">Settings</a> / Home neighbors</nav>
-  <div class="page-head"><div><h1>Home neighbors</h1><p class="subtitle">For each home, record its left and right neighbors from the development plan, and any other homes a project there affects. They are asked to acknowledge that home's architectural requests (the homeowner cannot remove them), and their owners are recused from reviewing them. Enter the neighbors' plat lot numbers; the address shows once saved.</p></div></div>
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "settings_hub" %}Home neighbors</nav>
+  <div class="page-head"><div><h1>Home neighbors</h1><p class="subtitle">For each home, record its left and right neighbors from the development plan, and any other homes a project there affects. They are asked to acknowledge that home's architectural requests (the homeowner cannot remove them), and their owners are recused from reviewing them. Enter the neighbors' plat lot numbers; the address shows once saved. This is a one-time set-up job, easier on a computer.</p></div></div>
   <form method="post" id="neighbors-all" data-warn-unsaved="Home neighbors">{% csrf_token %}
     <div class="table-card"><div class="table-wrap"><table class="stack-sm neighbors">
-      <thead><tr><th>Home</th><th>Left neighbor</th><th>Right neighbor</th><th>Also affected</th><th><span class="sr-only">Save this row</span></th></tr></thead>
+      <thead><tr><th>Home</th><th>Left neighbor</th><th>Right neighbor</th><th>Also affected</th></tr></thead>
       <tbody>{% for r in rows %}<tr id="lot-{{ r.lot.number }}">
         <td class="cell-title"><strong>{{ r.lot.label }}</strong><div class="lot-ref">{{ r.lot.lot_ref }}</div>{% if r.owners %}<div class="small muted">{{ r.owners }}</div>{% endif %}</td>
         <td data-label="Left"><input type="number" name="left_{{ r.lot.number }}" min="1" value="{{ r.left.number|default_if_none:'' }}" aria-label="Left neighbor of {{ r.lot.label }} (plat lot number)" class="narrow">{% if r.left %}<div class="small muted">{{ r.left_name|default:r.left.label }}</div>{% endif %}</td>
         <td data-label="Right"><input type="number" name="right_{{ r.lot.number }}" min="1" value="{{ r.right.number|default_if_none:'' }}" aria-label="Right neighbor of {{ r.lot.label }} (plat lot number)" class="narrow">{% if r.right %}<div class="small muted">{{ r.right_name|default:r.right.label }}</div>{% endif %}</td>
-        <td data-label="Also affected"><input type="text" name="others_{{ r.lot.number }}" value="{% for o in r.others %}{{ o.number }}{% if not forloop.last %} {% endif %}{% endfor %}" aria-label="Other homes affected by {{ r.lot.label }} (plat lot numbers)" size="10" placeholder="e.g. 14 15"></td>
-        <td><button type="submit" name="lot" value="{{ r.lot.number }}" class="secondary small" aria-label="Save {{ r.lot.label }}">Save</button></td></tr>{% endfor %}</tbody>
+        <td data-label="Also affected"><input type="text" name="others_{{ r.lot.number }}" value="{% for o in r.others %}{{ o.number }}{% if not forloop.last %} {% endif %}{% endfor %}" aria-label="Other homes affected by {{ r.lot.label }} (plat lot numbers)" size="10" placeholder="e.g. 14 15"></td></tr>{% endfor %}</tbody>
     </table></div></div>
-    {# One Save all, always in view at the bottom of the screen (WT-032). #}
-    <div class="save-bar"><button type="submit" name="save_all" value="1">Save all</button><span class="small status tone-warning" data-unsaved-note hidden>Unsaved changes</span><span class="small muted">Saves every row you changed (a row's own Save does the same).</span></div>
+    {# One Save all, always in view at the bottom of the screen (WT-032); no per-row Save (WT-031). #}
+    <div class="save-bar"><button type="submit" name="save_all" value="1">Save all</button><span class="small status tone-warning" data-unsaved-note hidden>Unsaved changes</span><span class="small muted">Saves every row you changed.</span></div>
   </form>
 {% endblock %}

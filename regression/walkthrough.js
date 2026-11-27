@@ -32,8 +32,12 @@ const WIDTHS = {
   desktop: { viewport: { width: 1280, height: 900 } },
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 },
 };
-const SKIP = [/logout/, /\.pdf$/, /\.csv(\?|$)/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
-  /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/, /\.zip$/, /\.ics(\?|$)/];
+// Downloads (with or without a query string) are not pages; same list as pages.js.
+const SKIP = [/logout/, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
+  /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
+// Downloads checked as downloads (expect a file, not a page): the meeting
+// packet .zip (WT-003, WT-042).
+const DOWNLOADS = [{ re: /\/meetings\/\d+\/packets\/\d+\/zip\/?$/, type: 'application/zip' }];
 const MAX_PAGES = Number(process.env.WALK_MAX_PAGES || 160);
 const CONCURRENCY = Number(process.env.WALK_CONCURRENCY || 3);
 const TAP = 40;
@@ -60,10 +64,12 @@ function readMenu() {
     const b = el && el.querySelector('.badge-count');
     return b && b.firstChild ? Number(b.firstChild.textContent.trim()) || 0 : 0;
   };
-  const sections = [...document.querySelectorAll('#sidebar .nav > .nav-section')].map((sec) => {
+  // The work sections sit inside one Board group (D64): .nav > .nav-work > .nav-section.
+  const sections = [...document.querySelectorAll('#sidebar .nav > .nav-section, #sidebar .nav > .nav-work > .nav-section')].map((sec) => {
     const summary = sec.querySelector(':scope > summary');
     return {
       key: sec.getAttribute('data-nav-group') || '',
+      work: !!sec.closest('.nav-work'),
       title: clean(summary),
       count: badge(summary),
       open: sec.tagName === 'DETAILS' ? sec.open : true,
@@ -116,6 +122,8 @@ function readPage() {
     forms,
     tables: main.querySelectorAll('table').length,
     tiles,
+    // D64: the page carries the Board (or Staff) badge from its menu entry.
+    board_badge: !!document.querySelector('[data-board-badge]'),
     height: document.documentElement.scrollHeight,
   };
 }
@@ -283,9 +291,11 @@ async function walkRole(browser, role) {
   }
   const via = new Map(); // pattern -> how it was reached
   const queue = [];
+  const downloads = new Map(); // pattern -> href
   const push = (href, how, from) => {
     if (!href || !href.startsWith('/') || href.startsWith('//')) return;
     const key = pattern(href);
+    if (DOWNLOADS.some((d) => d.re.test(href)) && !downloads.has(key)) downloads.set(key, href);
     if (via.has(key) || SKIP.some((re) => re.test(href))) return;
     via.set(key, { how, from });
     queue.push(href);
@@ -329,6 +339,19 @@ async function walkRole(browser, role) {
     for (const href of (pages[key].phone && pages[key].phone.hrefs) || []) push(href, 'link', key);
   }
   if (queue.length) add(`${role}: walkthrough reached every page type`, false, `stopped at ${MAX_PAGES} pages; ${queue.length} not visited`);
+  for (const [key, href] of downloads) {
+    const want = DOWNLOADS.find((d) => d.re.test(href));
+    let status = 0;
+    let type = '';
+    try {
+      const resp = await views.desktop.page.request.get(base + href, { maxRedirects: 0 });
+      status = resp.status();
+      type = (resp.headers()['content-type'] || '').split(';')[0];
+      await resp.body();
+    } catch (e) { type = String(e).slice(0, 120); }
+    add(`${role}: ${key} downloads a file (HTTP 200, ${want.type})`, status === 200 && type === want.type,
+      `HTTP ${status} ${type}`);
+  }
 
   // Menu label = page <h1>; no duplicate labels in the menu.
   for (const width of Object.keys(WIDTHS)) {

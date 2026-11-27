@@ -97,16 +97,16 @@ COMMUNITY = [
 ]
 CONTACT_HOME = ["My home", "My account", "Notices about my home", "My requests"]
 NOT_BUDGET = [c for c in COMMUNITY if c != "Budget and reserves"]
+# Reserve plan, Online payments, Disbursements and Resale certificates are on
+# the More finance hub (WT-036).
 FINANCE = [
     "Owner accounts",
     "Invoices",
     "Collections",
     "Budgets",
-    "Reserve plan",
     "Accounting",
-    "Disbursements",
-    "Resale certificates",
     "Reports",
+    "More finance",
 ]
 MAINTENANCE = ["Work orders", "Vendors", "Contracts"]
 # Every role's sidebar with the default features (reservations, online
@@ -121,7 +121,8 @@ MENUS = {
         "My home": ["My requests"],
         "Community": ["Surveys" if c == "Voting" else c for c in NOT_BUDGET],
     },
-    "former_owner": {"": ["Dashboard"], "My home": ["My history"]},
+    # WT-014: the former owner's one section is titled after its one page.
+    "former_owner": {"": ["Dashboard"], "My history": ["My history"]},
     "board": {
         "": ["Dashboard", "My items"],
         "My home": MY_HOME,
@@ -138,7 +139,8 @@ MENUS = {
         ],
         "Maintenance": MAINTENANCE,
         "Finance": FINANCE,
-        "Admin": ["Server tasks", "Sysadmin activity", "Settings"],
+        # Server tasks history is on Sysadmin activity for the board (WT-007).
+        "Admin": ["Sysadmin activity", "Settings"],
     },
     "manager": {
         "": ["Dashboard", "My items"],
@@ -154,8 +156,9 @@ MENUS = {
         ],
         "Maintenance": MAINTENANCE,
         "Finance": FINANCE,
-        # Community settings and Paper mail settings (D55).
-        "Admin": ["Settings"],
+        # Paper mail settings opens from Paper mail, so Settings has one page
+        # and the menu links straight to it (WT-009).
+        "Admin": ["Community settings"],
     },
     "arc_reviewer": {
         "": ["Dashboard", "My items"],
@@ -167,7 +170,7 @@ MENUS = {
         "Community": COMMUNITY,
         "Association": ["Architectural review", "Violations", "Homes and owners"],
         "Maintenance": MAINTENANCE,
-        "Finance": [f for f in FINANCE if f != "Resale certificates"],
+        "Finance": FINANCE,
         "Admin": ["Sysadmin activity", "Community settings"],
     },
     "sysadmin": {
@@ -223,18 +226,8 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Paper mail",
     ]
     assert sections["Maintenance"] == ["Work orders", "Vendors", "Contracts"]
-    assert sections["Finance"] == [
-        "Owner accounts",
-        "Invoices",
-        "Collections",
-        "Budgets",
-        "Reserve plan",
-        "Accounting",
-        "Disbursements",
-        "Resale certificates",
-        "Reports",
-    ]
-    assert sections["Admin"] == ["Server tasks", "Sysadmin activity", "Settings"]
+    assert sections["Finance"] == FINANCE
+    assert sections["Admin"] == ["Sysadmin activity", "Settings"]
     everything = [label for labels in sections.values() for label in labels]
     for gone in (
         "Board overview",
@@ -259,15 +252,21 @@ def test_online_payments_only_with_payments_manage(client, board):
     from core import features
 
     features.set_feature("online_payments", True, actor=board)
-    assert "Online payments" in menu(client, board)["Finance"]
+    client.force_login(board)
+    response = client.get(reverse("finance_more"))
+    labels = [link["label"] for link in navigation.hub_links(response.wsgi_request, "finance_more")]
+    assert "Online payments" in labels
     for role in (Role.MANAGER, Role.AUDITOR):
-        assert "Online payments" not in menu(client, make_member(roles=[role])).get("Finance", [])
+        client.force_login(make_member(roles=[role]))
+        response = client.get(reverse("finance_more"))
+        labels = [x["label"] for x in navigation.hub_links(response.wsgi_request, "finance_more")]
+        assert "Online payments" not in labels
 
 
 def test_former_owner_has_history_not_my_requests(client, board):
     users = role_users(board)
     sections = menu(client, users["former_owner"])
-    assert sections["My home"] == ["My history"]
+    assert sections["My history"] == ["My history"] and "My home" not in sections
     for role in ("view_only", "tenant", "authorized"):
         assert "My requests" in menu(client, users[role])["My home"], role
 
@@ -365,9 +364,10 @@ def test_past_term_seat_and_missing_rules_alerts_top_my_items(client, board):
     with system_access("test"):
         name = Person.objects.get(user=other).display_name
     assert f"{name}&#x27;s board term has ended" in page
-    assert "2 governing rules need a value or citation" in page
+    # One setup banner holds the rules missing a citation (WT-004).
+    assert "Finish community setup: " in page and "2 rules missing a value or citation" in page
     above = page.split('id="area-')[0]  # alerts, not rows in the lists below
-    assert "board term has ended" in above and "governing rules need" in above
+    assert "board term has ended" in above and "rules missing a value" in above
     client.force_login(other)  # a dashboard to-do as well
     assert "board term has ended" in client.get(reverse("home")).content.decode()
 

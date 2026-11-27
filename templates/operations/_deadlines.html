@@ -1,11 +1,11 @@
 {% load portal %}{# Board tasks → Recurring deadlines (the compliance calendar). Forms post to ?tab=deadlines. #}
   <p class="muted">Insurance renewals, tax and corporate filings, reserve studies, seasonal contracts. The board is emailed when an item enters its reminder window; it also shows in My items.</p>
   {% if not items %}<div class="form-actions"><form method="post" action="?tab=deadlines">{% csrf_token %}<button type="submit" name="action" value="starters" class="secondary">Add suggested items</button></form></div>{% endif %}
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Item</th><th>Due</th><th>Repeats</th><th>Who</th><th></th></tr></thead>
-    <tbody>{% for i in items %}<tr><td><strong>{{ i.title }}</strong><div class="small muted">{{ i.get_category_display }}{% if i.notes %} · {{ i.notes|truncatechars:90 }}{% endif %}{% if i.citation %} · {{ i.citation }}{% endif %}</div></td>
-      <td class="nowrap">{{ i.due_on|date:"M j, Y" }}{% if i.due_on < today %} <span class="badge tone-danger">overdue</span>{% elif i.pk in soon %} <span class="badge tone-warning">soon</span>{% endif %}</td>
-      <td>{{ i.get_recurrence_display }}</td><td class="small">{{ i.responsible.display_name|default:"" }}</td>
+    <tbody>{% for i in items %}<tr><td class="cell-title"><strong>{{ i.title }}</strong><div class="small muted">{{ i.get_category_display }}{% if i.notes %} · {{ i.notes|truncatechars:90 }}{% endif %}{% if i.citation %} · {{ i.citation }}{% endif %}</div></td>
+      <td class="nowrap" data-label="Due">{{ i.due_on|date:"M j, Y" }}{% if i.due_on < today %} <span class="badge tone-danger">overdue</span>{% elif i.pk in soon %} <span class="badge tone-warning">soon</span>{% endif %}</td>
+      <td data-label="Repeats">{{ i.get_recurrence_display }}</td><td class="small" data-label="Who">{{ i.responsible.display_name|default:"" }}</td>
       <td><form method="post" action="?tab=deadlines" data-confirm="Mark done?{% if i.recurrence != 'once' %} It moves to its next due date.{% endif %}">{% csrf_token %}<input type="hidden" name="item" value="{{ i.pk }}"><input type="hidden" name="due_on" value="{{ i.due_on|date:'Y-m-d' }}"><button type="submit" name="action" value="done" class="secondary small">Done</button></form>
         <details class="row-menu"><summary class="small">Edit</summary><form method="post" action="?tab=deadlines" class="form-grid">{% csrf_token %}<input type="hidden" name="item" value="{{ i.pk }}">
           <input type="text" name="title" value="{{ i.title }}" maxlength="200" required aria-label="Title">

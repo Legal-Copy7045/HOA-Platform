@@ -384,6 +384,27 @@ def create_mailing(
     return mailing
 
 
+def prepare_case_copy(letter, *, actor, request=None) -> Mailing:
+    """A paper copy of one collection-case letter (WT-006): a mailing for that
+    home only, to every owner on the deed (delinquency notices are not a
+    consent choice), with the case letter's wording. The caller fetched the
+    letter through its scoping and checked ``collections.manage``."""
+    require(actor, "mail.print")
+    case = letter.case
+    if case.state in ("closed", "referred"):
+        raise PaperMailError("This case is closed or referred.")
+    defaults = source_defaults(template=letter.kind)
+    return create_mailing(
+        actor=actor,
+        defaults=defaults,
+        subject=defaults["subject"],
+        body=defaults["body"],
+        everyone=True,
+        lot_id=case.lot_id,
+        request=request,
+    )
+
+
 def closing_event(mailing: Mailing) -> MailingEvent | None:
     with system_access("mailing status"):
         return MailingEvent.objects.filter(mailing=mailing).first()

@@ -2,8 +2,8 @@
 {% load portal %}
 {% block title %}Server tasks · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Server tasks</h1><p class="subtitle">Backups, restore drills and other upkeep on the server. The portal only asks; the server's own agent runs each task from a fixed list and reports back here (decision D35).{% if not can_run %} Sysadmins start tasks; the board sees the history.{% endif %}</p></div></div>
-  {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> {% if agent_seen %}The server's agent was last seen {{ agent_seen|timesince }} ago: it may be stopped, or busy installing an update.{% else %}The server's agent has not reported yet: it is installed by start-portal.sh on the VM.{% endif %} Requests wait until it is back.</span></div>{% endif %}
+  <div class="page-head"><div><h1>Server tasks</h1><p class="subtitle">Backups, restore drills and other upkeep on the server. The portal only asks; the server's own agent runs each task from a fixed list and reports back here.{% if not can_run %} Sysadmins start tasks; the board sees the history.{% endif %}</p></div></div>
+  {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> {% if agent_seen %}The server's agent was last seen {{ agent_seen|timesince }} ago: it may be stopped, or busy installing an update.{% else %}The server's agent has not reported yet: it is installed when the server is set up.{% endif %} Requests wait until it is back.</span></div>{% endif %}
   {% if current %}<section class="card" id="current-task"><h2>Now</h2>
     <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email }} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
     <p class="small muted">Refresh the page to see the result. Another task can start once this one has finished.</p></section>{% endif %}
@@ -30,7 +30,7 @@
     </section>
   </div>
   <section class="card" id="task-list"><h2>Tasks</h2>
-    <ul class="list">{% for t in tasks %}<li>
+    <ul class="list task-rows">{% for t in tasks %}<li>
       <div class="grow"><div class="title">{{ t.label }}</div><div class="small muted">{{ t.description }}</div></div>
       {% if can_run %}{% if t.demo_only %}<a class="btn secondary small" href="{% url 'demo_data' %}">Choose a dataset</a>{% else %}<form method="post" data-confirm="{{ t.confirm }}">{% csrf_token %}<input type="hidden" name="kind" value="{{ t.kind }}"><button type="submit" class="secondary small"{% if current %} disabled title="Another task is waiting or running"{% endif %}>Start</button></form>{% endif %}{% endif %}
     </li>{% endfor %}
@@ -38,14 +38,14 @@
       {% if can_run %}<form method="post" action="{% url 'system_status' %}">{% csrf_token %}<input type="hidden" name="action" value="test_email"><input type="hidden" name="next" value="server_tasks"><button type="submit" class="secondary small">Start</button></form>{% endif %}</li>
     </ul></section>
   <h2>History</h2>
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Task</th><th>Asked by</th><th>When</th><th>State</th><th>Result</th></tr></thead>
     <tbody>{% for row in history %}<tr>
-      <td>{{ row.label }}</td>
-      <td>{{ row.task.requested_by.email }}</td>
-      <td class="nowrap">{{ row.task.requested_at|date:"M j, Y g:i A" }}</td>
-      <td>{% status row.task.state row.task.get_state_display %}</td>
-      <td class="small">{{ row.summary }}{% if row.tail %}<details><summary>Last lines of output</summary><pre class="small task-output">{{ row.tail }}</pre></details>{% endif %}</td>
+      <td class="cell-title">{{ row.label }}</td>
+      <td data-label="Asked by">{{ row.task.requested_by.email }}</td>
+      <td class="nowrap" data-label="When">{{ row.task.requested_at|date:"M j, Y g:i A" }}</td>
+      <td data-label="State">{% status row.task.state row.task.get_state_display %}</td>
+      <td class="small" data-label="Result">{{ row.summary }}{% if row.tail %}<details><summary>Last lines of output</summary><pre class="small task-output">{{ row.tail }}</pre></details>{% endif %}</td>
     </tr>{% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="clock" title="No server tasks yet" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
 {% endblock %}

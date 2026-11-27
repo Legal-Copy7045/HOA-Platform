@@ -12,7 +12,7 @@
         </section>
       {% empty %}<section class="card">{% include "partials/empty.html" with icon="users" title="No committees yet" %}</section>{% endfor %}
     </div>
-    {% if can_manage %}<aside><section class="card"><h2>New committee</h2>
+    {% if can_manage %}<aside><section class="card" id="new-committee"><h2>New committee</h2>
       <form method="post">{% csrf_token %}
         <p><label>Name <input type="text" name="name" maxlength="120" required></label></p>
         <p><label>Purpose <textarea name="purpose" rows="3"></textarea></label></p>

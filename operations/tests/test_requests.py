@@ -341,14 +341,14 @@ def test_owners_cannot_set_follow_ups(client, w):
 def test_my_items_lists_unassigned_and_my_requests_with_counts(client, w):
     req = _submit(w)
     items = my_items.items_for(w["board"])
-    assert any(f"#{req.pk}" in i.title for i in items if i.area == "Requests")
+    assert any(f"#{req.pk}" in i.title for i in items if i.area == "Owner requests")
     with system_access("t"):
         board2 = Person.objects.get(user=w["board2"])
     services.assign_request(req, board2, actor=w["board"])
     assert not any(f"#{req.pk}" in i.title for i in my_items.items_for(w["board"]))
     assert any(f"#{req.pk}" in i.title for i in my_items.items_for(w["board2"]))
     counts = my_items.counts(my_items.items_for(w["board2"]))
-    assert {"area": "Requests", "count": 1, "overdue": 0} in counts
+    assert {"area": "Owner requests", "count": 1, "overdue": 0} in counts
     client.force_login(w["board2"])
     assert b"Broken fence" in client.get(reverse("my_items")).content
     assert client.get(reverse("board_home"))["Location"] == reverse("my_items")

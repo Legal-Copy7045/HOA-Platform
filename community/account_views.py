@@ -152,6 +152,11 @@ def pending_changes_for_lot(user, lot):
         .select_related("contact__person", "ownership__person", "requested_by")
     )
     _add_deed_files(changes)
+    from community.services import own_change_refusal
+
+    for change in changes:
+        # Shown before any button (D64); the service still refuses it.
+        change.own_note = own_change_refusal(change, user)
     return changes
 
 

@@ -106,7 +106,11 @@ def test_declining_a_seat_nomination_asks_first(client, settings):
     page = client.get(reverse("approvals")).content.decode()
     decline = reverse("seat_nomination_decide", args=[nomination.pk, "decline"])
     form = page[page.index(f'action="{decline}"') :][:300]
-    assert 'data-confirm="Decline this board seat for Nominee Example?"' in form
+    # D64: a decision says who is acting.
+    assert (
+        'data-confirm="Decline this board seat for Nominee Example?'
+        " You're acting for the association." in form
+    )
     client.force_login(first)
     page = client.get(reverse("approvals")).content.decode()
     form = page[page.index(f'action="{decline}"') :][:300]
