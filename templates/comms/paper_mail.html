@@ -18,7 +18,7 @@
       {% if meetings %}<form method="get" action="{% url 'paper_mail_new' %}" class="stack"><p><label for="pm-meeting">Meeting notice</label><select id="pm-meeting" name="meeting">{% for mt in meetings %}<option value="{{ mt.pk }}">{{ mt.title }} ({{ mt.starts_at|date:"M j" }})</option>{% endfor %}</select></p><div><button type="submit" class="secondary small">Prepare meeting notice</button></div></form>{% endif %}
       {% if budgets %}<form method="get" action="{% url 'paper_mail_new' %}" class="stack"><p><label for="pm-budget">Budget notice</label><select id="pm-budget" name="budget">{% for b in budgets %}<option value="{{ b.pk }}">{{ b }}</option>{% endfor %}</select></p>
         <p><label for="pm-stage">Which notice</label><select id="pm-stage" name="stage"><option value="proposed">Proposed budget</option><option value="adopted">Adopted budget</option></select></p><div><button type="submit" class="secondary small">Prepare budget notice</button></div></form>{% endif %}
-      <form method="get" action="{% url 'paper_mail_new' %}" class="stack"><p><label for="pm-template">From Letters and certificates</label><select id="pm-template" name="template">{% for k, label in templates %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></p><div><button type="submit" class="secondary small">Prepare letter</button></div></form>
+      <p class="small muted">Delinquency notices are not mailed from here: open the home's collection case (Finance, Collections) and use "Also prepare a paper copy" next to its letter.</p>
     </section>
   </div>
   <section class="card" id="mailings"><h2>Mailings</h2>

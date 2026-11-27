@@ -311,6 +311,7 @@ PROTECTED = {
     "collection_detail": ("GET", "collection"),
     "collection_action": ("POST", "collection"),
     "collection_letter": ("POST", "collection"),
+    "collection_paper_copy": ("POST", "collection"),
     "collection_notice_pdf": ("GET", "collection"),
     "accounting": ("GET", None),
     "accounting_export": ("GET", None),

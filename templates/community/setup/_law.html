@@ -1,7 +1,7 @@
-{% load portal %}{# The step's "What the law says" panel (community/pa_law.py, community/us_law.py). Expects: law #}<aside class="card setup-law" aria-labelledby="setup-law-title" data-testid="setup-law">
-  <h2 id="setup-law-title">{% icon "book" %} What the law says</h2>
-  {% for n in law.pa %}<div class="setup-law-entry"><h3>Pennsylvania Uniform Planned Community Act: {{ n.title }}</h3><p class="small">{{ n.text }}</p></div>{% endfor %}
+{% load portal %}{# The step's "What the law says" panel (community/pa_law.py, community/us_law.py). Expects: law #}{# Open on a computer, closed on a phone so the first field is near the top (WT-032); without JavaScript it stays open. #}<details class="card setup-law" open data-collapse-narrow data-testid="setup-law">
+  <summary><h2 id="setup-law-title">{% icon "book" %} What the law says{% with n=law.pa|length|add:law.notes|length %}{% if n %} <span class="small muted">({{ n }} note{{ n|pluralize }})</span>{% endif %}{% endwith %}</h2></summary>
+  {% for n in law.pa %}<div class="setup-law-entry"><h3>Pennsylvania Uniform Planned Community Act: {{ n.title }}</h3>{% if n.citation %}<p class="small muted">{{ n.citation }}</p>{% endif %}<p class="small">{{ n.text }}</p>{% if n.meaning %}<p class="small"><strong>For this choice:</strong> {{ n.meaning }}</p><p class="small muted">{{ n.caveat }}</p>{% endif %}</div>{% endfor %}
   {% for n in law.notes %}<div class="setup-law-entry"><h3>{{ n.title }}</h3><p class="small muted">{{ n.citation }}</p><p class="small">{{ n.summary }}</p><p class="small"><strong>For this choice:</strong> {{ n.meaning }}</p><p class="small muted">{{ n.caveat }}</p></div>{% endfor %}
   {% if law.none %}<p class="small">{{ law.none }}</p>{% endif %}
   {% if law.pa or law.notes %}<p class="small muted">The Pennsylvania guidance for each setting is shown beside it.</p>{% endif %}
-</aside>
+</details>

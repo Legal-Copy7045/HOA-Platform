@@ -263,7 +263,32 @@ def people(request):
             return _done(request, "Person added.", reverse("person_detail", args=[person.pk]))
         return _invalid(request, form, reverse("people"))
     people_ = Person.objects.for_user(request.user).select_related("user")
-    context = {"people": people_, "form": form}
+    total = people_.count()
+    # Find a person without scrolling every row (WT-037): name, email or the
+    # address of a home they own now. Never logged or audited, like portal search.
+    q = request.GET.get("q", "").strip()[:100]
+    if q:
+        from django.db.models import Q
+
+        by_home = (
+            Ownership.objects.for_user(request.user)
+            .active()
+            .filter(
+                Q(lot__street_address__icontains=q) | Q(lot__number=int(q) if q.isdigit() else -1)
+            )
+        )
+        home_people = list(by_home.values_list("person_id", flat=True))
+        people_ = people_.filter(
+            Q(display_name__icontains=q) | Q(email__icontains=q) | Q(pk__in=home_people)
+        )
+    login = request.GET.get("login", "")
+    if login == "none":
+        people_ = people_.filter(user__isnull=True)
+    elif login == "active":
+        people_ = people_.filter(user__isnull=False)
+    else:
+        login = ""
+    context = {"people": people_, "form": form, "q": q, "login": login, "total": total}
     if policy.can(request.user, "access_review.record"):
         # The quarterly access review lives here, not in Settings (streamlining).
         from accounts import access_review
@@ -585,6 +610,9 @@ def community_settings(request):
             "groups": groups,
             "attention": attention,
             "group_attention": group_attention,
+            # Only the first section needing attention starts open; the rest
+            # show their count on the closed summary (WT-027).
+            "first_attention": next((g for g, n in group_attention.items() if n), None),
             "group_notes": group_notes,
             "pa_disclaimer": pa_law.DISCLAIMER,
             "profile_form": forms.ProfileForm(

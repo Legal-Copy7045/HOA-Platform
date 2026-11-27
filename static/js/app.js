@@ -236,6 +236,49 @@ portalButtonConfirm();
   }, true);
 })();
 
+// Record payments (WT-033): "Add another row" copies an empty row in place, so
+// nothing typed is lost; without JavaScript the button re-posts the form and
+// the server adds the row.
+(function () {
+  "use strict";
+  Array.prototype.forEach.call(document.querySelectorAll("[data-add-row]"), function (button) {
+    var form = button.form;
+    var body = form && form.querySelector("[data-batch-rows]");
+    var count = form && form.querySelector("input[name=rows]");
+    if (!body || !count) return;
+    var max = parseInt(body.getAttribute("data-max"), 10) || 60;
+    button.addEventListener("click", function (e) {
+      var rows = body.querySelectorAll("tr[data-batch-row]");
+      var n = parseInt(count.value, 10) || rows.length;
+      if (!rows.length || n >= max) return;
+      e.preventDefault();
+      var row = rows[0].cloneNode(true);
+      row.classList.remove("row-error");
+      row.removeAttribute("id");
+      Array.prototype.forEach.call(row.querySelectorAll("[id], [for], [name]"), function (el) {
+        ["id", "for", "name"].forEach(function (attr) {
+          var v = el.getAttribute(attr);
+          if (v) el.setAttribute(attr, v.replace(/_\d+$/, "_" + n));
+        });
+        el.removeAttribute("aria-invalid");
+        el.removeAttribute("aria-describedby");
+        if (el.tagName === "SELECT") el.selectedIndex = 0;
+        else if (el.tagName === "INPUT" && el.type !== "date") el.value = "";
+      });
+      Array.prototype.forEach.call(row.querySelectorAll("label.sr-only"), function (l) {
+        l.textContent = l.textContent.replace(/row \d+$/, "row " + (n + 1));
+      });
+      var title = row.querySelector(".cell-title");
+      if (title) title.textContent = "Check " + (n + 1);
+      body.appendChild(row);
+      count.value = n + 1;
+      if (n + 1 >= max) button.hidden = true;
+      var first = row.querySelector("select, input");
+      if (first) first.focus();
+    });
+  });
+})();
+
 // <details data-collapse-narrow open> starts closed on a phone (board
 // controls that would push the page's own content down, WT-044). Without
 // JavaScript it stays open.
@@ -382,6 +425,12 @@ portalButtonConfirm();
     if (target) target.scrollIntoView({ block: "start" });
   }
   if (window.location.hash) openTo(window.location.hash);
+  // "Jump to section" on a phone (WT-027): the same as following the link.
+  Array.prototype.forEach.call(document.querySelectorAll("select[data-jump]"), function (sel) {
+    sel.addEventListener("change", function () {
+      if (sel.value && sel.value.charAt(0) === "#") window.location.hash = sel.value;
+    });
+  });
   window.addEventListener("hashchange", function () { openTo(window.location.hash); });
   var wide = window.matchMedia && window.matchMedia("(min-width: 821px)").matches;
   if (wide) {

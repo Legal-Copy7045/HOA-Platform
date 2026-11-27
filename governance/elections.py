@@ -31,6 +31,7 @@ from core.policy import can, require
 from core.scoping import system_access
 from core.text import single_line
 from governance.models import (
+    OWNER_MEETING_KINDS,
     Attendance,
     Candidate,
     ConsentRequest,
@@ -467,6 +468,13 @@ def grant_proxy(meeting: Meeting, *, lot: Lot, holder: Person, actor, request=No
     roles = policy.roles_for(actor)
     if lot.pk not in roles.owned_lot_ids:
         raise PermissionDenied("proxy")
+    if meeting.kind not in OWNER_MEETING_KINDS:
+        # Owners vote only at owners' meetings; a proxy for a board meeting
+        # would look valid but have no effect (WT-002).
+        raise ElectionError(
+            "Proxies are only for owners' meetings. Owners may attend a board "
+            "meeting and speak, but they do not vote there."
+        )
     if meeting.starts_at < timezone.now() - datetime.timedelta(hours=12):
         raise ElectionError("That meeting has already taken place.")
     grantor = _person(actor)

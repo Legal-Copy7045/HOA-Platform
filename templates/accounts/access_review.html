@@ -20,16 +20,16 @@
     <div class="stat"><div class="label">Sysadmins</div><div class="value">{{ counts.sysadmins }}</div></div>
   </div>
 
-  <div class="table-card"><div class="table-wrap"><table>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Login</th><th>Homes</th><th>Board, offices, roles</th><th>Account contact</th><th>Last sign-in</th><th>Authenticator</th><th>Flags</th></tr></thead>
     <tbody>{% for r in rows %}<tr>
-      <td>{% if r.person %}<a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a>{% else %}<span class="muted">No person record</span>{% endif %}<div class="small muted">{{ r.user.email }}</div></td>
-      <td class="small">{% for n in r.lots %}{{ n }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
-      <td class="small">{% if r.board %}Board{% endif %}{% for o in r.offices %}{% if r.board or not forloop.first %}, {% endif %}{{ o }}{% endfor %}{% for x in r.roles %}{% if r.board or r.offices or not forloop.first %}, {% endif %}{{ x }}{% endfor %}{% if not r.board and not r.offices and not r.roles %}<span class="muted">-</span>{% endif %}</td>
-      <td class="small">{% for c in r.contacts %}{{ c }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
-      <td class="nowrap small">{% if r.user.last_login %}{{ r.user.last_login|date:"M j, Y" }}{% else %}<span class="muted">Never</span>{% endif %}</td>
-      <td>{% if r.mfa %}{% status "active" "Yes" %}{% else %}{% status "overdue" "None" %}{% endif %}</td>
-      <td class="small">{% for f in r.flag_labels %}<span class="badge tone-warning">{{ f }}</span> {% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="cell-title">{% if r.person %}<a href="{% url 'person_detail' r.person.pk %}">{{ r.person.display_name }}</a>{% else %}<span class="muted">No person record</span>{% endif %}<div class="small muted">{{ r.user.email }}</div></td>
+      <td class="small" data-label="Homes">{% for n in r.lots %}{{ n }}{% if not forloop.last %}; {% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="small" data-label="Board, offices, roles">{% if r.board %}Board{% endif %}{% for o in r.offices %}{% if r.board or not forloop.first %}, {% endif %}{{ o }}{% endfor %}{% for x in r.roles %}{% if r.board or r.offices or not forloop.first %}, {% endif %}{{ x }}{% endfor %}{% if not r.board and not r.offices and not r.roles %}<span class="muted">-</span>{% endif %}</td>
+      <td class="small" data-label="Account contact">{% for c in r.contacts %}{{ c }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="muted">-</span>{% endfor %}</td>
+      <td class="nowrap small" data-label="Last sign-in">{% if r.user.last_login %}{{ r.user.last_login|date:"M j, Y" }}{% else %}<span class="muted">Never</span>{% endif %}</td>
+      <td data-label="Authenticator">{% if r.mfa %}{% status "active" "Yes" %}{% else %}{% status "overdue" "None" %}{% endif %}</td>
+      <td class="small" data-label="Flags">{% for f in r.flag_labels %}<span class="badge tone-warning">{{ f }}</span> {% empty %}<span class="muted">-</span>{% endfor %}</td>
     </tr>{% endfor %}</tbody>
   </table></div></div>
   <p class="small muted">To end a seat, office, role or ownership, or to reset a lost authenticator, open the person's page. To switch off a login at once (for example a compromised account), a sysadmin runs the audited <code>breakglass_lock_user</code> command.</p>

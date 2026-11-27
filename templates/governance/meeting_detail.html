@@ -17,6 +17,7 @@
           <p class="small"><strong>{% if variant == "board" %}Board packet{% else %}Owner packet{% endif %}</strong>{% if variant == "board" %} <span class="badge tone-warning">Confidential – board only</span>{% endif %}<br><span class="muted">Built {{ p.built_at|short_date }}, version {{ p.version.number }}</span></p>
           <a class="btn secondary small" href="{% url 'document_download' p.document_id %}">{% icon "file" %} Packet (PDF)</a>
           <a class="btn secondary small" href="{% url 'meeting_packet_zip' m.pk p.pk %}">{% icon "file" %} Packet with attachments (.zip)</a>
+          {% if p.not_in_zip %}<p class="small muted" data-testid="not-in-zip">{{ p.not_in_zip }} attachment{{ p.not_in_zip|pluralize }} {{ p.not_in_zip|pluralize:"is,are" }} not included in the .zip; NOT-INCLUDED.txt inside it says why.</p>{% endif %}
         </div>{% empty %}<p class="muted small">No packet yet.</p>{% endfor %}
         {% if can_build_packet and m.status != "cancelled" %}<p><a class="btn small" href="{% url 'meeting_packet' m.pk %}">Build packet</a></p>{% endif %}
       </section>{% endif %}
@@ -65,6 +66,11 @@
       {% for e in linked_elections %}<li><div class="todo-icon">{% icon "users" %}</div><div class="grow"><a class="title" href="{% url 'election_detail' e.pk %}">{{ e.title }}</a><div class="small muted">Board election · {{ e.seats }} seat{{ e.seats|pluralize }}{% if e.state == "voting" and e.voting_closes_at %} · vote by {{ e.voting_closes_at|date:"M j, Y g:i A" }}{% endif %}</div></div>{% status e.state e.get_state_display %}</li>{% endfor %}
       {% for r in linked_resolutions %}<li><div class="todo-icon">{% icon "book" %}</div><div class="grow"><a class="title" href="{% url 'resolutions' %}?all=1">{{ r.number }} {{ r.title }}</a><div class="small muted">{{ r.get_kind_display }} · adopted {{ r.adopted_on|short_date }} · vote {{ r.votes_for }}-{{ r.votes_against }}-{{ r.abstentions }}</div></div></li>{% endfor %}
     </ul>{% else %}<p class="muted small">Nothing linked to this meeting yet.</p>{% endif %}
+  </section>{% endif %}
+  {% if owners_do_not_vote %}<section class="card" id="owners-attend"><h2>Owners at this meeting</h2>
+    <p>Owners may attend and speak; they do not vote here, so there are no owner proxies and no owners' quorum for this meeting.</p>
+    {% if proxies_mine %}<ul class="list">{% for p in proxies_mine %}<li><span class="grow">{{ p.lot.label }}: a proxy held by {{ p.holder.display_name }} was recorded for this meeting. It has no effect here.</span><form method="post" action="{% url 'proxy_revoke' p.pk %}" class="inline" data-confirm="Revoke the proxy for {{ p.lot.label }}? It stays in the records as revoked.">{% csrf_token %}<button type="submit" class="secondary small">Revoke</button></form></li>{% endfor %}</ul>{% endif %}
+    {% if proxies_without_effect %}<p class="small muted">{{ proxies_without_effect }} proxy record{{ proxies_without_effect|pluralize }} for this meeting {{ proxies_without_effect|pluralize:"was,were" }} made before proxies were limited to owners' meetings. {{ proxies_without_effect|pluralize:"It has,They have" }} no effect and {{ proxies_without_effect|pluralize:"stays,stay" }} in the records.</p>{% endif %}
   </section>{% endif %}
   {% if quorum %}<section class="card"><h2>Quorum</h2>
     <p><strong>{{ quorum.represented }}</strong> of {{ quorum.eligible }} homes represented ({{ quorum.in_person }} in person, {{ quorum.by_proxy }} by proxy). Needed: {{ quorum.needed }} ({{ quorum.percent }}%).

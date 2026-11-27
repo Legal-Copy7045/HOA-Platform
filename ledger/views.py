@@ -491,7 +491,9 @@ def lot_ledger_action(request, pk, action):
     return redirect("lot_ledger", pk=lot.pk)
 
 
-BATCH_ROWS = 10
+# Three rows to start (WT-033); "Add another row" adds more without losing
+# what was typed (in place with JavaScript, by re-posting the form without).
+BATCH_ROWS = 3
 BATCH_MAX_ROWS = 60
 
 
@@ -558,7 +560,16 @@ def record_payments(request):
         count = BATCH_ROWS
     count = max(1, min(count, BATCH_MAX_ROWS))
     rows = [{"values": {"date": today.isoformat()}, "errors": []} for _ in range(count)]
-    if request.method == "POST":
+    if request.method == "POST" and request.POST.get("more"):
+        # "Add another row" without JavaScript: the same rows as typed, one
+        # more empty row, nothing checked or recorded yet.
+        for i in range(count):
+            values, _payment, _errors = _batch_row(request, i, lots_by_pk, today)
+            rows[i] = {"values": values, "errors": []}
+        if count < BATCH_MAX_ROWS:
+            rows.append({"values": {"date": today.isoformat()}, "errors": []})
+            count += 1
+    elif request.method == "POST":
         payments, has_errors = [], False
         for i in range(count):
             values, payment, errors = _batch_row(request, i, lots_by_pk, today)
@@ -594,7 +605,7 @@ def record_payments(request):
             "lots": lots,
             "rows": rows,
             "row_count": count,
-            "more_rows": min(count + 10, BATCH_MAX_ROWS),
+            "max_rows": BATCH_MAX_ROWS,
             "today": today,
             "recorded": recorded,
             "recorded_total": sum(-e.amount_cents for e, _ in recorded),
@@ -669,6 +680,9 @@ def collection_detail(request, pk):
             "history": services.COLLECTION.history(case),
             "next_letter": _next_letter(case),
             "letters": CollectionLetter.objects.for_user(request.user).filter(case=case),
+            "can_paper_copy": case.state not in ("closed", "referred")
+            and policy.can(request.user, "collections.manage")
+            and policy.can(request.user, "mail.print"),
             "action_url_name": "collection_action",
         },
     )
@@ -1335,6 +1349,29 @@ def _bank_feed_for_statement(request, statement_date) -> dict:
         "feed_account": chosen,
         "feed_balance": bank.feed_balance(chosen, statement_date) if chosen else None,
     }
+
+
+@login_required
+@require_POST
+def collection_paper_copy(request, pk):
+    """ "Also prepare a paper copy" of one of this case's letters (WT-006):
+    a Paper mail mailing for this home only (D55 records)."""
+    from comms import services as comms
+
+    case = get_object_or_404(CollectionCase.objects.for_user(request.user), pk=pk)
+    policy.require(request.user, "collections.manage")
+    policy.require(request.user, "mail.print")
+    letter = get_object_or_404(
+        CollectionLetter.objects.for_user(request.user).filter(case=case),
+        pk=request.POST.get("letter") or 0,
+    )
+    try:
+        mailing = comms.paper_copy_of_case_letter(letter, actor=request.user, request=request)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("collection_detail", pk=case.pk)
+    messages.success(request, "Paper copy prepared for this home. Print it below.")
+    return redirect("paper_mail_detail", pk=mailing.pk)
 
 
 @login_required
