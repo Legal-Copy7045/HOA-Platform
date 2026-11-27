@@ -449,7 +449,19 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        for key in ("push", "sms", "bank_feeds", "usps_tracking"):  # off by default; checked here
+        for key in (
+            "push",
+            "sms",
+            "bank_feeds",
+            "usps_tracking",
+            # Finance options (D80-D85)
+            "overdue_interest",
+            "cashflow_forecast",
+            "collections_legal",
+            "capital_projects",
+            "owner_finance_dashboard",
+            "insurance_claims",
+        ):  # off by default; checked here
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
