@@ -59,20 +59,16 @@ class InterestError(ValueError):
     """A refusal the page shows."""
 
 
-# --- Adapters (switch at merge) ----------------------------------------------------------
+# --- Sources in other areas ------------------------------------------------------------
 
 
 def on_payment_plan(lot_id: int) -> bool:
-    """Switch to claude/finance-gaps at merge: a payment plan in force with its
-    schedule kept. Interim: the home's open collection case is at the
-    "Payment plan agreed" step."""
-    from ledger.models import CollectionCase
+    """A payment plan in force with its schedule kept (D76,
+    ``ledger.payment_plans.plan_kept``): approved, not ended, and no
+    installment missed."""
+    from ledger import payment_plans
 
-    return (
-        CollectionCase.objects.unscoped("interest: payment plan")
-        .filter(lot_id=lot_id, state="payment_plan")
-        .exists()
-    )
+    return payment_plans.plan_kept(lot_id)
 
 
 def disputed_charge_ids(lot_id: int) -> set[int]:
@@ -82,10 +78,10 @@ def disputed_charge_ids(lot_id: int) -> set[int]:
 
 
 def principal_kinds(include_fees: bool) -> set[str]:
-    """Kinds of charge whose past-due part earns interest. Switch to
-    claude/finance-gaps at merge: add the special assessment installments'
-    kind."""
-    kinds = {EntryKind.ASSESSMENT}
+    """Kinds of charge whose past-due part earns interest: the monthly
+    assessment and special assessment installments (D75), and with
+    ``include_fees`` late fees and interest."""
+    kinds = {EntryKind.ASSESSMENT, EntryKind.SPECIAL_ASSESSMENT}
     if include_fees:
         kinds |= {EntryKind.LATE_FEE, EntryKind.INTEREST}
     return {str(k) for k in kinds}

@@ -4,14 +4,17 @@ The next 12 months by month and by fund (operating, reserve). ``project`` is
 pure integer-cents arithmetic on ``Inputs`` (unit tested); ``build`` gathers
 the inputs from what the portal holds through small adapters:
 
-* opening cash: ``opening_balances`` (switch to claude/books-and-close fund
-  balances at merge; interim: the cash book for operating, the reserve
-  plan's balance for reserve);
+* opening cash: ``opening_balances``, each fund's cash in the books at the
+  end of the last closed month (D70); while the books are not in use or no
+  month is closed, the cash book for operating and the reserve plan's
+  balance for reserve, marked not closed;
 * assessments expected: the monthly {term} x homes billed, times the
   collection rate (rule ``cashflow.collection_rate_percent``, or worked out
   from the last 12 months);
-* special assessment installments: ``special_installments`` (switch to
-  claude/finance-gaps at merge; interim none);
+* special assessment installments (D75): ``special_installments``, the
+  installments not yet cancelled falling due in each month, all homes'
+  shares; reserve-fund levies go to the reserve, operating-fund levies are
+  added to the month's operating collections;
 * interest on overdue balances (D80): the last three months' average;
 * operating outflows: approved invoices by due date and active contracts'
   amounts by their schedule;
@@ -80,6 +83,7 @@ class Inputs:
     billed: tuple[int, ...]  # assessments billed each month
     collection_rate_bp: int  # 10000 = everything billed is collected
     special: tuple[int, ...] = ()  # special assessment installments (to reserve)
+    special_operating: tuple[int, ...] = ()  # operating-fund installments (D75)
     interest_income: tuple[int, ...] = ()  # owner interest collected (operating)
     operating_out: tuple[int, ...] = ()
     reserve_out: tuple[int, ...] = ()
@@ -139,7 +143,7 @@ def project(inputs: Inputs) -> list[Row]:
         start = add_months(inputs.start, i)
         collected = round_half_up(
             Fraction(inputs.at(inputs.billed, i) * inputs.collection_rate_bp, 10000)
-        )
+        ) + inputs.at(inputs.special_operating, i)
         interest_in = inputs.at(inputs.interest_income, i)
         out = inputs.at(inputs.operating_out, i)
         transfer = inputs.at(inputs.reserve_transfer, i)
@@ -209,7 +213,7 @@ def apply_scenario(inputs: Inputs, scenario: Scenario) -> Inputs:
     return replace(inputs, collection_rate_bp=rate, operating_out=tuple(out))
 
 
-# --- Adapters (switch at merge) ---------------------------------------------------------
+# --- Sources in other areas ------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -217,19 +221,33 @@ class Opening:
     operating: int
     reserve: int
     as_of: datetime.date
-    closed: bool  # from a closed month (books branch) or today's open figures
+    closed: bool  # from a closed month (the books) or today's open figures
     source: str
 
 
 def opening_balances(today: datetime.date) -> Opening:
-    """Switch to claude/books-and-close at merge: the operating and reserve fund
-    balances at the last closed month. Interim, today's open figures: for
-    operating, the cash book (ledger.accounting.book_balance) plus owner
-    payments received and not yet deposited; for reserve, the reserve plan's
-    own path (its starting balance moved by the plan's contribution, interest
-    and replacements month by month to the end of this month), or its starting
-    balance when the plan is not in use."""
+    """The operating and reserve funds' cash in the books at the end of the
+    last closed month (``ledger.books.close.closed_fund_positions``,
+    ``closed=True``). While the books are not in use or no month is closed,
+    today's open figures: for operating, the cash book
+    (ledger.accounting.book_balance) plus owner payments received and not yet
+    deposited; for reserve, the reserve plan's own path (its starting balance
+    moved by the plan's contribution, interest and replacements month by month
+    to the end of this month), or its starting balance when the plan is not in
+    use."""
     from ledger import accounting, reserve_plan
+    from ledger.books import close
+
+    closed = close.closed_fund_positions()
+    if closed is not None:
+        as_of, positions = closed
+        return Opening(
+            positions["operating"]["cash"],
+            positions["reserve"]["cash"],
+            as_of,
+            True,
+            "books (last closed month)",
+        )
 
     undeposited = -sum(e.amount_cents for e in accounting.undeposited_payments())
     operating = accounting.book_balance(today) + undeposited
@@ -264,10 +282,14 @@ def _plan_parts(row) -> tuple[list[int], list[int], list[int]]:
     )
 
 
-def special_installments(months: list[datetime.date]) -> list[int]:
-    """Switch to claude/finance-gaps at merge: special assessment installments
-    due in each month. Interim: none recorded on this base."""
-    return [0 for _ in months]
+def special_installments(months: list[datetime.date], fund: str = "reserve") -> list[int]:
+    """Special assessment installments (D75) of levies designated to ``fund``
+    falling due in each month: every home's share of each installment not
+    cancelled (``ledger.special_assessments.due_by_month``)."""
+    from ledger import special_assessments
+
+    due = special_assessments.due_by_month(months[0], months[-1])
+    return [due.get((m.year, m.month, fund), 0) for m in months]
 
 
 # --- Gathering the inputs ----------------------------------------------------------------
@@ -388,7 +410,8 @@ def build(today: datetime.date | None = None, scenario: Scenario | None = None) 
         opening_reserve=opening.reserve,
         billed=tuple([billed] * MONTHS),
         collection_rate_bp=rate,
-        special=tuple(special_installments(months)),
+        special=tuple(special_installments(months, "reserve")),
+        special_operating=tuple(special_installments(months, "operating")),
         interest_income=tuple([interest] * MONTHS),
         operating_out=tuple(_operating_out(months)),
         reserve_out=tuple(reserve_out),

@@ -95,9 +95,7 @@ def seed(c) -> None:
         if state == "final_notice":
             C.apply(case, "send_final_notice", actor=manager)
         if state == "payment_plan":
-            C.apply(
-                case, "payment_plan", actor=manager, note="$100 a month from next month (demo)."
-            )
+            _payment_plan(c, case, manager, treas)
         if state == "referred":
             C.apply(case, "refer", actor=treas, note="Sent to the association's attorney (demo).")
         case.refresh_from_db()
@@ -219,3 +217,26 @@ def seed(c) -> None:
             cand = row["candidates"][0]
             matching.confirm(row["line"], kind=cand.kind, object_id=cand.object_id, actor=manager)
             break
+
+
+def _payment_plan(c, case, manager, treas) -> None:
+    """The case at "Payment plan agreed": with payment plans on (D76) only an
+    approved plan moves it there (prepared by the manager, approved by the
+    treasurer); with the feature off, the note-only step."""
+    from core import features
+    from ledger import payment_plans
+    from ledger import services as ledger
+
+    if not features.enabled("payment_plans"):
+        ledger.COLLECTION.apply(
+            case, "payment_plan", actor=manager, note="$100 a month from next month (demo)."
+        )
+        return
+    _charges, total, _account = payment_plans.covered_charges(case)
+    plan = payment_plans.prepare(
+        case,
+        installments=payment_plans.even_installments(total, 3, c.days(10)),
+        note="Three monthly installments from next month (demo).",
+        actor=manager,
+    )
+    payment_plans.approve(plan, actor=treas)

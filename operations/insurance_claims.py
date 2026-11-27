@@ -12,7 +12,7 @@ claim are board decisions. A settlement at or above rule
 
 Owners never see claims (board, manager and auditor only). Proof of loss
 due dates and appeal deadlines put a reminder on My items 14 days ahead.
-The books branch codes the bank lines; this records what is expected and
+The books code the bank lines; this records what is expected and
 what arrived.
 """
 

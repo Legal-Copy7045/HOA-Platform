@@ -33,11 +33,12 @@ class EntryKind(models.TextChoices):
     # Finance options (D80, D82): simple interest on overdue assessments,
     # posted monthly by ledger/interest.py; collection costs and attorney
     # fees the Declaration lets the association charge (ledger/legal.py).
-    # Books branch: map "interest" to interest income on the operating fund.
+    # The journal maps both to their own income accounts on the operating
+    # fund (OWNER_FINANCE_GL); both are member (exempt-function) income.
     INTEREST = "interest", "Interest on overdue balance"
     LEGAL_COST = "legal_cost", "Collection costs and attorney fees"
     # A special assessment installment (D75, ledger/special_assessments.py).
-    # Books branch: map to income of the assessment's fund
+    # The journal credits special assessment income in the levy's fund
     # (SpecialAssessment.fund, operating or reserve).
     SPECIAL_ASSESSMENT = "special_assess", "Special assessment"
 
@@ -362,9 +363,15 @@ ONLINE_GL = {
 }
 # Disbursements (D52): where a surplus distribution is paid from.
 DISBURSEMENT_GL = {"surplus_fund": "3100 Reserve and surplus fund"}
-# Special assessments (D75): their income account (the books branch maps it
-# to the fund of SpecialAssessment.fund).
+# Special assessments (D75): their income account, in the fund of
+# SpecialAssessment.fund (ledger.accounting.journal_lines).
 SPECIAL_ASSESSMENT_GL = {"special_assess": "4400 Special assessment income"}
+# Finance options (D80, D82): interest charged on overdue balances and
+# collection costs recovered from owners, operating fund, member income.
+OWNER_FINANCE_GL = {
+    "interest": "4150 Interest on overdue balances",
+    "legal_cost": "4250 Collection costs recovered",
+}
 
 
 class AccountingSetup(models.Model):
@@ -397,7 +404,14 @@ class AccountingSetup(models.Model):
             k.strip(): v.strip()
             for k, _, v in (line.partition("=") for line in DEFAULT_GL.splitlines())
         }
-        return {**defaults, **ONLINE_GL, **DISBURSEMENT_GL, **SPECIAL_ASSESSMENT_GL, **out}
+        return {
+            **defaults,
+            **ONLINE_GL,
+            **DISBURSEMENT_GL,
+            **SPECIAL_ASSESSMENT_GL,
+            **OWNER_FINANCE_GL,
+            **out,
+        }
 
 
 class DepositBatch(AppendOnlyModel):
@@ -1169,10 +1183,10 @@ class CheckPrintSettings(models.Model):
 # --- Books and close (D69-D71): ledger/books/models.py ---------------------------------
 from ledger.books.models import *  # noqa: E402, F403
 
-# Finance options (D80-D85): collections legal records live in their own
-# module; imported here so Django registers them with the ledger app.
-from ledger.models_options import LegalEvent  # noqa: E402, F401
-
 # Special assessments (D75) and payment plans (D76): their own module, so the
 # models merge cleanly with other ledger work.
 from ledger.models_finance_gaps import *  # noqa: E402, F403
+
+# Finance options (D80-D85): collections legal records live in their own
+# module; imported here so Django registers them with the ledger app.
+from ledger.models_options import LegalEvent  # noqa: E402, F401

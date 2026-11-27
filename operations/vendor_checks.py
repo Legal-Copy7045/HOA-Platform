@@ -103,6 +103,12 @@ def payables(actor=None) -> list[Payable]:
         if remaining <= 0:
             continue
         payee, mail_to, memo, claim = payee_for(invoice)
+        refusal = _refusal(actor, claim) if actor is not None else ""
+        if not refusal:
+            # D79: an unapproved or inactive vendor is never paid.
+            from operations.services import payment_block_reason
+
+            refusal = payment_block_reason(invoice) or ""
         out.append(
             Payable(
                 invoice,
@@ -111,7 +117,7 @@ def payables(actor=None) -> list[Payable]:
                 mail_to,
                 memo,
                 claim,
-                _refusal(actor, claim) if actor is not None else "",
+                refusal,
             )
         )
     return out
@@ -379,7 +385,8 @@ def outstanding_checks(
 ) -> list[OutstandingCheck]:
     """Vendor checks issued through ``as_of`` (after ``since``), not voided by
     then and not reconciled (their ``InvoicePayment`` not on a statement).
-    For the books branch's reconciliation and the Checks page."""
+    For the Checks page and the cash-book reconciliation; the books count
+    vendor checks through their ``InvoicePayment`` (do not add these again)."""
     from ledger.models import ReconciledItem
 
     reconciled = set(

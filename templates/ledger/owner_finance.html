@@ -19,7 +19,7 @@
   <section id="budget" aria-labelledby="bva-h">
     <h2 id="bva-h">Budget and actual{% if bva.fiscal_year %}, {{ bva.fiscal_year }} so far{% endif %}</h2>
     {% if bva.fiscal_year %}
-      <p class="muted small">{% if bva.through %}Through the end of {{ bva.through|date:"F Y" }} ({{ bva.closed_months }} month{{ bva.closed_months|pluralize }} of the year), from the association's records.{% else %}The year has just started: no full month to compare yet.{% endif %}</p>
+      <p class="muted small">{% if bva.through %}Through the end of {{ bva.through|date:"F Y" }} ({{ bva.closed_months }} month{{ bva.closed_months|pluralize }} of the year), {% if bva.closed %}from the closed books{% else %}not yet closed, so figures may still change{% endif %}.{% else %}The year has just started: no full month to compare yet.{% endif %}</p>
       {% for kind, title in kinds %}
       <h3>{{ title }}</h3>
       <div class="table-card"><div class="table-wrap"><table class="stack-sm">

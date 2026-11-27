@@ -102,6 +102,10 @@ def _payment_plans(lots, staff_for) -> int:
         lot = lots.get(number)
         if lot is None:
             continue
+        existing = CollectionCase.objects.filter(lot=lot).exclude(state="closed").first()
+        if existing is not None and payment_plans.plan_for_case(existing) is not None:
+            made += 1  # the demo states already agreed this home's plan
+            continue
         ledger.post_charge(
             lot=lot,
             kind="other_charge",

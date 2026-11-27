@@ -31,8 +31,9 @@ project, on top of the monthly charge.
   posted, with a reason; posted charges are corrected only by a normal
   reversal on the home's account.
 
-The money's fund (``SpecialAssessment.fund``) is a designation the general
-ledger maps (books branch); the owner ledger only knows the charge.
+The money's fund (``SpecialAssessment.fund``) is where the journal credits
+the income (``ledger.accounting.journal_lines``); the owner ledger only knows
+the charge.
 """
 
 from __future__ import annotations
@@ -52,6 +53,7 @@ from community.rules import rule, rule_with_citation
 from core.money import format_cents
 from core.policy import SYSTEM, can, require
 from core.scoping import internal, system_access
+from ledger.books.periods import open_date
 from ledger.models import (
     EntryKind,
     LedgerEntry,
@@ -315,6 +317,39 @@ def installments(sa: SpecialAssessment) -> list[dict]:
     return rows
 
 
+@internal("special assessment installments by month")
+def due_by_month(first: datetime.date, last: datetime.date) -> dict[tuple[int, int, str], int]:
+    """(year, month, fund) -> all homes' installments due that month, for
+    installments from ``first``'s month to ``last``'s month that are not
+    cancelled (the cash-flow forecast, D81)."""
+    start = first.replace(day=1)
+    out: dict[tuple[int, int, str], int] = {}
+    rows = SpecialAssessmentInstallment.objects.filter(
+        due_on__gte=start, due_on__lt=_month_after(last)
+    ).select_related("assessment")
+    stops: dict[int, int | None] = {}
+    share_totals: dict[int, list[int]] = {}
+    for inst in rows:
+        sa = inst.assessment
+        if sa.pk not in stops:
+            stops[sa.pk] = cancelled_from(sa)
+            per = [0] * sa.installments
+            for share in SpecialAssessmentShare.objects.filter(assessment=sa):
+                for i, cents in enumerate(installment_amounts(share.amount_cents, sa.installments)):
+                    per[i] += cents
+            share_totals[sa.pk] = per
+        stop = stops[sa.pk]
+        if stop is not None and inst.number >= stop:
+            continue
+        key = (inst.due_on.year, inst.due_on.month, sa.fund)
+        out[key] = out.get(key, 0) + share_totals[sa.pk][inst.number - 1]
+    return out
+
+
+def _month_after(day: datetime.date) -> datetime.date:
+    return (day.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+
+
 @internal("special assessment shares")
 def shares(sa: SpecialAssessment) -> list[SpecialAssessmentShare]:
     rows = list(SpecialAssessmentShare.objects.filter(assessment=sa).select_related("lot"))
@@ -391,7 +426,9 @@ def post_due(
                         with transaction.atomic():
                             entry = LedgerEntry.objects.create(
                                 lot_id=share.lot_id,
-                                posted_on=inst.due_on,
+                                # Never into a closed month (D70): a late
+                                # catch-up posts in the open month.
+                                posted_on=open_date(inst.due_on),
                                 kind=EntryKind.SPECIAL_ASSESSMENT,
                                 amount_cents=cents,
                                 description=describe(sa, inst.number),

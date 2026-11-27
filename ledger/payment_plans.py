@@ -496,7 +496,19 @@ def check_plans(today: datetime.date | None = None) -> dict[str, int]:
     return done
 
 
-# --- Hooks for late fees, My items and My account ----------------------------------------
+# --- Hooks for late fees, interest, My items and My account ------------------------------
+
+
+@internal("payment plan kept")
+def plan_kept(lot_id: int, on: datetime.date | None = None) -> bool:
+    """The home has an approved plan, not ended, with no installment missed
+    (overdue interest, D80, is not charged while it does)."""
+    for plan in PaymentPlan.objects.filter(lot_id=lot_id):
+        if status(plan) != "active":
+            continue
+        if not any(r["status"] == "missed" for r in schedule(plan, on)):
+            return True
+    return False
 
 
 @internal("late fees suspended")
