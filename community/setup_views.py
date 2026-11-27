@@ -339,7 +339,14 @@ def _server_status():
         bounce = bounces.setup_status()
     except Exception as exc:  # shown like a failed check
         bounce = {"state": "failing", "text": f"Check failed ({type(exc).__name__})"}
+    try:
+        from comms import delivery
+
+        relay = delivery.setup_status()
+    except Exception as exc:  # shown like a failed check
+        relay = {"state": "failing", "provider": "", "text": f"Check failed ({type(exc).__name__})"}
     return {
+        "relay": relay,
         "email_ok": email_ok,
         "email_detail": email_detail,
         "email_redirect": bool(settings.EMAIL_REDIRECT_ALL_TO),

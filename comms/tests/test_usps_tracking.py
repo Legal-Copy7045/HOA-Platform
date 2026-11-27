@@ -708,18 +708,17 @@ def test_set_usps_script_takes_the_password_hidden_and_checks_after_restart():
     script = Path("infra/poc/set-usps.sh").read_text()
     assert 'read -r -s -p "BCG password (hidden): " PASSWORD' in script
     assert 'ENVIRONMENT="${ENVIRONMENT:-cat}"' in script
-    assert "set_env .env USPS_IV_ENVIRONMENT" in script
-    assert "set_env .env USPS_IV_USERNAME" in script
-    assert "set_env .env USPS_IV_PASSWORD \"'$PASSWORD'\"" in script
-    assert "cp -p .env .env.before-usps" in script
+    assert 'env_update .env USPS_IV_ENVIRONMENT "$ENVIRONMENT" USPS_IV_USERNAME' in script
+    assert "USPS_IV_PASSWORD \"'$PASSWORD'\"" in script
+    assert 'BACKUP="$(env_backup .env usps)"' in script
     assert script.index("start-portal.sh") < script.index("manage.py check_usps_iv")
-    assert ".env.before-usps .env" in script.split("check_usps_iv", 1)[1]
+    assert 'env_restore_keys .env "$BACKUP"' in script.split("check_usps_iv", 1)[1]
     # The password is never echoed, printed or passed to another program.
     for line in script.splitlines():
         if "PASSWORD" in line and not line.lstrip().startswith("#"):
             assert not line.lstrip().startswith(("echo", "printf")), line
             assert "$PASSWORD" not in line or line.lstrip().startswith(
-                ("set_env", "if [[", "[ -n")
+                ("env_update", "if [[", "[ -n")
             ), line
     assert "unset PASSWORD" in script
 

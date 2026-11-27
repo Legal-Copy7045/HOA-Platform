@@ -280,8 +280,9 @@ STEPS: list[Step] = [
     Step(
         "server",
         "Server and email",
-        "Outgoing email, the bounce mailbox, backups, the off-site copy, the payment and bank "
-        "keys, the vendor document key and the USPS tracking login. These "
+        "Outgoing email and its provider (SMTP server or SMTP2Go), the bounce mailbox, "
+        "backups, the off-site copy, the payment and bank keys, the vendor document key "
+        "and the USPS tracking login. These "
         "are done on the server by a sysadmin; this step shows where things stand.",
         kind=SERVER,
     ),

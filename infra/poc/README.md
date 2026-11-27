@@ -62,6 +62,47 @@ connections from the internet or other VLANs.
 
    Copy the generated secrets from `.env` into the HOA password manager.
 
+## Email through SMTP2Go
+
+The portal sends through SMTP2Go's HTTP API and reads delivery and bounce
+reports back from SMTP2Go every five minutes (pull only: no webhook, and no
+bounce mailbox is needed). In the SMTP2Go dashboard, once:
+
+1. **Sending → Verified Senders → Sender Domains → Add**: your domain (the
+   part after @ in the portal's From address). SMTP2Go then shows the exact
+   records to add at your domain's DNS host; generically they are:
+
+   | Purpose | Type | Name | Value |
+   |---|---|---|---|
+   | SPF | TXT | `@` (the domain) | `v=spf1 include:spf.smtp2go.com ~all` (add the include to an existing SPF record instead of making a second one) |
+   | DKIM | CNAME | `s<nnn>._domainkey` | `dkim.smtp2go.net` |
+   | Return path (bounces) | CNAME | `em<nnn>` | `return.smtp2go.net` |
+   | Link tracking (optional) | CNAME | `link` | `track.smtp2go.net` |
+   | DMARC (recommended) | TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:dmarc@<your domain>` |
+
+   Use the names and numbers SMTP2Go shows (`<nnn>` is per account), wait
+   for "Verified", and leave open and click tracking off.
+2. **Sending → API Keys → Add API Key**: permissions *Emails* (send),
+   *Activity* (search) and *Statistics* (the harmless key check) only.
+   Copy the key once into the HOA password manager.
+3. On the VM:
+
+   ```bash
+   sudo bash infra/poc/set-smtp2go.sh
+   ```
+
+   It asks for the region, the sender address and name, and the key (hidden),
+   checks the key with SMTP2Go (no email is sent), changes only its own keys
+   in `.env` (`EMAIL_PROVIDER`, `SMTP2GO_API_KEY`, `SMTP2GO_REGION`,
+   `DEFAULT_FROM_EMAIL`), restarts web and worker, checks again from the
+   portal and sends a test email. If anything fails, only those keys are put
+   back. Back to plain SMTP: `sudo bash infra/poc/set-smtp2go.sh --off`.
+4. Admin → Features → Bounced email on, so addresses that bounce are flagged.
+
+Every set-*.sh script edits `.env` through `lib.sh` (`env_update`): only
+its own keys change, every other line is kept, the file stays mode 600, and
+the `.env.before-*` copy is shredded when the script ends.
+
 ## Settings
 
 `create-vm.sh`: `VLAN_ID` (required), `BRIDGE` (vmbr0), `STORAGE` (local-lvm),

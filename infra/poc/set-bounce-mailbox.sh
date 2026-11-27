@@ -8,10 +8,23 @@
 #
 #   sudo bash /opt/hoa-portal/infra/poc/set-bounce-mailbox.sh
 #
+# Only for plain SMTP: with SMTP2Go as the relay (set-smtp2go.sh) bounces
+# come from SMTP2Go's reports and no bounce mailbox is needed.
+#
 # Before running: a mailbox the association owns that receives bounces
 # (ideally a dedicated address, e.g. bounces@<your domain>, with IMAP on and,
 # where the provider needs it, an app password). docs/runbook.md "Bounced
 # email".
+#
+# This script changes only the BOUNCE_* keys of .env (env_update in lib.sh),
+# never EMAIL_* or anything another script set. An earlier version broke
+# outgoing email in two ways, both fixed here: the optional "envelope sender"
+# (BOUNCE_RETURN_PATH) changes the MAIL FROM of every outgoing email to
+# bounces+<token>@..., which an authenticated SMTP relay refuses unless it
+# allows that sender, and nothing then checked that email still went out;
+# and the failed-check advice to copy .env.before-bounce-mailbox over .env put back
+# the WHOLE old file, undoing any EMAIL_ change made since. Now a test email
+# is sent after the change, and a failure puts back only this script's keys.
 set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
@@ -21,6 +34,14 @@ APP_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
 source "$APP_DIR/infra/poc/lib.sh"
 cd "$APP_DIR"
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
+
+PROVIDER="$(env_get .env EMAIL_PROVIDER || true)"
+PROVIDER="${PROVIDER//[\"\']/}"
+if [ "${PROVIDER,,}" = "smtp2go" ]; then
+  echo "Email goes through SMTP2Go (EMAIL_PROVIDER=smtp2go): SMTP2Go reports bounces to the portal and no bounce mailbox is needed."
+  read -r -p "Set up a bounce mailbox anyway? [y/N]: " ANSWER
+  [[ "${ANSWER:-N}" =~ ^[Yy] ]] || { echo "Nothing was changed."; exit 0; }
+fi
 
 read -r -p "IMAP server host name (e.g. imap.example.org): " HOST
 HOST="$(printf '%s' "$HOST" | tr 'A-Z' 'a-z')"
@@ -41,10 +62,21 @@ FOLDER="${FOLDER:-INBOX}"
 [[ "$FOLDER" =~ ^[A-Za-z0-9._/\ -]{1,100}$ ]] \
   || { echo "Use letters, digits, spaces, dots, dashes or slashes for the folder. Nothing was changed." >&2; exit 1; }
 
-read -r -p "The mailbox's own address, used as the envelope sender of outgoing mail (optional, Enter to skip): " RETURN_PATH
-if [ -n "$RETURN_PATH" ]; then
-  [[ "$RETURN_PATH" =~ ^[A-Za-z0-9._-]{1,60}@[A-Za-z0-9.-]{3,190}$ ]] \
-    || { echo "That does not look like a plain address (no + in it). Nothing was changed." >&2; exit 1; }
+RETURN_PATH=""
+if [ "${PROVIDER,,}" != "smtp2go" ]; then
+  echo "Optional: send outgoing mail with the mailbox's address as the envelope sender (VERP),"
+  echo "so bounces reach it. Only if your SMTP server allows that sender for the portal's login"
+  echo "(many refuse it, and then NO email goes out; a test email below checks it)."
+  read -r -p "The mailbox's own address (Enter to skip): " RETURN_PATH
+  if [ -n "$RETURN_PATH" ]; then
+    [[ "$RETURN_PATH" =~ ^[A-Za-z0-9._-]{1,60}@[A-Za-z0-9.-]{3,190}$ ]] \
+      || { echo "That does not look like a plain address (no + in it). Nothing was changed." >&2; exit 1; }
+  fi
+fi
+read -r -p "Send a test email afterwards to (an address you can read; Enter for EMAIL_REDIRECT_ALL_TO): " TEST_TO
+if [ -n "$TEST_TO" ]; then
+  [[ "$TEST_TO" =~ ^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{3,190}$ ]] \
+    || { echo "That does not look like an email address. Nothing was changed." >&2; exit 1; }
 fi
 
 read -r -s -p "Mailbox password or app password (hidden): " PASSWORD; echo
@@ -57,23 +89,46 @@ if [[ "$PASSWORD" == *"'"* || "$PASSWORD" =~ [[:cntrl:]] ]]; then
   exit 1
 fi
 
-cp -p .env .env.before-bounce-mailbox
-chmod 600 .env.before-bounce-mailbox
-set_env .env BOUNCE_IMAP_HOST "$HOST"
-set_env .env BOUNCE_IMAP_PORT "$PORT"
-set_env .env BOUNCE_IMAP_USER "$USERNAME"
-set_env .env BOUNCE_IMAP_FOLDER "'$FOLDER'"
-set_env .env BOUNCE_IMAP_PASSWORD "'$PASSWORD'"
+KEYS=(BOUNCE_IMAP_HOST BOUNCE_IMAP_PORT BOUNCE_IMAP_USER BOUNCE_IMAP_FOLDER BOUNCE_IMAP_PASSWORD BOUNCE_RETURN_PATH)
+BACKUP="$(env_backup .env bounce-mailbox)"
+trap 'env_discard_backup "$BACKUP"' EXIT
+env_update .env \
+  BOUNCE_IMAP_HOST "$HOST" \
+  BOUNCE_IMAP_PORT "$PORT" \
+  BOUNCE_IMAP_USER "$USERNAME" \
+  BOUNCE_IMAP_FOLDER "'$FOLDER'" \
+  BOUNCE_IMAP_PASSWORD "'$PASSWORD'" \
+  BOUNCE_RETURN_PATH "$RETURN_PATH"
 unset PASSWORD
-set_env .env BOUNCE_RETURN_PATH "$RETURN_PATH"
+
+undo() {
+  env_restore_keys .env "$BACKUP" "${KEYS[@]}"
+  echo "$1 The previous bounce settings are back in .env (nothing else in it was changed); restarting." >&2
+  bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null || true
+  exit 1
+}
+
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Signing in to the mailbox (no message is read)"
-if ! "${COMPOSE[@]}" exec -T web python manage.py check_bounce_mailbox; then
-  echo "The check failed (above). To undo: cp .env.before-bounce-mailbox .env && sudo bash infra/poc/start-portal.sh" >&2
+# Only the worker container has the password (EXP-003): check from there.
+if ! "${COMPOSE[@]}" exec -T worker python manage.py check_bounce_mailbox; then
+  undo "The check failed (above)."
+fi
+echo "==> Sending a test email (outgoing mail must still work)"
+if ! bash "$APP_DIR/infra/poc/test-email.sh" ${TEST_TO:+"$TEST_TO"}; then
+  if [ -n "$RETURN_PATH" ]; then
+    env_restore_keys .env "$BACKUP" BOUNCE_RETURN_PATH
+    bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null || true
+    echo "Outgoing email failed with the envelope sender $RETURN_PATH, so it was switched off again" >&2
+    echo "(BOUNCE_RETURN_PATH restored; the mailbox login is kept). Bounces then reach the From" >&2
+    echo "address's mailbox instead. Run test-email.sh to confirm email works." >&2
+    exit 1
+  fi
+  echo "The test email failed, but this script did not change any EMAIL_ setting: check them with test-email.sh." >&2
   exit 1
 fi
-shred -u .env.before-bounce-mailbox 2>/dev/null || rm -f .env.before-bounce-mailbox
+env_discard_backup "$BACKUP"
 echo "Removed .env.before-bounce-mailbox (the copy of the previous settings, with the old secret)."
 echo "Done. Switch on Bounced email in Admin -> Features; System status shows the Bounce mailbox check."
 echo "To change the mailbox, run this script again."

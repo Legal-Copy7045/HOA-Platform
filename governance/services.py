@@ -13,7 +13,7 @@ from audit.services import record_event
 from community import services as community_services
 from community.models import ContactProfile, Lot, Ownership, Person
 from community.rules import rule, rule_with_citation
-from core.email import NOTICE, mail_kind
+from core.email import NOTICE, mail_about, mail_kind
 from core.policy import SYSTEM, can, require
 from core.policy import invalidate_roles as _invalidate_roles
 from core.scoping import system_access
@@ -237,7 +237,8 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
             if person.pk in consent and (person.email or person.user_id):
                 to = [person.user.email if person.user_id else person.email]
                 to += [e for e in community_services.notice_emails(person) if e not in to]
-                with mail_kind(NOTICE):  # a bounce asks for a paper copy (D74)
+                # A bounce asks for a paper copy (D74); delivery shows on the meeting.
+                with mail_kind(NOTICE), mail_about("meeting_notice", meeting.pk):
                     send_mail(
                         f"[{settings.SITE_NAME}] Meeting notice: {single_line(meeting.title)}",
                         body,

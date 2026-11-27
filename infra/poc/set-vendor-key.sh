@@ -45,14 +45,21 @@ fi
 NEW_KEY="$(head -c 48 /dev/urandom | base64 -w0 | tr '+/' '-_' | tr -d '=')"
 [ "${#NEW_KEY}" -ge 60 ] || { echo "Could not make a key. Nothing was changed." >&2; exit 1; }
 
-cp -p .env .env.before-vendor-key
-chmod 600 .env.before-vendor-key
+# Only the two vendor keys change (env_update, infra/poc/lib.sh). The copy of
+# the old .env is removed whatever happens (EXP-004): on --rotate the old key
+# stays in VENDOR_DOCUMENT_KEY_FALLBACKS, so documents re-encrypted part-way
+# remain readable, and the copy would only be a second plaintext of every
+# server secret.
+BACKUP="$(env_backup .env vendor-key)"
+trap 'env_discard_backup "$BACKUP"' EXIT
 if [ -n "$current" ]; then
   old_fallbacks="$(grep -E '^VENDOR_DOCUMENT_KEY_FALLBACKS=' .env | tail -1 | cut -d= -f2- || true)"
-  set_env .env VENDOR_DOCUMENT_KEY_FALLBACKS "${current}${old_fallbacks:+,$old_fallbacks}"
+  env_update .env VENDOR_DOCUMENT_KEY_FALLBACKS "${current}${old_fallbacks:+,$old_fallbacks}" \
+    VENDOR_DOCUMENT_KEY "$NEW_KEY"
   unset old_fallbacks
+else
+  env_update .env VENDOR_DOCUMENT_KEY "$NEW_KEY"
 fi
-set_env .env VENDOR_DOCUMENT_KEY "$NEW_KEY"
 unset NEW_KEY current
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
@@ -60,10 +67,11 @@ echo "==> Checking the key (a test value is encrypted and opened; nothing is sho
 CHECK=(python manage.py check_vendor_key)
 [ "$ROTATE" -eq 1 ] && CHECK+=(--reencrypt)
 if ! "${COMPOSE[@]}" exec -T web "${CHECK[@]}"; then
-  echo "The check failed (above). To undo: cp .env.before-vendor-key .env && sudo bash infra/poc/start-portal.sh" >&2
+  echo "The check failed (above). The new key is kept in .env (the old one, if any, is in VENDOR_DOCUMENT_KEY_FALLBACKS); run this script with --rotate again once the cause is fixed." >&2
   exit 1
 fi
+env_discard_backup "$BACKUP"
+echo "Removed .env.before-vendor-key (the copy of the previous settings)."
 echo "Done. Now keep a copy of the key apart from the backups (the HOA's password manager):"
 echo "  sudo grep -E '^VENDOR_DOCUMENT_KEY' $APP_DIR/.env"
-echo "Then remove the copy this script left: sudo shred -u $APP_DIR/.env.before-vendor-key"
 echo "Switch on Vendor onboarding in Admin -> Features (Settings -> Community setup -> Vendors)."

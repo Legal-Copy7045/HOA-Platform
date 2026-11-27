@@ -384,7 +384,13 @@ def _monitoring_context() -> dict:
     storage trend. Operations data only; each part fails on its own."""
     from core import growth, job_health, ops_timeline
 
-    out = {"job_problems": [], "timeline": [], "growth": None}
+    out = {"job_problems": [], "timeline": [], "growth": None, "email": None}
+    try:
+        from comms import delivery
+
+        out["email"] = delivery.overview()
+    except Exception:  # shown by the Outgoing email check itself
+        out["email"] = None
     try:
         out["job_problems"] = job_health.problems()
     except Exception:  # shown by the health check itself
