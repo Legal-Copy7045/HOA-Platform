@@ -773,7 +773,17 @@ def log(argv: list[str]) -> int:
     parser.add_argument("--full-check", action="store_true")
     args = parser.parse_args(argv)
     if not args.walkthrough or args.full_check:
-        standard.cmd_log(argparse.Namespace(walkthrough=False, full_check=args.full_check))
+        # standard.cmd_log writes its own WALKTHROUGHS.md row on a full check, from an
+        # inventory shape this project does not use (5 roles, 0 pages); this project
+        # writes the walkthrough row below, so only the RUNS.md row comes from there.
+        add_row = standard.add_row
+        standard.add_row = lambda path, *a, **k: (
+            None if Path(path).name == "WALKTHROUGHS.md" else add_row(path, *a, **k)
+        )
+        try:
+            standard.cmd_log(argparse.Namespace(walkthrough=False, full_check=args.full_check))
+        finally:
+            standard.add_row = add_row
     if args.walkthrough or args.full_check:
         sha, ver = standard.git("rev-parse", "--short", "HEAD"), standard.version()
         date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")

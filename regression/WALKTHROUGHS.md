@@ -13,6 +13,7 @@ below it keep their own format. `/walkthrough` skips itself when no UI file
 
 | Date (UTC) | Commit | Version | Roles | Pages | UX checks failing | Findings | Report |
 |---|---|---|---|---|---|---|---|
+| 2026-11-27 21:44 | `7a8d8e9` | 0.42.0 | 11 | 734 | 67 | 49 | [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) · [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) |
 | 2026-11-27 | `d62bd1e` | 0.34.0 | 11 | not recorded | 0 | 54 | [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) · [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) |
 
 ## 2026-11-27 — third full walkthrough (release 0.34.0, with the regression)
