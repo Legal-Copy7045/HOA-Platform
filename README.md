@@ -37,7 +37,8 @@ new reversing records. Rules from the Declaration are data with citations.
 
 ## Documentation
 
-- `CLAUDE.md`: architecture and rules (source of truth), and the commands
+- `CLAUDE.md`: architecture and rules (source of truth), how to run and test;
+  the full rules and reference in `docs/claude/`
 - `docs/decisions.md`: why each decision was made (D1 onwards)
 - `docs/runbook.md`: operating the portal (setup, updates, backups, malware
   scanning, payments, bank feed, the go-live checklist)
@@ -121,9 +122,13 @@ pip install --require-hashes -r requirements/base.txt -r requirements/dev.txt
 scripts/check.sh
 ```
 
-CI runs ruff, bandit, pip-audit, the tests in four shards (one `test`
-check), the compose and image build, a Trivy image scan, gitleaks, CodeQL and
-the regression page crawl.
+`scripts/check.sh` runs `python3 regression/run.py check` (the owner's
+project standard, D90). CI (`ci-result` is the one required check) runs ruff,
+bandit, the version check, the privacy guard and gitleaks on every ready pull
+request, and the tests in two shards, pip-audit, the image build with a Trivy
+scan and the regression page crawl when the pull request touches what they
+test; everything weekly; CodeQL weekly. A merged version bump is the release
+(tag `v<VERSION>`), and the server installs only releases.
 
 ## Project layout
 
