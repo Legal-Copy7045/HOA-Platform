@@ -6,6 +6,18 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.38.0 — 2026-11-27
+
+- The demo community now has records in every state of every section, with
+  something waiting at each next step, and a test login for every role
+  (including a board member with their own matters and a recused ARC
+  reviewer). docs/demo-test-guide.md says what is seeded, where to find it and
+  what to try, including what should be refused. Reseed from Settings → Demo
+  data to get it on the POC.
+- Fixed: an owner with more than four to-dos saw a "See all in My items" link
+  on a phone that led to a refused page; owners now see all their to-dos on
+  the dashboard.
+
 ## 0.37.0 — 2026-11-27
 
 - Secret ballots are sealed while they wait to be mixed (D68). A secret

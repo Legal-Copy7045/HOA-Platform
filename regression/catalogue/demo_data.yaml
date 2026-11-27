@@ -1,5 +1,5 @@
 # Demo datasets and reseeding the POC from Settings (D53). `match` runs over "<stage>:<check>".
-- feature: "Demo dataset registry: seed_demo --dataset (oak_creek default, output unchanged; fresh_start) and --list-datasets; refused unless SEED_DEMO_ALLOWED"
+- feature: "Demo dataset registry: seed_demo --dataset (oak_creek default, its seeded counts fixed; fresh_start) and --list-datasets; refused unless SEED_DEMO_ALLOWED"
   since: M5
   match: ["^unit:community/tests/test_demo_datasets.py::test_(registry|list_datasets|unknown_dataset|every_dataset_refuses|default_is_oak_creek|naming_oak_creek)", "^unit:community/tests/test_commands.py::test_seed_demo"]
 - feature: "Fresh start dataset: 44 homes, owners with and without email, a trust, an entity, two couples, a declarant-appointed board of three with offices, a sysadmin, a placeholder Declaration, no history, default settings, no invitations, fictional only"
@@ -20,3 +20,6 @@
 - feature: "Old data's files removed after a reseed (only unreferenced, never the health probe); demo data loading in production warned by the startup and health checks; production settings force it off"
   since: M5
   match: ["^unit:core/tests/test_demo_reseed.py::test_(clean_demo_files|startup_check|production_settings)"]
+- feature: "oak_creek demo as test data: records in every state of every area (ARC, violations, requests, work orders, contracts, invoices, meetings, consents, votes, elections, surveys, records, resale, collections, refunds, bookings, paper mail, invitations, resets, nominations), a step waiting for each role, test personas for every role (logins on the Person email, no password or authenticator), each role's My items has work, own matters refused and the neighbouring ARC reviewer recused, and the tester's guide names only seeded people and homes"
+  since: M5
+  match: ["^unit:community/tests/test_demo_coverage.py::"]

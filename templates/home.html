@@ -49,7 +49,7 @@
     {% if dash.todos %}
       <ul class="list">{% for t in dash.todos %}{% include "partials/todo.html" %}{% endfor %}</ul>
       {# Phones show the first four (WT-049); the rest are one tap away. #}
-      {% if dash.todos|length > 4 or dash.todos_more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}
+      {% if dash.can_open_queue and dash.todos|length > 4 or dash.todos_more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}
     {% else %}
       {% include "partials/empty.html" with icon="check-circle" title="You're all caught up" text="Nothing needs you right now." %}
     {% endif %}

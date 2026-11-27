@@ -206,6 +206,8 @@ def parts(items, quick, can_open_queue, groups=frozenset({policy.BOARD})) -> lis
             "title": title,
             "todos": shown,
             "more": len(todos) - len(shown),
+            # Only staff can open the My items page (owners see every to-do).
+            "queue": can_open_queue,
             "quick": quick_links,
         }
 
@@ -234,6 +236,7 @@ def build(user, request=None) -> dict:
     can_open_queue = any(policy.can(user, p) for p in my_items.MY_ITEMS_PERMISSIONS)
     data["todos"] = items[:TODO_LIMIT] if can_open_queue else items
     data["todos_more"] = len(items) - len(data["todos"])
+    data["can_open_queue"] = can_open_queue
     if roles.groups & policy.ACCOUNT_VIEWERS:
         data["owner"] = owner_panel(user, roles)
     if roles.groups & {policy.BOARD, policy.MANAGER, policy.AUDITOR, policy.ARC_REVIEWER}:

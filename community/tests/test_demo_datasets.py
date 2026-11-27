@@ -77,28 +77,29 @@ def test_every_dataset_refuses_unless_allowed(settings, dataset):
 
 # --- oak_creek: the default, output unchanged -------------------------------------------
 
-# Seeded people and lots before the registry existed (names, emails and
-# addresses; dates and ledger counts depend on today).
-OAK_CREEK_PEOPLE_AND_LOTS = "358db8c2de1ac954021487e1a142b08757512b3eda334102c6eed929f55ba000"
+# Seeded people and lots (names, emails and addresses; dates and ledger counts
+# depend on today). Since the records-in-every-state part
+# (community/demo/states) the counts include its records and test personas.
+OAK_CREEK_PEOPLE_AND_LOTS = "419278dc99bb1dfacd5c8a7adeabc7c9d1434d82e423b1224c7034f763717c0f"
 OAK_CREEK_COUNTS = {
-    "accounts.User": 5,
-    "arc.ArcRequest": 1,
-    "comms.Announcement": 2,
-    "comms.Event": 4,
+    "accounts.User": 20,
+    "arc.ArcRequest": 16,
+    "comms.Announcement": 4,
+    "comms.Event": 10,
     "community.Account": 45,
-    "community.AccountContact": 3,
+    "community.AccountContact": 5,
     "community.BoardSeat": 5,
     "community.Lot": 44,
     "community.OfficeHolding": 4,
     "community.Ownership": 47,
-    "community.Person": 51,
-    "community.RoleAssignment": 3,
-    "compliance.Violation": 1,
-    "documents.Document": 4,
-    "governance.Meeting": 3,
-    "governance.Vote": 1,
-    "operations.Invoice": 4,
-    "operations.Vendor": 3,
+    "community.Person": 56,
+    "community.RoleAssignment": 5,
+    "compliance.Violation": 9,
+    "documents.Document": 9,
+    "governance.Meeting": 7,
+    "governance.Vote": 5,
+    "operations.Invoice": 10,
+    "operations.Vendor": 4,
 }
 
 
@@ -122,7 +123,8 @@ def test_default_is_oak_creek_and_its_output_is_unchanged(settings):
     out = run("seed_demo")
     assert "Demo data created: 44 lots, joint owners on lots 7 and 23" in out
     assert "Governing rules are cited 'DEMO - replace'" in out
-    assert "Demo logins" in out and "demo-board0@example.com" in out
+    # Demo logins are on the Person's own email, so a setup link can be sent (D59).
+    assert "Demo logins" in out and "demo001@example.com" in out
     default = _fingerprint()
     assert default == (OAK_CREEK_COUNTS, OAK_CREEK_PEOPLE_AND_LOTS)
     assert DemoSeed.objects.get().dataset == "oak_creek"
