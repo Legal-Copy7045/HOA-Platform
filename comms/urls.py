@@ -1,11 +1,22 @@
 from django.urls import path, re_path
 
-from comms import papermail_views, pwa_views, rsvp_views, views
+from comms import bounce_views, papermail_views, pwa_views, rsvp_views, views
 
 urlpatterns = [
     # Paper mail (D55): board and manager only.
     path("paper-mail/", papermail_views.paper_mail, name="paper_mail"),
     path("paper-mail/new/", papermail_views.paper_mail_new, name="paper_mail_new"),
+    # Bounced email (D74): a bounced official notice's paper copy went another way.
+    path(
+        "paper-mail/bounced/<int:pk>/sent/",
+        bounce_views.bounce_paper_done,
+        name="bounce_paper_done",
+    ),
+    path(
+        "board/people/<int:pk>/email-bounces/clear/",
+        bounce_views.person_email_bounce_clear,
+        name="person_email_bounce_clear",
+    ),
     path("paper-mail/settings/", papermail_views.paper_mail_settings, name="paper_mail_settings"),
     path("paper-mail/settings/test.pdf", papermail_views.paper_mail_test, name="paper_mail_test"),
     path("paper-mail/<int:pk>/", papermail_views.paper_mail_detail, name="paper_mail_detail"),

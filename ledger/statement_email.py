@@ -34,6 +34,7 @@ from audit.services import record_event
 from community.models import Account, AccountContact, ContactKind, ContactProfile, Ownership
 from community.rules import rule
 from community.terms import Term, charge_term
+from core.email import KIND_HEADER, STATEMENT
 from core.money import format_cents
 from core.scoping import system_access
 from ledger.models import EntryKind, LedgerEntry, StatementEmail
@@ -209,6 +210,7 @@ def send_for_account(account: Account, *, year: int, month: int, term: Term | No
             None,
             [person.email],
             connection=connection,
+            headers={KIND_HEADER: STATEMENT},  # what a bounce was (D74)
         )
         # No names or numbers in the file name.
         message.attach(f"statement-{period}.pdf", pdf, "application/pdf")

@@ -648,3 +648,123 @@ class UspsPollState(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("The USPS tracking status is kept.")
+
+
+# --- Bounced email (D74) ----------------------------------------------------------------
+
+
+class BounceKind(models.TextChoices):
+    HARD = "hard", "Hard bounce (the address does not accept mail)"
+    SOFT = "soft", "Soft bounce (temporary: mailbox full, server busy)"
+
+
+class MailKind(models.TextChoices):
+    """What an outgoing email was, as tagged when it was sent (core.email)."""
+
+    NOTICE = "notice", "Official notice"
+    STATEMENT = "statement", "Monthly statement"
+    DIGEST = "digest", "Weekly summary"
+    BOARD = "board", "Board notification"
+    ACCOUNT = "account", "Sign-in or account email"
+    OTHER = "other", "Other email"
+
+
+class EmailBounce(ScopedAppendOnlyModel):
+    """One bounce read from the bounce mailbox (comms/bounces.py): whose
+    address (by a keyed hash, and the person when it matched one), hard or
+    soft, the delivery status code and what kind of email it was. Never the
+    address itself, the bounce's text or the original message. First and
+    last seen for an address are the earliest and latest of its rows."""
+
+    scope_person_path = "person"
+
+    person = models.ForeignKey(
+        "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    address_hash = models.CharField(max_length=64)
+    kind = models.CharField(max_length=4, choices=BounceKind.choices)
+    mail_kind = models.CharField(max_length=10, choices=MailKind.choices)
+    status = models.CharField(max_length=12, blank=True)  # e.g. "5.1.1"
+    sent_at = models.DateTimeField(null=True, blank=True)  # from the message's token
+    received_at = models.DateTimeField(default=timezone.now)
+    dedupe = models.CharField(max_length=64, unique=True)
+
+    class Meta:
+        ordering = ["-received_at", "-id"]
+        indexes = [models.Index(fields=["address_hash", "received_at"])]
+
+    def __str__(self) -> str:
+        return f"Email bounce #{self.pk} ({self.kind})"
+
+
+class EmailBounceClear(ScopedAppendOnlyModel):
+    """The board marked a bouncing address as fixed (or the person changed
+    it): bounces before this no longer count for that address."""
+
+    scope_person_path = "person"
+
+    person = models.ForeignKey("community.Person", on_delete=models.PROTECT, related_name="+")
+    address_hash = models.CharField(max_length=64)
+    cleared_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    cleared_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-cleared_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Bounce cleared #{self.pk}"
+
+
+class BounceFollowUp(ScopedAppendOnlyModel):
+    """The board says the paper copy of a bounced official notice went to
+    this home another way (a mailing prepared on Paper mail closes it by
+    itself). One row per bounce and home."""
+
+    scope_lot_path = "lot"
+
+    bounce = models.ForeignKey(EmailBounce, on_delete=models.PROTECT, related_name="+")
+    lot = models.ForeignKey("community.Lot", on_delete=models.PROTECT, related_name="+")
+    done_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
+    done_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-done_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["bounce", "lot"], name="bounce_follow_up_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"Bounce follow-up #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.none()  # board and manager pages only (mail.print)
+
+
+class BouncePollState(models.Model):
+    """How the last reading of the bounce mailbox went (one row; operations
+    status for the health check and the set-up wizard, no personal data)."""
+
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_failure_at = models.DateTimeField(null=True, blank=True)
+    # auth, connect, tls, protocol, folder
+    last_failure = models.CharField(max_length=20, blank=True)
+    last_read = models.PositiveIntegerField(default=0)
+    last_recorded = models.PositiveIntegerField(default=0)
+    last_unmatched = models.PositiveIntegerField(default=0)
+
+    def __str__(self) -> str:
+        return "Bounce mailbox status"
+
+    @classmethod
+    def get(cls) -> "BouncePollState":
+        found, _ = cls.objects.get_or_create(pk=1)
+        return found
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("The bounce mailbox status is kept.")

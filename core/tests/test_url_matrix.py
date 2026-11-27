@@ -235,6 +235,11 @@ PROTECTED = {
     "sysadmin_activity": ("GET", None),
     "system_status": ("GET", None),
     "server_tasks": ("GET", None),
+    # D74: the incident timeline (sysadmins); bounced email actions (board,
+    # and board or manager for the paper copy).
+    "ops_timeline": ("GET", None),
+    "person_email_bounce_clear": ("POST", "person"),
+    "bounce_paper_done": ("POST", "lot"),
     "demo_data": ("POST", None),  # 404 unless demo data is allowed; sysadmins only (D53)
     "community_settings": ("GET", None),
     # Community setup wizard (D51): board only.
@@ -432,7 +437,8 @@ def world():
     ):
         from core.models import FeatureSetting
 
-        for key in ("push", "sms", "bank_feeds", "usps_tracking"):  # off by default; checked here
+        # Off by default; checked here.
+        for key in ("push", "sms", "bank_feeds", "usps_tracking", "bounce_tracking"):
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),

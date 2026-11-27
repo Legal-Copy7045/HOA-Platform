@@ -364,6 +364,58 @@ def system_status(request):
             "scan_stuck_minutes": SCAN_STUCK_MINUTES,
             "scan_alert_minutes": SCAN_ALERT_MINUTES,
             **_server_errors_context(),
+            **_monitoring_context(),
+        },
+    )
+
+
+def _monitoring_context() -> dict:
+    """D74: job problems in words, the newest timeline lines, the 90-day
+    storage trend. Operations data only; each part fails on its own."""
+    from core import growth, job_health, ops_timeline
+
+    out = {"job_problems": [], "timeline": [], "growth": None}
+    try:
+        out["job_problems"] = job_health.problems()
+    except Exception:  # shown by the health check itself
+        out["job_problems"] = []
+    try:
+        out["timeline"] = ops_timeline.recent()
+    except Exception:
+        out["timeline"] = []
+    try:
+        out["growth"] = growth.trend()
+    except Exception:
+        out["growth"] = None
+    return out
+
+
+@login_required
+def ops_timeline(request):
+    """The incident timeline (D74): sysadmins, like System status. Newest
+    first, a filter by kind, 25 a page. Operations words and counts only."""
+    from core import ops_timeline as timeline
+
+    policy.require(request.user, "system.view_status")
+    kind = request.GET.get("kind") or ""
+    if kind not in timeline.FILTER_KEYS:
+        kind = ""
+    try:
+        page = max(1, min(int(request.GET.get("page") or 1), 1000))
+    except ValueError:
+        page = 1
+    rows, more = timeline.entries(kind or None, page=page)
+    return render(
+        request,
+        "core/ops_timeline.html",
+        {
+            "rows": rows,
+            "kind": kind,
+            "filters": timeline.FILTERS,
+            "page": page,
+            "more": more,
+            "window_days": timeline.WINDOW_DAYS,
+            "site_tz": settings.TIME_ZONE,
         },
     )
 

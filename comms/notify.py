@@ -50,11 +50,14 @@ def board_subject(subject: str) -> str:
 def mail_board(emails, *, subject: str, body: str, fail_silently: bool = True) -> int:
     """Send a board or staff notification now, one message per address (the
     worker's tasks, which run outside a request). Returns how many went."""
+    from core.email import BOARD, mail_kind
+
     sent = 0
-    for address in sorted({e for e in emails if e}):
-        sent += send_mail(
-            board_subject(subject), body, None, [address], fail_silently=fail_silently
-        )
+    with mail_kind(BOARD):
+        for address in sorted({e for e in emails if e}):
+            sent += send_mail(
+                board_subject(subject), body, None, [address], fail_silently=fail_silently
+            )
     return sent
 
 
@@ -219,7 +222,12 @@ def send_digests() -> int:
                     "You can switch to one email per update in My profile.\n\n"
                     f"-- \n{settings.SITE_NAME}"
                 )
-                send_mail(f"[{settings.SITE_NAME}] Your weekly summary", body, None, [user.email])
+                from core.email import DIGEST, mail_kind
+
+                with mail_kind(DIGEST):
+                    send_mail(
+                        f"[{settings.SITE_NAME}] Your weekly summary", body, None, [user.email]
+                    )
                 sent += 1
             DigestItem.objects.filter(pk__in=[i.pk for i in items]).delete()
     return sent

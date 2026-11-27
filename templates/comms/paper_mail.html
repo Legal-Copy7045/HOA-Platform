@@ -4,6 +4,12 @@
 {% block content %}
   <div class="page-head"><div><h1>Paper mail</h1><p class="subtitle">Letters, envelopes and labels for owners who get official notices by post. Prepare a mailing, print it, then mark it mailed.</p></div>
     <div class="actions"><a class="btn secondary" href="{% url 'paper_mail_settings' %}">{% icon "sliders" %} Paper mail settings</a></div></div>
+  {% if bounced %}<section class="card" id="bounced"><h2>Official notices that bounced</h2>
+    <p class="small">These owners agreed to official notices by email, but the email came back: their address does not accept mail. Send each home a paper copy.</p>
+    <ul class="list">{% for b in bounced %}<li><div class="grow"><div class="title">Send a paper copy to {{ b.copy.lot.label }}</div><div class="small muted">Bounced {{ b.copy.first|short_date }}{% if b.copy.bounces|length > 1 %} ({{ b.copy.bounces|length }} notices){% endif %}</div></div>
+      <a class="btn small" href="{{ b.url }}">Prepare the letter</a>
+      <form method="post" action="{% url 'bounce_paper_done' b.copy.lot.pk %}" data-confirm="Mark the paper copy for {{ b.copy.lot.label }} as sent another way (handed over, or a letter written outside the portal)? It leaves this list and My items.">{% csrf_token %}<button type="submit" class="secondary small">Sent another way</button></form></li>{% endfor %}</ul>
+    <p class="small muted">A mailing prepared here for the home closes it by itself. Fix the address on the owner's page in People.</p></section>{% endif %}
   <div class="split">
     <section class="card" id="who"><h2>Who gets paper</h2>
       <p><strong>{{ counts.homes }}</strong> home{{ counts.homes|pluralize }}, <strong>{{ counts.letters }}</strong> letter{{ counts.letters|pluralize }} ({{ counts.owners }} owner{{ counts.owners|pluralize }} on the deed who have not agreed to official notices by email, or withdrew that choice).{% if counts.no_address %} <span class="badge tone-warning">{{ counts.no_address }} without an address</span>{% endif %}</p>

@@ -289,6 +289,17 @@ FEATURES: list[Feature] = [
         {"paper_mail_piece_checked"},
         default=False,
     ),
+    # Bounced email (D74): also needs the bounce mailbox's login on the server
+    # (infra/poc/set-bounce-mailbox.sh).
+    _f(
+        "bounce_tracking",
+        "Bounced email",
+        "Reads bounced email from the association's bounce mailbox every 20 minutes, marks "
+        "addresses that do not accept mail and asks for a paper copy when an official notice "
+        "bounces (needs the mailbox's login on the server).",
+        {"person_email_bounce_clear", "bounce_paper_done"},
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"

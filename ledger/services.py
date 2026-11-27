@@ -1803,8 +1803,11 @@ def send_budget_notice(budget: Budget, *, stage: str, actor, request=None) -> di
         )
     body += f"\n-- \n{settings.SITE_NAME}"
     emails, paper = owner_notice_recipients()
-    for address in emails:
-        send_mail(subject, body, None, [address], fail_silently=True)
+    from core.email import NOTICE, mail_kind
+
+    with mail_kind(NOTICE):  # official notices: a bounce asks for a paper copy (D74)
+        for address in emails:
+            send_mail(subject, body, None, [address], fail_silently=True)
     field = "proposed_notice_sent_at" if stage == "proposed" else "adopted_notice_sent_at"
     Budget.objects.filter(pk=budget.pk).update(**{field: timezone.now()})
     record_event(

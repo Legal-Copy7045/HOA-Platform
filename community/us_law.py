@@ -255,6 +255,8 @@ NO_SPECIFIC_LAW: dict[str, str] = {
     "people": "Board seats, offices and terms come from the Bylaws and the Nonprofit "
     "Corporation Law; this step only shows who holds them.",
     "review": "Each step's law notes apply to the decisions listed here.",
+    "monitoring": "No specific law sets how early the server's disk warning comes; it is an "
+    "operations choice.",
 }
 
 

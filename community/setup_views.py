@@ -290,6 +290,12 @@ def _server_status():
         usps = usps_tracking.setup_status()
     except Exception as exc:  # shown like a failed check
         usps = {"state": "failing", "text": f"Check failed ({type(exc).__name__})"}
+    try:
+        from comms import bounces
+
+        bounce = bounces.setup_status()
+    except Exception as exc:  # shown like a failed check
+        bounce = {"state": "failing", "text": f"Check failed ({type(exc).__name__})"}
     return {
         "email_ok": email_ok,
         "email_detail": email_detail,
@@ -303,6 +309,7 @@ def _server_status():
         "teller": teller.configured(),
         "push": push_ready,
         "usps": usps,
+        "bounce": bounce,
         "sms": getattr(settings, "SMS_PROVIDER", "none") != "none",
         "file_store_r2": _file_store_is_r2(),
     }

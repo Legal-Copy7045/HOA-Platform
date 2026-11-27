@@ -46,3 +46,14 @@ async def remove_old_jobs(context, timestamp: int) -> None:
         remove_cancelled=True,
         remove_aborted=True,
     )
+
+
+@app.periodic(cron="53 2 * * *")  # daily
+@app.task(queue="maintenance", queueing_lock="growth_snapshot")
+def growth_snapshot(timestamp: int) -> bool:
+    """Database and disk sizes for the 90-day trend (D74); old hourly
+    tallies are removed at the same time."""
+    from core import growth, ops_timeline
+
+    ops_timeline.purge_tallies()
+    return growth.snapshot() is not None

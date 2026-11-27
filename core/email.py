@@ -3,13 +3,21 @@
 When ``EMAIL_REDIRECT_ALL_TO`` is set (POC only), every message goes to that
 one address instead, with the intended recipients noted in the subject. The
 seed data uses @example.com addresses, so without this nothing would arrive.
+
+Every message also gets a bounce token (D74, comms/bounces.py): an
+``X-Portal-Ref`` header, the token inside its Message-ID and, when
+``BOUNCE_RETURN_PATH`` is set, a VERP envelope sender. The kind of email
+comes from an ``X-Portal-Kind`` header the caller sets (removed before
+sending) or from ``with mail_kind("notice"):`` around the send.
 """
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import logging
 import smtplib
+from contextvars import ContextVar
 
 from django.conf import settings
 from django.core.mail import get_connection
@@ -23,6 +31,59 @@ class EmailUnavailable(Exception):
 
 
 FAILURE_CACHE_KEY = "email:last_failure"
+
+KIND_HEADER = "X-Portal-Kind"
+REF_HEADER = "X-Portal-Ref"
+NOTICE, STATEMENT, DIGEST, BOARD, ACCOUNT = "notice", "statement", "digest", "board", "account"
+_kind: ContextVar[str] = ContextVar("portal_mail_kind", default="")
+
+
+@contextlib.contextmanager
+def mail_kind(kind: str):
+    """Mark the emails sent inside the block (e.g. official notices, D44), so a
+    bounce of one is recognised as such."""
+    token = _kind.set(kind)
+    try:
+        yield
+    finally:
+        _kind.reset(token)
+
+
+def tag(message):
+    """A copy of ``message`` carrying its bounce token (see the module
+    docstring). The original is not changed. Never fails the send."""
+    from django.core.mail.message import make_msgid
+    from django.core.mail.utils import DNS_NAME
+
+    from comms import bounces
+
+    tagged = copy.copy(message)
+    headers = dict(getattr(message, "extra_headers", None) or {})
+    names = {k.lower(): k for k in headers}
+    kind = headers.pop(names[KIND_HEADER.lower()], "") if KIND_HEADER.lower() in names else ""
+    kind = kind or _kind.get() or "other"
+    ref = bounces.make_ref(kind, message.recipients())
+    headers[REF_HEADER] = ref
+    if "message-id" not in names:
+        headers["Message-ID"] = make_msgid(idstring=ref, domain=DNS_NAME)
+    envelope = bounces.return_path(ref)
+    if envelope:
+        if "from" not in names:
+            headers["From"] = message.from_email or settings.DEFAULT_FROM_EMAIL
+        tagged.from_email = envelope
+    tagged.extra_headers = headers
+    return tagged
+
+
+def _tagged(messages):
+    out = []
+    for message in messages:
+        try:
+            out.append(tag(message))
+        except Exception as exc:  # a missing token never stops an email
+            logger.warning("email.not_tagged", extra={"exc_type": type(exc).__name__})
+            out.append(message)
+    return out
 
 
 def _note_failure(exc: Exception) -> None:
@@ -78,6 +139,7 @@ class RedirectingBackend(BaseEmailBackend):
         return sent
 
     def _send(self, email_messages):
+        email_messages = _tagged(email_messages)
         target = settings.EMAIL_REDIRECT_ALL_TO
         if not target:
             return self._inner.send_messages(email_messages)

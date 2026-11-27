@@ -38,6 +38,8 @@
     </div>
     <aside>
       <section class="card" id="contact"><h3>How we reach them</h3>
+        {% if bouncing %}<div class="alert warning" role="status">{% icon "alert" %}<span><strong>Email bouncing:</strong> {% for b in bouncing %}{{ b.address }} (since {{ b.since|short_date }}, last {{ b.mail_kind|lower }}){% if not forloop.last %}; {% endif %}{% endfor %}. Mail to {% if bouncing|length == 1 %}this address{% else %}these addresses{% endif %} comes back as undeliverable. Ask them for a working address; official notices that bounced are on Paper mail.</span></div>
+          <form method="post" action="{% url 'person_email_bounce_clear' person.pk %}" data-confirm="Mark these addresses as fixed? Do it once the address is corrected or they confirm it works; it shows here again if the next email bounces.">{% csrf_token %}<div class="form-actions"><button type="submit" class="secondary small">Mark as fixed</button></div></form>{% endif %}
         <p class="small"><strong>Official notices:</strong> {% if contact.answered %}{% if contact.consent %}by email{% else %}by post{% endif %} (chosen {{ contact.profile.consent_changed_at|date:"M j, Y" }}{% if contact.profile.notice_consent_version %}, wording {{ contact.profile.notice_consent_version }}{% endif %}){% else %}not answered (post until they choose){% endif %}</p>
         <p class="small"><strong>Mailing address for post:</strong><br>{% if contact.address %}{{ contact.address|linebreaksbr }}{% else %}<span class="muted">None on file</span>{% endif %}
           {% if contact.source == "home" %}<br><span class="muted">(the home's address)</span>{% elif contact.source == "old" %}<br><span class="badge tone-warning">Address on file (please check)</span>{% endif %}</p>
