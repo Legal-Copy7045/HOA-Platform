@@ -32,6 +32,7 @@ from governance.models import (
     SurveyResponse,
     VoteKind,
 )
+from governance.tests.helpers import close_early, window_kw
 
 pytestmark = pytest.mark.django_db
 
@@ -59,13 +60,13 @@ def _owners(n):
     return out
 
 
-def _secret_formal(board, labels):
+def _secret_formal(board, labels, days=8):
     community.set_rule(key="vote.quorum_percent", value="10", citation="Bylaws §2.6", actor=board)
     community.set_rule(key="vote.pass_percent", value="50", citation="Decl. §14", actor=board)
     vote = services.create_vote(
         title="Pond fountain?", kind=VoteKind.FORMAL, options=labels, secret=True, actor=board
     )
-    vote = services.open_vote(vote, actor=board)
+    vote = services.open_vote(vote, actor=board, **window_kw(days))
     return vote, list(vote.options.all())
 
 
@@ -157,7 +158,7 @@ def test_closing_with_fewer_than_k_pooled_still_counts_them(board):
     vote, options = _secret_formal(board, ["Yes", "No"])
     _cast(vote, voters, options, [0, 0, 1])
     assert mixing.flush("vote", vote.pk) == 0
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
     assert PendingSecretChoice.objects.count() == 0
     res = services.results(vote)
     assert {r["option"].label: r["count"] for r in res["rows"]} == {"Yes": 2, "No": 1}
@@ -172,7 +173,7 @@ def test_choices_are_written_in_shuffled_order_not_casting_order(board):
     _cast(vote, voters[:10], options, picks[:10])
     assert mixing.flush("vote", vote.pk) == K  # an open-time batch
     _cast(vote, voters[10:], options, picks[10:])
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
     by_position = _physical("governance_secretchoice", "option_id", "vote_id", vote.pk)
     by_id = [
         c.option_id for c in SecretChoice.objects.filter(vote=vote).order_by("id")
@@ -194,23 +195,26 @@ def test_permanent_choice_rows_have_no_time_or_sequence():
     assert SurveyResponse._meta.pk.get_internal_type() == "UUIDField"
 
 
-def test_results_of_a_vote_past_its_closing_time_count_the_pool(board):
+def test_results_of_a_vote_past_its_closing_time_count_the_pool(board, monkeypatch):
     voters = _owners(2)
     vote, options = _secret_formal(board, ["Yes", "No"])
     _cast(vote, voters, options, [0, 1])
-    type(vote).objects.filter(pk=vote.pk).update(closes_at=timezone.now() - timedelta(minutes=1))
-    vote.refresh_from_db()
+    # Past the deadline, before the close task has run (D61 forbids
+    # moving the deadline earlier, so time moves instead).
+    later = vote.closes_at + timedelta(minutes=1)
+    monkeypatch.setattr(timezone, "now", lambda: later)
     res = services.results(vote)  # nobody can vote any more: write the pool first
     assert res["pending"] == 0 and res["total"] == 2
 
 
-def test_sweep_writes_what_can_no_longer_grow_and_leaves_open_pools(board):
+def test_sweep_writes_what_can_no_longer_grow_and_leaves_open_pools(board, monkeypatch):
     voters = _owners(4)
-    open_vote, open_options = _secret_formal(board, ["Yes", "No"])
+    open_vote, open_options = _secret_formal(board, ["Yes", "No"], days=20)
     _cast(open_vote, voters[:2], open_options, [0, 1])
     ended, ended_options = _secret_formal(board, ["Yes", "No"])
     _cast(ended, voters[2:], ended_options, [0, 0])
-    type(ended).objects.filter(pk=ended.pk).update(closes_at=timezone.now() - timedelta(hours=1))
+    later = ended.closes_at + timedelta(hours=1)
+    monkeypatch.setattr(timezone, "now", lambda: later)
     assert mixing.sweep() == 2
     assert mixing.pending_count("vote", open_vote.pk) == 2
     assert mixing.pending_count("vote", ended.pk) == 0
@@ -223,7 +227,7 @@ def test_choices_cast_before_this_change_still_count(board):
     vote, options = _secret_formal(board, ["Yes", "No"])
     SecretChoice.objects.create(vote=vote, option=options[1])  # the pre-D56 layout
     _cast(vote, voters, options, [0])
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
     counts = {r["option"].label: r["count"] for r in services.results(vote)["rows"]}
     assert counts == {"Yes": 1, "No": 1}
 
@@ -255,7 +259,7 @@ def test_eligibility_is_unchanged_and_refusals_pool_nothing(board):
         services.cast_ballot(
             vote, option_id=options[0].pk, lot_id=lot.pk, actor=make_member(roles=[Role.MANAGER])
         )
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
     with pytest.raises(services.GovernanceError):  # closed
         services.cast_ballot(vote, option_id=options[0].pk, lot_id=lot.pk, actor=_owner)
     assert PendingSecretChoice.objects.count() == 0
@@ -269,7 +273,8 @@ def test_vote_page_shows_pooled_ballots_as_a_count_only(board, client):
     from django.urls import reverse
 
     page = client.get(reverse("vote_detail", args=[vote.pk])).content.decode()
-    assert "2 more secret ballots are waiting to be mixed" in page
+    assert "2 secret ballots are waiting to be mixed" in page
+    assert "Yes" not in page.split("Turnout so far", 1)[1].split("</section>", 1)[0]
 
 
 # --- Elections and anonymous surveys ------------------------------------------------------
@@ -283,7 +288,7 @@ def _election(board, voters, picks_by_voter, seats=2):
 
         for _lot, user in candidates_people:
             elections.nominate(election, person=Person.objects.get(user=user), actor=user)
-    election = elections.open_voting(election, actor=board)
+    election = elections.open_voting(election, actor=board, **window_kw())
     cands = list(elections.ballot_candidates(election).order_by("pk"))
     for (lot, user), picks in zip(voters, picks_by_voter, strict=True):
         elections.cast_election_ballot(
@@ -303,7 +308,7 @@ def test_election_ballots_are_pooled_and_counted_at_close(board):
         elections.cast_election_ballot(
             election, lot_id=lot.pk, candidate_ids=[cands[2].pk], actor=user
         )
-    elections.close_voting(election, actor=board)
+    close_early(election, board)
     assert PendingSecretChoice.objects.count() == 0
     votes = {r["candidate"].pk: r["votes"] for r in elections.tally(election)["rows"]}
     assert votes == {cands[0].pk: 2, cands[1].pk: 1, cands[2].pk: 1}
@@ -313,7 +318,7 @@ def test_election_choices_are_shuffled(board):
     voters = _owners(9)
     picks = [[i % 3] for i in range(9)]
     election, cands = _election(board, voters, picks, seats=1)
-    elections.close_voting(election, actor=board)
+    close_early(election, board)
     written = _physical("governance_electionchoice", "candidate_id", "election_id", election.pk)
     cast_order = [cands[p[0]].pk for p in picks]
     assert sorted(written) == sorted(cast_order) and written != cast_order
@@ -395,7 +400,7 @@ def test_no_log_or_audit_line_carries_the_choice(board, sw, caplog):
     vote, options = _secret_formal(board, ["Plain", marker])
     _cast(vote, voters[:3], options, [1, 1, 0])
     _respond(survey, voters[3][1], 1, "Quokka-Text-5512")
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
     surveys.close_survey(survey, actor=board)
     assert SecretChoice.objects.filter(vote=vote, option=options[1]).count() == 2
     text = "\n".join(

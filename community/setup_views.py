@@ -302,7 +302,20 @@ def _server_status():
         "push": push_ready,
         "usps": usps,
         "sms": getattr(settings, "SMS_PROVIDER", "none") != "none",
+        "file_store_r2": _file_store_is_r2(),
     }
+
+
+def _file_store_is_r2() -> bool:
+    """Whether uploads go to Cloudflare R2 (else the local SeaweedFS store).
+    Only the endpoint's host name is read, never a key."""
+    from urllib.parse import urlsplit
+
+    from django.conf import settings
+
+    options = settings.STORAGES.get("default", {}).get("OPTIONS", {})
+    host = urlsplit(options.get("endpoint_url") or "").hostname or ""
+    return host.endswith(".r2.cloudflarestorage.com")
 
 
 def _links(request, step):

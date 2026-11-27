@@ -3,13 +3,27 @@
 {% block title %}{{ e.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="crumbs"><a href="{% url 'voting' %}?type=elections">Voting</a> / {{ e.title }}</div>
-  <div class="page-head"><div><h1>{{ e.title }}</h1><div class="meta">{% status e.state e.get_state_display %}<span>{{ e.seats }} seat{{ e.seats|pluralize }} · {{ e.term_years }}-year terms</span>{% if e.citation %}<span>{% icon "book" %}{{ e.citation }}</span>{% endif %}{% if e.meeting %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' e.meeting_id %}">{{ e.meeting.title }}</a></span>{% endif %}</div></div>
+  <div class="page-head"><div><h1>{{ e.title }}</h1><div class="meta">{% status e.state e.get_state_display %}<span>{{ e.seats }} seat{{ e.seats|pluralize }} · {{ e.term_years }}-year terms</span>{% if e.citation %}<span>{% icon "book" %}{{ e.citation }}</span>{% endif %}{% if e.meeting %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' e.meeting_id %}">{{ e.meeting.title }}</a></span>{% endif %}{% if e.voting_closes_at %}<span>{% icon "clock" %}{% if e.state == "voting" %}Vote by {{ e.voting_closes_at|date:"M j, Y g:i A" }}{% else %}Voting closed {{ e.voting_closed_at|default:e.voting_closes_at|date:"M j, Y g:i A" }}{% endif %}</span>{% endif %}{% if window_not_started %}<span>{% icon "calendar" %}Opens {{ e.voting_opens_at|date:"M j, Y g:i A" }}</span>{% endif %}</div></div>
     {% if can_manage %}<div class="actions">
-      {% if e.state == "nominations" %}<form method="post" action="{% url 'election_action' e.pk 'open' %}" data-confirm="Close nominations and open voting? Owners are emailed a link to their ballot.">{% csrf_token %}<button type="submit">Open voting</button></form>{% endif %}
-      {% if e.state == "voting" %}<form method="post" action="{% url 'election_action' e.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit">Close voting</button></form>{% endif %}
+      {% if can_extend and not extend_open %}<a class="btn secondary" href="#extend" data-opens="extend">{% icon "clock" %} Extend deadline</a>{% endif %}
+      {% if e.state == "voting" and past_deadline or e.state == "voting" and not e.voting_closes_at %}<form method="post" action="{% url 'election_action' e.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit">Close voting</button></form>{% endif %}
       {% if e.state == "closed" %}<form method="post" action="{% url 'election_action' e.pk 'certify' %}" data-confirm="Certify these results? They are recorded permanently and the elected are proposed for board seats.">{% csrf_token %}<button type="submit">Certify results</button></form>{% endif %}
     </div>{% endif %}</div>
+  {% if window_form %}<section class="card" id="open-voting"><h2>Open voting</h2>
+    <p class="small muted">Closes nominations. Set when voting opens and closes: voting closes by itself at the closing time; the deadline can be extended once, before it passes, but never shortened. Owners are emailed a personal link to their ballot.</p>
+    <form method="post" action="{% url 'election_action' e.pk 'open' %}" class="form-grid" data-confirm="Close nominations and open voting? The ballot is fixed once open.">{% csrf_token %}{% include "partials/form_errors.html" with form=window_form %}{{ window_form }}<div class="form-actions"><button type="submit">Open voting</button></div></form>
+  </section>{% endif %}
+  {% if can_extend %}<details class="panel"{% if extend_open %} open{% else %} hidden{% endif %} id="extend" data-hide-closed><summary>Extend the deadline</summary><div class="panel-body">
+    <p class="small muted">Once only, before {{ e.voting_closes_at|date:"M j, Y g:i A" }}. Owners are told the new deadline and the reason.</p>
+    <form method="post" action="{% url 'election_action' e.pk 'extend' %}" class="form-grid" data-confirm="Extend the deadline? This can be done only once.">{% csrf_token %}{% include "partials/form_errors.html" with form=extend_form %}{{ extend_form }}<div class="form-actions"><button type="submit">Extend deadline</button></div></form></div></details>{% endif %}
+  {% if can_manage and e.state == "voting" and early_close_allowed and e.voting_closes_at and not past_deadline %}<details class="panel" id="close-early"><summary>Close voting early</summary><div class="panel-body">
+    <p class="small muted">Community settings allow closing before the deadline. Say why: the reason is kept with the election.</p>
+    <form method="post" action="{% url 'election_action' e.pk 'close' %}" class="form-grid" data-confirm="Close voting before its deadline? No more ballots can be cast.">{% csrf_token %}<p><label for="close-reason">Why<span class="required-mark" aria-hidden="true">*</span></label><input id="close-reason" name="reason" maxlength="300" required></p><div class="form-actions"><button type="submit" class="danger">Close voting now</button></div></form></div></details>{% endif %}
+  {% if e.extended_at %}<p class="small">{% icon "clock" %} Deadline extended on {{ e.extended_at|date:"M j, Y" }}: {{ e.extension_reason }}</p>{% endif %}
+  {% if e.closed_at_deadline %}<p class="small muted">Voting closed automatically at the deadline.</p>{% elif e.early_close_reason %}<p class="small muted">Voting closed early by the board: {{ e.early_close_reason }}</p>{% endif %}
+  {% if window_not_started %}<div class="alert info">{% icon "calendar" %}<span>Voting opens {{ e.voting_opens_at|date:"F j, Y g:i A" }} and closes {{ e.voting_closes_at|date:"F j, Y g:i A" }}.</span></div>{% endif %}
   <div class="split"><div>
+    {% include "governance/_turnout.html" %}
     {% if recorded %}<section class="card" id="ballot-recorded"><h2>Your ballot</h2>
       <ul class="list">{% for r in recorded %}<li class="voted">{% icon "check-circle" %}<span class="grow">{{ r.lot.label }}: your ballot was recorded.</span></li>{% endfor %}</ul>
       <p class="small muted">Choices are stored apart from names, so nobody can see how a home voted.</p></section>{% endif %}
@@ -41,6 +55,7 @@
           <form method="post" action="{% url 'election_action' e.pk 'withdraw' %}" data-confirm="Withdraw from this election? You leave the ballot.">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><button type="submit" class="secondary small">Withdraw</button></form>{% elif can_manage and not c.accepted and not c.withdrawn %}<form method="post" action="{% url 'election_action' e.pk 'accept' %}">{% csrf_token %}<input type="hidden" name="candidate" value="{{ c.pk }}"><button type="submit" class="secondary small">Record acceptance</button></form>{% endif %}
       </li>{% endfor %}</ul>{% else %}<p class="muted small">No nominations yet.</p>{% endif %}
     </section></div>
+    {% if turnout_staff and turnout %}<aside>{% include "governance/_who_voted.html" %}</aside>{% endif %}
     {% if can_nominate %}<aside><section class="card"><h2>Nominate</h2><form method="post" action="{% url 'election_action' e.pk 'nominate' %}">{% csrf_token %}
       <p><label for="nominee">Who</label><select id="nominee" name="lot"><option value="">Myself</option>{% for lot in owners %}<option value="{{ lot.pk }}">The owner at {{ lot.label }}</option>{% endfor %}</select></p>
       <p><label for="nominate-why">Why (optional)</label><textarea id="nominate-why" name="statement" rows="3" maxlength="3000"></textarea></p>

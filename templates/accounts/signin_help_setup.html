@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load portal signin %}
+{% block title %}Get a new setup link · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% signin_contact as contact %}{% enrollment_window as window %}
+  <h1>Get a new setup link</h1>
+  <p>Every account needs a passkey or an authenticator app. You add it in the browser where you opened your setup link, within {{ window }}. If that time ran out, or you never got that far, the board can send you a <strong>new setup link</strong>. It comes by email to the address the association has for you.</p>
+  <p class="small muted">Already set up a passkey or app and lost it? Go back and choose "I lost my phone" instead.</p>
+  {% include "partials/form_errors.html" %}
+  <form method="post" action="{% url 'signin_help_setup' %}" novalidate>{% csrf_token %}
+    <div class="field{% if form.email.errors %} has-error{% endif %}">
+      <label for="id_email">Your email address</label>
+      <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" autocomplete="email" maxlength="254" required{% if form.email.errors %} aria-invalid="true" aria-describedby="id_email_errors"{% endif %}>
+      {% if form.email.errors %}<ul class="errorlist" id="id_email_errors" role="alert">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+    <div class="form-actions"><button type="submit" class="block">Ask the board</button></div>
+  </form>
+  <div class="alert info">{% icon "info" %}<span>{% if contact %}You can also contact {{ contact }}.{% else %}You can also contact a board member.{% endif %}</span></div>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'signin_help' %}">Back</a></div>
+{% endblock %}

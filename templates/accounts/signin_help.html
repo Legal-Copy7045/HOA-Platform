@@ -1,25 +1,20 @@
 {% extends "base.html" %}
-{% load portal signin %}
-{% block title %}Sign-in help · {{ SITE_NAME }}{% endblock %}
+{% load portal %}
+{# Can't sign in? (D62): one question, then the page for that problem. A sign-in step: nothing here is about any account. #}
+{% block title %}Can't sign in? · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  {% signin_contact as contact %}{% enrollment_window as window %}
-  <h1>Sign-in help</h1>
-  <h2>I forgot my password</h2>
-  <p>We can email you a link to choose a new one. Before you choose it you'll still need your passkey, your authenticator app or one of your recovery codes.</p>
-  <div class="form-actions"><a class="btn secondary block" href="{% url 'account_reset_password' %}">{% icon "mail" %} Email me a password reset link</a></div>
+  <h1>Can't sign in?</h1>
+  <p>Tell us what's wrong and we'll show you what to do.</p>
+  <form method="get" action="{% url 'signin_help' %}" novalidate>
+    {% if error %}<div class="alert danger" role="alert" id="problem_error">{% icon "alert" %}<span>{{ error }}</span></div>{% endif %}
+    <fieldset class="choices"{% if error %} aria-describedby="problem_error"{% endif %}>
+      <legend>What's wrong?</legend>
+      {% for value, label in problems %}
+        <label class="choice" for="problem_{{ value }}"><input type="radio" name="problem" value="{{ value }}" id="problem_{{ value }}" required> {{ label }}</label>
+      {% endfor %}
+    </fieldset>
+    <div class="form-actions"><button type="submit" class="block">Continue</button></div>
+  </form>
   <p class="small muted">Have a passkey? You don't need your password at all: use "Sign in with a passkey".</p>
-
-  <h2>I lost my phone or passkey</h2>
-  <p>Sign in with your password as usual. When asked for the 6-digit code, type one of your <strong>recovery codes</strong> instead. If you have a passkey on another device (your computer, a second phone) or an authenticator app, use that. Then add a new passkey or app under "Sign-in and security".</p>
-
-  <h2>I've lost my phone and recovery codes</h2>
-  <p><strong>Homeowners, account contacts and tenants</strong> can recover their sign-in themselves. For your safety it waits <strong>{{ recovery_wait }} hours</strong>: you, every email address we have for you, your phone (if you get our texts) and the board are told at once, and anyone can cancel. Afterwards you set up a new passkey or app, and for {{ recovery_lock }} hours voting, proxies, contact details and automatic payments are locked.</p>
-  <div class="form-actions"><a class="btn secondary block" href="{% if user.is_authenticated %}{% url 'account_recovery_status' %}{% else %}{% url 'recovery_request' %}{% endif %}">{% icon "key" %} I've lost my phone and recovery codes</a></div>
-
-  <h2>Board members, officers and staff</h2>
-  <p>The board resets your sign-in instead. For your safety this takes <strong>two board members</strong>: one checks it's really you and starts the reset, and a second approves it. The second one then gives you a one-time code in person or by phone (never by email). Homeowners can ask for this too.</p>
-  <p>Next, sign in with your password, type that code, and add a new passkey or authenticator app within {{ window }}, in the same browser.</p>
-  <div class="alert info">{% icon "info" %}<span>{% if contact %}To start a reset, contact {{ contact }}.{% else %}To start a reset, contact a board member.{% endif %}</span></div>
-  <p class="small muted">To avoid all this: add a second passkey or an authenticator app as a backup, and keep your recovery codes printed with your important papers.</p>
   <div class="form-actions">{% if user.is_authenticated %}<a class="btn secondary" href="{% url 'home' %}">Back to the portal</a>{% else %}<a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a>{% endif %}</div>
 {% endblock %}

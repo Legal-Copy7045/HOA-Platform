@@ -4,13 +4,26 @@
 {% block content %}
   <div class="crumbs"><a href="{% url 'voting' %}">Voting</a> / {{ vote.title|truncatechars:40 }}</div>
   <div class="page-head"><div><h1>{{ vote.title }}</h1>
-    <div class="meta">{% status vote.status vote.get_status_display %}<span>{{ vote.get_kind_display }}</span>{% if vote.closes_at %}<span>{% icon "clock" %}Closes {{ vote.closes_at|date:"M j, Y g:i A" }}</span>{% endif %}{% if vote.secret %}<span>{% icon "lock" %}Secret ballot</span>{% endif %}{% if vote.meeting_id %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' vote.meeting_id %}">{{ vote.meeting.title }}</a></span>{% endif %}</div>
+    <div class="meta">{% status vote.status vote.get_status_display %}<span>{{ vote.get_kind_display }}</span>{% if vote.closes_at %}<span>{% icon "clock" %}{% if vote.status == "closed" %}Closed {{ vote.closed_at|date:"M j, Y g:i A" }}{% else %}Vote by {{ vote.closes_at|date:"M j, Y g:i A" }}{% endif %}</span>{% endif %}{% if window_not_started %}<span>{% icon "calendar" %}Opens {{ vote.opens_at|date:"M j, Y g:i A" }}</span>{% endif %}{% if vote.secret %}<span>{% icon "lock" %}Secret ballot</span>{% endif %}{% if vote.meeting_id %}<span>{% icon "calendar" %}<a href="{% url 'meeting_detail' vote.meeting_id %}">{{ vote.meeting.title }}</a></span>{% endif %}</div>
     {% if vote.kind == "informal" %}<p class="small muted">An informal poll from before polls became surveys. Kept as it was.</p>{% endif %}</div>
     {% if can_manage %}<div class="actions">
-      {% if vote.status == "draft" %}<form method="post" action="{% url 'vote_action' vote.pk 'open' %}" data-confirm="Open voting? Options and rules are frozen once open.">{% csrf_token %}<button type="submit">Open voting</button></form>{% endif %}
-      {% if vote.status == "open" %}<form method="post" action="{% url 'vote_action' vote.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit" class="danger">Close voting</button></form>{% endif %}
+      {% if can_extend and not extend_open %}<a class="btn secondary" href="#extend" data-opens="extend">{% icon "clock" %} Extend deadline</a>{% endif %}
+      {% if vote.status == "open" and past_deadline or vote.status == "open" and not vote.closes_at or vote.status == "open" and vote.kind != "formal" %}<form method="post" action="{% url 'vote_action' vote.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast, and the results are counted.">{% csrf_token %}<button type="submit" class="danger">Close voting</button></form>{% endif %}
     </div>{% endif %}
   </div>
+  {% if window_form %}<section class="card" id="open-voting"><h2>Open voting</h2>
+    <p class="small muted">Set when voting opens and closes. Voting closes by itself at the closing time; the deadline can be extended once, before it passes, but never shortened. Options and rules are frozen once open, and owners are emailed a personal link to their ballot.</p>
+    <form method="post" action="{% url 'vote_action' vote.pk 'open' %}" class="form-grid" data-confirm="Open voting? Options, rules and the opening time are frozen once open.">{% csrf_token %}{% include "partials/form_errors.html" with form=window_form %}{{ window_form }}<div class="form-actions"><button type="submit">Open voting</button></div></form>
+  </section>{% endif %}
+  {% if can_extend %}<details class="panel"{% if extend_open %} open{% else %} hidden{% endif %} id="extend" data-hide-closed><summary>Extend the deadline</summary><div class="panel-body">
+    <p class="small muted">Once only, before {{ vote.closes_at|date:"M j, Y g:i A" }}. Owners are told the new deadline and the reason.</p>
+    <form method="post" action="{% url 'vote_action' vote.pk 'extend' %}" class="form-grid" data-confirm="Extend the deadline? This can be done only once.">{% csrf_token %}{% include "partials/form_errors.html" with form=extend_form %}{{ extend_form }}<div class="form-actions"><button type="submit">Extend deadline</button></div></form></div></details>{% endif %}
+  {% if can_manage and vote.status == "open" and early_close_allowed and vote.kind == "formal" and vote.closes_at and not past_deadline %}<details class="panel" id="close-early"><summary>Close voting early</summary><div class="panel-body">
+    <p class="small muted">Community settings allow closing before the deadline. Say why: the reason is kept with the vote.</p>
+    <form method="post" action="{% url 'vote_action' vote.pk 'close' %}" class="form-grid" data-confirm="Close voting before its deadline? No more ballots can be cast.">{% csrf_token %}<p><label for="close-reason">Why<span class="required-mark" aria-hidden="true">*</span></label><input id="close-reason" name="reason" maxlength="300" required></p><div class="form-actions"><button type="submit" class="danger">Close voting now</button></div></form></div></details>{% endif %}
+  {% if vote.extended_at %}<p class="small">{% icon "clock" %} Deadline extended on {{ vote.extended_at|date:"M j, Y" }}: {{ vote.extension_reason }}</p>{% endif %}
+  {% if vote.status == "closed" and vote.closed_at_deadline %}<p class="small muted">Closed automatically at the deadline.</p>{% elif vote.status == "closed" and vote.early_close_reason %}<p class="small muted">Closed early by the board: {{ vote.early_close_reason }}</p>{% endif %}
+  {% if window_not_started %}<div class="alert info">{% icon "calendar" %}<span>Voting opens {{ vote.opens_at|date:"F j, Y g:i A" }} and closes {{ vote.closes_at|date:"F j, Y g:i A" }}.</span></div>{% endif %}
   {% if vote.kind == "formal" %}<div class="alert info">{% icon "vote" %}<span>Formal vote: the result is binding, one ballot per home.{% if vote.rules_citation %} Rules applied: quorum {{ vote.quorum_percent }}%, pass {{ vote.pass_percent }}% ({{ vote.rules_citation }}).{% endif %}</span></div>{% endif %}
   <div class="split">
     <div>
@@ -38,14 +51,14 @@
         </section>
       {% endif %}
       {% for m in proxy_meetings %}<p class="small">Owners vote at {{ m.title }}, {{ m.starts_at|date:"F j, Y" }}. Can't attend? <a href="{% url 'meeting_detail' m.pk %}#proxy">Give a proxy</a></p>{% endfor %}
+      {% include "governance/_turnout.html" %}
       {% if results %}
-        <section class="card"><h2>Results{% if vote.status != "closed" %} so far{% endif %}</h2>
+        <section class="card"><h2>Results</h2>
           {% for r in results.rows %}<div class="bar-row"><div class="bar-label"><span>{{ r.option.label }}</span><span class="muted">{{ r.count }} · {{ r.percent }}%</span></div><meter class="bar" min="0" max="100" value="{{ r.percent }}">{{ r.percent }}%</meter></div>{% endfor %}
           <p class="muted small">{{ results.total }} ballot{{ results.total|pluralize }}.{% if results.outcome %} Turnout {{ results.outcome.turnout }}% of homes; quorum {{ results.outcome.quorum_met|yesno:"met,not met" }}; {% if results.outcome.leading == "tie" %}the leading options are tied, so nothing passes.{% elif results.outcome.leading %}leading option "{{ results.outcome.leading }}" {{ results.outcome.meets_threshold|yesno:"meets,does not meet" }} the pass threshold.{% endif %}{% endif %}</p>
-          {% if results.pending %}<p class="muted small">{{ results.pending }} more secret ballot{{ results.pending|pluralize }} {{ results.pending|pluralize:"is,are" }} waiting to be mixed with others before {{ results.pending|pluralize:"it is,they are" }} counted, so no one can tell whose choice is whose. Every ballot is counted when the vote closes.</p>{% endif %}
         </section>
       {% endif %}
     </div>
-    <aside>{% if voters %}<section class="card"><h3>Who voted</h3><ul class="list">{% for b in voters %}<li><div class="grow">{{ b.person.display_name }}{% if b.lot %} <span class="muted small">{{ b.lot.label }}</span>{% endif %}</div><span class="small">{{ b.option.label }}</span></li>{% endfor %}</ul></section>{% endif %}</aside>
+    <aside>{% include "governance/_who_voted.html" %}{% if voters %}<section class="card"><h3>Who voted</h3><ul class="list">{% for b in voters %}<li><div class="grow">{{ b.person.display_name }}{% if b.lot %} <span class="muted small">{{ b.lot.label }}</span>{% endif %}</div><span class="small">{{ b.option.label }}</span></li>{% endfor %}</ul></section>{% endif %}</aside>
   </div>
 {% endblock %}

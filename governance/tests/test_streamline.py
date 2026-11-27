@@ -18,7 +18,7 @@ from documents.tests.helpers import pdf
 from governance import elections, surveys
 from governance import services as gov
 from governance.models import ConsentRequest, Election, Meeting, Resolution, Vote, VoteKind
-from governance.tests.helpers import legacy_poll
+from governance.tests.helpers import close_early, legacy_poll, window_kw
 from governance.tests.test_surveys import _account, _contact_user
 
 pytestmark = pytest.mark.django_db
@@ -106,8 +106,8 @@ def test_one_list_with_open_and_past_filters(client, w):
 
     community.set_rule(key="vote.quorum_percent", value="10", citation="Bylaws §2", actor=board)
     community.set_rule(key="vote.pass_percent", value="51", citation="Bylaws §2", actor=board)
-    gov.open_vote(closed, actor=board)
-    gov.close_vote(closed, actor=board)
+    gov.open_vote(closed, actor=board, **window_kw())
+    close_early(closed, board)
     old_poll = legacy_poll(board, title="Old fountain poll", status="open")
     election = elections.create_election(title="2027 election", seats=2, actor=board)
     client.force_login(w["owner"])
@@ -153,13 +153,26 @@ def test_board_gets_new_buttons_owners_do_not(client, w):
         assert "New vote" not in html and "New election" not in html and "New survey" not in html
 
 
+def _window_post() -> dict:
+    """The New vote form's voting window (D61), as the browser posts it."""
+    import datetime
+
+    from django.utils import timezone
+
+    start = timezone.localtime()
+    return {
+        "opens_at": start.strftime("%Y-%m-%dT%H:%M"),
+        "closes_at": (start + datetime.timedelta(days=9)).strftime("%Y-%m-%dT%H:%M"),
+    }
+
+
 def test_vote_form_offers_formal_votes_only(client, w):
     client.force_login(w["board"])
     html = _page(client, reverse("voting"))
     assert "informal" not in html.lower().split('id="new-vote"')[1].split("</details>")[0]
     response = client.post(
         reverse("votes"),
-        {"title": "Adopt pet rules", "options": "Yes\nNo", "kind": "informal"},
+        {"title": "Adopt pet rules", "options": "Yes\nNo", "kind": "informal", **_window_post()},
     )
     vote = Vote.objects.get(title="Adopt pet rules")
     assert response.status_code == 302 and vote.kind == VoteKind.FORMAL
@@ -173,7 +186,9 @@ def test_service_refuses_new_informal_polls(w):
 
 def test_refused_vote_form_comes_back_with_what_was_typed(client, w):
     client.force_login(w["board"])
-    response = client.post(reverse("votes"), {"title": "Keep this title", "options": "Only one"})
+    response = client.post(
+        reverse("votes"), {"title": "Keep this title", "options": "Only one", **_window_post()}
+    )
     html = response.content.decode()
     assert response.status_code == 200
     assert "Keep this title" in html and 'open id="new-vote"' in html

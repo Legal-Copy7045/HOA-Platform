@@ -494,8 +494,26 @@ def items_for(user) -> list[Item]:
         # D59: signed in once but never added a passkey or app, so they cannot
         # get back in; the board sends a new setup link or starts a reset.
         from accounts.services import STUCK_WITHOUT_AUTHENTICATOR_DAYS, stuck_logins
+        from accounts.setup_requests import open_requests
 
+        # D62: asked for one themselves on Can't sign in?
+        asked = set()
+        for person, asked_at in open_requests():
+            asked.add(person.pk)
+            out.append(
+                Item(
+                    "People",
+                    f"{person.display_name} asked for a new setup link",
+                    f"From Can't sign in? on {short_date(timezone.localdate(asked_at))}: "
+                    "send it from their page if you know it's them",
+                    reverse("person_detail", args=[person.pk]),
+                    "warning",
+                    nav="people",
+                )
+            )
         for person in stuck_logins():
+            if person.pk in asked:
+                continue
             out.append(
                 Item(
                     "People",
@@ -738,6 +756,7 @@ def items_for(user) -> list[Item]:
     if can(user, "vote.cast"):
         from governance.models import Vote
         from governance.services import ballot_choices_for
+        from governance.window import when
 
         for vote in Vote.objects.filter(status="open"):
             if ballot_choices_for(vote, user)["can_vote"]:
@@ -745,9 +764,12 @@ def items_for(user) -> list[Item]:
                     Item(
                         "Voting",
                         f"Vote: {vote.title}",
-                        "Your ballot is open",
+                        f"Vote by {when(vote.closes_at)}"
+                        if vote.closes_at
+                        else "Your ballot is open",
                         reverse("vote_detail", args=[vote.pk]),
                         "info",
+                        timezone.localdate(vote.closes_at) if vote.closes_at else None,
                         nav="voting",
                         icon="vote",
                     )
@@ -760,18 +782,40 @@ def items_for(user) -> list[Item]:
         for election in Election.objects.filter(state=ElectionState.VOTING):
             lots = elections.lots_actor_may_vote_for(election, user)
             if lots:
+                from governance.window import when
+
+                deadline = election.voting_closes_at
                 out.append(
                     Item(
                         "Voting",
                         f"Election: {election.title}",
-                        "Your ballot is open"
+                        (f"Vote by {when(deadline)}" if deadline else "Your ballot is open")
                         + (f" ({len(lots)} homes: one ballot each)" if len(lots) > 1 else ""),
                         reverse("election_detail", args=[election.pk]),
                         "info",
+                        timezone.localdate(deadline) if deadline else None,
                         nav="voting",
                         icon="vote",
                     )
                 )
+    # --- Votes and elections closing within 48 hours, with their turnout
+    # (board and manager, D61) ---
+    if can(user, "vote.turnout"):
+        from governance.window import closing_soon_items
+
+        for row in closing_soon_items(user):
+            out.append(
+                Item(
+                    "Voting",
+                    row["title"],
+                    row["detail"],
+                    row["url"],
+                    "info" if row["quorum_met"] in (True, None) else "warning",
+                    row["due"],
+                    nav="voting",
+                    icon="vote",
+                )
+            )
     # --- Surveys (M5): open surveys this person is asked to answer ---
     if can(user, "survey.respond"):
         from governance import surveys

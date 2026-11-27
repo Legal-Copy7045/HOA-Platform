@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load portal signin %}
+{# The same page for every address (D62): never say whether it matched. #}
+{% block title %}Thanks, we've passed it on · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% signin_contact as contact %}
+  <h1>Thanks, we've passed it on</h1>
+  <p>If that address belongs to an account that can get a new setup link, the board has been told. A board member checks it's you and sends the link to the email address the association has on file.</p>
+  <p class="small muted">Nothing else happens until then, and we don't email you about this request. Not heard back in a few days? {% if contact %}Contact {{ contact }}.{% else %}Contact a board member.{% endif %}</p>
+  <div class="form-actions"><a class="btn secondary" href="{% url 'account_login' %}">Back to sign in</a></div>
+{% endblock %}

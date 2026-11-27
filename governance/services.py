@@ -612,11 +612,14 @@ def create_vote(
     options: list[str],
     description="",
     secret=False,
+    opens_at=None,
     closes_at=None,
     meeting=None,
     actor,
     request=None,
 ) -> Vote:
+    """A draft formal vote. Its window (opens_at, closes_at) may be set now
+    and is required when it opens (D61)."""
     require(actor, "vote.manage")
     options = [o.strip() for o in options if o and o.strip()]
     if kind == VoteKind.INFORMAL:
@@ -631,12 +634,15 @@ def create_vote(
         raise GovernanceError("A vote can belong only to a coming owners' meeting.")
     if len(options) < 2 or len(set(options)) != len(options):
         raise GovernanceError("Give at least two different options.")
+    if opens_at and closes_at and closes_at <= opens_at:
+        raise GovernanceError("Voting must close after it opens.")
     with transaction.atomic():
         vote = Vote.objects.create(
             title=single_line(title)[:200],
             kind=kind,
             description=description,
             secret=secret,
+            opens_at=opens_at,
             closes_at=closes_at,
             meeting=meeting,
             created_by=actor,
@@ -653,11 +659,25 @@ def create_vote(
     return vote
 
 
-def open_vote(vote: Vote, *, actor, request=None) -> Vote:
+def open_vote(vote: Vote, *, opens_at=None, closes_at=None, actor, request=None) -> Vote:
+    """Open a draft vote. A formal vote needs its window: an opening time
+    (now, or later) and a closing time at least ``vote.min_open_days``
+    after it (D61); it closes by itself then."""
+    from governance import window
+
     require(actor, "vote.manage")
     if vote.status != VoteStatus.DRAFT:
         raise GovernanceError("Only a draft vote can be opened.")
-    fields = {"status": VoteStatus.OPEN, "opened_at": timezone.now()}
+    now = timezone.now()
+    fields = {"status": VoteStatus.OPEN, "opened_at": now}
+    opens_at = opens_at or vote.opens_at
+    closes_at = closes_at or vote.closes_at
+    if vote.kind == VoteKind.FORMAL or closes_at:
+        try:
+            start = window.check_window(opens_at, closes_at, now=now)
+        except window.WindowError as exc:
+            raise GovernanceError(str(exc)) from exc
+        fields.update(opens_at=start, closes_at=closes_at)
     if vote.kind == VoteKind.FORMAL:
         quorum, q_cite = rule_with_citation("vote.quorum_percent")
         passing, p_cite = rule_with_citation("vote.pass_percent")
@@ -676,7 +696,11 @@ def open_vote(vote: Vote, *, actor, request=None) -> Vote:
         )
     Vote.objects.filter(pk=vote.pk).update(**fields)
     record_event(
-        "vote.opened", actor=actor, request=request, target=vote, metadata={"kind": vote.kind}
+        "vote.opened",
+        actor=actor,
+        request=request,
+        target=vote,
+        metadata={"kind": vote.kind, "open_days": _open_days(fields)},
     )
     vote.refresh_from_db()
     if vote.kind == VoteKind.FORMAL:
@@ -686,22 +710,56 @@ def open_vote(vote: Vote, *, actor, request=None) -> Vote:
     return vote
 
 
-def close_vote(vote: Vote, *, actor, request=None) -> Vote:
+def _open_days(fields) -> int | None:
+    if fields.get("closes_at") and fields.get("opens_at"):
+        return (fields["closes_at"] - fields["opens_at"]).days
+    return None
+
+
+def close_vote(
+    vote: Vote, *, actor, reason: str = "", at_deadline: bool = False, request=None
+) -> Vote:
+    """Close voting. SYSTEM closes at the deadline (the periodic task, D61);
+    the board closes a formal vote before its deadline only when the rule
+    ``vote.allow_early_close`` is on, with a reason."""
+    from governance import window
+
     if actor is not SYSTEM:
         require(actor, "vote.manage")
+        at_deadline = False
     with transaction.atomic():
         # Lock the vote so no ballot can slip in while it closes (review D3).
         locked = Vote.objects.select_for_update().get(pk=vote.pk)
         if locked.status != VoteStatus.OPEN:
             raise GovernanceError("Only an open vote can be closed.")
-        Vote.objects.filter(pk=vote.pk).update(status=VoteStatus.CLOSED, closed_at=timezone.now())
+        if at_deadline:
+            how = "deadline"
+            if not window.past_deadline(locked):
+                raise GovernanceError("The deadline has not passed.")
+        elif actor is SYSTEM:
+            how = "system"
+        else:
+            try:
+                how = window.require_early_close(locked, reason)
+            except window.WindowError as exc:
+                raise GovernanceError(str(exc)) from exc
+        Vote.objects.filter(pk=vote.pk).update(
+            status=VoteStatus.CLOSED,
+            closed_at=timezone.now(),
+            closed_at_deadline=how == "deadline",
+            early_close_reason=window.clean_reason(reason) if how == "early" else "",
+        )
         if locked.secret:
             # Every pooled choice is written before anyone sees results (D56).
             from governance import mixing
 
             mixing.flush(mixing.VOTE, locked.pk, final=True)
     record_event(
-        "vote.closed", actor=None if actor is SYSTEM else actor, request=request, target=vote
+        "vote.closed",
+        actor=None if actor is SYSTEM else actor,
+        request=request,
+        target=vote,
+        metadata={"how": how},
     )
     vote.refresh_from_db()
     return vote
@@ -713,7 +771,10 @@ def ballot_choices_for(vote: Vote, user) -> dict:
 
     if vote.status != VoteStatus.OPEN or not policy.can(user, "vote.cast"):
         return {"can_vote": False, "lots": []}
-    if vote.closes_at and vote.closes_at <= timezone.now():
+    now = timezone.now()
+    if vote.closes_at and vote.closes_at <= now:
+        return {"can_vote": False, "lots": []}
+    if vote.opens_at and now < vote.opens_at:
         return {"can_vote": False, "lots": []}
     roles = policy.roles_for(user)
     if vote.kind == VoteKind.INFORMAL:

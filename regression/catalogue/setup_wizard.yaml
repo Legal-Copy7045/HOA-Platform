@@ -3,3 +3,7 @@
   since: M5
   docs: docs/decisions.md
   match: ["^unit:community/tests/test_setup_wizard\\.py::test_", "^unit:core/tests/test_url_matrix\\.py::test_.*\\[setup_", "^manual:community setup wizard on a phone"]
+- feature: "Community setup wizard stays current (D61): every rule group is named by a step (none fall into the catch-all silently), every optional feature is on the Features step with its description, every secret-taking server script in CLAUDE.md has a status line on the server step, and the voting window rules are on the meetings and voting step"
+  since: M5
+  docs: docs/decisions.md
+  match: ["^unit:community/tests/test_setup_wizard_guard\\.py::test_"]

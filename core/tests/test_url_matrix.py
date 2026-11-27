@@ -41,8 +41,14 @@ PUBLIC = {
     "invite_accept",
     "account_setup_expired",
     "login_background_image",
-    # Sign-in help (forgot password, lost phone): one of the sign-in steps.
+    # Can't sign in? (D62): the guided help and its steps are sign-in steps.
+    # They show no portal data and nothing about any account (tested below);
+    # the setup-link form answers every address the same way.
     "signin_help",
+    "signin_help_device",
+    "signin_help_setup",
+    "signin_help_email",
+    "signin_help_locked",
     # Self-service account recovery (D58): the email form, the emailed link
     # and its confirm/finish page are sign-in steps too.
     "recovery_request",
@@ -260,6 +266,9 @@ PROTECTED = {
     "records_request_action": ("POST", "records_request_b"),
     "vote_detail": ("GET", "draft_vote"),
     "vote_action": ("POST", "draft_vote"),
+    # Who has voted (D61): board and manager only.
+    "vote_who_voted_csv": ("GET", "draft_vote"),
+    "election_who_voted_csv": ("GET", "election"),
     # Surveys (M5): a draft is invisible to owners; board steps are refused.
     "survey_detail": ("GET", "draft_survey"),
     "survey_action": ("POST", "draft_survey"),
@@ -982,6 +991,18 @@ def test_anonymous_visitors_are_sent_to_sign_in(client, world, name):
     response = client.get(url) if method == "GET" else client.post(url, {})
     assert response.status_code == 302
     assert response["Location"].startswith(reverse("account_login"))
+
+
+SIGNIN_HELP_PAGES = sorted(n for n in PUBLIC if n.startswith("signin_help"))
+
+
+@pytest.mark.parametrize("name", SIGNIN_HELP_PAGES)
+def test_signin_help_pages_are_open_and_serve_no_portal_data(client, world, name):
+    response = client.get(reverse(name))
+    assert response.status_code == 200, name
+    assert "_auth_user_id" not in client.session
+    for marker in (*BOARD_ONLY_MARKERS, b"1 Alpha Way", b"2 Bravo Way", b"@example"):
+        assert marker not in response.content, (name, marker)
 
 
 @pytest.mark.parametrize("name", sorted(OLD_EMAIL_LINKS))

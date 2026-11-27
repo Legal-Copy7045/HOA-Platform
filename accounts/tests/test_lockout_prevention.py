@@ -117,8 +117,13 @@ def test_account_without_authenticator_is_sent_to_the_board(
 
 
 def test_login_page_has_a_clear_forgot_password_link(client):
+    """D62: through Can't sign in?, whose first choice is the password reset."""
     page = client.get(reverse("account_login")).content.decode()
-    assert "Forgot your password?" in page and reverse("account_reset_password") in page
+    assert "Can't sign in?" in page and reverse("signin_help") in page
+    help_page = client.get(reverse("signin_help")).content.decode()
+    assert "I forgot my password" in help_page
+    response = client.get(reverse("signin_help"), {"problem": "password"})
+    assert response["Location"] == reverse("account_reset_password")
 
 
 # --- Backup sign-in method and recovery codes on My items ---------------------------------

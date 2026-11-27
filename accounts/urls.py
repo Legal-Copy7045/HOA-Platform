@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from accounts import access_review, board_views, recovery_views, views
+from accounts import access_review, board_views, recovery_views, signin_help, views
 
 urlpatterns = [
     path("invite/accept/", views.invite_accept, name="invite_accept"),
@@ -9,7 +9,12 @@ urlpatterns = [
     path("account/enroll-code/", views.enroll_with_code, name="enroll_with_code"),
     path("account/setup-expired/", views.account_setup_expired, name="account_setup_expired"),
     path("account/setup/done/", views.account_setup_done, name="account_setup_done"),
-    path("sign-in-help/", views.signin_help, name="signin_help"),
+    # Can't sign in? (D62): the guided help, all sign-in steps.
+    path("sign-in-help/", signin_help.signin_help, name="signin_help"),
+    path("sign-in-help/lost-device/", signin_help.signin_help_device, name="signin_help_device"),
+    path("sign-in-help/setup-link/", signin_help.signin_help_setup, name="signin_help_setup"),
+    path("sign-in-help/no-email/", signin_help.signin_help_email, name="signin_help_email"),
+    path("sign-in-help/locked-out/", signin_help.signin_help_locked, name="signin_help_locked"),
     # Self-service account recovery (D58): sign-in steps, then signed-in pages.
     path("sign-in-help/recover/", recovery_views.recovery_request, name="recovery_request"),
     path(

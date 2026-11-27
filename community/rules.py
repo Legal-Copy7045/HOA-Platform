@@ -210,6 +210,34 @@ REGISTRY: dict[str, RuleSpec] = {
         RuleSpec(
             "vote.pass_percent", "Share of votes cast needed to pass", PERCENT, None, "Voting"
         ),
+        # D61: every formal vote and election has a voting window.
+        RuleSpec(
+            "vote.min_open_days",
+            "Shortest voting period for formal votes and elections (days)",
+            DAYS,
+            "7",
+            "Voting",
+            "Opening a vote or an election is refused if its closing time is sooner than this "
+            "after it opens. Voting closes by itself at the closing time.",
+        ),
+        RuleSpec(
+            "vote.allow_early_close",
+            "Allow the board to close a formal vote or election before its deadline",
+            BOOL,
+            "false",
+            "Voting",
+            "Off: voting runs until the closing time (the board may extend it once, with a "
+            "reason, before it passes). On: the board may close early, giving a reason.",
+        ),
+        RuleSpec(
+            "vote.show_turnout_to_owners",
+            "Show owners the turnout while voting is open",
+            BOOL,
+            "false",
+            "Voting",
+            "Off: owners see only whether their own home has voted and the deadline. On: they "
+            "also see how many homes have voted. Choices are never shown while voting is open.",
+        ),
         RuleSpec(
             "ledger.assessments_before_fees",
             "Apply payments to {terms} before late fees and other charges",

@@ -205,7 +205,17 @@ class Vote(models.Model):
     kind = models.CharField(max_length=16, choices=VoteKind.choices)
     secret = models.BooleanField(default=False, help_text="Hide who chose what (counts only).")
     status = models.CharField(max_length=16, choices=VoteStatus.choices, default=VoteStatus.DRAFT)
+    # The voting window (D61): both are required to open a formal vote; the
+    # vote closes by itself at ``closes_at`` (governance/window.py).
+    opens_at = models.DateTimeField(null=True, blank=True)
     closes_at = models.DateTimeField(null=True, blank=True)
+    # One extension of the deadline, before it passes, with a reason.
+    extended_at = models.DateTimeField(null=True, blank=True)
+    extension_reason = models.CharField(max_length=300, blank=True, default="")
+    # Early close (only when the rule vote.allow_early_close is on).
+    early_close_reason = models.CharField(max_length=300, blank=True, default="")
+    closed_at_deadline = models.BooleanField(default=False, db_default=False)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     meeting = models.ForeignKey(
         Meeting,
         null=True,
@@ -428,6 +438,16 @@ class Election(models.Model):
         max_length=12, choices=ElectionState.choices, default=ElectionState.NOMINATIONS
     )
     eligible_lots = models.PositiveSmallIntegerField(null=True, blank=True)
+    # The voting window (D61), set when voting opens; voting closes by
+    # itself at ``voting_closes_at``.
+    voting_opens_at = models.DateTimeField(null=True, blank=True)
+    voting_closes_at = models.DateTimeField(null=True, blank=True)
+    voting_closed_at = models.DateTimeField(null=True, blank=True)
+    extended_at = models.DateTimeField(null=True, blank=True)
+    extension_reason = models.CharField(max_length=300, blank=True, default="")
+    early_close_reason = models.CharField(max_length=300, blank=True, default="")
+    closed_at_deadline = models.BooleanField(default=False, db_default=False)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -756,6 +776,7 @@ class Survey(models.Model):
     )
     opened_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+    closed_at_deadline = models.BooleanField(default=False, db_default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )

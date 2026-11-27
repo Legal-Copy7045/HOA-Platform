@@ -6,6 +6,44 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.31.0 — 2026-11-26
+
+- Can't sign in? The sign-in page now has one help link instead of two. It
+  asks what's wrong and takes you to the right step: forgot your password
+  (the emailed reset, as before); lost your phone, passkey or app (type a
+  recovery code or use another device, otherwise recover your sign-in after
+  the waiting period); setup link expired or never finished (ask the board
+  for a new setup link, which shows on the board's My items); no access to
+  your email (the board helps, with who to contact); locked out (how long to
+  wait, from the settings in effect, then Try again). None of these pages
+  says whether an account exists. Old links to the password reset and
+  account recovery still work.
+
+## 0.30.0 — 2026-11-26
+
+- Votes and elections are timeboxed (D61): opening one needs an opening and
+  a closing time, at least the shortest voting period apart (a Community
+  setting, 7 days by default). Voting closes by itself at the deadline and
+  the results are counted then, secret ballots included. The board can
+  extend a deadline once, with a reason, before it passes (owners are told),
+  never shorten it, and close early only if Community settings allow it.
+  Owners who have not voted get a reminder with their personal link 48 hours
+  before the close, and everyone is told of an extension, straight away even
+  if they chose the weekly summary. The deadline shows on the Voting list, the page, the
+  email and My items ("Vote by ...").
+- Turnout while voting is open: the board and the manager see "N of M homes
+  have voted", the quorum needed and whether it is reached so far, a
+  progress bar and which homes have voted (addresses only, with a CSV
+  download); surveys show how many people have responded. Nobody sees how
+  the votes are going until voting closes, for votes, elections and
+  surveys alike. Owners see whether their own home has voted, and the
+  turnout only if Community settings allow it. My items tells the board
+  "Vote closes in 30 hours: 61% turnout, quorum met".
+- Community setup: the voting period, early close and owner turnout
+  settings are in the meetings and voting step; the server step now shows
+  where uploaded files are kept; a check keeps every setting, feature and
+  server script in the wizard as they are added.
+
 ## 0.29.0 — 2026-11-26
 
 - USPS tracking for paper mail (optional, Admin → Features → USPS tracking):

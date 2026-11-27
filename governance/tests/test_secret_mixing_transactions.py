@@ -15,6 +15,7 @@ from community.tests.factories import LotFactory, make_member
 from core.scoping import system_access
 from governance import elections, mixing, services, surveys
 from governance.models import PendingSecretChoice, VoteKind
+from governance.tests.helpers import close_early, window_kw
 
 # These tests commit, so Django empties the tables afterwards with TRUNCATE.
 # The append-only triggers refuse TRUNCATE; switch them off for this module
@@ -73,7 +74,7 @@ def test_secret_vote_choices_share_no_transaction_with_ballots():
     vote = services.create_vote(
         title="Fountain?", kind=VoteKind.FORMAL, options=["Yes", "No"], secret=True, actor=board
     )
-    vote = services.open_vote(vote, actor=board)
+    vote = services.open_vote(vote, actor=board, **window_kw())
     yes, no = list(vote.options.all())
     voters = _owners(7)
     lot, user = voters[0]
@@ -86,7 +87,7 @@ def test_secret_vote_choices_share_no_transaction_with_ballots():
     for i, (lot, user) in enumerate(voters[1:]):
         services.cast_ballot(vote, option_id=(no if i % 2 else yes).pk, lot_id=lot.pk, actor=user)
     assert _xmins("governance_secretchoice", "vote_id", vote.pk)  # open-time batches ran
-    services.close_vote(vote, actor=board)
+    close_early(vote, board)
 
     ballots = _xmins("governance_ballot", "vote_id", vote.pk)
     choices = _xmins("governance_secretchoice", "vote_id", vote.pk)
@@ -106,13 +107,13 @@ def test_election_choices_share_no_transaction_with_participation():
         with system_access("t"):
             person = Person.objects.get(user=user)
         elections.nominate(election, person=person, actor=user)
-    election = elections.open_voting(election, actor=board)
+    election = elections.open_voting(election, actor=board, **window_kw())
     cands = list(elections.ballot_candidates(election).order_by("pk"))
     for i, (lot, user) in enumerate(_owners(5)):
         elections.cast_election_ballot(
             election, lot_id=lot.pk, candidate_ids=[cands[i % 2].pk], actor=user
         )
-    elections.close_voting(election, actor=board)
+    close_early(election, board)
     with system_access("t"):
         parts = _xmins("governance_electionparticipation", "election_id", election.pk)
     choices = _xmins("governance_electionchoice", "election_id", election.pk)
