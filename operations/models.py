@@ -456,3 +456,8 @@ class ComplianceItem(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Compliance items are retired, not deleted.")
+
+
+# Expense reimbursements and vendor checks (D77): their own module, so the
+# models merge cleanly with other operations work.
+from operations.models_payouts import *  # noqa: E402, F403

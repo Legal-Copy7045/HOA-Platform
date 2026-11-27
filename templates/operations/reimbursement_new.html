@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Claim an expense · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'reimbursements' %}?mine=1">My reimbursements</a> / Claim</div>
+  <div class="page-head"><div><h1>Claim an expense</h1>
+    <p class="subtitle">For something you paid for the association yourself. Attach the receipt; a board member other than you approves the claim{% if threshold %} (two at {{ threshold|cents }} or more{% if citation %}, {{ citation }}{% endif %}){% endif %}.</p></div></div>
+  {% include "partials/form_errors.html" %}
+  {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="card form-grid">{% csrf_token %}
+    {% for field in form %}<div class="field">{{ field.label_tag }}{{ field }}{% for e in field.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>{% endfor %}
+    <div class="field"><label for="receipts">Receipt (PDF or photo)</label><input id="receipts" type="file" name="receipts" multiple required accept=".pdf,.png,.jpg,.jpeg"><p class="help">Each file is checked for malware before it is kept.</p></div>
+    <div class="form-actions"><button type="submit">Submit claim</button></div>
+  </form>
+{% endblock %}
