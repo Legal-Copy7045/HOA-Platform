@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Vendor onboarding: {{ vendor.name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  {% include "ledger/finance_nav.html" %}
+  <div class="crumbs"><a href="{% url 'vendors' %}">Vendors</a> / <a href="{% url 'vendor_onboarding_list' %}">Vendor onboarding</a> / {{ vendor.name }}</div>
+  <div class="page-head"><div><h1>{{ vendor.name }}</h1><div class="meta"><span>{{ rnd.get_mode_display }}</span><span>{{ rnd.get_status_display }}</span>{% if submission %}<span>{{ approvals }} of {{ needed }} approvals</span>{% endif %}<a href="{% url 'vendor_onboarding_vendor' vendor.pk %}">Vendor's onboarding record</a></div></div></div>
+  {% include "partials/form_errors.html" with form=reason_form %}
+  {% if reason_form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<div>{{ reason_form.non_field_errors|join:" " }}</div></div>{% endif %}
+  {% if answers.conflict == "yes" %}<div class="alert warning" role="status">{% icon "alert" %}<div><strong>Conflict of interest disclosed:</strong> {{ answers.conflict_details|linebreaksbr }}{% if possible_people %}<br>It may name: {% for p in possible_people %}{{ p.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %}. Link anyone it names below: they cannot approve this vendor or its invoices.{% endif %}</div></div>{% endif %}
+  {% for w in warnings %}<div class="alert warning" role="status">{% icon "alert" %}<div>{{ w }}</div></div>{% endfor %}
+  <div class="split">
+    <div>
+      <h2>What the vendor {% if submitted %}submitted{% else %}has entered so far{% endif %}</h2>
+      <dl class="facts">
+        {% if rnd.mode == "full" %}
+        <dt>Legal name</dt><dd>{{ answers.legal_name|default:"—" }}</dd>
+        <dt>Doing business as</dt><dd>{{ answers.dba|default:"—" }}</dd>
+        <dt>Taxed as</dt><dd>{{ entity_label|default:"—" }}{% if answers.entity_other %} ({{ answers.entity_other }}){% endif %}</dd>
+        <dt>Form 1099</dt><dd>{% if eligible_1099 is None %}Not known yet{% elif eligible_1099 %}Likely reportable{% else %}Generally not reportable{% endif %} <span class="small muted">({{ citation_1099 }}. {{ preparer_caveat }})</span></dd>
+        <dt>Contact</dt><dd>{{ answers.contact_name|default:"—" }} · {{ answers.contact_email|default:"" }} · {{ answers.contact_phone|default:"" }}</dd>
+        <dt>Remit-to address (checks only)</dt><dd>{{ answers.remit_address|default:"—"|linebreaksbr }}</dd>
+        <dt>Services</dt><dd>{{ answers.services|default:"—" }}</dd>
+        <dt>Conflict of interest</dt><dd>{% if answers.conflict == "yes" %}Yes: {{ answers.conflict_details }}{% elif answers.conflict == "no" %}No{% else %}—{% endif %}</dd>
+        <dt>Vendor terms accepted</dt><dd>{% if answers.terms_accepted %}Yes (version {{ answers.terms_version }}){% else %}No{% endif %}</dd>
+        {% endif %}
+        {% if answers.coi_gl_carrier or answers.coi_gl_expires %}<dt>General liability</dt><dd>{{ answers.coi_gl_carrier }} · {{ answers.coi_gl_amount_cents|cents }} · expires {{ answers.coi_gl_expires }}</dd>{% endif %}
+        {% if answers.coi_auto_carrier or answers.coi_auto_expires %}<dt>Auto liability</dt><dd>{{ answers.coi_auto_carrier }} · {{ answers.coi_auto_amount_cents|cents }} · expires {{ answers.coi_auto_expires }}</dd>{% endif %}
+        {% if answers.workers_comp_mode %}<dt>Workers' compensation</dt><dd>{% if answers.workers_comp_mode == "exempt" %}Exempt (statement uploaded){% else %}{{ answers.workers_comp_carrier }} · expires {{ answers.workers_comp_expires }}{% endif %}</dd>{% endif %}
+        {% if answers.hic_registration %}<dt>PA HIC registration</dt><dd>{{ answers.hic_registration }}</dd>{% endif %}
+        {% if answers.licence_text %}<dt>Licences</dt><dd>{{ answers.licence_text }}</dd>{% endif %}
+        {% if answers.w9_revision_confirmed %}<dt>W-9</dt><dd>Vendor confirmed the current revision</dd>{% endif %}
+      </dl>
+      <p class="small muted">Required for this vendor: {% for i in required %}{{ i.label }}{% if not forloop.last %}; {% endif %}{% empty %}nothing beyond the basics{% endfor %}.</p>
+      {% if missing %}<p class="small muted">Still missing: {{ missing|join:" " }}</p>{% endif %}
+
+      <h2>Documents</h2>
+      {% if not key_ready %}<p class="small muted">The vendor document key is not set up on the server: documents can't be opened.</p>{% endif %}
+      <div class="table-card"><div class="table-wrap"><table class="stack-sm"><thead><tr><th>Document</th><th>Uploaded</th><th>Scan</th><th></th></tr></thead><tbody>
+        {% for row in files %}<tr><td class="cell-title">{{ row.label }}{% if row.submitted %} <span class="small muted">(in the submission)</span>{% endif %}</td><td data-label="Uploaded">{{ row.file.uploaded_at|date:"M j, Y" }}</td><td data-label="Scan">{% status row.scan %}</td>
+          <td>{% if row.may_view and row.downloadable and key_ready %}<a href="{% url 'vendor_onboarding_file' rnd.pk row.file.pk %}">Download</a>{% elif not row.may_view %}<span class="small muted">Board members only</span>{% elif not row.downloadable %}<span class="small muted">Waiting for a clean scan</span>{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="4" class="muted">No documents yet.</td></tr>{% endfor %}
+      </tbody></table></div></div>
+
+      <h2>History</h2>
+      <ul class="timeline">
+        {% for s in submissions %}<li>Submission {{ s.number }} on {{ s.submitted_at|date:"M j, Y H:i" }}{% for d in s.decisions.all %}<br><span class="small">{{ d.get_decision_display }} by {{ d.decided_by.person.display_name|default:d.decided_by }} on {{ d.created_at|date:"M j, Y" }}{% if d.reason %}: {{ d.reason }}{% endif %}</span>{% endfor %}</li>{% endfor %}
+        {% for l in links %}<li class="small muted">Link created {{ l.created_at|date:"M j, Y" }}{% if l.sent_at %}, emailed {{ l.sent_at|date:"M j" }}{% endif %}, {% if l.ended_at %}ended {{ l.ended_at|date:"M j" }} ({{ l.get_end_reason_display }}){% else %}open until {{ l.expires_at|date:"M j, Y" }}{% endif %}; opened {{ l.opened_count }} time{{ l.opened_count|pluralize }}</li>{% endfor %}
+      </ul>
+    </div>
+    <aside>
+      {% if submitted and can_decide %}<section class="card"><h3>Decide</h3>
+        {% if approval_refusal %}<p class="small muted">{{ approval_refusal }}</p>{% else %}
+        <form method="post" action="{% url 'vendor_onboarding_action' rnd.pk 'approve' %}">{% csrf_token %}<label for="note">Note (optional)</label><input id="note" name="note" maxlength="2000"><div class="form-actions"><button type="submit">Approve for the board</button></div></form>{% endif %}
+        <form method="post" action="{% url 'vendor_onboarding_action' rnd.pk 'return' %}">{% csrf_token %}<label for="reason-r">What should the vendor change?</label><textarea id="reason-r" name="reason" rows="3" maxlength="2000" required></textarea><div class="form-actions"><button type="submit" class="secondary">Return to the vendor</button></div></form>
+        <form method="post" action="{% url 'vendor_onboarding_action' rnd.pk 'decline' %}">{% csrf_token %}<label for="reason-d">Reason for declining</label><textarea id="reason-d" name="reason" rows="2" maxlength="2000" required></textarea><div class="form-actions"><button type="submit" class="danger">Decline</button></div></form>
+      </section>{% endif %}
+      {% if can_invite and editable %}<section class="card"><h3>The vendor's link</h3>
+        <form method="post" action="{% url 'vendor_onboarding_action' rnd.pk 'resend' %}">{% csrf_token %}<p class="small muted">Sends a new link to {{ vendor.email }}; the old one stops working.</p><div class="form-actions"><button type="submit" class="secondary">Send a new link</button></div></form>
+        <form method="post" action="{% url 'vendor_onboarding_action' rnd.pk 'cancel' %}">{% csrf_token %}<div class="form-actions"><button type="submit" class="secondary">Cancel this request</button></div></form>
+      </section>{% endif %}
+      {% if can_invite %}<section class="card"><h3>Conflict of interest</h3>
+        <p class="small muted">People linked here cannot approve this vendor or its invoices.</p>
+        <ul>{% for p in conflict_people %}<li>{{ p.display_name }} <form method="post" action="{% url 'vendor_onboarding_action' rnd.pk 'conflict_remove' %}" class="inline">{% csrf_token %}<input type="hidden" name="person" value="{{ p.pk }}"><button type="submit" class="link">Remove</button></form></li>{% empty %}<li class="muted">Nobody linked.</li>{% endfor %}</ul>
+        <form method="post" action="{% url 'vendor_onboarding_action' rnd.pk 'conflict_add' %}">{% csrf_token %}<label for="person">Person</label><select id="person" name="person">{% for p in all_people %}<option value="{{ p.pk }}">{{ p.display_name }}</option>{% endfor %}</select><label for="cnote">Note</label><input id="cnote" name="note" maxlength="200"><div class="form-actions"><button type="submit" class="secondary">Link person</button></div></form>
+      </section>{% endif %}
+    </aside>
+  </div>
+{% endblock %}

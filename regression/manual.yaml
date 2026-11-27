@@ -375,3 +375,11 @@
   check: "Counsel confirmed the Declaration allows interest (rate, grace, no compounding) and charging collection costs before the features are switched on with real data (D80, D82)."
   steps: "Show counsel the Interest on overdue balances page, a statement line, and the setup step's law notes; record the citations they give."
   last: "not done yet"
+- key: vendor onboarding on a phone
+  check: "A real run-through as a vendor on a phone: the emailed link opens the form (no menu, no portal links), the address bar shows /vendor-form/ without the token, a W-9 and a certificate upload from the phone's files, Save keeps answers, Submit locks it and the link then says it can't be used; two board members approve from My items and the vendor appears active; a W-9 download shows up in the vendor's document access history (D79)."
+  steps: "POC with fictional data and the vendor document key set: invite a made-up vendor at the redirected test mailbox, open the link on an iPhone and an Android phone, use the sample PDFs; approve as two demo board members."
+  last: ""
+- key: vendor document key on the VM
+  check: "sudo bash infra/poc/set-vendor-key.sh makes the key without typing, check_vendor_key passes, the setup wizard's server step says Set up, --rotate re-encrypts existing documents (0 under an old key afterwards), and a copy of the key is stored apart from the backups."
+  steps: "VM console as hoa; run the script, then --rotate after uploading one demo document; open the document as a board member after each step."
+  last: ""

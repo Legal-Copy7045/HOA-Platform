@@ -521,6 +521,44 @@ REGISTRY: dict[str, RuleSpec] = {
             "every step is done or they hide it. 0 turns the checklist off.",
             maximum=365,
         ),
+        # D79: vendor onboarding (board vendor policy).
+        RuleSpec(
+            "vendor.onboarding_link_days",
+            "Days a vendor's onboarding link stays open",
+            DAYS,
+            "14",
+            "Vendors",
+            "The emailed link to the vendor information form ends after this many days, or "
+            "when the vendor submits, whichever comes first. 1 to 60.",
+            maximum=60,
+            minimum=1,
+        ),
+        RuleSpec(
+            "vendor.min_general_liability_cents",
+            "Least general liability insurance a vendor should carry",
+            CENTS,
+            "100000000",
+            "Vendors",
+            "Board reviewers see a warning when a certificate shows less. Blank: no warning.",
+        ),
+        RuleSpec(
+            "vendor.min_auto_liability_cents",
+            "Least auto liability insurance a vendor should carry",
+            CENTS,
+            "100000000",
+            "Vendors",
+            "For vendors who bring vehicles onto the property. Blank: no warning.",
+        ),
+        RuleSpec(
+            "vendor.w9_retention_years",
+            "Years a W-9 is kept after the last 1099 year it supports",
+            INT,
+            "4",
+            "Vendors",
+            "After this, the W-9 is listed for two board members to dispose of. At least 3.",
+            maximum=20,
+            minimum=3,
+        ),
         *[
             RuleSpec(
                 f"request.sla_days.{key}",

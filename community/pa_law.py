@@ -123,6 +123,14 @@ GROUP_NOTES: dict[str, str] = {
         "sign in. The waiting period and the lock afterwards protect votes, notices and "
         "payments if someone else gets into an owner's email."
     ),
+    "Vendors": (
+        "The Act does not regulate how the association onboards vendors; these are board "
+        f"policy and internal controls. The association keeps its financial records ({ACT} "
+        "§ 5316), which include what supports payments to vendors. Federal tax rules (Form W-9, "
+        "Form 1099) and Pennsylvania's Home Improvement Consumer Protection Act and Workers' "
+        "Compensation Act are summarised under What the law says; the tax preparer and counsel "
+        "should confirm them."
+    ),
     "Owner requests": (
         "The Act sets no response times for owner questions. These are service targets the "
         "board chooses."
@@ -733,6 +741,35 @@ GUIDES["insurance.second_approval_cents"] = Guide(
     f"Not covered by the Act; proceeds must still go to repair the common elements unless the "
     f"Declaration says otherwise ({ACT} § 5312).",
     "Two approvals at $5,000 and over: Board resolution 2026-07 (spending controls).",
+)
+
+GUIDES["vendor.onboarding_link_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; a board security choice. The link is the only way into the "
+    "public vendor form, so a short life limits what a forwarded or leaked email exposes.",
+    "14 days: Board vendor policy, resolution 2027-02.",
+)
+GUIDES["vendor.min_general_liability_cents"] = Guide(
+    BOARD,
+    "Not set by the Act. Check the Declaration's insurance article and the association's own "
+    "policy; Pennsylvania's Home Improvement Consumer Protection Act requires registered home "
+    "improvement contractors to carry liability insurance (73 P.S. § 517.1 et seq.). Counsel and "
+    "the association's insurance agent should confirm the amount.",
+    "$1,000,000 per occurrence: Board vendor policy, resolution 2027-02.",
+)
+GUIDES["vendor.min_auto_liability_cents"] = Guide(
+    BOARD,
+    "Not set by the Act; Pennsylvania's own minimum auto insurance is far lower than what an "
+    "association usually asks of vendors on its property. The insurance agent should advise.",
+    "$1,000,000 combined single limit: Board vendor policy, resolution 2027-02.",
+)
+GUIDES["vendor.w9_retention_years"] = Guide(
+    BOARD,
+    f"Not set by the Act ({ACT} § 5316 only requires the association to keep its records). "
+    "IRS record-keeping guidance asks payers to keep information-return records for at least "
+    "3 years and employment tax records for 4; the tax preparer should confirm the period. W-9s "
+    "carry tax identification numbers, so keeping them no longer than needed reduces risk.",
+    "4 years after the last 1099 year: Board records retention policy, resolution 2027-02.",
 )
 
 

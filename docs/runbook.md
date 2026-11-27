@@ -1178,3 +1178,18 @@ whatever their email choice) and mark the mailing as mailed as usual.
 **Mistakes in a closed month.** Post the correction in the open month (coding a line again, a reversal): the portal adds the reference to the original date. Reopening needs a board member's request and a different board member's approval; only the latest closed month, and only while its year is open.
 
 **Year end.** Finance → Financial statements → the fiscal year: the statements (PDF, CSV) and the year-end package. The package's manifest.json is signed with `BOOKS_PACKAGE_KEY` (set it in the server's .env and keep a copy with the treasurer's records); on the server `python manage.py verify_books_package <file.zip>` checks it; elsewhere use the snippet in the package's README.txt with the key. More finance → Tax worksheet: Form 1120-H line by line with the 60%/90% tests, the 1099 IRIS upload (add each vendor's TIN from the W-9 in IRIS; the portal keeps none) and recipient copies. Nothing is filed by the portal; the preparer confirms the form and the figures.
+
+## Vendor onboarding (D79)
+
+**Key set-up (sysadmin, once, on the VM).** `sudo bash infra/poc/set-vendor-key.sh` makes the vendor document key on the server (nothing to type), saves it in `.env`, restarts the portal and runs `manage.py check_vendor_key`. Then copy the key into the HOA's password manager (`sudo grep -E '^VENDOR_DOCUMENT_KEY' /opt/hoa-portal/.env`) and `shred` the `.env.before-vendor-key` copy the script names. Keep that copy apart from the backups: the backups hold the encrypted documents only. The setup wizard's server step shows "Vendor document key: Set up".
+
+**Rotating the key.** `sudo bash infra/poc/set-vendor-key.sh --rotate` keeps the old key in `VENDOR_DOCUMENT_KEY_FALLBACKS`, makes a new one and re-encrypts every stored document; `check_vendor_key` then reports "0 under an old key". Remove the fallback only after that, and store the new key in the password manager. A restore needs the key that was current when the backup was taken (or the fallbacks).
+
+**Switching it on.** Admin → Features → Vendor onboarding (or the Vendors step of Community setup, where the link life, insurance minimums and W-9 retention are set with citations). Finance → Vendors → Vendor requirements and terms: the board ticks what each kind of vendor provides (with a citation) and edits the terms.
+
+**Sending a link (board or manager).** Finance → Vendors → Vendor onboarding → Invite a vendor: name, email, services and kind of work. The vendor is created inactive and gets an email with the link (it works until it expires or they submit). "Send a new link" on the request ends the old one. For a vendor added before onboarding, open its Onboarding record → Complete onboarding; for an expired certificate or a new W-9, Ask for updated documents (the link shows only those items).
+
+**Reviewing (board).** My items lists "Review vendor onboarding: <vendor>". Check the answers, the warnings (insurance below the minimum, expired certificates), the documents (W-9s open for board members only; every view is logged) and any conflict disclosure; link anyone it names (they cannot approve the vendor or its invoices). Approve, Return to the vendor (say what to change: they get a new link), or Decline. Two different board members approve; the one who sent the link does not. Until then the vendor's invoices cannot be approved or paid.
+
+**W-9 retention.** My items shows "W-9s past retention" when any are due; Finance → Vendors → W-9 retention: one board member proposes disposal, a different one confirms.
+

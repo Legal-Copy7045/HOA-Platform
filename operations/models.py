@@ -232,6 +232,21 @@ class Invoice(models.Model):
     def delete(self, *args, **kwargs):
         raise PermissionError("Invoices are voided, not deleted.")
 
+    conflict_noun = "vendor's invoice"
+
+    def conflict_of_interest(self, user) -> bool:
+        """D79: a board member the vendor's conflict disclosure names may not
+        approve, pay or otherwise advance its invoices (core.conflicts)."""
+        from operations.vendor_onboarding import person_conflicted
+
+        return person_conflicted(user, self.vendor_id)
+
+    def conflict_message(self, actor) -> str:
+        return (
+            "You are named in this vendor's conflict-of-interest disclosure: another board "
+            "member handles its invoices."
+        )
+
 
 class ApprovalDecision(models.TextChoices):
     APPROVE = "approve", "Approve"
@@ -473,3 +488,6 @@ from operations.models_options import (  # noqa: E402, F401
     SettlementApproval,
     SettlementOffer,
 )
+
+# --- Vendor onboarding (D79): models in their own module -----------------------------
+from operations.onboarding_models import *  # noqa: E402, F403

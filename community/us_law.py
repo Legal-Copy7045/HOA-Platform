@@ -347,6 +347,46 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "Encrypted backups and a locked off-site copy are part of keeping owners' data safe.",
         ),
     ],
+    "vendors": [
+        LawNote(
+            "26 U.S.C. § 6041, § 6041A, § 3406; IRS Form W-9 and Instructions for Forms "
+            "1099-MISC and 1099-NEC",
+            "Form W-9 and Form 1099 reporting",
+            "A business that pays a vendor for services may have to report the payments on a "
+            "Form 1099 and should collect a Form W-9 first; payments to corporations are "
+            "generally not reported except attorneys' fees, and payments for goods only are not. "
+            "Without a W-9 backup withholding can apply.",
+            "The portal asks every vendor how it is taxed and keeps the W-9 encrypted; the "
+            "1099 list follows that answer. The tax preparer confirms which vendors and the "
+            "current IRS threshold.",
+            "Have the association's counsel or tax preparer confirm how this applies.",
+        ),
+        LawNote(
+            "IRS record-keeping guidance (Publication 583; Publication 15 for employment taxes)",
+            "How long tax records are kept",
+            "Records that support information returns are kept at least 3 years; employment "
+            "tax records at least 4.",
+            "The W-9 retention rule defaults to 4 years after the last 1099 year; the tax "
+            "preparer should confirm.",
+            "Have the association's counsel or tax preparer confirm how this applies.",
+        ),
+        LawNote(
+            "73 P.S. § 517.1 et seq.",
+            "Pennsylvania Home Improvement Consumer Protection Act",
+            "Contractors doing home improvement work in Pennsylvania register with the Attorney "
+            "General and carry liability insurance.",
+            "The registration number is asked of home improvement contractors; whether work on "
+            "common areas is home improvement under the Act is a question for counsel.",
+        ),
+        LawNote(
+            "77 P.S. § 1 et seq.",
+            "Pennsylvania Workers' Compensation Act",
+            "Employers carry workers' compensation insurance; some sole proprietors and others "
+            "without employees may be exempt and say so in writing.",
+            "Contractors upload a certificate or an exemption statement, so an injured "
+            "worker's claim does not fall on the association.",
+        ),
+    ],
 }
 
 # Steps whose choices no particular statute governs: said explicitly.

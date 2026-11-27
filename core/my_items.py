@@ -508,6 +508,10 @@ def items_for(user) -> list[Item]:
         from documents import retention
 
         out.extend(retention.my_items(user, today))
+    # Vendor onboarding (D79): reviews, expired links, older vendors to complete.
+    from operations.vendor_onboarding import my_items as vendor_onboarding_items
+
+    out.extend(vendor_onboarding_items(user))
     # Recurring deadlines (Board tasks tab): hidden with the "compliance" feature.
     from core.features import enabled as feature_on
 

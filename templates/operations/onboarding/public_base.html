@@ -1,0 +1,21 @@
+{% load static %}<!doctype html>
+{# Vendor onboarding (D79): the public form's own page shell. No portal menu, links, scripts, manifest or sign-in background: nothing of the portal beyond the association's name. #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}Vendor information form{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/site.css' %}">
+</head>
+<body>
+  <main id="main" class="auth vendor-form">
+    <div class="auth-card">
+      <p class="muted small">{% if association %}{{ association }} · {% endif %}Vendor information form</p>
+      {% include "partials/messages.html" %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</body>
+</html>

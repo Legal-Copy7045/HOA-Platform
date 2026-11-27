@@ -119,6 +119,14 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "violation.decide": frozenset({BOARD}),
     # Operations and money
     "vendor.manage": frozenset({BOARD, MANAGER}),
+    # Vendor onboarding (D79): the manager invites and reads submissions; only
+    # board members approve, configure, open W-9s (tax IDs) and dispose of them.
+    "vendor.onboarding_invite": frozenset({BOARD, MANAGER}),
+    "vendor.onboarding_review": frozenset({BOARD, MANAGER}),
+    "vendor.onboarding_approve": frozenset({BOARD}),
+    "vendor.onboarding_configure": frozenset({BOARD}),
+    "vendor.w9_view": frozenset({BOARD}),
+    "vendor.w9_dispose": frozenset({BOARD}),
     # Owner requests: owners, authorized contacts and tenants raise them
     # (view-only contacts and former owners cannot).
     "request.submit": frozenset({OWNER, AUTHORIZED, TENANT}),
