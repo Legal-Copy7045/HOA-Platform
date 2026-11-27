@@ -78,3 +78,13 @@ def send_statement_emails(year: int, month: int) -> int:
     from ledger.statement_email import send_monthly_statements
 
     return send_monthly_statements(year=year, month=month)["emails"]
+
+
+@app.periodic(cron="37 11 * * *")  # daily, about 06:37 site time
+@app.task(queue="maintenance", queueing_lock="books_auto_close")
+def books_auto_close(timestamp: int) -> int:
+    """Code new bank lines by the rules, confirm unambiguous matches, and
+    close every due month (and fiscal year) whose checks pass (D70, D71)."""
+    from ledger.books.close import run
+
+    return len(run()["closed"])

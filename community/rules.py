@@ -325,6 +325,118 @@ REGISTRY: dict[str, RuleSpec] = {
             "approve. A surplus distribution approved by an owner who receives part of it "
             "always needs two.",
         ),
+        # Books and close (D69-D71): the association's own books.
+        RuleSpec(
+            "books.auto_close",
+            "Close a month by itself when every check passes",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: from the close day, last month closes by itself once every bank line is "
+            "matched or coded, every account reconciles and nothing else needs the treasurer. "
+            "Off: a board member presses Close.",
+        ),
+        RuleSpec(
+            "books.auto_close_year",
+            "Close a fiscal year by itself once its twelve months are closed",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: the year closes when its checks pass, and the year-end package is built.",
+        ),
+        RuleSpec(
+            "books.close_day",
+            "Day of the month the automatic close starts on last month",
+            DAYS,
+            "3",
+            "Books and close",
+            "Gives the bank time to post the month's last lines. 1 to 28.",
+            maximum=28,
+            minimum=1,
+        ),
+        RuleSpec(
+            "books.undeposited_days",
+            "Days a received payment may wait to be deposited",
+            DAYS,
+            "5",
+            "Books and close",
+            "Older undeposited checks are an exception at month end.",
+        ),
+        RuleSpec(
+            "books.stale_check_days",
+            "Days after which an uncleared check is flagged",
+            DAYS,
+            "90",
+            "Books and close",
+            "A warning on the close, not a block.",
+        ),
+        RuleSpec(
+            "books.reserve_monthly_cents",
+            "Monthly reserve contribution",
+            CENTS,
+            None,
+            "Books and close",
+            "What is transferred to the reserve account each month (the reserve the board "
+            "determines). Blank: the reserve plan's annual contribution divided by 12. A "
+            "shortfall is a warning on the close.",
+        ),
+        RuleSpec(
+            "books.surplus_from_reserve",
+            "Surplus distributions are paid from the reserve fund",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: the statements show a surplus distribution as paid out of the reserve fund "
+            '(the "Surplus distributions paid from" account). Off: from the operating fund.',
+        ),
+        RuleSpec(
+            "books.auto_match",
+            "Confirm unambiguous bank matches by itself",
+            BOOL,
+            "true",
+            "Books and close",
+            "On: a deposit, payout or check that is the only one fitting a bank line (amount, "
+            "date, check number) is matched without waiting for a person.",
+        ),
+        RuleSpec(
+            "books.rule_suggest_after",
+            "Suggest a coding rule after this many lines coded the same way",
+            INT,
+            "3",
+            "Books and close",
+            "Lines coded by hand with the same words and category.",
+            minimum=2,
+        ),
+        # Year-end tax documents (D71-tax).
+        RuleSpec(
+            "tax.hoa_rate_bp",
+            "Federal tax rate on a homeowners association's taxable income (Form 1120-H)",
+            BASIS_POINTS,
+            "3000",
+            "Books and close",
+            "30% for homeowners associations (32% applies only to timeshare associations). "
+            "Used on the Form 1120-H worksheet; confirm with your tax preparer.",
+            maximum=10000,
+        ),
+        RuleSpec(
+            "tax.nonqualifying_accounts",
+            "Expense accounts that are not spending on association property (90% test)",
+            TEXT,
+            "6400 6900",
+            "Books and close",
+            "Account numbers (or their first digits), separated by spaces: e.g. income taxes "
+            "and penalties. Everything else spent, and money set aside in reserves, counts "
+            "towards the 90% test.",
+        ),
+        RuleSpec(
+            "tax.1099_misc_categories",
+            "Expense category codes reported on Form 1099-MISC instead of 1099-NEC",
+            TEXT,
+            "",
+            "Books and close",
+            "For example rent paid for a meeting room. Separated by spaces; blank: all on "
+            "1099-NEC (services).",
+        ),
         RuleSpec(
             "retention.former_owner_contact_days",
             "Days after someone leaves before their contact details are cleared",

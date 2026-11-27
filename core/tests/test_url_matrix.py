@@ -399,6 +399,18 @@ PROTECTED = {
     "paper_mail_labels": ("GET", "mailing"),
     "paper_mail_mark": ("POST", "mailing"),
     "paper_mail_piece_checked": ("POST", "mailing"),
+    # Books and close, statements and tax (D69-D71): board, manager, auditor.
+    "books_close": ("GET", None),
+    "books_action": ("POST", None),
+    "books_accounts": ("GET", None),
+    "books_coding": ("GET", None),
+    "accounting_quickbooks": ("GET", None),
+    "financial_statements": ("GET", None),
+    "financial_statements_csv": ("GET", None),
+    "financial_statements_pdf": ("GET", None),
+    "year_end_package": ("GET", None),
+    "tax_worksheet": ("GET", None),
+    "tax_download": ("GET", None),
 }
 
 

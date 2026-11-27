@@ -46,6 +46,12 @@ GROUP_NOTES: dict[str, str] = {
         "lots as the Declaration says (§ 5207, § 5314). Unpaid assessments, late charges, fines "
         "and interest are a lien on the lot (§ 5315)."
     ),
+    "Books and close": (
+        f"The association keeps financial records sufficiently detailed for its resale "
+        f"certificates and makes them reasonably available to owners ({ACT} § 5316, § 5407). "
+        f"How the books are kept and closed is for the board, the Bylaws and the Declaration "
+        f"(the annual accounting, the reserves)."
+    ),
     "Invoices": (
         "The Act does not regulate how the board approves spending; these are internal "
         "controls the board sets by resolution."
@@ -387,6 +393,86 @@ GUIDES["disbursement.second_approval_cents"] = Guide(
     BOARD,
     "Not covered by the Act; an internal financial control like the invoice approval rule.",
     "Two approvals at $500 and over: Board resolution 2026-07 (spending controls).",
+)
+
+GUIDES["books.auto_close"] = Guide(
+    BOARD,
+    f"The Act requires financial records sufficiently detailed to enable the association to "
+    f"comply with its resale certificate duty, and that they be available to owners ({ACT} "
+    f"§ 5316, § 5407). It does not say how or when the books are closed; an internal control "
+    f"the board sets.",
+    "On: Board resolution 2027-01 (financial controls), closing each month when it balances.",
+)
+GUIDES["books.auto_close_year"] = Guide(
+    BYLAWS,
+    f"The Act does not set the fiscal year or a closing procedure; the Bylaws usually name "
+    f"the fiscal year and the annual accounting. Records stay available to owners ({ACT} "
+    f"§ 5316).",
+    "On: Bylaws §6.4 (fiscal year), Board resolution 2027-01.",
+)
+GUIDES["books.close_day"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal timetable.",
+    "3: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.undeposited_days"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal control (money received is deposited promptly).",
+    "5 days: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.stale_check_days"] = Guide(
+    BOARD,
+    "Not covered by the Act. Pennsylvania's unclaimed property law applies to long-uncashed "
+    "checks; the treasurer confirms the dormancy period with the PA Treasury.",
+    "90 days: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.reserve_monthly_cents"] = Guide(
+    DECLARATION,
+    f"The budget the board adopts includes the reserves ({ACT} § 5302(a)); many Declarations "
+    f"require a reserve for replacement of common elements in an amount the board "
+    f"determines, collected as part of the assessments.",
+    "$500.00 a month: Declaration §8.7 (reserves as the board determines), budget 2027.",
+)
+GUIDES["books.surplus_from_reserve"] = Guide(
+    DECLARATION,
+    f"Unless the Declaration provides otherwise, surplus is paid or credited to owners ({ACT} "
+    f"§ 5313). Whether reserve funds may be treated as surplus is for counsel; this setting "
+    f"only says which fund the statements show it paid from.",
+    "On: Declaration §8.10 (surplus); D52 surplus fund account 3100.",
+)
+GUIDES["books.auto_match"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal control. Only exact amounts with one possible item "
+    "are matched by themselves.",
+    "On: Board resolution 2027-01 (financial controls).",
+)
+GUIDES["books.rule_suggest_after"] = Guide(
+    BOARD,
+    "Not covered by the Act; a convenience for the treasurer.",
+    "3: Board resolution 2027-01.",
+)
+
+GUIDES["tax.hoa_rate_bp"] = Guide(
+    BOARD,
+    "Federal, not the Act: IRC § 528(b) taxes a qualifying homeowners association's taxable "
+    "income at 30% (32% for timeshare associations); see the Form 1120-H instructions. Have "
+    "the tax preparer confirm the rate each year.",
+    "30%: IRC § 528(b); Instructions for Form 1120-H.",
+)
+GUIDES["tax.nonqualifying_accounts"] = Guide(
+    BOARD,
+    "Federal, not the Act: IRC § 528(c)(1)(C) and Treas. Reg. § 1.528-6 require at least 90% "
+    "of expenditures to be for acquiring, constructing, managing, maintaining and caring for "
+    "association property; amounts put in reserves for that purpose count. The preparer "
+    "decides which accounts do not qualify.",
+    "6400 6900: tax preparer's advice, 2027 (income taxes and penalties).",
+)
+GUIDES["tax.1099_misc_categories"] = Guide(
+    BOARD,
+    "Federal, not the Act: the IRS Instructions for Forms 1099-MISC and 1099-NEC say which "
+    "payments go on which form (services on 1099-NEC; rents and some other payments on "
+    "1099-MISC). Filed through IRIS or on paper; the preparer confirms.",
+    "Blank (all services): tax preparer's advice, 2027.",
 )
 
 GUIDES["recovery.wait_hours"] = Guide(

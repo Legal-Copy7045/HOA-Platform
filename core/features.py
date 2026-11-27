@@ -262,6 +262,38 @@ FEATURES: list[Feature] = [
             "check_alignment_pdf",
         },
     ),
+    # Books and close (D69, D70): the association's own books, for a
+    # self-managed association (on by default).
+    _f(
+        "books",
+        "Books and month-end close",
+        "The association's own books: bank accounts by fund (operating, reserve), bank lines "
+        "coded to categories by rules, and the month and year close that runs by itself when "
+        "everything balances.",
+        {
+            "books_close",
+            "books_action",
+            "books_accounts",
+            "books_coding",
+            "accounting_quickbooks",
+        },
+    ),
+    # Financial statements and the year-end package (D71).
+    _f(
+        "financial_statements",
+        "Financial statements",
+        "Balance sheet by fund, income and expenses against the budget, reserve activity, "
+        "the annual accounting and the year-end package for the treasurer and the tax "
+        "preparer.",
+        {
+            "financial_statements",
+            "financial_statements_csv",
+            "financial_statements_pdf",
+            "year_end_package",
+            "tax_worksheet",
+            "tax_download",
+        },
+    ),
     # Automatic payments of the monthly assessment (D46): also needs
     # "online_payments" on and Stripe keys on the server.
     _f(

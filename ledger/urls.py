@@ -122,3 +122,8 @@ urlpatterns += [
         name="check_alignment_pdf",
     ),
 ]
+
+# Books and close (D69-D71).
+from ledger.books.urls import urlpatterns as _books  # noqa: E402
+
+urlpatterns += _books
