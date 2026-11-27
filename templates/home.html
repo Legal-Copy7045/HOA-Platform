@@ -15,6 +15,11 @@
   </div>
 
   {% if dash.welcome %}<section class="card welcome">{% icon "home" %}<div class="prose">{{ dash.welcome|linebreaks }}</div></section>{% endif %}
+  {% if dash.checklist %}{% with checklist=dash.checklist %}<section class="card" id="getting-started" aria-labelledby="getting-started-h">
+    <div class="card-head"><h2 id="getting-started-h">Getting started</h2><span class="small muted">{{ checklist.done }} of {{ checklist.total }} done</span></div>
+    {% include "community/_checklist.html" with compact=True %}
+    <div class="form-actions"><a class="btn secondary" href="{% url 'getting_started' %}">{% icon "check-circle" %} Open your checklist</a><a class="small" href="{% url 'help' %}">Help: how it all works</a></div>
+  </section>{% endwith %}{% endif %}
   {% with o=dash.owner s=dash.staff %}
   {% if user|can:"history.view_own" and not o and not s %}
     <section class="card"><h2>Your records</h2>

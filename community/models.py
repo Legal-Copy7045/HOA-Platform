@@ -1166,3 +1166,55 @@ class RegisterImportScan(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"scan {self.result}"
+
+
+# --- Owner help (D73) --------------------------------------------------------------------
+
+
+class HelpText(AppendOnlyModel):
+    """The board's own words added to a help page (D73). Every save is a new
+    row; the newest row of a topic is shown, the rest are its history. Plain
+    text with a little markdown, always escaped (community.help.render_text)."""
+
+    topic = models.CharField(max_length=40)
+    body = models.TextField(blank=True)
+    saved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    saved_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["topic", "-saved_at", "-id"]
+        indexes = [models.Index(fields=["topic", "-saved_at"], name="helptext_topic_newest")]
+
+    def __str__(self) -> str:
+        return f"help text #{self.pk}"
+
+
+class HelpMark(AppendOnlyModel):
+    """One login's own marks for the getting-started checklist (D73): the
+    welcome page was shown, the governing documents were read, a page was
+    opened from the checklist, a step (or the whole checklist) was hidden, the
+    contact details were confirmed. Append-only and per login, like
+    AnnouncementRead: read and written only for the signed-in user
+    (community.checklist). Holds no content."""
+
+    class Kind(models.TextChoices):
+        WELCOME = "welcome", "Welcome page shown"
+        DOCS_READ = "docs_read", "Governing documents read"
+        OPENED = "opened", "Opened from the checklist"
+        DISMISSED = "dismissed", "Hidden from the checklist"
+        CONFIRMED = "confirmed", "Confirmed from the checklist"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    key = models.CharField(max_length=40, blank=True)
+    at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "kind", "key"], name="helpmark_once"),
+        ]
+
+    def __str__(self) -> str:
+        return f"help mark #{self.pk}"

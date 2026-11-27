@@ -134,6 +134,7 @@ def seed() -> SeedResult:
 
     # seed_demo prints one summary for the whole dataset.
     call_command("seed_demo_operations", stdout=io.StringIO())
+    call_command("seed_demo_help", stdout=io.StringIO())  # D73: help pages, checklist progress
     return SeedResult(
         summary=(
             "Demo data created: 44 lots, joint owners on lots 7 and 23, lot 31 "

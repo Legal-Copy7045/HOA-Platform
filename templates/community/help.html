@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Help · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Help</h1>
+    <p class="subtitle">How the portal works, in plain words, and how to ask the board when this doesn't answer your question.</p></div>
+    <div class="actions"><a class="btn" href="{{ ask_url }}">{% icon "mail" %} Ask the board</a></div></div>
+
+  {% if checklist %}<section class="card" id="getting-started">
+    <div class="card-head"><h2>Getting started</h2><span class="small muted">{{ checklist.done }} of {{ checklist.total }} done</span></div>
+    <p class="small muted">The few things worth doing in your first weeks here.</p>
+    <a class="btn secondary" href="{% url 'getting_started' %}">{% icon "check-circle" %} Open your checklist</a>
+  </section>{% endif %}
+
+  {% if topics %}<section class="help-topics" aria-labelledby="how-h">
+    <h2 id="how-h">How it works</h2>
+    <ul class="tiles">{% for c in topics %}<li><a class="tile" href="{{ c.url }}">{% icon "book" %}<div><strong>{{ c.topic.title }}</strong><span>{{ c.summary }}</span></div></a></li>{% endfor %}</ul>
+  </section>{% endif %}
+
+  <section class="card" aria-labelledby="more-h">
+    <h2 id="more-h">More answers</h2>
+    <ul class="list">
+      {% if faq_on %}<li><a class="title" href="{% url 'faq' %}">{% icon "info" %} Frequently asked questions</a></li>{% endif %}
+      <li><div class="grow"><a class="title" href="{% url 'search' %}">{% icon "search" %} Search</a><div class="small muted">Help pages, the FAQ, documents, announcements and more.</div></div></li>
+      {% if user|can:"document.view_owner" %}<li><a class="title" href="{% url 'documents' %}">{% icon "folder" %} Documents</a></li>{% endif %}
+      <li><a class="title" href="{% url 'welcome' %}">{% icon "leaf" %} The welcome page again</a></li>
+      <li><div class="grow"><a class="title" href="{% url 'mfa_index' %}">{% icon "key" %} Sign-in and security</a><div class="small muted">Passkeys, the authenticator app and recovery codes.</div></div></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="where-h" id="whats-where">
+    <h2 id="where-h">What's where</h2>
+    <p class="small muted">Your menu, section by section.</p>
+    {% for s in guide %}<section class="card guide-section">
+      <h3>{{ s.title }}</h3>{% if s.text %}<p class="small muted">{{ s.text }}</p>{% endif %}
+      <ul class="list">{% for i in s.items %}<li><div class="grow"><a class="title" href="{{ i.url }}">{% icon i.icon %} {{ i.label }}</a>{% if i.text %}<div class="small muted">{{ i.text }}</div>{% endif %}</div></li>{% endfor %}</ul>
+    </section>{% endfor %}
+  </section>
+{% endblock %}

@@ -134,7 +134,10 @@ def account_setup_done(request):
 
     if notice_choice_due(request.user):
         return redirect("notice_choice")
-    return redirect("home")
+    # D73: the welcome page once, then the dashboard.
+    from community.help import after_setup_url
+
+    return redirect(after_setup_url(request.user, request))
 
 
 # --- Bulk onboarding (Milestone 4) ---------------------------------------------------

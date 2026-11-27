@@ -130,6 +130,12 @@ MEMBER_PAGES = {
     # Reserve plan (reserves): the adopted plan's summary (now a redirect to
     # Budget and reserves, streamlining).
     "reserve_summary",
+    # Owner help (D73): Help, Welcome, Getting started (the signed-in login's
+    # own steps only) and Ask the board (opens the login's own new request).
+    "help",
+    "welcome",
+    "getting_started",
+    "ask_board",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -145,6 +151,9 @@ VOTING_REDIRECTS = {
 COMMUNITY_DETAIL = {
     "election_detail": ("GET", "election"),
     "election_action": ("POST", "election"),
+    # Owner help (D73): a "How it works" page and the board's text on it.
+    "help_topic": ("GET", None),
+    "help_text_save": ("POST", None),
 }
 
 # Board and committees (streamlining, owner decision 2026-11-26): every
@@ -965,6 +974,8 @@ def _url(name, key, targets):
         kwargs["action"] = "join"
     elif name == "setup_step":
         kwargs["step"] = "charge"
+    elif name in ("help_topic", "help_text_save"):
+        kwargs["slug"] = "paying"
     elif name == "disbursement_action":
         kwargs["action"] = "approve"
     elif name == "register_template":

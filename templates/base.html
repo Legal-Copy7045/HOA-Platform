@@ -38,6 +38,7 @@
         <div class="foot-links">
           <a href="{% url 'my_profile' %}">Profile</a>
           <a href="{% url 'mfa_index' %}">Sign-in and security</a>
+          {% if user|can:"request.submit" or user|can:"help.view" %}<a href="{% url 'ask_board' %}" class="ask-board-link">Ask the board</a>{% endif %}
           <form method="post" action="{% url 'account_logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>
         </div>
       </div>
@@ -48,6 +49,7 @@
         <button type="button" class="menu-button" data-nav-toggle aria-controls="sidebar" aria-expanded="false">{% icon "menu" %}<span>Menu</span></button>
         <a class="brand" href="{% url 'home' %}"><span class="brand-mark"><svg aria-hidden="true"><use href="{% static 'img/icons.svg' %}#leaf"></use></svg></span><span>{{ SITE_NAME }}</span></a>
         <a class="topbar-search" href="{% url 'search' %}">{% icon "search" %}<span class="sr-only">Search</span></a>
+        {% feature_on "help" as help_on %}{% if help_on and user|can:"help.view" %}<a class="topbar-help" href="{% url 'help' %}">{% icon "help" %}<span class="sr-only">Help</span></a>{% endif %}
       </header>
       <main id="main" class="content{% if nav.board_page and not own_matter %} board-page{% endif %} {% block content_class %}{% endblock %}">
         {% if nav.board_page and not own_matter %}{# D64: a work-section page; derived from the menu (core.navigation.build), never per template. static/js/app.js moves the badge beside the page's heading. D65: a page about the viewer's own matter (views pass own_matter) is the homeowner's context, so no badge. #}

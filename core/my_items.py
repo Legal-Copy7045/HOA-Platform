@@ -934,6 +934,11 @@ def items_for(user) -> list[Item]:
         out.extend(_balance_items(user, roles))
     out.extend(_contact_items(user, roles))
     out.extend(_signin_items(user))
+    # Getting started (D73): one entry for the steps nothing above asks for.
+    if g & policy.RESIDENTS:
+        from community import checklist
+
+        out.extend(checklist.my_items(user))
     if can(user, "account_recovery.cancel"):
         out.extend(_recovery_items(user))
     # An automatic payment that didn't go through (D46).

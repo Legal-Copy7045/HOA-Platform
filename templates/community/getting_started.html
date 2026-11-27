@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Getting started · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'help' %}">Help</a> / </nav>
+  <div class="page-head"><div><h1>Getting started</h1>
+    <p class="subtitle">A few things worth doing in your first weeks. Each step ticks itself once it's done.</p></div>
+    <div class="actions"><a class="btn secondary" href="{{ ask_url }}">{% icon "mail" %} Ask the board</a></div></div>
+  <section class="card">
+    <div class="card-head"><h2>Your steps</h2><span class="small muted">{{ checklist.done }} of {{ checklist.total }} done</span></div>
+    <progress class="checklist-progress" max="{{ checklist.total }}" value="{{ checklist.done }}" aria-label="Steps done">{{ checklist.percent }}%</progress>
+    {% include "community/_checklist.html" with compact=False %}
+    {% if on_dashboard %}<form method="post" action="{% url 'getting_started' %}" class="inline">{% csrf_token %}<button type="submit" name="action" value="hide_all" class="small link">Take this list off my dashboard</button></form>{% endif %}
+  </section>
+  {% if documents %}<section class="card" aria-labelledby="docs-h">
+    <h2 id="docs-h">Governing documents</h2>
+    <ul class="list">{% for d in documents %}<li><a class="title" href="{% url 'document_detail' d.pk %}">{% icon "file" %} {{ d.title }}</a></li>{% endfor %}</ul>
+  </section>{% endif %}
+{% endblock %}

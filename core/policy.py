@@ -243,6 +243,14 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "disbursement.approve": frozenset({BOARD}),
     "disbursement.issue": frozenset({BOARD, MANAGER}),
     "disbursement.void": frozenset({BOARD}),
+    # --- Owner help (D73, optional feature "owner_help") ---
+    # Help pages and the welcome page: everyone who sees the community pages
+    # (not former owners: their login shows their own history only). The
+    # board adds its own words to a help page. The getting-started checklist
+    # is for residents (owners, account contacts, tenants).
+    "help.view": COMMUNITY,
+    "help.edit": frozenset({BOARD}),
+    "help.checklist": RESIDENTS,
 }
 
 # Role groups that require MFA... every account requires it (decision D5);

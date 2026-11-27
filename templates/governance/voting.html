@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% load portal %}
+{% load help_tags portal %}
 {% block title %}{{ heading }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{{ heading }}</h1><p class="subtitle">{% if shown.votes %}Formal votes of the owners (binding){% endif %}{% if shown.votes and shown.elections %}, {% endif %}{% if shown.elections %}board elections{% endif %}{% if shown.surveys %}{% if shown.votes or shown.elections %} and {% endif %}surveys (to hear your views, nothing is decided by them){% endif %}.</p></div>
+  <div class="page-head"><div><h1>{{ heading }}</h1><p class="subtitle">{% if shown.votes %}Formal votes of the owners (binding){% endif %}{% if shown.votes and shown.elections %}, {% endif %}{% if shown.elections %}board elections{% endif %}{% if shown.surveys %}{% if shown.votes or shown.elections %} and {% endif %}surveys (to hear your views, nothing is decided by them){% endif %}. {% how_it_works "voting-and-meetings" %}</p></div>
     {% if new.vote or new.election or new.survey %}<div class="actions">
       {% if new.vote and open_panel != "vote" %}<a class="btn secondary" href="?new=vote#new-vote" data-opens="new-vote">{% icon "plus" %} New vote</a>{% endif %}
       {% if new.election and open_panel != "election" %}<a class="btn secondary" href="?new=election#new-election" data-opens="new-election">{% icon "plus" %} New election</a>{% endif %}

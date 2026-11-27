@@ -231,6 +231,8 @@ SUBPAGES = {
     # The board reads server task history on Sysadmin activity (WT-007);
     # sysadmins, who cannot open that page, keep Server tasks in the menu.
     "sysadmin_activity": ["server_tasks"],
+    # Help pages (D73): the topics, Getting started and Welcome mark Help.
+    "help": ["welcome"],
 }
 
 # Entries shown only while an optional feature is off: Meetings is part of
@@ -249,6 +251,8 @@ SECTIONS = [
         [
             ("Dashboard", "home", "home", None),
             ("My items", "my_items", "inbox", MY_ITEMS_PERMISSIONS),
+            # Owner help (D73): how it works, getting started, Ask the board.
+            ("Help", "help", "help", "help.view"),
         ],
     ),
     (
