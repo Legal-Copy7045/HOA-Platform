@@ -121,7 +121,7 @@ def _closed_vote(
     with system_access("t"):
         lots = w["lots"] + [Lot.objects.get(street_address="4 Bravo Way")]
     voters = w["owners"] + [w["board_owner"]]
-    fields = {"quorum_percent": 50, "pass_percent": 50, "eligible_lots": 4, "kind": "formal"}
+    fields = {"quorum_percent": 50, "pass_percent": 50, "eligible_lots": 4, "kind": "formal"}  # nosec B105 - a vote's pass percent
     fields.update(kw)
     vote = Vote.objects.create(title=title, status="closed", created_by=w["board"], **fields)
     options = [
