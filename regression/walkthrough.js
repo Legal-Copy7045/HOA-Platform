@@ -33,7 +33,8 @@ const WIDTHS = {
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 },
 };
 // Downloads (with or without a query string) are not pages; same list as pages.js.
-const SKIP = [/logout/, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
+// /help/ask/ is the "Ask the board" shortcut: it forwards to a new owner request by design (D73).
+const SKIP = [/logout/, /\/help\/ask\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=csv/, /download/, /\/files?\//, /\/letters?\//, /statement/,
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 // Downloads checked as downloads (expect a file, not a page): the meeting
 // packet .zip (WT-003, WT-042).
