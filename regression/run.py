@@ -296,6 +296,16 @@ def stage_ci(st: Stage) -> None:
             f"regression/out/logs/{log}",
         )
 
+    # A minor or major release keeps RUNS.md and WALKTHROUGHS.md at most one
+    # release line behind (regression/release_logs.py, D91).
+    code, text = run([PY, str(HERE / "release_logs.py")], log="ci-release-logs.log")
+    st.add(
+        "regression logs current for the release",
+        "pass" if code == 0 else "fail",
+        "" if code == 0 else tail(text),
+        "regression/out/logs/ci-release-logs.log",
+    )
+
     # Repository hygiene.
     tracked = subprocess.run(  # nosec B603 B607
         ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=False

@@ -26,6 +26,8 @@ done
 
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 APP_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+# shellcheck source=infra/poc/lib.sh
+source "$APP_DIR/infra/poc/lib.sh"
 cd "$APP_DIR"
 [ -f .env ] || { echo "No .env yet: run infra/poc/make-env.sh first." >&2; exit 1; }
 if [ "$(stat -c %a .env)" != "600" ]; then
@@ -44,6 +46,9 @@ add_setting() {
     printf '%s=%s\n' "$key" "$value" >> .env
   fi
 }
+# Plain `docker compose ...` here uses both compose files (D91), so a hand-run
+# recreate keeps web on the tunnel's edge network.
+ensure_compose_file .env
 if grep -q '^DEPLOYMENT_STAGE=poc' .env; then
   add_setting BOARD_SEAT_SECOND_APPROVAL false
 fi
@@ -85,6 +90,9 @@ fi
 echo "==> Starting (migrations run first, as the owner role; unchanged services keep running)"
 "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 300 \
   || { echo "Some services are not healthy yet; status below." >&2; }
+# cloudflared stays on the edge network only (security review E3/E9): undo a
+# hand-made `docker network connect <project>_default` (D91). Idempotent.
+cloudflared_edge_only
 
 # cloudflared is pinned in docker-compose.tunnel.yml and updated by a
 # Dependabot pull request plus the normal portal update (D57). Remove the old

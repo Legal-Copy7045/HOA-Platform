@@ -37,6 +37,8 @@ host_task_command() {
       TASK_MINUTES=5; TASK_CMD=("${COMPOSE[@]}" exec -T web python manage.py health_check --alert) ;;
     reseed_demo)
       TASK_MINUTES=25; TASK_NEEDS_DATASET=1; TASK_CMD=(bash "$APP_DIR/infra/poc/reseed-demo.sh") ;;
+    restart_app)
+      TASK_MINUTES=5; TASK_CMD=(bash "$APP_DIR/infra/poc/restart-portal.sh") ;;
     *)
       return 1 ;;
   esac

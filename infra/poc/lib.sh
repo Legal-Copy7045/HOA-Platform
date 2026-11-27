@@ -1,6 +1,7 @@
 # Small helpers shared by the POC scripts. Sourced, never run; bash builtins
 # only, so no value passed to them ever appears on a command line (ps, /proc).
-# core/tests/test_infra_scripts.py runs each one.
+# The cloudflared network helpers at the end (D91) call docker, with container
+# and network names only. core/tests/test_infra_scripts.py runs each one.
 
 # The address of the drill's own, empty file store (the scratch SeaweedFS).
 DRILL_STORE_ENDPOINT="http://seaweedfs:8333"
@@ -151,5 +152,96 @@ reseed_allowed() {
     echo "Refusing: a demo reseed needs DEPLOYMENT_STAGE=poc and SEED_DEMO_ALLOWED=true in .env." >&2
     return 1
   fi
+  return 0
+}
+
+# --- Compose files always together (D91) -------------------------------------
+# On the VM the portal is the base file plus the tunnel overlay. Plain
+# `docker compose ...` in the checkout reads COMPOSE_FILE from .env, so it
+# uses both files too; without it, `docker compose up -d --force-recreate web`
+# recreated web without the edge network and cloudflared lost the site.
+PORTAL_COMPOSE_FILE="docker-compose.yml:docker-compose.tunnel.yml"
+
+# ensure_compose_file <env file>: add COMPOSE_FILE=<both files> when the file
+# has no COMPOSE_FILE line (appended; no other line is touched). A line with
+# another value is replaced with set_env, which rewrites only that key.
+ensure_compose_file() {
+  local file="$1" line current="" found=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" == COMPOSE_FILE=* ]]; then found=1; current="${line#COMPOSE_FILE=}"; fi
+  done <"$file"
+  if [ "$found" -eq 0 ]; then
+    echo "Adding COMPOSE_FILE=$PORTAL_COMPOSE_FILE to .env (plain docker compose uses both files)"
+    # Keep the last line intact when the file does not end with a newline.
+    if [ -s "$file" ] && [ -n "$(tail -c 1 "$file")" ]; then printf '\n' >>"$file"; fi
+    printf 'COMPOSE_FILE=%s\n' "$PORTAL_COMPOSE_FILE" >>"$file"
+  elif [ "$current" != "$PORTAL_COMPOSE_FILE" ]; then
+    echo "Setting COMPOSE_FILE=$PORTAL_COMPOSE_FILE in .env (was ${current:-empty})"
+    set_env "$file" COMPOSE_FILE "$PORTAL_COMPOSE_FILE"
+  fi
+  return 0
+}
+
+# network_names  (stdin: names, one per line): prints only plain names
+# (letters, digits, _ . -), so nothing else reaches a command line or SQL.
+network_names() {
+  local name
+  while IFS= read -r name || [ -n "$name" ]; do
+    if [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$ ]]; then printf '%s\n' "$name"; fi
+  done
+  return 0
+}
+
+# cloudflared_networks: the running cloudflared container's id on the first
+# line, its project's edge network on the second, then every network it is
+# attached to. Prints nothing when cloudflared is not running. Needs COMPOSE.
+cloudflared_networks() {
+  local id project
+  id="$("${COMPOSE[@]}" ps -q cloudflared 2>/dev/null | head -1 | tr -cd '0-9a-f')" || true
+  [ -n "$id" ] || return 0
+  project="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$id" \
+    2>/dev/null | head -1 | network_names)" || true
+  printf '%s\n%s\n' "$id" "${project:-oak-creek-portal}_edge"
+  docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' \
+    "$id" 2>/dev/null | network_names || true
+}
+
+# cloudflared_extra_networks: the networks cloudflared is on besides edge,
+# one per line. Security review E3/E9: cloudflared belongs on edge only and
+# must never reach Postgres or the file store. Needs COMPOSE.
+cloudflared_extra_networks() {
+  cloudflared_networks | extra_networks
+}
+
+# extra_networks  (stdin: cloudflared_networks' output): the attached
+# networks other than the edge network (line 2), one per line.
+extra_networks() {
+  local lines edge
+  lines="$(cat)"
+  [ -n "$lines" ] || return 0
+  edge="$(sed -n 2p <<<"$lines")"
+  sed -n '3,$p' <<<"$lines" | grep -Fxv -- "$edge" || true
+}
+
+# cloudflared_edge_only: disconnect cloudflared from every network but edge
+# (for example after `docker network connect <project>_default` by hand).
+# Idempotent: does nothing when it is on edge only or not running. Needs COMPOSE.
+cloudflared_edge_only() {
+  local lines id edge net
+  lines="$(cloudflared_networks)"
+  [ -n "$lines" ] || return 0
+  id="$(sed -n 1p <<<"$lines")"
+  edge="$(sed -n 2p <<<"$lines")"
+  if ! sed -n '3,$p' <<<"$lines" | grep -Fxq -- "$edge"; then
+    echo "WARNING: cloudflared is not on the $edge network; recreating it from both compose files."
+    "${COMPOSE[@]}" up -d --no-deps --force-recreate cloudflared || true
+    return 0
+  fi
+  while IFS= read -r net; do
+    if [ -z "$net" ] || [ "$net" = "$edge" ]; then continue; fi
+    echo "Disconnecting cloudflared from the $net network: it belongs on $edge only (security review E3)."
+    docker network disconnect "$net" "$id" \
+      || echo "WARNING: could not disconnect cloudflared from $net (sudo docker network disconnect $net $id)." >&2
+  done < <(sed -n '3,$p' <<<"$lines")
   return 0
 }

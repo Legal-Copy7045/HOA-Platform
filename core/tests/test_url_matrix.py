@@ -260,6 +260,8 @@ PROTECTED = {
     "sysadmin_activity": ("GET", None),
     "system_status": ("GET", None),
     "server_tasks": ("GET", None),
+    # D91: Restart the portal (sysadmins; then a fresh sign-in check).
+    "system_restart": ("POST", None),
     # D74: the incident timeline (sysadmins); bounced email actions (board,
     # and board or manager for the paper copy).
     "ops_timeline": ("GET", None),
@@ -1223,7 +1225,15 @@ def test_owner_sees_own_lot_detail(client, world):
         (
             "auditor",
             ["lot_list", "sysadmin_activity"],
-            ["board_home", "people", "system_status", "server_tasks", "invitations", "approvals"],
+            [
+                "board_home",
+                "people",
+                "system_status",
+                "server_tasks",
+                "system_restart",
+                "invitations",
+                "approvals",
+            ],
         ),
         (
             "sysadmin",
@@ -1233,7 +1243,15 @@ def test_owner_sees_own_lot_detail(client, world):
         (
             "arc",
             [],
-            ["lot_list", "board_home", "people", "system_status", "server_tasks", "my_lot"],
+            [
+                "lot_list",
+                "board_home",
+                "people",
+                "system_status",
+                "server_tasks",
+                "system_restart",
+                "my_lot",
+            ],
         ),
     ],
 )
