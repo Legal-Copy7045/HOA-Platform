@@ -299,6 +299,8 @@ MEMBER_READS = {
                 "reserves.view_summary",
                 "payments.pay",
                 "help.checklist",  # Getting started (D73): residents
+                # Capital projects the board shares with owners (D83).
+                "capital_project.view_summary",
             },
         ),
         (
@@ -328,6 +330,10 @@ MEMBER_READS = {
                 "statements.view",
                 "books.package",
                 "tax.view",
+                # Finance options (D83, D85): read-only.
+                "capital_project.view",
+                "capital_project.view_summary",
+                "insurance.view",
             },
         ),
         ("arc", MEMBER_READS | {"arc.view_all", "arc.intake", "arc.decide"}),

@@ -123,6 +123,21 @@ HUBS = {
             "resale.manage",
             "Certificates for a home being sold, with the fee and the documents.",
         ),
+        # Finance options (D80, D81): optional features, off by default.
+        (
+            "Interest on overdue balances",
+            "interest",
+            "dollar",
+            "finance.view",
+            "Simple interest on past-due {terms}, posted monthly at the Declaration's rate.",
+        ),
+        (
+            "Cash-flow forecast",
+            "cashflow",
+            "chart",
+            "finance.view",
+            "The next 12 months of operating and reserve cash, with what-ifs.",
+        ),
     ],
     "settings_hub": [
         # The setup wizard (D51): board members who may change rules.
@@ -311,6 +326,8 @@ SECTIONS = [
             ("Documents", "documents", "folder", "document.view_owner"),
             ("Resolutions and policies", "resolutions", "file", "resolution.view"),
             ("Budget and reserves", "owner_budget", "chart", "budget.view_owner"),
+            # Capital projects the board shares with owners (D83).
+            ("Community projects", "community_projects", "wrench", "capital_project.view_summary"),
             ("Community info", "community_info", "info", HUB),
             ("Common area bookings", "reservations", "calendar", "reservation.view"),
         ],
@@ -338,6 +355,9 @@ SECTIONS = [
             ("Contracts", "contracts", "file", "finance.view"),
             # Insurance, vendor certificates and contract deadlines (D72).
             ("Renewals", "renewals", "shield", "renewals.view"),
+            # Finance options (D83, D85): optional features, off by default.
+            ("Capital projects", "capital_projects", "wrench", "capital_project.view"),
+            ("Insurance claims", "insurance_claims", "shield", "insurance.view"),
         ],
     ),
     (

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Insurance claim · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'insurance_claims' %}">Insurance claims</a> / {% if obj.claim_number %}{{ obj.claim_number }}{% else %}Claim #{{ obj.pk }}{% endif %}</div>
+  <div class="page-head"><div><h1>Insurance claim {% if obj.claim_number %}{{ obj.claim_number }}{% else %}#{{ obj.pk }}{% endif %}</h1>
+    <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ policy_label }}</span><span>Loss {{ obj.incident_on|date:"M j, Y" }}{% if obj.discovered_on %}, found {{ obj.discovered_on|date:"M j, Y" }}{% endif %}</span></div>
+    <p class="subtitle">{{ obj.description }}</p></div></div>
+  {% for name, d in deadlines %}<div class="alert warning">{% icon "clock" %}<span>{{ name }}: <strong>{{ d|date:"F j, Y" }}</strong></span></div>{% endfor %}
+  <div class="grid grid-4">
+    <div class="stat"><div class="label">Estimate</div><div class="value">{% if obj.estimate_cents is None %}-{% else %}{{ obj.estimate_cents|cents }}{% endif %}</div></div>
+    <div class="stat"><div class="label">Deductible</div><div class="value">{% if obj.deductible_cents is None %}-{% else %}{{ obj.deductible_cents|cents }}{% endif %}</div></div>
+    <div class="stat"><div class="label">Expected</div><div class="value">{{ totals.expected|cents }}</div></div>
+    <div class="stat"><div class="label">Received</div><div class="value">{{ totals.received|cents }}</div></div>
+  </div>
+  <div class="split"><div>
+    {% if steps %}<section class="card"><h2>Next steps</h2><form method="post" class="form-grid">{% csrf_token %}<div class="field"><label for="claim-note">Note (required to deny, close or reopen)</label><textarea id="claim-note" name="note" rows="2"></textarea></div><div class="wf-actions">{% for action, label, need in steps %}<button type="submit" name="do" value="{{ action }}" class="{% if action == 'deny' or action == 'close' %}danger{% else %}secondary{% endif %}"{% if action == 'close' %} data-confirm="Close this claim? Nothing more is recorded until a board member reopens it."{% endif %}>{% if action == 'close' or action == 'reopen' %}{% for_board label %}{% else %}{{ label }}{% endif %}</button>{% endfor %}</div></form></section>{% endif %}
+    <section class="card" id="settlement" aria-labelledby="settle-h"><h2 id="settle-h">Settlement</h2>
+      {% if offers %}<ul class="list">{% for o, st, approvers in offers %}<li><span class="grow"><strong>{{ o.amount_cents|cents }}</strong> offered · recorded by {{ o.recorded_by }} {{ o.created_at|date:"M j, Y" }} · needs {{ o.required_approvals }} board approval{{ o.required_approvals|pluralize }} · {{ approvers|length }} given · {{ st|capfirst }}{% if o.note %}<br><span class="small">{{ o.note }}</span>{% endif %}</span>
+        {% if can_decide and offer_open and o == latest_offer and st == "pending" and me not in approvers %}<form method="post" class="inline" data-confirm="Accept the insurer's settlement of {{ o.amount_cents|cents }} for the association?">{% csrf_token %}<input type="hidden" name="do" value="approve_offer"><input type="hidden" name="offer" value="{{ o.pk }}"><button type="submit" class="small">{% for_board "Accept settlement" %}</button></form>{% endif %}</li>{% endfor %}</ul>{% else %}<p class="muted">No offer recorded.</p>{% endif %}
+      {% if can_record and offer_open %}<details class="panel"><summary>Record the insurer's offer</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="offer"><div class="field"><label for="offer-amount">Offer ($)</label><input id="offer-amount" name="amount" required inputmode="decimal"></div><div class="field"><label for="offer-note">Note</label><textarea id="offer-note" name="note" rows="2"></textarea></div><div class="form-actions"><button type="submit">Record offer</button></div></form><p class="small muted">A board member accepts it; two at or above the amount set in Community setup.</p></div></details>{% endif %}
+    </section>
+    <section class="card"><h2>Money</h2>
+      {% if money %}<ul class="list">{% for m in money %}<li><span class="muted nowrap">{{ m.on|short_date }}</span><span class="grow">{{ m.get_kind_display }}{% if m.reference %} · {{ m.reference }}{% endif %}</span><span class="num">{{ m.amount_cents|cents }}</span></li>{% endfor %}</ul>{% else %}<p class="muted">Nothing recorded.</p>{% endif %}
+      {% if can_record %}<details class="panel"><summary>Record money expected or received</summary><div class="panel-body"><form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="money">
+        <div class="field"><label for="m-kind">Kind</label><select id="m-kind" name="kind">{% for k, l in money_kinds %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="m-amount">Amount ($, negative corrects an earlier line)</label><input id="m-amount" name="amount" required inputmode="decimal"></div>
+        <div class="field"><label for="m-on">Date</label><input id="m-on" name="on" type="date" required></div>
+        <div class="field"><label for="m-ref">Check or reference</label><input id="m-ref" name="reference" maxlength="80"></div>
+        <div class="form-actions"><button type="submit">Record</button></div></form></div></details>{% endif %}
+    </section>
+  </div><aside>
+    <section class="card"><h3>Claim details</h3><dl class="dl">
+      <dt>Location</dt><dd>{% if obj.common_area %}{{ obj.common_area }}{% endif %}{% if obj.location %} {{ obj.location }}{% endif %}{% if not obj.common_area and not obj.location %}-{% endif %}</dd>
+      <dt>Adjuster</dt><dd>{{ obj.adjuster_name|default:"-" }}{% if obj.adjuster_contact %}<br>{{ obj.adjuster_contact }}{% endif %}</dd>
+      <dt>Work orders</dt><dd>{% for w in work_orders %}<a href="{% url 'work_order_detail' w.pk %}">{{ w.title }}</a>{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</dd></dl></section>
+    <section class="card"><h3>Photos and documents</h3>
+      {% if files %}<ul class="list">{% for f in files %}<li><a class="grow" href="{% url 'insurance_claim_file' obj.pk f.pk %}">{% icon "download" %} {{ f.original_filename }}</a></li>{% endfor %}</ul>{% else %}<p class="muted small">None yet.</p>{% endif %}
+      {% if can_record %}<form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="do" value="upload"><label for="claim-file" class="small">Add files (PDF or photos)</label><input id="claim-file" type="file" name="file" multiple accept=".pdf,.png,.jpg,.jpeg"><button type="submit" class="secondary small">Upload</button></form>{% endif %}</section>
+    {% if can_record %}<section class="card"><details><summary>Change the claim's details</summary><form method="post" class="form-grid">{% csrf_token %}<input type="hidden" name="do" value="update">{{ edit_form }}<div class="form-actions"><button type="submit" class="secondary">Save</button></div></form></details></section>{% endif %}
+    <section class="card"><h3>History</h3><ul class="list">{% for e in events %}<li><span class="grow small">{{ e.action|humanize_action }}{% if e.note %}: {{ e.note }}{% endif %}<br><span class="muted">{{ e.by }} · {{ e.at|date:"M j, Y" }}</span></span></li>{% endfor %}</ul></section>
+  </aside></div>
+{% endblock %}

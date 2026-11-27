@@ -584,6 +584,118 @@ REGISTRY: dict[str, RuleSpec] = {
     ]
 }
 
+# --- Finance options (D80-D85): each belongs to an optional feature and is
+# shown on the setup wizard's "Interest, forecast, legal, projects and
+# claims" step (community/setup.py). Interest is simple interest only: the
+# portal never compounds it.
+INTEREST_GROUP = "Interest on overdue balances"
+LEGAL_GROUP = "Collections legal"
+FORECAST_GROUP = "Cash-flow forecast"
+PROJECTS_GROUP = "Capital projects"
+CLAIMS_GROUP = "Insurance claims"
+REGISTRY.update(
+    {
+        spec.key: spec
+        for spec in [
+            RuleSpec(
+                "interest.annual_rate_bp",
+                "Yearly interest rate on overdue {terms}",
+                BASIS_POINTS,
+                None,
+                INTEREST_GROUP,
+                "Only if the Declaration allows interest. Simple interest, posted monthly at "
+                "one twelfth of this rate on what is past due; never compounded. Blank: no "
+                "interest is charged even with the feature on.",
+                maximum=2400,
+            ),
+            RuleSpec(
+                "interest.max_annual_rate_bp",
+                "Highest yearly interest rate the Declaration allows",
+                BASIS_POINTS,
+                None,
+                INTEREST_GROUP,
+                "Interest is never posted at a rate above this. Blank: only the rate above.",
+                maximum=2400,
+            ),
+            RuleSpec(
+                "interest.grace_days",
+                "Days past due before a {term} earns interest",
+                DAYS,
+                "30",
+                INTEREST_GROUP,
+            ),
+            RuleSpec(
+                "interest.min_balance_cents",
+                "Smallest past-due amount that earns interest",
+                CENTS,
+                "0",
+                INTEREST_GROUP,
+            ),
+            RuleSpec(
+                "interest.include_fees",
+                "Charge interest on late fees and earlier interest too",
+                BOOL,
+                "false",
+                INTEREST_GROUP,
+                "Off (the default): interest only on the past-due {term} itself.",
+            ),
+            RuleSpec(
+                "interest.posting_day",
+                "Day of the month interest is posted",
+                DAYS,
+                "15",
+                INTEREST_GROUP,
+                maximum=28,
+                minimum=1,
+            ),
+            RuleSpec(
+                "interest.suspend_on_payment_plan",
+                "No interest while an owner keeps to a payment plan",
+                BOOL,
+                "true",
+                INTEREST_GROUP,
+            ),
+            RuleSpec(
+                "legal.costs_chargeable",
+                "Collection costs and attorney fees can be charged to the owner",
+                BOOL,
+                None,
+                LEGAL_GROUP,
+                "Only where the Declaration says so. Each cost is still charged by a board "
+                "member, one at a time.",
+            ),
+            RuleSpec(
+                "cashflow.collection_rate_percent",
+                "Share of the {terms} expected to be collected each month (forecast)",
+                PERCENT,
+                None,
+                FORECAST_GROUP,
+                "Blank: worked out from the last 12 months' payments.",
+            ),
+            RuleSpec(
+                "cashflow.min_operating_cents",
+                "Lowest operating cash the forecast should show before it warns",
+                CENTS,
+                "0",
+                FORECAST_GROUP,
+            ),
+            RuleSpec(
+                "capital.second_approval_cents",
+                "Capital project or change order amount needing two board approvals",
+                CENTS,
+                "500000",
+                PROJECTS_GROUP,
+            ),
+            RuleSpec(
+                "insurance.second_approval_cents",
+                "Insurance settlement needing two board approvals to accept",
+                CENTS,
+                "500000",
+                CLAIMS_GROUP,
+            ),
+        ]
+    }
+)
 
 # Keys no longer in use. A value the board recorded for one stays in the
 # database (rules are never deleted, their history is kept) but nothing reads

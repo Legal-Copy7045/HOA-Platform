@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Community projects · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>Community projects</h1><p class="subtitle">Major work on the common areas that the board shares with owners: where each stands, its budget and what has been spent so far.</p></div></div>
+  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+    <thead><tr><th>Project</th><th>Status</th><th class="num">Budget</th><th class="num">Spent so far</th></tr></thead>
+    <tbody>{% for p in projects %}<tr><td class="cell-title">{{ p.title }}</td><td data-label="Status">{% status p.state p.status %}</td><td class="num" data-label="Budget">{{ p.budget|cents }}</td><td class="num" data-label="Spent so far">{{ p.spent|cents }}</td></tr>
+    {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="wrench" title="No projects shared yet" %}</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  {% if user|can:"request.submit" %}<p class="link-row"><a href="{% url 'requests' %}?mine=1">Ask the board about a project</a></p>{% endif %}
+{% endblock %}

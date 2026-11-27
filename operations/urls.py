@@ -48,3 +48,31 @@ urlpatterns = [
     ),
     path("finance/invoices/<int:pk>/files/<int:file_id>/", fv.invoice_file, name="invoice_file"),
 ]
+
+# Finance options (D83 capital projects, D85 insurance claims), each an
+# optional feature (core.features).
+from operations import finance_option_views as fov  # noqa: E402
+
+urlpatterns += [
+    path("maintenance/projects/", fov.capital_projects, name="capital_projects"),
+    path(
+        "maintenance/projects/<int:pk>/", fov.capital_project_detail, name="capital_project_detail"
+    ),
+    path(
+        "maintenance/projects/<int:pk>/files/<int:file_id>/",
+        fov.capital_project_file,
+        name="capital_project_file",
+    ),
+    path("projects/", fov.community_projects, name="community_projects"),
+    path("maintenance/insurance-claims/", fov.insurance_claims, name="insurance_claims"),
+    path(
+        "maintenance/insurance-claims/<int:pk>/",
+        fov.insurance_claim_detail,
+        name="insurance_claim_detail",
+    ),
+    path(
+        "maintenance/insurance-claims/<int:pk>/files/<int:file_id>/",
+        fov.insurance_claim_file,
+        name="insurance_claim_file",
+    ),
+]

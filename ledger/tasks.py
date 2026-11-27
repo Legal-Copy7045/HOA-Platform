@@ -88,3 +88,12 @@ def books_auto_close(timestamp: int) -> int:
     from ledger.books.close import run
 
     return len(run()["closed"])
+
+
+@app.periodic(cron="47 7 * * *")  # daily; only with "overdue_interest" on (D80)
+@app.task(queue="maintenance", queueing_lock="overdue_interest")
+def overdue_interest(timestamp: int) -> int:
+    """On or after the posting day, post the month's interest (once per account)."""
+    from ledger.interest import run_monthly
+
+    return run_monthly()

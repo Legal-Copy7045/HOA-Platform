@@ -367,4 +367,11 @@
 - key: tax worksheet with the preparer
   check: "The tax preparer reviews the Form 1120-H worksheet and the IRIS upload file against the current IRS forms and IRIS template (columns, rate, threshold) and confirms the PA annual report deadline."
   steps: "Finance > More finance > Tax worksheet; download the PDF, CSV and IRIS file."
+- key: finance options read right on a phone
+  check: "With the six finance options on (demo data), the Cash-flow forecast table, a capital project, an insurance claim, the legal panel of a referred collection case and the owners' Budget and reserves summary read without sideways scrolling on a phone, and the statement PDF shows the interest line in full."
+  steps: "Settings, Features: switch on the finance options (the demo has them on); open each page on a phone as a board member and the owners' page as an owner; download a delinquent home's statement."
+  last: "not done yet"
+- key: interest and legal costs reviewed by counsel
+  check: "Counsel confirmed the Declaration allows interest (rate, grace, no compounding) and charging collection costs before the features are switched on with real data (D80, D82)."
+  steps: "Show counsel the Interest on overdue balances page, a statement line, and the setup step's law notes; record the citations they give."
   last: "not done yet"

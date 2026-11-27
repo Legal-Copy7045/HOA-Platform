@@ -971,6 +971,19 @@ def owner_budget(request):
     from core import features
 
     policy.require(request.user, "budget.view_owner")
+    if features.enabled("owner_finance_dashboard", request):
+        # Owners' finance summary (D84): just operating vs reserve and the
+        # budget against actual (ledger/owner_finance.py).
+        from ledger import owner_finance
+
+        return render(
+            request,
+            "ledger/owner_finance.html",
+            {
+                **owner_finance.context(request),
+                "kinds": [("income", "Money in"), ("expense", "Money out")],
+            },
+        )
     show_budget = features.enabled("owner_budget", request)
     show_reserves = features.enabled("reserves", request) and policy.can(
         request.user, "reserves.view_summary"

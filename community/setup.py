@@ -98,6 +98,30 @@ STEPS: list[Step] = [
         groups=("Disbursements",),
         features=("disbursements",),
     ),
+    # Finance options (D80-D85): each is an optional feature with its rules.
+    Step(
+        "finance_options",
+        "Interest, forecast, legal, projects and claims",
+        "Interest on overdue balances (only if your Declaration allows it), the cash-flow "
+        "forecast's assumptions, whether collection costs and attorney fees can be charged "
+        "to owners, and the amounts at which a capital project, change order or insurance "
+        "settlement needs two board approvals. Also the owners' simple finance view.",
+        groups=(
+            "Interest on overdue balances",
+            "Collections legal",
+            "Cash-flow forecast",
+            "Capital projects",
+            "Insurance claims",
+        ),
+        features=(
+            "overdue_interest",
+            "cashflow_forecast",
+            "collections_legal",
+            "capital_projects",
+            "owner_finance_dashboard",
+            "insurance_claims",
+        ),
+    ),
     Step(
         "books",
         "Books and close",

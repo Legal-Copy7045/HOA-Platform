@@ -626,6 +626,115 @@ GUIDES["help.welcome_days"] = Guide(
     "90 days: Board decision adopting the owner portal's help pages (D73).",
 )
 
+# --- Finance options (D80-D85) --------------------------------------------------------
+
+GROUP_NOTES["Interest on overdue balances"] = (
+    f"Unpaid assessments, late charges, fines and interest are a lien on the lot ({ACT} § 5315), "
+    f"and the association may impose charges for late payment ({ACT} § 5302(a)(11)). The Act sets "
+    "no interest rate: interest may be charged only if the Declaration (or Bylaws) provides for "
+    "it, at the rate it states. Pennsylvania's usury law (Loan Interest and Protection Law, 41 "
+    "P.S. § 101 et seq., 6% legal rate) is written for loans; whether it reaches assessment "
+    "interest is a question for counsel, so many associations stay at or below the "
+    "Declaration's rate and never compound. Confirm with counsel before switching it on."
+)
+GROUP_NOTES["Collections legal"] = (
+    f"The association's lien for assessments arises automatically when an assessment is due "
+    f"({ACT} § 5315(a)); recording the Declaration is notice of it, and no further filing is "
+    f"required to perfect it. It is enforced like a mortgage foreclosure or by an action for the "
+    f"debt, and costs and reasonable attorney fees are recoverable when the Declaration provides "
+    f"for them (§ 5315). The lien is extinguished unless proceedings are begun within three years "
+    f"after the assessments become due (§ 5315(d)). Counsel collecting the debt is subject to the "
+    f"federal Fair Debt Collection Practices Act and the Pennsylvania Fair Credit Extension "
+    f"Uniformity Act. The association's attorney should confirm every step."
+)
+GROUP_NOTES["Cash-flow forecast"] = (
+    "No law governs the forecast; it is a planning tool for the board. The Act requires the "
+    f"board to adopt budgets and reserves as the Declaration and Bylaws say ({ACT} § 5302(a))."
+)
+GROUP_NOTES["Capital projects"] = (
+    f"The board acts for the association in contracting for and maintaining the common elements "
+    f"({ACT} § 5302(a), § 5303). Spending reserve funds on the components they were set aside for "
+    f"is a board decision recorded by resolution; the Declaration or Bylaws may require an owner "
+    f"vote above an amount, and a special assessment follows § 5302 and the Declaration."
+)
+GROUP_NOTES["Insurance claims"] = (
+    f"The association must carry the insurance § 5312 of the Act and the Declaration require, and "
+    f"insurance proceeds for damage to the common elements are used to repair it unless the "
+    f"Declaration provides otherwise ({ACT} § 5312). The policy sets the claim deadlines (notice, "
+    f"proof of loss, suit limitation); the board should read them with the agent or counsel."
+)
+
+GUIDES["interest.annual_rate_bp"] = Guide(
+    DECLARATION,
+    "The Act sets no rate; interest forms part of the lien (§ 5315) only where the Declaration "
+    "provides for it. Pennsylvania's usury law (41 P.S. § 101 et seq.) is aimed at loans; ask "
+    "counsel whether it limits assessment interest before choosing a rate above 6%.",
+    "10% a year: Declaration §6.6 (interest on unpaid assessments).",
+)
+GUIDES["interest.max_annual_rate_bp"] = Guide(
+    DECLARATION,
+    "Not set by the Act. A ceiling from the Declaration, or one the board chooses on counsel's "
+    "advice, stops a typing mistake from charging more than allowed.",
+    "15% a year: Declaration §6.6 (the highest rate permitted by law, as confirmed by counsel).",
+)
+GUIDES["interest.grace_days"] = Guide(
+    DECLARATION,
+    "Not set by the Act.",
+    "30 days after the due date: Declaration §6.6, collection policy resolution 2027-02.",
+)
+GUIDES["interest.min_balance_cents"] = Guide(
+    BOARD,
+    "Not set by the Act; a collection policy choice to avoid charging cents of interest.",
+    "$50.00: collection policy, Board resolution 2027-02.",
+)
+GUIDES["interest.include_fees"] = Guide(
+    DECLARATION,
+    "The Act lists interest and late charges separately as part of the lien (§ 5315); it does "
+    "not say interest may be charged on fees or on earlier interest. Charging interest on "
+    "interest compounds it: leave this off unless the Declaration clearly allows it.",
+    "Off: Declaration §6.6 (interest on the unpaid assessment only).",
+)
+GUIDES["interest.posting_day"] = Guide(
+    BOARD,
+    "Not set by the Act; a bookkeeping choice.",
+    "The 15th: collection policy, Board resolution 2027-02.",
+)
+GUIDES["interest.suspend_on_payment_plan"] = Guide(
+    BOARD,
+    "Not set by the Act. Payment plans are a collection policy choice; the plan agreement "
+    "should say whether interest stops while the owner keeps to it.",
+    "On: payment plan policy, Board resolution 2027-04.",
+)
+GUIDES["legal.costs_chargeable"] = Guide(
+    DECLARATION,
+    f"Costs and reasonable attorney fees of collecting are part of the lien and recoverable when "
+    f"the Declaration provides for them ({ACT} § 5315). Without such a clause they generally stay "
+    f"with the association; counsel should confirm before any is charged.",
+    "Yes: Declaration §6.7 (costs of collection, including reasonable attorney fees).",
+)
+GUIDES["cashflow.collection_rate_percent"] = Guide(
+    BOARD,
+    "Not covered by the Act; a planning assumption.",
+    "95%: Treasurer's forecast assumption, budget workshop 2027.",
+)
+GUIDES["cashflow.min_operating_cents"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal financial control.",
+    "$10,000.00: operating cash floor, Board resolution 2027-06 (financial controls).",
+)
+GUIDES["capital.second_approval_cents"] = Guide(
+    BOARD,
+    "Not covered by the Act; an internal control like the invoice approval rule. The Bylaws or "
+    "Declaration may also require an owner vote above an amount.",
+    "Two approvals at $5,000 and over: Board resolution 2026-07 (spending controls).",
+)
+GUIDES["insurance.second_approval_cents"] = Guide(
+    BOARD,
+    f"Not covered by the Act; proceeds must still go to repair the common elements unless the "
+    f"Declaration says otherwise ({ACT} § 5312).",
+    "Two approvals at $5,000 and over: Board resolution 2026-07 (spending controls).",
+)
+
 
 def guide(key: str) -> Guide | None:
     return GUIDES.get(key)

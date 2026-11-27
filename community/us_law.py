@@ -263,6 +263,48 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "Record the Bylaws' own numbers with their citation where they differ.",
         ),
     ],
+    # Finance options (D80-D85).
+    "finance_options": [
+        LawNote(
+            "68 Pa.C.S. § 5315",
+            "Uniform Planned Community Act: the association's lien",
+            "Assessments, late charges, fines and interest are a lien on the home from the day "
+            "they are due; no filing is needed. Costs and reasonable attorney fees are part of "
+            "it when the Declaration says so. Proceedings must start within three years.",
+            "Charge interest and collection costs only as the Declaration allows, and record "
+            "what counsel filed (a statement of lien, a judgment) and when it was released.",
+        ),
+        LawNote(
+            "41 P.S. § 101 et seq.",
+            "Pennsylvania Loan Interest and Protection Law (usury)",
+            "Sets a 6% legal rate and limits interest on loans; whether it reaches interest on "
+            "unpaid assessments is not settled for every case.",
+            "Stay at or below the Declaration's rate, never compound, and ask counsel before "
+            "choosing a rate above 6%.",
+        ),
+        LawNote(
+            "15 U.S.C. § 1692 et seq.; 73 P.S. § 2270.1 et seq.",
+            "Fair Debt Collection Practices Act; Fair Credit Extension Uniformity Act",
+            "Govern how a collection attorney or agency contacts an owner and what it may say "
+            "and charge; the Pennsylvania act also covers creditors' own collection conduct.",
+            "Letters from counsel follow these acts; the portal only records that they were sent.",
+        ),
+        LawNote(
+            "50 U.S.C. § 3901 et seq.",
+            "Servicemembers Civil Relief Act",
+            "Protects servicemembers on active duty before a default judgment and caps interest "
+            "on their pre-service debts at 6% while they serve.",
+            "Check active duty before suing or charging interest above 6% to a servicemember.",
+        ),
+        LawNote(
+            "40 P.S. § 1171.5; 42 Pa.C.S. § 8371",
+            "Pennsylvania Unfair Insurance Practices Act; insurer bad faith",
+            "Insurers must handle claims promptly and fairly; a court may award more where an "
+            "insurer acts in bad faith on a claim.",
+            "Keep the claim's dates, letters and the adjuster's answers on the claim; they "
+            "matter if a claim is delayed or denied.",
+        ),
+    ],
     "privacy": [
         LawNote(
             "73 P.S. § 2301 et seq.",

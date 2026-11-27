@@ -727,6 +727,12 @@ def record_online_refund(
 def reverse_entry(entry: LedgerEntry, *, reason: str, actor, request=None) -> LedgerEntry:
     """Corrections are new, opposite entries (CLAUDE.md rule 5)."""
     _authorize(actor, "ledger.manage")
+    # Interest (D80) and charged collection costs (D82) are board decisions,
+    # and so is taking one back: never the manager.
+    if entry.kind == EntryKind.INTEREST:
+        _authorize(actor, "interest.reverse")
+    elif entry.kind == EntryKind.LEGAL_COST:
+        _authorize(actor, "legal.post_costs")
     _refuse_own(actor, entry, "reverse", request)
     if not reason.strip():
         raise LedgerError("Give the reason for the reversal.")

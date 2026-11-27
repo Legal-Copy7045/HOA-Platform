@@ -456,3 +456,20 @@ class ComplianceItem(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Compliance items are retired, not deleted.")
+
+
+# Finance options (D83 capital projects, D85 insurance claims): their models
+# live in their own module; imported here so Django registers them.
+from operations.models_options import (  # noqa: E402, F401
+    CapitalProject,
+    CapitalProjectApproval,
+    CapitalProjectEvent,
+    CapitalProjectLink,
+    ChangeOrder,
+    ChangeOrderDecision,
+    InsuranceClaim,
+    InsuranceClaimEvent,
+    InsuranceMoney,
+    SettlementApproval,
+    SettlementOffer,
+)

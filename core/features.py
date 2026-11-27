@@ -369,6 +369,62 @@ FEATURES: list[Feature] = [
         {"person_email_bounce_clear", "bounce_paper_done"},
         default=False,
     ),
+    # --- Finance options (D80-D85), all off by default ---
+    _f(
+        "overdue_interest",
+        "Interest on overdue balances",
+        "Simple interest on past-due assessments, posted once a month at the Declaration's "
+        "rate (only if the Declaration allows it; set the rate with its citation).",
+        {"interest"},
+        default=False,
+    ),
+    _f(
+        "cashflow_forecast",
+        "Cash-flow forecast",
+        "The next 12 months of operating and reserve cash, with what-if changes and a warning "
+        "when a month runs low.",
+        {"cashflow", "cashflow_export"},
+        default=False,
+    ),
+    _f(
+        "collections_legal",
+        "Liens and legal collection",
+        "On a collection case: attorney referral, demand letters, liens, lawsuits, costs, money "
+        "recovered and the lien release (board only).",
+        {"collection_legal", "collection_legal_file"},
+        default=False,
+    ),
+    _f(
+        "capital_projects",
+        "Capital projects",
+        "Big projects with their budget, approvals, change orders, contracts, invoices and "
+        "progress; owners see a short summary of the ones the board shares.",
+        {
+            "capital_projects",
+            "capital_project_detail",
+            "capital_project_file",
+            "community_projects",
+        },
+        default=False,
+    ),
+    # Budget and reserves (owner_budget, in ANY_OF): with this on, owners see
+    # only operating vs reserve and budget vs actual there (D84).
+    _f(
+        "owner_finance_dashboard",
+        "Owners' finance summary",
+        "Budget and reserves shows owners just two things: operating vs reserve money, and "
+        "the budget against what was actually spent this year.",
+        set(),
+        default=False,
+    ),
+    _f(
+        "insurance_claims",
+        "Insurance claims",
+        "Claims on the association's insurance: dates, adjuster, deadlines, settlement "
+        "approval and money received (board and manager).",
+        {"insurance_claims", "insurance_claim_detail", "insurance_claim_file"},
+        default=False,
+    ),
 ]
 BY_KEY = {f.key: f for f in FEATURES}
 # Shared endpoints that act on another feature's records, by their "kind"
@@ -387,7 +443,7 @@ BY_URL = {name: f.key for f in FEATURES for name in f.url_names}
 ANY_OF = {
     "voting": frozenset({"votes", "elections", "surveys"}),
     # Budget and reserves (streamlining): the budget and the reserve summary.
-    "owner_budget": frozenset({"owner_budget", "reserves"}),
+    "owner_budget": frozenset({"owner_budget", "reserves", "owner_finance_dashboard"}),
 }
 
 

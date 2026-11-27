@@ -136,6 +136,9 @@ MEMBER_PAGES = {
     "welcome",
     "getting_started",
     "ask_board",
+    # Capital projects shared with owners (D83): title, status, budget and
+    # spent only (ledger/tests/test_finance_options.py checks the rest).
+    "community_projects",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -442,6 +445,20 @@ PROTECTED = {
     "year_end_package": ("GET", None),
     "tax_worksheet": ("GET", None),
     "tax_download": ("GET", None),
+    # Finance options (D80-D85): board, manager and auditor pages only (each
+    # feature on or off; owners get 403/404 either way). Feature-on cross-owner
+    # tests: ledger/tests/test_finance_options.py.
+    "interest": ("POST", None),
+    "cashflow": ("GET", None),
+    "cashflow_export": ("GET", None),
+    "collection_legal": ("POST", "collection"),
+    "collection_legal_file": ("GET", "collection"),
+    "capital_projects": ("POST", None),
+    "capital_project_detail": ("GET", "lot"),
+    "capital_project_file": ("GET", "lot"),
+    "insurance_claims": ("POST", None),
+    "insurance_claim_detail": ("GET", "lot"),
+    "insurance_claim_file": ("GET", "lot"),
 }
 # Pages refused before their record is looked up: any id will do (D72).
 PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
@@ -478,7 +495,20 @@ def world():
         from core.models import FeatureSetting
 
         # Off by default; checked here.
-        for key in ("push", "sms", "bank_feeds", "usps_tracking", "bounce_tracking"):
+        for key in (
+            "push",
+            "sms",
+            "bank_feeds",
+            "usps_tracking",
+            "bounce_tracking",
+            # Finance options (D80-D85)
+            "overdue_interest",
+            "cashflow_forecast",
+            "collections_legal",
+            "capital_projects",
+            "owner_finance_dashboard",
+            "insurance_claims",
+        ):  # off by default; checked here
             FeatureSetting.objects.create(key=key, enabled=True)
         lot_a, lot_b = (
             LotFactory(street_address="1 Alpha Way"),
@@ -1015,6 +1045,8 @@ def _url(name, key, targets):
         kwargs["slug"] = "paying"
     elif name == "disbursement_action":
         kwargs["action"] = "approve"
+    elif name in ("collection_legal_file", "capital_project_file", "insurance_claim_file"):
+        kwargs["file_id"] = 1
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
     elif name.startswith("register_import_") or name in PK_ONE:

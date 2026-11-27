@@ -975,12 +975,40 @@ def items_for(user) -> list[Item]:
 
         out.extend(payer_items(user))
 
+    # Finance options (D81-D85): each module's own items, only with its
+    # feature on (the path check below hides them too).
+    out.extend(_finance_option_items(user))
+
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))
     from core import features
 
     states = features.states()  # one query, not one per item (optimization A9)
     return [i for i in out if features.path_enabled(i.url, states_=states)]
+
+
+def _finance_option_items(user) -> list[Item]:
+    from core import features
+
+    out: list[Item] = []
+    on = features.states()  # one query for all four
+    if on.get("cashflow_forecast"):
+        from ledger import cashflow
+
+        out.extend(cashflow.my_items(user))
+    if on.get("collections_legal"):
+        from ledger import legal
+
+        out.extend(legal.my_items(user))
+    if on.get("capital_projects"):
+        from operations import capital_projects
+
+        out.extend(capital_projects.my_items(user))
+    if on.get("insurance_claims"):
+        from operations import insurance_claims
+
+        out.extend(insurance_claims.my_items(user))
+    return out
 
 
 def _paper_mail_items() -> list[Item]:

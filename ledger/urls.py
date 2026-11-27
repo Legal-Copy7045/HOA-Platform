@@ -127,3 +127,18 @@ urlpatterns += [
 from ledger.books.urls import urlpatterns as _books  # noqa: E402
 
 urlpatterns += _books
+# Finance options (D80 interest, D81 cash-flow forecast, D82 legal collection),
+# each an optional feature (core.features).
+from ledger import finance_option_views as fov  # noqa: E402
+
+urlpatterns += [
+    path("finance/interest/", fov.interest_page, name="interest"),
+    path("finance/cash-flow/", fov.cashflow_page, name="cashflow"),
+    path("finance/cash-flow/export/", fov.cashflow_export, name="cashflow_export"),
+    path("finance/collections/<int:pk>/legal/", fov.collection_legal, name="collection_legal"),
+    path(
+        "finance/collections/<int:pk>/legal/files/<int:file_id>/",
+        fov.collection_legal_file,
+        name="collection_legal_file",
+    ),
+]
