@@ -1,6 +1,6 @@
 # The project standard this repository follows (github.com/Legal-Copy7045/project-standards). Decision D90.
-standard: 1.1.0
-profile: private            # public | private (only the CodeQL upload differs)
+standard: 1.2.2
+profile: public             # public | private (only the CodeQL upload differs)
 weekly_slot: "Sun 03:17"    # STANDARD.md 1.6 (CodeQL Sun 05:17)
 beyond:                     # more advanced than the baseline, kept on purpose
   - concept: regression runner

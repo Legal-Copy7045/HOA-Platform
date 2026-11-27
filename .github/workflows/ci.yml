@@ -90,13 +90,13 @@ jobs:
   privacy:
     needs: changes
     if: github.event_name != 'push'
-    uses: Legal-Copy7045/project-standards/.github/workflows/privacy.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    uses: Legal-Copy7045/project-standards/.github/workflows/privacy.yml@bba160b88041c0564769d6415d5f7f6514144cbb  # v1.2.2
 
   # The private terms (PRIVACY_DENYLIST, environment "privacy", main only): on push to main only.
   privacy-denylist:
     needs: changes
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
-    uses: Legal-Copy7045/project-standards/.github/workflows/privacy.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    uses: Legal-Copy7045/project-standards/.github/workflows/privacy.yml@bba160b88041c0564769d6415d5f7f6514144cbb  # v1.2.2
     with: {denylist: true}
     secrets: inherit
 
@@ -104,7 +104,7 @@ jobs:
   secrets:
     needs: changes
     if: github.event_name != 'push'
-    uses: Legal-Copy7045/project-standards/.github/workflows/gitleaks.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    uses: Legal-Copy7045/project-standards/.github/workflows/gitleaks.yml@bba160b88041c0564769d6415d5f7f6514144cbb  # v1.2.2
     with: {full-history: "${{ needs.changes.outputs.full == 'true' }}"}
 
   # The suite runs in two parallel shards (conftest.py --shard): each job
@@ -317,7 +317,7 @@ jobs:
     if: needs.changes.outputs.release == 'true'
     permissions:
       contents: write
-    uses: Legal-Copy7045/project-standards/.github/workflows/release.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    uses: Legal-Copy7045/project-standards/.github/workflows/release.yml@bba160b88041c0564769d6415d5f7f6514144cbb  # v1.2.2
     with:
       title: "Oak Creek Farms HOA portal"
 
