@@ -38,7 +38,7 @@ def _date(**kw):
 class SurplusForm(forms.Form):
     total_cents = MoneyField(label="Total to distribute ($)")
     year = forms.IntegerField(
-        label="Surplus from the year",
+        label="Surplus from the fiscal year",
         min_value=2000,
         max_value=2100,
         initial=lambda: timezone.localdate().year,
@@ -73,6 +73,9 @@ class SurplusForm(forms.Form):
             (r.pk, f"{r.number}: {r.title}"[:120]) for r in Resolution.objects.all()[:50]
         ]
         self.fields["by_check"].choices = [(a.lot_id, a.lot.label) for a in disb.surplus_accounts()]
+        if not disb.cash_allowed():
+            # Statement credits only (D67): no check choices at all.
+            del self.fields["by_check"]
 
     def clean(self):
         data = super().clean()
@@ -193,14 +196,16 @@ def disbursement_new(request):
                     year=d["year"],
                     resolution=resolution,
                     resolution_ref=d["resolution_ref"],
-                    by_check=d["by_check"],
+                    by_check=d.get("by_check") or (),
                     note=d["note"],
                     actor=request.user,
                     request=request,
                 )
                 messages.success(request, "Proposed. Other board members are asked to approve it.")
                 return redirect("disbursement_detail", pk=batch.pk)
-            preview = disb.surplus_split(d["total_cents"], by_check=d["by_check"])
+            preview = disb.surplus_split(
+                d["total_cents"], year=d["year"], by_check=d.get("by_check") or ()
+            )
         except disb.DisbursementError as exc:
             form.add_error(None, str(exc))
     return render(
@@ -212,7 +217,12 @@ def disbursement_new(request):
             "preview": preview,
             "preview_total": sum(p["amount_cents"] for p in preview or []),
             "surplus": disb.reserve_surplus(),
-            "equal_rule": rule_with_citation(disb.EQUAL_RULE),
+            "share_rule": rule_with_citation(disb.SHARE_PAID_RULE),
+            "cash_rule": rule_with_citation(disb.CASH_RULE),
+            "by_share_paid": disb.by_share_paid(),
+            "cash_allowed": disb.cash_allowed(),
+            "stays_with_home": disb.stays_with_home(),
+            "home_rule": rule_with_citation(disb.HOME_RULE),
         },
     )
 

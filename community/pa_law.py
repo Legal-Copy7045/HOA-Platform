@@ -100,8 +100,13 @@ GROUP_NOTES: dict[str, str] = {
         f"common expenses and funding reserves is paid to the owners in proportion to their "
         f"common expense liability or credited to them to reduce their future assessments "
         f'({ACT} § 5313, "Surplus funds"). Counsel should confirm what the Declaration says '
-        f"and whether reserve funds count as surplus at all. Refunding an owner's own credit "
-        f"(for example after a sale) is not a surplus distribution."
+        f"and whether reserve funds count as surplus at all. Many Declarations credit the "
+        f"surplus to each owner who paid a share of the common expenses, in proportion to the "
+        f"share paid, and apply it to the next assessments until it is used up; that gives no "
+        f"basis for paying it in cash. Whether a credit stays with the home or follows the owner "
+        f"who paid (a seller) is for the Bylaws or a board resolution, and belongs on the resale "
+        f"certificate. Refunding an owner's own credit (for example after a sale) is not a "
+        f"surplus distribution."
     ),
     "Account recovery": (
         "Not set by the Act; a board security policy. The Act does not regulate how owners "
@@ -343,16 +348,39 @@ GUIDES["retention.former_owner_contact_days"] = Guide(
     "730 days (two years after leaving): Board privacy policy, resolution 2027-11.",
 )
 
-GUIDES["disbursement.surplus_equal_shares"] = Guide(
+GUIDES["disbursement.surplus_by_share_paid"] = Guide(
     DECLARATION,
     f"Unless the Declaration provides otherwise, surplus funds are paid to the owners in "
     f"proportion to their common expense liability, or credited to them to reduce future "
-    f"assessments ({ACT} § 5313). Common expense liability is allocated by the Declaration "
-    f"(§ 5207); with an equal assessment per home, the shares are equal. Counsel should "
-    f"confirm the Declaration's allocation and whether reserve funds may be treated as surplus "
-    f"(many declarations and the reserve study say reserves are kept for their purpose).",
-    "On (equal shares, each home's assessment is the same): Declaration §6.2 and § 5313; a "
-    "Board resolution approves each distribution.",
+    f"assessments ({ACT} § 5313). Many Declarations have their own surplus section that "
+    f"credits the excess to each owner who paid a share of the common expenses, in proportion "
+    f"to what they paid; a surplus is what is left after the actual common expenses and the "
+    f"board's reserves. Counsel should confirm the Declaration's allocation and whether reserve "
+    f"funds may be treated as surplus.",
+    "On: Declaration §8.10 (surplus credited to each owner who paid a share of the common "
+    "expenses, in proportion to the share paid); §8.4 and §8.14 (equal assessment per lot).",
+)
+
+GUIDES["disbursement.surplus_stays_with_home"] = Guide(
+    DECLARATION,
+    f"The Act does not say whether a surplus credit follows the home or the owner who paid "
+    f"({ACT} § 5313 only says it is paid or credited to the owners). A Declaration that "
+    f"applies the credit to the next assessments points to the home; the Bylaws or a board "
+    f"resolution (and the resale certificate, {ACT} § 5407) should say which, so buyers and "
+    f"sellers know at settlement.",
+    "On: Declaration §8.10 (credit applied to the next monthly assessments); board resolution "
+    "setting the procedure under §8.13.",
+)
+
+GUIDES["disbursement.surplus_cash_allowed"] = Guide(
+    DECLARATION,
+    f"The Act allows either a payment or a credit against future assessments unless the "
+    f"Declaration provides otherwise ({ACT} § 5313). If the Declaration says the surplus "
+    f'"shall be credited" and applied to the next assessments, a cash payment has no basis in '
+    f"it: leave this off unless counsel advises otherwise, and record the reason in the board "
+    f"resolution.",
+    "Off: Declaration §8.10 (credited and applied to the next monthly assessments until "
+    "exhausted).",
 )
 
 GUIDES["disbursement.second_approval_cents"] = Guide(

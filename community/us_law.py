@@ -73,26 +73,37 @@ STEP_LAW: dict[str, list[LawNote]] = {
             "duty.",
         ),
         LawNote(
-            "68 Pa.C.S. § 5313",
-            "Uniform Planned Community Act: surplus funds",
-            "Says what happens to money left over at the end of the year unless the Declaration "
-            "provides otherwise.",
-            "Relevant if the board refunds or credits a surplus; follow the Declaration.",
-        ),
-        LawNote(
-            "Pennsylvania unclaimed property law",
-            "Uncashed checks",
-            "Refund or vendor checks that stay uncashed may have to be reported to the state "
-            "after a dormancy period.",
-            "The treasurer should confirm the dormancy period and keep a list of uncashed checks.",
-        ),
-        LawNote(
             "Internal Revenue Code, Form 1099 reporting",
             "1099s for vendors",
             "Payments to some vendors over the year must be reported on a Form 1099; the IRS "
             "sets and changes the threshold.",
             "Check the current IRS threshold and set the 1099 rule to match; the portal only "
             "flags vendors, the treasurer decides.",
+        ),
+    ],
+    "surplus": [
+        LawNote(
+            "68 Pa.C.S. § 5313",
+            "Uniform Planned Community Act: surplus funds",
+            "Says what happens to money left over at the end of the year unless the Declaration "
+            "provides otherwise: paid to owners or credited against their future assessments.",
+            "Follow the Declaration's surplus section; if it says the surplus is credited, leave "
+            "check payments off and record the section as the citation.",
+        ),
+        LawNote(
+            "68 Pa.C.S. § 5407",
+            "Uniform Planned Community Act: resale certificates",
+            "A seller gives the buyer a certificate of the association's finances and the "
+            "home's account.",
+            "Whether a surplus credit stays with the home or follows the seller affects what "
+            "the certificate shows; the board's choice should be in a resolution or the Bylaws.",
+        ),
+        LawNote(
+            "Pennsylvania unclaimed property law",
+            "Uncashed checks",
+            "Refund checks that stay uncashed may have to be reported to the state after a "
+            "dormancy period.",
+            "The treasurer should confirm the dormancy period and keep a list of uncashed checks.",
         ),
     ],
     "payments": [
