@@ -7,6 +7,7 @@ urlpatterns = [
     path("budget/", views.owner_budget, name="owner_budget"),
     path("my-account/", views.my_account, name="my_account"),
     path("my-account/<int:lot_id>/statement.pdf", views.my_statement_pdf, name="my_statement_pdf"),
+    path("finance/overview/", views.finance_overview, name="finance_overview"),
     path("finance/ledger/", views.ledger_home, name="ledger_home"),
     path("finance/ledger/lot/<int:pk>/", views.lot_ledger, name="lot_ledger"),
     path("finance/ledger/record-payments/", views.record_payments, name="record_payments"),

@@ -1,68 +1,81 @@
 name: CI
 
-# Economical CI (D86): pull requests run once per commit and never while still
-# a draft; a merge to main does not run again (the pull request already tested
-# that code). Main gets a full weekly run of everything, and any run can be
-# started by hand. The image build/scan and the page crawl run on a pull
-# request only when it touches what they test (job "changes").
+# CI per the owner's project standard 1.1.0 (D90; built on the economical CI of D86):
+#  - pull request: nothing while a draft; then lint, versions, privacy guard, gitleaks on the PR's commits and the
+#    compose check always, and each slow group (tests, image build and scan, page crawl, dependency audit) only when
+#    the PR changes its files (job "changes", .github/changes.yaml);
+#  - push to main: nothing is re-tested (the pull request did); the private-terms check, and the release path when
+#    VERSION has no v<VERSION> tag yet (tag + GitHub Release; the VM deploys only release tags);
+#  - weekly (Sunday 03:17 UTC, this project's slot) and by hand: everything, whole-history secret scan, audits;
+#    publishes nothing (workflow_dispatch with release: true on main retries a release).
+# ci-result is the only required check.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
   schedule:
-    - cron: "23 8 * * 0"  # Sundays: everything on main
+    - cron: "17 3 * * 0"  # Sundays: everything on main (STANDARD.md 1.6 slot for HOA-Portal)
   workflow_dispatch:
+    inputs:
+      release: {type: boolean, default: false, description: "Release VERSION if it has no tag yet (main only)"}
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Which of the slower checks this pull request needs. Scheduled and manual
-  # runs do everything.
+  # Which groups this run needs (.github/changes.yaml). Skipped for drafts, so a draft runs nothing.
   changes:
-    runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
-      image: ${{ steps.files.outputs.image }}
-      pages: ${{ steps.files.outputs.pages }}
+      release: ${{ steps.c.outputs.release }}
+      full: ${{ steps.c.outputs.full }}
+      tests: ${{ steps.c.outputs.tests }}
+      image: ${{ steps.c.outputs.image }}
+      pages: ${{ steps.c.outputs.pages }}
+      lockfiles: ${{ steps.c.outputs.lockfiles }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with: {persist-credentials: false, fetch-depth: 0}
-      - id: files
+        with: {fetch-depth: 0, persist-credentials: false}
+      - id: c
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ "$EVENT" != "pull_request" ]; then
-            echo "image=true" >> "$GITHUB_OUTPUT"; echo "pages=true" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          files=$(git diff --name-only "$BASE"...HEAD)
-          if echo "$files" | grep -qE '^(Dockerfile|\.dockerignore|requirements/|docker/|docker-compose[^/]*\.yml|\.github/workflows/ci\.yml)'; then
-            echo "image=true" >> "$GITHUB_OUTPUT"; else echo "image=false" >> "$GITHUB_OUTPUT"; fi
-          if echo "$files" | grep -qE '^(templates/|static/|regression/(run|pages|passkey|page_settings|page_setup)\.|requirements/|\.github/workflows/ci\.yml)|(urls|views|_views|models|navigation|features|policy|middleware|forms)\.py$|/migrations/|/templatetags/'; then
-            echo "pages=true" >> "$GITHUB_OUTPUT"; else echo "pages=false" >> "$GITHUB_OUTPUT"; fi
-          echo "Changed files decide: $(grep -h . "$GITHUB_OUTPUT" | tr '\n' ' ')"
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          RELEASE_INPUT: ${{ inputs.release }}
+        run: python3 .github/scripts/changes.py
 
+  # The standard's "quick" job, under the name people know: lint, bandit, versions.
   lint:
+    needs: changes
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with: {python-version: "3.13", cache: pip, cache-dependency-path: requirements/*.txt}
       - run: pip install --require-hashes -r requirements/base.txt -r requirements/dev.txt
+      - name: versions (VERSION, CHANGELOG.md, .github/versions.yaml)
+        run: python3 .github/scripts/check_versions.py
       - name: ruff
         run: ruff check . && ruff format --check .
       - name: bandit
         run: bandit -q -c pyproject.toml -r .
 
+  # Dependency audit: when requirements change, and weekly for newly published advisories.
   audit:
+    needs: changes
+    if: needs.changes.outputs.lockfiles == 'true' || needs.changes.outputs.full == 'true'
     runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -73,14 +86,37 @@ jobs:
         # Every requirement is pinned with hashes, so nothing needs resolving.
         run: pip-audit --strict --disable-pip --no-deps -r requirements/base.txt -r requirements/dev.txt
 
+  # The privacy guard (.github/scripts/privacy_guard.py, loaded from main so a PR cannot weaken it).
+  privacy:
+    needs: changes
+    if: github.event_name != 'push'
+    uses: Legal-Copy7045/project-standards/.github/workflows/privacy.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+
+  # The private terms (PRIVACY_DENYLIST, environment "privacy", main only): on push to main only.
+  privacy-denylist:
+    needs: changes
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
+    uses: Legal-Copy7045/project-standards/.github/workflows/privacy.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    with: {denylist: true}
+    secrets: inherit
+
+  # Gitleaks (D57): the PR's commits; the whole history weekly and by hand. Allowances in .gitleaks.toml.
+  secrets:
+    needs: changes
+    if: github.event_name != 'push'
+    uses: Legal-Copy7045/project-standards/.github/workflows/gitleaks.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    with: {full-history: "${{ needs.changes.outputs.full == 'true' }}"}
+
   # The suite runs in two parallel shards (conftest.py --shard): each job
   # takes every second test, so the slow cross-owner URL matrix is shared out
   # too. Two rather than four (D86): each shard repeats about a minute and a
   # half of set-up, which is billed; the wait is a few minutes longer.
   test-shard:
     name: test (shard ${{ matrix.shard }})
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
     runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -127,21 +163,27 @@ jobs:
       - name: pytest
         run: pytest -p no:cacheprovider --shard ${{ matrix.shard }}/2
 
-  # One "test" check for the pull request, green only when every shard is.
+  # One "test" line for people reading the run, green only when every shard is
+  # (ci-result is the required check; this one is kept for its familiar name).
   test:
+    needs: [changes, test-shard]
+    if: always() && needs.changes.outputs.tests == 'true'
     runs-on: ubuntu-24.04
-    needs: [test-shard]
-    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    timeout-minutes: 2
     steps:
       - name: All shards passed
+        env:
+          RESULT: ${{ needs.test-shard.result }}
         run: |
-          [ "${{ needs.test-shard.result }}" = "success" ] || { echo "A test shard failed or was cancelled."; exit 1; }
+          [ "$RESULT" = "success" ] || { echo "A test shard failed or was cancelled."; exit 1; }
 
   # Compose files are checked on every pull request (seconds); the image is
   # built once, in image-scan, and only when it can have changed (D86).
   docker:
+    needs: changes
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -155,13 +197,14 @@ jobs:
   # findings that have a fixed version (nothing to do about the others but
   # wait); the infrastructure images from the compose files are scanned too
   # and listed in the summary, so a Dependabot bump shows what it fixes.
-  # Builds the image (the build check) and scans it. On a pull request only
-  # when the Dockerfile, requirements, docker/ or compose files changed; the
-  # weekly run on main scans everything again for newly published CVEs (D86).
+  # Builds the image (the build check, once per run) and scans it. On a pull
+  # request only when the Dockerfile, requirements, docker/ or compose files
+  # changed; the weekly run scans everything again for newly published CVEs.
   image-scan:
-    runs-on: ubuntu-24.04
     needs: [changes]
     if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -212,9 +255,9 @@ jobs:
   # On a pull request only when it touches pages, views, URLs, templates,
   # static files, models or permissions; weekly on main (D86).
   pages:
-    runs-on: ubuntu-24.04
     needs: [changes]
     if: needs.changes.outputs.pages == 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:
@@ -235,7 +278,7 @@ jobs:
       HOA_OWNER_DB_PASSWORD: hoa_owner
       HOA_APP_DB_USER: hoa_app
       HOA_APP_DB_PASSWORD: ci-app
-      PLAYWRIGHT_VERSION: "1.63.0"
+      PLAYWRIGHT_VERSION: "1.63.0"  # by hand: .github/upstreams.yaml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with: {persist-credentials: false}
@@ -266,3 +309,27 @@ jobs:
               for r in failed[:50]:
                   print(f"- {r['id']} {r['check']}: {r['detail'][:150]}")
           PY
+
+  # A merged version bump is the release: tag v<VERSION> and the GitHub Release with the CHANGELOG.md section.
+  # The VM builds its own image from the tag (infra/poc/update-portal.sh); nothing else is published.
+  release:
+    needs: [changes, privacy-denylist]
+    if: needs.changes.outputs.release == 'true'
+    permissions:
+      contents: write
+    uses: Legal-Copy7045/project-standards/.github/workflows/release.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    with:
+      title: "Oak Creek Farms HOA portal"
+
+  # The only required check: fails when any needed job failed or was cancelled.
+  ci-result:
+    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    needs: [changes, lint, audit, privacy, privacy-denylist, secrets, test-shard, test, docker, image-scan, pages, release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -qE '"(failure|cancelled)"'; then echo "A needed job failed or was cancelled."; exit 1; fi

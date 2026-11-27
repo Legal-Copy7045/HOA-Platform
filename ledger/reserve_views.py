@@ -166,6 +166,8 @@ def _render_plan(request, *, settings_form=None, component_form=None):
         {
             "plan": plan,
             "result": result,
+            # The years that matter (WT-036): a replacement due or below zero.
+            "key_years": [r for r in result.rows if r.expense_cents or r.negative],
             "balance": balance,
             "inflation": _percent_text(plan.inflation_bp),
             "interest": _percent_text(plan.interest_bp),

@@ -528,15 +528,15 @@ def test_people_find_by_name_or_home_and_sign_up_filter(client, w):
     community.record_person(display_name="Zion Example", actor=SYSTEM)
     client.force_login(w["board"])
     page = client.get(reverse("people")).content.decode()
-    assert 'name="q"' in page and "?login=none" in page
+    # Sign-up status lives on Homes and owners' Sign-ups view (WT-001).
+    assert 'name="q"' in page and "?login=none" not in page
+    assert f'href="{reverse("lot_list")}?view=signups"' in page
     response = client.get(reverse("people"), {"q": "zion"})
     names = [p.display_name for p in response.context["people"]]
     assert names == ["Zion Example"]
     owner = _person(w["owner"])
     by_home = client.get(reverse("people"), {"q": w["lot"].street_address})
     assert owner in list(by_home.context["people"])
-    pending = client.get(reverse("people"), {"login": "none"})
-    assert all(p.user_id is None for p in pending.context["people"])
 
 
 def test_people_find_is_board_only(client, w):

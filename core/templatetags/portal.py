@@ -239,6 +239,16 @@ def humanize_action(action: str) -> str:
 
 
 @register.filter
+def audit_label(action: str) -> str:
+    """An audit action in plain words, from its registered description
+    ("Person added to the community register"), else humanized (WT-022)."""
+    from audit.actions import ACTIONS
+
+    spec = ACTIONS.get(action or "")
+    return spec.description if spec else humanize_action(action)
+
+
+@register.filter
 def step_label(event) -> str:
     """A workflow history entry as people see it: the step's own label
     ("Submit for review"), not its code name ("submit")."""
@@ -378,6 +388,13 @@ def hub_crumb(context, hub):
     request = context.get("request")
     if request is None:
         return ""
+    if hub in navigation.CRUMB_PAGES:
+        # A parent page that is not a hub (the Finance overview, D89).
+        label, permission = navigation.CRUMB_PAGES[hub]
+        if not policy.can(request.user, permission):
+            return ""
+        target = navigation.CRUMB_TARGETS.get(hub, hub)
+        return format_html('<a href="{}">{}</a> / ', reverse(target), label)
     if len(navigation.hub_links(request, hub)) < 2 and not (
         hub == "settings_hub" and policy.can(request.user, "community.manage_rules")
     ):

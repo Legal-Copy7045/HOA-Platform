@@ -14,7 +14,7 @@
 - feature: "Breadcrumbs on Settings pages, Access review and Neighbor acknowledgements"
   since: M5
   match: ["^unit:core/tests/test_walkthrough_flow.py::test_(hub_children_have_a_way_back|neighbor_acknowledgements_crumb)"]
-- feature: "Sysadmin activity: 30-day window with Older/Newer, by day, filters, audited CSV export"
+- feature: "Sysadmin activity: 7-day window (D88) with Older/Newer, by day, filters, audited CSV export"
   since: M5
   match: ["^unit:core/tests/test_walkthrough_flow.py::test_sysadmin_activity"]
 - feature: "Community settings index and folding sections; ARC request types fold to a line with the citation"

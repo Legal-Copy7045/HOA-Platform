@@ -65,9 +65,10 @@ def test_every_optional_feature_is_on_the_features_step(client, board):
 
 
 def _secret_scripts_from_claude_md() -> list[str]:
-    """The scripts CLAUDE.md's deployment section lists as steps that take
-    secrets typed by a person."""
-    text = (Path(settings.BASE_DIR) / "CLAUDE.md").read_text()
+    """The scripts CLAUDE.md's deployment section (moved to
+    docs/claude/deployment.md, D90) lists as steps that take secrets typed by a
+    person."""
+    text = (Path(settings.BASE_DIR) / "docs" / "claude" / "deployment.md").read_text()
     section = text.split("## Deployment targets", 1)[1]
     line = next(ln for ln in section.splitlines() if "take secrets typed by a person" in ln)
     inside = line.split("take secrets typed by a person", 1)[1]

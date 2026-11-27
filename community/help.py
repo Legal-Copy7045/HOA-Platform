@@ -152,8 +152,17 @@ def section_link(user, topic: Topic, request=None) -> tuple[str, str] | None:
         choices.append(topic.section)
     if topic.staff_section and groups & _STAFF:
         choices.append(topic.staff_section)
+    from core import navigation
+
+    # The menu's own permission for that page: an authorized or view-only
+    # contact is a resident but may not open "My home improvement requests"
+    # (arc.submit is the owner's), so they are not sent there.
+    menu_perms = {name: perm for _t, items in navigation.SECTIONS for _l, name, _i, perm in items}
     for label, name in choices:
         if not features.url_name_enabled(name.partition("?")[0], request):
+            continue
+        perm = menu_perms.get(name)
+        if perm not in (None, navigation.HUB) and not navigation.allowed(groups, perm):
             continue
         url = _url(name)
         if url:
@@ -728,7 +737,7 @@ PAGE_DESCRIPTIONS = {
     "budgets": "Budgets by year.",
     "accounting": "Journal exports, deposits and reconciliation.",
     "reports": "Financial and activity reports.",
-    "finance_more": "Reserve plan, online payments, disbursements, resale certificates.",
+    "finance_overview": "Every finance part at a glance, with what waits on you in each.",
     "system_status": "Health checks, updates and backups.",
     "sysadmin_activity": "What sysadmins did, for the board to see.",
     "server_tasks": "Backups, restore drills and other server tasks.",

@@ -31,5 +31,7 @@ def test_ci_runs_every_shard():
     run = " ".join(s.get("run", "") for s in ci["jobs"]["test-shard"]["steps"])
     assert "--shard ${{ matrix.shard }}/" + str(len(shards)) in run
     assert sorted(shards) == list(range(len(shards)))
-    # The summary job keeps the "test" check name and fails if any shard failed.
-    assert ci["jobs"]["test"]["needs"] == ["test-shard"]
+    # The summary job keeps the "test" line and fails if any shard failed; the
+    # required check is ci-result (D90), which needs both.
+    assert ci["jobs"]["test"]["needs"] == ["changes", "test-shard"]
+    assert {"test", "test-shard"} <= set(ci["jobs"]["ci-result"]["needs"])

@@ -3,7 +3,7 @@
 {% block title %}Bank accounts and funds · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   {% include "ledger/finance_nav.html" %}
-  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "finance_more" %}Bank accounts and funds</nav>
+  <nav class="crumbs" aria-label="Breadcrumb">{% hub_crumb "finance_overview" %}Bank accounts and funds</nav>
   <div class="page-head"><div><h1>Bank accounts and funds</h1>
     <p class="subtitle">Every association bank account belongs to a fund: operating, or reserve (the reserve the board determines, Declaration §8.7). The primary operating account holds deposits, Stripe payouts and checks unless they are matched to another account's line. Opening balances are on the books' start date{% if start %} ({{ start|date:"M j, Y" }}){% endif %}.</p></div></div>
   {% if not start %}<div class="alert warning">{% icon "alert" %}<span>Set the books' start date first: <a href="{% url 'accounting' %}?tab=setup">Accounting setup</a> (the opening balance date).</span></div>{% endif %}

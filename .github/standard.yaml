@@ -1,0 +1,73 @@
+# The project standard this repository follows (github.com/Legal-Copy7045/project-standards). Decision D90.
+standard: 1.1.0
+profile: private            # public | private (only the CodeQL upload differs)
+weekly_slot: "Sun 03:17"    # STANDARD.md 1.6 (CodeQL Sun 05:17)
+beyond:                     # more advanced than the baseline, kept on purpose
+  - concept: regression runner
+    what: "regression/run.py runs ci, unit, page (and the walkthrough) side by side in lanes, the unit stage in three
+      pytest lanes with their own databases, the page and walkthrough stages each on a seeded demo community with
+      their own database and port; standard.py is vendored and answers brief/summary/manual/log."
+  - concept: ci stage
+    what: "Besides lint, versions, privacy, bandit and pip-audit: migration check, check --deploy with production
+      settings (accepted warnings listed), repository hygiene (no .env tracked, actions pinned by commit, workflow
+      permissions, no pull_request_target, out/ git-ignored)."
+  - concept: page stage
+    what: "Playwright crawl of every page type for six roles on desktop and phone, cross-role refusals, a real passkey
+      (WebAuthn) sign-in; also a CI job (pages) when a PR touches pages."
+  - concept: live stage
+    what: "Read-only checks of the POC: HTTPS, Cloudflare Access in front, no plain HTTP, DNS proxied, TLS 1.2+,
+      tunnel healthy, Access application (Cloudflare API GETs only; host from LIVE_HOST, never the repo)."
+  - concept: walkthrough
+    what: "11 roles on desktop and phone with screenshots, menu/hub inventory, UX checks (label = heading, no sideways
+      scroll, nothing off screen, tap targets, no duplicate labels, no redirect-only pages, no console/CSP errors) and
+      its own report (walkthrough_report.py: findings by group, proposed menus, thumbnails of failing pages)."
+  - concept: regression report
+    what: "report.py: feature catalogue state (pass/fail/not run/uncovered), checks owned by no feature, review
+      findings and claims, report.md beside report.html; reads the standard findings files too."
+  - concept: catalogue
+    what: "regression/catalogue/*.yaml features carry since/docs/checks besides match; every feature change keeps it
+      current (CLAUDE.md)."
+  - concept: security gates (D57)
+    what: "Trivy fails on fixable HIGH/CRITICAL in the portal image and reports the infrastructure images; gitleaks
+      with marker-only allowances; CodeQL for actions, Python and JavaScript; tests pin all of it
+      (core/tests/test_image_pins.py)."
+  - concept: image pins
+    what: "Every compose image is tag@sha256:digest with its Dependabot ecosystem, no :latest on the VM, tested."
+  - concept: economical CI (D86)
+    what: "changes.yaml groups for tests, image, pages and lockfiles tuned to what the tests read; tests pin the
+      structure (core/tests/test_image_pins.py::test_ci_is_economical, test_changes_start_the_right_groups)."
+  - concept: privacy guard
+    what: "The standard guard plus this repository's exact-fixture allowances (the same values .gitleaks.toml allows)."
+  - concept: deployment
+    what: "The VM agent (System status: Check now, Install now, Install tonight) installs only release tags,
+      signed backups and restore drills, off-site copies to a locked bucket, server tasks from a fixed allowlist."
+  - concept: CLAUDE.md move check
+    what: "core/tests/test_claude_md.py: CLAUDE.md stays under 8 KB and every backticked name and decision reference
+      of the pre-split CLAUDE.md is still in CLAUDE.md or docs/claude/."
+exceptions:                 # done differently, each with the reason
+  - rule: "1.3 quick job"
+    reason: "Split into lint (ruff, bandit, versions), audit (pip-audit) and docker (compose validation), the job names
+      people know from D86; the unit tests (several minutes, need Postgres) are the tests group in two shards."
+  - rule: "1.3 test job names"
+    reason: "test-shard (two shards) and the test summary line are kept beside ci-result; only ci-result is required."
+  - rule: "1.2 ignore list"
+    reason: "docs/claude/, docs/glossary.md, docs/examples/, CLAUDE.md, CHANGELOG.md and the regression ids start the
+      tests group, because tests read them; other docs and *.md start nothing."
+  - rule: "1.3 runs-on"
+    reason: "ubuntu-24.04 pinned (Postgres service and Playwright system packages), as STANDARD.md allows."
+  - rule: "3.1 IDs zero-padded to four"
+    reason: "Existing IDs are PREFIX-NNN (at least three digits: CI-011, UNIT-3739); never renumbered. run.py
+      keeps issuing them; standard.py's Ids is not used for writing."
+  - rule: "3.1 stage result key"
+    reason: "Results carry the standard `key` and, as before, `check` (the same text), so older tooling still reads them."
+  - rule: "3.2 default stages"
+    reason: "Plain run.py runs ci, unit, page and manual; live runs only with --stage live and LIVE_HOST (a hostname
+      that never goes in the repository), and skips when unreachable."
+  - rule: "3.3 report"
+    reason: "run.py report runs the project's own report.py (and walkthrough_report.py for --walkthrough), which read
+      the standard findings files; standard.py report is not used."
+  - rule: "3.5 tap targets"
+    reason: "The walkthrough checks 40x40 px outside running text (the portal's D48 rule); 44x44 is the standard's."
+  - rule: "1.5 Dependabot open-pull-requests-limit and groups"
+    reason: "pip reads /requirements (pip-tools .in/.txt); Django stays on the LTS line and Postgres majors are
+      ignored (planned dump and restore)."

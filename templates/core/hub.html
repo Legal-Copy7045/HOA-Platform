@@ -3,7 +3,9 @@
 {% block title %}{{ heading }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>{{ heading }}</h1><p class="subtitle">{{ subtitle }}</p></div></div>
+  {% if own_count %}<p class="small"><a href="{% url 'my_items' %}">{{ own_count }} item{{ own_count|pluralize }} on this page in My items</a></p>{% endif %}
+  {# Each tile shows its own waiting count; the menu bubble is their sum (D89). #}
   <ul class="tiles">
-    {% for link in links %}<li><a class="tile" href="{{ link.url }}">{% icon link.icon %}<div><strong>{{ link.label }}</strong><span>{{ link.text }}</span></div></a></li>{% endfor %}
+    {% for link in links %}<li><a class="tile" href="{{ link.url }}">{% icon link.icon %}<div><strong>{{ link.label }}{% if link.count %} <span class="badge-count" data-testid="tile-count">{{ link.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</strong><span>{{ link.text }}</span></div></a></li>{% endfor %}
   </ul>
 {% endblock %}

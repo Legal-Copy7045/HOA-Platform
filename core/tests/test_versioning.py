@@ -52,5 +52,5 @@ def test_status_page_shows_the_release_and_the_update_number(client):
 
 def test_agent_reads_the_new_number_safely():
     text = Path("infra/poc/portal-agent.sh").read_text()
-    assert 'g show "origin/$BRANCH:VERSION"' in text and "tr -cd '0-9.'" in text
+    assert 'g show "$TARGET:VERSION"' in text and "tr -cd '0-9.'" in text
     assert '-v version="$version"' in text and "latest_version = :'version'" in text

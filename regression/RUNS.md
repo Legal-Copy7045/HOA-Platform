@@ -3,6 +3,13 @@
 One entry per full run (newest first): date, commit, totals, failing check IDs,
 finding IDs, report link. No real names, hosts or addresses.
 
+From the standard (D90), `python3 regression/run.py log` adds one row to this
+table per run; the older entries below it keep their own format.
+
+| Date (UTC) | Commit | Version | Audit | Pass | Fail | Skip | Manual due | Failing IDs | Findings | Report |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-27 | `d62bd1e` | 0.34.0 | full (full check) | 4615 | 0 | 215 | 84 | none | 16 (none critical or high) | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
+
 ## 2026-11-27 — full check on release 0.34.0 (with the walkthrough)
 
 - Commit: d62bd1e (main after 0.34.0, own matters). Totals: 4615 pass, 0 fail, 84 manual, 215 skip (retired IDs; LIVE-001 HTTPS and one live check not reachable from the cloud session).

@@ -2,9 +2,11 @@
 {% load portal %}
 {% block title %}{{ e.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
+  {# The way back, like a meeting page (WT-019). #}
+  <div class="crumbs"><a href="{% url 'calendar' %}">Calendar</a> / {{ e.starts_at|date:"M j, Y" }}</div>
   <div class="page-head"><div><h1>{% if e.cancelled %}<s>{{ e.title }}</s>{% else %}{{ e.title }}{% endif %}</h1>
     <p class="subtitle">{{ e.starts_at|date:"l, F j, Y g:i A" }}{% if e.ends_at %}–{{ e.ends_at|date:"g:i A" }}{% endif %}{% if e.location %} · {{ e.location }}{% endif %}{% if e.join_url %} · Online{% endif %}</p></div>
-    <div class="actions">{% if e.join_url and not e.cancelled %}<a class="btn" href="{{ e.join_url }}" target="_blank" rel="noopener noreferrer" data-testid="join-link">Join online</a>{% endif %}{% if meeting %}<a class="btn{% if e.join_url and not e.cancelled %} secondary{% endif %}" href="{% url 'meeting_detail' meeting.pk %}">{% icon "file" %} Meeting page</a>{% endif %}{% include "partials/add_to_calendar.html" %}<a class="btn secondary" href="{% url 'calendar' %}">Calendar</a></div></div>
+    <div class="actions">{% if e.join_url and not e.cancelled %}<a class="btn" href="{{ e.join_url }}" target="_blank" rel="noopener noreferrer" data-testid="join-link">Join online</a>{% endif %}{% if meeting %}<a class="btn{% if e.join_url and not e.cancelled %} secondary{% endif %}" href="{% url 'meeting_detail' meeting.pk %}">{% icon "file" %} Meeting page</a>{% endif %}{% include "partials/add_to_calendar.html" %}</div></div>
   {% if e.join_url and not e.cancelled %}<p class="small muted join-note">Join link: <a href="{{ e.join_url }}" target="_blank" rel="noopener noreferrer">{{ e.join_url }}</a>. Please don't forward it: it is shown only to people who can open this page.</p>{% endif %}
 
   {% if e.cancelled %}<div class="alert danger" role="alert">{% icon "alert" %}<span>This event was cancelled.</span></div>{% endif %}
@@ -29,10 +31,13 @@
       </form>
     {% elif user|can:"history.view_own" and not can_answer %}<p class="small muted">Your login is read-only, so you cannot answer.</p>{% endif %}
     {% if names_ok %}
-      <h3>Who answered</h3>
+      {# Names are the board's (event.rsvp_names): the Board cue on this part (WT-013). #}
+      <div class="board-panel" id="rsvp-names">
+      <h3>{% include "partials/board_cue.html" %} Who answered</h3>
       {% if names %}<ul class="list">{% for r in names %}<li><div class="grow"><div class="title">{{ r.person.display_name }}</div><div class="small muted">{{ r.updated_at|short_date }}</div></div>{% status r.answer r.get_answer_display %}{% if r.guests %} <span class="small">+{{ r.guests }} guest{{ r.guests|pluralize }}</span>{% endif %}</li>{% endfor %}</ul>
       {% else %}<p class="small muted">No answers yet.</p>{% endif %}
       <p class="small"><a href="{% url 'event_rsvp_export' e.pk %}">Download RSVPs and volunteers (CSV)</a></p>
+      </div>
     {% endif %}
   </section>
   {% endif %}
@@ -55,13 +60,14 @@
   {% endif %}
 
   {% if can_manage and not e.cancelled %}
-    <details class="panel"{% if settings_form.errors %} open{% endif %}><summary>RSVP settings</summary><div class="panel-body">
+    {# Board controls carry the Board cue (WT-013, D88). #}
+    <details class="panel board-panel" id="rsvp-settings"{% if settings_form.errors %} open{% endif %}><summary>{% include "partials/board_cue.html" %} RSVP settings</summary><div class="panel-body">
       <form method="post" action="{% url 'event_rsvp_settings' e.pk %}" class="form-grid">{% csrf_token %}
         {% include "partials/form_errors.html" with form=settings_form %}
         {{ settings_form }}
         <div class="form-actions field wide"><button type="submit">Save RSVP settings</button></div></form>
     </div></details>
-    <details class="panel"{% if slot_form.errors %} open{% endif %}><summary>Add a volunteer slot</summary><div class="panel-body">
+    <details class="panel board-panel" id="add-slot"{% if slot_form.errors %} open{% endif %}><summary>{% include "partials/board_cue.html" %} Add a volunteer slot</summary><div class="panel-body">
       <form method="post" action="{% url 'event_slot_add' e.pk %}" class="form-grid">{% csrf_token %}
         {% include "partials/form_errors.html" with form=slot_form %}
         {{ slot_form }}
