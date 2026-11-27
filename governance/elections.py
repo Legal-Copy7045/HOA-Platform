@@ -446,6 +446,7 @@ def certify(election: Election, *, actor, request=None) -> dict:
                     + (f" ({election.citation})" if election.citation else ""),
                     actor=actor,
                     request=request,
+                    elected=True,
                 )
             except CommunityError:
                 continue  # e.g. already holds a seat; the board handles it

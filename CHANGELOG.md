@@ -6,6 +6,22 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.35.0 — 2026-11-27
+
+- Refund checks are made out to the right people: today's owners while the
+  home is still theirs, or the owners at the sale once it is sold. A co-owner
+  taken off the deed is no longer named on the check or used as its address.
+- Payments to board members are processed by another board member (D66).
+  Nobody prints, writes, voids or clears a check to an account they are or
+  were on the deed of, sellers included, and the manager never processes a
+  check to a board member. "Mark as issued" writes the checks you may write
+  and names the ones left for another board member.
+- A board member who no longer owns a home here shows on the board's My items
+  as "End <name>'s board seat": board members selling their home resign first.
+- The start-up exception for board seats is one-time: once two seats have
+  been recorded, a new seat always needs a second board member, even if seats
+  later end. An owners' election can still seat its winners on a board of one.
+
 ## 0.34.0 — 2026-11-27
 
 - Board members' own homes are handled by another board member (D65). Your

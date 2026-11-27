@@ -41,8 +41,9 @@
       <td class="num" data-label="Amount">{{ r.line.amount_cents|cents }}</td>
       <td data-label="Status">{{ r.label }}{% for c in r.checks %}<div class="small">Check #{{ c.number }} · {{ c.issued_on|short_date }} · {% if c.status == "voided" %}<span class="status tone-danger">Voided</span>{% elif c.status == "cleared" %}<span class="status tone-success">Cleared</span>{% else %}Outstanding{% endif %}</div>
         {% if c.status == "issued" %}
-          {% if can_issue %}<form method="post" action="{% url 'disbursement_action' batch.pk 'clear' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}">{% if c.suggestion %}<input type="hidden" name="bank_line" value="{{ c.suggestion.pk }}"><span class="small">Bank line {{ c.suggestion.posted_on|short_date }} matches.</span>{% endif %}<input type="date" name="on" value="{% if c.suggestion %}{{ c.suggestion.posted_on|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" aria-label="Cleared on" required><button type="submit" class="secondary small">Mark cleared</button></form>{% endif %}
-          {% if can_void %}<form method="post" action="{% url 'disbursement_action' batch.pk 'void' %}" class="inline-form" data-confirm="Void check #{{ c.number }}? {% if batch.kind == 'refund' %}The refund entry is reversed and the credit is back on the owner's account; {% endif %}a new check can then be written. {% acting_confirm %}">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}"><input name="reason" maxlength="150" required aria-label="Reason for voiding" placeholder="Reason"><button type="submit" class="secondary small">{% for_board "Void" %}</button></form>{% endif %}
+          {% if r.refusal %}<p class="small muted">{{ r.refusal }}</p>{% endif %}
+          {% if can_issue and not r.refusal %}<form method="post" action="{% url 'disbursement_action' batch.pk 'clear' %}" class="inline-form">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}">{% if c.suggestion %}<input type="hidden" name="bank_line" value="{{ c.suggestion.pk }}"><span class="small">Bank line {{ c.suggestion.posted_on|short_date }} matches.</span>{% endif %}<input type="date" name="on" value="{% if c.suggestion %}{{ c.suggestion.posted_on|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" aria-label="Cleared on" required><button type="submit" class="secondary small">Mark cleared</button></form>{% endif %}
+          {% if can_void and not r.refusal %}<form method="post" action="{% url 'disbursement_action' batch.pk 'void' %}" class="inline-form" data-confirm="Void check #{{ c.number }}? {% if batch.kind == 'refund' %}The refund entry is reversed and the credit is back on the owner's account; {% endif %}a new check can then be written. {% acting_confirm %}">{% csrf_token %}<input type="hidden" name="check" value="{{ c.pk }}"><input name="reason" maxlength="150" required aria-label="Reason for voiding" placeholder="Reason"><button type="submit" class="secondary small">{% for_board "Void" %}</button></form>{% endif %}
         {% endif %}{% endfor %}</td>
     </tr>{% endfor %}</tbody>
   </table></div></div>
@@ -54,6 +55,11 @@
       {% include "partials/form_errors.html" with form=issue_form %}
       <form method="post" action="{% url 'disbursement_action' batch.pk 'issue' %}" class="form-grid" data-confirm="Record these checks as issued with these numbers?{% if batch.kind == 'refund' %} The refund is posted on the owner's account.{% endif %}">{% csrf_token %}{{ issue_form }}<div class="form-actions"><button type="submit">Mark as issued</button></div></form>
       <p class="small muted">In order: {% for r in to_issue %}{{ r.line.lot.label }}{% if not forloop.last %}; {% endif %}{% endfor %}.</p>
+      {% if left_for_others %}<p class="small" data-testid="left-for-others">Left for another board member: {% for r in left_for_others %}{{ r.line.lot.label }}{% if not forloop.last %}; {% endif %}{% endfor %} (a payment to an account you are on, or to a board member, is written by a board member other than the one paid).</p>{% endif %}
+    </section>
+  {% elif left_for_others and can_issue %}
+    <section class="card" id="write-checks"><h2>Write the checks</h2>
+      <p class="small" data-testid="left-for-others">{% for r in left_for_others %}{{ r.refusal }}{% if not forloop.last %} {% endif %}{% endfor %}</p>
     </section>
   {% endif %}
   <p class="small muted">Checks uncashed after {{ stale_days }} days appear in My items. {{ unclaimed_note }}</p>

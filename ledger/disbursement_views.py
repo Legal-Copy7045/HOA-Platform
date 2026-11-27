@@ -282,6 +282,11 @@ def _detail_context(request, batch, **forms_):
             )
         suggestions = disb.clearing_suggestions(checks)
         recipients = disb.recipient_person_ids(batch)
+        # Checks this person may not write, void or clear (their own account,
+        # or a board member's when they are not on the board, D66).
+        board = disb.board_person_ids()
+        for r in rows:
+            r["refusal"] = disb.payment_refusal(request.user, r["line"], board=board)
     for c in checks:
         c.suggestion = suggestions.get(c.pk)
     user = request.user
@@ -299,12 +304,14 @@ def _detail_context(request, batch, **forms_):
         and not any(d.approver_id == user.pk for d in state.approvals)
         and not own
     )
-    to_issue = [r for r in rows if r["status"] == "to_issue"]
+    to_issue = [r for r in rows if r["status"] == "to_issue" and not r["refusal"]]
+    left_for_others = [r for r in rows if r["status"] == "to_issue" and r["refusal"]]
     return {
         "batch": batch,
         "state": state,
         "rows": rows,
         "to_issue": to_issue,
+        "left_for_others": left_for_others,
         "is_recipient": person_id in recipients,
         # A refund to this board member: shown before any button (D64); the
         # service refuses the approval itself.

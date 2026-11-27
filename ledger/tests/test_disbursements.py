@@ -942,3 +942,161 @@ def test_pa_guidance_cites_the_surplus_funds_section():
 
     assert "§ 5313" in pa_law.GROUP_NOTES["Disbursements"]
     assert "counsel" in pa_law.guide("disbursement.surplus_equal_shares").law.lower()
+
+
+# --- D66: payees and who processes a payment ------------------------------------------------
+
+
+def _home(w, key):
+    with system_access("t"):
+        return w[key].person.ownerships.select_related("lot").first().lot
+
+
+def _co_owner_removed(w):
+    """Lot 0 is owned jointly; the second owner is taken off the deed and
+    moves away, the first keeps the home (the account stays open)."""
+    lot = w["lots"][0]
+    removed = PersonFactory()
+    with system_access("t"):
+        own = community.record_ownership(
+            person=removed, lot=lot, start_date=days_ago(300), actor=SYSTEM
+        )
+    with mock.patch("community.tasks.notify_board.defer"):
+        community.end_ownership(own, end_date=days_ago(5), actor=SYSTEM)
+    services.record_payment(
+        lot=lot, amount_cents=900, received_on=days_ago(3), reference="5", actor=w["board"]
+    )
+    return lot, removed
+
+
+def test_refund_payee_leaves_out_a_co_owner_removed_from_the_deed(w):
+    lot, removed = _co_owner_removed(w)
+    account = _account(lot)
+    assert account.is_active
+    defaults = disb.refund_defaults(account)
+    assert removed.display_name not in defaults["payee_name"]
+    assert defaults["payee_name"] == w["owners"][0].person.display_name
+    batch = disb.propose_refund(account=account, amount_cents=900, actor=w["manager"])
+    (line,) = _lines(batch)
+    assert removed.display_name not in line.payee_name
+
+
+def test_refund_payee_after_a_sale_is_the_owners_at_the_sale(w):
+    old = _sold_with_credit(w)
+    defaults = disb.refund_defaults(old)
+    assert defaults["payee_name"] == w["owners"][0].person.display_name
+
+
+def _board_seller(w, credit=5000):
+    """A board member sells their home with a credit left on the account."""
+    lot = _home(w, "board_owner")
+    services.record_payment(
+        lot=lot, amount_cents=credit, received_on=days_ago(10), reference="8", actor=w["board"]
+    )
+    old = _account(lot)
+    with mock.patch("community.tasks.notify_board.defer"):
+        community.transfer_lot(
+            lot, new_owners=[PersonFactory()], transfer_date=days_ago(2), actor=SYSTEM
+        )
+    with system_access("t"):
+        old.refresh_from_db()
+    assert not old.is_active
+    return old
+
+
+def test_a_seller_on_the_board_takes_no_step_on_their_own_refund(w):
+    seller = w["board_owner"]
+    old = _board_seller(w)
+    with pytest.raises(disb.DisbursementError, match="owner on this account"):
+        disb.propose_refund(
+            account=old, amount_cents=5000, forwarding_address="9 Far Road", actor=seller
+        )
+    batch = disb.propose_refund(
+        account=old, amount_cents=5000, forwarding_address="9 Far Road", actor=w["manager"]
+    )
+    with pytest.raises(disb.DisbursementError, match="were an owner"):
+        disb.decline(batch, note="No", actor=seller)
+    with pytest.raises(disb.DisbursementError, match="were an owner"):
+        disb.approve(batch, actor=seller)
+    disb.approve(batch, actor=w["board"])
+    for step in (
+        lambda: disb.issue_checks(batch, first_number="500", issued_on=TODAY, actor=seller),
+        lambda: disb.checks_pdf(batch, on=TODAY, actor=seller),
+    ):
+        with pytest.raises(disb.DisbursementError, match="were an owner"):
+            step()
+    (check,) = disb.issue_checks(batch, first_number="500", issued_on=TODAY, actor=w["board"])
+    with pytest.raises(disb.DisbursementError, match="were an owner"):
+        disb.void_check(check, reason="Lost", actor=seller)
+    with pytest.raises(disb.DisbursementError, match="were on the deed"):
+        disb.mark_cleared(check, on=TODAY, actor=seller)
+    assert disb.check_status(check) == "issued"
+    from audit.models import AuditEvent
+
+    assert AuditEvent.objects.filter(action="policy.own_matter_refused").count() >= 6
+
+
+def test_a_payment_to_a_board_member_is_processed_by_another_board_member(w):
+    lot = _home(w, "board_owner")
+    services.record_payment(
+        lot=lot, amount_cents=700, received_on=days_ago(3), reference="9", actor=w["board"]
+    )
+    batch = disb.propose_refund(account=_account(lot), amount_cents=700, actor=w["manager"])
+    disb.approve(batch, actor=w["board"])
+    with pytest.raises(disb.DisbursementError, match="pays a board member"):
+        disb.issue_checks(batch, first_number="600", issued_on=TODAY, actor=w["manager"])
+    with pytest.raises(disb.DisbursementError, match="pays a board member"):
+        disb.checks_pdf(batch, on=TODAY, actor=w["manager"])
+    (check,) = disb.issue_checks(batch, first_number="600", issued_on=TODAY, actor=w["board"])
+    with pytest.raises(disb.DisbursementError, match="pays a board member"):
+        disb.mark_cleared(check, on=TODAY, actor=w["manager"])
+    disb.mark_cleared(check, on=TODAY, actor=w["board_owner2"])
+    assert disb.check_status(check) == "cleared"
+
+
+def test_surplus_checks_to_board_members_are_left_for_another_board_member(w):
+    homes = [*w["lots"]]
+    for key in ("board_owner", "board_owner2"):
+        homes.append(_home(w, key))
+    batch = _surplus(w, total=1000, by_check=[lot.pk for lot in homes])
+    disb.approve(batch, actor=w["board"])
+    # The manager writes the owners' checks; the board members' wait.
+    made = disb.issue_checks(batch, first_number="700", issued_on=TODAY, actor=w["manager"])
+    assert {c.line.lot.label for c in made} == {lot.label for lot in w["lots"]}
+    mine, left = disb.lines_for_actor(w["board_owner"], batch)
+    assert [line.lot for line in mine] == [_home(w, "board_owner2")]
+    assert [line.lot for line in left] == [_home(w, "board_owner")]
+    (own,) = left
+    with pytest.raises(disb.DisbursementError, match="you are or were on the deed"):
+        disb.issue_checks(
+            batch, first_number="800", issued_on=TODAY, line_ids=[own.pk], actor=w["board_owner"]
+        )
+    made = disb.issue_checks(batch, first_number="800", issued_on=TODAY, actor=w["board_owner"])
+    assert [c.line_id for c in made] == [mine[0].pk]
+    made = disb.issue_checks(batch, first_number="900", issued_on=TODAY, actor=w["board"])
+    assert [c.line_id for c in made] == [own.pk]
+
+
+def test_the_disbursement_page_hides_steps_on_checks_one_may_not_process(w, client):
+    lot = _home(w, "board_owner")
+    services.record_payment(
+        lot=lot, amount_cents=700, received_on=days_ago(3), reference="9", actor=w["board"]
+    )
+    batch = disb.propose_refund(account=_account(lot), amount_cents=700, actor=w["manager"])
+    disb.approve(batch, actor=w["board"])
+    client.force_login(w["manager"])
+    page = client.get(reverse("disbursement_detail", args=[batch.pk])).content.decode()
+    assert 'data-testid="left-for-others"' in page and "pays a board member" in page
+    assert "Mark as issued" not in page
+
+
+def test_a_board_member_who_sold_their_home_gets_a_resign_reminder(w):
+    from core.my_items import items_for
+
+    _board_seller(w)
+    titles = [i.title for i in items_for(w["board"])]
+    name = w["board_owner"].person.display_name
+    assert f"End {name}'s board seat" in titles
+    # The board member without a home here (declarant-style test fixture)
+    # also shows: an owner-elected seat needs a home.
+    assert all("board seat" not in t for t in (i.title for i in items_for(w["owners"][1])))
