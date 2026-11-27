@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-3543
+# highest issued: UNIT-3544
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -3529,3 +3529,4 @@ UNIT-3540: "governance/tests/test_packets.py::test_zip_never_fails_when_even_the
 UNIT-3541: "governance/tests/test_packets.py::test_zip_never_fails_when_even_the_packet_pdf_is_missing[board]"
 UNIT-3542: "governance/tests/test_packets.py::test_zip_lists_a_file_that_vanishes_while_streaming"
 UNIT-3543: "governance/tests/test_packets.py::test_meeting_page_says_how_many_attachments_the_zip_leaves_out"
+UNIT-3544: "core/tests/test_walkthrough2_fixes.py::test_summary_tiles_are_not_turned_into_inline_tap_links"

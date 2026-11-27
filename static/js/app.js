@@ -406,7 +406,9 @@ portalButtonConfirm();
   if (main) {
     Array.prototype.forEach.call(main.querySelectorAll("p > a, dd > a, li > a, div > a, span > a"), function (a) {
       var parent = a.parentElement;
-      if (a.classList.contains("btn") || parent.children.length !== 1) return;
+      // Summary tiles (.stat) are cards, not text links: they keep their
+      // stacked label, amount and hint (WT-026).
+      if (a.classList.contains("btn") || a.classList.contains("stat") || parent.children.length !== 1) return;
       var around = parent.textContent.replace(/\s+/g, " ").trim().length - a.textContent.replace(/\s+/g, " ").trim().length;
       if (around <= 3) a.classList.add("tap");
     });

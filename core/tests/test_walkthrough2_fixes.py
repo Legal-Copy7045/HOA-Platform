@@ -315,6 +315,12 @@ def test_site_css_fixes(rule):
     assert rule in CSS
 
 
+def test_summary_tiles_are_not_turned_into_inline_tap_links():
+    # app.js gives a lone link the 44px inline-flex tap style; a .stat tile
+    # would then lay its label, amount and hint side by side (WT-026).
+    assert 'a.classList.contains("stat")' in JS
+
+
 def test_kv_is_defined_once_and_stat_values_never_break_anywhere():
     assert CSS.count(".kv { display: grid;") == 1
     assert ".stat .value { font-size: 1.2rem; overflow-wrap: anywhere; }" not in CSS

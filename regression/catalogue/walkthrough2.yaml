@@ -19,7 +19,7 @@
   match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(setup_steps_never_show_the_same_law|merged_law_entry|setup_law_panel_is_closed)", "^manual:walkthrough 2 phone fixes"]
 - feature: "Phone CSS at the source: [hidden] wins, .kv one column, sticky bars above the tab bar, amounts never break, task rows wrap"
   since: M5
-  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(site_css_fixes|kv_is_defined_once)"]
+  match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(site_css_fixes|kv_is_defined_once|summary_tiles_are_not)"]
 - feature: "Every table stacks on phones (stack-sm, data-label) or opts out with data-wide and a reason"
   since: M5
   match: ["^unit:core/tests/test_walkthrough2_fixes.py::test_(every_table_stacks|access_review_and_disbursements)"]
