@@ -3,7 +3,7 @@
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from core import navigation, policy
 
@@ -16,11 +16,6 @@ PAGES = {
     "community_info": (
         "Community info",
         "Answers to common questions, who is on the board and committees, and the owner directory.",
-    ),
-    "finance_more": (
-        "More finance",
-        "Finance pages used now and then: the reserve plan, online payments, payments back to"
-        " owners and resale certificates.",
     ),
 }
 
@@ -36,7 +31,14 @@ def _hub(request, name, template="core/hub.html", **extra):
     return render(
         request,
         template,
-        {"heading": heading, "subtitle": subtitle, "links": links, **extra},
+        {
+            "heading": heading,
+            "subtitle": subtitle,
+            "links": links,
+            # Items for the hub page itself, beside the tiles' own counts (D89).
+            "own_count": navigation.waiting_counts(request).get(name, 0),
+            **extra,
+        },
     )
 
 
@@ -51,11 +53,14 @@ def settings_hub(request):
         return _hub(request, "settings_hub")
     from community.setup_views import setup_front
 
-    links = [
-        link
-        for link in navigation.hub_links(request, "settings_hub")
-        if link["name"] not in navigation.COVERED_BY_SETUP
-    ]
+    every = navigation.hub_links(request, "settings_hub")
+    links = [link for link in every if link["name"] not in navigation.COVERED_BY_SETUP]
+    # "Finish community setup" and the items of pages the steps cover (rules
+    # missing a value, two-person coverage) wait on the setup card, so the
+    # page's numbers add up to the menu bubble (D89).
+    setup_count = navigation.waiting_counts(request).get("settings_hub", 0) + sum(
+        link["count"] for link in every if link["name"] in navigation.COVERED_BY_SETUP
+    )
     heading, _subtitle = PAGES["settings_hub"]
     return render(
         request,
@@ -64,6 +69,7 @@ def settings_hub(request):
             **setup_front(),
             "heading": heading,
             "links": links,
+            "setup_count": setup_count,
             "settings_front": True,
         },
     )
@@ -76,4 +82,6 @@ def community_info(request):
 
 @login_required
 def finance_more(request):
-    return _hub(request, "finance_more")
+    """The More finance hub became the Finance overview (D89)."""
+    policy.require(request.user, "finance.view")
+    return redirect("finance_overview")

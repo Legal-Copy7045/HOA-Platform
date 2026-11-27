@@ -1,7 +1,8 @@
-"""A small tab bar across the four day-to-day money pages: Owner accounts,
-Collections, Accounting and Reports. It shows only on those pages (and the
-pages under them); everything else in Finance and Maintenance is reached from
-the sidebar. Tabs the user cannot use are left out."""
+"""A small tab bar across the day-to-day money pages: the Finance overview
+(D89), Owner accounts, Collections, Accounting and Reports, the same pages as
+the Finance menu entries except Invoices. It shows only on those pages (and
+the pages under them); every other finance page opens from the overview.
+Tabs the user cannot use are left out."""
 
 from django import template
 from django.urls import reverse
@@ -12,6 +13,7 @@ register = template.Library()
 
 # (label, URL name, path prefix that belongs to the tab, permission)
 TABS = (
+    ("Finance overview", "finance_overview", "/finance/overview", "finance.view"),
     ("Owner accounts", "ledger_home", "/finance/ledger", "finance.view"),
     ("Collections", "collections", "/finance/collections", "finance.view"),
     ("Accounting", "accounting", "/finance/accounting", "finance.view"),

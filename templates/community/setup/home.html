@@ -5,7 +5,7 @@
   {# The board's Settings: Community setup first, then the editors its steps do not contain (WT-004). #}
   <div class="page-head"><div><h1>Settings</h1><p class="subtitle">Community setup walks the board through every decision the portal needs, one step at a time: the community's details, the monthly {% term "term" %}, late fees, payments, notices, reviews, features, people and the server. Each step shows today's values, so it can be run again at any time, and any step opens on its own.</p></div></div>
 
-  <section class="card" id="setup" aria-labelledby="setup-h"><h2 id="setup-h">Community setup</h2>
+  <section class="card" id="setup" aria-labelledby="setup-h"><h2 id="setup-h">Community setup{% if setup_count %} <span class="badge-count" data-testid="tile-count">{{ setup_count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</h2>
     {% if not run %}
       <p>Setup has not been run yet. {{ left }} step{{ left|pluralize }} to go, then a review of every decision.</p>
       <form method="post" action="{% url 'setup_start' %}">{% csrf_token %}<div class="form-actions"><button type="submit">Start setup</button></div></form>
@@ -29,7 +29,7 @@
   {% if links %}
   <section aria-labelledby="change-one-h"><h2 id="change-one-h">Change one thing</h2>
     <ul class="tiles">
-      {% for link in links %}<li><a class="tile" href="{{ link.url }}">{% icon link.icon %}<div><strong>{{ link.label }}</strong><span>{{ link.text }}</span></div></a></li>{% endfor %}
+      {% for link in links %}<li><a class="tile" href="{{ link.url }}">{% icon link.icon %}<div><strong>{{ link.label }}{% if link.count %} <span class="badge-count" data-testid="tile-count">{{ link.count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</strong><span>{{ link.text }}</span></div></a></li>{% endfor %}
     </ul>
   </section>
   {% endif %}

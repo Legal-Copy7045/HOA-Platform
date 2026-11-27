@@ -383,6 +383,13 @@ def hub_crumb(context, hub):
     request = context.get("request")
     if request is None:
         return ""
+    if hub in navigation.CRUMB_PAGES:
+        # A parent page that is not a hub (the Finance overview, D89).
+        label, permission = navigation.CRUMB_PAGES[hub]
+        if not policy.can(request.user, permission):
+            return ""
+        target = navigation.CRUMB_TARGETS.get(hub, hub)
+        return format_html('<a href="{}">{}</a> / ', reverse(target), label)
     if len(navigation.hub_links(request, hub)) < 2 and not (
         hub == "settings_hub" and policy.can(request.user, "community.manage_rules")
     ):

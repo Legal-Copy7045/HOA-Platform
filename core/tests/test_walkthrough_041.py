@@ -310,9 +310,9 @@ def test_owner_accounts_list_first_and_forms_in_closed_panels(client, w):
 @pytest.mark.parametrize(
     "template, crumb",
     [
-        ("ledger/reserve_plan.html", '{% hub_crumb "finance_more" %}Reserve plan'),
-        ("ledger/disbursements.html", '{% hub_crumb "finance_more" %}Disbursements'),
-        ("payments/board.html", '{% hub_crumb "finance_more" %}Online payments'),
+        ("ledger/reserve_plan.html", '{% hub_crumb "finance_overview" %}Reserve plan'),
+        ("ledger/disbursements.html", '{% hub_crumb "finance_overview" %}Disbursements'),
+        ("payments/board.html", '{% hub_crumb "finance_overview" %}Online payments'),
         ("comms/faq.html", '{% hub_crumb "community_info" %}Frequently asked questions'),
         ("community/directory.html", '{% hub_crumb "community_info" %}Owner directory'),
         ("community/board_and_committees.html", '{% hub_crumb "community_info" %}Board and'),

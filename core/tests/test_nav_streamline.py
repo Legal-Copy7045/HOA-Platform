@@ -97,16 +97,17 @@ COMMUNITY = [
 ]
 CONTACT_HOME = ["My home", "My account", "Notices about my home", "My requests"]
 NOT_BUDGET = [c for c in COMMUNITY if c != "Budget and reserves"]
-# Reserve plan, Online payments, Disbursements and Resale certificates are on
-# the More finance hub (WT-036).
+# Budgets, Reserve plan, Online payments, Disbursements and Resale
+# certificates open from the Finance overview (D89).
 FINANCE = [
+    # The Finance overview first (D89); Budgets and the old More finance
+    # pages open from it.
+    "Finance overview",
     "Owner accounts",
     "Invoices",
     "Collections",
-    "Budgets",
     "Accounting",
     "Reports",
-    "More finance",
 ]
 MAINTENANCE = ["Work orders", "Vendors", "Contracts", "Renewals"]  # Renewals: D72
 # Every role's sidebar with the default features (reservations, online
@@ -254,15 +255,15 @@ def test_online_payments_only_with_payments_manage(client, board):
     from core import features
 
     features.set_feature("online_payments", True, actor=board)
-    client.force_login(board)
-    response = client.get(reverse("finance_more"))
-    labels = [link["label"] for link in navigation.hub_links(response.wsgi_request, "finance_more")]
-    assert "Online payments" in labels
+
+    def cards(user):
+        client.force_login(user)
+        response = client.get(reverse("finance_overview"))
+        return [c["label"] for g in response.context["groups"] for c in g["cards"]]
+
+    assert "Online payments" in cards(board)
     for role in (Role.MANAGER, Role.AUDITOR):
-        client.force_login(make_member(roles=[role]))
-        response = client.get(reverse("finance_more"))
-        labels = [x["label"] for x in navigation.hub_links(response.wsgi_request, "finance_more")]
-        assert "Online payments" not in labels
+        assert "Online payments" not in cards(make_member(roles=[role]))
 
 
 def test_former_owner_has_history_not_my_requests(client, board):

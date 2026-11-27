@@ -171,6 +171,7 @@ PROTECTED = {
     "my_items": ("GET", None),
     "settings_hub": ("GET", None),
     "finance_more": ("GET", None),
+    "finance_overview": ("GET", None),
     "proxy_grant": ("POST", "executive_meeting"),
     "proxy_revoke": ("POST", "proxy_b"),
     "consents": ("GET", None),

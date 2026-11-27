@@ -360,3 +360,7 @@
   check: "On a 390 px phone, the Finance tabs (Owner accounts, Collections, Accounting, Reports) and the Homes and owners views (Homes, Accounts, Sign-ups) wrap onto a second line with every tab visible; nothing scrolls sideways; the dashboard's Latest news card is as wide as the cards above it; Owner accounts shows one line per home (D88)."
   steps: "POC with fictional data, signed in as a demo board member on an iPhone and an Android phone (or the browser's 390 px phone view); open Owner accounts, Reports, Homes and owners and the dashboard."
   last: ""
+- key: finance overview on a phone
+  check: "On a 390 px phone and on a desktop, a demo board member's Finance overview shows the cards (one column on the phone) with each card's number beside its title, and the Finance menu number equals the sum of the numbers on the cards; the dashboard's Record payments received button has clear space above the stat tiles; the demo manager's and auditor's overview shows only what they may open (D89)."
+  steps: "POC with fictional data (oak_creek), signed in as a demo board member, the demo manager and the demo auditor; compare the menu bubble with the cards; check the dashboard on both widths."
+  last: ""

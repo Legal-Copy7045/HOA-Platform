@@ -69,38 +69,6 @@ HUBS = {
         # Committees (the workspaces) open from Board and committees, where
         # each committee's name links to it (WT-008); see SUBPAGES.
     ],
-    # Finance pages the board opens now and then (WT-036): the Finance section
-    # keeps the daily ones.
-    "finance_more": [
-        (
-            "Reserve plan",
-            "reserve_plan",
-            "chart",
-            "reserves.view",
-            "The reserve study's components, the funding plan and what has been adopted.",
-        ),
-        (
-            "Online payments",
-            "online_payments",
-            "wallet",
-            "payments.manage",
-            "Card and bank payments through Stripe, payouts and automatic payments.",
-        ),
-        (
-            "Disbursements",
-            "disbursements",
-            "dollar",
-            "disbursement.view",
-            "Surplus distributions and refunds to owners, with their checks.",
-        ),
-        (
-            "Resale certificates",
-            "resales",
-            "file",
-            "resale.manage",
-            "Certificates for a home being sold, with the fee and the documents.",
-        ),
-    ],
     "settings_hub": [
         # The setup wizard (D51): board members who may change rules.
         (
@@ -226,6 +194,33 @@ HUB_KEEPS_LABEL = {"voting": "type"}
 # (governance.voting_views: the heading is "Surveys" when only surveys show).
 HUB_SINGLE_LABELS = {("voting", "surveys"): "Surveys"}
 
+# A hub tile's count includes the pages reached from that tile's page (D89),
+# so the waiting item lands on the tile that opens it.
+TILE_SUBPAGES = {"board_and_committees": ["committees"]}
+
+
+# Overview pages whose menu bubble is the sum of their cards' counts, cards
+# that may also have their own menu entry (D89). They are left out of their
+# section's total so nothing is counted twice there.
+def _finance_overview_count(request, groups, counts) -> int:
+    from ledger import finance_overview
+
+    return sum(
+        finance_overview.card_count(c, counts) for c in finance_overview.open_cards(groups, request)
+    )
+
+
+AGGREGATES = {"finance_overview": _finance_overview_count}
+
+# Pages that are breadcrumb parents without being hubs ({% hub_crumb %}):
+# url name -> (label, permission). The More finance hub became the Finance
+# overview (D89); its old name keeps working in templates.
+CRUMB_PAGES = {
+    "finance_overview": ("Finance overview", "finance.view"),
+    "finance_more": ("Finance overview", "finance.view"),
+}
+CRUMB_TARGETS = {"finance_more": "finance_overview"}
+
 # Pages reached from a sidebar entry's page rather than from the sidebar: the
 # entry is marked current on them and counts their waiting items. A page
 # listed here is not shown again as its own entry further down the menu.
@@ -247,6 +242,15 @@ SUBPAGES = {
     "sysadmin_activity": ["server_tasks"],
     # Help pages (D73): the topics, Getting started and Welcome mark Help.
     "help": ["welcome"],
+    # Finance components without their own menu entry open from the Finance
+    # overview (D89), which is current on them.
+    "finance_overview": [
+        "budgets",
+        "reserve_plan",
+        "online_payments",
+        "disbursements",
+        "resales",
+    ],
 }
 
 # Entries shown only while an optional feature is off: Meetings is part of
@@ -325,14 +329,18 @@ SECTIONS = [
     (
         "Finance",
         [
+            # The Finance overview (D89) first: every finance component as a
+            # card with its status and its own waiting count; its bubble is
+            # their sum (AGGREGATES). The daily pages follow; Budgets, Reserve
+            # plan, Online payments, Disbursements, Resale certificates and
+            # Bank feed open from the overview (SUBPAGES). It replaces the
+            # More finance hub (finance_more redirects there).
+            ("Finance overview", "finance_overview", "dollar", "finance.view"),
             ("Owner accounts", "ledger_home", "wallet", "finance.view"),
             ("Invoices", "invoices", "receipt", "finance.view"),
             ("Collections", "collections", "dollar", "finance.view"),
-            ("Budgets", "budgets", "chart", "finance.view"),
             ("Accounting", "accounting", "receipt", "finance.view"),
             ("Reports", "reports", "chart", "reports.view"),
-            # Reserve plan, Online payments, Disbursements, Resale certificates.
-            ("More finance", "finance_more", "dollar", HUB),
         ],
     ),
     (
@@ -439,11 +447,35 @@ def shortcuts(request, names: list[str], groups: frozenset[str]) -> list[dict]:
     return out
 
 
-def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[dict]:
-    """The pages of a hub this person may open, with their features on. A page
-    whose URL does not exist (yet) is skipped."""
+def waiting_counts(request) -> dict[str, int]:
+    """My items per sidebar key, once per request (core.my_items)."""
+    from core.my_items import nav_counts
+
+    user = getattr(request, "user", None)
+    if user is None or not user.is_authenticated:
+        return {}
+    try:
+        return nav_counts(user, request)
+    except Exception:  # a count must never break the page
+        return {}
+
+
+def tile_count(name: str, counts: dict[str, int]) -> int:
+    """A hub tile's own waiting items: its page and the pages reached from it
+    (D89), the same counts that make up the hub's menu bubble."""
+    return counts.get(name, 0) + sum(counts.get(s, 0) for s in TILE_SUBPAGES.get(name, []))
+
+
+def hub_links(
+    request, hub: str, groups: frozenset[str] | None = None, counts: dict | None = None
+) -> list[dict]:
+    """The pages of a hub this person may open, with their features on, each
+    with its own waiting count (D89). A page whose URL does not exist (yet) is
+    skipped."""
     if groups is None:
         groups = policy.roles_for(request.user).groups
+    if counts is None:
+        counts = waiting_counts(request)
     out = []
     for label, name, icon, permission, description in HUBS[hub]:
         if not allowed(groups, permission):
@@ -463,6 +495,7 @@ def hub_links(request, hub: str, groups: frozenset[str] | None = None) -> list[d
                     "url": url,
                     "icon": icon,
                     "text": term_text(description),
+                    "count": tile_count(name, counts),
                 }
             )
     return out
@@ -478,7 +511,7 @@ def _matches(url: str, path: str, here_mine: bool) -> bool:
 def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict, list] | None:
     """One sidebar entry and the pages it stands for, or None if hidden."""
     if permission == HUB:
-        children = hub_links(request, name, groups)
+        children = hub_links(request, name, groups, counts)
         if not children:
             return None
         if len(children) > 1:
@@ -507,13 +540,24 @@ def _item(request, groups, label, name, icon, permission, counts) -> tuple[dict,
         else:
             url = children[0]["url"]
             label, icon = children[0]["label"], children[0]["icon"]
-    count = counts.get(name, 0) + sum(counts.get(c["name"], 0) for c in children)
+    if permission == HUB:
+        # The hub's own items plus each tile's count: the bubble is the sum
+        # of the numbers on the hub page (D89).
+        count = counts.get(name, 0) + sum(c.get("count", 0) for c in children if "label" in c)
+    else:
+        count = counts.get(name, 0) + sum(counts.get(c["name"], 0) for c in children)
+    # What this entry adds to its section's total; an overview's bubble also
+    # counts cards that have their own entry, so only its subpages add here.
+    section_count = count
+    if name in AGGREGATES:
+        count = AGGREGATES[name](request, groups, counts)
     item = {
         "label": label,
         "url": url,
         "icon": icon,
         "current": False,
         "count": count,
+        "section_count": section_count,
         "name": name,
     }
     return item, children
@@ -551,7 +595,7 @@ def build(request) -> dict:
                     best = (base, item, len(sections))
             visible.append(item)
         if visible:
-            count = sum(i["count"] for i in visible)
+            count = sum(i["section_count"] for i in visible)
             if title == "My home" and not roles.groups & policy.RESIDENTS:
                 # A former owner's one section holds only My history (WT-014).
                 title = "My history"

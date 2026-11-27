@@ -1406,3 +1406,13 @@ def collection_letter(request, pk):
         messages.error(request, str(exc))
         return redirect("collection_detail", pk=case.pk)
     return pdf_response(data, f"{kind}-notice-lot-{case.lot.number}.pdf")
+
+
+@login_required
+def finance_overview(request):
+    """Finance overview (D89): every finance component this person may open,
+    with its status, its own waiting count and a link."""
+    policy.require(request.user, "finance.view")
+    from ledger import finance_overview as overview
+
+    return render(request, "ledger/finance_overview.html", overview.build(request))

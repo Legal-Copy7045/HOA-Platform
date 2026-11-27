@@ -728,7 +728,7 @@ PAGE_DESCRIPTIONS = {
     "budgets": "Budgets by year.",
     "accounting": "Journal exports, deposits and reconciliation.",
     "reports": "Financial and activity reports.",
-    "finance_more": "Reserve plan, online payments, disbursements, resale certificates.",
+    "finance_overview": "Every finance part at a glance, with what waits on you in each.",
     "system_status": "Health checks, updates and backups.",
     "sysadmin_activity": "What sysadmins did, for the board to see.",
     "server_tasks": "Backups, restore drills and other server tasks.",

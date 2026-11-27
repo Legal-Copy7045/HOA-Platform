@@ -638,8 +638,8 @@ def test_feature_switch_hides_every_page(client, w):
 def test_reserve_plan_is_in_the_finance_menu_and_tabs(client, w):
     client.force_login(w["manager"])
     html = client.get(reverse("budgets")).content.decode()
-    # On the More finance hub (WT-036), not the sidebar, and no tab bar.
+    # On the Finance overview (D89), not the sidebar, and no tab bar.
     assert f'href="{reverse("reserve_plan")}"' not in html
-    assert f'href="{reverse("finance_more")}"' in html
-    hub = client.get(reverse("finance_more")).content.decode()
+    assert f'href="{reverse("finance_overview")}"' in html
+    hub = client.get(reverse("finance_overview")).content.decode()
     assert hub.count(f'href="{reverse("reserve_plan")}"') == 1
