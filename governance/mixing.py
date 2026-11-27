@@ -1,4 +1,4 @@
-"""Mixing pool for secret choices (decision D56).
+"""Mixing pool for secret choices (decisions D56 and D68).
 
 Secret votes, elections and anonymous surveys record *who* took part in one
 append-only table and *what* was chosen in another. Writing both in the same
@@ -26,11 +26,26 @@ one, revealing that voter). Closing flushes everything before results are
 computed, and results for a closed vote, election or survey flush anything
 left first, so no tally ever leaves a pooled choice out.
 
-Residual risk (docs/decisions.md D56): while a choice waits in the pool, a
-person with live database access, a backup or the write-ahead log from that
-window could still link it (the pool row and the participation share a
-transaction). After the flush and VACUUM, the persistent tables cannot be
-linked. Nothing here is logged or audited with the choice itself.
+Sealed pool (D68). The pool row is written in the casting transaction on
+purpose: the participation and the choice commit together or not at all, so
+one vote per home stays atomic and no crash or retry loses or doubles a
+ballot. That row therefore shares the casting transaction's id (``xmin``),
+its place in the write-ahead log and its place in a dump with the
+participation. So it holds nothing readable: the choice is sealed in the web
+process (``governance.sealing``: AES-GCM, key derived from the server's
+``DJANGO_SECRET_KEY``, padded to one size per vote, election or survey)
+before the INSERT, and only ``flush`` opens it, in memory. Choices kept
+behind are sealed again with fresh nonces and new ids, so they cannot be
+followed from one batch to the next. A person with the database, a backup or
+the WAL but not the server's key sees which homes voted (as the board does)
+and opaque rows of one size; the plaintext choices appear only in the
+flush's shuffled inserts, with no tie to any sealed row.
+
+Residual risk (docs/decisions.md D68): someone holding the server's key *and*
+the database, a disk image or the WAL from the voting window (in practice
+root on the server) can open each sealed row and link it; a server operator
+willing to change the code can read choices as they are cast. Nothing here is
+logged or audited with the choice itself.
 """
 
 from __future__ import annotations
@@ -41,10 +56,13 @@ import uuid
 
 from django.conf import settings
 from django.db import connection, transaction
+from django.db.models import Count
 from django.utils import timezone
 from psycopg import sql
 
+from governance import sealing
 from governance.models import (
+    TEXT_ANSWER_MAX,
     Election,
     ElectionChoice,
     ElectionState,
@@ -52,6 +70,7 @@ from governance.models import (
     SecretChoice,
     Survey,
     SurveyAnswer,
+    SurveyQuestion,
     SurveyResponse,
     Vote,
     VoteStatus,
@@ -76,16 +95,37 @@ def mix_min() -> int:
 # --- Casting -----------------------------------------------------------------------------
 
 
+def size_for(kind: str, target) -> int:
+    """The one padded plaintext size for every sealed choice of ``target``
+    (options, seats and survey questions are fixed once voting opens)."""
+    if kind == VOTE:
+        return sealing.vote_bound()
+    if kind == ELECTION:
+        return sealing.election_bound(target.seats)
+    questions = list(
+        SurveyQuestion.objects.filter(survey_id=target.pk)
+        .annotate(n=Count("choices"))
+        .values_list("kind", "n")
+    )
+    return sealing.survey_bound(questions, TEXT_ANSWER_MAX)
+
+
+def _pool(kind: str, target, payload: dict) -> None:
+    """Seal the choice before it reaches the database, then stage it in the
+    caller's (casting) transaction, next to the participation."""
+    PendingSecretChoice.objects.create(
+        **{_COLUMN[kind]: target.pk},
+        sealed=sealing.seal(kind, target.pk, payload, size_for(kind, target)),
+    )
+    _schedule(kind, target.pk)
+
+
 def pool_vote_choice(vote: Vote, option_id: int) -> None:
-    PendingSecretChoice.objects.create(vote=vote, payload={"option": int(option_id)})
-    _schedule(VOTE, vote.pk)
+    _pool(VOTE, vote, {"option": int(option_id)})
 
 
 def pool_election_ballot(election: Election, candidate_ids: list[int]) -> None:
-    PendingSecretChoice.objects.create(
-        election=election, payload={"candidates": [int(c) for c in candidate_ids]}
-    )
-    _schedule(ELECTION, election.pk)
+    _pool(ELECTION, election, {"candidates": [int(c) for c in candidate_ids]})
 
 
 def pool_survey_response(survey: Survey, answers: list[dict]) -> None:
@@ -99,8 +139,7 @@ def pool_survey_response(survey: Survey, answers: list[dict]) -> None:
         }
         for a in answers
     ]
-    PendingSecretChoice.objects.create(survey=survey, payload={"answers": clean})
-    _schedule(SURVEY, survey.pk)
+    _pool(SURVEY, survey, {"answers": clean})
 
 
 def _schedule(kind: str, target_id: int) -> None:
@@ -174,13 +213,18 @@ def flush(kind: str, target_id: int, *, final: bool = False) -> int:
             return 0
         rows = _take(kind, target_id)
         if not final:
-            # Keep K random choices behind for the next batch (pool mix).
+            # Keep K random choices behind for the next batch (pool mix),
+            # sealed again with fresh nonces and new ids: nothing ties a kept
+            # row to the sealed row it came from.
             _rng.shuffle(rows)
             keep, rows = rows[:k], rows[k:]
+            size = size_for(kind, parent)
             PendingSecretChoice.objects.bulk_create(
                 [
                     PendingSecretChoice(
-                        id=uuid.uuid4(), **{_COLUMN[kind]: target_id}, payload=payload
+                        id=uuid.uuid4(),
+                        **{_COLUMN[kind]: target_id},
+                        sealed=sealing.seal(kind, target_id, payload, size),
                     )
                     for payload in keep
                 ]
@@ -191,26 +235,24 @@ def flush(kind: str, target_id: int, *, final: bool = False) -> int:
 
 
 def _take(kind: str, target_id: int) -> list[dict]:
-    """Delete and return every pooled payload for the target, in random order."""
+    """Delete, open and return every pooled choice for the target, in random
+    order. A row no configured key opens stops the flush
+    (``sealing.PoolKeyError``): the transaction rolls back, the row stays
+    pooled, and no result is computed without it."""
     statement = sql.SQL(
-        "DELETE FROM governance_pendingsecretchoice WHERE {} = %s RETURNING payload, sort_key"
+        "DELETE FROM governance_pendingsecretchoice WHERE {} = %s RETURNING sealed, sort_key"
     ).format(sql.Identifier(_COLUMN[kind]))
     with connection.cursor() as cursor:
         cursor.execute(statement.as_string(cursor.connection), [target_id])
         fetched = cursor.fetchall()
-    decoded = [(_decode(payload), key) for payload, key in fetched]
-    decoded.sort(key=lambda row: row[1])  # random keys: physical order is gone
-    rows = [payload for payload, _ in decoded]
+    fetched.sort(key=lambda row: row[1])  # random keys: physical order is gone
+    try:
+        rows = [sealing.unseal(kind, target_id, blob) for blob, _ in fetched]
+    except sealing.PoolKeyError:
+        logger.error("governance.mix_unseal_failed", extra={"kind": kind})
+        raise
     _rng.shuffle(rows)
     return rows
-
-
-def _decode(payload):
-    if isinstance(payload, (bytes, str)):
-        import json
-
-        return json.loads(payload)
-    return payload
 
 
 def _write(kind: str, parent, rows: list[dict]) -> int:

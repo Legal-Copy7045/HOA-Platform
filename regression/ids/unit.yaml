@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-3667
+# highest issued: UNIT-3676
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -3033,7 +3033,16 @@ UNIT-3664: "regression/tests/test_live_checks.py::test_other_redirects_are_not[h
 UNIT-3665: "regression/tests/test_live_checks.py::test_other_redirects_are_not[https://notcloudflareaccess.com/login]"
 UNIT-3666: "regression/tests/test_live_checks.py::test_other_redirects_are_not[/accounts/login/]"
 UNIT-3667: "regression/tests/test_live_checks.py::test_other_redirects_are_not[]"
+UNIT-3668: "governance/tests/test_secret_ballot_unlinkable.py::test_a_failure_after_the_participation_loses_nothing_and_allows_a_retry"
+UNIT-3669: "governance/tests/test_secret_ballot_unlinkable.py::test_without_the_key_nothing_is_counted_and_nothing_is_lost"
 UNIT-367: "accounts/tests/test_mfa_reset.py::test_only_board_members_take_part[roles0]"
+UNIT-3670: "governance/tests/test_secret_ballot_unlinkable.py::test_a_sealed_choice_opens_only_for_its_own_vote"
+UNIT-3671: "governance/tests/test_secret_ballot_unlinkable.py::test_a_snapshot_during_voting_links_each_home_only_to_an_opaque_row"
+UNIT-3672: "governance/tests/test_secret_ballot_unlinkable.py::test_kept_choices_are_sealed_again_and_lose_every_tie_to_their_cast"
+UNIT-3673: "governance/tests/test_secret_ballot_unlinkable.py::test_no_persisted_relationship_links_a_participation_to_its_choice"
+UNIT-3674: "governance/tests/test_secret_ballot_unlinkable.py::test_election_and_survey_pools_are_sealed_too"
+UNIT-3675: "governance/tests/test_secret_ballot_unlinkable.py::test_concurrent_submissions_for_one_home_record_one_ballot_and_one_choice"
+UNIT-3676: "governance/tests/test_secret_ballot_unlinkable.py::test_padding_hides_what_was_chosen_and_never_truncates"
 UNIT-368: "accounts/tests/test_mfa_reset.py::test_only_board_members_take_part[roles1]"
 UNIT-369: "accounts/tests/test_mfa_reset.py::test_approval_signs_the_user_out_everywhere"
 UNIT-370: "accounts/tests/test_mfa_reset.py::test_after_reset_only_the_code_page_works_until_the_code_is_entered"

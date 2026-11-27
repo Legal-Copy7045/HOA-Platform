@@ -76,6 +76,11 @@ CAUSES = {
         "because the file store could not be reached",
         "Check File store on System status.",
     ),
+    "PoolKeyError": (
+        "because secret ballots waiting to be mixed could not be opened with the server's key",
+        "Put the previous DJANGO_SECRET_KEY in DJANGO_SECRET_KEY_FALLBACKS in .env and restart "
+        "(docs/runbook.md 'Secrets'); the vote stays open and no ballot is lost until then.",
+    ),
     "MemoryError": (
         "because the server ran out of memory",
         "Check Server memory on System status.",

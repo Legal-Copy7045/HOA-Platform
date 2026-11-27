@@ -6,6 +6,18 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.37.0 — 2026-11-27
+
+- Secret ballots are sealed while they wait to be mixed (D68). A secret
+  vote's, election's or anonymous survey's choice is encrypted, padded to one
+  size, before it is stored, and opened only when it is shuffled into the
+  results. Someone with the database, a backup or the server's logs, but not
+  the server's secret key, can no longer link a home to how it voted. Votes
+  still count once per home and none is lost on an error.
+- The server's secret key now also protects open secret ballots: keep
+  `.env` apart from backups, and rotate the key only with the old one listed
+  in `DJANGO_SECRET_KEY_FALLBACKS` until open secret votes close (runbook).
+
 ## 0.36.0 — 2026-11-27
 
 - Surplus distributions follow the Declaration (D67). A surplus is split in
