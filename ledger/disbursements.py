@@ -1054,6 +1054,9 @@ def issue_checks(
     today = timezone.localdate()
     if issued_on > today:
         raise DisbursementError("The issue date cannot be in the future.")
+    from ledger.books.periods import refuse_closed
+
+    refuse_closed(issued_on, error=DisbursementError, what="The issue date")  # D70
     out = []
     with transaction.atomic(), system_access("issue checks"):
         _lock(_BATCH_LOCK, batch.pk)

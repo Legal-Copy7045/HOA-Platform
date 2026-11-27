@@ -243,6 +243,26 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "disbursement.approve": frozenset({BOARD}),
     "disbursement.issue": frozenset({BOARD, MANAGER}),
     "disbursement.void": frozenset({BOARD}),
+    # --- Books and close (D69-D71, features "books", "financial_statements") ---
+    # The manager codes bank lines, enters statement balances and notes
+    # differences (preparing); rules, money differences, waivers, closing
+    # and reopening are board decisions, and a reopen or a money difference
+    # needs a second board member.
+    "books.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "books.setup": frozenset({BOARD}),
+    "books.code": frozenset({BOARD, MANAGER}),
+    "books.rules": frozenset({BOARD}),
+    "books.balance": frozenset({BOARD, MANAGER}),
+    "books.difference": frozenset({BOARD, MANAGER}),
+    "books.difference_agree": frozenset({BOARD}),
+    "books.waive_late_fee": frozenset({BOARD}),
+    "books.close": frozenset({BOARD}),
+    "books.reopen_request": frozenset({BOARD}),
+    "books.reopen_approve": frozenset({BOARD}),
+    "statements.view": frozenset({BOARD, MANAGER, AUDITOR}),
+    "books.package": frozenset({BOARD, AUDITOR}),
+    # Tax worksheet, 1099 files and copies (D71-tax).
+    "tax.view": frozenset({BOARD, AUDITOR}),
 }
 
 # Role groups that require MFA... every account requires it (decision D5);
