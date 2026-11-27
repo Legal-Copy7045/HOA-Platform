@@ -52,5 +52,6 @@
       <thead><tr><th>Request</th><th>Status</th><th>Due</th></tr></thead>
       <tbody>{% for r in records %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'records_request_detail' r.pk %}">Records request #{{ r.pk }}</a><div class="small muted">{{ r.description|truncatechars:80 }}</div></td><td data-label="Status">{% status r.state r.get_state_display %}</td><td class="nowrap" data-label="Due">{{ r.due_on|short_date|default:"" }}</td></tr>{% endfor %}</tbody>
     </table></div>{% else %}<p class="muted small">No records requests yet.</p>{% endif %}
+    <p class="small"><a href="{% url 'records_requests' %}?mine=1" data-testid="all-my-records-requests">All my records requests</a></p>
   </section>{% endif %}
 {% endblock %}
