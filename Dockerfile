@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # One image runs web, worker and the migrate step (CLAUDE.md: Docker, one image).
-FROM python:3.13-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
