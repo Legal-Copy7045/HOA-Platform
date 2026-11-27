@@ -6,6 +6,26 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.41.0 — 2026-11-27
+
+Fixes from the full check (D87):
+
+- A board member who sold their home, or a co-owner removed from a deed, can
+  no longer post, move, reverse or refund money on the account they were on.
+- A co-owner removed from a deed no longer sees checks written after they left.
+- Architectural review recusal now covers tenants and contacts of the
+  neighbouring homes a request affects, and whoever owned them at the time.
+- A candidate cannot open, extend or close their own election.
+- Account recovery: "still waiting" emails at most once a day; statement and
+  digest emails cannot be switched off during the lock afterwards.
+- Online payments accept only a restricted Stripe key (rk_...): if the POC
+  uses a full key, run set-stripe-key.sh again with a restricted one.
+- The server refuses a database role with superuser rights; text messages
+  refuse redirects; the sign-in picture is malware-scanned; the USPS password
+  reaches only the worker; key scripts remove their .env backup copies.
+- Rebuilding payment matching after "Move to account" now gives the same
+  balances.
+
 ## 0.40.0 — 2026-11-27
 
 The portal is now the association's books (self-managed, D69-D85):
