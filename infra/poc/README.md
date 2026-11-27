@@ -75,10 +75,12 @@ Both scripts check before changing anything and are safe to re-run.
 
 ## Updating to a new version
 
-One command pulls the latest code, shows what changed, rebuilds, restarts
-(migrations run automatically) and prints the record counts. It refuses to
-pull over local edits and does nothing if there is nothing new (`--force`
-restarts anyway). Optional shortcut, once:
+One command moves the checkout to the newest release tag (`v<VERSION>`, made
+by CI when a version bump merges; D90), shows what changed, rebuilds the image
+on the VM, restarts (migrations run automatically) and prints the record
+counts. It refuses to pull over local edits and does nothing if there is
+nothing new (`--force` restarts anyway); `--ref <branch>` deploys that
+branch's tip on purpose (`--ref main` for unreleased code). Optional shortcut, once:
 `sudo ln -sf /opt/hoa-portal/infra/poc/update-portal.sh /usr/local/bin/hoa-update`,
 then `sudo hoa-update`.
 

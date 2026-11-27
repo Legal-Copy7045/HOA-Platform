@@ -1,0 +1,13 @@
+# Versions Dependabot doesn't track (STANDARD.md 5): the Monday maintenance session checks each for a newer release
+# (tools/upstreams.py of the standards repository). source: pypi:<name> | npm:<name> | github:<owner>/<repo> |
+# docker:<image>. track: stay on that release line (a new line is a deliberate decision, see `why`).
+- {name: Playwright (page crawl and walkthrough browser), current: "1.63.0", source: "npm:playwright",
+   where: ".github/workflows/ci.yml (pages job, PLAYWRIGHT_VERSION)"}
+- {name: Trivy (image scan), current: "0.70.0", source: "github:aquasecurity/trivy",
+   where: ".github/workflows/ci.yml (image-scan job, trivy-action input version)"}
+- {name: PostgreSQL major line, current: "16", track: "16", source: "docker:postgres",
+   where: "docker-compose.yml (postgres, minor updates via Dependabot) and .github/workflows/ci.yml services (postgres:16-alpine)",
+   why: "a new major needs a dump and restore (Dependabot ignores Postgres majors); move the line on purpose"}
+- {name: Python (image and CI), current: "3.13", source: "docker:python",
+   where: "Dockerfile (python:3.13-slim-bookworm; Dependabot keeps the patch level) and .github/workflows/ci.yml (python-version)",
+   why: "a new minor Python is a planned change: CI, Dockerfile and pyproject together"}

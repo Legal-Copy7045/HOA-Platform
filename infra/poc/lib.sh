@@ -73,6 +73,29 @@ branch_allowed() {
   return 1
 }
 
+# pick_release_tag  (stdin: tag names, one per line, e.g. `git tag --merged origin/main`)
+# Prints the newest release tag v<MAJOR>.<MINOR>.<PATCH> (D90: the VM installs
+# only released versions); pre-releases (v1.2.0-beta.1) and other names are
+# skipped. Prints nothing and fails when there is none.
+pick_release_tag() {
+  local tag best="" a b c x y z
+  while IFS= read -r tag; do
+    [[ "$tag" =~ ^v([0-9]{1,6})\.([0-9]{1,6})\.([0-9]{1,6})$ ]] || continue
+    a=$((10#${BASH_REMATCH[1]})); b=$((10#${BASH_REMATCH[2]})); c=$((10#${BASH_REMATCH[3]}))
+    if [ -n "$best" ]; then
+      [[ "$best" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]
+      x=$((10#${BASH_REMATCH[1]})); y=$((10#${BASH_REMATCH[2]})); z=$((10#${BASH_REMATCH[3]}))
+      if [ "$a" -lt "$x" ] || { [ "$a" -eq "$x" ] && [ "$b" -lt "$y" ]; } \
+         || { [ "$a" -eq "$x" ] && [ "$b" -eq "$y" ] && [ "$c" -le "$z" ]; }; then
+        continue
+      fi
+    fi
+    best="$tag"
+  done
+  [ -n "$best" ] || return 1
+  printf '%s\n' "$best"
+}
+
 # offsite_pick <now stamp>  (stdin: backup names, oldest first, as pull_backup --list)
 # Prints the newest well-formed name not dated after <now>. Names in the
 # future or not shaped like a stamp are skipped with a warning, so one

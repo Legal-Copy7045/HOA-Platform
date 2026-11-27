@@ -1,0 +1,19 @@
+# Which slow CI groups a pull request starts (STANDARD.md 1.2, D90). Regexes over changed paths.
+# Narrower than the template's ignore list on purpose: tests here read CLAUDE.md, docs/claude/, docs/glossary.md,
+# CHANGELOG.md and the regression ids, so only files nothing tests start nothing slow.
+ignore: ['^\.claude/', '^LICENSE$', '^README\.md$','^regression/(RUNS|WALKTHROUGHS|README)\.md$', '^docs/(?!claude/|glossary\.md|examples/)']
+shared: ['^\.github/workflows/', '^\.github/scripts/', '^\.github/changes\.yaml$']   # start every group
+groups:
+  # The whole pytest suite (two shards): code, templates, static files, settings and every file a test reads.
+  tests: ['\.py$', '\.(html|txt|css|js|mjs|json|svg|csv|toml|cfg|ini|sh|ya?ml|webmanifest)$', '^VERSION$',
+          '^CHANGELOG\.md$', '^CLAUDE\.md$', '^docs/', '^requirements/', '^docker/', '^infra/', '^Dockerfile$',
+          '^\.dockerignore$', '^\.env\.example$', '^\.gitleaks\.toml$', '^\.github/']
+  # The image build and Trivy scan (built once per run).
+  image: ['^Dockerfile$', '^\.dockerignore$', '^requirements/', '^docker/', '^docker-compose[^/]*\.yml$']
+  # The regression page crawl in a browser.
+  pages: ['^templates/', '^static/', '^regression/(run|pages|passkey|page_settings|page_setup)\.', '^requirements/',
+          '(urls|views|_views|models|navigation|features|policy|middleware|forms)\.py$', '/migrations/',
+          '/templatetags/']
+  # Dependency audit (pip-audit).
+  lockfiles: ['^requirements/.*\.(txt|in)$']
+# A changed file that matches nothing above starts every group (safe default).

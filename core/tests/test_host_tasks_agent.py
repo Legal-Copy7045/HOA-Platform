@@ -278,7 +278,8 @@ def test_scripts_never_build_sql_or_commands_from_strings():
 
 def test_agent_runs_tasks_after_the_update_logic_and_survives_a_missing_table():
     assert 'source "$APP_DIR/infra/poc/host-tasks.sh"' in AGENT
-    assert AGENT.rindex("process_host_task") > AGENT.index('update-portal.sh" >>')
+    install = AGENT.index('update-portal.sh" "${UPDATE_ARGS[@]}" >>')
+    assert AGENT.rindex("process_host_task") > install
     assert "flock -n 9" in AGENT
     guard = TASKS.split("process_host_task() {", 1)[1]
     assert guard.index("SELECT 1 FROM core_hosttask LIMIT 1;") < guard.index("UPDATE core_hosttask")

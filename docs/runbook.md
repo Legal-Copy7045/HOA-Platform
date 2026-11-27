@@ -95,12 +95,31 @@ alias dc='docker compose -f docker-compose.yml -f docker-compose.tunnel.yml'
 
 ## Deploying an update
 
+Only released versions are deployed (D90, the owner's standard): a merged
+version bump on `main` is the release, and CI tags it `v<VERSION>` and creates
+the GitHub Release with that version's CHANGELOG section. The VM moves to the
+newest release tag and builds its own image from it (no registry):
+
 ```bash
-git pull --ff-only && sudo bash infra/poc/start-portal.sh
+sudo bash /opt/hoa-portal/infra/poc/update-portal.sh               # the newest release tag
+sudo bash /opt/hoa-portal/infra/poc/update-portal.sh --ref main    # main's tip, on purpose (not a release)
+sudo bash /opt/hoa-portal/infra/poc/update-portal.sh --ref <branch>  # another branch, on purpose
 ```
 
-The script stops the containers first (data volumes are kept), so expect a
-few seconds of downtime. The `migrate` service applies migrations (as the
+Or from the portal: **System status** → Check now / Install now / Install
+tonight (the VM agent, D25/D38). "Update available" means a newer release tag
+than the running code: it shows that release's number, how many commits it
+adds and their titles. The local `main` branch is fast-forwarded to the tag,
+never past it; a checkout already newer than the newest release (deployed with
+`--ref main`) is left alone until the next release. If `main` has no release
+tag yet, the script says so and installs nothing (`--ref main` deploys the tip
+on purpose). The "Install" button works only while the checkout is on `main`,
+or on the one branch named in `ALLOW_BRANCH` in `.env` (a deliberate test,
+review R2-011), which installs that branch's tip.
+
+`update-portal.sh` runs `start-portal.sh`, which stops the containers first
+(data volumes are kept), so expect a few seconds of downtime.
+The `migrate` service applies migrations (as the
 owner role) before web and worker start; web and worker then check they are
 connected as the app role and refuse to start otherwise. The sysadmin
 **System status** page shows the deployed commit.

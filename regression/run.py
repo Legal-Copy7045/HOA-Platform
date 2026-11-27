@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 """Full regression run: every check in the repo, one result per check, stable IDs.
 
-    python3 regression/run.py                 # every regression stage except live
+The owner's standard command set (STANDARD.md 3.3, D90): the stages are this
+project's own code; everything after them goes through regression/standard.py
+(vendored unchanged from the standards repository):
+
+    python3 regression/run.py check           # ci + unit, quiet: before a PR is marked ready
+    python3 regression/run.py                 # every regression stage except live and walkthrough
     python3 regression/run.py --stage unit    # some stages only (repeatable)
     python3 regression/run.py --stage walkthrough      # the walkthrough only
     python3 regression/run.py --with-walkthrough       # regression + walkthrough together
     LIVE_HOST=portal-dev.example.org python3 regression/run.py --stage live
-    python3 regression/report.py              # out/*.json -> out/report.html + report.md
+    python3 regression/run.py brief [--full] [--walkthrough]    # reviewer briefs (standard.py)
+    python3 regression/run.py report [--walkthrough]   # report.py / walkthrough_report.py
+    python3 regression/run.py log [--walkthrough | --full-check]  # RUNS.md / WALKTHROUGHS.md row
+    python3 regression/run.py summary         # at most 40 lines (standard.py)
+    python3 regression/run.py manual KEY pass|fail --note "..."   # manual-log.yaml (standard.py)
 
 Stages run side by side in three lanes (ci | unit | page); live runs last, and only
 when asked. The walkthrough stage (every role and page on a desktop and a phone,
@@ -38,6 +47,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import standard  # vendored from the standards repository, never edited here)
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -125,6 +137,7 @@ class Stage:
         self.results.append(
             {
                 "id": self.ids.get(check),
+                "key": check,  # the standard's name (standard.py reads "key")
                 "check": check,
                 "status": status,
                 "detail": detail[:2000],
@@ -139,6 +152,7 @@ class Stage:
                 self.results.append(
                     {
                         "id": rid,
+                        "key": key,
                         "check": key,
                         "status": "skip",
                         "detail": "not produced by this run",
@@ -148,6 +162,7 @@ class Stage:
         self.ids.save()
         data = {
             "stage": self.name,
+            "prefix": PREFIX[self.name],
             "started": self.started,
             "finished": now(),
             "environment": environment or {},
@@ -263,6 +278,23 @@ def stage_ci(st: Stage) -> None:
         f"unexpected: {sorted(unexpected)}" if unexpected else f"accepted: {sorted(found)}",
         "regression/out/logs/ci-check-deploy.log",
     )
+
+    # The standard's version check and privacy guard (.github/scripts, D90).
+    for name, script, log in (
+        ("versions (VERSION, CHANGELOG.md, versions.yaml)", "check_versions.py", "ci-versions.log"),
+        ("privacy guard", "privacy_guard.py", "ci-privacy.log"),
+    ):
+        code, text = run(
+            [PY, str(ROOT / ".github" / "scripts" / script)],
+            env={"DEFAULT_BRANCH": "main"},
+            log=log,
+        )
+        st.add(
+            name,
+            "pass" if code == 0 else "fail",
+            "" if code == 0 else tail(text),
+            f"regression/out/logs/{log}",
+        )
 
     # Repository hygiene.
     tracked = subprocess.run(  # nosec B603 B607
@@ -644,8 +676,18 @@ def stage_live(st: Stage) -> None:
 
 
 def stage_manual(st: Stage) -> None:
+    """manual.yaml: "needs a person" unless `run.py manual KEY pass|fail` recorded a
+    result for this version in manual-log.yaml (STANDARD.md 3.1)."""
+    path = HERE / "manual-log.yaml"
+    log = (yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else None) or {}
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     for item in yaml.safe_load((HERE / "manual.yaml").read_text(encoding="utf-8")) or []:
-        st.add(item["key"], "manual", f"{item['check']} (last: {item.get('last', 'not done yet')})")
+        rec = log.get(item["key"]) or {}
+        if rec.get("version") == version and rec.get("result") in ("pass", "fail"):
+            st.add(item["key"], rec["result"], f"{rec.get('date', '')}: {rec.get('note', '')}")
+        else:
+            last = item.get("last", "not done yet")
+            st.add(item["key"], "manual", f"{item['check']} (last: {last})")
 
 
 STAGES = {
@@ -680,8 +722,84 @@ def chosen_stages(argv: list[str] | None = None) -> list[str]:
     return [s for s in ORDER if s in chosen]
 
 
+# --- after the stages: the standard's tooling (STANDARD.md 3.3) ----------------------------
+
+TOOLING = {"brief", "report", "log", "summary", "manual", "schema", "walkthrough-due"}
+
+
+def report(argv: list[str]) -> int:
+    """`run.py report [--walkthrough]`: this project's own reports (they read the
+    standard findings files too), in the profile's time zone."""
+    parser = argparse.ArgumentParser(prog="run.py report")
+    parser.add_argument("--walkthrough", action="store_true")
+    parser.add_argument("--no-thumbs", action="store_true")
+    args = parser.parse_args(argv)
+    env = {"REPORT_TZ": os.environ.get("REPORT_TZ") or standard.profile().get("report_tz", "UTC")}
+    script = "walkthrough_report.py" if args.walkthrough else "report.py"
+    cmd = [sys.executable, str(HERE / script)] + (["--no-thumbs"] if args.no_thumbs else [])
+    code = subprocess.run(cmd, cwd=ROOT, env={**os.environ, **env}, check=False).returncode  # nosec B603
+    return code
+
+
+def _walk_counts() -> tuple[int, int, int, int]:
+    """Roles, page types, failing WALK- checks and reviewer findings of the last walkthrough
+    (this project's inventory is {"roles": {role: {desktop|phone: {menu, pages}}}})."""
+    inventory = (
+        json.loads((OUT / "walkthrough.json").read_text())
+        if (OUT / "walkthrough.json").exists()
+        else {}
+    )
+    roles = inventory.get("roles", {})
+    pages = sum(len((w.get("desktop") or {}).get("pages", [])) for w in roles.values())
+    checks = OUT / "walkthrough-checks.json"
+    failing = (
+        sum(1 for r in json.loads(checks.read_text()).get("results", []) if r["status"] == "fail")
+        if checks.exists()
+        else 0
+    )
+    sys.path.insert(0, str(HERE))
+    import walkthrough_report
+
+    findings = len(walkthrough_report.merged_findings(OUT).get("findings", []))
+    return len(roles), pages, failing, findings
+
+
+def log(argv: list[str]) -> int:
+    """`run.py log [--walkthrough | --full-check]`: the standard rows in RUNS.md and
+    WALKTHROUGHS.md (standard.py's helpers; the walkthrough counts read this
+    project's inventory)."""
+    parser = argparse.ArgumentParser(prog="run.py log")
+    parser.add_argument("--walkthrough", action="store_true")
+    parser.add_argument("--full-check", action="store_true")
+    args = parser.parse_args(argv)
+    if not args.walkthrough or args.full_check:
+        standard.cmd_log(argparse.Namespace(walkthrough=False, full_check=args.full_check))
+    if args.walkthrough or args.full_check:
+        sha, ver = standard.git("rev-parse", "--short", "HEAD"), standard.version()
+        date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+        roles, pages, failing, findings = _walk_counts()
+        rep = standard.link("walkthrough") + (
+            " · " + standard.link("regression") if args.full_check else ""
+        )
+        row = [date, f"`{sha}`", ver, str(roles), str(pages), str(failing), str(findings), rep]
+        standard.add_row(HERE / "WALKTHROUGHS.md", standard.WALKS_HEADER, "Walkthroughs", row)
+        print("logged in regression/WALKTHROUGHS.md")
+    return 0
+
+
+def tooling(argv: list[str]) -> int:
+    if argv[0] == "report":
+        return report(argv[1:])
+    if argv[0] == "log":
+        return log(argv[1:])
+    return standard.main(argv)
+
+
 def main() -> int:
-    chosen = chosen_stages()
+    if len(sys.argv) > 1 and sys.argv[1] in TOOLING:
+        return tooling(sys.argv[1:])
+    check = len(sys.argv) > 1 and sys.argv[1] == "check"
+    chosen = ["ci", "unit"] if check else chosen_stages()
     OUT.mkdir(exist_ok=True)
     LOGS.mkdir(exist_ok=True)
     started = time.time()
@@ -693,10 +811,10 @@ def main() -> int:
         except Exception as exc:  # a broken stage is a result, not a crash
             st.add(f"{PREFIX[name]}-RUN", "fail", f"{type(exc).__name__}: {exc}")
         data = st.finish({"python": sys.version.split()[0]})
-        counts = {}
-        for r in data["results"]:
-            counts[r["status"]] = counts.get(r["status"], 0) + 1
-        print(f"{name:11} {counts}", flush=True)
+        # One line per stage and the failing checks (full output in out/logs/).
+        standard.print_stage_line(data, quiet=True)
+        if name == "walkthrough":
+            print("walkthrough done", flush=True)  # /full-check starts its reviewers on this
         return data
 
     lanes = [[s] for s in PARALLEL if s in chosen]
