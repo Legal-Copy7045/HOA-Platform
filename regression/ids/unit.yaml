@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-4608
+# highest issued: UNIT-4620
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -4068,8 +4068,20 @@ UNIT-4605: "core/tests/test_env_helper.py::test_vendor_key_script_removes_its_en
 UNIT-4606: "core/tests/test_env_helper.py::test_smtp2go_script_never_puts_the_key_on_a_command_line"
 UNIT-4607: "core/tests/test_env_helper.py::test_secrets_reach_only_the_containers_that_use_them"
 UNIT-4608: "core/tests/test_env_helper.py::test_bounce_config_needs_only_the_flag_outside_the_worker"
+UNIT-4609: "core/tests/test_menu_043.py::test_no_role_has_the_old_entries_or_a_duplicate_label"
 UNIT-461: "core/tests/test_production_settings.py::test_unsafe_configuration_is_refused[overrides15]"
+UNIT-4610: "core/tests/test_menu_043.py::test_menu_lengths"
+UNIT-4611: "core/tests/test_menu_043.py::test_owner_violations_entry_is_named_my_violations"
+UNIT-4612: "core/tests/test_menu_043.py::test_committee_member_menu_has_no_reimbursements_entry"
+UNIT-4613: "core/tests/test_menu_043.py::test_finance_overview_links_the_board_members_own_claims"
+UNIT-4614: "core/tests/test_menu_043.py::test_switched_off_reimbursements_hide_the_link"
+UNIT-4615: "core/tests/test_menu_043.py::test_own_claim_waits_in_my_items_without_a_menu_bubble"
+UNIT-4616: "core/tests/test_menu_043.py::test_my_requests_shows_own_records_requests_with_status"
+UNIT-4617: "core/tests/test_menu_043.py::test_contacts_and_tenants_get_no_records_section"
+UNIT-4618: "core/tests/test_menu_043.py::test_records_request_pages_go_back_to_my_requests"
+UNIT-4619: "core/tests/test_menu_043.py::test_records_request_detail_is_404_for_another_owner"
 UNIT-462: "core/tests/test_production_settings.py::test_direct_connections_can_opt_out_of_a_proxy"
+UNIT-4620: "core/tests/test_menu_043.py::test_sections_list_has_no_mine_entry_for_records_or_reimbursements"
 UNIT-463: "core/tests/test_production_settings.py::test_demo_data_only_on_a_deployment_marked_poc[production-False]"
 UNIT-464: "core/tests/test_production_settings.py::test_demo_data_only_on_a_deployment_marked_poc[poc-True]"
 UNIT-465: "core/tests/test_trusted_proxy.py::test_trusted_proxy_supplies_client_ip_and_https"
