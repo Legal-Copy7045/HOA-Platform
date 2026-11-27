@@ -111,7 +111,8 @@ def _refresh(checkout):
     ("key", "stage", "live_allowed", "available"),
     [
         ("rk_test_abc", "poc", False, True),
-        ("sk_test_abc", "local", False, True),
+        ("sk_test_abc", "local", False, False),  # full secret keys never (D87)
+        ("sk_live_abc", "production", True, False),
         ("rk_test_abc", "production", False, False),  # test cards could "pay" real accounts
         ("sk_test_abc", "production", True, False),
         ("rk_live_abc", "poc", True, False),

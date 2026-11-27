@@ -383,7 +383,7 @@ class _Response(io.BytesIO):
 def test_twilio_provider_posts_the_message(twilio):
     out = sms.provider()
     assert isinstance(out, sms.TwilioProvider) and out.available
-    with mock.patch("urllib.request.urlopen", return_value=_Response(b"{}")) as urlopen:
+    with mock.patch("urllib.request.OpenerDirector.open", return_value=_Response(b"{}")) as urlopen:
         result = out.send("+12155550123", "Hello")
     assert result.ok
     request = urlopen.call_args.args[0]
@@ -397,9 +397,31 @@ def test_twilio_unsubscribed_recipient_is_reported_as_opted_out(twilio):
     error = urllib.error.HTTPError(
         "https://api.twilio.example", 400, "Bad", {}, io.BytesIO(b'{"code": 21610}')
     )
-    with mock.patch("urllib.request.urlopen", side_effect=error):
+    with mock.patch("urllib.request.OpenerDirector.open", side_effect=error):
         result = sms.provider().send("+12155550123", "Hello")
     assert not result.ok and result.opted_out
+
+
+def test_twilio_never_follows_a_redirect(twilio):
+    """D87 (SEC-003): a 3xx is a failure, so the Basic credentials never
+    reach another host."""
+    import email.message
+    import urllib.response
+
+    opened = []
+
+    def https_open(handler, req):
+        opened.append(req.full_url)
+        headers = email.message.Message()
+        headers["Location"] = "https://elsewhere.example/collect"
+        response = urllib.response.addinfourl(io.BytesIO(b""), headers, req.full_url, 302)
+        response.msg = "Found"
+        return response
+
+    with mock.patch("urllib.request.HTTPSHandler.https_open", https_open):
+        result = sms.provider().send("+12155550123", "Hello")
+    assert not result.ok
+    assert opened == ["https://api.twilio.example/2010-04-01/Accounts/ACtest/Messages.json"]
 
 
 def test_twilio_needs_every_setting_and_https(twilio, settings):

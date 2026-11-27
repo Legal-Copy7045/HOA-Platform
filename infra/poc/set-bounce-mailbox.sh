@@ -58,6 +58,7 @@ if [[ "$PASSWORD" == *"'"* || "$PASSWORD" =~ [[:cntrl:]] ]]; then
 fi
 
 cp -p .env .env.before-bounce-mailbox
+chmod 600 .env.before-bounce-mailbox
 set_env .env BOUNCE_IMAP_HOST "$HOST"
 set_env .env BOUNCE_IMAP_PORT "$PORT"
 set_env .env BOUNCE_IMAP_USER "$USERNAME"
@@ -72,5 +73,7 @@ if ! "${COMPOSE[@]}" exec -T web python manage.py check_bounce_mailbox; then
   echo "The check failed (above). To undo: cp .env.before-bounce-mailbox .env && sudo bash infra/poc/start-portal.sh" >&2
   exit 1
 fi
+shred -u .env.before-bounce-mailbox 2>/dev/null || rm -f .env.before-bounce-mailbox
+echo "Removed .env.before-bounce-mailbox (the copy of the previous settings, with the old secret)."
 echo "Done. Switch on Bounced email in Admin -> Features; System status shows the Bounce mailbox check."
-echo "To undo: cp .env.before-bounce-mailbox .env && sudo bash infra/poc/start-portal.sh"
+echo "To change the mailbox, run this script again."

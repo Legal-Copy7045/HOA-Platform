@@ -49,6 +49,7 @@ if [ "$ENVIRONMENT" != "sandbox" ]; then
 fi
 
 cp -p .env .env.before-teller
+chmod 600 .env.before-teller
 set_env .env TELLER_APPLICATION_ID "$APP_ID"
 set_env .env TELLER_ENVIRONMENT "$ENVIRONMENT"
 if [ -n "$CERT" ]; then
@@ -73,5 +74,7 @@ if [ -n "$CERT" ]; then
     echo "Kept. Delete them yourself: sudo shred -u $CERT $KEY"
   fi
 fi
+shred -u .env.before-teller 2>/dev/null || rm -f .env.before-teller
+echo "Removed .env.before-teller (the copy of the previous settings, with the old secret)."
 echo "Done. Switch on Bank feed in Admin -> Features, then Finance -> Accounting -> Bank feed -> Connect a bank."
 echo "Keep the certificate and key in the HOA's password manager; never send them by email or chat."

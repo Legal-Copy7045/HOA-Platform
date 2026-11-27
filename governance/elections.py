@@ -57,6 +57,31 @@ def _person(actor) -> Person | None:
         return Person.objects.filter(user=actor).first()
 
 
+CANDIDATE_REFUSAL = "A candidate takes no step on the timing of their own election."
+
+
+def is_candidate(actor, election: Election) -> bool:
+    """Whether ``actor`` stands in ``election`` (any nomination)."""
+    if actor is policy.SYSTEM or actor is None:
+        return False
+    me = _person(actor)
+    if me is None:
+        return False
+    with system_access("candidate check"):
+        return Candidate.objects.filter(election_id=election.pk, person=me).exists()
+
+
+def refuse_candidate(actor, election: Election, *, action: str, request=None, error=None):
+    """A candidate does not open, extend or close their own election (D87,
+    as certify): another board member does. Audited, before any transaction."""
+    if not is_candidate(actor, election):
+        return
+    from core import conflicts
+
+    conflicts.audit_refusal(actor, election, area="election", action=action, request=request)
+    raise (error or ElectionError)(CANDIDATE_REFUSAL)
+
+
 def _is_owner(person: Person) -> bool:
     with system_access("is owner"):
         return Ownership.objects.active().filter(person=person).exists()
@@ -191,6 +216,7 @@ def open_voting(
     from governance import window
 
     require(actor, "vote.manage")
+    refuse_candidate(actor, election, action="open", request=request)
     if election.state != ElectionState.NOMINATIONS:
         raise ElectionError("Voting can only be opened once, after nominations.")
     if not ballot_candidates(election).exists():
@@ -232,6 +258,7 @@ def close_voting(
 
     if actor is not policy.SYSTEM:
         require(actor, "vote.manage")
+        refuse_candidate(actor, election, action="close", request=request)
         at_deadline = False
     with transaction.atomic():
         locked = Election.objects.select_for_update().get(pk=election.pk)
