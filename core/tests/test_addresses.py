@@ -190,6 +190,11 @@ def test_home_lists_follow_the_address_not_the_lot_number(client):
 
 def test_board_search_still_finds_a_home_by_its_lot_number(client, world):
     client.force_login(world["board"])
+    # A single-digit lot number is searchable too (lots 1-9).
+    used = set(Lot.objects.unscoped("test: free lot number").values_list("number", flat=True))
+    digit = next(n for n in range(1, 10) if n not in used)
+    Lot.objects.unscoped("test: renumber").filter(pk=world["lot_b"].pk).update(number=digit)
+    world["lot_b"].refresh_from_db()
     html = client.get(reverse("search"), {"q": str(world["lot_b"].number)}).content.decode()
     assert "2 Bravo Way" in html
     assert not _offending(html)

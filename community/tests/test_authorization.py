@@ -356,6 +356,8 @@ MEMBER_READS = {
                 "system.view_tasks",
                 # Keys and connections (D93)
                 "system.manage_keys",
+                # Demo mode (D97, POC only)
+                "demo.switch",
             },
         ),
         # Former owners read their old requests inside My history.

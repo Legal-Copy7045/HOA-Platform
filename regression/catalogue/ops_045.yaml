@@ -1,0 +1,38 @@
+# Server tasks in 0.45.0 (D98): restore from a backup, result emails, the
+# reseed's schema emptying and the failure summary, the blank dataset.
+- feature: "Restore from a backup (Server tasks -> Restore from a backup): sysadmins only (everyone else 403, signed out to sign-in), a fresh passkey or authenticator check (never a password, an emailed code or a recovery code; checked by the page and the service), RESTORE typed exactly, refused while previewing as an owner, one task at a time, audited with the backup point, the board and sysadmins emailed before it starts; the board sees it in the history"
+  since: "0.45"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_restore_backup\\.py::test_(url_and_allowlist|only_sysadmins|signed_out|without_a_fresh|the_service_checks|the_word_must|a_restore_is_requested|previewing|the_plain_start|the_board_sees|a_restored_row)"]
+- feature: "Backup points are names, never paths: only a listed local:<stamp> or offsite:<stamp> is accepted (path traversal, unlisted and other shapes refused by the page, the service and a database check constraint); a backup from a newer release, or one that does not say, cannot be chosen; the page shows date, size, release and what happens"
+  since: "0.45"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_restore_backup\\.py::test_(only_a_listed|the_database_refuses|a_newer_release|the_page_lists|restore_point_labels)"]
+- feature: "The VM agent runs restore-portal.sh only for a backup point that really exists (a real folder, not a link, or a complete off-site set), as --local|--offsite <stamp>; it writes the task's row back into the restored database; the local backup list is built from checked values only; lib.sh refuses a backup from a newer or unknown release"
+  since: "0.45"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_restore_agent\\.py::test_(a_listed_local|an_offsite_point|anything_else|a_symlinked|a_requester_id|the_local_list|backup_release_ok|restore_case_entry)"]
+- feature: "restore-portal.sh: keyed checksum and release checked before anything changes, a kept safety backup first (backup.sh --keep; the clean-up leaves it), web and worker stopped, the database emptied and loaded, migrated, sessions ended, waiting tasks marked not run, files put back without overwriting, started with both compose files; on failure the safety backup goes back"
+  since: "0.45"
+  docs: docs/claude/operations.md
+  match: ["^unit:core/tests/test_restore_agent\\.py::test_(restore_script_steps|safety_backups_are_kept|a_failure_shows)"]
+- feature: "Every server task and Install update emails the requester and the sysadmins its result once (task, result, duration, link; no log lines or addresses); a restore also the board; a mail failure never fails the task or its audit"
+  since: "0.45"
+  docs: docs/claude/operations.md
+  match: ["^unit:core/tests/test_restore_backup\\.py::test_(every_task_emails|a_restore_result|the_summary_in_an_email|a_mail_failure|an_install_update)"]
+- feature: "Reseed and restore empty the database table by table (empty-database.sql): a schema with more objects than one transaction may lock is emptied, recreated as the owner role with the app role's USAGE (the 0.44.0 reseed failed with out of shared memory); Postgres runs with max_locks_per_transaction=256"
+  since: "0.45"
+  docs: docs/claude/operations.md
+  match: ["^unit:core/tests/test_empty_database\\.py::", "^unit:core/tests/test_host_tasks_agent\\.py::test_reseed_script_guards_and_order"]
+- feature: "A failed task's summary is its real error (the first ERROR, psql: or Refusing line, else a traceback's exception, else the last line) from before the scripts' 'Restarting after a failure' marker, not the restart's 'Container ... Started'"
+  since: "0.45"
+  docs: docs/claude/operations.md
+  match: ["^unit:core/tests/test_restore_agent\\.py::test_(the_reseed_failure|the_summary_prefers|reseed_marks)", "^unit:core/tests/test_host_tasks_agent\\.py::test_a_failing_task"]
+- feature: "Blank demo dataset: no homes, owners, board or history, only the kept real logins; the box gives a board seat only so the setup wizard and the register import open; Demo data describes each dataset by what it holds; kept task rows carry the restore columns"
+  since: "0.45"
+  docs: docs/claude/operations.md
+  match: ["^unit:community/tests/test_demo_blank\\.py::", "^unit:core/tests/test_demo_reseed\\.py::test_page_lists_datasets"]
+- feature: "Restore, result emails and the blank reseed checked by a person on the VM"
+  since: "0.45"
+  docs: docs/runbook.md
+  match: ["^manual:restore the live portal from a backup", "^manual:restore from an off-site copy", "^manual:server task result emails", "^manual:reseed fresh start and blank"]

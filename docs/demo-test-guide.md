@@ -29,6 +29,20 @@ one:
 3. Open the link in a private window, choose a password and set up an
    authenticator app (or passkey). That browser is now the persona.
 
+Quicker on the POC: demo mode (D97). Signed in with your own login (a board
+member or sysadmin, with your passkey or app), use the banner at the top of
+every page: "Demo — you are viewing as: ..." with a list of the personas
+below. Choose one and "View as": the portal is now exactly the persona's
+(their menu, scope, recusals and own matters), with your login still signed
+in underneath; "Back to me" returns. Keys and connections, Restart, server
+tasks, Demo data, sign-in and security pages, Preview as owner and payment or
+bank-feed set-up are refused while you view as a persona, and a persona can
+never change a real login. A formal vote asks for your own password or
+second factor. Every switch is in the audit log under your login, and what
+you do as the persona is recorded as theirs with your id behind it. Only
+logins the seed made are in the list; one you have set up with a password or
+authenticator (steps 1-3 above) drops out of it.
+
 Exceptions on purpose:
 
 - demo007@example.com (Harper Birchfield, joint owner), demo028@example.com

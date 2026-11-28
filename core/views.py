@@ -109,8 +109,10 @@ def _update_action(request, action):
     from django.shortcuts import redirect
 
     from audit.services import record_event
+    from core import demo_mode
     from core.models import UpdateStatus
 
+    demo_mode.refuse_switched(request)
     metadata: dict = {}
     with transaction.atomic():
         UpdateStatus.get()
@@ -321,6 +323,12 @@ SERVER_ERRORS_SHOWN = 25
 def system_status(request):
     """Operations view for sysadmins: health only, no owner data (decision D9)."""
     policy.require(request.user, "system.view_status")
+    if request.method == "POST":
+        from core import demo_mode
+
+        # Install update, test email and the other actions: never while
+        # demo-switched (D97; review fixes 0.45.0, BUG-002).
+        demo_mode.refuse_switched(request)
     if request.method == "POST" and request.POST.get("action") == "test_email":
         return _send_test_email(request)
     if request.method == "POST" and request.POST.get("action") == "clear_check":

@@ -461,13 +461,13 @@ def test_proxy_holder_is_chosen_by_address(client, w, election):
     client.force_login(w["owner"])
     html = client.get(reverse("meeting_detail", args=[election.meeting_id])).content.decode()
     assert 'name="holder_home"' in html and 'name="holder_lot"' not in html
-    assert w["lot_b"].street_address in html
+    assert "data-home-picker" in html  # the shared home picker (D96)
     proxy_section = html[html.index('id="proxy"') :]
     assert "data-confirm=" in proxy_section[:2000]
     assert not re.search(r"<p[^>]*>[^<]*(<(?!/p)[^>]*>[^<]*)*<form", proxy_section)
     client.post(
         reverse("proxy_grant", args=[election.meeting_id]),
-        {"lot": w["lot_a"].pk, "holder_home": w["lot_b"].pk},
+        {"lot": w["lot_a"].pk, "holder_home": w["lot_b"].label},
     )
     with system_access("test"):
         proxy = Proxy.objects.get(meeting_id=election.meeting_id, lot=w["lot_a"])

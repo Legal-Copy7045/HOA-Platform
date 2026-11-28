@@ -242,6 +242,8 @@ SUBPAGES = {
     # The board reads server task history on Sysadmin activity (WT-007);
     # sysadmins, who cannot open that page, keep Server tasks in the menu.
     "sysadmin_activity": ["server_tasks"],
+    # Restore from a backup opens from Server tasks (D98).
+    "server_tasks": ["backup_restore"],
     # Help pages (D73): the topics, Getting started and Welcome mark Help.
     "help": ["welcome"],
     # Finance components without their own menu entry open from the Finance

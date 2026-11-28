@@ -124,11 +124,14 @@ class DecisionForm(forms.Form):
     )
 
 
-def _affected_numbers(req) -> list[int]:
+def _affected_value(req) -> str:
+    """The affected homes as the picker shows them: "address; address" (D96)."""
+    from community.home_picker import picker_values
     from core.scoping import system_access
 
-    with system_access("affected lot numbers for intake form"):
-        return list(req.affected_lots.values_list("number", flat=True))
+    with system_access("affected homes for intake form"):
+        lots = sorted(req.affected_lots.all(), key=lambda lot: lot.sort_key)
+    return picker_values(lots)
 
 
 def _affected_labels(req) -> list[str]:
@@ -341,7 +344,7 @@ def arc_detail(request, pk):
             "can_set_affected": policy.can(user, "arc.intake")
             and not own["own_matter"]
             and req.state in (ArcState.SUBMITTED, ArcState.IN_REVIEW),
-            "affected": _affected_numbers(req),
+            "affected": _affected_value(req),
             "affected_labels": _affected_labels(req),
         },
     )
@@ -482,11 +485,15 @@ def arc_letter(request, pk, decision_id):
 def arc_affected(request, pk):
     req = _get(request, pk)
     policy.require(request.user, "arc.intake")
-    numbers = [
-        int(n) for n in request.POST.get("lots", "").replace(",", " ").split() if n.isdigit()
-    ]
-    # Intake roles name neighboring lots by number; only the numbers are used.
-    lots = list(Lot.objects.unscoped("affected lots by number").filter(number__in=numbers))
+    # Picked by street address (D96); a lot number is still accepted. Any
+    # home may be affected, so the picker resolves against every home.
+    from community import home_picker
+
+    lots, errors = home_picker.resolve_many(request.POST.get("lots", ""), home_picker.all_homes())
+    if errors:
+        for error in errors:
+            messages.error(request, f"Affected homes not saved. {error}")
+        return redirect(f"{reverse('arc_detail', args=[req.pk])}#affected")
     try:
         services.set_affected_lots(req, lots, actor=request.user, request=request)
     except services.ArcError as exc:

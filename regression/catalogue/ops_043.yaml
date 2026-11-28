@@ -7,7 +7,7 @@
   since: "0.43"
   docs: docs/claude/deployment.md
   match: ["^unit:core/tests/test_restart_portal\\.py::", "^unit:core/tests/test_host_tasks_agent\\.py::test_(restart|only_the_exact_restart)", "^unit:core/tests/test_url_matrix\\.py::.*system_restart"]
-- feature: "Regression logs kept current: a minor or major release fails unless RUNS.md and WALKTHROUGHS.md each have a newest entry for the previous release line or newer (patch releases exempt), in run.py check and in the suite"
+- feature: "A full check before a release when one is due (D91, amended 0.45.0): weekly (the newest full check logged in both RUNS.md and WALKTHROUGHS.md more than 7 days older than the release date), every 5 releases (patches included), after a change to a material security or accounting path in profile.yaml full_check (templates, static, docs, tests and regression files excluded), and on a major release (a full check on that version); only when VERSION has no tag; in run.py check and in the suite"
   since: "0.43"
   docs: docs/claude/development.md
   match: ["^unit:regression/tests/test_release_logs\\.py::", "^ci:regression logs current for the release$"]

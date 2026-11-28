@@ -17,6 +17,9 @@ from audit.models import ActorType, AuditEvent, AuditEventNetwork, Channel, Outc
 from core.net import client_ip
 
 MAX_METADATA_VALUE_LENGTH = 200
+# Added by record_event itself while a demo persona is in use (D97); never
+# accepted from a caller (it is in no action's field list).
+DEMO_SWITCH_FIELD = "demo_switch_by"
 _SCALARS = (str, int, bool, type(None))
 
 
@@ -71,6 +74,12 @@ def record_event(
     occurred_at: datetime | None = None,
 ) -> AuditEvent:
     clean_metadata = _validate_metadata(action, metadata or {})
+    # Demo mode (D97): what a persona does is also the real user's behind it.
+    from core.demo_mode import current as demo_switch
+
+    switch = demo_switch()
+    if switch is not None:
+        clean_metadata[DEMO_SWITCH_FIELD] = switch.real_user_id
     if outcome not in Outcome.values:
         raise AuditError(f"Unknown outcome {outcome!r}")
 

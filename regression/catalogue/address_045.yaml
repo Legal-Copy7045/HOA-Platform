@@ -1,0 +1,21 @@
+# The 0.45.0 home picker (D96): homes picked by street address with a
+# type-ahead everywhere a person picks a home; lot numbers only as a fallback.
+# `match` runs over "<stage>:<check>".
+- feature: "The home picker's suggestions need sign-in, take GET only, give any member with a current community role every home's address and current owners' names (owner's decision: public in the community), nothing to a former owner, a sysadmin-only or a role-less login, never contact details or money, at most 10 results from 2 characters, are rate-limited and never audited (D96)"
+  since: "0.45"
+  match: ["^unit:community/tests/test_home_picker.py::test_(anonymous_is_sent_to_sign_in|post_is_refused|every_member_sees_every_home_by_address|suggestions_carry_no_contact_details_or_money|no_community_role_gets_nothing|a_former_owner_gets_nothing|minimum_two_characters_and_ten_results|rate_limited_after_the_cap|the_query_is_never_audited)", "^unit:core/tests/test_url_matrix.py::test_(home_suggest_gives_addresses_and_owner_names_only|member_pages_require_sign_in\\[home_suggest\\]|member_pages_hide_board_only_content_from_owners\\[home_suggest\\])"]
+- feature: "Suggestions match part of an address case-insensitively, a lot number or 'Lot N' first, and owners' names; typed text without JavaScript saves an exact address, '<address> (Lot N)' or a lot number, and anything else is refused with the closest addresses; two homes with one address are told apart by '(Lot N)'; several homes are separated by semicolons and the old '12 14' still works (D96)"
+  since: "0.45"
+  match: ["^unit:community/tests/test_home_picker.py::test_(partial_address_case_insensitive|lot_number_is_a_fallback_and_ranks_first|owner_name_matches|resolve_.*|home_field_errors_and_shows_the_address)"]
+- feature: "One shared widget (form widget, template partial, static/js/home-picker.js): no inline script or handler, suggestions built with textContent, combobox and listbox ARIA with Up, Down, Enter and Escape, chips with Remove buttons for several homes, 44px tap targets; loaded only for signed-in pages (D96)"
+  since: "0.45"
+  match: ["^unit:community/tests/test_home_picker.py::test_(script_is_static_and_csp_safe|base_loads_the_script_only_when_signed_in)"]
+- feature: "Home neighbors picks Left, Right and Also affected (several, as chips) by street address and shows addresses everywhere, the phone list too; a row whose text names no home saves nothing, keeps what was typed and lists close matches; lot numbers still save; board only (D96)"
+  since: "0.45"
+  match: ["^unit:community/tests/test_home_picker.py::test_neighbors_.*", "^unit:core/tests/test_board_settings_ux.py::.*neighbor.*", "^unit:core/tests/test_walkthrough_041.py::.*neighbor.*"]
+- feature: "Every other pick-a-home field uses the picker and saves the right home: an ARC request's affected homes (recusal follows) and Ask another homeowner, Report a violation, Record payments rows, the board's resale request (owners keep the list of their own homes), Add an ownership, document upload, paper mail's Only one home, a proxy's 'or the owner at' (D96)"
+  since: "0.45"
+  match: ["^unit:community/tests/test_home_picker.py::test_(violation_report_by_address|paper_mail_one_home_by_address|resale_request_by_address_for_the_board|owner_resale_form_stays_a_list_of_their_homes|owner_cannot_use_another_home_in_the_owner_resale_form|add_ownership_by_address|arc_affected_homes_by_address)", "^unit:arc/tests/test_signoffs.py::test_add_a_homeowner_by_address_and_name_never_email", "^unit:core/tests/test_ux_nav.py::test_proxy_holder_is_chosen_by_address", "^unit:ledger/tests/test_finance_ux.py::test_record_payments_.*", "^unit:core/tests/test_walkthrough2_fixes.py::test_add_another_row_without_javascript_keeps_what_was_typed"]
+- feature: "Keyboard, screen reader and phone use of the home picker, and the plain text box with JavaScript off (D96)"
+  since: "0.45"
+  match: ["^manual:home picker by address with keyboard and phone$"]

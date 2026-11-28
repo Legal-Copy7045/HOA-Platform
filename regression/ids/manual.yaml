@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-116
+# highest issued: MAN-124
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -116,3 +116,11 @@ MAN-113: "keys and connections gemini real account"
 MAN-114: "keys and connections vendor key and kek"
 MAN-115: "keys and connections email change through the old relay"
 MAN-116: "keys and connections server override and clear"
+MAN-117: "home picker by address with keyboard and phone"
+MAN-118: "demo mode persona switch on the poc"
+MAN-119: "restore the live portal from a backup"
+MAN-120: "restore from an off-site copy and the refusals"
+MAN-121: "server task result emails"
+MAN-122: "reseed fresh start and blank on the vm"
+MAN-123: "demo mode refuses operations as the sysadmin persona"
+MAN-124: "restore keeps the requester in the restored history"

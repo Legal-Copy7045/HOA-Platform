@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Restore from a backup · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'server_tasks' %}">Server tasks</a> / Restore from a backup</div>
+  <div class="page-head"><div><h1>Restore from a backup</h1>
+    <p class="subtitle">Puts the whole portal back to one backup point: its database and its files. The portal only asks; the server's own agent checks the backup point against the backups it really has and does the restore (decision D98).</p></div></div>
+  {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> The server's agent has not reported in the last few minutes. A restore waits until it is back.</span></div>{% endif %}
+  {% if current %}<section class="card" id="current-task"><h2>Now</h2>
+    <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {% if current.task.requested_by %}{{ current.task.requested_by.email }}{% else %}a login not in this data{% if current.task.requested_by_user_id %} (login #{{ current.task.requested_by_user_id }}){% endif %}{% endif %} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
+    <p class="small muted">Another task, or a restore, can start once this one has finished. During a restore the portal does not load for several minutes; then sign in again.</p></section>{% endif %}
+
+  <section class="card" id="what-happens"><h2>What happens</h2>
+    <ol class="small">
+      <li>The board and the sysadmins are emailed that you asked, and again when it has finished.</li>
+      <li>A <strong>safety backup</strong> of the portal as it is now is taken first. If it fails, nothing is changed. It is kept (not removed after 14 days) and, when off-site backups are set up, copied off-site.</li>
+      <li>The portal stops. Its database is emptied and the chosen backup is loaded; the backup's files are put back into the file store.</li>
+      <li>If the backup was made by an older release, it is brought up to the installed release{% if installed %} ({{ installed|join:"." }}){% endif %}. A backup made by a newer release is refused: install that release first.</li>
+      <li>The portal starts again and is checked. If any step fails, the server puts the safety backup back the same way.</li>
+    </ol>
+    <div class="alert warning" role="note">{% icon "alert" %}<span>{{ confirm_text }}</span></div>
+    <p class="small"><strong>Why the backup's logins, not today's:</strong> a login belongs to the people, roles and records around it. Keeping today's logins on top of older data would give back access that was removed after the backup and could point logins at the wrong person, and it would bring back nothing that was lost. So the backup is restored as it was, and every session is ended. If your own login was created after the backup, or your passkey was added after it, sign in with what you had then, or have another sysadmin from the backup sign in. A demo reseed is different: it keeps real logins because demo data has none.</p>
+  </section>
+
+  <section class="card" id="choose-backup"><h2>Choose a backup point</h2>
+    {% if inv.local_stale %}<p class="small muted">The server has not listed its backups in the last few minutes{% if inv.local_at %} (last {{ inv.local_at|timesince }} ago){% endif %}: the list below may be out of date.</p>{% endif %}
+    <form method="post">{% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+      {% if form.backup.errors %}<p class="error">{{ form.backup.errors|join:" " }}</p>{% endif %}
+      <h3>On the server</h3>
+      {% if inv.local %}<ul class="list backup-points">{% for p in inv.local %}<li>
+        <label class="grow"><input type="radio" name="backup" value="{{ p.ident }}"{% if p.refusal %} disabled{% endif %}{% if selected == p.ident %} checked{% endif %}>
+          <strong>{{ p.made_at|date:"M j, Y g:i A" }}</strong> · {{ p.size_text }} · {% if p.release_text %}made by release {{ p.release_text }}{% else %}release unknown{% endif %}{% if p.kept %} · safety backup{% endif %}{% if p.older %} · brought up to the installed release{% endif %}
+          {% if p.refusal %}<span class="small muted">{{ p.refusal }}</span>{% endif %}</label></li>{% endfor %}</ul>
+      {% else %}<p class="muted">No backups listed on the server yet.</p>{% endif %}
+      <h3>Off-site copies</h3>
+      {% if inv.offsite_error %}<p class="small muted">The off-site list could not be refreshed ({{ inv.offsite_error }}); it shows the last good list.</p>{% endif %}
+      {% if inv.offsite %}<ul class="list backup-points">{% for p in inv.offsite %}<li>
+        <label class="grow"><input type="radio" name="backup" value="{{ p.ident }}"{% if p.refusal %} disabled{% endif %}{% if selected == p.ident %} checked{% endif %}>
+          <strong>{{ p.made_at|date:"M j, Y g:i A" }}</strong> · {{ p.size_text }} · {% if p.release_text %}made by release {{ p.release_text }}{% else %}release unknown{% endif %}{% if p.older %} · brought up to the installed release{% endif %}
+          {% if p.refusal %}<span class="small muted">{{ p.refusal }}</span>{% endif %}</label></li>{% endfor %}</ul>
+        {% if inv.offsite_at %}<p class="small muted">Listed {{ inv.offsite_at|timesince }} ago. An off-site copy is downloaded and checked first, so it takes a little longer.</p>{% endif %}
+      {% else %}<p class="muted">No off-site copies listed{% if not inv.offsite_at %} (off-site backups are not set up, or not listed yet){% endif %}.</p>{% endif %}
+      <div class="field"><label for="id_confirm">{{ form.confirm.label }}</label>{{ form.confirm }}{% if form.confirm.errors %}<p class="error">{{ form.confirm.errors|join:" " }}</p>{% endif %}
+        <p class="small muted">You confirmed it's you with your {% if has_passkey %}passkey{% else %}authenticator app{% endif %} in the last 5 minutes; after that you are asked again.</p></div>
+      <div class="inline-form"><button type="submit" class="danger"{% if current %} disabled title="A server task is waiting or running"{% endif %}>Restore this backup</button>
+        <a class="btn secondary" href="{% url 'server_tasks' %}">Cancel</a></div>
+    </form>
+  </section>
+
+  <section class="card" id="last-restore"><h2>Last restore</h2>
+    {% if last %}<p>{{ last.task.requested_at|date:"M j, Y g:i A" }} · {{ last.label }} · {% status last.task.state last.task.get_state_display %} · asked by {% if last.task.requested_by %}{{ last.task.requested_by.email }}{% else %}a login not in this data{% if last.task.requested_by_user_id %} (login #{{ last.task.requested_by_user_id }}){% endif %}{% endif %}</p>
+      {% if last.summary %}<p class="small">{{ last.summary }}</p>{% endif %}
+      {% if last.tail %}<details><summary>Last lines of output</summary><pre class="small task-output">{{ last.tail }}</pre></details>{% endif %}
+    {% else %}<p class="muted">The portal has not been restored from here yet.</p>{% endif %}
+  </section>
+{% endblock %}

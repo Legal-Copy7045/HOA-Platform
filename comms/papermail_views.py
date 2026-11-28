@@ -19,6 +19,7 @@ from django.views.decorators.http import require_POST
 
 from comms import papermail
 from comms.models import Mailing, MailingAudience, MailingKind, WindowStyle
+from community.home_picker import HomeField
 from core import policy
 from documents.attachments import pdf_response
 
@@ -40,13 +41,16 @@ class ComposeForm(forms.Form):
         widget=forms.RadioSelect,
         initial="paper",
     )
-    home = forms.ChoiceField(label="Only one home", required=False)
+    # Picked by street address (D96); empty is every home.
+    home = HomeField(
+        label="Only one home",
+        required=False,
+        help_text="Leave empty for every home, or type part of one home's address.",
+    )
 
     def __init__(self, *args, homes=(), **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["home"].choices = [("", "(every home)")] + [
-            (str(lot.pk), lot.label) for lot in homes
-        ]
+        self.fields["home"].queryset = list(homes)
 
 
 class SettingsForm(forms.Form):
@@ -197,7 +201,8 @@ def paper_mail_new(request):
         form = ComposeForm(request.POST, homes=homes)
         if form.is_valid():
             everyone = form.cleaned_data["audience"] == "all"
-            lot_id = _int(form.cleaned_data["home"])
+            home = form.cleaned_data["home"]
+            lot_id = home.pk if home else None
             args = {
                 "actor": request.user,
                 "defaults": defaults,
@@ -222,7 +227,7 @@ def paper_mail_new(request):
         if data.get("everyone") == "1":
             initial["audience"] = "all"
         if _int(data.get("home")):
-            initial["home"] = str(_int(data.get("home")))
+            initial["home"] = _int(data.get("home"))
         form = ComposeForm(initial=initial, homes=homes)
     return render(
         request,

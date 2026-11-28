@@ -89,6 +89,44 @@ def stamps() -> list[str]:
     return sorted(s for s, files in found.items() if set(BACKUP_FILES) <= files)
 
 
+def inventory(known_versions: dict[str, str] | None = None, limit: int = 60) -> list[dict]:
+    """Complete backups in the bucket, newest first (at most ``limit``), for
+    Backups -> Restore from a backup (D98): stamp, total size in KB and the
+    release label from its APP_VERSION object (fetched once per backup; the
+    ones already known are passed in). The label is not covered by the keyed
+    checksum: it is shown cleaned and checked again before a restore."""
+    import io
+
+    client = _client()
+    found: dict[str, dict[str, int]] = {}
+    try:
+        for page in client.get_paginator("list_objects_v2").paginate(
+            Bucket=settings.BACKUP_S3_BUCKET, Prefix=PREFIX
+        ):
+            for obj in page.get("Contents", []):
+                name = obj["Key"][len(PREFIX) :]
+                match = STAMP_RE.match(name)
+                if match:
+                    files = found.setdefault(match.group(1), {})
+                    files[name[match.end() :]] = int(obj.get("Size") or 0)
+    except Exception as exc:
+        raise OffsiteError(f"Off-site listing failed: {_code(exc)}") from exc
+    known = known_versions or {}
+    rows = []
+    complete = sorted((s for s, f in found.items() if set(BACKUP_FILES) <= set(f)), reverse=True)
+    for stamp in complete[:limit]:
+        files = found[stamp]
+        version = known.get(stamp, "")
+        if not version and "APP_VERSION" in files:
+            buf = io.BytesIO()
+            with contextlib.suppress(OffsiteError):
+                fetch(f"{stamp}-APP_VERSION", buf)
+            version = re.sub(r"[^a-z0-9.-]", "", buf.getvalue()[:64].decode("ascii", "ignore"))
+        size_kb = sum(size for name, size in files.items() if name in BACKUP_FILES) // 1024
+        rows.append({"stamp": stamp, "size_kb": size_kb, "version": version[:48]})
+    return rows
+
+
 def fetch(name: str, out) -> None:
     key = _check_name(name)
     try:

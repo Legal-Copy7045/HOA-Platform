@@ -33,6 +33,9 @@ class Dataset:
     label: str
     description: str
     module: str  # dotted path of the module with seed()
+    # False for a dataset without homes (blank): the reseed cannot make the
+    # requester a board member and home owner there.
+    has_homes: bool = True
 
 
 @dataclass
@@ -47,7 +50,8 @@ DATASETS = [
     Dataset(
         "oak_creek",
         "Oak Creek Farms (full demo)",
-        "44 homes with three years of history: owners, a board of five, ARC reviewers, "
+        "Everything filled in: 44 homes with three years of history: owners, a board of "
+        "five, ARC reviewers, "
         "dues and payments, ARC requests, violations, meetings, votes, surveys, vendors, "
         "invoices, documents and more.",
         "community.demo.oak_creek",
@@ -55,10 +59,20 @@ DATASETS = [
     Dataset(
         "fresh_start",
         "Fresh start (just handed over)",
-        "A community the declarant has just handed over: 44 homes and their owners, a "
-        "declarant-appointed board of three, a sysadmin and a placeholder Declaration. "
-        "No history, settings left at their defaults, no invitations sent yet.",
+        "Not empty: 44 homes with their owners, a declarant-appointed board of three, a "
+        "sysadmin and a placeholder Declaration, as when the declarant has just handed "
+        "over. No history, settings left at their defaults, no invitations sent yet.",
         "community.demo.fresh_start",
+    ),
+    Dataset(
+        "blank",
+        "Blank (empty portal)",
+        "Nothing at all: no homes, no owners, no board, no documents, no history; only the "
+        "real logins this portal keeps (yours and the other non-demo logins). Settings at "
+        "their defaults, to start with the setup wizard and the register import (tick the "
+        "box to get a board seat for them).",
+        "community.demo.blank",
+        has_homes=False,
     ),
 ]
 DEFAULT = "oak_creek"

@@ -20,6 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.models import AuditEvent
+from community import demo
 from community.models import Role
 from community.tests.factories import make_member
 from core import demo_reseed, health, host_tasks, navigation
@@ -128,7 +129,7 @@ def test_page_lists_datasets_with_descriptions_and_the_confirmation(client, admi
         assert label in page
     assert "declarant-appointed board of three" in page
     assert f'data-confirm="{CONFIRM}"' in page
-    assert page.count("Reseed with this dataset</button>") == 2
+    assert page.count("Reseed with this dataset</button>") == len(demo.DATASETS) == 3
     assert "Type RESEED to confirm" in page
     assert "with <strong>Fresh start (just handed over)</strong>" in page
 
@@ -343,7 +344,7 @@ def test_the_box_is_ticked_by_default_and_stored_on_the_task(client, admin, poc)
     client.force_login(admin)
     page = client.get(URL).content.decode()
     label = "After reseeding, make me a board member and the owner of a demo home in the new data"
-    assert page.count(f"checked> {label}") == 2
+    assert page.count(f"checked> {label}") == 3
     client.post(URL, {"dataset": "oak_creek", "confirm": "RESEED", "attach_requester": "on"})
     task = HostTask.objects.get()
     assert task.attach_requester is True

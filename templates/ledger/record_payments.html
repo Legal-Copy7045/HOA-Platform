@@ -38,10 +38,7 @@
         <tr data-batch-row{% if row.errors %} class="row-error"{% endif %}>
           <td class="muted cell-title">Check {{ forloop.counter }}</td>
           <td data-label="Home"><label class="sr-only" for="lot_{{ i }}">Home, row {{ forloop.counter }}</label>
-            <select id="lot_{{ i }}" name="lot_{{ i }}"{% if row.errors %} aria-describedby="err_{{ i }}" aria-invalid="true"{% endif %}>
-              <option value="">Choose a home</option>
-              {% for lot in lots %}<option value="{{ lot.pk }}"{% if row.values.lot == lot.pk|stringformat:"d" %} selected{% endif %}>{{ lot.label }}</option>{% endfor %}
-            </select></td>
+            {% if row.errors %}{% include "partials/home_picker.html" with name=row.name id=row.name value=row.values.lot placeholder="Type part of an address" describedby=row.err_id invalid=True %}{% else %}{% include "partials/home_picker.html" with name=row.name id=row.name value=row.values.lot placeholder="Type part of an address" %}{% endif %}</td>
           <td data-label="Amount"><label class="sr-only" for="amount_{{ i }}">Amount in dollars, row {{ forloop.counter }}</label><input id="amount_{{ i }}" name="amount_{{ i }}" inputmode="decimal" placeholder="75.00" value="{{ row.values.amount|default:'' }}"></td>
           <td data-label="Check #"><label class="sr-only" for="check_{{ i }}">Check number, row {{ forloop.counter }}</label><input id="check_{{ i }}" name="check_{{ i }}" maxlength="40" value="{{ row.values.check|default:'' }}"></td>
           <td data-label="Date received"><label class="sr-only" for="date_{{ i }}">Date received, row {{ forloop.counter }}</label><input id="date_{{ i }}" name="date_{{ i }}" type="date" max="{{ today|date:'Y-m-d' }}" value="{{ row.values.date|default:'' }}"></td>

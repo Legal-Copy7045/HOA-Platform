@@ -144,6 +144,14 @@ class UpdateStatus(models.Model):
     # Server memory, swap and load, from the agent every minute (D39).
     # Nullable, so the agent's INSERT never has to name it.
     host_resources = models.JSONField(null=True, blank=True)
+    # The backup points restore_backup can use (D98): the local ones from the
+    # agent every minute, the off-site ones every 15 minutes and after each
+    # task (``manage.py backup_inventory``). Nullable for the agent's INSERT.
+    backup_points = models.JSONField(null=True, blank=True)
+    # When the agent started the last install, and when its result was
+    # emailed (D98). Nullable, written by tolerant agent statements.
+    run_started_at = models.DateTimeField(null=True, blank=True)
+    result_notified_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
         return f"update status ({self.state})"
@@ -171,6 +179,9 @@ class HostTask(models.Model):
         RESEED_DEMO = "reseed_demo", "Reseed with demo data"
         # System status -> Restart the portal (D91): web and worker, both compose files.
         RESTART_APP = "restart_app", "Restart the portal"
+        # Backups -> Restore from a backup (D98): replaces the live database and
+        # files with one backup point, after a safety backup.
+        RESTORE_BACKUP = "restore_backup", "Restore from a backup"
 
     class State(models.TextChoices):
         REQUESTED = "requested", "Waiting for the server"
@@ -189,9 +200,19 @@ class HostTask(models.Model):
     # reseed_demo only: afterwards give the requester a board seat and a demo
     # home in the new data (demo_attach_requester, POC only).
     attach_requester = models.BooleanField(default=False, db_default=False)
+    # restore_backup only: the backup point, "local:<stamp>" or
+    # "offsite:<stamp>" (backup.sh's YYYY-MM-DDTHHMMZ). Never a path: the
+    # agent checks it against the backups that really exist (D98).
+    backup = models.CharField(max_length=40, blank=True, default="", db_default="")
+    # Nullable since D98: a restore's own row is written back into the
+    # restored database, where its requester's login may not exist.
     requested_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT, related_name="+"
     )
+    # The requester's login id as a plain number, kept even where that login
+    # does not exist (a restore's row written back into older data: review
+    # BUG-003, 0.45.0), so the history and audit still say who asked.
+    requested_by_user_id = models.BigIntegerField(null=True, blank=True)
     requested_at = models.DateTimeField(default=timezone.now)
     state = models.CharField(max_length=10, choices=State.choices, default=State.REQUESTED)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -201,6 +222,8 @@ class HostTask(models.Model):
     output_tail = models.TextField(blank=True)  # at most 40 lines of 200 characters
     # Set by `manage.py record_host_tasks` once the result is in the audit log.
     audited_at = models.DateTimeField(null=True, blank=True)
+    # Set once the requester and the sysadmins were emailed the result (D98).
+    notified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-requested_at", "-id"]
@@ -223,6 +246,16 @@ class HostTask(models.Model):
             models.CheckConstraint(
                 condition=models.Q(attach_requester=False) | models.Q(kind="reseed_demo"),
                 name="core_hosttask_attach_only_reseed",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    backup__regex=r"^((local|offsite):[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{4}Z)?$"
+                ),
+                name="core_hosttask_backup_plain",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(backup="") | models.Q(kind="restore_backup"),
+                name="core_hosttask_backup_only_restore",
             ),
         ]
 
@@ -249,6 +282,27 @@ class DemoSeed(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Demo seed records are kept.")
+
+
+class DemoPersona(models.Model):
+    """A login the demo seed created for a test persona (D97). Demo mode
+    (core/demo_mode.py) switches only to these: never by email or name alone.
+    Written only by the seed (``core.demo_mode.mark_persona``); a reseed
+    replaces the whole database, so the table holds only the dataset's own."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="demo_persona"
+    )
+    key = models.CharField(max_length=40, unique=True)
+    label = models.CharField(max_length=160)
+    position = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self) -> str:
+        return f"demo persona {self.key}"
 
 
 # --- Monitoring (D74) ------------------------------------------------------------------

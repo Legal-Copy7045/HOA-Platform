@@ -133,6 +133,10 @@ def create_invitation(
 ) -> Invitation:
     if actor is not SYSTEM:
         require(actor, "invite.send")
+    # Demo mode (D97; review SEC-002, 0.45.0): a persona invites demo people only.
+    from core.demo_mode import refuse_real_target
+
+    refuse_real_target(person_id=person.pk, error=InvitationError)
     # Always the address on the person's record: an invitation can never be
     # pointed at someone else's mailbox (security review 2026-11, finding A1).
     email = normalize_email_address(person.email or "")

@@ -131,6 +131,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "accounts.middleware.RequireMFAMiddleware",
+    # Demo mode (D97, POC only): after the real user's MFA check.
+    "core.demo_mode.DemoSwitchMiddleware",
     "core.features.FeatureGateMiddleware",
     "core.middleware.EmailUnavailableMiddleware",
     "core.preview.OwnerPreviewMiddleware",
@@ -157,6 +159,7 @@ TEMPLATES = [
                 "core.context_processors.site",
                 "core.context_processors.navigation",
                 "core.context_processors.login_background",
+                "core.context_processors.demo_mode",
             ],
         },
     },

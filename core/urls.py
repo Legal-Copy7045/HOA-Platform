@@ -5,12 +5,12 @@ from django.urls import include, path, re_path
 from accounts import mfa_views, password_reset, recovery_codes
 from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
-from core import hub_views, preview
+from core import demo_mode, hub_views, preview
 from core.followups import set_follow_up
 from core.keys_views import keys_change, keys_connections, keys_service
 from core.my_items_views import my_items_page
 from core.search_views import search_page
-from core.server_task_views import demo_data, server_tasks, system_restart
+from core.server_task_views import backup_restore, demo_data, server_tasks, system_restart
 from core.views import (
     export_my_data,
     feature_settings,
@@ -35,6 +35,8 @@ urlpatterns = [
     path("ops/status/keys/change/<int:pk>/", keys_change, name="keys_change"),
     path("ops/status/keys/<slug:service>/", keys_service, name="keys_service"),
     path("ops/tasks/", server_tasks, name="server_tasks"),
+    # Restore from a backup (D98): sysadmins, fresh passkey or authenticator, RESTORE typed.
+    path("ops/tasks/restore/", backup_restore, name="backup_restore"),
     path("ops/timeline/", ops_timeline, name="ops_timeline"),
     path("account/profile/", my_profile, name="my_profile"),
     path("account/export/", export_my_data, name="export_my_data"),
@@ -47,6 +49,8 @@ urlpatterns = [
     path("board/features/", feature_settings, name="feature_settings"),
     path("board/setup/", hub_views.settings_hub, name="settings_hub"),
     path("ops/demo-data/", demo_data, name="demo_data"),
+    path("demo/switch/", demo_mode.switch, name="demo_switch"),
+    path("demo/switch-back/", demo_mode.switch_back, name="demo_switch_back"),
     path("community-info/", hub_views.community_info, name="community_info"),
     path("finance/more/", hub_views.finance_more, name="finance_more"),
     re_path(

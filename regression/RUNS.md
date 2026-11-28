@@ -8,6 +8,7 @@ table per run; the older entries below it keep their own format.
 
 | Date (UTC) | Commit | Version | Audit | Pass | Fail | Skip | Manual due | Failing IDs | Findings | Report |
 |---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-28 04:56 | `a0ab016` | 0.45.0 | full (full check) | 6225 | 4 | 417 | 121 | CI-014, UNIT-1690, UNIT-4060, UNIT-4556 | 2 high, 2 medium, 5 low, 1 info | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
 | 2026-11-28 00:38 | `b471995` | 0.44.0 | full (full check) | 5955 | 2 | 397 | 113 | CI-014, UNIT-4556 | 1 high, 7 medium, 9 low, 4 info | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
 | 2026-11-27 21:44 | `7a8d8e9` | 0.42.0 | full (full check) | 5656 | 0 | 394 | 99 | none | 7 medium, 8 low, 1 info | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
 | 2026-11-27 | `d62bd1e` | 0.34.0 | full (full check) | 4615 | 0 | 215 | 84 | none | 16 (none critical or high) | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |

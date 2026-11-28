@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from audit.services import record_event
+from community.home_picker import HomeField
 from community.models import Lot
 from core import features, policy
 from documents import services
@@ -28,11 +29,11 @@ class NewDocumentForm(forms.Form):
         choices=[c for c in Visibility.choices if c[0] != "committee"],
         help_text="Used only when no folder is chosen.",
     )
-    lot = forms.ModelChoiceField(
-        queryset=Lot.objects.none(),
+    # Picked by street address (D96).
+    lot = HomeField(
         required=False,
         label="Home",
-        help_text="Only for documents about one home.",
+        help_text="Only for documents about one home: type part of its address.",
     )
     description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
     dated_on = forms.DateField(

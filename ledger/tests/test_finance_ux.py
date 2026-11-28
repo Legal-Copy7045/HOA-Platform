@@ -311,7 +311,8 @@ def test_amount_due_reports_past_due_and_paid_up(w):
 
 
 def _row(i, lot, amount, check="", date=""):
-    return {f"lot_{i}": str(lot.pk), f"amount_{i}": amount, f"check_{i}": check, f"date_{i}": date}
+    # The home is typed by street address (D96).
+    return {f"lot_{i}": lot.label, f"amount_{i}": amount, f"check_{i}": check, f"date_{i}": date}
 
 
 @pytest.mark.parametrize("who", ["board", "manager"])
@@ -319,7 +320,9 @@ def test_board_and_manager_can_open_record_payments(client, w, who):
     client.force_login(w[who])
     page = client.get(reverse("record_payments"))
     assert page.status_code == 200
-    assert b">10 Oak Lane</option>" in page.content and b"(Lot" not in page.content
+    # The shared home picker (D96): no long list of every home on the page.
+    assert b'name="lot_0"' in page.content and b"data-home-picker" in page.content
+    assert b"(Lot" not in page.content
 
 
 @pytest.mark.parametrize("who", ["owner", "auditor"])

@@ -7,13 +7,17 @@ host: it only inserts a ``core.HostTask`` row naming one of the kinds below.
 The agent (infra/poc/portal-agent.sh with infra/poc/host-tasks.sh) maps the
 kind to a fixed command with a bash ``case``; nothing else from the database
 reaches a command line, except the dataset of a demo reseed (D53), which the
-agent accepts only as a plain name ([a-z_]) the portal's own seed_demo lists.
-Results come back as a state and a short summary.
+agent accepts only as a plain name ([a-z_]) the portal's own seed_demo lists,
+and the backup point of a real restore (D98), which the agent accepts only as
+``local:<stamp>`` or ``offsite:<stamp>`` naming a backup that really exists.
+Results come back as a state and a short summary; the requester and the
+sysadmins are emailed each result (``core.task_mail``).
 """
 
 from __future__ import annotations
 
 import datetime
+import logging
 import re
 from dataclasses import dataclass
 
@@ -22,6 +26,8 @@ from django.utils import timezone
 
 from core import policy
 from core.models import HostTask
+
+logger = logging.getLogger(__name__)
 
 Kind = HostTask.Kind
 State = HostTask.State
@@ -48,6 +54,24 @@ RESTART_CONFIRM_TEXT = (
     "(with both compose files, so the tunnel keeps reaching the site). Everyone is "
     "unavailable for up to a minute; anything being typed into a form at that moment "
     "may need to be sent again. The database, files, scanner and tunnel keep running."
+)
+
+
+# Restoring from a backup (D98): started only from Backups -> Restore from a
+# backup, with a listed backup point, this word typed exactly, and a fresh
+# passkey or authenticator check (core/fresh_mfa.py, never a password or an
+# emailed code).
+RESTORE_WORD = "RESTORE"
+RESTORE_CONFIRM_TEXT = (
+    "First a safety backup of the portal as it is now is taken (kept, not removed "
+    "after 14 days). Then the portal stops, its database and files are replaced by "
+    "the chosen backup, it is brought up to the installed release, and it starts "
+    "again: several minutes without the portal. Everything entered after that backup "
+    "(payments recorded, votes, documents, the audit log) is no longer in the portal; "
+    "it stays in the safety backup. Logins, passkeys and authenticator apps are the "
+    "ones in the backup, and everyone signs in again. Service keys on Keys and "
+    "connections go back to what they were then. If anything fails, the server puts "
+    "the safety backup back."
 )
 
 
@@ -135,6 +159,15 @@ TASKS = [
         RESTART_CONFIRM_TEXT,
         own_page="system_restart",
     ),
+    TaskSpec(
+        Kind.RESTORE_BACKUP,
+        "Restore from a backup",
+        "Replaces the portal's database and files with a backup point you choose, after "
+        "a safety backup of the current state. Started from Backups, after you type "
+        f"{RESTORE_WORD} and confirm with your passkey or authenticator app.",
+        RESTORE_CONFIRM_TEXT,
+        own_page="backup_restore",
+    ),
 ]
 BY_KIND = {spec.kind: spec for spec in TASKS}
 
@@ -177,14 +210,18 @@ def request_task(
     dataset: str = "",
     confirmation: str = "",
     attach_requester: bool = False,
+    backup: str = "",
 ) -> HostTask:
     """Ask the VM agent to run one allowlisted task. Sysadmins only; one at a
     time. Audited (``system.task_requested`` with the kind, and the dataset
     for a reseed). A reseed needs demo data allowed here, a dataset from the
     registry and the word RESEED typed (D53)."""
     from audit.services import record_event
-    from core import demo_reseed
+    from core import demo_mode, demo_reseed
 
+    # Never while demo-switched (D97; review fixes 0.45.0, EXP-001): the
+    # service refuses itself, behind the page and the policy.
+    demo_mode.refuse_switched(request, error=HostTaskRefused)
     policy.require(actor, "system.run_task")
     if kind not in {spec.kind for spec in offered()}:
         raise HostTaskRefused("That task is not offered on this server.")
@@ -195,6 +232,10 @@ def request_task(
         dataset, attach_requester = "", False
     if kind == Kind.RESTART_APP:
         check_restart(confirmation)
+    if kind == Kind.RESTORE_BACKUP:
+        check_restore(request, backup, confirmation)
+    else:
+        backup = ""
     waiting = current()
     if waiting is not None:
         raise HostTaskRefused(
@@ -206,8 +247,10 @@ def request_task(
             task = HostTask.objects.create(
                 kind=kind,
                 requested_by=actor,
+                requested_by_user_id=getattr(actor, "pk", None),
                 dataset=dataset,
                 attach_requester=attach_requester,
+                backup=backup,
             )
     except IntegrityError as exc:  # another request got in first
         raise HostTaskRefused(
@@ -217,8 +260,37 @@ def request_task(
     if dataset:
         metadata["dataset"] = dataset
         metadata["attach_requester"] = attach_requester
+    if backup:
+        metadata["backup"] = backup
     record_event("system.task_requested", actor=actor, request=request, metadata=metadata)
+    if kind == Kind.RESTORE_BACKUP:
+        from core import task_mail
+
+        task_mail.restore_requested(task)
     return task
+
+
+def check_restore(request, backup: str, confirmation: str) -> None:
+    """A restore needs a fresh passkey or authenticator check in this
+    session, the word RESTORE typed exactly, and a backup point the server
+    listed that this release can take (D98). The agent checks the point again
+    against the backups that really exist."""
+    from core import backup_points, demo_mode, fresh_mfa, preview
+
+    demo_mode.refuse_switched(request, error=HostTaskRefused)
+    if request is not None and preview.current_for(request.user) is not None:
+        raise HostTaskRefused("Leave the homeowner view first.")
+    if request is None or not fresh_mfa.is_fresh(request):
+        raise HostTaskRefused(
+            "Confirm it's you with your passkey or authenticator app first (within 5 minutes)."
+        )
+    if confirmation != RESTORE_WORD:
+        raise HostTaskRefused(f"Type {RESTORE_WORD} in capitals to confirm the restore.")
+    point = backup_points.find(backup)
+    if point is None:
+        raise HostTaskRefused("Choose one of the backup points listed on this page.")
+    if point.refusal:
+        raise HostTaskRefused(f"That backup cannot be restored here. {point.refusal}")
 
 
 def last_restart() -> HostTask | None:
@@ -278,6 +350,12 @@ def record_finished() -> int:
             metadata = {"kind": kind, "state": locked.state}
             if kind == Kind.RESEED_DEMO and locked.dataset:
                 metadata["dataset"] = locked.dataset
+            if kind == Kind.RESTORE_BACKUP and locked.backup:
+                metadata["backup"] = locked.backup
+            # Who asked, by login id only: after a restore that login may not
+            # exist in the restored data (BUG-003, 0.45.0).
+            if locked.requested_by_id is None and locked.requested_by_user_id is not None:
+                metadata["requested_by_user_id"] = locked.requested_by_user_id
             record_event(
                 "system.task_finished",
                 actor=None,
@@ -288,7 +366,57 @@ def record_finished() -> int:
             locked.audited_at = timezone.now()
             locked.save(update_fields=["audited_at"])
             done += 1
+    notify_finished()
     return done
+
+
+def notify_finished() -> int:
+    """Email each finished task's result once, and an Install update's (D98).
+    A mail failure is logged and never stops the audit or the next task."""
+    from core import task_mail
+    from core.models import UpdateStatus
+
+    sent = 0
+    pending = HostTask.objects.filter(finished_at__isnull=False, notified_at__isnull=True)
+    for pk in list(pending.order_by("id").values_list("pk", flat=True)):
+        with transaction.atomic():
+            locked = (
+                HostTask.objects.select_for_update(skip_locked=True, of=("self",))
+                .select_related("requested_by")
+                .filter(pk=pk, notified_at__isnull=True)
+                .first()
+            )
+            if locked is None:
+                continue
+            locked.notified_at = timezone.now()
+            locked.save(update_fields=["notified_at"])
+        try:
+            sent += task_mail.task_finished(locked)
+        except Exception as exc:  # never fails the agent's run
+            logger.warning("host_tasks.notify_failed", extra={"error": type(exc).__name__})
+    with transaction.atomic():
+        status = (
+            UpdateStatus.objects.select_for_update(skip_locked=True, of=("self",))
+            .select_related("requested_by")
+            .filter(pk=1, state__in=["succeeded", "failed"], state_changed_at__isnull=False)
+            .first()
+        )
+        due = status is not None and (
+            status.result_notified_at is None or status.result_notified_at < status.state_changed_at
+        )
+        if due:
+            status.result_notified_at = timezone.now()
+            status.save(update_fields=["result_notified_at"])
+    if due:
+        try:
+            sent += task_mail.update_finished(status)
+        except Exception as exc:
+            logger.warning("host_tasks.notify_failed", extra={"error": type(exc).__name__})
+    return sent
+
+
+def last_restore() -> HostTask | None:
+    return HostTask.objects.filter(kind=Kind.RESTORE_BACKUP).select_related("requested_by").first()
 
 
 def backups_overview() -> dict:

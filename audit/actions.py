@@ -163,6 +163,22 @@ _SPECS = [
     ),
     _spec("export.own_data", "Downloaded own data"),
     _spec("preview.owner_started", "Preview as owner started", "lot_id"),
+    # Demo mode (D97): the actor is the real user; ids and persona keys only.
+    _spec(
+        "demo.switched",
+        "Demo mode: switched to a demo persona",
+        "persona",
+        "persona_user_id",
+        "from_persona_user_id",
+    ),
+    _spec("demo.switched_back", "Demo mode: back to the real login", "persona_user_id"),
+    _spec("demo.switch_refused", "Demo mode: a switch was refused", "reason"),
+    _spec(
+        "demo.page_refused",
+        "Demo mode: a page refused while viewing as a persona",
+        "url_name",
+        "persona",
+    ),
     _spec("account.number_set", "Account number set"),
     _spec("account.contact_added", "Account contact added", "person_id", "kind"),
     _spec("account.contact_ended", "Account contact ended", "person_id", "kind"),
@@ -828,8 +844,23 @@ _SPECS = [
         "checkout_id",
     ),
     # Server tasks (hosttasks, D35)
-    _spec("system.task_requested", "Server task requested", "kind", "dataset", "attach_requester"),
-    _spec("system.task_finished", "Server task finished on the VM", "kind", "state", "dataset"),
+    _spec(
+        "system.task_requested",
+        "Server task requested",
+        "kind",
+        "dataset",
+        "attach_requester",
+        "backup",
+    ),
+    _spec(
+        "system.task_finished",
+        "Server task finished on the VM",
+        "kind",
+        "state",
+        "dataset",
+        "backup",
+        "requested_by_user_id",
+    ),
     # Keys and connections (D93): service and setting names, ids and states only, never a value.
     _spec(
         "system.credential_saved",

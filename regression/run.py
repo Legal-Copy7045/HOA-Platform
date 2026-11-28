@@ -296,8 +296,8 @@ def stage_ci(st: Stage) -> None:
             f"regression/out/logs/{log}",
         )
 
-    # A minor or major release keeps RUNS.md and WALKTHROUGHS.md at most one
-    # release line behind (regression/release_logs.py, D91).
+    # A release needs a full check when one is due: weekly, every 5 releases, a
+    # material security or accounting change, a major release (release_logs.py, D91).
     code, text = run([PY, str(HERE / "release_logs.py")], log="ci-release-logs.log")
     st.add(
         "regression logs current for the release",

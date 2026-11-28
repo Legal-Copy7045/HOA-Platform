@@ -39,4 +39,6 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
         self.stdout.write(
             f"Requester attached: board seat, joint owner of demo home {result['lot_number']}."
+            if result["lot_number"] is not None
+            else "Requester attached: board seat (no homes in this dataset)."
         )

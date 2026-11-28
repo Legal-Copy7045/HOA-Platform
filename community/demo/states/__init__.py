@@ -254,11 +254,27 @@ def _personas(c: Ctx) -> None:
     c.people["former_owner"] = seller.person
     for persona in PERSONAS:
         c.users[persona.key] = login_for(c.people[persona.key])
+    _mark_personas(c)
     for p in ("president", "vice_president", "treasurer", "secretary", "director"):
         c.board.append(c.users[p])
     # Sysadmin: nominated by one board member, approved by another.
     nomination = community.nominate_sysadmin(person=c.people["sysadmin"], actor=c.u("president"))
     community.approve_sysadmin(nomination, actor=c.u("treasurer"))
+
+
+def _mark_personas(c: Ctx) -> None:
+    """Demo mode (D97): mark each persona's login so a board member on the POC
+    can view the portal as it. A login that already has a way in (a real
+    officer's, made before the demo) is never marked."""
+    from core.demo_mode import DemoModeError, mark_persona
+
+    for position, persona in enumerate(PERSONAS):
+        try:
+            mark_persona(
+                c.users[persona.key], key=persona.key, label=persona.who, position=position
+            )
+        except DemoModeError:
+            continue
 
 
 def _features(c: Ctx) -> None:

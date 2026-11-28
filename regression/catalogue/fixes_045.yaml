@@ -1,0 +1,30 @@
+# Release 0.45 review fixes (D97 and D98 "Review fixes (0.45.0)"): demo mode
+# refuses every operations page and permission by default (EXP-001, BUG-001,
+# SEC-001, BUG-002, EXP-002), personas act on demo data only (SEC-002,
+# CLM-013), a restore keeps its requester's id (BUG-003), the SMTP and IMAP
+# tests connect to the address they checked (BUG-004, EXP-003), and the
+# walkthrough's Records retention row link on phones (WP-011).
+- feature: "While viewing as a demo persona, Restore from a backup is refused (page and service), even as the sysadmin persona with the real user's fresh second factor, and no task is queued"
+  since: "0.45"
+  match: ["^unit:core/tests/test_demo_review_045.py::test_(restore_is_refused_as_the_sysadmin_persona|the_restore_and_task_services_refuse)"]
+- feature: "While viewing as a demo persona, every System status action (Install update, schedule or cancel an update, check for updates, test email, clear a check, scan waiting files) is refused and changes nothing"
+  since: "0.45"
+  match: ["^unit:core/tests/test_demo_review_045.py::test_(system_status_actions_are_refused|the_update_action_refuses)"]
+- feature: "Demo mode is deny by default for operations: every page under /ops/ is refused while switched, and no system.* or sysadmin-only permission holds for the persona, so every URL in the project (walked) that needs one is refused"
+  since: "0.45"
+  match: ["^unit:core/tests/test_demo_review_045.py::test_(every_operations_url_is_refused|every_ops_path_is_refused|operations_permissions_answer_no)"]
+- feature: "A fresh second factor never counts while demo-switched: the session's factor is the real user's, and pages needing one refuse outright"
+  since: "0.45"
+  match: ["^unit:core/tests/test_demo_review_045.py::test_no_fresh_second_factor_while_switched"]
+- feature: "While switched, personas grant or end roles, seats, offices and sysadmin and send invitations only for demo data (persona logins and person records the seed made), never for a person added since, even one named like demo data, and never approve the real user's own nomination or seat proposal"
+  since: "0.45"
+  match: ["^unit:core/tests/test_demo_review_045.py::test_(a_person_added_after_the_seed|a_persona_never_approves_the_real_users_own|demo_people_the_seed_made)", "^unit:core/tests/test_demo_mode.py::test_actions_are_the_persona_s"]
+- feature: "A server task keeps its requester's login id; after a restore whose data lacks that login, the row written back, the audit event and the history pages still say which login asked"
+  since: "0.45"
+  match: ["^unit:core/tests/test_demo_review_045.py::test_(the_requesters_id_is_kept|a_request_records_the_requesters_id)", "^unit:core/tests/test_restore_agent.py::test_a_listed_local_backup_runs_the_fixed_script"]
+- feature: "The SMTP and IMAP tests on Keys and connections resolve the host once, need every address public, and connect to that checked address with the host name kept for TLS (no DNS rebinding)"
+  since: "0.45"
+  match: ["^unit:core/tests/test_keys_review_045.py::test_"]
+- feature: "A list row's link (Records retention's files waiting for disposal) is a whole-line tap target of at least 44 px on phones; desktop unchanged"
+  since: "0.45"
+  match: ["^unit:core/tests/test_walkthrough_045.py::test_"]

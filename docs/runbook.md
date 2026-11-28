@@ -550,6 +550,34 @@ missing, altered, or from a different backup. Backups made before
 stamped checksums (November 2026) restore only with `--allow-unsigned`, which
 prints a warning: use it only for a backup you know you made.
 
+### Restore the live portal from a backup (D98)
+
+**Admin → Server tasks → Backups → Restore from a backup** (sysadmins). Confirm
+it's you with your passkey (or authenticator app), choose a backup point (on
+the server or an off-site copy: date and time, size, the release that made
+it), read what happens, type `RESTORE` and press **Restore this backup**. The
+board and the sysadmins are emailed, then the agent, within a minute:
+
+1. checks the backup point is one it really has and its keyed checksum, and
+   refuses a backup from a newer release than the installed one (install that
+   release first) or one that does not say which release made it;
+2. takes a safety backup of the portal as it is now (kept: the 14-day clean-up
+   leaves folders with a `KEEP` file; delete it by hand when no longer needed);
+   if that fails nothing is changed;
+3. stops web and worker, empties the database, loads the backup, migrates it
+   up to the installed release, ends every session, puts its files back, and
+   starts the portal with both compose files;
+4. on any failure, puts the safety backup back the same way and starts the
+   portal; the result (and the email) says whether it did.
+
+Afterwards everyone signs in again with the logins, passkeys and
+authenticator apps of the backup; service keys are the backup's too, so
+check any changed since. Everything entered after the backup (the audit log
+included) is in the safety backup named in the result. If a restore was cut
+off by its time limit, or the safety backup could not be put back, on the VM:
+`sudo bash /opt/hoa-portal/infra/poc/restore-portal.sh --local <safety stamp>`
+(the stamp is in the result and `/var/log/hoa-portal-tasks.log`).
+
 To check a backup by hand before a real restore (for example one downloaded
 from the off-site bucket into a folder), run
 `python3 -I /opt/hoa-portal/infra/poc/backup_mac.py verify <folder> /root/hoa-backup.key`:
@@ -1069,7 +1097,10 @@ The web app only records the request; the VM's agent
 (`infra/poc/portal-agent.sh`, every minute) runs the fixed command for it
 from `infra/poc/host-tasks.sh` and writes back the state and a one-line
 summary. One task runs at a time. The full output of each task is in
-`/var/log/hoa-portal-tasks.log` on the VM.
+`/var/log/hoa-portal-tasks.log` on the VM. When a task (or an Install
+update) finishes, the person who asked and the sysadmins get an email with
+the result, how long it took and a link (D98); a failed task's summary is
+the line with the real error, not the restart that followed it.
 
 | Task | What runs on the VM | Time limit |
 |---|---|---|
@@ -1080,6 +1111,8 @@ summary. One task runs at a time. The full output of each task is in
 | Re-apply host security | `infra/poc/harden-host.sh` | 25 min |
 | Run the health checks | `manage.py health_check --alert` in the web container | 5 min |
 | Reseed with demo data | `infra/poc/reseed-demo.sh <dataset>` (only on the POC with demo data on; started from Settings → Demo data) | 25 min |
+| Restart the portal | `infra/poc/restart-portal.sh` (started from System status → Restart the portal) | 5 min |
+| Restore from a backup | `infra/poc/restore-portal.sh --local\|--offsite <stamp>` (started from Server tasks → Restore from a backup) | 28 min |
 
 If the page says tasks will not run, the agent has not been seen for five
 minutes: check `systemctl status hoa-portal-agent.timer` and
@@ -1098,8 +1131,10 @@ Only on the POC (`DEPLOYMENT_STAGE=poc` and `SEED_DEMO_ALLOWED=true` in
 2. Pick a dataset: **Oak Creek Farms (full demo)** (three years of history)
    or **Fresh start (just handed over)** (44 homes and owners, a
    declarant-appointed board of three, a sysadmin, a placeholder Declaration,
-   nothing else: good for trying the setup and invitations). Type `RESEED`
-   and press **Reseed with this dataset**.
+   nothing else: good for trying the setup and invitations) or **Blank
+   (empty portal)** (no homes, owners, board or history; only the real
+   logins: for starting with the setup wizard and the register import).
+   Type `RESEED` and press **Reseed with this dataset**.
 3. Within a minute the agent takes a backup (the reseed stops if it fails),
    saves the real logins, stops the portal, empties the database, migrates,
    puts the real logins back, seeds the dataset, removes the old data's
@@ -1116,7 +1151,14 @@ Only on the POC (`DEPLOYMENT_STAGE=poc` and `SEED_DEMO_ALLOWED=true` in
 4. The result is on Server tasks (and Demo data). Full output:
    `/var/log/hoa-portal-tasks.log` on the VM.
 
+With Blank, the box gives a board seat only (there are no homes): the setup
+wizard and the register import need a board member.
+
 By hand on the VM: `sudo bash /opt/hoa-portal/infra/poc/reseed-demo.sh fresh_start`.
+The database is emptied table by table (`infra/poc/empty-database.sql`, D98):
+before 0.45.0 one `DROP SCHEMA public CASCADE` needed more locks than the
+VM's Postgres has room for in one transaction and failed with "out of shared
+memory" (exit 3).
 If it fails before "Emptying the database", nothing was changed. If it fails
 while seeding or removing files, the real logins are already back: sign in
 and reseed again. If it fails in between (migrations, putting the logins

@@ -20,3 +20,17 @@ class AccountAdapter(DefaultAccountAdapter):
         # TrustedProxyMiddleware, not on the tunnel's address (security
         # review 2026-11: otherwise one client could lock out everyone).
         return client_ip(request) or "unknown"
+
+    def is_reauthentication_required(self, *, app: str, **kwargs) -> bool:
+        """Demo mode (D97): while a board member views as a demo persona, the
+        re-authentication before a vote is the real user's own; their recent
+        password or second-factor check counts, a persona never has one."""
+        required = super().is_reauthentication_required(app=app, **kwargs)
+        if not required:
+            return False
+        from allauth.core import context
+
+        from core.demo_mode import real_user_recently_reauthenticated
+
+        recent = real_user_recently_reauthenticated(getattr(context, "request", None))
+        return required if recent is None else not recent

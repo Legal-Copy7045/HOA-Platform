@@ -52,3 +52,13 @@ def login_background(request):
         "login_background_url": url(desktop or phone),
         "login_background_phone_url": url(phone or desktop),
     }
+
+
+def demo_mode(request):
+    """The demo banner (D97): only on the POC with a seeded demo dataset."""
+    from core import demo_mode as demo
+
+    if not demo.configured():
+        return {}
+    data = demo.banner(request)
+    return {"demo_banner": data} if data else {}

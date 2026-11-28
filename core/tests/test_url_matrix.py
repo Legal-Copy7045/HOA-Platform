@@ -148,6 +148,9 @@ MEMBER_PAGES = {
     # Capital projects shared with owners (D83): title, status, budget and
     # spent only (ledger/tests/test_finance_options.py checks the rest).
     "community_projects",
+    # The home picker's type-ahead (D96): homes and their owners are public
+    # within the community (owner's decision); address and owners' names only.
+    "home_suggest",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -259,6 +262,8 @@ PROTECTED = {
     "server_tasks": ("GET", None),
     # D91: Restart the portal (sysadmins; then a fresh sign-in check).
     "system_restart": ("POST", None),
+    # D98: Restore from a backup (sysadmins; then a fresh passkey or authenticator check).
+    "backup_restore": ("POST", None),
     # D93: Keys and connections (sysadmins; a key change also the board).
     "keys_connections": ("GET", None),
     "keys_service": ("POST", None),
@@ -269,6 +274,10 @@ PROTECTED = {
     "person_email_bounce_clear": ("POST", "person"),
     "bounce_paper_done": ("POST", "lot"),
     "demo_data": ("POST", None),  # 404 unless demo data is allowed; sysadmins only (D53)
+    # Demo mode (D97): 404 off the POC (and in these tests); board and
+    # sysadmin only, to seeded personas only (core/tests/test_demo_mode.py).
+    "demo_switch": ("POST", None),
+    "demo_switch_back": ("POST", None),
     "community_settings": ("GET", None),
     # Community setup wizard (D51): board only.
     "setup_home": ("GET", None),
@@ -1238,6 +1247,7 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "backup_restore",
                 "keys_connections",
                 "invitations",
                 "approvals",
@@ -1258,6 +1268,7 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "backup_restore",
                 "keys_connections",
                 "my_lot",
             ],
@@ -1428,3 +1439,20 @@ def test_community_detail_pages_require_sign_in_and_hide_board_content(client, w
         assert page.status_code == 200
         for secret in BOARD_ONLY_MARKERS:
             assert secret not in page.content
+
+
+def test_home_suggest_gives_addresses_and_owner_names_only(client, world):
+    """D96: any signed-in member finds any home by address with its current
+    owners' names (public within the community); nothing else about it."""
+    response = client.get(reverse("home_suggest"), {"q": "Bravo"})
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("account_login"))
+    client.force_login(world["owner_a"])
+    response = client.get(reverse("home_suggest"), {"q": "Bravo"})
+    assert response.status_code == 200 and response["Cache-Control"] == "no-store"
+    results = response.json()["results"]
+    assert [r["label"] for r in results] == ["2 Bravo Way"]
+    assert set(results[0]) == {"value", "label", "owners"}
+    assert b"@" not in response.content and b"$" not in response.content
+    for secret in BOARD_ONLY_MARKERS:
+        assert secret not in response.content

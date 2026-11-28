@@ -1,5 +1,6 @@
 from django import forms
 
+from community.home_picker import HomeField
 from community.models import (
     AppointedBy,
     Lot,
@@ -38,7 +39,7 @@ class OwnershipForm(forms.Form):
 
 
 class LotOwnershipForm(forms.Form):
-    lot = forms.ModelChoiceField(queryset=Lot.objects.none(), label="Home")
+    lot = HomeField(label="Home")  # picked by street address (D96)
     ownership_type = forms.ChoiceField(choices=OwnershipType.choices)
     start_date = forms.DateField(widget=DateInput, initial=today)
 

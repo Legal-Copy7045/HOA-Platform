@@ -62,6 +62,7 @@
           <div class="preview-banner" role="status">{% icon "home" %}<span><strong>Preview as owner:</strong> you're seeing what the owner of {{ request.owner_preview.lot_label }} sees. Read-only; personal pages are still yours.</span>
             <form method="post" action="{% url 'owner_preview_stop' %}" class="inline">{% csrf_token %}<button type="submit" class="small">Exit the preview</button></form></div>
         {% endif %}
+        {% if demo_banner %}{% include "partials/demo_banner.html" %}{% endif %}
 {% else %}
   <main id="main" class="auth{% if login_background_url %} has-bg{% endif %}">
     {% if login_background_url %}<picture class="auth-bg"><source media="(max-width: 700px)" srcset="{{ login_background_phone_url }}"><img src="{{ login_background_url }}" alt=""></picture>{% endif %}
@@ -81,6 +82,7 @@
   </main>
 {% endif %}
   <script src="{% static 'js/app.js' %}"></script>
+  {% if user.is_authenticated %}<script src="{% static 'js/home-picker.js' %}"></script>{% endif %}
   {# allauth puts page scripts here (passkey sign-in form and script, recovery codes). #}
   {% block extra_body %}{% endblock %}
 </body>

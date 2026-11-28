@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from audit.services import record_event
+from community.home_picker import HomeField
 from community.models import Lot
 from compliance import services
 from compliance.models import Violation, ViolationCategory
@@ -14,7 +15,7 @@ from documents import attachments
 
 
 class ReportForm(forms.Form):
-    lot = forms.ModelChoiceField(queryset=Lot.objects.none(), label="Home")
+    lot = HomeField(label="Home")  # picked by street address (D96)
     category = forms.ChoiceField(choices=ViolationCategory.choices)
     description = forms.CharField(widget=forms.Textarea(attrs={"rows": 4}))
     observed_on = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))

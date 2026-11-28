@@ -368,6 +368,37 @@ reseed_allowed() {
   return 0
 }
 
+# --- Restore from a backup (D98) -----------------------------------------------
+
+# backup_stamp_ok <stamp>: backup.sh's folder name (YYYY-MM-DDTHHMMZ), nothing else.
+backup_stamp_ok() {
+  [[ "$1" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{4}Z$ ]]
+}
+
+# backup_release_ok <backup's APP_VERSION label> <installed VERSION>: a
+# backup may be restored onto the release that made it or a newer one (the
+# migrations then bring it up); one from a newer release, or one that does
+# not say, is refused with a clear message. Plain comparisons, no eval.
+backup_release_ok() {
+  local label="$1" installed="$2" a b c x y z
+  if ! [[ "$label" =~ ^([0-9]{1,6})\.([0-9]{1,6})\.([0-9]{1,6})(-[a-z0-9]{1,40})?$ ]]; then
+    echo "Refusing: the backup does not say which release made it (APP_VERSION), so it cannot be checked against this one." >&2
+    return 1
+  fi
+  a=$((10#${BASH_REMATCH[1]})); b=$((10#${BASH_REMATCH[2]})); c=$((10#${BASH_REMATCH[3]}))
+  if ! [[ "$installed" =~ ^([0-9]{1,6})\.([0-9]{1,6})\.([0-9]{1,6})$ ]]; then
+    echo "Refusing: the installed release (VERSION) is not readable." >&2
+    return 1
+  fi
+  x=$((10#${BASH_REMATCH[1]})); y=$((10#${BASH_REMATCH[2]})); z=$((10#${BASH_REMATCH[3]}))
+  if [ "$a" -gt "$x" ] || { [ "$a" -eq "$x" ] && [ "$b" -gt "$y" ]; } \
+     || { [ "$a" -eq "$x" ] && [ "$b" -eq "$y" ] && [ "$c" -gt "$z" ]; }; then
+    echo "Refusing: the backup was made by release $a.$b.$c, newer than the installed $x.$y.$z. Install release $a.$b.$c (or newer) first, then restore." >&2
+    return 1
+  fi
+  return 0
+}
+
 # --- Compose files always together (D91) -------------------------------------
 # On the VM the portal is the base file plus the tunnel overlay. Plain
 # `docker compose ...` in the checkout reads COMPOSE_FILE from .env, so it

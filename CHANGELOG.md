@@ -6,6 +6,33 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.45.0 — 2026-11-28
+
+- Homes by address (D96): every "pick a home" field (Home neighbors, ARC
+  affected homes, violations, ownerships, resale, payment rows, documents,
+  paper mail, proxies) takes a street address with one type-ahead; lot numbers
+  still work but are never needed. Homes and their owners are public within
+  the community.
+- Demo mode (D97): on the demo POC a board member or sysadmin can view the
+  portal as any demo persona (owner, contact, tenant, board, treasurer,
+  manager, ARC, auditor...) and switch back; every rule still applies, real
+  logins are never targets, and switches are audited.
+- Restore from a backup (D98): pick a backup point, confirm with a fresh
+  passkey or authenticator and type RESTORE; a safety backup is taken first and
+  put back on any failure; the board is emailed. Every server task emails its
+  result. Reseeding no longer fails with "out of shared memory", failed tasks
+  show the real error, and a new Blank dataset gives an empty portal.
+- Full checks are due weekly, every 5 releases, before material security or
+  accounting changes and before major releases (D91 amended). A backlog file
+  lists agreed work not yet scheduled.
+- Fixes from the 0.45.0 full check: in demo mode every operations, server and
+  keys page is refused by default, sysadmin-only actions are refused and the
+  fresh second-factor check refuses while switched; personas never touch real
+  people or approve the real user's own proposals; a restore keeps who asked
+  for it; mail-server tests connect only to the address that was checked; a
+  bigger tap target on Records retention; searching a single-digit lot number
+  works.
+
 ## 0.44.0 — 2026-11-28
 
 - Keys and connections (D93): third-party keys are set up in the browser on

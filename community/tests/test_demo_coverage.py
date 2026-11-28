@@ -277,6 +277,21 @@ def test_every_persona_has_a_login_on_their_own_email_without_any_way_in(seeded)
                 assert setup_again_refusal(person) is None, key
 
 
+def test_every_persona_is_marked_for_demo_mode_and_nothing_else_is(seeded):
+    """Demo mode (D97) switches only to logins the seed marked: each persona's
+    own, with its key and guide label, in the guide's order."""
+    from core.models import DemoPersona
+
+    with system_access("demo coverage"):
+        users = _persona_users()
+        marked = {p.key: p for p in DemoPersona.objects.all()}
+    assert set(marked) == {p.key for p in PERSONAS}
+    for position, persona in enumerate(PERSONAS):
+        assert marked[persona.key].user_id == users[persona.key].pk, persona.key
+        assert marked[persona.key].label == persona.who
+        assert marked[persona.key].position == position
+
+
 def _persona_users() -> dict:
     """Each persona's login, found the way the guide describes them."""
     from accounts.models import User

@@ -64,9 +64,25 @@ def _authorize(actor, action: str) -> None:
     require(actor, action)
 
 
+def _refuse_real_login(person_id) -> None:
+    """Demo mode (D97): a persona never changes a real login's powers."""
+    from core.demo_mode import refuse_real_target
+
+    refuse_real_target(person_id=person_id, error=CommunityError)
+
+
+def _refuse_own_proposal(nominated_by_id) -> None:
+    """Demo mode (D97; review SEC-002, 0.45.0): a persona never approves what
+    the real user behind the switch proposed as themselves."""
+    from core.demo_mode import refuse_own_proposal
+
+    refuse_own_proposal(nominated_by_id, error=CommunityError)
+
+
 def _refuse_self_grant(actor, person: Person, what: str) -> None:
     if actor is SYSTEM:
         return
+    _refuse_real_login(person.pk)
     with system_access("self-grant check"):
         mine = Person.objects.filter(user=actor).values_list("pk", flat=True).first()
     if mine is not None and mine == person.pk:
@@ -1075,6 +1091,7 @@ def end_board_seat(
 
     Board members may always end their own seat (resignation).
     """
+    _refuse_real_login(seat.person_id)
     with system_access("end_board_seat: own seat?"):
         own = actor is not SYSTEM and seat.person.user_id == getattr(actor, "pk", None)
     if not own:
@@ -1159,6 +1176,7 @@ def end_office(
 
 
 def _end_office(holding, *, end_date, actor, request) -> OfficeHolding:
+    _refuse_real_login(holding.person_id)
     end_date = end_date or today()
     with transaction.atomic(), system_access("end_office"):
         holding = OfficeHolding.objects.select_for_update().get(pk=holding.pk)
@@ -1253,6 +1271,7 @@ def end_role(
     request: HttpRequest | None = None,
 ) -> RoleAssignment:
     """End a role. Revoking sysadmin needs only one board member (D4)."""
+    _refuse_real_login(assignment.person_id)
     action = (
         "role.sysadmin.revoke"
         if assignment.role == Role.SYSADMIN
@@ -1291,6 +1310,9 @@ def link_login(person: Person, user, *, actor, request: HttpRequest | None = Non
     """Attach a login to a Person (called when an invitation is accepted)."""
     if actor is not SYSTEM:
         _authorize(actor, "person.manage")
+    from core.demo_mode import refuse_real_target
+
+    refuse_real_target(user_id=user.pk, error=CommunityError)
     with transaction.atomic(), system_access("link_login"):
         person = Person.objects.select_for_update().get(pk=person.pk)
         if person.user_id is not None:
@@ -1322,6 +1344,7 @@ def nominate_sysadmin(*, person: Person, actor, request: HttpRequest | None = No
     from community.models import SysadminNomination
 
     _authorize(actor, "role.sysadmin.nominate")
+    _refuse_real_login(person.pk)
     if person.user_id is not None and person.user_id == getattr(actor, "pk", None):
         raise CommunityError("You cannot nominate yourself.")
     now = timezone.now()
@@ -1351,12 +1374,14 @@ def approve_sysadmin(nomination, *, actor, request: HttpRequest | None = None):
     from community.models import NominationOutcome, SysadminNomination
 
     _authorize(actor, "role.sysadmin.approve")
+    _refuse_real_login(nomination.person_id)
     with transaction.atomic(), system_access("approve_sysadmin"):
         nomination = SysadminNomination.objects.select_for_update().get(pk=nomination.pk)
         if not nomination.is_open:
             raise CommunityError("This nomination is no longer open.")
         if nomination.nominated_by_id == actor.pk:
             raise CommunityError("A different board member must approve your nomination.")
+        _refuse_own_proposal(nomination.nominated_by_id)
         if nomination.person.user_id == actor.pk:
             raise CommunityError("You cannot approve your own nomination.")
         assignment = _record_role(
@@ -2262,6 +2287,7 @@ def decide_seat_nomination(nomination, *, approve: bool, actor, request=None):
     from community.models import BoardSeatNomination
 
     _authorize(actor, "seat.manage")
+    _refuse_real_login(nomination.person_id)
     with transaction.atomic(), system_access("decide seat nomination"):
         nomination = BoardSeatNomination.objects.select_for_update().get(pk=nomination.pk)
         if nomination.outcome:
@@ -2269,6 +2295,7 @@ def decide_seat_nomination(nomination, *, approve: bool, actor, request=None):
         if approve:
             if nomination.nominated_by_id == _user(actor).pk:
                 raise CommunityError("A different board member must approve your proposal.")
+            _refuse_own_proposal(nomination.nominated_by_id)
             seat = record_board_seat(
                 person=nomination.person,
                 seat_type=nomination.seat_type,
