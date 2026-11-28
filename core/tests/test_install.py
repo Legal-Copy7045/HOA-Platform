@@ -90,6 +90,15 @@ class Box:
             record + 'case "$1" in -u) echo 0 ;; -un|-gn) echo root ;; '
             '*) exec /usr/bin/id "$@" ;; esac\n',
         )
+        # Tests may run as an ordinary user (GitHub's runners): only root may
+        # set an owner, so the fake drops -o/-g there and runs the real install.
+        _fake(
+            self.bin,
+            "install",
+            'args=(); while [ $# -gt 0 ]; do case "$1" in -o|-g) '
+            'if [ "$(/usr/bin/id -u)" -eq 0 ]; then args+=("$1" "$2"); fi; shift 2 ;; '
+            '*) args+=("$1"); shift ;; esac; done; exec /usr/bin/install "${args[@]}"\n',
+        )
         _fake(self.bin, "nproc", "echo 4\n")
         _fake(
             self.bin,
