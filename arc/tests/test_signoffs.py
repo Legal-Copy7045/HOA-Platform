@@ -512,19 +512,19 @@ def test_an_objection_online_needs_a_comment(w, django_capture_on_commit_callbac
 
 
 def test_add_a_homeowner_by_address_and_name_never_email(client, w):
-    from arc.signoff_views import _lot_choices
-
-    labels = dict(_lot_choices(w["req"]))
-    far = labels[w["far_lot"].pk]
-    assert far.startswith(w["far_lot"].street_address.splitlines()[0])
-    assert "Pat Paper" in labels[w["paper_lot"].pk]
-    assert "@" not in " ".join(labels.values())
-    assert w["applicant_lot"].pk not in labels
+    # D96: the homeowner picks by street address with the shared home
+    # picker; suggestions carry the address and the owners on the deed only.
     client.force_login(w["applicant"])
+    found = client.get(reverse("home_suggest"), {"q": w["paper_lot"].label[:6]}).json()["results"]
+    paper = next(r for r in found if r["label"] == w["paper_lot"].label)
+    assert "Pat Paper" in paper["owners"]
+    assert "@" not in str(found)
     page = client.get(reverse("arc_detail", args=[w["req"].pk])).content.decode()
     assert "Ask another homeowner" in page and "pat.paper@example.com" not in page
+    assert "data-home-picker" in page
     client.post(
-        reverse("arc_signoff_action", args=[w["req"].pk, "add_lot"]), {"lot": w["far_lot"].pk}
+        reverse("arc_signoff_action", args=[w["req"].pk, "add_lot"]),
+        {"lot": w["far_lot"].label},
     )
     with system_access("t"):
         assert SignoffRequest.objects.filter(arc_request=w["req"], lot=w["far_lot"]).exists()

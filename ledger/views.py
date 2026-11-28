@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 
 from audit.services import record_event
 from community.account_views import my_account_people
+from community.home_picker import HomeField
 from community.models import Lot
 from community.rules import rule, rule_with_citation
 from community.terms import term_text
@@ -543,9 +544,18 @@ def _batch_row(request, i, lots_by_pk, today):
     if not (values["lot"] or values["amount"] or values["check"]):
         return values, None, []
     errors = []
-    lot = lots_by_pk.get(int(values["lot"])) if values["lot"].isdigit() else None
-    if lot is None:
-        errors.append("Choose the home.")
+    # The home is typed or picked by street address (D96; a lot number is
+    # still accepted), resolved among the homes this person may post to.
+    from community import home_picker
+
+    try:
+        lot = home_picker.resolve(values["lot"], lots_by_pk.values())
+    except home_picker.HomeNotFound as exc:
+        lot = None
+        errors.append(exc.message)
+    else:
+        if lot is None:
+            errors.append("Choose the home: type part of its address.")
     try:
         amount = parse_cents(values["amount"])
     except ValueError:
@@ -621,6 +631,8 @@ def record_payments(request):
                 return redirect(f"{request.path}?recorded={ids}")
         else:
             messages.error(request, "Fix the rows marked below; nothing was recorded.")
+    for i, row in enumerate(rows):
+        row["name"], row["err_id"] = f"lot_{i}", f"err_{i}"
     recorded = []
     ids = [int(i) for i in request.GET.get("recorded", "").split(",") if i.isdigit()][:100]
     if ids and request.method == "GET":
@@ -919,7 +931,11 @@ class ResaleForm(forms.Form):
         super().__init__(*args, **kwargs)
         lots = Lot.objects.for_user(user)
         if not policy.can(user, "resale.manage"):
+            # An owner picks from their own homes (a short list).
             lots = lots.filter(pk__in=policy.roles_for(user).owned_lot_ids)
+        else:
+            # The board and manager pick any home by street address (D96).
+            self.fields["lot"] = HomeField(label="Home")
         self.fields["lot"].queryset = lots.order_by("street_address", "number")
 
 

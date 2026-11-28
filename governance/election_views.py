@@ -292,9 +292,6 @@ def meeting_extras(user, meeting) -> dict:
         "proxies_held": [p for p in mine if p.holder_id == roles.person_id],
         "proxy_board": board,
         "proxy_lots": my_lots,
-        "proxy_homes": [lot for lot in _owner_choices() if lot.pk not in roles.owned_lot_ids]
-        if my_lots
-        else [],
         "quorum": elections.quorum_status(meeting) if policy.can(user, "meeting.manage") else None,
     }
 
@@ -314,14 +311,22 @@ def proxy_grant(request, pk):
         with system_access("holder must be on the board"):
             if not BoardSeat.objects.active().filter(person=holder).exists():
                 raise PermissionDenied
-    elif request.POST.get("holder_home"):
-        # "The owner at <address>": homes are listed by street address, no
-        # owner names (SEC-010).
-        home = request.POST["holder_home"]
+    elif request.POST.get("holder_home", "").strip():
+        # "The owner at <address>", picked by street address (D96); a lot
+        # number is still accepted. Only homes with an owner, not one's own.
+        from community import home_picker
+
+        roles = policy.roles_for(request.user)
+        homes = [h for h in _owner_choices() if h.pk not in roles.owned_lot_ids]
+        try:
+            home = home_picker.resolve(request.POST["holder_home"], homes)
+        except home_picker.HomeNotFound as exc:
+            messages.error(request, f"Proxy not given. {exc.message}")
+            return redirect("meeting_detail", pk=meeting.pk)
         with system_access("proxy holder by home"):
             ownership = (
                 Ownership.objects.active()
-                .filter(lot_id=int(home) if home.isdigit() else 0)
+                .filter(lot_id=home.pk if home else 0)
                 .order_by("start_date", "pk")
                 .first()
             )

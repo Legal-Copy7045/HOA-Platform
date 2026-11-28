@@ -457,7 +457,7 @@ def test_add_another_row_without_javascript_keeps_what_was_typed(client, w):
     client.force_login(w["manager"])
     data = {
         "rows": "3",
-        "lot_0": str(w["lot"].pk),
+        "lot_0": w["lot"].label,
         "amount_0": "75.00",
         "check_0": "1042",
         "date_0": timezone.localdate().isoformat(),
@@ -468,7 +468,7 @@ def test_add_another_row_without_javascript_keeps_what_was_typed(client, w):
     assert response.context["row_count"] == 4
     html = response.content.decode()
     assert 'value="75.00"' in html and 'value="1042"' in html
-    assert f'<option value="{w["lot"].pk}" selected>' in html
+    assert f'name="lot_0" id="lot_0" value="{w["lot"].label}"' in html
     assert 'name="lot_3"' in html
     assert not LedgerEntry.objects.unscoped("t").filter(kind="payment").exists()
 

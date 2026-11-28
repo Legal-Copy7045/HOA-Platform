@@ -882,3 +882,15 @@ meter.bar { width: 100%; max-width: 16rem; height: 1rem; vertical-align: middle;
 /* A row link in a list (e.g. a file waiting for disposal on Records retention) is a
    full tap target on phones (walkthrough 0.44.0: 17px tall); desktop unchanged. */
 @media (max-width: 640px) { .list > li > a.grow { display: flex; align-items: center; min-height: 44px; } }
+
+/* The home picker (D96): type-ahead by street address; 44px tap targets. */
+.home-picker { position: relative; width: 100%; max-width: 32rem; }
+.home-picker input { max-width: 100%; }
+.home-picker-list { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin: .2rem 0 0; padding: .25rem 0; list-style: none; background: var(--surface); border: 1px solid #8a8f88; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.12); max-height: 18rem; overflow-y: auto; }
+.home-picker-option, .home-picker-empty { display: flex; flex-direction: column; justify-content: center; min-height: 44px; padding: .35rem .7rem; cursor: pointer; overflow-wrap: anywhere; }
+.home-picker-empty { cursor: default; color: var(--muted); }
+.home-picker-option[aria-selected="true"], .home-picker-option:hover { background: var(--green-100); }
+.home-picker-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: 0 0 .35rem; padding: 0; list-style: none; }
+.home-picker-chip { display: inline-flex; align-items: center; gap: .2rem; max-width: 100%; padding-left: .7rem; border: 1px solid var(--line); border-radius: 99px; background: var(--green-50); overflow-wrap: anywhere; }
+.home-picker-remove { min-height: 44px; min-width: 44px; padding: 0; background: transparent; color: var(--ink-2); border: 0; font-size: 1.2rem; }
+.home-picker-remove:hover { background: var(--green-100); }

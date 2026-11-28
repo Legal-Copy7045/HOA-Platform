@@ -5,6 +5,7 @@ from community import (
     account_views,
     branding_views,
     help_views,
+    home_picker_views,
     profile_views,
     register_views,
     reservation_views,
@@ -14,6 +15,8 @@ from community import (
 )
 
 urlpatterns = [
+    # The home picker's type-ahead (D96): any signed-in portal user.
+    path("homes/suggest/", home_picker_views.home_suggest, name="home_suggest"),
     # Community setup wizard (D51)
     path("board/community-setup/", setup_views.setup_home, name="setup_home"),
     path("board/community-setup/start/", setup_views.setup_start, name="setup_start"),

@@ -148,6 +148,9 @@ MEMBER_PAGES = {
     # Capital projects shared with owners (D83): title, status, budget and
     # spent only (ledger/tests/test_finance_options.py checks the rest).
     "community_projects",
+    # The home picker's type-ahead (D96): homes and their owners are public
+    # within the community (owner's decision); address and owners' names only.
+    "home_suggest",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -1428,3 +1431,20 @@ def test_community_detail_pages_require_sign_in_and_hide_board_content(client, w
         assert page.status_code == 200
         for secret in BOARD_ONLY_MARKERS:
             assert secret not in page.content
+
+
+def test_home_suggest_gives_addresses_and_owner_names_only(client, world):
+    """D96: any signed-in member finds any home by address with its current
+    owners' names (public within the community); nothing else about it."""
+    response = client.get(reverse("home_suggest"), {"q": "Bravo"})
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("account_login"))
+    client.force_login(world["owner_a"])
+    response = client.get(reverse("home_suggest"), {"q": "Bravo"})
+    assert response.status_code == 200 and response["Cache-Control"] == "no-store"
+    results = response.json()["results"]
+    assert [r["label"] for r in results] == ["2 Bravo Way"]
+    assert set(results[0]) == {"value", "label", "owners"}
+    assert b"@" not in response.content and b"$" not in response.content
+    for secret in BOARD_ONLY_MARKERS:
+        assert secret not in response.content

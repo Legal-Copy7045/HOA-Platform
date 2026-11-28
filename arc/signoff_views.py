@@ -57,7 +57,6 @@ def panel_context(user, req: ArcRequest) -> dict:
         "signoff_neighbors": signoffs.neighbors_of(req.lot),
         "signoff_has_reader": bool(_gemini_configured()),
         "signoff_board": signoffs.is_board_side(user, req),
-        "signoff_lot_choices": _lot_choices(req) if can_arrange else [],
     }
     if staff:
         data["signoff_readings"] = ScanReading.objects.filter(arc_request=req).order_by("-id")[:5]
@@ -68,23 +67,6 @@ def panel_context(user, req: ArcRequest) -> dict:
             label__in=SIGNED_FORM_LABELS
         )
     return data
-
-
-def _lot_choices(req) -> list[tuple[int, str]]:
-    """Every other home as "136 Oak Creek Drive (Pat & Sam Example)": the
-    address's first line and the owners on the deed (never tenants or emails)."""
-    from core.scoping import system_access
-
-    with system_access("neighbor lot choices"):
-        lots = sorted(Lot.objects.exclude(pk=req.lot_id), key=lambda lot: lot.sort_key)
-    names = signoffs.owner_names([lot.pk for lot in lots])
-    out = []
-    for lot in lots:
-        label = lot.label
-        if names.get(lot.pk):
-            label += f" ({names[lot.pk]})"
-        out.append((lot.pk, label))
-    return out
 
 
 def _gemini_configured():
@@ -105,11 +87,19 @@ def arc_signoff_action(request, pk, action):
             "Neighbors added from the development plan.",
         )
     elif action == "add_lot":
-        # Lot numbers and addresses are not private within the community;
-        # the service checks the caller may arrange sign-offs for this request.
-        lot = get_object_or_404(
-            Lot.objects.unscoped("pick a neighbor lot"), pk=int(request.POST.get("lot") or 0)
-        )
+        # Homes and their owners are public within the community (D96);
+        # picked by street address, and the service checks the caller may
+        # arrange sign-offs for this request.
+        from community import home_picker
+
+        try:
+            lot = home_picker.resolve(request.POST.get("lot", ""), home_picker.all_homes())
+        except home_picker.HomeNotFound as exc:
+            messages.error(request, exc.message)
+            return redirect("arc_detail", pk=req.pk)
+        if lot is None:
+            messages.error(request, "Choose a home: type part of its address.")
+            return redirect("arc_detail", pk=req.pk)
         _flash(
             request,
             lambda: signoffs.add_signoff_lot(req, lot, actor=user, request=request),
@@ -400,70 +390,97 @@ def signoff_link_file(request, token, file_id):
 
 @login_required
 def neighbors_page(request):
-    """Board: each lot's left and right neighbors and other affected lots."""
+    """Board: each home's left and right neighbors and other affected homes,
+    picked by street address (D96; a lot number is still accepted)."""
+    from community import home_picker
+
     policy.require(request.user, "arc.configure")
     lots = list(Lot.objects.for_user(request.user).order_by("number"))
     by_number = {lot.number: lot for lot in lots}
 
-    def pick(value):
+    def row_lot(value):
+        # The row being saved is named internally by its lot number.
         value = (value or "").strip()
         return by_number.get(int(value)) if value.isdigit() else None
 
     def wanted(suffix):
-        others = [
-            by_number[int(p)]
-            for p in (request.POST.get(f"others{suffix}") or "").replace(",", " ").split()
-            if p.isdigit() and int(p) in by_number
-        ]
-        return (
-            pick(request.POST.get(f"left{suffix}")),
-            pick(request.POST.get(f"right{suffix}")),
-            others,
-        )
+        """(left, right, others, typed values, errors) from the posted text."""
+        values = {k: request.POST.get(f"{k}{suffix}", "") for k in ("left", "right", "others")}
+        errors = []
+        sides = {}
+        for key, name in (("left", "Left neighbor"), ("right", "Right neighbor")):
+            try:
+                sides[key] = home_picker.resolve(values[key], lots)
+            except home_picker.HomeNotFound as exc:
+                sides[key] = None
+                errors.append(f"{name}: {exc.message}")
+        others, other_errors = home_picker.resolve_many(values["others"], lots)
+        errors += [f"Also affected: {e}" for e in other_errors]
+        return sides["left"], sides["right"], others, values, errors
 
     def save(lot, left, right, others):
         signoffs.set_neighbors(
             lot, left=left, right=right, others=others, actor=request.user, request=request
         )
 
+    posted = {}  # lot pk -> (typed values, errors) for a form that needs fixing
     all_rows = any(k.startswith("left_") for k in request.POST)
     if request.method == "POST" and (request.POST.get("save_all") or all_rows):
-        # Every row is in one form: "Save all", or a row's own Save, saves
-        # each row that changed (and audits it), so no edit is lost.
-        changed = []
+        # Every row is in one form: "Save all" saves each row that changed
+        # (and audits it). A row whose text names no home stops the save and
+        # the page comes back with every typed value and the errors.
+        plans = []
         for lot in lots:
             if f"left_{lot.number}" not in request.POST:
                 continue
-            left, right, others = wanted(f"_{lot.number}")
+            left, right, others, values, errors = wanted(f"_{lot.number}")
+            if errors:
+                posted[lot.pk] = (values, errors)
+                continue
+            posted.setdefault(lot.pk, (values, []))
             sides = signoffs.neighbor_sides(lot)
             if (left, right, sorted(o.pk for o in others)) != (
                 sides["left"],
                 sides["right"],
                 sorted(o.pk for o in sides["other"]),
             ):
-                save(lot, left, right, others)
-                changed.append(lot.number)
-        messages.success(
-            request,
-            f"Neighbors saved for {len(changed)} home{'s' if len(changed) != 1 else ''}."
-            if changed
-            else "No changes to save.",
-        )
-        row = pick(request.POST.get("lot"))
-        return redirect(_neighbors_url() + (f"#lot-{row.number}" if row else ""))
-    if request.method == "POST":
-        lot = pick(request.POST.get("lot"))
+                plans.append((lot, left, right, others))
+        if not any(errs for _, errs in posted.values()):
+            for plan in plans:
+                save(*plan)
+            messages.success(
+                request,
+                f"Neighbors saved for {len(plans)} home{'s' if len(plans) != 1 else ''}."
+                if plans
+                else "No changes to save.",
+            )
+            row = row_lot(request.POST.get("lot"))
+            return redirect(_neighbors_url() + (f"#lot-{row.number}" if row else ""))
+        messages.error(request, "Nothing was saved: check the homes marked below.")
+    elif request.method == "POST":
+        lot = row_lot(request.POST.get("lot"))
         if lot is None:
             raise Http404
-        save(lot, *wanted(""))
-        messages.success(request, f"Neighbors of {lot.label} saved.")
-        # Back to the list it was opened from (WT-035: one home at a time).
-        back = "?show=missing" if request.POST.get("show") == "missing" else ""
-        return redirect(f"{_neighbors_url()}{back}#home-{lot.number}")
+        left, right, others, values, errors = wanted("")
+        if not errors:
+            save(lot, left, right, others)
+            messages.success(request, f"Neighbors of {lot.label} saved.")
+            # Back to the list it was opened from (WT-035: one home at a time).
+            back = "?show=missing" if request.POST.get("show") == "missing" else ""
+            return redirect(f"{_neighbors_url()}{back}#home-{lot.number}")
+        posted[lot.pk] = (values, errors)
     names = signoffs.owner_names([lot.pk for lot in lots])
+    dup = home_picker._duplicates(lots)
     rows = []
     for lot in lots:
         sides = signoffs.neighbor_sides(lot)
+        values, errors = posted.get(lot.pk, (None, []))
+        if values is None:
+            values = {
+                "left": home_picker.picker_value(sides["left"], dup),
+                "right": home_picker.picker_value(sides["right"], dup),
+                "others": "; ".join(home_picker.picker_value(o, dup) for o in sides["other"]),
+            }
         rows.append(
             {
                 "lot": lot,
@@ -474,6 +491,14 @@ def neighbors_page(request):
                 "left_name": names.get(sides["left"].pk, "") if sides["left"] else "",
                 "right_name": names.get(sides["right"].pk, "") if sides["right"] else "",
                 "missing": not (sides["left"] and sides["right"]),
+                "values": values,
+                "errors": errors,
+                "left_field": f"left_{lot.number}",
+                "right_field": f"right_{lot.number}",
+                "others_field": f"others_{lot.number}",
+                "left_id": f"nl-{lot.number}",
+                "right_id": f"nr-{lot.number}",
+                "others_id": f"no-{lot.number}",
             }
         )
     # WT-035: a find box, a Missing neighbors filter and one home at a time
@@ -482,11 +507,11 @@ def neighbors_page(request):
     # for computers. Never logged or audited, like the other find boxes.
     missing = sum(r["missing"] for r in rows)
     total = len(rows)
-    show = request.GET.get("show", "")
+    show = request.GET.get("show", "") or request.POST.get("show", "")
     if show != "missing":
         show = ""
     q = request.GET.get("q", "").strip()[:100]
-    shown = [r for r in rows if r["missing"]] if show else rows
+    shown = [r for r in rows if r["missing"] or r["errors"]] if show else rows
     if q:
         needle = q.lower()
         shown = [
@@ -496,8 +521,11 @@ def neighbors_page(request):
             or needle in r["lot"].label.lower()
             or needle in r["owners"].lower()
         ]
-    edit = pick(request.GET.get("home"))
+    edit = row_lot(request.GET.get("home") or request.POST.get("lot"))
+    if request.method == "POST" and all_rows:
+        edit = None
     edit_row = next((r for r in rows if edit and r["lot"].pk == edit.pk), None)
+    status = 400 if request.method == "POST" else 200
     return render(
         request,
         "arc/neighbors.html",
@@ -509,6 +537,7 @@ def neighbors_page(request):
             "q": q,
             "edit": edit_row,
         },
+        status=status,
     )
 
 
