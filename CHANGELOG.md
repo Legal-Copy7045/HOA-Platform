@@ -24,6 +24,15 @@ adds an entry here.
   officer's name and email for their sign-in link). It generates every server
   secret, hardens the host, starts the portal, checks it and is safe to run
   again.
+- Fixes from the 0.44.0 full check: email and AI key changes also need a
+  second board member, and every warning about a key change goes out through
+  the settings in force before it; a changed mail server needs its password
+  typed again and only public mail servers are accepted; removing keys needs
+  the same approval; a waiting key change can be refused or cancelled until it
+  takes effect; the vendor documents key can't be removed while vendor files
+  need it; a seller's payment plan no longer stops the buyer's late fees or
+  interest; SMTP2Go delivery records are kept when one message in a batch
+  fails.
 
 ## 0.43.0 — 2026-11-27
 
