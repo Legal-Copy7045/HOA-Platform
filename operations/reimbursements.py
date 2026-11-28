@@ -1,6 +1,6 @@
 """Expense reimbursements (D77).
 
-A board member, committee member or volunteer owner who paid an association
+A board member or committee member who paid an association
 expense out of pocket submits a claim: the amount, the date, who was paid,
 the expense category, what it was for and the receipt (one or more files,
 through the safe upload path with the malware scan, ``documents.attachments``).

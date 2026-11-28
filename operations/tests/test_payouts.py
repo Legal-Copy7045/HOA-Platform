@@ -9,13 +9,15 @@ from django.utils import timezone
 
 from audit.models import AuditEvent
 from community import services as community
-from community.models import Role
+from community.models import Person, Role
 from community.tests.factories import LotFactory, make_member
 from core.append_only import AppendOnlyError
 from core.db_roles import append_only_tables
 from core.policy import SYSTEM
+from core.scoping import system_access
 from documents.models import ScanResult
 from documents.tests.helpers import pdf
+from governance import services as governance
 from ledger import accounting, check_numbers
 from operations import reimbursements as rb
 from operations import services as ops
@@ -41,18 +43,24 @@ def w():
     board2 = make_member(board=True)
     board3 = make_member(board=True)
     manager = make_member(roles=[Role.MANAGER])
-    volunteer = make_member(lots=[LotFactory(street_address="2 Alpha Way")])
+    # Claims are board and committee work (0.44.0): the non-board claimant is
+    # an owner who serves on a committee.
+    member = make_member(lots=[LotFactory(street_address="2 Alpha Way")])
+    committee = governance.create_committee(name="Grounds", actor=board)
+    with system_access("t"):
+        person = Person.objects.get(user=member)
+    governance.appoint_committee_member(committee, person=person, actor=board)
     return {
         "category": category,
         "board": board,
         "board2": board2,
         "board3": board3,
         "manager": manager,
-        "volunteer": volunteer,
+        "member": member,
     }
 
 
-def _claim(w, who="volunteer", amount=4250, files=None):
+def _claim(w, who="member", amount=4250, files=None):
     return rb.submit(
         amount_cents=amount,
         spent_on=TODAY - D(days=3),
@@ -132,7 +140,7 @@ def test_decline_and_withdraw(w):
     rb.decline(claim, note="Not an association expense", actor=w["board2"])
     assert rb.state(claim)["status"] == "declined"
     other = _claim(w)
-    rb.withdraw(other, actor=w["volunteer"])
+    rb.withdraw(other, actor=w["member"])
     assert rb.state(other)["status"] == "withdrawn"
     with pytest.raises(AppendOnlyError):
         other.save()
@@ -146,16 +154,22 @@ def test_decline_and_withdraw(w):
 
 
 def test_claims_are_scoped_to_the_claimant(client, w):
-    claim = _claim(w)
-    other_owner = make_member(lots=[LotFactory(street_address="3 Alpha Way")])
-    client.force_login(other_owner)
-    assert client.get(reverse("reimbursement_detail", args=[claim.pk])).status_code == 404
     from documents.attachments import attachments_for
 
+    claim = _claim(w)
     file_id = attachments_for(claim).first().pk
+    # Another committee member sees the list, but not this claim.
+    other_member = make_member(lots=[LotFactory(street_address="3 Alpha Way")])
+    with system_access("t"):
+        person = Person.objects.get(user=other_member)
+    committee = governance.create_committee(name="Social", actor=w["board"])
+    governance.appoint_committee_member(committee, person=person, actor=w["board"])
+    client.force_login(other_member)
+    assert client.get(reverse("reimbursement_detail", args=[claim.pk])).status_code == 404
     assert client.get(reverse("reimbursement_file", args=[claim.pk, file_id])).status_code == 404
-    assert b"Hardware store" not in client.get(reverse("reimbursements")).content
-    client.force_login(w["volunteer"])
+    listing = client.get(reverse("reimbursements"))
+    assert listing.status_code == 200 and b"Hardware store" not in listing.content
+    client.force_login(w["member"])
     assert b"Hardware store" in client.get(reverse("reimbursements")).content
     assert client.get(reverse("reimbursement_file", args=[claim.pk, file_id])).status_code == 200
     client.force_login(w["board2"])
@@ -163,8 +177,22 @@ def test_claims_are_scoped_to_the_claimant(client, w):
     assert reverse("reimbursement_action", args=[claim.pk, "approve"]) in page
 
 
+def test_owners_on_no_committee_do_not_claim(client, w):
+    """Owner decision 0.44.0 (D95): claims are board and committee work."""
+    owner = make_member(lots=[LotFactory(street_address="4 Alpha Way")])
+    with pytest.raises(PermissionDenied):
+        _claim({**w, "owner": owner}, who="owner")
+    claim = _claim(w)
+    client.force_login(owner)
+    for url in (reverse("reimbursements"), reverse("reimbursements") + "?mine=1"):
+        assert client.get(url).status_code == 403, url
+    assert client.get(reverse("reimbursement_new")).status_code == 403
+    assert client.get(reverse("reimbursement_detail", args=[claim.pk])).status_code == 404
+    assert not rb.claimant_items(owner)
+
+
 def test_submit_page(client, w):
-    client.force_login(w["volunteer"])
+    client.force_login(w["member"])
     assert client.get(reverse("reimbursement_new")).status_code == 200
     response = client.post(
         reverse("reimbursement_new"),
@@ -303,7 +331,7 @@ def test_vendor_checks_page(client, w):
     client.force_login(w["board2"])
     client.post(reverse("vendor_check_action", args=[check.pk, "void"]), {"reason": "Typo"})
     assert vc.status(check) == "voided"
-    owner = w["volunteer"]
+    owner = w["member"]
     client.force_login(owner)
     assert client.get(reverse("vendor_checks")).status_code == 403
     assert Invoice.objects.get(pk=inv.pk).state == "approved"
@@ -377,7 +405,7 @@ def test_a_receipt_missing_from_the_store_is_a_404_not_a_server_error(client, w)
     attachment = attachments_for(claim).first()
     default_storage.delete(attachment.file.name)
     client.raise_request_exception = True
-    for who in ("board2", "manager", "volunteer"):
+    for who in ("board2", "manager", "member"):
         client.force_login(w[who])
         url = reverse("reimbursement_file", args=[claim.pk, attachment.pk])
         assert client.get(url).status_code == 404
@@ -390,7 +418,7 @@ def test_a_receipt_of_another_claim_or_out_of_scope_is_a_404(client, w):
     claim = _claim(w)
     other = _claim(w, who="board")
     other_file = attachments_for(other).first().pk
-    client.force_login(w["volunteer"])
+    client.force_login(w["member"])
     # Someone else's claim, and another claim's file under one's own claim.
     assert client.get(reverse("reimbursement_file", args=[other.pk, other_file])).status_code == 404
     assert client.get(reverse("reimbursement_file", args=[claim.pk, other_file])).status_code == 404

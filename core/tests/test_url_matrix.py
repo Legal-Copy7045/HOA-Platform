@@ -148,9 +148,6 @@ MEMBER_PAGES = {
     # Capital projects shared with owners (D83): title, status, budget and
     # spent only (ledger/tests/test_finance_options.py checks the rest).
     "community_projects",
-    # Expense reimbursements (D77): a volunteer owner sees only their own claims.
-    "reimbursements",
-    "reimbursement_new",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -436,6 +433,10 @@ PROTECTED = {
     "payment_plan_action": ("POST", "plan_b"),
     "payment_plan_letter": ("GET", "plan_b"),
     "payment_plan_acknowledge": ("POST", "plan_b"),
+    # Expense reimbursements (D77): board and committee work (0.44.0, D95);
+    # an owner on no committee is refused the list and the claim form.
+    "reimbursements": ("GET", None),
+    "reimbursement_new": ("GET", None),
     "reimbursement_detail": ("GET", "claim_b"),
     "reimbursement_action": ("POST", "claim_b"),
     "reimbursement_file": ("GET", "claim_b"),
@@ -905,7 +906,7 @@ def world():
         total_cents=4400, year=2026, resolution_ref="Resolution 2026-14", actor=board
     )
     # Finance gaps (D75-D77): a special assessment, lot B's payment plan,
-    # owner B's reimbursement claim and a vendor check.
+    # owner B's reimbursement claim (B serves on a committee) and a vendor check.
     from ledger import payment_plans
     from ledger import special_assessments as sa_service
     from operations import reimbursements as rb

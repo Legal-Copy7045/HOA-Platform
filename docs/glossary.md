@@ -55,8 +55,8 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Set up a payment plan | The page, from a collection case, where a plan's installments are entered. | `payment_plan_new` |
 | Your payment plan | The owner's view of their plan on My account, with the next installment, the agreement letter and "I agree to this plan". | `ledger/_my_plans.html` |
 | Reimbursements | The board's page of expense reimbursement claims (D77): approved by a board member other than the claimant, paid by check or bank transfer. Finance overview hub. | `reimbursements`, `operations/reimbursements.py` |
-| My reimbursements | One's own claims for association expenses paid out of pocket. Not a menu entry (D95): board members open it from the Finance overview, committee members from their committee's page, anyone who may claim from My account. | `reimbursements?mine=1` |
-| Claim an expense | The form for a reimbursement claim with its receipt. | `reimbursement_new` |
+| My reimbursements | One's own claims for association expenses paid out of pocket. Not a menu entry (D95): board members open it from the Finance overview, committee members from their committee's page. Board members and committee members only (0.44.0). | `reimbursements?mine=1` |
+| Claim an expense | The form for a reimbursement claim with its receipt; board members and committee members only. | `reimbursement_new` |
 | Checks | The board's page for paying approved invoices and reimbursements by check on the association's check stock, with the check register, voids and clearing (D77). Finance overview hub. | `vendor_checks`, `operations/vendor_checks.py` |
 | Start next year's budget | On Budgets: a draft for the next fiscal year from this year's budget and actuals, with the adopted reserve plan's contribution and the monthly charge per home (D78). | `budget_prepare`, `ledger/budget_prep.py` |
 | Budget compared | A draft budget beside last year's budget and actuals, with the monthly charge per home and its change. | `budget_compare` |

@@ -330,13 +330,13 @@ PERMISSIONS: dict[str, frozenset[str]] = {
     "payment_plan.prepare": frozenset({BOARD, MANAGER}),
     "payment_plan.approve": frozenset({BOARD}),
     "payment_plan.acknowledge": frozenset({OWNER}),
-    # Expense reimbursements: board members, committee members and volunteer
-    # owners claim; a board member other than the claimant approves; paying
-    # is data entry (D66 limits who pays a board member).
-    "reimbursement.submit": frozenset({OWNER, BOARD, COMMITTEE_MEMBER}),
+    # Expense reimbursements: claims are board and committee work (owner
+    # decision 0.44.0, D95), so board members and committee members claim;
+    # an owner on neither does not. A board member other than the claimant
+    # approves; paying is data entry (D66 limits who pays a board member).
+    "reimbursement.submit": frozenset({BOARD, COMMITTEE_MEMBER}),
     # The "My reimbursements" link on the Finance overview and a committee's
-    # page (D95): those who usually spend for the association (volunteer
-    # owners reach the page from My account).
+    # page (D95): the same people who may claim.
     "reimbursement.menu": frozenset({BOARD, COMMITTEE_MEMBER}),
     "reimbursement.view_all": frozenset({BOARD, MANAGER, AUDITOR}),
     "reimbursement.approve": frozenset({BOARD}),

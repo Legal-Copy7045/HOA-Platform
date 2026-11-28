@@ -301,9 +301,9 @@ MEMBER_READS = {
                 "help.checklist",  # Getting started (D73): residents
                 # Capital projects the board shares with owners (D83).
                 "capital_project.view_summary",
-                # D76, D77: agree to one's payment plan; claim an expense back.
+                # D76: agree to one's payment plan. Claiming an expense back is
+                # board and committee work, not an owner's (0.44.0, D95).
                 "payment_plan.acknowledge",
-                "reimbursement.submit",
             },
         ),
         (
