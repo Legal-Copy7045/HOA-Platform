@@ -276,6 +276,7 @@ def repo(tmp_path):
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "0.44.0")
+    _git(tmp_path, "tag", "v0.44.0")
     sha = _head(tmp_path)
     entry = ("2026-11-27", sha, "0.44.0")
     (tmp_path / "regression" / "RUNS.md").write_text(_runs(entry))
@@ -308,18 +309,29 @@ def test_checkout_already_tagged_is_not_a_release(repo):
     _git(repo, "tag", "v0.45.0")
     found, notes = release_logs.report(repo, TODAY)
     assert found == [] and "already tagged" in notes[0]
-    # Another tag but not this version's: a release again.
+    # Without this version's tag it is a release again.
     _git(repo, "tag", "-d", "v0.45.0")
-    _git(repo, "tag", "v0.44.0")
     assert release_logs.check(repo, TODAY)
 
 
-def test_checkout_unknown_commit_fails(repo):
-    entry = ("2026-11-27", "0000000", "0.44.0")
+def test_checkout_fixes_after_this_versions_full_check_pass(repo):
+    """A full check on the version being released covers the fixes made after it
+    (often its own findings): no loop of full checks."""
+    entry = ("2026-11-28", _head(repo), "0.45.0")
     (repo / "regression" / "RUNS.md").write_text(_runs(entry))
     (repo / "regression" / "WALKTHROUGHS.md").write_text(_walks(entry))
-    found = release_logs.check(repo, TODAY)
-    assert len(found) == 1 and "not in this repository's history" in found[0]
+    _git(repo, "commit", "-qam", "log the 0.45.0 full check")
+    (repo / "core" / "policy.py").write_text("RULES = {'fixed': 1}\n")
+    _git(repo, "commit", "-qam", "fix a finding")
+    assert release_logs.check(repo, TODAY) == []
+
+
+def test_checkout_without_a_release_tag_skips_the_material_rule(repo):
+    _git(repo, "tag", "-d", "v0.44.0")
+    (repo / "core" / "policy.py").write_text("RULES = {'x': 1}\n")
+    _git(repo, "commit", "-qam", "policy")
+    found, notes = release_logs.report(repo, TODAY)
+    assert found == [] and "no release tag" in notes[0]
 
 
 def test_checkout_weekly_and_count_through_the_files(repo):
@@ -346,7 +358,7 @@ def test_checkout_shallow_clone_skips_the_material_rule(repo, monkeypatch):
 
     monkeypatch.setattr(release_logs, "git", shallow)
     found, notes = release_logs.report(repo, TODAY)
-    assert found == [] and "shallow clone" in notes[0]
+    assert found == [] and "not checked" in notes[0]
     (repo / "CHANGELOG.md").write_text(
         _changelog(("0.45.0", "2026-12-06"), ("0.44.0", "2026-11-27"))
     )

@@ -50,12 +50,13 @@ of these is true; `release_logs.py` (CI-014 in `run.py check`, and
 2. **Every 5 releases**: `full_check.every_releases` (5) or more CHANGELOG.md
    versions, patches included and the one being released counted, after the
    full check's version.
-3. **Material security or accounting change**: `git diff --name-only <full
-   check commit>..HEAD` has a file matching `full_check.material_paths` in
+3. **Material security or accounting change**: `git diff --name-only <last
+   release tag>..HEAD` has a file matching `full_check.material_paths` in
    `profile.yaml` and none of `full_check.not_material` (templates, static,
-   CSS, docs, tests, regression: layout and wording are not material). A
-   shallow clone (the CI test job) skips this rule with a note; `run.py check`
-   has the history.
+   CSS, docs, tests, regression: layout and wording are not material); then the
+   full check must be on the version being released. Fixes made after it (its
+   own findings) are covered. A clone without tags (the CI test job) skips this
+   rule with a note; `run.py check` has them.
 4. **Major release**: X.0.0 needs a full check on that version itself.
 
 Otherwise no full check is needed. Weekly maintenance expects a weekly full

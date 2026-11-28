@@ -188,8 +188,8 @@ def problems(
 ) -> list[str]:
     """Why the release of ``version`` needs a full check first (empty: none due).
 
-    ``changed`` is the list of files changed since the newest full check's commit
-    (``git diff --name-only <commit>..HEAD``), or None when it cannot be told.
+    ``changed`` is the list of files changed in this release, since the last
+    release tag (``git diff --name-only <tag>..HEAD``), or None when it cannot be told.
     """
     settings = settings or Settings()
     current = parse(version)
@@ -228,14 +228,16 @@ def problems(
             f"A full check is due (every {settings.every_releases} releases): "
             f"{len(since)} releases since the last one ({last}) — {HOW}"
         )
-    # 3. A material security or accounting change since the full check's commit.
-    if changed is not None:
+    # 3. A material security or accounting change in this release (files changed
+    #    since the last release tag): it needs a full check on this version itself.
+    #    Fixes made after that full check (often its own findings) are covered by it.
+    if changed is not None and entry.version != current:
         hits = material(changed, settings)
         if hits:
             shown = ", ".join(hits[:5]) + (f" and {len(hits) - 5} more" if len(hits) > 5 else "")
             out.append(
                 f"A full check is due (security or accounting change): {shown} changed "
-                f"since the last one ({last}, commit {entry.commit}) — {HOW}"
+                f"in this release, and the last full check was on {last}, not {version} — {HOW}"
             )
     return out
 
@@ -282,22 +284,19 @@ def report(root: Path = ROOT, today: dt.date | None = None) -> tuple[list[str], 
     if parse(version) and not is_release(root, version):
         return [], [f"{version} is already tagged: not a release, nothing to check"]
     runs_md, walks_md = read("regression/RUNS.md"), read("regression/WALKTHROUGHS.md")
-    entry = newest_full_check(runs_md, walks_md)
     notes, changed = [], None
-    if entry is not None:
-        changed = changed_since(root, entry.commit)
+    code, tag = git(root, "describe", "--tags", "--abbrev=0", "--match", "v*", "HEAD")
+    if code == 0 and tag:
+        changed = changed_since(root, tag)
         if changed is None:
-            _, shallow = git(root, "rev-parse", "--is-shallow-repository")
-            if shallow == "true":
-                notes.append(
-                    f"commit {entry.commit} is not in this shallow clone: the "
-                    "security or accounting change rule was not checked"
-                )
-            else:
-                return [
-                    f"A full check is due: commit {entry.commit} of the last one "
-                    f"({show(entry.version)}) is not in this repository's history — {HOW}"
-                ], notes
+            notes.append(
+                f"could not compare with {tag}: the security or accounting change rule "
+                "was not checked"
+            )
+    else:
+        notes.append(
+            "no release tag in this clone: the security or accounting change rule was not checked"
+        )
     found = problems(
         version,
         runs_md,

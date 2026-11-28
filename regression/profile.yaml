@@ -68,7 +68,7 @@ walkthrough:
 
 # When a release needs a full check first (D91, owner decision 2026-11-28; regression/release_logs.py, CI-014): weekly
 # (the newest full check more than max_age_days older than the release date), every every_releases releases (patches
-# included), when a material security or accounting path changed since the full check's commit, and on every major
+# included), when a material security or accounting path changed since the last release tag (then the full check must be on this version), and on every major
 # release (X.0.0). A path is material when it matches material_paths and none of not_material (layout and wording are
 # not: templates, static, CSS, docs, tests, regression). Globs: ** any directories, * within one name.
 full_check:
