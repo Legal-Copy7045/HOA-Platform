@@ -112,8 +112,10 @@ x-app-env: &app-env
   # USPS tracking (optional feature "usps_tracking"; infra/poc/set-usps.sh).
   USPS_IV_ENVIRONMENT: ${USPS_IV_ENVIRONMENT:-cat}
   USPS_IV_USERNAME: ${USPS_IV_USERNAME:-}
-  # The password goes to the worker alone (it polls USPS; D87); the others
-  # are only told whether one is set.
+  # A password set in .env goes to the worker alone (it polls USPS; D87); the
+  # others are only told whether one is set. A password saved on Keys and
+  # connections (D93) is in the database instead, and web and worker both open
+  # it with the key-encryption key (review EXP-002, 0.44.0): this split covers .env only.
   USPS_IV_PASSWORD_SET: ${USPS_IV_PASSWORD:+true}
   USPS_IV_API_HOST: ${USPS_IV_API_HOST:-}
   USPS_IV_AUTH_HOST: ${USPS_IV_AUTH_HOST:-}
@@ -121,7 +123,8 @@ x-app-env: &app-env
   BOUNCE_IMAP_HOST: ${BOUNCE_IMAP_HOST:-}
   BOUNCE_IMAP_PORT: ${BOUNCE_IMAP_PORT:-993}
   BOUNCE_IMAP_USER: ${BOUNCE_IMAP_USER:-}
-  # The password goes to the worker alone (it reads the mailbox; EXP-003).
+  # A password set in .env goes to the worker alone (it reads the mailbox;
+  # EXP-003); one saved on Keys and connections is opened by web and worker (D93).
   BOUNCE_IMAP_PASSWORD_SET: ${BOUNCE_IMAP_PASSWORD:+true}
   BOUNCE_IMAP_FOLDER: ${BOUNCE_IMAP_FOLDER:-INBOX}
   BOUNCE_RETURN_PATH: ${BOUNCE_RETURN_PATH:-}
@@ -230,7 +233,9 @@ services:
       <<: *app-env
       SMTP2GO_API_KEY: ${SMTP2GO_API_KEY:-}
       # Keys and connections (D93): opens the service keys saved in the
-      # database. Web and worker only, never migrate or create-bucket.
+      # database. Web and worker only, never migrate or create-bucket. Web
+      # can open every saved key (it tests them before a save), so the
+      # container split above applies to .env values only (review EXP-002).
       CREDENTIALS_KEK: ${CREDENTIALS_KEK:-}
     ports:
       - "127.0.0.1:8000:8000"

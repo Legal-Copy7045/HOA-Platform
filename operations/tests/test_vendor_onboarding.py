@@ -8,6 +8,7 @@ from unittest import mock
 
 import pytest
 from django.core.exceptions import PermissionDenied
+from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
 
@@ -648,3 +649,46 @@ def test_payments_extend_w9_retention(w):
     Vendor.objects.filter(pk=vendor.pk).update(active=False)
     assert vo.retention_due(on=datetime.date(year + 5, 1, 1)) == []
     assert len(vo.retention_due(on=datetime.date(year + 7, 1, 1))) == 1
+
+
+def test_reencrypt_keeps_a_copy_until_the_new_blob_is_written_and_skips_unreadable(
+    w, settings, monkeypatch
+):
+    """Review BUG-007 (0.44.0): the old blob is copied aside before the file
+    is rewritten and removed only once the new one opens; a document no key
+    opens is skipped and counted, not a stop for the run."""
+    _, rnd = invite(w)
+    good = vo.upload_file(rnd, "w9", pdf())
+    bad = vo.upload_file(rnd, "w9", pdf())
+    storage = good.file.storage
+    storage.delete(bad.file.name)
+    storage.save(bad.file.name, ContentFile(b"not a vendor blob"))
+    settings.VENDOR_DOCUMENT_KEY = "the-new-vendor-document-key-" * 3
+    settings.VENDOR_DOCUMENT_KEY_FALLBACKS = [KEY]
+    saved = []
+    real_save = storage.save
+    monkeypatch.setattr(
+        storage, "save", lambda name, content, **kw: saved.append(name) or real_save(name, content)
+    )
+    assert vo.reencrypt_all() == 1
+    assert saved[0] == f"{good.file.name}.before-reencrypt"  # the copy is written first
+    assert not storage.exists(f"{good.file.name}.before-reencrypt")  # then removed
+    settings.VENDOR_DOCUMENT_KEY_FALLBACKS = []
+    assert vo.open_file(VendorFile.objects.get(pk=good.pk), actor=w["b1"]) == FAKE_W9
+    event = AuditEvent.objects.filter(action="vendor.files_reencrypted").latest("id")
+    assert event.metadata == {"count": 1, "skipped": 1}
+
+
+def test_the_portal_vendor_key_is_not_removed_while_documents_are_held(w, settings):
+    """Review BUG-003 / EXP-003 (0.44.0)."""
+    from core import credentials
+
+    admin = make_member(roles=[Role.SYSADMIN])
+    settings.VENDOR_DOCUMENT_KEY = ""
+    credentials.make_vendor_key(admin)
+    _, rnd = invite(w)
+    vo.upload_file(rnd, "w9", pdf())
+    assert vo.stored_document_count() == 1
+    with pytest.raises(credentials.CredentialError, match="cannot be removed"):
+        credentials.clear(admin, "vendor_key")
+    assert credentials.get("VENDOR_DOCUMENT_KEY")

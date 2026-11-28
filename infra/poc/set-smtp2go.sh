@@ -114,7 +114,7 @@ undo() {
 echo "==> Restarting web and worker"
 restart || undo "The portal did not come back up."
 echo "==> Checking the key from the portal"
-"${COMPOSE[@]}" exec -T worker python manage.py check_smtp2go || undo "The portal's check failed (above)."
+"${COMPOSE[@]}" exec -T worker python manage.py check_smtp2go --server || undo "The portal's check failed (above)."
 echo "==> Sending a test email"
 bash "$APP_DIR/infra/poc/test-email.sh" ${TEST_TO:+"$TEST_TO"} || undo "The test email was not accepted."
 env_discard_backup "$BACKUP"

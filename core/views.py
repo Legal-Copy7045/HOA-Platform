@@ -375,8 +375,28 @@ def system_status(request):
             "scan_alert_minutes": SCAN_ALERT_MINUTES,
             **_server_errors_context(),
             **_monitoring_context(),
+            "key_changes": _key_changes(),
         },
     )
+
+
+def _key_changes() -> list:
+    """Recent and open key changes (D93; review EXP-001, 0.44.0): shown here
+    so a change is seen in the portal, not only in the board's email."""
+    from core import credentials
+
+    try:
+        return [
+            {
+                "cs": cs,
+                "label": credentials.BY_KEY[cs.change.service].label
+                if cs.change.service in credentials.BY_KEY
+                else cs.change.service,
+            }
+            for cs in credentials.recent_changes()
+        ]
+    except Exception:  # the page never fails on this panel
+        return []
 
 
 def _monitoring_context() -> dict:

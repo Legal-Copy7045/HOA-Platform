@@ -449,6 +449,9 @@ BOUNCE_RETURN_PATH = env("BOUNCE_RETURN_PATH", default="")
 # page refuses to save and saved values are not read (fail closed); the .env
 # values below stay the fallback.
 CREDENTIALS_KEK = env("CREDENTIALS_KEK", default="")
+# Error reports (DEBUG pages, mailed reports) hide it too: Django's own
+# filter does not match "KEK" (review EXP-007, 0.44.0).
+DEFAULT_EXCEPTION_REPORTER_FILTER = "core.errors.PortalExceptionReporterFilter"
 # How long a process keeps the saved values before reading them again (a
 # save in the same process is seen at once; web and worker within this).
 CREDENTIALS_CACHE_SECONDS = env.int("CREDENTIALS_CACHE_SECONDS", default=15)

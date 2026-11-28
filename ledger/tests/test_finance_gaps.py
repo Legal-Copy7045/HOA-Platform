@@ -734,3 +734,33 @@ def test_finance_gaps_demo_seed(w):
     assert {vc.status(c) for c in VendorCheck.objects.all()} == {"issued", "cleared", "voided"}
     assert Budget.objects.filter(fiscal_year=TODAY.year + 1).exists()
     assert demo_finance_gaps.seed() == {}  # once
+
+
+def test_a_sellers_plan_never_stops_the_buyers_late_fees_or_interest(w, settings):
+    """Review BUG-004 (0.44.0): late fees (and overdue interest) are suspended
+    per account, so after a sale the seller's kept plan does not cover the
+    buyer's own late installments."""
+    from ledger import accounts, interest
+
+    settings.LEDGER_LATE_FEES_ENABLED = True
+    _rule("late_fee.cents", "2500")
+    _rule("late_fee.grace_days", "10")
+    _rule("special_assessment.late_fees", "true")
+    lot = w["lots"][0]
+    case = _arrears(w)
+    plan = _plan(w, case, first=TODAY + D(days=60))
+    payment_plans.approve(plan, actor=w["board"])
+    seller = accounts.current_account_id(lot.pk)
+    assert interest.on_payment_plan(lot.pk, seller)
+    _sell(lot)
+    buyer = accounts.current_account_id(lot.pk)
+    assert buyer != seller
+    later = TODAY + D(days=20)
+    suspended = payment_plans.late_fee_suspended(later)
+    assert (lot.pk, seller) in suspended  # the seller's plan is still kept ...
+    assert (lot.pk, buyer) not in suspended  # ... but never covers the buyer
+    assert not interest.on_payment_plan(lot.pk, buyer)
+    _levy(w, total=4000, dates=[TODAY + D(days=5)])
+    sa_service.post_due(today=TODAY + D(days=5))
+    candidates = {r["lot"].pk: r["account_id"] for r in sa_service.late_fee_candidates(later)}
+    assert candidates.get(lot.pk) == buyer

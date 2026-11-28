@@ -517,10 +517,17 @@ def check_plans(today: datetime.date | None = None) -> dict[str, int]:
 
 
 @internal("payment plan kept")
-def plan_kept(lot_id: int, on: datetime.date | None = None) -> bool:
+def plan_kept(
+    lot_id: int, on: datetime.date | None = None, *, account_id: int | None = None
+) -> bool:
     """The home has an approved plan, not ended, with no installment missed
-    (overdue interest, D80, is not charged while it does)."""
-    for plan in PaymentPlan.objects.filter(lot_id=lot_id):
+    (overdue interest, D80, is not charged while it does). ``account_id``:
+    only a plan of that ownership account counts, so a seller's plan never
+    covers the buyer's account after a sale (review BUG-004, 0.44.0)."""
+    plans = PaymentPlan.objects.filter(lot_id=lot_id)
+    if account_id is not None:
+        plans = plans.filter(account_id=account_id)
+    for plan in plans:
         if status(plan) != "active":
             continue
         if not any(r["status"] == "missed" for r in schedule(plan, on)):
@@ -529,16 +536,26 @@ def plan_kept(lot_id: int, on: datetime.date | None = None) -> bool:
 
 
 @internal("late fees suspended")
-def late_fee_suspended_lots(on: datetime.date | None = None) -> set[int]:
-    """Homes with a current plan (no missed installment) that stops late fees."""
+def late_fee_suspended(on: datetime.date | None = None) -> set[tuple[int, int]]:
+    """(lot id, account id) of each current plan (no missed installment) that
+    stops late fees. A plan belongs to its case's account (BUG-004, 0.43.0),
+    so the callers compare the charge's own account: a seller's plan never
+    stops the buyer's late fees (review BUG-004, 0.44.0)."""
     out = set()
     for plan in PaymentPlan.objects.filter(suspend_late_fees=True):
         if status(plan) != "active":
             continue
         if any(r["status"] == "missed" for r in schedule(plan, on)):
             continue
-        out.add(plan.lot_id)
+        out.add((plan.lot_id, plan.account_id))
     return out
+
+
+@internal("late fees suspended")
+def late_fee_suspended_lots(on: datetime.date | None = None) -> set[int]:
+    """Homes with such a plan on any of their accounts (display only; the
+    late-fee paths use ``late_fee_suspended``, per account)."""
+    return {lot_id for lot_id, _account in late_fee_suspended(on)}
 
 
 def board_items(user) -> list:

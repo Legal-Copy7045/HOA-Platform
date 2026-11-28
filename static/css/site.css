@@ -879,3 +879,6 @@ table.diff tr.diff-replace .diff-new, table.diff tr.diff-insert .diff-new { back
 
 /* Finance options (D84): bars on the owners finance summary. */
 meter.bar { width: 100%; max-width: 16rem; height: 1rem; vertical-align: middle; }
+/* A row link in a list (e.g. a file waiting for disposal on Records retention) is a
+   full tap target on phones (walkthrough 0.44.0: 17px tall); desktop unchanged. */
+@media (max-width: 640px) { .list > li > a.grow { display: flex; align-items: center; min-height: 44px; } }

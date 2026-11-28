@@ -62,13 +62,16 @@ class InterestError(ValueError):
 # --- Sources in other areas ------------------------------------------------------------
 
 
-def on_payment_plan(lot_id: int) -> bool:
+def on_payment_plan(lot_id: int, account_id: int | None = None) -> bool:
     """A payment plan in force with its schedule kept (D76,
     ``ledger.payment_plans.plan_kept``): approved, not ended, and no
-    installment missed."""
+    installment missed; with ``account_id``, a plan of that account only (a
+    seller's plan never covers the buyer, review BUG-004, 0.44.0)."""
     from ledger import payment_plans
 
-    return payment_plans.plan_kept(lot_id)
+    if account_id is None:
+        return payment_plans.plan_kept(lot_id)
+    return payment_plans.plan_kept(lot_id, account_id=account_id)
 
 
 def disputed_charge_ids(lot_id: int) -> set[int]:
@@ -216,7 +219,7 @@ def candidates(*, year: int, month: int, policy: Policy | None = None) -> list[C
             account_id = account_on(lot.pk, on)
             if account_id is None or account_id in done or account_id not in open_accounts:
                 continue
-            if policy.suspend_on_plan and on_payment_plan(lot.pk):
+            if policy.suspend_on_plan and on_payment_plan(lot.pk, account_id):
                 continue
             principal = principal_for(lot.pk, account_id, on, policy)
             if principal <= 0 or principal < policy.min_cents:

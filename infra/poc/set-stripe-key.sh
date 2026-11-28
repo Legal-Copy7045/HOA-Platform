@@ -47,7 +47,7 @@ echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Checking the key with Stripe (read-only)"
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
-if ! "${COMPOSE[@]}" exec -T web python manage.py check_stripe; then
+if ! "${COMPOSE[@]}" exec -T web python manage.py check_stripe --server; then
   env_restore_keys .env "$BACKUP" "${KEYS[@]}"
   env_discard_backup "$BACKUP"
   echo "The check failed (above). The previous Stripe settings are back in .env (nothing else in it was changed); restarting." >&2

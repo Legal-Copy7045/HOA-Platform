@@ -130,9 +130,9 @@
   where: [docs/claude/deployment.md, docs/decisions.md D25 D36 D90]
   code: ["core/host_tasks.py", "infra/poc/portal-agent.sh", "infra/poc/host-tasks.sh", "infra/poc/update-portal.sh", "infra/poc/lib.sh"]
 - id: CLM-033
-  claim: Secrets never pass through the web app, the repository or chat - set on the server with guided scripts (Stripe, Teller, USPS, bounce mailbox, vendor key, off-site backups).
-  where: [CLAUDE.md, docs/claude/deployment.md]
-  code: ["infra/poc/set-*.sh", "infra/poc/setup-offsite-backups.sh", "community/setup*.py", ".gitleaks.toml"]
+  claim: No secret is in the repository, chat, logs or audit; third-party service keys are entered only on Keys and connections (sysadmin, fresh second factor, tested, sealed under CREDENTIALS_KEK, write-only, the board told; payments, bank, email and Gemini changes approved by another board member) or, as a fallback, with the guided server scripts; server-only secrets (Django key, database, tunnel, file store, CREDENTIALS_KEK, off-site backups) stay in the server's .env (D93).
+  where: [CLAUDE.md, docs/claude/deployment.md, docs/claude/security.md, docs/decisions.md D93]
+  code: ["core/credentials.py", "core/keys_views.py", "infra/poc/set-*.sh", "infra/poc/setup-offsite-backups.sh", "community/setup*.py", ".gitleaks.toml"]
 - id: CLM-034
   claim: Backups are signed with a keyed checksum and the restore drill refuses unsigned backups; off-site copies go to a locked R2 bucket.
   where: [docs/claude/operations.md, docs/decisions.md D31 D57]

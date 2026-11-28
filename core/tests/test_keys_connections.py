@@ -827,6 +827,7 @@ def test_the_smtp_test_signs_in_without_sending(monkeypatch):
             opened["closed"] = True
 
     monkeypatch.setattr("django.core.mail.backends.smtp.EmailBackend", FakeBackend)
+    monkeypatch.setattr(credential_checks, "resolve", lambda host: ["93.184.215.14"])
     result = credential_checks.run(
         "smtp",
         {

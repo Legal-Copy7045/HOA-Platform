@@ -106,11 +106,18 @@ class Service:
     fields: tuple[Field, ...]
     # Set alongside every save (e.g. EMAIL_PROVIDER=smtp2go).
     implied: dict = field(default_factory=dict)
-    approval: bool = False  # Stripe, Teller: a second person approves (D93)
+    # A board member who did not make the change approves it (D93): Stripe and
+    # Teller; email and Gemini too since review EXP-001 (0.44.0), because the
+    # relay carries every sign-in link and invitation.
+    approval: bool = False
     pinned: str = ""  # what the pin is ("Stripe account", "Teller application")
     script: str = ""  # the optional server fallback
     feature: str = ""  # the optional feature that uses it, if any
     generated: bool = False  # made in the portal, nothing typed (vendor key)
+    # Where the secrets go (host, port, user, region): when one of these
+    # changes, the service's secrets must be typed again, so a saved secret is
+    # never sent to a new endpoint (review SEC-001, 0.44.0).
+    endpoint: tuple[str, ...] = ()
 
     def field(self, name: str) -> Field:
         return next(f for f in self.fields if f.name == name)
@@ -152,7 +159,9 @@ SERVICES: tuple[Service, ...] = (
             ),
         ),
         implied={"EMAIL_PROVIDER": "smtp2go"},
+        approval=True,
         script="set-smtp2go.sh",
+        endpoint=("SMTP2GO_REGION",),
     ),
     Service(
         "smtp",
@@ -167,6 +176,8 @@ SERVICES: tuple[Service, ...] = (
             Field("DEFAULT_FROM_EMAIL", "Sender", TEXT, 'e.g. "Oak Creek Farms HOA <portal@...>"'),
         ),
         implied={"EMAIL_PROVIDER": "smtp"},
+        approval=True,
+        endpoint=("EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER"),
     ),
     Service(
         "stripe",
@@ -227,6 +238,7 @@ SERVICES: tuple[Service, ...] = (
         ),
         script="set-usps.sh",
         feature="usps_tracking",
+        endpoint=("USPS_IV_ENVIRONMENT", "USPS_IV_USERNAME"),
     ),
     Service(
         "bounce",
@@ -241,6 +253,7 @@ SERVICES: tuple[Service, ...] = (
         ),
         script="set-bounce-mailbox.sh",
         feature="bounce_tracking",
+        endpoint=("BOUNCE_IMAP_HOST", "BOUNCE_IMAP_PORT", "BOUNCE_IMAP_USER"),
     ),
     Service(
         "ai",
@@ -250,6 +263,7 @@ SERVICES: tuple[Service, ...] = (
             Field("GEMINI_API_KEY", "Gemini API key", SECRET, max_length=200),
             Field("GEMINI_MODEL", "Model", TEXT, "e.g. gemini-2.5-flash", max_length=80),
         ),
+        approval=True,
     ),
     Service(
         "vendor_key",
@@ -340,7 +354,7 @@ def unseal(blob: bytes, name: str, change_id: int) -> str:
 
 # --- Reading: the state of every change, cached briefly ---------------------------------
 
-PENDING, WAITING, ACTIVE, SUPERSEDED, EXPIRED, REFUSED, CANCELLED = (
+PENDING, WAITING, ACTIVE, SUPERSEDED, EXPIRED, REFUSED, CANCELLED, OTHER_ACCOUNT = (
     "pending",
     "waiting",
     "active",
@@ -348,6 +362,7 @@ PENDING, WAITING, ACTIVE, SUPERSEDED, EXPIRED, REFUSED, CANCELLED = (
     "expired",
     "refused",
     "cancelled",
+    "other_account",
 )
 STATE_WORDS = {
     PENDING: "Waiting for board approval",
@@ -357,7 +372,11 @@ STATE_WORDS = {
     EXPIRED: "Lapsed without approval",
     REFUSED: "Refused by the board",
     CANCELLED: "Cancelled",
+    OTHER_ACCOUNT: "Not used: its account is not the pinned one",
 }
+# Until it takes effect, a change can still be refused or cancelled (review
+# BUG-001, 0.44.0): a pin move in its 72-hour wait too.
+OPEN_STATES = (PENDING, WAITING)
 
 
 @dataclass
@@ -394,6 +413,25 @@ class State:
 _lock = threading.Lock()
 _cache: list = [0.0, None]  # [expires (monotonic), State]
 _candidate: ContextVar[dict | None] = ContextVar("credential_candidate", default=None)
+# A snapshot read instead of the live state: the board's notice of a change
+# goes through the settings in effect before it (review EXP-001 / SEC-004).
+_frozen: ContextVar[State | None] = ContextVar("credential_frozen_state", default=None)
+
+
+@contextlib.contextmanager
+def as_of(snapshot: State | None):
+    """Within the block, ``get`` reads ``snapshot`` (a ``State``)."""
+    token = _frozen.set(snapshot)
+    try:
+        yield
+    finally:
+        _frozen.reset(token)
+
+
+def snapshot() -> State:
+    """What is in effect right now, read afresh from the database."""
+    forget()
+    return state()
 
 
 def forget() -> None:
@@ -456,11 +494,30 @@ def _load(now=None) -> State:
     )
     for cs in active:
         c = cs.change
-        if c.account_ref and (c.service not in state.pins or c.kind == "pin_change"):
+        pinned = c.service in state.pins
+        if (
+            c.kind == "set"
+            and c.account_ref
+            and pinned
+            and c.service in BY_KEY
+            and BY_KEY[c.service].pinned
+            and c.account_ref != state.pins[c.service]
+        ):
+            # Approved after the pin moved to another account (review BUG-006,
+            # 0.44.0): the pin is checked when a key takes effect, not only
+            # when it is saved, so it is never used.
+            cs.state = OTHER_ACCOUNT
+            continue
+        if c.account_ref and (not pinned or c.kind == "pin_change"):
             state.pins[c.service] = c.account_ref
         for v in values.get(c.pk, []):
             if v.cleared:
-                state.values.pop(v.name, None)
+                # A removal clears only what its own service saved (review
+                # BUG-005, 0.44.0): the sender and provider are shared by the
+                # two email services.
+                held = state.values.get(v.name)
+                if held is not None and held.change.service == c.service:
+                    state.values.pop(v.name, None)
                 continue
             cur = Current(source="portal", change=c, last4=v.last4, shown=v.shown)
             try:
@@ -473,6 +530,9 @@ def _load(now=None) -> State:
 
 
 def state() -> State:
+    frozen = _frozen.get()
+    if frozen is not None:
+        return frozen
     ttl = max(0, int(getattr(settings, "CREDENTIALS_CACHE_SECONDS", 15)))
     with _lock:
         if _cache[1] is not None and time.monotonic() < _cache[0]:
@@ -558,6 +618,83 @@ def pin(service: str) -> str:
     return state().pins.get(service, "")
 
 
+def portal_names(service_key: str) -> list[str]:
+    """The names a service's own changes hold in the portal now (a shared
+    name saved by the other email service is not counted)."""
+    service = BY_KEY[service_key]
+    st = state()
+    return [
+        n
+        for n in service.names
+        if n in st.values and getattr(st.values[n].change, "service", "") == service_key
+    ]
+
+
+@sensitive_variables("values")
+def server_values(service_key: str) -> dict:
+    """The server's own (.env) settings for a service, as ``candidate`` takes them."""
+    service = BY_KEY[service_key]
+    values = {}
+    for name in service.names:
+        value = _server_value(name)
+        values[name] = ",".join(value) if isinstance(value, list | tuple) else value
+    return values
+
+
+@contextlib.contextmanager
+def server_only(service_key: str):
+    """Within the block, the service reads the server's .env values, not the
+    portal's: the server scripts' checks test what they just wrote (review
+    EXP-006, 0.44.0)."""
+    with candidate(server_values(service_key)):
+        yield
+
+
+def override_note(service_key: str) -> str:
+    """For the server scripts: say when the portal's values win over .env."""
+    names = [n for n in portal_names(service_key) if n not in IMPLIED_NAMES]
+    if not names:
+        return ""
+    return (
+        f"Note: Keys and connections in the portal holds {', '.join(sorted(names))} for "
+        f"{BY_KEY[service_key].label}, and the portal's values win over .env. This check "
+        "tested the server's .env values; the portal keeps using its own until they are "
+        "removed there or with: python manage.py clear_portal_keys "
+        f"{service_key}"
+    )
+
+
+def _same(name: str, typed, current) -> bool:
+    if current in (None, ""):
+        return typed in (None, "")
+    if FIELDS.get(name) and FIELDS[name].kind == INT:
+        try:
+            return int(typed) == int(current)
+        except (TypeError, ValueError):
+            return False
+    return str(typed).strip().lower() == str(current).strip().lower()
+
+
+@sensitive_variables("values")
+def secrets_to_retype(service_key: str, values: dict) -> list[str]:
+    """Labels of the secrets that must be typed again because ``values``
+    change where they would be sent (host, port, user, region): a saved
+    secret is never reused for a new endpoint (review SEC-001, 0.44.0)."""
+    service = BY_KEY[service_key]
+    changed = [
+        n
+        for n in service.endpoint
+        if values.get(n) not in (None, "") and not _same(n, values[n], get(n))
+    ]
+    if not changed:
+        return []
+    return [
+        f.label
+        for f in service.fields
+        if f.kind == SECRET and values.get(f.name) in (None, "") and get(f.name) not in (None, "")
+    ]
+
+
 # --- Writing ------------------------------------------------------------------------------
 
 
@@ -591,7 +728,8 @@ def note_test(actor) -> bool:
 def _audit(action, actor, request=None, outcome="success", **metadata):
     from audit.services import record_event
 
-    record_event(action, actor=actor, request=request, outcome=outcome, metadata=metadata)
+    user = actor if getattr(actor, "pk", None) else None  # SYSTEM: the server operator
+    record_event(action, actor=user, request=request, outcome=outcome, metadata=metadata)
 
 
 def _require(actor, action):
@@ -641,6 +779,10 @@ def save(
     clean.update(service.implied)
     if not any(k for k in clean if k not in service.implied):
         raise CredentialError("Nothing to save: enter at least one value.")
+    before = snapshot()  # the notice goes through the settings in effect now
+    retype = secrets_to_retype(service_key, clean)
+    if retype:
+        raise CredentialError(_retype_words(retype))
     account = (test.account_ref if test is not None else "") or ""
     current_pin = pin(service_key)
     if service.pinned:
@@ -673,7 +815,7 @@ def save(
     if pin_change:
         needed, wait = PIN_CHANGE_APPROVALS, PIN_CHANGE_WAIT_HOURS
         expires = now + datetime.timedelta(days=PIN_CHANGE_EXPIRY_DAYS)
-    elif service.approval:
+    elif needs_board(service, actor):
         needed, expires = 1, now + datetime.timedelta(hours=APPROVAL_HOURS)
     with transaction.atomic():
         change = CredentialChange.objects.create(
@@ -715,9 +857,41 @@ def save(
             pin_change=pin_change,
         )
         transaction.on_commit(forget)
-        transaction.on_commit(lambda: _tell_board_saved(change, service, actor))
+        transaction.on_commit(lambda: _tell_board_saved(change, service, actor, before))
     forget()
     return change
+
+
+def _retype_words(labels: list[str]) -> str:
+    return (
+        f"You changed where this service connects, so type the {' and the '.join(labels)} "
+        "again: a saved secret is never sent to a new server, port or user name."
+    )
+
+
+def needs_board(service: Service, actor) -> bool:
+    """Whether a change waits for a board member who did not make it (D93).
+    Stripe and Teller always. Email and Gemini (review EXP-001, 0.44.0) too,
+    except while nobody else could approve: until another board member has
+    signed up with a second factor, the first officer sets up email alone, as
+    the install needs (invitations go by email), and the page says so."""
+    if not service.approval:
+        return False
+    if service.pinned:
+        return True
+    return _other_approver_exists(actor)
+
+
+def _other_approver_exists(actor) -> bool:
+    from allauth.mfa.models import Authenticator
+
+    from community.services import board_user_ids
+
+    others = [u for u in board_user_ids() if u != getattr(actor, "pk", None)]
+    return Authenticator.objects.filter(
+        user_id__in=others,
+        type__in=(Authenticator.Type.TOTP, Authenticator.Type.WEBAUTHN),
+    ).exists()
 
 
 @sensitive_variables("new", "current", "fallbacks")
@@ -727,6 +901,7 @@ def make_vendor_key(actor, *, rotate: bool = False, request=None):
     ones) as fallbacks and re-encrypts stored documents in the background."""
     import secrets
 
+    forget()  # never a 15-second-old copy: another process may just have rotated (BUG-007)
     current = get("VENDOR_DOCUMENT_KEY") or ""
     if current and not rotate:
         raise CredentialError("A vendor document key is already set: use Rotate to replace it.")
@@ -734,7 +909,16 @@ def make_vendor_key(actor, *, rotate: bool = False, request=None):
         raise CredentialError("There is no key to rotate yet: make one first.")
     new = secrets.token_urlsafe(48)
     fallbacks = []
-    for old in [current, *(get("VENDOR_DOCUMENT_KEY_FALLBACKS") or [])]:
+    # Every vendor key the portal or the server ever held stays a fallback, so
+    # a key removed or replaced earlier still opens the files it sealed
+    # (review BUG-003, 0.44.0).
+    for old in [
+        current,
+        *(get("VENDOR_DOCUMENT_KEY_FALLBACKS") or []),
+        *_vendor_key_history(),
+        _server_value("VENDOR_DOCUMENT_KEY") or "",
+        *(_server_value("VENDOR_DOCUMENT_KEY_FALLBACKS") or []),
+    ]:
         if old and old not in fallbacks and old != new:
             fallbacks.append(old)
     values = {"VENDOR_DOCUMENT_KEY": new}
@@ -753,36 +937,144 @@ def make_vendor_key(actor, *, rotate: bool = False, request=None):
     return change
 
 
-def clear(actor, service_key: str, *, request=None):
-    """Remove the portal's values for a service: the server's .env applies again."""
+@sensitive_variables("out", "value")
+def _vendor_key_history() -> list[str]:
+    """Every vendor document key a change that took effect ever held."""
+    from core.models import CredentialValue
+
+    active = {cs.change.pk for cs in state().changes if cs.state == ACTIVE}
+    out: list[str] = []
+    for v in CredentialValue.objects.filter(
+        change__service="vendor_key",
+        name__in=("VENDOR_DOCUMENT_KEY", "VENDOR_DOCUMENT_KEY_FALLBACKS"),
+        cleared=False,
+    ).order_by("id"):
+        if v.change_id not in active:
+            continue
+        try:
+            value = unseal(v.ciphertext, v.name, v.change_id)
+        except Unreadable:
+            continue
+        out.extend(p for p in value.split(",") if p)
+    return out
+
+
+def clear(actor, service_key: str, *, request=None, from_server: bool = False):
+    """Remove the portal's values for a service: the server's .env applies
+    again. Review fixes (0.44.0): only the names this service saved are
+    removed (BUG-005); a removal on a service that needs the board waits for
+    a board member who did not make it, like a save (BUG-002 / SEC-002); a
+    pinned service's .env fallback must be for the pinned account; the vendor
+    document key is never removed while vendor documents are held (BUG-003 /
+    EXP-003). ``from_server``: the server operator's ``clear_portal_keys``
+    command (root on the server already controls .env): at once, audited,
+    and the board told through the server's own settings."""
     from core.models import CredentialChange, CredentialValue
 
     _require(actor, "system.manage_keys")
     service = BY_KEY.get(service_key)
     if service is None:
         raise CredentialError("Unknown service.")
-    if _rate_limited(actor):
+    if getattr(actor, "pk", None) and _rate_limited(actor):
         raise CredentialError("Too many changes in the last hour. Try again later.")
+    before = snapshot()
+    names = portal_names(service_key)
+    if not names:
+        raise CredentialError(f"Nothing is saved in the portal for {service.label}.")
+    if service.generated:
+        from operations.vendor_onboarding import stored_document_count
+
+        held = stored_document_count()
+        if held:
+            _audit(
+                "system.credential_refused",
+                actor,
+                request,
+                "denied",
+                service=service_key,
+                reason="documents_held",
+            )
+            raise CredentialError(
+                f"{held} vendor document(s) are encrypted under this key, so it cannot be "
+                "removed: they could no longer be opened. Rotate it instead."
+            )
+    current_pin = pin(service_key)
+    if service.pinned and current_pin and not from_server:
+        _check_server_fallback(service, current_pin, actor, request)
+    needed, expires = 0, None
+    if not from_server and needs_board(service, actor):
+        needed = 1
+        expires = timezone.now() + datetime.timedelta(hours=APPROVAL_HOURS)
     with transaction.atomic():
         change = CredentialChange.objects.create(
-            service=service_key, kind=CredentialChange.Kind.CLEAR, requested_by=actor
+            service=service_key,
+            kind=CredentialChange.Kind.CLEAR,
+            requested_by=actor if getattr(actor, "pk", None) else None,
+            approvals_needed=needed,
+            expires_at=expires,
         )
-        for name in service.names:
+        for name in names:
             CredentialValue.objects.create(change=change, name=name, cleared=True)
         _audit(
-            "system.credential_cleared", actor, request, service=service_key, change_id=change.pk
+            "system.credential_cleared",
+            actor,
+            request,
+            service=service_key,
+            change_id=change.pk,
+            waits_for_board=needed > 0,
+            from_server=from_server,
         )
-        transaction.on_commit(forget)
-        transaction.on_commit(
-            lambda: _tell_board(
-                f"{service.label}: the keys saved in the portal were removed",
-                f"{_name(actor)} removed the keys saved in the portal for {service.label}. The "
-                "server's own settings, if any, apply again.",
-                change,
+        if needed:
+            subject = f"Approval needed: removing the {service.label} keys"
+            body = (
+                f"{_name(actor)} asked to remove the keys saved in the portal for "
+                f"{service.label} on {_when(change.requested_at)}; the server's own settings, "
+                f"if any, would apply again. It takes effect once another board member "
+                f"approves it, within {APPROVAL_HOURS} hours; otherwise it lapses."
             )
-        )
+        else:
+            subject = f"{service.label}: the keys saved in the portal were removed"
+            body = (
+                f"{_name(actor)} removed the keys saved in the portal for {service.label}"
+                f"{' on the server' if from_server else ''}. The server's own settings, if "
+                "any, apply again."
+            )
+        # The notice goes through the settings in effect before the change,
+        # except the server operator's removal, which restores the server's.
+        notice_state = None if from_server else before
+        transaction.on_commit(forget)
+        transaction.on_commit(lambda: _tell_board(subject, body, change, before=notice_state))
     forget()
     return change
+
+
+def _check_server_fallback(service: Service, current_pin: str, actor, request) -> None:
+    """Removing a pinned service's portal keys falls back to the server's
+    .env: refuse unless that is nothing or a key for the pinned account."""
+    if not any(_server_value(f.name) for f in service.fields if f.required):
+        return  # nothing on the server: the service is simply switched off
+    from core import credential_checks
+
+    result = credential_checks.run_server(service.key)
+    if result.ok and result.account_ref == current_pin:
+        return
+    _audit(
+        "system.credential_refused",
+        actor,
+        request,
+        "denied",
+        service=service.key,
+        reason="server_other_account" if result.ok else "server_untested",
+    )
+    raise CredentialError(
+        f"The server's own {service.label} settings (.env) would apply after this, and "
+        + (
+            f"they belong to a different {service.pinned.lower()} than the pinned one"
+            if result.ok
+            else "the test of them failed"
+        )
+        + ", so nothing was removed. Fix the server's settings first, or save a new key here."
+    )
 
 
 def change_state(change) -> ChangeState:
@@ -798,15 +1090,33 @@ def change_state(change) -> ChangeState:
 
 def decide(actor, change, decision: str, *, request=None):
     """A board member approves or refuses a waiting change, or its requester
-    cancels it. Nobody approves their own change (D65)."""
+    cancels it. Nobody approves their own change (D65). Until it takes effect
+    a change can be refused (any board member who has not decided on it and
+    did not make it) or cancelled (its requester): a pin move in its waiting
+    period too (review BUG-001, 0.44.0). The notice goes through the settings
+    in effect before the decision (review EXP-001)."""
     from core import conflicts
     from core.models import CredentialDecision
 
-    forget()
+    before = snapshot()
     cs = change_state(change)
-    if cs.state != PENDING:
+    if decision == "approve" and cs.state != PENDING:
         raise CredentialError(f"This change is not waiting for a decision ({cs.words.lower()}).")
+    if cs.state not in OPEN_STATES:
+        raise CredentialError(f"This change can no longer be decided ({cs.words.lower()}).")
     service = BY_KEY[change.service]
+    if (
+        decision == "approve"
+        and service.pinned
+        and change.kind == "set"
+        and change.account_ref
+        and pin(change.service)
+        and change.account_ref != pin(change.service)
+    ):
+        raise CredentialError(
+            f"The pinned {service.pinned.lower()} has moved since this key was saved, so it "
+            "cannot be approved: it would not be used."
+        )
     if decision == "cancel":
         if getattr(actor, "pk", None) != change.requested_by_id:
             raise CredentialError("Only the person who made the change can cancel it.")
@@ -850,7 +1160,7 @@ def decide(actor, change, decision: str, *, request=None):
         body += f" It takes effect on {_when(after.active_at)} (the waiting period)."
     elif after.state == PENDING and decision == "approve":
         body += " It needs one more board member's approval."
-    _tell_board(f"{service.label}: change {words}", body, change)
+    _tell_board(f"{service.label}: change {words}", body, change, before=before)
     return row
 
 
@@ -860,6 +1170,8 @@ def decide(actor, change, decision: str, *, request=None):
 def _name(user) -> str:
     if user is None:
         return "The system"
+    if not getattr(user, "pk", None):
+        return "The server operator"
     try:
         from core.people import display_name
 
@@ -872,7 +1184,11 @@ def _when(at) -> str:
     return timezone.localtime(at).strftime("%b %-d, %Y at %-I:%M %p")
 
 
-def _tell_board(subject: str, body: str, change) -> None:
+def _tell_board(subject: str, body: str, change, *, before: State | None = None) -> None:
+    """Email the board. ``before``: the settings in effect before the change,
+    so a change of the email relay never carries its own notice (review
+    EXP-001 / SEC-004, 0.44.0); recent changes also show on System status and
+    in the board's My items, so the notice does not rest on email alone."""
     from django.urls import reverse
 
     from comms.notify import mail_board
@@ -880,12 +1196,13 @@ def _tell_board(subject: str, body: str, change) -> None:
 
     link = settings.PORTAL_BASE_URL + reverse("keys_change", args=[change.pk])
     try:
-        mail_board(board_emails(), subject=subject, body=f"{body}\n\nSee the change: {link}")
+        with as_of(before):
+            mail_board(board_emails(), subject=subject, body=f"{body}\n\nSee the change: {link}")
     except Exception as exc:  # the change stands; only the notice failed
         logger.warning("credentials.board_not_told", extra={"exc_type": type(exc).__name__})
 
 
-def _tell_board_saved(change, service, actor) -> None:
+def _tell_board_saved(change, service, actor, before: State | None = None) -> None:
     names = ", ".join(sorted(f.label for f in service.fields if _in_change(change, f.name)))
     subject = f"Key changed: {service.label}"
     body = (
@@ -906,9 +1223,14 @@ def _tell_board_saved(change, service, actor) -> None:
         subject = f"Approval needed: {service.label} key"
         body += (
             f" It takes effect once another board member approves it, within {APPROVAL_HOURS} "
-            "hours; otherwise it lapses."
+            "hours; otherwise it lapses. If you did not expect this, refuse it."
         )
-    _tell_board(subject, body, change)
+    elif service.approval:
+        body += (
+            " It took effect at once because no other board member has signed in with a "
+            "second factor yet to approve it."
+        )
+    _tell_board(subject, body, change, before=before)
 
 
 def _in_change(change, name) -> bool:
@@ -942,13 +1264,76 @@ def overview(service: Service) -> dict:
         "service": service,
         "rows": rows,
         "configured": all(r["set"] for r in rows if r["field"].required),
-        "any_portal": any(r["source"] == "portal" for r in rows),
+        # Only what this service saved (the other email service's sender is not "here").
+        "any_portal": bool(portal_names(service.key)),
         "unreadable": any(r["unreadable"] for r in rows),
         "pending": [cs for cs in history if cs.state in (PENDING, WAITING)],
         "history": history[:10],
         "last_test": last_test,
         "pin": st.pins.get(service.key, ""),
     }
+
+
+def recent_changes(days: int = 14, limit: int = 10) -> list[ChangeState]:
+    """Key changes of the last ``days`` days and every one still open, newest
+    first: System status shows them (review EXP-001, 0.44.0), so a change is
+    seen in the portal whatever happened to its email."""
+    since = timezone.now() - datetime.timedelta(days=days)
+    rows = [
+        cs for cs in state().changes if cs.state in OPEN_STATES or cs.change.requested_at >= since
+    ]
+    rows.sort(key=lambda cs: (cs.change.requested_at, cs.change.pk), reverse=True)
+    return rows[:limit]
+
+
+def board_items(user) -> list:
+    """My items for a board member: key changes that are still open and
+    that this person may refuse or approve (not their own, not decided)."""
+    from core import conflicts, policy
+    from core.models import CredentialDecision
+
+    if not policy.can(user, "system.approve_keys"):
+        return []
+    from django.urls import reverse
+
+    from core.my_items import Item
+
+    open_ = [cs for cs in state().changes if cs.state in OPEN_STATES]
+    if not open_:
+        return []
+    decided = set(CredentialDecision.objects.filter(by=user).values_list("change_id", flat=True))
+    items = []
+    for cs in open_:
+        c = cs.change
+        if c.pk in decided or conflicts.own_matter(user, c):
+            continue
+        service = BY_KEY.get(c.service)
+        label = service.label if service else c.service
+        if cs.state == PENDING:
+            title, detail, due = (
+                f"Key change: {label}",
+                "Needs a board member's approval",
+                timezone.localdate(c.expires_at) if c.expires_at else None,
+            )
+        else:
+            title, detail, due = (
+                f"Key change: {label}",
+                f"Approved; takes effect {_when(cs.active_at)} unless refused",
+                timezone.localdate(cs.active_at) if cs.active_at else None,
+            )
+        items.append(
+            Item(
+                "Keys and connections",
+                title,
+                detail,
+                reverse("keys_change", args=[c.pk]),
+                "warning",
+                due,
+                nav="",
+                icon="key",
+            )
+        )
+    return items
 
 
 def _server_value(name: str):

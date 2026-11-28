@@ -51,7 +51,7 @@ echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Signing in to USPS (no mail is looked up)"
 # Only the worker container has the password (D87): check from there.
-if ! "${COMPOSE[@]}" exec -T worker python manage.py check_usps_iv; then
+if ! "${COMPOSE[@]}" exec -T worker python manage.py check_usps_iv --server; then
   env_restore_keys .env "$BACKUP" "${KEYS[@]}"
   env_discard_backup "$BACKUP"
   echo "The check failed (above). The previous USPS settings are back in .env (nothing else in it was changed); restarting." >&2

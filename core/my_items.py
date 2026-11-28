@@ -114,6 +114,7 @@ AREA_NAV = {
     "Setup": "community_settings",
     "Paper mail": "paper_mail",
     # Not in the sidebar: counted only in My items' own total.
+    "Keys and connections": "",
     "Sign-in and security": "",
 }
 
@@ -140,6 +141,7 @@ AREA_ICONS = {
     "Tasks": "list",
     "Setup": "sliders",
     "Paper mail": "mail",
+    "Keys and connections": "key",
     "Sign-in and security": "key",
 }
 
@@ -166,6 +168,7 @@ AREAS = [
     "Tasks",
     "People",
     "Paper mail",
+    "Keys and connections",
     "Setup",
     "Sign-in and security",
 ]
@@ -1032,6 +1035,11 @@ def items_for(user) -> list[Item]:
     # Finance options (D81-D85): each module's own items, only with its
     # feature on (the path check below hides them too).
     out.extend(_finance_option_items(user))
+    # Key changes the board may still approve or refuse (D93; review EXP-001 and
+    # BUG-001, 0.44.0): in the portal, not only by email.
+    from core import credentials
+
+    out.extend(credentials.board_items(user))
 
     order = {a: i for i, a in enumerate(AREAS)}
     out.sort(key=lambda i: (order.get(i.area, 99), not i.overdue, i.due or datetime.date.max))

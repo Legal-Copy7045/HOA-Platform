@@ -238,9 +238,7 @@ class RedirectingBackend(BaseEmailBackend):
         email_messages = _tagged(email_messages)
         target = settings.EMAIL_REDIRECT_ALL_TO
         if not target:
-            sent = self._inner.send_messages(email_messages)
-            _record(email_messages, sent)
-            return sent
+            return self._send_and_record(email_messages)
         redirected = []
         for message in email_messages:
             copy_ = copy.copy(message)
@@ -248,8 +246,20 @@ class RedirectingBackend(BaseEmailBackend):
             copy_.subject = f"[to: {intended}] {message.subject}"
             copy_.to, copy_.cc, copy_.bcc = [target], [], []
             redirected.append(copy_)
-        sent = self._inner.send_messages(redirected)
-        _record(redirected, sent)
+        return self._send_and_record(redirected)
+
+    def _send_and_record(self, messages):
+        """Send, and record what the relay accepted, also when a later
+        message of the batch fails (review BUG-008, 0.44.0): SMTP2Go marks
+        each accepted message, so its delivery reports still match and a
+        retry is not taken for a first send."""
+        try:
+            sent = self._inner.send_messages(messages)
+        except Exception:
+            accepted = sum(1 for m in messages if getattr(m, "provider_message_id", ""))
+            _record(messages, min(accepted, max(len(messages) - 1, 0)))
+            raise
+        _record(messages, sent)
         return sent
 
 

@@ -1792,9 +1792,10 @@ def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
     out = []
     # D76: no late fee while the home keeps a payment plan (rule
     # payment_plan.suspend_late_fees, fixed on each plan).
-    from ledger.payment_plans import late_fee_suspended_lots
+    from ledger.payment_plans import late_fee_suspended
 
-    suspended = late_fee_suspended_lots(on)
+    # Per account (review BUG-004, 0.44.0): a seller's plan never stops the buyer's fee.
+    suspended = late_fee_suspended(on)
     with system_access("late fee candidates"):
         assessments = LedgerEntry.objects.filter(kind=EntryKind.ASSESSMENT, period=period)
         already = set(
@@ -1804,7 +1805,11 @@ def late_fee_candidates(*, year: int, month: int, on=None) -> list[dict]:
         )
         for entry in assessments.select_related("lot"):
             late_from = entry.posted_on + datetime.timedelta(days=int(grace) + 1)
-            if on < late_from or entry.lot_id in already or entry.lot_id in suspended:
+            if (
+                on < late_from
+                or entry.lot_id in already
+                or (entry.lot_id, entry.account_id) in suspended
+            ):
                 continue
             open_cents = _allocation().state_as_of(entry.lot_id, on).open.get(entry.pk, 0)
             if open_cents <= 0:
