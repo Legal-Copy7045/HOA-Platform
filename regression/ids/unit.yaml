@@ -1,6 +1,6 @@
 # Stable check IDs for the unit stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: UNIT-5218
+# highest issued: UNIT-5228
 UNIT-001: "core/tests/test_url_matrix.py::test_every_named_url_is_classified"
 UNIT-002: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[announcement_detail]"
 UNIT-003: "core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data[approvals]"
@@ -4739,7 +4739,17 @@ UNIT-5215: "core/tests/test_review_fixes_046.py::test_mailpit_is_used_as_before"
 UNIT-5216: "core/tests/test_review_fixes_046.py::test_bounce_polling_refuses_a_mailbox_host_now_private"
 UNIT-5217: "core/tests/test_review_fixes_046.py::test_bounce_polling_connects_to_the_checked_public_address"
 UNIT-5218: "core/tests/test_review_fixes_046.py::test_bounce_polling_in_local_development_is_not_pinned"
+UNIT-5219: "comms/tests/test_rsvp.py::test_answers_and_volunteer_slots_are_audited_without_names"
 UNIT-522: "community/tests/test_commands.py::test_bootstrap_refuses_once_a_board_exists"
+UNIT-5220: "operations/tests/test_compliance.py::test_adding_the_starter_items_is_audited_with_the_count_only"
+UNIT-5221: "regression/tests/test_ids_files.py::test_every_line_matches_the_tool_pattern[simulation.yaml]"
+UNIT-5222: "regression/tests/test_ids_files.py::test_the_loader_reads_every_line[simulation.yaml]"
+UNIT-5223: "regression/tests/test_simulation.py::test_cron_fields_and_days"
+UNIT-5224: "regression/tests/test_simulation.py::test_every_periodic_task_has_a_cron_the_simulation_reads"
+UNIT-5225: "regression/tests/test_simulation.py::test_the_stage_checks_from_a_results_file"
+UNIT-5226: "regression/tests/test_simulation.py::test_simulation_is_never_a_default_stage_nor_in_check"
+UNIT-5227: "regression/tests/test_simulation.py::test_the_workflow_is_manual_only"
+UNIT-5228: "regression/tests/test_simulation.py::test_a_one_month_smoke_run_keeps_every_invariant"
 UNIT-523: "community/tests/test_commands.py::test_bootstrap_does_not_create_a_second_sysadmin"
 UNIT-524: "community/tests/test_commands.py::test_breakglass_requires_a_sysadmin_actor_and_a_reason"
 UNIT-525: "community/tests/test_commands.py::test_breakglass_lock_user_signs_out_and_deactivates"
