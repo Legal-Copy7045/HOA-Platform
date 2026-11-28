@@ -25,6 +25,13 @@ adds an entry here.
   mail relay and bounce-mailbox ports (and the tunnel), never private or
   internal addresses; applied by the install and by Re-apply host security,
   with a health check on System status.
+- Full-check fixes: the firewall's rules are saved and loaded at boot before
+  Docker starts, and new networks (first start, full restart, restore drill)
+  are filtered before their containers start; live mail sending and bounce
+  polling connect only to the public address they checked; mail port 25 is
+  refused with a clear message (use 587, 465 or 2525); a home's ledger opens
+  on its newest entries; a stage passed on a side branch shows "Earlier", not
+  as still ahead.
 
 ## 0.45.0 — 2026-11-28
 
