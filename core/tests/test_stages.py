@@ -57,7 +57,10 @@ def test_every_module_with_a_workflow_is_loaded_by_the_tracker():
     found = set()
     for py in ROOT.glob("*/**/*.py"):
         rel = py.relative_to(ROOT)
-        if ".venv" in rel.parts or "tests" in rel.parts or "migrations" in rel.parts:
+        # Hidden folders (.venv, .claude worktrees, .git) are not the app's code.
+        if any(part.startswith(".") for part in rel.parts):
+            continue
+        if "tests" in rel.parts or "migrations" in rel.parts:
             continue
         if re.search(r"^\w+ = (?:Workflow|track)\(", py.read_text(encoding="utf-8"), re.M):
             found.add(".".join(rel.with_suffix("").parts))
