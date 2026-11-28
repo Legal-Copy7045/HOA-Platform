@@ -39,7 +39,7 @@ def test_a_saved_port_25_fails_its_test_at_once_without_connecting(monkeypatch):
     monkeypatch.setattr(
         core_email,
         "smtp_options",
-        lambda: {"host": "smtp.example.org", "port": 25, "username": "", "password": ""},
+        lambda: {"host": "smtp.example.org", "port": 25, "username": "", "password": ""},  # nosec B105 - empty test value
     )
     result = credential_checks._smtp()
     assert result.code == "port_blocked" and "outbound firewall" in result.words
@@ -75,7 +75,7 @@ def _smtp_settings(settings, monkeypatch, host):
             "host": host,
             "port": 587,
             "username": "",
-            "password": "",
+            "password": "",  # nosec B105 - empty test value
             "use_tls": False,
             "use_ssl": False,
         },
