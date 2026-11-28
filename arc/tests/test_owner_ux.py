@@ -203,7 +203,7 @@ def test_draft_checklist_with_submit_inside_and_no_note_box(client, w):
     assert "Note for Submit for review" not in page
     assert 'accept="image/*,application/pdf" multiple' in page
     # The breadcrumb leads back to the owner's own list.
-    assert f'href="{reverse("arc_list")}?mine=1">My home improvement requests (ARC)' in page
+    assert f'href="{reverse("arc_list")}?mine=1">My ARC requests' in page
 
 
 def test_checklist_sends_to_neighbors_when_there_are_some(client, w):

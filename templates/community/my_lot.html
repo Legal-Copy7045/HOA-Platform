@@ -50,7 +50,7 @@
     </section>
   {% endfor %}
   <div class="grid grid-3">
-    {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}?mine=1"><div class="label">{% icon "pencil" %} My home improvement requests (ARC)</div><div class="hint">Apply for exterior changes and track decisions</div></a>{% endif %}
+    {% if user|can:"arc.submit" %}<a class="stat" href="{% url 'arc_list' %}?mine=1"><div class="label">{% icon "pencil" %} My ARC requests</div><div class="hint">Apply for exterior changes and track decisions</div></a>{% endif %}
     <a class="stat" href="{% url 'violations' %}?mine=1"><div class="label">{% icon "flag" %} My violations</div><div class="hint">Covenant or rule violations, their notices and your responses</div></a>
     <a class="stat" href="{% url 'documents' %}"><div class="label">{% icon "folder" %} Documents</div><div class="hint">Governing documents, minutes and forms</div></a>
   </div>

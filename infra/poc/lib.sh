@@ -489,3 +489,50 @@ cloudflared_edge_only() {
   done < <(sed -n '3,$p' <<<"$lines")
   return 0
 }
+
+# --- The outbound firewall for the containers (D101) -------------------------
+# harden-host.sh installs /usr/local/sbin/hoa-egress-firewall (from
+# egress-firewall.sh); its timer keeps the rules on the portal's networks.
+# After compose creates or recreates networks, the scripts re-apply at once
+# rather than within the minute. Nothing happens where it is not installed
+# (local development never has it).
+EGRESS_FIREWALL_BIN="${HOA_EGRESS_BIN:-/usr/local/sbin/hoa-egress-firewall}"
+
+egress_firewall_refresh() {
+  [ -x "$EGRESS_FIREWALL_BIN" ] || return 0
+  "$EGRESS_FIREWALL_BIN" apply --quiet \
+    || echo "WARNING: the outbound firewall could not be re-applied (sudo hoa-egress-firewall status); its timer tries again each minute." >&2
+  return 0
+}
+
+# egress_firewall_before_start <project> <compose command...>: where the
+# firewall is installed and the project has no networks yet (first start, or
+# after `compose down`), create them and the containers without starting
+# them, then apply, so no container runs a moment without the rules (review
+# EXP-001, 0.46.0). Networks that already exist keep their rules.
+egress_firewall_before_start() {
+  local project="$1"
+  shift
+  [ -x "$EGRESS_FIREWALL_BIN" ] || return 0
+  if [ -n "$(docker network ls -q --filter "label=com.docker.compose.project=$project" 2>/dev/null)" ]; then
+    return 0
+  fi
+  echo "==> Creating the networks and applying the outbound firewall before anything starts (D101)"
+  "$@" up --no-start --remove-orphans \
+    || { echo "WARNING: could not create the containers first; the firewall follows within a minute." >&2; return 0; }
+  egress_firewall_refresh
+}
+
+# egress_firewall_state: "<state> <networks>": active, stale, missing or
+# no-networks from the firewall; absent when it is not installed; unknown
+# when it cannot tell. Only that shape is printed (it goes to SQL variables).
+egress_firewall_state() {
+  local out
+  if [ ! -x "$EGRESS_FIREWALL_BIN" ]; then echo "absent 0"; return 0; fi
+  out="$("$EGRESS_FIREWALL_BIN" status 2>/dev/null | head -1)" || true
+  if [[ "$out" =~ ^(active|stale|missing|no-networks)\ ([0-9]{1,3})$ ]]; then
+    echo "$out"
+  else
+    echo "unknown 0"
+  fi
+}

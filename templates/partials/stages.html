@@ -1,0 +1,16 @@
+{% load portal %}{# The stage tracker (D99): core.workflow.strip(). A strip on wide screens; on phones (640px or less) one line, "Step 3 of 5: In review", that opens the list. States only, never notes. No inline script or style (CSP). #}
+{% if strip %}
+<section class="card stages{% if strip.ended %} is-ended{% elif strip.finished %} is-finished{% endif %}" aria-labelledby="stages-title" data-testid="stages">
+  <h2 id="stages-title" class="sr-only">Progress</h2>
+  <ol class="stages-strip" data-testid="stages-strip">
+    {% for s in strip.items %}{% include "partials/stage_item.html" %}{% endfor %}
+  </ol>
+  <details class="stages-compact" data-testid="stages-compact">
+    <summary>{{ strip.summary }}</summary>
+    <ol class="stages-list">
+      {% for s in strip.items %}{% include "partials/stage_item.html" %}{% endfor %}
+    </ol>
+  </details>
+  {% if strip.next_who %}<p class="stages-next small" data-testid="stages-next"><strong>Next:</strong> {{ strip.next_who }}{% if strip.next_due %} — by {{ strip.next_due|date:"M j, Y" }}{% endif %}</p>{% endif %}
+</section>
+{% endif %}

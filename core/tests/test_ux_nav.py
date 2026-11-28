@@ -135,11 +135,10 @@ def test_hub_entry_is_current_on_its_pages_and_its_group_opens(client, w):
     assert admin["open"] and [i["label"] for i in admin["items"] if i["current"]] == ["Settings"]
     response = client.get(reverse("home"))
     admin = section(response, "Admin")
-    # Collapsed unless the page is inside or (staff, WT-036) it is the work
-    # section with the most waiting.
+    # Collapsed unless the page is inside (staff, D100).
     work = [s for s in nav(response) if s["work"]]
-    assert [s for s in work if s["open"]] == [max(work, key=lambda s: s["count"])]
-    assert not admin["open"] or admin["count"]
+    assert not [s for s in work if s["open"]]
+    assert not admin["open"]
     # Staff start with My home and Community closed (WT-040); owners keep them open.
     assert not section(response, "My home")["open"]
     assert not section(response, "Community")["open"]
@@ -173,7 +172,10 @@ def test_feature_switches_still_gate_hubs_and_voting(client, w):
     assert 'href="?type=elections#results"' in page and 'href="?type=votes' not in page
     features.set_feature("elections", False, actor=w["board"])
     page = client.get(reverse("voting")).content.decode()
-    assert "surveys (to hear your views" in page and 'href="?type=elections' not in page
+    assert (
+        "Surveys ask for your views; nothing is decided by them." in page
+        and 'href="?type=elections' not in page
+    )
     features.set_feature("surveys", False, actor=w["board"])
     assert client.get(reverse("voting")).status_code == 404
     assert "Voting" not in labels(client.get(reverse("home")))
@@ -274,7 +276,7 @@ def test_dashboard_todos_come_before_tiles_and_use_mine(client, w):
     assert html.index('id="part-') < html.index('class="stat')
     assert f'href="{reverse("arc_list")}?mine=1"' in html
     assert f'href="{reverse("violations")}?mine=1"' in html
-    assert "My home improvement requests (ARC)" in html
+    assert "My ARC requests" in html
 
 
 def test_dashboard_todo_row_is_one_link(client, w):

@@ -7,7 +7,7 @@
   <ul class="tiles welcome-tiles">
     {% if owner %}<li><a class="tile" href="{% url 'my_account' %}">{% icon "wallet" %}<div><strong>My account</strong><span>Your {% term "term" %}, statement and balance, and how to pay.</span></div></a></li>{% endif %}
     {% if user|can:"request.submit" %}<li><a class="tile" href="{{ ask_url }}">{% icon "mail" %}<div><strong>Ask the board</strong><span>Questions and problems go straight to the board, with the reply here and by email.</span></div></a></li>{% endif %}
-    {% if user|can:"arc.submit" %}<li><a class="tile" href="{% url 'arc_list' %}?mine=1">{% icon "pencil" %}<div><strong>My home improvement requests (ARC)</strong><span>Changes to your home: ask for approval before changing the outside of your home.</span></div></a></li>{% endif %}
+    {% if user|can:"arc.submit" %}<li><a class="tile" href="{% url 'arc_list' %}?mine=1">{% icon "pencil" %}<div><strong>My ARC requests</strong><span>Changes to your home: ask for approval before changing the outside of your home.</span></div></a></li>{% endif %}
     <li><a class="tile" href="{% url 'announcements' %}">{% icon "megaphone" %}<div><strong>Announcements</strong><span>Community news, the calendar and meetings{% if user|can:"vote.view" %}, and voting{% endif %}.</span></div></a></li>
     <li><a class="tile" href="{% url 'help' %}">{% icon "info" %}<div><strong>Help</strong><span>How paying, home improvement requests, notices and voting work, in plain words.</span></div></a></li>
   </ul>

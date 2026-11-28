@@ -14,14 +14,22 @@
   {% endif %}{% endfor %}
   {# One line of jump links instead of a tile per group (WT-011). #}
   {# Ordered by part for someone with a home and board work (WT-003). #}
+  {# D100: overdue only, as a filter on the same page. #}
+  {% if overdue_count or only_overdue %}<nav class="filters" aria-label="Which items" data-testid="my-items-filter">
+    <a href="{% url 'my_items' %}"{% if not only_overdue %} aria-current="true"{% endif %}>All ({{ total }})</a>
+    <a href="{% url 'my_items' %}?show=overdue"{% if only_overdue %} aria-current="true"{% endif %}>Overdue ({{ overdue_count }})</a>
+  </nav>{% endif %}
   {% if counts|length > 1 %}<nav class="jump-links small" aria-label="Groups on this page" data-testid="my-items-summary">{% for p in parts %}{% if split %}<span class="jump-part">{% if p.key == "board" %}{{ nav.work_label }} work{% else %}{{ p.title }}{% endif %}:</span> {% endif %}{% for c in p.counts %}<a href="#area-{{ p.key }}-{{ c.area|slugify }}">{{ c.area }} {{ c.count }}{% if c.overdue %} <span class="status tone-danger">{{ c.overdue }} overdue</span>{% endif %}</a>{% if not forloop.last %} · {% endif %}{% endfor %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</nav>{% endif %}
   {% for p in parts %}
     {% if split %}<h2 class="my-items-part" id="part-{{ p.key }}">{% if p.key == "board" %}<span class="board-badge">{{ nav.work_label }}</span> {% endif %}{{ p.title }}</h2>{% endif %}
-    {% regroup p.items by area as areas %}
-    {% for group in areas %}
-      <section class="card" id="area-{{ p.key }}-{{ group.grouper|slugify }}">{% if split %}<h3>{{ group.grouper }}</h3>{% else %}<h2>{{ group.grouper }}</h2>{% endif %}
-        <ul class="list">{% for t in group.list %}{% include "partials/todo.html" %}{% endfor %}</ul>
-      </section>
+    {# D100: each group folds; the first groups and any with overdue items start open, and a long group shows its first items with "Show N more". #}
+    {% for g in p.groups %}
+      <details class="card fold-group" id="{{ g.id }}"{% if g.open %} open{% endif %}>
+        <summary class="fold-head">{% if split %}<h3>{{ g.area }}</h3>{% else %}<h2>{{ g.area }}</h2>{% endif %}<span class="badge-count">{{ g.count }}</span>{% if g.overdue %}<span class="status tone-danger">{{ g.overdue }} overdue</span>{% endif %}</summary>
+        <ul class="list">{% for t in g.shown %}{% include "partials/todo.html" %}{% endfor %}</ul>
+        {% if g.rest %}<details class="more-items" data-testid="more-{{ g.id }}"><summary>Show {{ g.rest|length }} more</summary>
+          <ul class="list">{% for t in g.rest %}{% include "partials/todo.html" %}{% endfor %}</ul></details>{% endif %}
+      </details>
     {% endfor %}
-  {% empty %}{% if not alerts %}{% include "partials/empty.html" with icon="check-circle" title="Nothing waiting on you" text="New requests, approvals and follow-ups will appear here." %}{% endif %}{% endfor %}
+  {% empty %}{% if only_overdue %}{% include "partials/empty.html" with icon="check-circle" title="Nothing overdue" text="Every item waiting on you is still within its time." %}{% elif not alerts %}{% include "partials/empty.html" with icon="check-circle" title="Nothing waiting on you" text="New requests, approvals and follow-ups will appear here." %}{% endif %}{% endfor %}
 {% endblock %}

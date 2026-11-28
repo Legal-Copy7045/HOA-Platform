@@ -169,7 +169,7 @@ SERVICES: tuple[Service, ...] = (
         "Any mail server with a login (also SMTP2Go's SMTP). Saving switches email to it.",
         (
             Field("EMAIL_HOST", "Server", TEXT, "e.g. smtp.example.org", max_length=253),
-            Field("EMAIL_PORT", "Port", INT, "587 with STARTTLS, 465 with TLS."),
+            Field("EMAIL_PORT", "Port", INT, "587 with STARTTLS, 465 with TLS, or 2525; never 25."),
             Field("EMAIL_HOST_USER", "User name", TEXT, max_length=200),
             Field("EMAIL_HOST_PASSWORD", "Password", SECRET, max_length=200),
             Field("EMAIL_SECURITY", "Encryption", CHOICE, choices=SECURITY_CHOICES),

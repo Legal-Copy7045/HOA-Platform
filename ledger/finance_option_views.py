@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 
 from audit.services import record_event
 from core import policy
-from core.lists import csv_response
+from core.lists import csv_response, paginate
 from core.money import MoneyField, parse_cents
 from documents import attachments
 from documents.attachments import pdf_response
@@ -65,6 +65,11 @@ def interest_page(request):
         return redirect("interest")
     current = interest.current_policy()
     on = interest.posting_date(today.year, today.month, current)
+    candidates = interest.candidates(year=today.year, month=today.month, policy=current)
+    # D100 (WT-021): this month's homes a page at a time (the Post button
+    # still charges every one of them, and says how many), and the posted
+    # charges folded by month, the newest month open.
+    page = paginate(request, candidates, INTEREST_PAGE_SIZE)
     return render(
         request,
         "ledger/interest.html",
@@ -73,13 +78,33 @@ def interest_page(request):
             "monthly": interest.monthly_rate_text(current.rate_bp) if current.rate_bp else "",
             "posting_on": on,
             "due": on <= today,
-            "candidates": interest.candidates(year=today.year, month=today.month, policy=current),
-            "postings": interest.recent_postings(),
+            "candidates": candidates,
+            "page": page,
+            "candidates_total": sum(c.interest_cents for c in candidates),
+            "posted_months": interest_months(interest.recent_postings()),
             "can_post": policy.can(user, "interest.post"),
             "can_reverse": policy.can(user, "interest.reverse"),
             "notice": interest.owner_notice(request),
         },
     )
+
+
+INTEREST_PAGE_SIZE = 15
+
+
+def interest_months(postings) -> list[dict]:
+    """Posted interest charges by month, newest first: each month's entries,
+    count and total; only the newest month starts open (D100)."""
+    months: list[dict] = []
+    for entry in postings:
+        key = entry.posted_on.strftime("%Y-%m")
+        if not months or months[-1]["key"] != key:
+            months.append({"key": key, "month": entry.posted_on, "entries": [], "total": 0})
+        months[-1]["entries"].append(entry)
+        months[-1]["total"] += entry.amount_cents
+    for n, month in enumerate(months):
+        month["open"] = n == 0
+    return months
 
 
 # --- Cash-flow forecast (D81) ---------------------------------------------------------------

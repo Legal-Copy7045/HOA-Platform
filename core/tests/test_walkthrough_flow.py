@@ -51,7 +51,7 @@ def _invoice(manager, number="PP-102", vendor="Pond Pros"):
 def test_owner_arc_area_has_one_name(client, w):
     client.force_login(w["owner"])
     html = client.get(reverse("my_lot")).content.decode()
-    assert "My home improvement requests (ARC)" in html
+    assert "My ARC requests" in html
     assert "Home improvement approvals" not in html
 
 
@@ -146,7 +146,7 @@ def test_hub_children_have_a_way_back(client, w, name, parent):
 def test_neighbor_acknowledgements_crumb_leads_to_my_arc_requests(client, w):
     client.force_login(w["owner"])
     html = client.get(reverse("signoffs_mine")).content.decode()
-    assert f'href="{reverse("arc_list")}?mine=1">My home improvement requests (ARC)</a>' in html
+    assert f'href="{reverse("arc_list")}?mine=1">My ARC requests</a>' in html
 
 
 def test_community_settings_has_an_index_and_folding_sections(client, w):
@@ -277,8 +277,9 @@ def test_auditor_and_sysadmin_get_shortcuts_instead_of_an_empty_card(client, w):
         assert f'href="{reverse(name)}"' in html
     client.force_login(w["sysadmin"])
     html = client.get(reverse("home")).content.decode()
-    assert 'id="shortcuts"' in html
-    assert f'href="{reverse("server_tasks")}"' in html
+    # WT-010 (D100): the System status card with a fix button per failing
+    # check replaces the list of the sysadmin's own menu entries.
+    assert 'id="system-summary"' in html and 'id="shortcuts"' not in html
     assert reverse("community_settings") not in html  # only what they may open
     client.force_login(w["board"])
     html = client.get(reverse("home")).content.decode()
@@ -327,18 +328,18 @@ def test_staff_menu_opens_work_with_waiting_items(rf, w):
         return {s["title"]: s for s in navigation.build(request)["sections"]}
 
     board = sections(w["board"])
-    # WT-036: only the work section with the most waiting opens (a short
-    # phone drawer); the others show their count on the closed heading.
+    # D100 (WT-009/WT-017, replacing WT-036's busiest-open): on a page outside
+    # every section all of a staff member's sections start closed, each with
+    # its count on the heading, so the phone drawer fits about one screen.
     work = [s for s in board.values() if s["work"]]
-    opened = [s for s in work if s["open"]]
     assert board["Finance"]["count"]
-    assert len(opened) == 1 and opened[0]["count"] == max(s["count"] for s in work)
-    assert not board["My home"]["open"] if "My home" in board else True
+    assert not [s for s in board.values() if s["title"] and s["open"]]
     assert not board["Community"]["open"]
     owner = sections(w["owner"])
     assert owner["My home"]["open"] and owner["Community"]["open"]
     sysadmin = sections(w["sysadmin"])
-    assert sysadmin["Admin"]["open"]  # nothing waiting: the first work section opens
+    assert sysadmin["Admin"]["open"]  # their only work section
+    assert work
 
 
 def test_phone_drawer_puts_sign_out_at_the_top():

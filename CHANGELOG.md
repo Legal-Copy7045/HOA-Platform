@@ -6,6 +6,33 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.46.0 — 2026-11-28
+
+- Progress on every workflow item (D99): a stage strip at the top of ARC
+  requests, owner and records requests, violations, collection cases, resale
+  certificates, work orders, invoices, contracts, reimbursements,
+  disbursements, votes, elections, payment plans, special assessments,
+  insurance claims, capital projects, key changes, account recovery, sign-in
+  resets and vendor onboarding: stages done, the current one, what is next and
+  by when; "Step 3 of 5" on phones. Driven by each workflow's own definition.
+- A menu and dashboard that fit (D100): board and staff menu sections start
+  closed with their counts (the current page's section open); a per-role phone
+  tab bar; the board dashboard summarises My items instead of repeating it;
+  My items folds by group with an Overdue filter; Interest, Collections,
+  ledgers and month/year close are paged or folded on long pages; "My ARC
+  requests".
+- Outbound firewall (D101): the portal's containers may reach only HTTPS, the
+  mail relay and bounce-mailbox ports (and the tunnel), never private or
+  internal addresses; applied by the install and by Re-apply host security,
+  with a health check on System status.
+- Full-check fixes: the firewall's rules are saved and loaded at boot before
+  Docker starts, and new networks (first start, full restart, restore drill)
+  are filtered before their containers start; live mail sending and bounce
+  polling connect only to the public address they checked; mail port 25 is
+  refused with a clear message (use 587, 465 or 2525); a home's ledger opens
+  on its newest entries; a stage passed on a side branch shows "Earlier", not
+  as still ahead.
+
 ## 0.45.0 — 2026-11-28
 
 - Homes by address (D96): every "pick a home" field (Home neighbors, ARC

@@ -1,0 +1,36 @@
+# Release 0.46 layout (D100): the 0.45.0 walkthrough's layout, naming,
+# placement, duplicate and long-page findings (WT-001 to WT-028): staff menu
+# sections closed except the current page's, work first, remembered by static
+# JS; the board dashboard as a summary of My items; My items, Interest,
+# Collections, a home's ledger, Month and year close and the setup review
+# paged or folded with every action kept.
+- feature: "Staff menu sections start closed with their counts on the headings, except the current page's section; owners' My home and Community stay open; the open or closed choice is remembered by the static script (localStorage), with no inline script"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_(staff_sections_start_closed|the_current_pages_section|owner_sections_are_unchanged|open_state_is_remembered)", "^unit:core/tests/test_walkthrough_flow.py::test_staff_menu_opens_work_with_waiting_items", "^unit:core/tests/test_ux_nav.py::test_hub_entry_is_current_on_its_pages"]
+- feature: "Staff see their work sections before their own My home and Community, every menu entry of every role still drawn; a former owner's My history is a top-level entry"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_(staff_menu_puts_work_before|every_menu_entry_is_still_drawn|former_owner_history_is_a_top_level)", "^unit:core/tests/test_nav_streamline.py::test_(sidebar_for_every_role|former_owner_has_history)", "^unit:core/tests/test_board_cues.py::test_work_sections_sit_under_one_board_heading"]
+- feature: "Phone tab bar per role (board and manager: My items and Owner requests; auditor: Reports and Accounting) and the account links as a two-by-two grid of 44 px buttons"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_(phone_tab_bar_per_role|account_links_are_two_by_two)"]
+- feature: "The board dashboard summarises My items (counts per group linking to its card, the top three per part, Showing n of N), in the order Board work, Your home with the balance tile, Finance at a glance, Getting started as one line; staff without a home see the top five; quick actions do not repeat the menu"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_(board_dashboard_summarises|board_dashboard_order|groups_link_to_their_card|staff_without_a_home|quick_actions_do_not_repeat|board_reaches_meetings)", "^unit:core/tests/test_walkthrough_041.py::test_dashboard_never_drops_a_legal_deadline", "^unit:core/tests/test_walkthrough_043.py::test_board_dashboard_shows_the_work_before_the_checklist"]
+- feature: "The sysadmin dashboard shows each failing health check with its fix button instead of a copy of the menu"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_sysadmin_dashboard_has_a_fix_button", "^unit:core/tests/test_walkthrough_flow.py::test_auditor_and_sysadmin_get_shortcuts"]
+- feature: "My items folds by group (first groups and overdue ones open, Show N more past four items, every item still on the page) and has an Overdue filter"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_my_items_"]
+- feature: "Interest on overdue balances pages this month's homes (page 2 reachable, the Post button still for every home) and folds posted charges by month with each Reverse kept"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_interest_"]
+- feature: "Collections pages the overdue homes with their count and total on top; a home's ledger pages its entries with each row's Reverse and Move kept"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_(collections_pages|a_homes_ledger_pages)"]
+- feature: "Month and year close shows a check's first five exceptions and folds the rest with every form kept and unique field ids; the setup review folds steps with nothing flagged"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_(close_shows_five|setup_review_folds)"]
+- feature: "Naming and placement: My ARC requests, the tenant's Surveys sentence, the setup count naming the review, Finance overview shortcuts marked, Community and Capital projects linked, My history without empty cards; new controls are 44 px"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_(arc_menu_label|finance_cards_with_a_menu_entry|setup_count_names|former_owner_history_shows_no_empty|new_controls_are_44px)", "^unit:core/tests/test_ux_nav.py::test_feature_switches_still_gate_hubs_and_voting"]

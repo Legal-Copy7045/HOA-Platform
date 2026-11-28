@@ -81,7 +81,7 @@ def board():
 MY_HOME = [
     "My home",
     "My account",
-    "My home improvement requests (ARC)",
+    "My ARC requests",
     # 0.43.0 (D95): "My violations" (was "Notices about my home"); records
     # requests are a section of My requests, not an entry of their own.
     "My violations",
@@ -128,7 +128,8 @@ MENUS = {
         "Community": ["Surveys" if c == "Voting" else c for c in NOT_BUDGET],
     },
     # WT-014: the former owner's one section is titled after its one page.
-    "former_owner": {"": ["Dashboard"], "My history": ["My history"]},
+    # WT-027 (D100): the one entry sits in the lead section, not a one-entry group.
+    "former_owner": {"": ["Dashboard", "My history"]},
     "board": {
         "": ["Dashboard", "My items", "Help"],
         # My reimbursements opens from the Finance overview (D95).
@@ -276,7 +277,7 @@ def test_online_payments_only_with_payments_manage(client, board):
 def test_former_owner_has_history_not_my_requests(client, board):
     users = role_users(board)
     sections = menu(client, users["former_owner"])
-    assert sections["My history"] == ["My history"] and "My home" not in sections
+    assert sections == {"": ["Dashboard", "My history"]} and "My home" not in sections
     for role in ("view_only", "tenant", "authorized"):
         assert "My requests" in menu(client, users[role])["My home"], role
 
@@ -326,7 +327,7 @@ def test_subpages_mark_their_entry_current(client, board):
     cases = [
         ("access_review", "People"),
         ("tasks", "Tasks and deadlines"),
-        ("signoffs_mine", "My home improvement requests (ARC)"),
+        ("signoffs_mine", "My ARC requests"),
     ]
     for name, label in cases:
         url = reverse(name) + ("?tab=deadlines" if name == "tasks" else "")

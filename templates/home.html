@@ -28,7 +28,8 @@
       <div class="card-head"><h2>{% icon "activity" %} System status</h2><a class="small" href="{% url 'system_status' %}">Open System status</a></div>
       {% if sys.failing %}
         <div class="alert warning">{% icon "alert" %}<span>{{ sys.failing|length }} of {{ sys.checks }} health check{{ sys.checks|pluralize }} failing.</span></div>
-        <ul class="list">{% for r in sys.failing %}<li><div class="todo-icon tone-danger">{% icon "alert" %}</div><div class="grow"><div class="title">{{ r.label }}</div><div class="small muted">{{ r.detail }}</div></div></li>{% endfor %}</ul>
+        {# WT-010: each failing check with the button that fixes it. #}
+        <ul class="list" data-testid="failing-checks">{% for r, fix in sys.failing %}<li><div class="todo-icon tone-danger">{% icon "alert" %}</div><div class="grow"><div class="title">{{ r.label }}</div><div class="small muted">{{ r.detail }}</div></div><a class="btn small secondary todo-action" href="{{ fix.url }}">{{ fix.label }}</a></li>{% endfor %}</ul>
       {% else %}
         <p><span class="status tone-success">All {{ sys.checks }} health checks pass</span></p>
       {% endif %}
@@ -46,11 +47,12 @@
   </section>
   {% else %}
   <section class="card" id="todos">
-    <div class="card-head"><h2>Needs your attention</h2>{% if dash.todos_more %}<a class="small desktop-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}</div>
+    <div class="card-head"><h2>Needs your attention</h2>{% if dash.todos_more %}<span class="small muted">{{ dash.todos|length|add:dash.todos_more }} waiting</span>{% endif %}</div>
+    {# D100: a summary of My items (counts per group, the top few), not a copy of it. #}
+    {% if dash.todo_groups|length > 1 %}<nav class="jump-links small dash-groups" aria-label="Waiting by group" data-testid="todo-groups">{% for g in dash.todo_groups %}<a href="{{ g.url }}">{{ g.area }} {{ g.count }}{% if g.overdue %} <span class="status tone-danger">{{ g.overdue }} overdue</span>{% endif %}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</nav>{% endif %}
     {% if dash.todos %}
       <ul class="list">{% for t in dash.todos %}{% include "partials/todo.html" %}{% endfor %}</ul>
-      {# Phones show the first four (WT-049); the rest are one tap away. #}
-      {% if dash.can_open_queue and dash.todos|length > 4 or dash.todos_more %}<a class="btn secondary see-all phone-only" href="{% url 'my_items' %}">See all {{ dash.todos|length|add:dash.todos_more }} in My items</a>{% endif %}
+      {% if dash.todos_more %}<a class="btn secondary see-all" href="{% url 'my_items' %}">Showing {{ dash.todos|length }} of {{ dash.todos|length|add:dash.todos_more }} · See all in My items</a>{% endif %}
     {% else %}
       {% include "partials/empty.html" with icon="check-circle" title="You're all caught up" text="Nothing needs you right now." %}
     {% endif %}
@@ -63,14 +65,15 @@
       <div class="form-actions">{% for q in dash.quick %}<a class="btn secondary" href="{{ q.url }}">{% icon q.icon %} {{ q.label }}</a>{% endfor %}</div>
     </nav>
   {% endif %}{% endif %}
-  {# Board and staff: their work first, the checklist after it (WT-002). #}
-  {% if dash.checklist and dash.staff %}{% include "partials/dash_checklist.html" %}{% endif %}
+  {% if not dash.parts %}{% include "partials/dash_finance.html" %}{% endif %}
+  {# Board and staff: their work first, the checklist after it as one line (WT-002, WT-001). #}
+  {% if dash.checklist and dash.staff %}{% include "partials/dash_checklist.html" with compact_card=True %}{% endif %}
 
   {% for m in o.proxy_meetings %}
     <div class="alert info">{% icon "vote" %}<span><strong>{{ m.title }}</strong>, {{ m.starts_at|date:"l, F j, Y" }}: owners vote at this meeting. Can't attend? <a href="{% url 'meeting_detail' m.pk %}#proxy">Give a proxy</a></span></div>
   {% endfor %}
 
-  {% if o %}
+  {% if o and not dash.parts %}
     <div class="grid grid-4">
       {% for a in o.accounts %}
         <a class="stat {% if a.balance > 0 %}tone-warning{% else %}tone-success{% endif %}" href="{% url 'my_account' %}">
@@ -82,13 +85,6 @@
     </div>
   {% endif %}
 
-  {% if s and s.stats and not dash.parts %}
-    <div class="grid grid-4">
-      {% for st in s.stats %}
-        <a class="stat {% if st.tone %}tone-{{ st.tone }}{% endif %}" href="{{ st.url }}"><div class="label">{{ st.label }}</div><div class="value">{% if st.money %}{{ st.value|cents }}{% else %}{{ st.value }}{% endif %}</div>{% if st.hint %}<div class="hint">{{ st.hint }}</div>{% endif %}</a>
-      {% endfor %}
-    </div>
-  {% endif %}
 
   <div class="split dash">
     <div>
@@ -109,7 +105,7 @@
 
     <aside>
       {% if user|can:"calendar.view" %}<section class="card">
-        <div class="card-head"><h2>Coming up</h2><a href="{% url 'calendar' %}" class="small">Calendar</a></div>
+        <div class="card-head"><h2>Coming up</h2><span class="card-links">{% if user|can:"meeting.manage" %}<a href="{% url 'calendar' %}?type=meetings#results" class="small" data-testid="dash-meetings">Meetings</a> · {% endif %}<a href="{% url 'calendar' %}" class="small">Calendar</a></span></div>
         {% with events=dash.events %}
         {% if events %}
           <ul class="list">

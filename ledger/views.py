@@ -376,6 +376,9 @@ def ledger_home(request):
     )
 
 
+LEDGER_PAGE_SIZE = 25
+
+
 @login_required
 def lot_ledger(request, pk):
     _finance(request)
@@ -386,6 +389,13 @@ def lot_ledger(request, pk):
     notes = services.moved_notes(entries)
     for e in entries:
         e.moved_note = notes.get(e.pk, "")
+    # D100: the entries a page at a time, newest first, so the first page holds
+    # the recent activity and its Reverse / Move actions (review BUG-002,
+    # 0.46.0). The balance and ages above use all of them; the Statement PDF
+    # lists every entry in date order.
+    from core.lists import paginate
+
+    page = paginate(request, entries[::-1], LEDGER_PAGE_SIZE)
     open_charges = allocation.open_charges(lot.pk)
     lot_accounts = ledger_accounts.lot_accounts(lot.pk)
     # Own matters (D65): one's own home's account is read here like any
@@ -398,7 +408,9 @@ def lot_ledger(request, pk):
             "lot": lot,
             "own_matter": own,
             "own_note": conflicts.note_for(lot, request.user),
-            "entries": entries,
+            "entries": page,
+            "page": page,
+            "entry_count": len(entries),
             "balance": services.balance(lot.pk),
             "aging": (aging := services.aging(lot.pk)),
             "aging_columns": services.aging_columns(aging),
@@ -679,17 +691,30 @@ def lot_statement_pdf(request, pk, kind):
 # --- Collections -----------------------------------------------------------------------------
 
 
+COLLECTIONS_PAGE_SIZE = 15
+
+
 @login_required
 def collections(request):
     _finance(request)
+    from core.lists import paginate
+
+    delinquent = [
+        (lot, bal, services.aging_columns(a)) for lot, bal, a in services.delinquent_lots()
+    ]
+    cases = list(CollectionCase.objects.for_user(request.user).select_related("lot"))
+    # D100 (WT-021): the overdue homes a page at a time with the total on top,
+    # open cases first and closed ones folded below them (every case stays
+    # listed; nothing is removed from the record).
     return render(
         request,
         "ledger/collections.html",
         {
-            "cases": CollectionCase.objects.for_user(request.user).select_related("lot"),
-            "delinquent": [
-                (lot, bal, services.aging_columns(a)) for lot, bal, a in services.delinquent_lots()
-            ],
+            "page": paginate(request, delinquent, COLLECTIONS_PAGE_SIZE),
+            "delinquent_count": len(delinquent),
+            "delinquent_total": sum(bal for _lot, bal, _cols in delinquent),
+            "open_cases": [c for c in cases if c.state != "closed"],
+            "closed_cases": [c for c in cases if c.state == "closed"],
             "bucket_labels": list(services.BUCKET_LABELS.values()),
         },
     )

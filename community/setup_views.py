@@ -345,7 +345,14 @@ def _server_status():
         relay = delivery.setup_status()
     except Exception as exc:  # shown like a failed check
         relay = {"state": "failing", "provider": "", "text": f"Check failed ({type(exc).__name__})"}
+    try:
+        # The outbound firewall (D101), as the VM agent last reported it;
+        # None away from the VM (local development, no recent report).
+        egress = health._egress_firewall()
+    except Exception as exc:  # shown like a failed check
+        egress = (False, f"Check failed ({type(exc).__name__})")
     return {
+        "egress": egress,
         "relay": relay,
         "email_ok": email_ok,
         "email_detail": email_detail,
@@ -970,6 +977,10 @@ def _review(request, s, run, states):
     for section in sections:
         section["state"] = states.get(section["step"].key, "")
         section["url"] = reverse("setup_step", args=[section["step"].key])
+        # D100 (WT-021): a step's lines fold away unless one is flagged or
+        # the step was skipped, so the review is a short list of steps.
+        section["flags"] = sum(1 for line in section["lines"] if line["flag"])
+        section["open"] = bool(section["flags"]) or section["state"] == "skipped"
     flagged = sum(1 for sec in sections for line in sec["lines"] if line["flag"])
     return render(
         request,

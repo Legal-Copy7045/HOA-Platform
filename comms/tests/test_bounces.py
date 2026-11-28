@@ -32,7 +32,12 @@ OWNER_EMAIL = "notice-owner@example.com"
 
 
 @pytest.fixture
-def mailbox(settings):
+def mailbox(settings, monkeypatch):
+    # Live polling resolves a public host once and connects to that address
+    # (review EXP-002, 0.46.0): a public test address, no real DNS lookup.
+    from core import credential_checks
+
+    monkeypatch.setattr(credential_checks, "resolve", lambda host: ["93.184.215.14"])
     settings.BOUNCE_IMAP_HOST = "imap.example.org"
     settings.BOUNCE_IMAP_PORT = 993
     settings.BOUNCE_IMAP_USER = "bounces@example.org"

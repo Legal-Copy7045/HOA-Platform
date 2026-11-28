@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Capital projects · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Capital projects</h1><p class="subtitle">Big projects with their budget, board approval, change orders and what has been spent.</p></div></div>
+  <div class="page-head"><div><h1>Capital projects</h1><p class="subtitle">Big projects with their budget, board approval, change orders and what has been spent.{% if user|can:"capital_project.view_summary" %} <span data-testid="owner-projects-link">What owners see of the shared ones: <a href="{% url 'community_projects' %}">Community projects</a>.</span>{% endif %}</p></div></div>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Project</th><th>Status</th><th>Paid from</th><th class="num">Budget</th><th class="num">Committed</th><th class="num">Spent</th><th class="num">Done</th></tr></thead>
     <tbody>{% for p, f in rows %}<tr class="row-link">

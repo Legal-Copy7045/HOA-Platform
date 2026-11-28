@@ -15,18 +15,25 @@
     <div class="stat"><div class="label">Posted on</div><div class="value">{{ posting_on|date:"M j" }}</div><div class="hint">{% if policy.include_fees %}Includes late fees and earlier interest{% else %}On the {% term "term" %} only, not fees or interest{% endif %}{% if policy.suspend_on_plan %}; none during a payment plan{% endif %}</div></div>
   </div>
   {% if notice %}<p class="small muted">Owners read on My account: “{{ notice }}”</p>{% endif %}
-  <h2>This month{% if not due %} (posts on {{ posting_on|date:"F j" }}){% endif %}</h2>
+  <h2 id="this-month">This month{% if not due %} (posts on {{ posting_on|date:"F j" }}){% endif %}</h2>
+  {# D100 (WT-021): a page of homes at a time; the Post button charges all of them. #}
+  {% if candidates %}<p class="small" data-testid="interest-summary">{{ candidates|length }} home{{ candidates|length|pluralize }}, {{ candidates_total|cents }} in all{% if page.has_other_pages %}; showing {{ page.start_index }}–{{ page.end_index }}{% endif %}.</p>{% endif %}
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Home</th><th class="num">Past due</th><th class="num">Interest</th><th>Statement line</th></tr></thead>
-    <tbody>{% for c in candidates %}<tr><td class="cell-title"><a href="{% url 'lot_ledger' c.lot.pk %}">{{ c.lot.label }}</a></td><td class="num" data-label="Past due">{{ c.principal_cents|cents }}</td><td class="num" data-label="Interest">{{ c.interest_cents|cents }}</td><td data-label="Statement line" class="small">{{ c.description }}</td></tr>
+    <tbody>{% for c in page %}<tr><td class="cell-title"><a href="{% url 'lot_ledger' c.lot.pk %}">{{ c.lot.label }}</a></td><td class="num" data-label="Past due">{{ c.principal_cents|cents }}</td><td class="num" data-label="Interest">{{ c.interest_cents|cents }}</td><td data-label="Statement line" class="small">{{ c.description }}</td></tr>
     {% empty %}<tr><td colspan="4">{% include "partials/empty.html" with icon="check" title="Nothing to charge this month" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
+  {% include "partials/pager.html" %}
   <h2>Posted</h2>
-  <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+  {# D100: folded by month, the newest open; every charge and its Reverse stay one tap away. #}
+  {% for m in posted_months %}<details class="card fold-group" id="posted-{{ m.key }}"{% if m.open %} open{% endif %}>
+    <summary class="fold-head"><h3>{{ m.month|date:"F Y" }}</h3><span class="small muted">{{ m.entries|length }} charge{{ m.entries|length|pluralize }} · {{ m.total|cents }}</span></summary>
+  <div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Home</th><th>Posted</th><th class="num">Amount</th><th>Line</th><th></th></tr></thead>
-    <tbody>{% for e in postings %}<tr><td class="cell-title"><a href="{% url 'lot_ledger' e.lot.pk %}">{{ e.lot.label }}</a></td><td data-label="Posted">{{ e.posted_on|short_date }}</td><td class="num" data-label="Amount">{{ e.amount_cents|cents }}</td><td class="small" data-label="Line">{{ e.description }}</td>
+    <tbody>{% for e in m.entries %}<tr><td class="cell-title"><a href="{% url 'lot_ledger' e.lot.pk %}">{{ e.lot.label }}</a></td><td data-label="Posted">{{ e.posted_on|short_date }}</td><td class="num" data-label="Amount">{{ e.amount_cents|cents }}</td><td class="small" data-label="Line">{{ e.description }}</td>
       <td>{% if e.reversed_by %}<span class="muted small">Reversed</span>{% elif can_reverse %}<details><summary class="small">Reverse</summary><form method="post" class="inline" data-confirm="Reverse this interest charge? A reversing entry is posted; the charge stays on the record.">{% csrf_token %}<input type="hidden" name="do" value="reverse"><input type="hidden" name="entry" value="{{ e.pk }}"><label class="sr-only" for="reason-{{ e.pk }}">Reason</label><input id="reason-{{ e.pk }}" name="reason" required placeholder="Reason"><button type="submit" class="secondary small">{% for_board "Reverse" %}</button></form></details>{% endif %}</td></tr>
-    {% empty %}<tr><td colspan="5">{% include "partials/empty.html" with icon="receipt" title="No interest posted yet" %}</td></tr>{% endfor %}</tbody>
-  </table></div></div>
+    {% endfor %}</tbody>
+  </table></div></details>
+  {% empty %}{% include "partials/empty.html" with icon="receipt" title="No interest posted yet" %}{% endfor %}
   <p class="small muted">Rules: Settings, Community setup, “Interest, forecast, legal, projects and claims”. The monthly task posts on the posting day; a board member's own home is posted by the task or another board member.</p>
 {% endblock %}

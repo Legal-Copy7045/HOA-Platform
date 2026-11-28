@@ -11,6 +11,7 @@
     </div>
     <div class="amount-big">{{ obj.amount_cents|cents }}</div>
   </div>
+  {% workflow_stages obj %}
   <div class="split">
     <div>
       {% if obj.description %}<section class="card prose">{{ obj.description|linebreaks }}</section>{% endif %}

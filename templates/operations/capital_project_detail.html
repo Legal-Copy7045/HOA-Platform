@@ -5,6 +5,7 @@
   <div class="crumbs"><a href="{% url 'capital_projects' %}">Capital projects</a> / {{ obj.title }}</div>
   <div class="page-head"><div><h1>{{ obj.title }}</h1><div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_funding_display }}</span>{% if special_label %}<span>{% if special_url %}<a href="{{ special_url }}">{{ special_label }}</a>{% else %}{{ special_label }}{% endif %}</span>{% endif %}{% if obj.reserve_component %}<span>Reserve component: {{ obj.reserve_component.name }}</span>{% endif %}</div>
     {% if obj.description %}<p class="subtitle">{{ obj.description }}</p>{% endif %}</div></div>
+  {% workflow_stages obj %}
   <div class="grid grid-4">
     <div class="stat"><div class="label">Budget</div><div class="value">{{ f.budget|cents }}</div><div class="hint">{{ f.original|cents }} approved{% if f.changes %}, {{ f.changes|cents }} in change orders{% endif %}</div></div>
     <div class="stat"><div class="label">Committed</div><div class="value">{{ f.committed|cents }}</div><div class="hint">Contracts and vendors for this project</div></div>

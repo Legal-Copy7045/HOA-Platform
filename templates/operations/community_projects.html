@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}Community projects · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>Community projects</h1><p class="subtitle">Major work on the common areas that the board shares with owners: where each stands, its budget and what has been spent so far.</p></div></div>
+  <div class="page-head"><div><h1>Community projects</h1><p class="subtitle">Major work on the common areas that the board shares with owners: where each stands, its budget and what has been spent so far.{% if user|can:"capital_project.view" %} <span data-testid="board-projects-link">The board's full records: <a href="{% url 'capital_projects' %}">Capital projects</a>.</span>{% endif %}</p></div></div>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Project</th><th>Status</th><th class="num">Budget</th><th class="num">Spent so far</th></tr></thead>
     <tbody>{% for p in projects %}<tr><td class="cell-title">{{ p.title }}</td><td data-label="Status">{% status p.state p.status %}</td><td class="num" data-label="Budget">{{ p.budget|cents }}</td><td class="num" data-label="Spent so far">{{ p.spent|cents }}</td></tr>

@@ -9,6 +9,7 @@
       <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.label }}</span><span class="lot-ref">{{ obj.lot.lot_ref }}</span><span>Requested by {{ obj.requester_name }}</span>{% if obj.due_on %}<span>{% icon "clock" %}Due {{ obj.due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.fee_cents %}<span>Fee {{ obj.fee_cents|cents }}</span>{% endif %}</div></div>
     {% if obj.state == "issued" or can_manage %}<div class="actions"><a class="btn secondary" href="{% url 'resale_pdf' obj.pk %}">{% icon "download" %} {% if obj.state == "issued" %}Certificate (PDF){% else %}Preview certificate{% endif %}</a></div>{% endif %}
   </div>
+  {% workflow_stages obj %}
   {% if can_manage and obj.state != "issued" and obj.state != "cancelled" %}
     <div class="alert warning">{% icon "alert" %}<span>Before issuing, confirm with counsel that the certificate covers everything 68 Pa.C.S. § 5407 requires.</span></div>
     <section class="card"><form method="post">{% csrf_token %}<label for="d">Other disclosures</label><p class="help">Statements the law requires that the portal does not hold.</p><textarea id="d" name="other_disclosures" rows="5">{{ obj.other_disclosures }}</textarea><div class="form-actions"><button type="submit">Save</button></div></form></section>

@@ -128,7 +128,7 @@ def test_main_actions_come_first(client, w):
     page = _page(client, w["owner"], reverse("my_account"))
     assert page.index("Download statement (PDF)") < page.index("<h3>Statement</h3>")
     page = _page(client, w["board"], reverse("lot_ledger", args=[w["lot_a"].pk]))
-    assert page.index("<summary>Record a payment</summary>") < page.index("<h2>All entries</h2>")
+    assert page.index("<summary>Record a payment</summary>") < page.index("All entries")
 
 
 # --- One control per form (owner feedback, WT-009) ---------------------------------------
@@ -355,7 +355,8 @@ def _tabs(client, user):
 
 def test_tab_bar_for_owners_and_staff(client, w):
     assert _tabs(client, w["owner"]) == ["Dashboard", "My account", "Voting"]
-    assert _tabs(client, w["board"]) == ["Dashboard", "My items", "Search"]
+    # Staff: their queue and inbox (WT-028, D100); Search is in the top bar.
+    assert _tabs(client, w["board"]) == ["Dashboard", "My items", "Owner requests"]
     page = client.get(reverse("home")).content.decode()
     assert '<nav class="tabbar" aria-label="Quick links">' in page
     assert page.count("data-nav-toggle") == 2

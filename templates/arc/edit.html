@@ -2,7 +2,7 @@
 {% load portal static %}
 {% block title %}Edit: {{ obj.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'arc_list' %}?mine=1">My home improvement requests (ARC)</a> / <a href="{% url 'arc_detail' obj.pk %}">{{ obj.title|truncatechars:48 }}</a> / Edit</div>
+  <div class="crumbs"><a href="{% url 'arc_list' %}?mine=1">My ARC requests</a> / <a href="{% url 'arc_detail' obj.pk %}">{{ obj.title|truncatechars:48 }}</a> / Edit</div>
   <div class="page-head"><div><h1>Edit your draft</h1><p class="subtitle">{{ obj.lot.label }}. You can change the details until you send the request on. The earlier wording is kept.</p></div></div>
   <section class="card">
     <form method="post">{% csrf_token %}

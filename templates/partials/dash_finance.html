@@ -1,0 +1,7 @@
+{% load portal %}{# The finance glance (D100): after the work and Your home, never before them. #}
+{% if dash.staff.stats %}
+  <section class="card" id="finance-glance" aria-labelledby="finance-glance-h">
+    <div class="card-head"><h2 id="finance-glance-h">Finance at a glance</h2><a class="small" href="{% url 'finance_overview' %}">Finance overview</a></div>
+    <div class="grid grid-4">{% for st in dash.staff.stats %}<a class="stat {% if st.tone %}tone-{{ st.tone }}{% endif %}" href="{{ st.url }}"><div class="label">{{ st.label }}</div><div class="value">{% if st.money %}{{ st.value|cents }}{% else %}{{ st.value }}{% endif %}</div>{% if st.hint %}<div class="hint">{{ st.hint }}</div>{% endif %}</a>{% endfor %}</div>
+  </section>
+{% endif %}

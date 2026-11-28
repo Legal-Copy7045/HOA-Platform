@@ -51,7 +51,9 @@ _SENDER = re.compile(r"^[^<>\r\n]{0,80}<?[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.
 # addresses alone.
 _INTERNAL_SUFFIXES = (".internal", ".local", ".localhost", ".lan", ".home.arpa", ".localdomain")
 PORTS = {
-    "EMAIL_PORT": frozenset({25, 465, 587, 2525}),
+    # Never 25: the outbound firewall (D101) drops it (relays take mail on
+    # 587, 465 or 2525; no direct-to-MX sending), review BUG-001, 0.46.0.
+    "EMAIL_PORT": frozenset({465, 587, 2525}),
     "BOUNCE_IMAP_PORT": frozenset({993}),
 }
 
@@ -163,6 +165,12 @@ def validate(service_key: str, values: dict, *, merged: dict) -> list[str]:
             problems.append(f"Choose one of the offered values for {f.label}.")
         if f.kind == credentials.INT and not (str(v).isdigit() and 1 <= int(v) <= 65535):
             problems.append(f"{f.label} must be a port number.")
+        elif f.name == "EMAIL_PORT" and int(v) == 25:
+            problems.append(
+                f"{f.label} 25 is blocked by the server's outbound firewall (no direct "
+                "mail-server delivery): use your relay's submission port, 587 with "
+                "STARTTLS, 465 with TLS, or 2525."
+            )
         elif f.name in PORTS and int(v) not in PORTS[f.name]:
             allowed = ", ".join(str(p) for p in sorted(PORTS[f.name]))
             problems.append(f"{f.label} must be one of {allowed}.")
@@ -276,6 +284,11 @@ def _smtp() -> TestResult:
     options = smtp_options()
     if not options["host"]:
         return failed("not_configured", "Enter the SMTP server.")
+    if str(options["port"]) == "25":  # a setting saved before 0.46.1, or .env
+        return failed(
+            "port_blocked",
+            "Port 25 is blocked by the server's outbound firewall: use 587, 465 or 2525.",
+        )
     addresses = [] if host_problem(options["host"]) else public_addresses(options["host"])
     if not addresses:
         return failed("not_public", "The mail server must be a public host name that resolves.")

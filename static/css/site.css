@@ -903,3 +903,56 @@ meter.bar { width: 100%; max-width: 16rem; height: 1rem; vertical-align: middle;
 .home-picker-chip { display: inline-flex; align-items: center; gap: .2rem; max-width: 100%; padding-left: .7rem; border: 1px solid var(--line); border-radius: 99px; background: var(--green-50); overflow-wrap: anywhere; }
 .home-picker-remove { min-height: 44px; min-width: 44px; padding: 0; background: transparent; color: var(--ink-2); border: 0; font-size: 1.2rem; }
 .home-picker-remove:hover { background: var(--green-100); }
+/* Stage tracker (D99, partials/stages.html): a strip on wide screens, one line that opens the list on phones. Marks and hidden words, not colour alone. */
+.stages { padding: .8rem 1.1rem; }
+.stages ol { list-style: none; margin: 0; padding: 0; }
+.stages-strip { display: flex; align-items: flex-start; }
+.stages-strip .stage { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; padding: 0 .25rem; }
+.stages-strip .stage + .stage::before { content: ""; position: absolute; top: 14px; right: 50%; width: 100%; height: 2px; background: var(--line); }
+.stages-strip .stage.is-done + .stage::before { background: var(--green-700); }
+.stage-mark { position: relative; z-index: 1; width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line); background: var(--surface); font-weight: 700; color: var(--muted); }
+.stage-label { font-size: .875rem; color: var(--muted); margin-top: .3rem; overflow-wrap: anywhere; }
+.stage-detail { display: block; font-size: .8rem; font-weight: 400; }
+.stage.is-done .stage-mark { border-color: var(--green-700); background: var(--green-700); color: #fff; }
+.stage.is-done .stage-label { color: var(--ink-2); }
+.stage.is-current .stage-mark { border: 3px solid var(--green-700); color: var(--green-700); box-shadow: 0 0 0 3px var(--green-100); }
+.stage.is-current.is-done .stage-mark { background: var(--green-700); color: #fff; }
+.stage.is-current .stage-label, .stage.is-outcome .stage-label { color: var(--ink); font-weight: 700; }
+.stage.is-future .stage-mark { border-style: dashed; }
+.stage.is-skipped .stage-label { text-decoration: line-through; }
+.stage.is-earlier .stage-mark { border-color: var(--line); background: var(--surface-2); color: var(--ink-2); }
+.stage.is-earlier .stage-label { color: var(--ink-2); }
+.stage.is-outcome .stage-mark { border: 4px double var(--ink-2); background: var(--surface-2); color: var(--ink-2); }
+.stage.is-outcome .stage-label { font-style: italic; }
+.stages-compact { display: none; }
+.stages-compact > summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.stages-list .stage { display: flex; align-items: center; gap: .6rem; padding: .3rem 0; }
+.stages-list .stage-label { margin-top: 0; text-align: left; }
+.stages-next { margin: .6rem 0 0; color: var(--ink-2); }
+@media (max-width: 640px) { .stages-strip { display: none; } .stages-compact { display: block; } }
+@media print { .stages-compact { display: none; } .stages-strip { display: flex; } }
+
+/* Layout of 0.46.0 (D100): folded groups, "Show N more", the account links and
+   the dashboard summaries. Every new control is at least 44px tall. */
+details.fold-group > summary.fold-head { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; min-height: 44px; cursor: pointer; list-style: none; }
+details.fold-group > summary.fold-head::-webkit-details-marker { display: none; }
+details.fold-group > summary.fold-head h2, details.fold-group > summary.fold-head h3 { margin: 0; }
+details.fold-group > summary.fold-head::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s ease; }
+details.fold-group[open] > summary.fold-head::after { transform: rotate(45deg); }
+details.fold-group[open] > summary.fold-head { margin-bottom: .5rem; }
+details.more-items { margin: .4rem 0 0; }
+details.more-items > summary { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 .2rem; cursor: pointer; color: var(--green-700); font-weight: 600; font-size: .9rem; }
+.dash-groups { margin: 0 0 .5rem; }
+.finance-card .card-menu { display: block; margin-top: .2rem; }
+.card-head .card-links { display: inline-flex; align-items: center; gap: .3rem; }
+.card-head .card-links a { display: inline-flex; align-items: center; min-height: 44px; }
+.see-all { margin-top: .5rem; }
+.nav-own { margin-top: .4rem; }
+@media (max-width: 640px) { table.stack-sm td.hide-sm { display: none; } }
+/* The account links at the top of the phone drawer: two by two, each a full
+   44px button, Sign out included (WT-019). */
+@media (max-width: 820px) {
+  .sidebar-foot .foot-links { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+  .sidebar-foot .foot-links > a, .sidebar-foot .foot-links > form, .sidebar-foot .foot-links > form button.link { width: 100%; }
+  .sidebar-foot .foot-links > a, .sidebar-foot .foot-links > form button.link { justify-content: center; min-height: 44px; padding: .3rem .5rem; border: 1px solid rgba(255, 255, 255, .18); border-radius: 8px; text-align: center; text-decoration: none; line-height: 1.2; }
+}

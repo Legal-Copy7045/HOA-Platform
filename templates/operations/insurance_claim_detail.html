@@ -6,6 +6,7 @@
   <div class="page-head"><div><h1>Insurance claim {% if obj.claim_number %}{{ obj.claim_number }}{% else %}#{{ obj.pk }}{% endif %}</h1>
     <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ policy_label }}</span><span>Loss {{ obj.incident_on|date:"M j, Y" }}{% if obj.discovered_on %}, found {{ obj.discovered_on|date:"M j, Y" }}{% endif %}</span></div>
     <p class="subtitle">{{ obj.description }}</p></div></div>
+  {% workflow_stages obj %}
   {% for name, d in deadlines %}<div class="alert warning">{% icon "clock" %}<span>{{ name }}: <strong>{{ d|date:"F j, Y" }}</strong></span></div>{% endfor %}
   <div class="grid grid-4">
     <div class="stat"><div class="label">Estimate</div><div class="value">{% if obj.estimate_cents is None %}-{% else %}{{ obj.estimate_cents|cents }}{% endif %}</div></div>

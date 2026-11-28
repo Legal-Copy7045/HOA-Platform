@@ -4,6 +4,7 @@
 {% block content %}
   <div class="crumbs"><a href="{% url 'approvals' %}">Second approvals</a> / Reset approved</div>
   <div class="page-head"><div><h1>Reset approved</h1><p class="subtitle">The account's authenticators were removed and it was signed out everywhere.</p></div></div>
+  {% workflow_stages reset %}
   <section class="card code-card">
     <p>Give this code to the person <strong>directly</strong>: in person or by phone to the number on file. Never by email or text.</p>
     <p class="secret">{{ code }}</p>

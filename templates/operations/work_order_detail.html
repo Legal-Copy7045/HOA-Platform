@@ -6,6 +6,7 @@
   <div class="crumbs"><a href="{% url 'work_orders' %}">Work orders</a> / Work order #{{ obj.pk }}</div>
   <div class="page-head"><div><h1>{{ obj.title }}</h1>
     <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_priority_display }} priority</span>{% if obj.common_area %}<span>{% icon "pin" %}{{ obj.common_area }}</span>{% endif %}{% if obj.due_on %}<span>{% icon "clock" %}Due {{ obj.due_on|date:"M j" }}</span>{% endif %}</div></div></div>
+  {% workflow_stages obj %}
   <div class="split">
     <div>
       <section class="card prose">{{ obj.description|default:"No description."|linebreaks }}</section>

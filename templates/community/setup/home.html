@@ -7,7 +7,7 @@
 
   <section class="card" id="setup" aria-labelledby="setup-h"><h2 id="setup-h">Community setup{% if setup_count %} <span class="badge-count" data-testid="tile-count">{{ setup_count }}<span class="sr-only"> waiting on you</span></span>{% endif %}</h2>
     {% if not run %}
-      <p>Setup has not been run yet. {{ left }} step{{ left|pluralize }} to go, then a review of every decision.</p>
+      <p>Setup has not been run yet. {{ left }} step{{ left|pluralize }} to go, then step {{ steps|length }}, the review of every decision.</p>
       <form method="post" action="{% url 'setup_start' %}">{% csrf_token %}<div class="form-actions"><button type="submit">Start setup</button></div></form>
     {% elif finished %}
       <p><span class="status tone-success">Finished</span> Setup run {{ run }} was finished {{ last.at|short_date }}.</p>

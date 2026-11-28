@@ -490,6 +490,19 @@ def open_cards(groups: frozenset[str], request=None) -> list[Card]:
     ]
 
 
+def menu_sections() -> dict[str, str]:
+    """URL name -> the menu section holding its own entry (Finance's own
+    entries other than the overview read "Finance")."""
+    from core import navigation
+
+    return {
+        name: title
+        for title, items in navigation.SECTIONS
+        for _label, name, _icon, _perm in items
+        if title and name != "finance_overview"
+    }
+
+
 def card_count(card: Card, counts: dict[str, int]) -> int:
     return sum(counts.get(name, 0) for name in card.counts)
 
@@ -518,6 +531,7 @@ def build(request) -> dict:
     counts = nav_counts(request.user, request)
     ctx = _Context(request)
     cards = open_cards(groups, request)
+    in_menu = menu_sections()
     rows = []
     for card in cards:
         rows.append(
@@ -528,6 +542,9 @@ def build(request) -> dict:
                 "icon": card.icon,
                 "status": card.figure(ctx),
                 "count": card_count(card, counts),
+                # A card whose page has its own menu entry says so: it is a
+                # shortcut, not a second place (WT-002, WT-003, D100).
+                "menu_section": in_menu.get(card.url_name, ""),
             }
         )
     tiles = []

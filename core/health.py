@@ -387,6 +387,47 @@ def _tunnel_network():
     return True, "cloudflared is on the edge network only"
 
 
+EGRESS_PROBLEMS = {
+    "absent": "is not installed on the server",
+    "missing": "rules are not in place",
+    "stale": "rules do not match the portal's current networks or settings",
+    "no-networks": "covers no portal network",
+    "unknown": "could not be read on the server",
+}
+
+
+def _egress_firewall():
+    """The outbound firewall for the containers (D101): the VM agent reports
+    hoa-egress-firewall's state each minute (like the tunnel network, D91).
+    The containers may reach only public addresses on the HTTPS, mail and IMAP
+    ports (and the tunnel's port from edge), never private ranges or cloud
+    metadata. Not applicable without a recent report from an agent that knows
+    about it (local development, an older agent)."""
+    from core.models import UpdateStatus
+
+    status = UpdateStatus.objects.filter(pk=1).first()
+    states = (status.host_security if status else None) or {}
+    if not isinstance(states, dict) or "egress" not in states:
+        return None
+    if not status.agent_seen_at or status.agent_seen_at < timezone.now() - datetime.timedelta(
+        minutes=5
+    ):
+        return None
+    state = str(states.get("egress") or "unknown")
+    networks = str(states.get("egress_networks") or "0")
+    networks = networks if networks.isdigit() else "0"
+    if state == "active":
+        return True, (
+            f"On for {networks} portal network(s): public HTTPS, mail and IMAP ports only, "
+            "never the local network or cloud metadata"
+        )
+    problem = EGRESS_PROBLEMS.get(state, EGRESS_PROBLEMS["unknown"])
+    return False, (
+        f"The outbound firewall {problem}. Run System status -> Server tasks -> "
+        "Re-apply host security (or sudo bash infra/poc/harden-host.sh on the server)."
+    )
+
+
 CHECKS = [
     ("database", "Database", _database),
     ("worker", "Background worker", _worker),
@@ -402,6 +443,7 @@ CHECKS = [
     ("backups", "Backups", _backups),
     ("memory", "Server memory", _memory),
     ("tunnel_network", "Tunnel network", _tunnel_network),
+    ("egress_firewall", "Outbound firewall", _egress_firewall),
     ("connections", "Database connections", _connections),
     ("storage_growth", "Storage growth", _storage_growth),
     ("bank_feed", "Bank feed", _bank_feed),

@@ -4,6 +4,7 @@
 {% block content %}
   <div class="crumbs">{% if own_request %}<a href="{% url 'requests' %}?mine=1">My requests</a>{% else %}<a href="{% url 'records_requests' %}">Records requests</a>{% endif %} / #{{ obj.pk }}</div>
   <div class="page-head"><div><h1>Records request #{{ obj.pk }}</h1><div class="meta">{% status obj.state obj.get_state_display %}{% if obj.due_on %}<span>{% icon "clock" %}Response due {{ obj.due_on|date:"M j, Y" }}</span>{% endif %}</div></div></div>
+  {% workflow_stages obj %}
   <section class="card prose">{{ obj.description|linebreaks }}</section>
   {% include "partials/workflow.html" with obj=obj %}
 {% endblock %}

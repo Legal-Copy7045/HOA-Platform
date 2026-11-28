@@ -297,7 +297,8 @@ SECTIONS = [
         [
             ("My home", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
-            ("My home improvement requests (ARC)", "arc_list?mine=1", "pencil", "arc.submit"),
+            # Short enough for one line on a phone (WT-026, D100).
+            ("My ARC requests", "arc_list?mine=1", "pencil", "arc.submit"),
             # The owner side of Violations; letters and notices are
             # documents inside each violation (0.43.0).
             ("My violations", "violations?mine=1", "flag", "lot.view_own"),
@@ -391,8 +392,11 @@ SECTIONS = [
 # Sections open by default; the others open when the current page is inside
 # (and the browser remembers what the person last chose, static/js/app.js).
 OPEN_BY_DEFAULT = {"My home", "Community"}
-# Staff open their work instead: the work sections with something waiting,
-# and My home and Community start closed (WT-040).
+# Staff (D100, WT-009/WT-017): every section starts closed, showing its count
+# on the heading, except the one holding the current page (and a staff
+# member's only work section); the work sections come first, so the phone
+# drawer fits about one screen. The browser remembers each section the person
+# opens or closes (static/js/app.js, localStorage).
 STAFF_GROUPS = frozenset(
     {policy.BOARD, policy.MANAGER, policy.ARC_REVIEWER, policy.AUDITOR, policy.SYSADMIN}
 )
@@ -425,7 +429,7 @@ def work_label(groups: frozenset[str]) -> str:
 def _open_by_default(title: str, count: int, staff: bool) -> bool:
     if not staff:
         return title in OPEN_BY_DEFAULT
-    # Staff: chosen in build() (only the busiest work section, WT-036).
+    # Staff: closed; build() opens the current page's section (D100).
     return False
 
 
@@ -656,23 +660,28 @@ def build(request) -> dict:
                 }
             )
     work = [s for s in sections if s["work"]]
-    if staff and work:
-        # Staff: only the work section with the most waiting opens, else the
-        # first one, plus the current page's section below (WT-036: a short
-        # drawer on a phone; the browser remembers what the person opens).
-        busiest = max(work, key=lambda s: s["count"])
-        (busiest if busiest["count"] else work[0])["open"] = True
+    if staff and len(work) == 1:
+        # One work section (a sysadmin's Admin): nothing to choose between.
+        work[0]["open"] = True
+    _fold_single_history(sections)
     board_page = False
     if best[1]:
         best[1]["current"] = True
-        sections[best[2]]["open"] = True
-        sections[best[2]]["current"] = True
-        board_page = sections[best[2]]["work"]
+        here = next(s for s in sections if best[1] in s["items"])
+        here["open"] = True
+        here["current"] = True
+        board_page = here["work"]
+    personal = [s for s in sections if not s["work"]]
     return {
         "sections": sections,
-        # The menu as drawn: personal sections, then the work sections under
-        # one heading in the accent colour (D64).
-        "personal_sections": [s for s in sections if not s["work"]],
+        # The menu as drawn: the untitled lead section (Dashboard, My items),
+        # then for staff the work sections under one heading in the accent
+        # colour (D64) before their own home (D100, WT-009); for everyone
+        # else the personal sections first.
+        "personal_sections": personal,
+        "lead_sections": [s for s in personal if not s["title"]],
+        "own_sections": [s for s in personal if s["title"]],
+        "work_first": staff and bool(work),
         "work_sections": work,
         "work_label": work_label(roles.groups),
         "work_count": sum(s["count"] for s in work),
@@ -685,12 +694,27 @@ def build(request) -> dict:
     }
 
 
+def _fold_single_history(sections: list[dict]) -> None:
+    """A former owner's "My history" section holds one entry: it joins the
+    untitled lead section instead of a collapsed one-entry group (WT-027)."""
+    lead = next((s for s in sections if not s["title"]), None)
+    for s in list(sections):
+        if s["title"] == "My history" and len(s["items"]) == 1 and lead is not None:
+            lead["items"] += s["items"]
+            lead["count"] += s["count"]
+            sections.remove(s)
+
+
 # Phone tab bar (WT-041, D48): the pages people open most, at the bottom of a
 # phone screen, plus Menu (the drawer). Built from the menu entries this person
 # already sees, so it never shows a page the menu hides. Staff get their work
 # queue; owners and contacts get their account and Voting.
 TABBAR_STAFF_GROUPS = frozenset({policy.BOARD, policy.MANAGER, policy.ARC_REVIEWER})
-TABBAR_STAFF = ("home", "my_items", "search")
+# Per role (WT-028): staff get their queue and their inbox (Owner requests,
+# or Architectural review for an ARC reviewer; Search is in the top bar on
+# every page); an auditor, who never votes and has no queue, gets Reports.
+TABBAR_STAFF = ("home", "my_items", "requests", "arc_list")
+TABBAR_AUDITOR = ("home", "reports", "accounting")
 TABBAR_OWNER = ("home", "my_account", "voting")
 TABBAR_FALLBACK = ("my_items", "search")
 
@@ -706,7 +730,12 @@ def tabbar(sections: list[dict], groups: frozenset[str]) -> list[dict]:
         "count": 0,
         "name": "search",
     }
-    wanted = TABBAR_STAFF if groups & TABBAR_STAFF_GROUPS else TABBAR_OWNER
+    if groups & TABBAR_STAFF_GROUPS:
+        wanted = TABBAR_STAFF
+    elif policy.AUDITOR in groups:
+        wanted = TABBAR_AUDITOR
+    else:
+        wanted = TABBAR_OWNER
     tabs: list[dict] = []
     for name in wanted + TABBAR_FALLBACK:
         if len(tabs) == 3:

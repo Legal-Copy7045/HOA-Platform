@@ -50,7 +50,16 @@ from django.db.models import Sum  # noqa: E402
 
 from community.rules import rule  # noqa: E402
 from core.policy import SYSTEM  # noqa: E402
-from core.workflow import NotForYou, Transition, Workflow, WorkflowError  # noqa: E402
+from core.workflow import (  # noqa: E402
+    NotForYou,
+    Stages,
+    Transition,
+    Workflow,
+    WorkflowError,
+    outcome,
+    stage,
+    you_or,
+)
 from operations.models import (  # noqa: E402
     ApprovalDecision,
     ExpenseCategory,
@@ -121,6 +130,19 @@ WORK_ORDER = Workflow(
             note_required=True,
         ),
     ],
+    # The stage tracker (D99).
+    stages=Stages(
+        "operations.workorder",
+        [
+            stage("Open", "open", who="The manager: assign a vendor"),
+            stage("Assigned", "assigned", who="The vendor: start the work"),
+            stage("In progress", "in_progress", who="The vendor: finish the work"),
+            stage("Completed", "completed", who="The manager: close it"),
+            stage("Closed", "closed"),
+        ],
+        [outcome("Cancelled", "cancelled")],
+        due=lambda obj: obj.due_on,
+    ),
 )
 
 
@@ -319,6 +341,17 @@ INVOICE = Workflow(
             note_required=True,
         ),
     ],
+    # The stage tracker (D99).
+    stages=Stages(
+        "operations.invoice",
+        [
+            stage("Entered", "draft", who="The person who entered it: submit it"),
+            stage("Waiting for approval", "pending_approval", who="The board: approve or reject"),
+            stage("Approved", "approved", who="The board or manager: record the payment"),
+            stage("Paid", "paid"),
+        ],
+        [outcome("Rejected", "rejected"), outcome("Void", "void")],
+    ),
 )
 
 
@@ -677,6 +710,33 @@ OWNER_REQUEST = Workflow(
             guard=_is_requester,
         ),
     ],
+    # The stage tracker (D99).
+    stages=Stages(
+        "operations.ownerrequest",
+        [
+            stage("Submitted", RequestState.SUBMITTED, who="The board or manager: respond"),
+            stage(
+                "Waiting on the owner",
+                RequestState.WAITING,
+                branch=True,
+                who=you_or("request.manage", "The owner: reply", "You: reply"),
+            ),
+            stage("In progress", RequestState.IN_PROGRESS, who="The board or manager: resolve it"),
+            stage(
+                "Resolved",
+                RequestState.RESOLVED,
+                who=you_or(
+                    "request.manage",
+                    "The owner: reopen it if not resolved",
+                    "You: reopen it if not resolved",
+                ),
+            ),
+            stage("Closed", RequestState.CLOSED),
+        ],
+        [outcome("Withdrawn", RequestState.WITHDRAWN)],
+        due=lambda obj: obj.respond_by if obj.first_response_at is None else None,
+        labels=dict(RequestState.choices),
+    ),
 )
 
 
@@ -867,6 +927,15 @@ CONTRACT = Workflow(
         ),
         Transition("discard", {"draft"}, "discarded", "contract.manage", "Discard"),
     ],
+    # The stage tracker (D99).
+    stages=Stages(
+        "operations.contract",
+        [
+            stage("Entered", "draft", who="The board: approve it"),
+            stage("Approved", "active"),
+        ],
+        [outcome("Discarded", "discarded")],
+    ),
 )
 
 

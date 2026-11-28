@@ -5,6 +5,7 @@
   {% include "ledger/finance_nav.html" %}
   <div class="crumbs"><a href="{% url 'vendors' %}">Vendors</a> / <a href="{% url 'vendor_detail' vendor.pk %}">{{ vendor.name }}</a> / Onboarding record</div>
   <div class="page-head"><div><h1>Onboarding record: {{ vendor.name }}</h1><div class="meta"><span>{{ status_text }}</span><a href="{% url 'vendor_file_summary' vendor.pk %}">Vendor file (PDF)</a></div></div></div>
+  {% workflow_stages rounds.0 %}
   {% if error %}<div class="alert danger" role="alert">{% icon "alert" %}<div>{{ error }}</div></div>{% endif %}
   {% if not active %}<div class="alert warning" role="status">{% icon "alert" %}<div>This vendor's invoices can't be approved or paid until two board members approve its onboarding.</div></div>{% endif %}
   <div class="split">
