@@ -11,6 +11,7 @@
       {% if vote.status == "open" and past_deadline or vote.status == "open" and not vote.closes_at or vote.status == "open" and vote.kind != "formal" %}<form method="post" action="{% url 'vote_action' vote.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast, and the results are counted.">{% csrf_token %}<button type="submit" class="danger">Close voting</button></form>{% endif %}
     </div>{% endif %}
   </div>
+  {% workflow_stages vote %}
   {% if window_form %}<section class="card" id="open-voting"><h2>Open voting</h2>
     <p class="small muted">Set when voting opens and closes. Voting closes by itself at the closing time; the deadline can be extended once, before it passes, but never shortened. Options and rules are frozen once open, and owners are emailed a personal link to their ballot.</p>
     <form method="post" action="{% url 'vote_action' vote.pk 'open' %}" class="form-grid" data-confirm="Open voting? Options, rules and the opening time are frozen once open.">{% csrf_token %}{% include "partials/form_errors.html" with form=window_form %}{{ window_form }}<div class="form-actions"><button type="submit">Open voting</button></div></form>

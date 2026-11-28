@@ -3,6 +3,7 @@
 {% block title %}Account recovery · {{ SITE_NAME }}{% endblock %}
 {% block content %}
   <div class="page-head"><div><h1>Account recovery</h1><p class="subtitle">Requests to recover the sign-in to your account when the phone and recovery codes are lost.</p></div></div>
+  {% workflow_stages current %}
   {% if current %}
     <section class="card">
       <h2>{% icon "alert" %} A recovery is waiting</h2>

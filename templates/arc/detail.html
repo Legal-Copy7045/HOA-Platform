@@ -6,6 +6,7 @@
   <div class="page-head"><div><h1>{{ obj.title }}</h1>
     <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.label }}</span>{% if obj.review_due_on %}<span>{% icon "clock" %}Decision due {{ obj.review_due_on|date:"M j, Y" }}</span>{% endif %}{% if obj.appeal_due_on %}<span>Appeal by {{ obj.appeal_due_on|date:"M j, Y" }}</span>{% endif %}</div></div>
     {% if can_edit %}<div class="actions"><a class="btn secondary" href="{% url 'arc_edit' obj.pk %}">{% icon "pencil" %} Edit the details</a></div>{% endif %}</div>
+  {% workflow_stages obj %}
   {% if recused %}<div class="alert warning">{% icon "alert" %}<span>You can't review this one because it's your home or a neighboring home. The reviewers' discussion is hidden from you, and you can't decide it.</span></div>{% endif %}
   {% if checklist %}
   <section class="card" id="steps"><h2>Get your request ready</h2>

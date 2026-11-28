@@ -18,6 +18,7 @@ Rules:
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
@@ -63,10 +64,20 @@ REGISTRY: dict[str, Workflow] = {}
 
 
 class Workflow:
-    def __init__(self, name: str, transitions: Iterable[Transition]):
+    def __init__(
+        self, name: str, transitions: Iterable[Transition], *, stages: Stages | None = None
+    ):
         self.name = name
         self.transitions = {t.action: t for t in transitions}
+        # Where it is declared (the D99 guard test skips tests' stand-ins).
+        self.module = sys._getframe(1).f_globals.get("__name__", "")
         REGISTRY[name] = self
+        # The stage tracker (D99): the declared path, or one derived from the
+        # transitions (a guard test makes every workflow declare its own).
+        self.stages = stages or Stages.derive(self)
+        self.stages.workflow = self
+        if self.stages.model:
+            STAGES[self.stages.model] = self.stages
         for t in self.transitions.values():
             audit_actions.register(
                 audit_actions.ActionSpec(
@@ -245,3 +256,292 @@ def not_by(field_name: str, message: str) -> Guard:
         return None
 
     return guard
+
+
+# --- Where an item is in its workflow: the stage tracker (D99) ---------------------------
+#
+# Each workflow declares its main path (the ordered stages of the usual way
+# through) and its side outcomes (Withdrawn, Denied, Cancelled...). Pages draw
+# the strip from that declaration with {% workflow_stages obj %}
+# (templates/partials/stages.html), never by hand, so it cannot drift from
+# the transitions. Workflows on core.workflow pass ``stages=`` to Workflow;
+# other state machines (an append-only model whose state is derived from its
+# decisions) declare theirs with ``track()`` in a module listed in
+# STAGE_MODULES. The tracker shows states only, never notes: it adds nothing
+# the page does not already show the viewer (the status badge).
+
+StateFn = Callable[[object], str]
+WhoFn = Callable[[object, object], str]
+
+
+@dataclass(frozen=True)
+class Stage:
+    """One stage of the main path.
+
+    ``states``: the item's states that are this stage. ``branch``: off the
+    usual way (neighbor acknowledgements, an appeal, a payment plan): shown
+    only once the item is in it or has been. ``staff_only``: a stage people
+    outside the work never see (a violation before its notice), left out for
+    a viewer without the path's ``staff_permission``. ``who``: who acts while
+    the item is here ("The committee"), or a function (obj, viewer) -> text,
+    for the "Next:" line.
+    """
+
+    label: str
+    states: frozenset[str]
+    branch: bool = False
+    staff_only: bool = False
+    who: str | WhoFn = ""
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """A side outcome: the item stopped off the main path (Withdrawn).
+    ``who``: who may still act on it (a denied request's appeal), if anyone."""
+
+    label: str
+    states: frozenset[str]
+    who: str | WhoFn = ""
+
+
+def stage(label: str, *states: str, branch=False, staff_only=False, who: str | WhoFn = "") -> Stage:
+    return Stage(label, frozenset(str(s) for s in states), branch, staff_only, who)
+
+
+def outcome(label: str, *states: str, who: str | WhoFn = "") -> Outcome:
+    return Outcome(label, frozenset(str(s) for s in states), who)
+
+
+def you_or(staff_permission: str, others: str, you: str = "You") -> WhoFn:
+    """A "Next:" actor that reads "You" for the person the item belongs to
+    and ``others`` ("The owner") for staff with ``staff_permission``."""
+
+    def who(obj, viewer) -> str:
+        if viewer is not None and can(viewer, staff_permission):
+            return others
+        return you
+
+    return who
+
+
+# model label ("arc.arcrequest") -> its declared path
+STAGES: dict[str, Stages] = {}
+# Modules that declare paths (Workflows with ``stages=`` and track()):
+# loaded on the first lookup, so every path is known wherever it is asked.
+STAGE_MODULES = (
+    "arc.services",
+    "compliance.services",
+    "governance.services",
+    "ledger.services",
+    "operations.services",
+    "operations.stages",
+    "ledger.stages",
+    "governance.stages",
+    "accounts.stages",
+    "core.credential_stages",
+)
+_loaded = False
+
+
+class Stages:
+    """A workflow's main path and side outcomes (D99)."""
+
+    def __init__(
+        self,
+        model: str,
+        main: Iterable[Stage],
+        outcomes: Iterable[Outcome] = (),
+        *,
+        state: StateFn | None = None,
+        visited: Callable[[object], list[str] | None] | None = None,
+        due: Callable[[object], object] | None = None,
+        labels: dict[str, str] | None = None,
+        staff_permission: str = "",
+        derived: bool = False,
+    ):
+        self.model = model.lower()
+        self.main = list(main)
+        self.outcomes = list(outcomes)
+        self._state = state
+        self._visited = visited
+        self._due = due
+        self.labels = labels or {}
+        self.staff_permission = staff_permission
+        self.derived = derived
+        self.workflow: Workflow | None = None
+
+    # The states this path knows (a guard test: every state is somewhere).
+    def known_states(self) -> set[str]:
+        out: set[str] = set()
+        for part in (*self.main, *self.outcomes):
+            out |= set(part.states)
+        return out
+
+    def state_of(self, obj) -> str:
+        return str(self._state(obj) if self._state else obj.state)
+
+    def visited_of(self, obj) -> list[str] | None:
+        """The states the item has been in, oldest first; None if not known."""
+        if self._visited is not None:
+            return self._visited(obj)
+        if self.workflow is not None:
+            events = list(self.workflow.history(obj).values_list("from_state", "to_state"))
+            if not events:
+                return None
+            out = [events[0][0]]
+            out += [to for _f, to in events]
+            return out
+        return None
+
+    @classmethod
+    def derive(cls, workflow: Workflow) -> Stages:
+        """A plain default for a workflow that declares no path: its states in
+        the order the transitions reach them; states that end the item after
+        a closing or refusing step (withdraw, cancel, deny...) are outcomes."""
+        from core.templatetags.portal import is_danger, state_label
+
+        targets = {str(t.target) for t in workflow.transitions.values()}
+        sources = set()
+        for t in workflow.transitions.values():
+            sources |= {str(s) for s in t.sources}
+        order = sorted(sources - targets) or sorted(sources)[:1]
+        seen = list(order)
+        i = 0
+        while i < len(seen):
+            for t in workflow.transitions.values():
+                if seen[i] in {str(s) for s in t.sources} and str(t.target) not in seen:
+                    seen.append(str(t.target))
+            i += 1
+        ends = {
+            str(t.target)
+            for t in workflow.transitions.values()
+            if is_danger(t.action) and str(t.target) not in sources
+        }
+        main = [stage(state_label(s), s) for s in seen if s not in ends]
+        outs = [outcome(state_label(s), s) for s in seen if s in ends]
+        return cls("", main, outs, derived=True)
+
+
+def track(model: str, main, outcomes=(), **kwargs) -> Stages:
+    """Declare the path of a state machine that is not a core.workflow
+    Workflow (its state derived from append-only decisions)."""
+    path = Stages(model, main, outcomes, **kwargs)
+    STAGES[path.model] = path
+    return path
+
+
+def stages_for(obj) -> Stages | None:
+    global _loaded
+    if not _loaded:
+        import importlib
+
+        for name in STAGE_MODULES:
+            importlib.import_module(name)
+        _loaded = True
+    meta = getattr(obj, "_meta", None)
+    return STAGES.get(meta.label_lower) if meta is not None else None
+
+
+@dataclass
+class StageView:
+    label: str
+    status: str  # done | current | future | skipped | outcome
+    detail: str = ""
+
+
+@dataclass
+class Strip:
+    items: list[StageView]
+    step: int  # 1-based position of the current stage among the shown ones
+    total: int
+    current: StageView | None
+    ended: bool  # a side outcome
+    finished: bool  # at the last stage of the main path
+    next_who: str = ""
+    next_due: object = None
+
+    @property
+    def summary(self) -> str:
+        if self.current is None:
+            return ""
+        if self.ended:
+            return f"Ended: {self.current.label}"
+        return f"Step {self.step} of {self.total}: {self.current.label}"
+
+
+def strip(obj, viewer=None) -> Strip | None:
+    """Where ``obj`` is on its path, as ``viewer`` may see it (D99)."""
+    path = stages_for(obj)
+    if path is None:
+        return None
+    staff = not path.staff_permission or (viewer is not None and can(viewer, path.staff_permission))
+    main = [s for s in path.main if staff or not s.staff_only]
+    current = path.state_of(obj)
+    visited = path.visited_of(obj)
+    been = set(visited or ()) | {current}
+
+    def index_of(state: str) -> int | None:
+        for i, s in enumerate(main):
+            if state in s.states:
+                return i
+        return None
+
+    ended = next((o for o in path.outcomes if current in o.states), None)
+    if ended is not None:
+        # The stage it stopped at: the last main-path state before the outcome.
+        reached = None
+        for st in reversed(visited or ()):
+            idx = index_of(st)
+            if idx is not None:
+                reached = idx
+                break
+        upto = -1 if reached is None else reached
+        items = []
+        for s in main[: upto + 1]:
+            if s.branch and not (been & s.states):
+                continue
+            items.append(StageView(s.label, "done"))
+        cur = StageView(ended.label, "outcome")
+        items.append(cur)
+        who = ended.who(obj, viewer) if callable(ended.who) else ended.who
+        due = path._due(obj) if (path._due and who) else None
+        return Strip(items, len(items), len(items), cur, True, False, who or "", due)
+
+    at = index_of(current)
+    if at is None:  # a state the viewer's path leaves out (staff only)
+        return None
+    items = []
+    step = 0
+    cur = None
+    for i, s in enumerate(main):
+        if s.branch and i != at and not (been & s.states):
+            continue
+        if i < at:
+            status = "done"
+            if visited is not None and s.states and not (been & s.states):
+                status = "skipped"
+        elif i == at:
+            status = "current"
+        else:
+            status = "future"
+        detail = ""
+        if i == at and len(s.states) > 1:
+            label = path.labels.get(current)
+            if label is None:
+                from core.templatetags.portal import state_label
+
+                label = state_label(current)
+            detail = "" if label == s.label else label
+        view = StageView(s.label, status, detail)
+        items.append(view)
+        if i == at:
+            cur = view
+            step = len(items)
+    finished = at == len(main) - 1
+    who = ""
+    due = None
+    if not finished:
+        here = main[at]
+        who = here.who(obj, viewer) if callable(here.who) else here.who
+        due = path._due(obj) if (path._due and who) else None
+    return Strip(items, step, len(items), cur, False, finished, who or "", due)

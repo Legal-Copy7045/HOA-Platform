@@ -7,6 +7,7 @@
     <p class="subtitle">{{ sa.total_cents|cents }} · {{ sa.get_allocation_display }} · {{ sa.get_fund_display }} · levied {{ sa.created_at|short_date }}</p></div>
     {% if can_levy and not notice %}<div class="actions"><form method="post" action="{% url 'special_assessment_action' sa.pk 'notice' %}" data-confirm="Email the notice now to owners who accepted email notice? The others are counted for paper mail.">{% csrf_token %}<button type="submit">{% icon "mail" %} Send the owner notice</button></form></div>{% endif %}
   </div>
+  {% workflow_stages sa %}
   <section class="card"><h2>Purpose and authority</h2>
     <p>{{ sa.purpose|linebreaksbr }}</p>
     <ul class="list small">

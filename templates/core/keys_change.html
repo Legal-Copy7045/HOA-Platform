@@ -5,6 +5,7 @@
   <div class="crumbs"><a href="{% url 'system_status' %}">System status</a> / Keys and connections / Change</div>
   <div class="page-head"><div><h1>{{ svc.label|default:change.service }}: {{ change.get_kind_display|lower }}</h1>
     <p class="subtitle">Made by {{ change.requested_by.email|default:"the system" }} on {{ change.requested_at|date:"M j, Y g:i A" }}. {{ cs.words }}{% if cs.active_at %} (from {{ cs.active_at|date:"M j, Y g:i A" }}){% endif %}.</p></div></div>
+  {% workflow_stages change %}
   <section class="card"><h2>What changes</h2>
     <ul class="list">{% for n in names %}<li><div class="grow"><div class="title">{{ n.label }}</div><div class="small muted">{% if n.cleared %}Removed (the server's setting applies){% elif n.secret %}New value{% if n.last4 %} ending in {{ n.last4 }}{% endif %}{% else %}{{ n.shown }}{% endif %}</div></div></li>{% endfor %}</ul>
     {% if change.account_ref %}<p class="small">{{ svc.pinned }}: ending {{ change.account_ref|slice:"-4:" }}{% if pin and pin != change.account_ref %} (the pinned one ends {{ pin|slice:"-4:" }}){% endif %}. Compare it with the provider's dashboard before approving.</p>{% endif %}

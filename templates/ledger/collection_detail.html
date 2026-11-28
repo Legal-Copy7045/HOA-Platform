@@ -8,6 +8,7 @@
     <div><h1>Collection case #{{ obj.pk }}</h1><div class="meta">{% status obj.state obj.get_state_display %}<a href="{% url 'lot_ledger' obj.lot_id %}">{{ obj.lot.label }}</a><span class="lot-ref">{{ obj.lot.lot_ref }}</span></div></div>
     <div class="actions"><div class="amount-big">{{ balance|cents }}</div></div>
   </div>
+  {% workflow_stages obj %}
   <div class="split">
     <div>
       {% if actions %}<section class="card" aria-labelledby="steps-h">

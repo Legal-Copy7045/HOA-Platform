@@ -7,6 +7,7 @@
     <p class="subtitle">{{ plan.total_cents|cents }} in {{ schedule|length }} installment{{ schedule|length|pluralize }} · paid {{ paid_cents|cents }} · <span class="status {% if status == 'active' %}tone-success{% elif status == 'proposed' %}tone-warning{% elif status == 'defaulted' %}tone-danger{% else %}tone-info{% endif %}">{{ status_label }}</span></p></div>
     <div class="actions"><a class="btn secondary" href="{% url 'payment_plan_letter' plan.pk %}">{% icon "download" %} Agreement letter (PDF)</a><a class="btn secondary" href="{% url 'collection_detail' plan.case_id %}">Collection case</a></div>
   </div>
+  {% workflow_stages plan %}
   <section class="card"><h2>Terms</h2><ul class="list small">
     <li><span class="grow">Late fees while the plan is kept: {% if plan.suspend_late_fees %}none{% else %}as usual{% endif %}</span></li>
     <li><span class="grow">Missed {{ plan.grace_days }} days after a due date; defaults {{ plan.default_days }} days after it</span></li>

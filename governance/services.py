@@ -18,7 +18,7 @@ from core.policy import SYSTEM, can, require
 from core.policy import invalidate_roles as _invalidate_roles
 from core.scoping import system_access
 from core.text import single_line
-from core.workflow import Transition, Workflow
+from core.workflow import Stages, Transition, Workflow, outcome, stage
 from governance.models import (
     Attendance,
     Ballot,
@@ -581,6 +581,17 @@ RECORDS = Workflow(
             guard=_own_request,
         ),
     ],
+    # The stage tracker (D99).
+    stages=Stages(
+        "governance.recordsrequest",
+        [
+            stage("Submitted", "submitted", who="The board: acknowledge the request"),
+            stage("In progress", "in_progress", who="The board: provide the records"),
+            stage("Fulfilled", "fulfilled"),
+        ],
+        [outcome("Denied", "denied"), outcome("Withdrawn", "withdrawn")],
+        due=lambda obj: obj.due_on,
+    ),
 )
 
 

@@ -4,6 +4,7 @@
 {% block content %}
   <div class="crumbs"><a href="{% url 'my_items' %}">My items</a> / Account recovery</div>
   <div class="page-head"><div><h1>Account recovery</h1><p class="subtitle">{{ name }}{% if homes %} · {{ homes|join:", " }}{% endif %}</p></div></div>
+  {% workflow_stages row %}
   <section class="card">
     <dl class="facts">
       <dt>Asked</dt><dd>{{ started }}</dd>

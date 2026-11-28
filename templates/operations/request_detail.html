@@ -6,6 +6,7 @@
   <div class="page-head"><div><h1>{{ obj.subject }}</h1>
     <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.get_request_type_display }}</span><span>{% icon "pin" %}{{ obj.lot.label }}</span>{% if staff %}<span class="lot-ref">{{ obj.lot.lot_ref }}</span>{% endif %}
       {% if obj.first_response_at %}<span>{% icon "check" %}Answered {{ obj.first_response_at|date:"M j, Y" }}</span>{% elif obj.respond_by %}<span>{% icon "clock" %}{% if obj.is_overdue %}Response overdue since{% else %}Response expected by{% endif %} {{ obj.respond_by|date:"M j, Y" }}</span>{% endif %}</div></div></div>
+  {% workflow_stages obj %}
   <div class="split">
     <div>
       <section class="card prose">{{ obj.description|linebreaks }}{% if obj.common_area %}<p class="small muted">Common area: {{ obj.common_area }}</p>{% endif %}</section>

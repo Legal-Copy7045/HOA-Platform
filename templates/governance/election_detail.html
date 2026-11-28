@@ -9,6 +9,7 @@
       {% if e.state == "voting" and past_deadline or e.state == "voting" and not e.voting_closes_at %}<form method="post" action="{% url 'election_action' e.pk 'close' %}" data-confirm="Close voting now? No more ballots can be cast.">{% csrf_token %}<button type="submit">Close voting</button></form>{% endif %}
       {% if e.state == "closed" %}<form method="post" action="{% url 'election_action' e.pk 'certify' %}" data-confirm="Certify these results? They are recorded permanently and the elected are proposed for board seats. You're acting for the association.">{% csrf_token %}<button type="submit">{% for_board "Certify results" %}</button></form>{% endif %}
     </div>{% endif %}</div>
+  {% workflow_stages e %}
   {% if window_form %}<section class="card" id="open-voting"><h2>Open voting</h2>
     <p class="small muted">Closes nominations. Set when voting opens and closes: voting closes by itself at the closing time; the deadline can be extended once, before it passes, but never shortened. Owners are emailed a personal link to their ballot.</p>
     <form method="post" action="{% url 'election_action' e.pk 'open' %}" class="form-grid" data-confirm="Close nominations and open voting? The ballot is fixed once open.">{% csrf_token %}{% include "partials/form_errors.html" with form=window_form %}{{ window_form }}<div class="form-actions"><button type="submit">Open voting</button></div></form>

@@ -1,0 +1,26 @@
+# The 0.46.0 stage tracker (D99): every workflow item's detail page shows
+# where it is in its flow, drawn from the workflow's own declared path.
+# `match` runs over "<stage>:<check>".
+- feature: "Every core.workflow Workflow declares its main path and side outcomes (stages=), every state its transitions use is on the path or an outcome, every module declaring one is loaded by the tracker, and a workflow without a declaration gets a default derived from its transitions (D99)"
+  since: "0.46"
+  match: ["^unit:core/tests/test_stages.py::test_(every_workflow_declares_its_stages|every_module_with_a_workflow_is_loaded_by_the_tracker|a_workflow_without_a_path_gets_a_sensible_default|stage_declarations_are_plain_data)", "^unit:core/tests/test_stages.py::test_(tracked_state_machines_cover_every_state|derived_state_machines_cover_every_status).*"]
+- feature: "The tracker is at the top of every workflow item's detail page: ARC requests, owner requests, records requests, violations, collection cases, resale certificates, work orders, invoices, contracts, reimbursements, disbursements, votes, elections, payment plans, special assessments, insurance claims, capital projects, key changes, account recovery (board and owner), sign-in resets and vendor onboarding (D99)"
+  since: "0.46"
+  match: ["^unit:core/tests/test_stages.py::test_every_tracked_item_has_its_tracker_on_its_detail_page", "^unit:core/tests/test_stages.py::test_owner_and_board_see_the_arc_tracker_on_the_page"]
+- feature: "Each path shows done stages with a check, the current stage highlighted (with the decision's name where a stage has several states), future stages greyed, stages a history shows were skipped struck through, branches (neighbor acknowledgements, appeal, payment plan, referral, returned to the vendor) only when reached, and a side outcome (Withdrawn, Denied, Cancelled, Declined...) as the last stage where the item stopped (D99)"
+  since: "0.46"
+  match: ["^unit:core/tests/test_stages.py::test_(arc_in_review_and_next_actor_with_its_clock|arc_branches_show_only_when_reached|arc_decided_stage_names_the_decision_and_completed_is_done|side_outcome_ends_the_strip_where_it_stopped|a_stage_skipped_in_the_history_shows_as_skipped|derived_paths|signin_reset_and_account_recovery)", "^unit:core/tests/test_stages.py::test_each_path_(in_progress|side_outcome).*"]
+- feature: "Under the strip, 'Next: <who> — by <date>' from the workflow (ARC review clock and appeal window, records and resale due dates, cure-by date, owner request response target, vote and election closing, insurer deadlines, reset and recovery expiry, key change waiting period); 'You' for the person the item belongs to, the role for the board (D99)"
+  since: "0.46"
+  match: ["^unit:core/tests/test_stages.py::test_(arc_in_review_and_next_actor_with_its_clock|denied_arc_says_who_may_appeal|insurance_claim_denied_names_the_appeal_deadline|owner_request_next_actor_reads_you_for_the_owner|signin_reset_and_account_recovery)"]
+- feature: "The tracker uses the page's own visibility: states only, never notes; a violation's 'Reported' stage is the board's alone (owners see it from the notice on); a stranger still gets 404 (D99)"
+  since: "0.46"
+  match: ["^unit:core/tests/test_stages.py::test_(violation_reported_stage_is_the_boards_alone|a_path_never_shows_notes|owner_and_board_see_the_arc_tracker_on_the_page|nothing_is_drawn_for_an_untracked_object)"]
+- feature: "Accessible and CSP-safe markup: an ordered list with aria-current='step' and hidden words (done, current stage, not yet, skipped, how it ended), not colour alone; on phones (640px or less) one line 'Step 3 of 5: In review' that opens the list (details/summary, no script); no inline script, handler or style (D99)"
+  since: "0.46"
+  match: ["^unit:core/tests/test_stages.py::test_(markup_is_an_ordered_list_with_aria_current_and_a_phone_summary|tracker_is_csp_safe)"]
+- feature: "The stage tracker read on a computer and a phone, with a screen reader, as an owner and as the board (D99)"
+  since: "0.46"
+  match: ["^manual:stage tracker on workflow pages desktop and phone$"]
+  steps: "Local or POC portal with demo data; an owner login and a board login; a computer (keyboard, then a screen reader) and a phone."
+  last: ""

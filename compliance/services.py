@@ -12,7 +12,7 @@ from compliance.models import OwnerResponse, Violation, ViolationCategory, Viola
 from core import conflicts, pdf
 from core.policy import SYSTEM, require, roles_for
 from core.scoping import system_access
-from core.workflow import Transition, Workflow
+from core.workflow import Stages, Transition, Workflow, outcome, stage, you_or
 
 S = ViolationState
 
@@ -103,6 +103,31 @@ VIOLATION = Workflow(
             confirm="Close this record? It stays in the home's history.",
         ),
     ],
+    # The stage tracker (D99). "Reported" is the board's alone: owners see a
+    # violation only once its notice is sent (review A7).
+    stages=Stages(
+        "compliance.violation",
+        [
+            stage(
+                "Reported", S.OPEN, staff_only=True, who="The board: send the notice or dismiss it"
+            ),
+            stage(
+                "Notice sent",
+                S.NOTICED,
+                who=you_or(
+                    "violation.view_all", "The owner: fix it or respond", "You: fix it or respond"
+                ),
+            ),
+            stage("Owner responded", S.RESPONDED, who="The board: decide"),
+            stage("Hearing", S.HEARING, branch=True, who="The board: hold the hearing and decide"),
+            stage("Decided", S.CURED, S.UPHELD, who="The board: close it"),
+            stage("Closed", S.CLOSED),
+        ],
+        [outcome("Dismissed", S.DISMISSED)],
+        due=lambda obj: obj.cure_by if obj.state == S.NOTICED else None,
+        labels=dict(S.choices),
+        staff_permission="violation.view_all",
+    ),
 )
 
 

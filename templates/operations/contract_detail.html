@@ -6,6 +6,7 @@
   <div class="crumbs"><a href="{% url 'contracts' %}">Contracts</a> / {{ obj.title }}</div>
   <div class="page-head"><div><h1>{{ obj.title }}</h1>
     <div class="meta">{% status obj.state obj.get_state_display %}<span>{{ obj.vendor }}</span><span>{{ obj.get_schedule_display }}, up to {{ obj.amount_cap_cents|cents }} each</span><span>{% icon "book" %}{{ obj.citation }}</span></div></div></div>
+  {% workflow_stages obj %}
   <div class="split">
     <div>
       <section class="card"><h2>Invoices under this contract</h2>

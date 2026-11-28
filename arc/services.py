@@ -12,7 +12,16 @@ from community.rules import rule, rule_with_citation
 from core import pdf
 from core.policy import SYSTEM, can, require, roles_for
 from core.scoping import system_access
-from core.workflow import NotForYou, Transition, Workflow, WorkflowError
+from core.workflow import (
+    NotForYou,
+    Stages,
+    Transition,
+    Workflow,
+    WorkflowError,
+    outcome,
+    stage,
+    you_or,
+)
 
 
 class ArcError(ValueError):
@@ -287,6 +296,64 @@ ARC = Workflow(
             confirm="Mark the project complete? This closes the request.",
         ),
     ],
+    # The stage tracker (D99): the usual way through, and how it can end early.
+    stages=Stages(
+        "arc.arcrequest",
+        [
+            stage(
+                "Draft",
+                ArcState.DRAFT,
+                who=you_or(
+                    "arc.view_all", "The owner: finish and submit it", "You: finish and submit it"
+                ),
+            ),
+            stage(
+                "Neighbor acknowledgements",
+                ArcState.NEIGHBORS,
+                branch=True,
+                who="The neighbors: acknowledge the project",
+            ),
+            stage("Submitted", ArcState.SUBMITTED, who="The committee: check it is complete"),
+            stage("In review", ArcState.IN_REVIEW, who="The committee: decide"),
+            stage(
+                "Decided",
+                ArcState.APPROVED,
+                ArcState.APPROVED_WITH_CONDITIONS,
+                # A denial is an outcome (below); listed here too so an appeal
+                # after it shows the decision as done.
+                ArcState.DENIED,
+                who="The committee: mark it complete once the work is done",
+            ),
+            stage("Appeal", ArcState.APPEAL, branch=True, who="The board: decide the appeal"),
+            stage(
+                "Appeal decided",
+                ArcState.APPEAL_DECIDED,
+                branch=True,
+                who="The committee: mark it complete once the work is done",
+            ),
+            stage("Completed", ArcState.COMPLETED),
+        ],
+        [
+            outcome(
+                "Denied",
+                ArcState.DENIED,
+                who=you_or(
+                    "arc.view_all",
+                    "The owner may appeal to the board",
+                    "You may appeal to the board",
+                ),
+            ),
+            outcome("Withdrawn", ArcState.WITHDRAWN),
+        ],
+        due=lambda obj: (
+            obj.review_due_on
+            if obj.state == ArcState.IN_REVIEW
+            else obj.appeal_due_on
+            if obj.state == ArcState.DENIED
+            else None
+        ),
+        labels=dict(ArcState.choices),
+    ),
 )
 MAX_OPEN_DRAFTS = 5
 DECISION_ACTIONS = {"approve", "approve_with_conditions", "deny", "decide_appeal"}

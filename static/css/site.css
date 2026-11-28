@@ -903,3 +903,29 @@ meter.bar { width: 100%; max-width: 16rem; height: 1rem; vertical-align: middle;
 .home-picker-chip { display: inline-flex; align-items: center; gap: .2rem; max-width: 100%; padding-left: .7rem; border: 1px solid var(--line); border-radius: 99px; background: var(--green-50); overflow-wrap: anywhere; }
 .home-picker-remove { min-height: 44px; min-width: 44px; padding: 0; background: transparent; color: var(--ink-2); border: 0; font-size: 1.2rem; }
 .home-picker-remove:hover { background: var(--green-100); }
+/* Stage tracker (D99, partials/stages.html): a strip on wide screens, one line that opens the list on phones. Marks and hidden words, not colour alone. */
+.stages { padding: .8rem 1.1rem; }
+.stages ol { list-style: none; margin: 0; padding: 0; }
+.stages-strip { display: flex; align-items: flex-start; }
+.stages-strip .stage { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; padding: 0 .25rem; }
+.stages-strip .stage + .stage::before { content: ""; position: absolute; top: 14px; right: 50%; width: 100%; height: 2px; background: var(--line); }
+.stages-strip .stage.is-done + .stage::before { background: var(--green-700); }
+.stage-mark { position: relative; z-index: 1; width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line); background: var(--surface); font-weight: 700; color: var(--muted); }
+.stage-label { font-size: .875rem; color: var(--muted); margin-top: .3rem; overflow-wrap: anywhere; }
+.stage-detail { display: block; font-size: .8rem; font-weight: 400; }
+.stage.is-done .stage-mark { border-color: var(--green-700); background: var(--green-700); color: #fff; }
+.stage.is-done .stage-label { color: var(--ink-2); }
+.stage.is-current .stage-mark { border: 3px solid var(--green-700); color: var(--green-700); box-shadow: 0 0 0 3px var(--green-100); }
+.stage.is-current.is-done .stage-mark { background: var(--green-700); color: #fff; }
+.stage.is-current .stage-label, .stage.is-outcome .stage-label { color: var(--ink); font-weight: 700; }
+.stage.is-future .stage-mark { border-style: dashed; }
+.stage.is-skipped .stage-label { text-decoration: line-through; }
+.stage.is-outcome .stage-mark { border: 4px double var(--ink-2); background: var(--surface-2); color: var(--ink-2); }
+.stage.is-outcome .stage-label { font-style: italic; }
+.stages-compact { display: none; }
+.stages-compact > summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.stages-list .stage { display: flex; align-items: center; gap: .6rem; padding: .3rem 0; }
+.stages-list .stage-label { margin-top: 0; text-align: left; }
+.stages-next { margin: .6rem 0 0; color: var(--ink-2); }
+@media (max-width: 640px) { .stages-strip { display: none; } .stages-compact { display: block; } }
+@media print { .stages-compact { display: none; } .stages-strip { display: flex; } }

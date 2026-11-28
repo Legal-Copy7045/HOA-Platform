@@ -194,7 +194,9 @@ def reset_decide(request, pk, decision):
         if decision == "approve":
             code = mfa_reset.approve_reset(reset, actor=request.user, request=request)
             # Shown once, on this response only; never stored or logged.
-            return render(request, "accounts/board/reset_code.html", {"code": code})
+            # The stage tracker (D99): where the reset now is (never the code).
+            reset.refresh_from_db()
+            return render(request, "accounts/board/reset_code.html", {"code": code, "reset": reset})
         mfa_reset.cancel_reset(reset, actor=request.user, request=request)
         messages.success(request, "Reset cancelled. Nothing was changed.")
     except mfa_reset.MfaResetError as exc:

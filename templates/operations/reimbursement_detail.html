@@ -5,6 +5,7 @@
   <div class="crumbs"><a href="{% url 'reimbursements' %}">Reimbursements</a> / Claim #{{ claim.pk }}</div>
   <div class="page-head"><div><h1>Reimbursement claim #{{ claim.pk }}</h1>
     <p class="subtitle">{{ claim.amount_cents|cents }} paid to {{ claim.payee }} on {{ claim.spent_on|date:"F j, Y" }} · {{ claim.category.code }} {{ claim.category.name }} · <span class="status {% if st.status == 'paid' %}tone-success{% elif st.status == 'awaiting' or st.status == 'approved' %}tone-warning{% else %}tone-info{% endif %}">{{ label }}</span></p></div></div>
+  {% workflow_stages claim %}
   <section class="card"><h2>Claim</h2>
     <p>{{ claim.description|linebreaksbr }}</p>
     <ul class="list small">

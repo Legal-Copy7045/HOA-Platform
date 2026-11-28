@@ -469,3 +469,15 @@ def step_confirm(t):
     if workflow.is_decision(t.action):
         return workflow.acting_confirm(text or f"{t.label}?")
     return text
+
+
+# --- Stage tracker (D99) ------------------------------------------------------------------
+
+
+@register.inclusion_tag("partials/stages.html", takes_context=True)
+def workflow_stages(context, obj):
+    """{% workflow_stages obj %}: where the item is on its workflow's declared
+    path (core.workflow.Stages), as the signed-in viewer may see it."""
+    from core import workflow
+
+    return {"strip": workflow.strip(obj, context.get("user")) if obj is not None else None}

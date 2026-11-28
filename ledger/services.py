@@ -20,7 +20,7 @@ from core import conflicts, pdf
 from core.money import format_cents
 from core.policy import SYSTEM, require
 from core.scoping import internal, system_access
-from core.workflow import Transition, Workflow
+from core.workflow import Stages, Transition, Workflow, outcome, stage
 from ledger import accounts
 from ledger.accounts import ALL, CURRENT, MOVED_AWAY, account_q
 from ledger.models import (
@@ -1291,6 +1291,25 @@ COLLECTION = Workflow(
             note_required=True,
         ),
     ],
+    # The stage tracker (D99): reminders in order; a payment plan or a
+    # referral to counsel only when it happens.
+    stages=Stages(
+        "ledger.collectioncase",
+        [
+            stage("Opened", "open", who="The manager: send the first reminder"),
+            stage("First reminder", "reminder_sent", who="The manager: send the second reminder"),
+            stage("Second reminder", "second_reminder", who="The manager: send the final notice"),
+            stage(
+                "Final notice", "final_notice", who="The board: refer it or agree a payment plan"
+            ),
+            stage(
+                "Payment plan", "payment_plan", branch=True, who="The owner: pay the installments"
+            ),
+            stage("Referred to counsel", "referred", branch=True, who="Counsel"),
+            stage("Closed", "closed"),
+        ],
+        due=lambda obj: obj.follow_up_on,
+    ),
 )
 
 
@@ -1517,6 +1536,17 @@ RESALE = Workflow(
             note_required=True,
         ),
     ],
+    # The stage tracker (D99).
+    stages=Stages(
+        "ledger.resalerequest",
+        [
+            stage("Requested", "submitted", who="The manager: start preparing it"),
+            stage("Being prepared", "in_progress", who="The manager: issue the certificate"),
+            stage("Issued", "issued"),
+        ],
+        [outcome("Cancelled", "cancelled")],
+        due=lambda obj: obj.due_on,
+    ),
 )
 
 
