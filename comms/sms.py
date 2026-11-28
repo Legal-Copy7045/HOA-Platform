@@ -302,7 +302,7 @@ def link_path(choice: str) -> str:
 
         pk = choice.split(":", 1)[1]
         if (
-            not pk.isdigit()
+            not (pk.isascii() and pk.isdigit())
             or not Announcement.objects.filter(pk=int(pk), audience=Audience.MEMBERS).exists()
         ):
             raise SmsError("Choose a page to link to.")

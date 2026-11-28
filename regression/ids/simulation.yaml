@@ -1,6 +1,6 @@
 # Stable check IDs for the simulation stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: SIM-113
+# highest issued: SIM-114
 SIM-001: "simulation ran to the end"
 SIM-002: "invariant: append_only.unchanged"
 SIM-003: "invariant: books.funds_not_negative"
@@ -114,3 +114,4 @@ SIM-110: "snapshot month 6"
 SIM-111: "snapshot month 12"
 SIM-112: "snapshot month 18"
 SIM-113: "year-end package, fiscal year 1 of the run"
+SIM-114: "no outbound network call"

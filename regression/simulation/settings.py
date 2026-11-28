@@ -56,6 +56,26 @@ TELLER_ENVIRONMENT = "sandbox"
 TELLER_APPLICATION_ID = "app_sim_only"
 GEMINI_API_KEY = ""  # the AI reader is the fake (fakes.fake_ai)
 USPS_IV_USERNAME = ""
+USPS_IV_PASSWORD = ""  # nosec B105 - off
+# Outside services the simulation has no fake for are pinned off here, whatever
+# the shell exports (review EXP-002, 0.47.0); netguard.py is the backstop.
+SMS_PROVIDER = "none"
+SMS_ACCOUNT_SID = ""
+SMS_AUTH_TOKEN = ""  # nosec B105 - off
+SMS_FROM = ""
+VAPID_PUBLIC_KEY = ""
+VAPID_PRIVATE_KEY = ""
+VAPID_SUBJECT = ""
+BACKUP_S3_BUCKET = ""
+BACKUP_S3_ENDPOINT_URL = ""
+BACKUP_S3_ACCESS_KEY_ID = ""
+BACKUP_S3_SECRET_ACCESS_KEY = ""  # nosec B105 - off
+BOUNCE_IMAP_HOST = ""
+BOUNCE_IMAP_USER = ""
+BOUNCE_IMAP_PASSWORD = ""  # nosec B105 - off
+TELLER_CERTIFICATE_B64 = ""
+TELLER_PRIVATE_KEY_B64 = ""
+PASSWORD_BREACH_CHECK = False
 SECRET_BALLOT_MIX_MIN = 2
 LOGGING["root"]["level"] = "ERROR"  # noqa: F405
 for _name in list(LOGGING.get("loggers", {})):  # noqa: F405

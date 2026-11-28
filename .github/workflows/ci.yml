@@ -123,7 +123,7 @@ jobs:
         shard: [0, 1]
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16.16-alpine@sha256:f2f98726820d0342055351c6e9d36e705f5bfffb3dd53ff556325114b08afb6d  # the docker-compose.yml pin (review SEC-001, 0.47.0)
         env:
           POSTGRES_PASSWORD: ci-superuser
         ports: ["5432:5432"]
@@ -261,7 +261,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16.16-alpine@sha256:f2f98726820d0342055351c6e9d36e705f5bfffb3dd53ff556325114b08afb6d  # the docker-compose.yml pin (review SEC-001, 0.47.0)
         env:
           POSTGRES_PASSWORD: ci-superuser
         ports: ["5432:5432"]

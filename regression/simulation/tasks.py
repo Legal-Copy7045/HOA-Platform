@@ -14,7 +14,6 @@ from __future__ import annotations
 import asyncio
 import datetime
 import json
-import traceback
 from dataclasses import dataclass
 
 from django.db import connection
@@ -102,7 +101,9 @@ def drain(*, limit: int = 2000, on_failure=None) -> dict[str, int]:
         except Exception as exc:  # a failing job is a finding, not a crash
             status = "failed"
             if on_failure is not None:
-                on_failure(name, f"{type(exc).__name__}: {exc}\n{traceback.format_exc(limit=8)}")
+                from regression.simulation.engine import failure_detail
+
+                on_failure(name, failure_detail(exc))
         with connection.cursor() as cur:
             cur.execute(
                 "SELECT procrastinate_finish_job_v1(%s, %s, %s)",

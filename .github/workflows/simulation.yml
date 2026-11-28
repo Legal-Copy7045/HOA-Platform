@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 350
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16.16-alpine@sha256:f2f98726820d0342055351c6e9d36e705f5bfffb3dd53ff556325114b08afb6d  # the docker-compose.yml pin (review SEC-001, 0.47.0)
         env:
           POSTGRES_PASSWORD: ci-superuser
         ports: ["5432:5432"]
@@ -78,6 +78,10 @@ jobs:
         run: |
           case "$SIM_MONTHS" in ''|*[!0-9]*) echo "months must be a number"; exit 1;; esac
           case "$SIM_SEED" in ''|*[!0-9]*) echo "seed must be a number"; exit 1;; esac
+          if [ "${#SIM_MONTHS}" -gt 2 ] || [ "$SIM_MONTHS" -lt 1 ] || [ "$SIM_MONTHS" -gt 24 ]; then
+            echo "months must be from 1 to 24"; exit 1
+          fi
+          if [ "${#SIM_SEED}" -gt 9 ]; then echo "seed must be at most 9 digits"; exit 1; fi
           python regression/simulation/sim.py --db hoa_sim
       - name: Report
         if: always()

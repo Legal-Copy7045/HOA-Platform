@@ -239,7 +239,7 @@ def public_only(backend_class):
             addresses = credential_checks.public_addresses(self.host)
             if not addresses:
                 raise NotPublicHost("the mail server is not a public host")
-            return credential_checks.pinned_smtp(addresses[0], ssl=bool(self.use_ssl))
+            return credential_checks.pinned_smtp(addresses, ssl=bool(self.use_ssl))
 
     return PublicOnlyBackend
 

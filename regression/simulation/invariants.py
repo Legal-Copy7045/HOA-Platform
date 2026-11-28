@@ -21,14 +21,19 @@ Daily:
   board exception note explains it or the scenario injected it;
 * ``append_only.unchanged``: no row of any append-only table (every
   ``AppendOnlyModel`` and history table) changed or vanished: a hash per
-  table of the rows already seen is compared every day;
+  table of the rows already seen is compared every day. Tables with an
+  integer key are hashed up to the highest key seen; tables with random UUID
+  keys (secret choices, election choices, survey responses and answers) keep
+  the multiset of their rows' hashes, every one of which must still be there
+  (review BUG-001, 0.47.0);
 * ``close.month_closed``: after the close day, last month is closed by the
   automatic close when nothing was wrong; when the scenario injected a
   problem, the month stays open with that check failing, until it is fixed;
 * ``close.year_package``: once a fiscal year closes, its year-end package
   exists, its manifest verifies, and its balance sheet balances;
 * ``reminders.*``: statement emails went to every emailable account once a
-  month, vote and election deadline reminders went out before each close.
+  month (checked account by account, review BUG-002, 0.47.0), vote and
+  election deadline reminders went out before each close.
 
 After each event (cheap):
 * ``audit.every_change``: an event that changed something wrote an audit event;
@@ -38,6 +43,7 @@ After each event (cheap):
 
 from __future__ import annotations
 
+import collections
 import datetime
 from dataclasses import dataclass, field
 
@@ -134,7 +140,12 @@ def funds_not_negative(today: datetime.date, injected: set[str]) -> list[str]:
 # --- Append-only ---------------------------------------------------------------------------
 
 
+INTEGER_KEYS = ("AutoField", "BigAutoField", "IntegerField", "SmallAutoField")
+
+
 def append_only_models():
+    """(table, key column, whether the key is an integer) for every
+    append-only and history table, whatever its key."""
     from simple_history.models import HistoricalChanges
 
     from core.append_only import AppendOnlyModel
@@ -144,18 +155,25 @@ def append_only_models():
         if model._meta.proxy or not issubclass(model, (AppendOnlyModel, HistoricalChanges)):
             continue
         pk = model._meta.pk
-        if pk.get_internal_type() not in ("AutoField", "BigAutoField", "IntegerField"):
-            continue
-        out.append((model._meta.db_table, pk.column))
+        out.append((model._meta.db_table, pk.column, pk.get_internal_type() in INTEGER_KEYS))
     return sorted(set(out))
 
 
 class AppendOnlyWatch:
-    """Per table: (highest id seen, row count up to it, md5 of those rows)."""
+    """Per integer-keyed table: (highest id seen, row count up to it, md5 of
+    those rows). Per table with another key (random UUIDs): the multiset of
+    the md5 of each row, every one of which must still be there."""
 
     def __init__(self):
         self.tables = append_only_models()
         self.seen: dict[str, tuple[int, int, str]] = {}
+        self.rows: dict[str, collections.Counter] = {}
+
+    def _row_hashes(self, table) -> collections.Counter:
+        sql = f'SELECT md5(t::text) FROM "{table}" t'  # noqa: S608  # nosec B608 - our tables
+        with connection.cursor() as cur:
+            cur.execute(sql)
+            return collections.Counter(r[0] for r in cur.fetchall())
 
     def _state(self, table, pk, upto=None):
         where = f'WHERE "{pk}" <= %s' if upto is not None else ""  # nosec B608
@@ -170,7 +188,19 @@ class AppendOnlyWatch:
 
     def check(self) -> list[str]:
         out = []
-        for table, pk in self.tables:
+        for table, pk, integer in self.tables:
+            if not integer:
+                now = self._row_hashes(table)
+                before = self.rows.get(table)
+                if before is not None:
+                    missing = sum((before - now).values())
+                    total_before, total_now = sum(before.values()), sum(now.values())
+                    if total_now < total_before:
+                        out.append(f"{table}: {total_before - total_now} row(s) deleted")
+                    elif missing:
+                        out.append(f"{table}: {missing} row(s) changed")
+                self.rows[table] = now
+                continue
             prev = self.seen.get(table)
             if prev is not None:
                 high, count, digest = prev
@@ -332,22 +362,42 @@ def year_package(today: datetime.date) -> list[str]:
 
 def statements_sent(today: datetime.date) -> list[str]:
     """Each month with posted assessments: one statement email per account
-    that has someone to email (checked from the 3rd, after the queue ran)."""
+    that has someone to email, by the statement job's own rule
+    (``ledger.statement_email.recipients`` on the day the charge posted),
+    checked account by account from the 3rd, after the queue ran (review
+    BUG-002, 0.47.0). Account ids only."""
+    from django.db.models import Min
+
+    from community.models import Account
     from ledger.models import EntryKind, LedgerEntry, StatementEmail
+    from ledger.statement_email import recipients
 
     if today.day != 3:
         return []
     period = f"{today:%Y-%m}"
-    posted = set(
-        LedgerEntry.objects.filter(kind=EntryKind.ASSESSMENT, period=period).values_list(
-            "account_id", flat=True
-        )
+    posted = dict(
+        LedgerEntry.objects.filter(kind=EntryKind.ASSESSMENT, period=period)
+        .exclude(account_id=None)
+        .values("account_id")
+        .annotate(on=Min("posted_on"))
+        .values_list("account_id", "on")
     )
     if not posted:
         return []
     sent = set(StatementEmail.objects.filter(period=period).values_list("account_id", flat=True))
-    if not sent:
-        return [f"{period}: assessments posted but no statement email went out"]
+    accounts = Account.objects.unscoped("simulation invariant").in_bulk(list(posted))
+    missing = sorted(
+        pk
+        for pk, on in posted.items()
+        if pk not in sent and pk in accounts and recipients(accounts[pk], on=on)
+    )
+    if missing:
+        shown = ", ".join(f"#{pk}" for pk in missing[:20])
+        more = f" and {len(missing) - 20} more" if len(missing) > 20 else ""
+        return [
+            f"{period}: {len(missing)} account(s) with someone to email got no statement "
+            f"email: {shown}{more}"
+        ]
     return []
 
 

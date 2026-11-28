@@ -88,6 +88,22 @@ def default_start(months: int, today: datetime.date | None = None) -> datetime.d
 REFUSALS = (PermissionDenied, ValidationError)
 
 
+def failure_detail(exc: BaseException) -> str:
+    """What an error row keeps (review EXP-005, 0.47.0): the exception's
+    class and message, and the frames as file:line in function only, never
+    the source lines or local values."""
+    root = HERE.parent.parent
+    frames = []
+    for f in traceback.extract_tb(exc.__traceback__)[-12:]:
+        name = Path(f.filename)
+        try:
+            name = name.resolve().relative_to(root)
+        except ValueError:
+            name = Path(name.name)
+        frames.append(f"  {name}:{f.lineno} in {f.name}")
+    return f"{type(exc).__name__}: {str(exc)[:300]}\n" + "\n".join(frames)
+
+
 def is_refusal(exc: Exception) -> bool:
     """A refusal the portal shows a person (its own error classes), not a crash."""
     if isinstance(exc, REFUSALS):
@@ -125,6 +141,7 @@ class Run:
     refusals: list = field(default_factory=list)  # events the portal refused
     probes: list = field(default_factory=list)  # deliberate refusals and their outcome
     job_failures: list = field(default_factory=list)
+    outbound_blocked: dict = field(default_factory=dict)  # host:port -> calls refused
     snapshots: list = field(default_factory=list)
     year_end: dict = field(default_factory=dict)
     timings: dict = field(default_factory=dict)
@@ -171,13 +188,7 @@ class Engine:
                 run.refusals.append(self._row(ev, "refused", f"{type(exc).__name__}: {exc}"))
             else:
                 outcome = "error"
-                run.errors.append(
-                    self._row(
-                        ev,
-                        "error",
-                        f"{type(exc).__name__}: {exc}\n{traceback.format_exc(limit=12)}",
-                    )
-                )
+                run.errors.append(self._row(ev, "error", failure_detail(exc)))
         else:
             if ev.expect_refusal:
                 outcome = "probe not refused"
@@ -269,7 +280,7 @@ class Engine:
                         "event": f"task {name}",
                         "area": "tasks",
                         "status": "error",
-                        "detail": f"{type(exc).__name__}: {exc}\n" + traceback.format_exc(limit=12),
+                        "detail": failure_detail(exc),
                     }
                 )
             return
@@ -349,6 +360,7 @@ class Engine:
                     self.scenario.end_of_month(day)
                 day = nxt
             run.year_end = self.scenario.year_end_figures()
+            run.outbound_blocked = dict(getattr(self.scenario.fakes, "outbound_blocked", {}))
             run.timings["total_seconds"] = round(time.perf_counter() - run.started, 1)
         return run
 
@@ -439,6 +451,7 @@ def results_json(run: Run) -> dict:
         "refusals": run.refusals,
         "probes": run.probes,
         "job_failures": run.job_failures,
+        "outbound_blocked": run.outbound_blocked,
         "snapshots": run.snapshots,
         "year_end": run.year_end,
         "timings": {

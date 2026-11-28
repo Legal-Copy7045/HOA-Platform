@@ -608,10 +608,31 @@ def stage_walkthrough(st: Stage) -> None:
 # --- simulation (D102) -----------------------------------------------------------------
 
 
+SIM_MONTHS_RANGE = (1, 24)
+# An event kind the scenario runs expecting success may be refused now and
+# then (a probe is separate); more than this share of its runs refused fails
+# the stage (review BUG-006, 0.47.0). Tasks are never expected to be refused.
+REFUSAL_SHARE_LIMIT = 0.25
+REFUSAL_MIN_RUNS = 4
+
+
+def sim_months(value) -> int:
+    """The simulated months, 1 to 24 (review EXP-003, 0.47.0)."""
+    text = str(value).strip()
+    lo, hi = SIM_MONTHS_RANGE
+    if not (text.isascii() and text.isdigit()) or not lo <= int(text) <= hi:
+        raise argparse.ArgumentTypeError(f"months must be a whole number from {lo} to {hi}")
+    return int(text)
+
+
 def stage_simulation(st: Stage) -> None:
     """The accelerated simulation: months of community life on a moved clock,
     with the invariants checked every simulated day (regression/simulation/)."""
-    months = int(OPTIONS.get("months") or os.environ.get("SIM_MONTHS", "18"))
+    try:
+        months = sim_months(OPTIONS.get("months") or os.environ.get("SIM_MONTHS", "18"))
+    except argparse.ArgumentTypeError as exc:
+        st.add("simulation ran", "fail", str(exc), "regression/simulation/sim.py")
+        return
     cmd = [
         PY,
         str(HERE / "simulation" / "sim.py"),
@@ -691,6 +712,16 @@ def simulation_checks(data: dict) -> list[tuple[str, str, str, str]]:
             evidence,
         )
     )
+    blocked = data.get("outbound_blocked") or {}
+    out.append(
+        (
+            "no outbound network call",
+            "fail" if blocked else "pass",
+            ", ".join(f"{k} x{v}" for k, v in sorted(blocked.items()))[:300],
+            evidence,
+        )
+    )
+    out.extend(refusal_checks(data))
     for p in data["probes"]:
         out.append((f"probe refused: {p['event']}", p["status"], p["detail"][:300], evidence))
     for snap in data["snapshots"]:
@@ -709,6 +740,40 @@ def simulation_checks(data: dict) -> list[tuple[str, str, str, str]]:
                 f"year-end package, fiscal year {int(fy) - first_year + 1} of the run",
                 "pass" if y["year_closed"] else "fail",
                 f"{y['package_files']} files",
+                evidence,
+            )
+        )
+    return out
+
+
+def refusal_checks(data: dict) -> list[tuple[str, str, str, str]]:
+    """Refusals per kind (review BUG-006, 0.47.0): a scheduled task refused
+    fails; an event kind refused in more than REFUSAL_SHARE_LIMIT of at least
+    REFUSAL_MIN_RUNS runs fails (an error class the engine counts as a
+    refusal may hide a crash)."""
+    evidence = "regression/out/simulation.html"
+    runs: dict[str, int] = {}
+    for month in data["timeline"]:
+        for k, n in month["events"].items():
+            runs[k.split(" (", 1)[0]] = runs.get(k.split(" (", 1)[0], 0) + n
+    refused: dict[str, list] = {}
+    for r in data.get("refusals") or []:
+        refused.setdefault(r["event"], []).append(r)
+    out = []
+    for kind in sorted(refused):
+        rows = refused[kind]
+        total = max(runs.get(kind, 0), len(rows))
+        first = rows[0]["detail"].splitlines()[0][:200] if rows[0].get("detail") else ""
+        if kind.startswith("task "):
+            status = "fail"
+        else:
+            share = len(rows) / total if total else 1.0
+            status = "fail" if total >= REFUSAL_MIN_RUNS and share > REFUSAL_SHARE_LIMIT else "pass"
+        out.append(
+            (
+                f"refusals: {kind}",
+                status,
+                f"{len(rows)} of {total} run(s) refused; first: {first}",
                 evidence,
             )
         )
@@ -855,7 +920,7 @@ def chosen_stages(argv: list[str] | None = None) -> list[str]:
         help="also run the walkthrough stage, in a lane of its own beside the others",
     )
     sim = parser.add_argument_group("simulation stage (D102)")
-    sim.add_argument("--months", type=int, help="simulated months (default 18)")
+    sim.add_argument("--months", type=sim_months, help="simulated months, 1 to 24 (default 18)")
     sim.add_argument("--seed", type=int, help="the scenario's seed (default 47)")
     sim.add_argument("--dataset", choices=["fresh_start", "blank"])
     sim.add_argument("--fast", action="store_true", help="fewer optional events")

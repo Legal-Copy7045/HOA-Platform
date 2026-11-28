@@ -1,4 +1,5 @@
-"""Everything outside the portal, faked (no network, ever).
+"""Everything outside the portal, faked (no network, ever: ``netguard.py``
+refuses and records any outside lookup or connection while the fakes are in).
 
 * Stripe: ``payments/tests/fake_stripe.py`` (the suite's own fake), with the
   balance lines dated when they happen and weekly payouts to the fake bank.
@@ -12,7 +13,11 @@
   accepted message is delivered except to the addresses the scenario marked
   as bouncing (hard bounce), so the portal's delivery reports, bounce records
   and paper-copy items run as in production.
-* USPS: ``comms/tests/fake_usps.py`` with every piece "Delivered" 3 days on.
+* USPS: off (settings.py leaves the user name blank). Its transport is
+  replaced by one that answers 503 and counts the call, so tracking turned on
+  by mistake fails visibly instead of reaching USPS (review EXP-006, 0.47.0).
+* Malware scanner (ClamAV): every scan answers "clean" and the health
+  check's version query answers a current fictional version (review EXP-001).
 * AI (signed ARC forms): a reader that returns the expected signer.
 """
 
@@ -240,6 +245,31 @@ def digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
+# --- USPS and the scanner ----------------------------------------------------------------
+
+
+class RefusingUsps:
+    """USPS Informed Visibility, switched off: every call answers 503."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self, method, url, data, headers):
+        self.calls += 1
+        return 503, b"{}", {}
+
+
+def fake_scanner_version() -> dict:
+    """The ClamAV daemon's answer to VERSION, without a socket: answering,
+    with signatures from earlier today on the simulated clock."""
+    now = timezone.now().replace(tzinfo=None)
+    return {
+        "answering": True,
+        "version": "1.4.2",
+        "signatures_at": now.replace(hour=0, minute=0, second=0, microsecond=0),
+    }
+
+
 # --- Installing them -------------------------------------------------------------------------
 
 
@@ -248,6 +278,8 @@ class Fakes:
         self.stripe = SimStripe()
         self.bank = FakeBank(opening_operating, opening_reserve)
         self.smtp2go = FakeSmtp2go()
+        self.usps = RefusingUsps()
+        self.guard = None
         self._undo: list[tuple[object, str, object]] = []
 
     def _patch(self, module, name, value):
@@ -272,8 +304,23 @@ class Fakes:
         self._patch(scanning, "_clamd", lambda fileobj: (ScanResult.CLEAN, ""))
         self._patch(ai, "read_signed_form", fake_ai_reader)
         self._patch(ai, "api_key", lambda: "sim-fake-ai")
+        from comms import usps_iv
+        from core import health
+
+        self._patch(health, "scanner_version", fake_scanner_version)
+        self._patch(usps_iv, "transport", self.usps)
+        from regression.simulation import netguard
+
+        self.guard = netguard.Guard(netguard.database_hosts())
+        self.guard.install()
+
+    @property
+    def outbound_blocked(self) -> dict[str, int]:
+        return dict(self.guard.blocked) if self.guard else {}
 
     def uninstall(self) -> None:
+        if self.guard is not None:
+            self.guard.uninstall()
         while self._undo:
             module, name, value = self._undo.pop()
             setattr(module, name, value)

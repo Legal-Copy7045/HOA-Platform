@@ -7,8 +7,10 @@ One self-contained page: the run's options and timing, the timeline (events
 by kind per month, scheduled tasks per month), every invariant with the days
 it held and its breaks (simulated date, event, problem), event errors and
 refusals, failed background jobs, the probes, the snapshots and the year-end
-figures. IDs, counts and amounts only: the simulation's people are fictional,
-and none of their names are written here.
+figures. IDs, counts and amounts, plus each error's class, message and
+file:line frames (never source lines; review EXP-005, 0.47.0): a portal
+message may name one of the simulation's fictional people or addresses, so
+the report holds fictional data only, as everything in the simulation does.
 """
 
 from __future__ import annotations
