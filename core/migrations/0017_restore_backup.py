@@ -18,7 +18,7 @@ def mark_past_results_notified(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0015_service_credentials"),
+        ("core", "0016_demo_persona"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
