@@ -131,6 +131,8 @@ regression/
   walkthrough.js    the walkthrough stage's browser walk (every role, desktop and phone)
   walkthrough_report.py  out/walkthrough*.json -> out/walkthrough.html
   RUNS.md           one entry per full run (no names, hosts or addresses)
+  SIMULATIONS.md    one entry per simulation run (counts only)
+  simulation/       the accelerated simulation (D102): sim.py, engine, clock, fakes, scenario, report
   WALKTHROUGHS.md   one entry per walkthrough (same rules)
   tests/            tests of this tooling (part of the unit stage)
   out/              results, logs, report (git-ignored)
@@ -167,6 +169,7 @@ cores.
 | live | `LIVE-` | read-only: the POC answers over HTTPS behind Cloudflare Access, plain HTTP does not serve it, DNS is proxied, TLS 1.2+, the tunnel is healthy, an Access application covers the host. Host from `LIVE_HOST`, never the repo; Cloudflare API reads only |
 | manual | `MAN-` | `manual.yaml`, listed as "needs a person" |
 | walkthrough | `WALK-` | not a default stage (see below): every role's menu and pages on a desktop and a phone, with screenshots and UX checks |
+| simulation | `SIM-` | not a default stage, never in `check` or pull-request CI (see below): about 18 months of community life on a moved clock, invariants every simulated day |
 
 ## Walkthrough
 
@@ -211,6 +214,53 @@ by hand into `out/walkthrough-findings.json` (the older format in
 `out/walkthrough.html` from all three (only failing pages are embedded, as
 small thumbnails; `--no-thumbs` embeds none). A walkthrough fixes nothing in
 product code; its clear fixes go in the next release (see "Fix nothing" above).
+
+## Simulation (D102)
+
+An accelerated run of the whole application over months, to prove the
+features together (month ends, year ends, sales, elections, collections). Not
+part of a plain `run.py` or `run.py check`; run it by hand or with the manual
+GitHub workflow `simulation.yml`.
+
+```bash
+python3 regression/run.py --stage simulation                 # 18 months, seed 47, Fresh start
+python3 regression/run.py --stage simulation --months 3 --seed 7 --fast --keep-going
+.venv/bin/python regression/simulation/sim.py --smoke --db hoa_sim_smoke   # one fast month
+python3 regression/run.py report --simulation                # out/simulation.html
+python3 regression/run.py log --simulation                   # a row in SIMULATIONS.md
+python3 regression/run.py --stage page --from-snapshot regression/out/simulation/month-12.dump
+```
+
+- **Database**: its own, `hoa_sim` (`REGRESSION_SIM_DB`, or `sim.py --db`;
+  `SIM_DATABASE_BASE` for another server), dropped and created each run; Fresh
+  start (default) or Blank (`--dataset blank`: first officer, then the
+  register import) seeded on the first simulated day. The run ends at the end
+  of last month, so nothing is dated in the future.
+- **Clock**: `time-machine` moves Python's clock (`clock.py`); every periodic
+  task fires on its cron each simulated day (sub-hourly ones thinned to 24 a
+  day, 6 with `--fast`); deferred jobs are drained from Procrastinate's queue
+  after each step (`tasks.py`).
+- **Scenario** (`scenario/`, seeded per day: the same seed gives the same
+  history): `setup.py` (the first day: rules, features, books, the bank,
+  budget, reserve plan, vendors, contracts, staff), `money.py` (payments by
+  profile, deposits, Stripe, the bank's lines, invoices and checks,
+  reimbursements, collections, legal, payment plan, special assessment,
+  budget, reserve spending, an injected close problem, tax), `people.py`
+  (meetings, elections and board turnover, votes, surveys, ARC with
+  neighbours and recusal, violations, requests, reservations, RSVPs, home
+  sales, vendor onboarding, insurance claim, capital project, renewals,
+  probes). Everything through the services, as the right person.
+- **Fakes** (`fakes.py`): Stripe, the bank (Teller), SMTP2Go (with bounces),
+  the malware scanner, the AI reader. No network.
+- **Invariants** (`invariants.py`): checked every simulated day and per event;
+  a break stops the run (`--keep-going` records and goes on) and names the
+  simulated date, the event and the invariant.
+- **Output**: `out/simulation.json`, `out/simulation-checks.json` (the
+  stage's `SIM-` results: one per invariant, per kind of event, per probe,
+  snapshot and year-end package), `out/simulation.html`, snapshots
+  `out/simulation/month-06.dump` (and `-media/`), 12, 18.
+- About 1 to 3 hours for 18 months on four cores (the report shows the time
+  a simulated day takes and the slowest tasks and events).
 
 ## Results and IDs
 

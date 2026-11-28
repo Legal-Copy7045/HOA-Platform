@@ -10,10 +10,13 @@ project's own code; everything after them goes through regression/standard.py
     python3 regression/run.py --stage unit    # some stages only (repeatable)
     python3 regression/run.py --stage walkthrough      # the walkthrough only
     python3 regression/run.py --with-walkthrough       # regression + walkthrough together
+    python3 regression/run.py --stage simulation [--months 18] [--seed 47] [--fast]
+                                              # the accelerated simulation (D102), never by default
+    python3 regression/run.py --stage page --from-snapshot regression/out/simulation/month-12.dump
     LIVE_HOST=portal-dev.example.org python3 regression/run.py --stage live
     python3 regression/run.py brief [--full] [--walkthrough]    # reviewer briefs (standard.py)
-    python3 regression/run.py report [--walkthrough]   # report.py / walkthrough_report.py
-    python3 regression/run.py log [--walkthrough | --full-check]  # RUNS.md / WALKTHROUGHS.md row
+    python3 regression/run.py report [--walkthrough | --simulation]   # the HTML reports
+    python3 regression/run.py log [--walkthrough | --full-check | --simulation]  # the log rows
     python3 regression/run.py summary         # at most 40 lines (standard.py)
     python3 regression/run.py manual KEY pass|fail --note "..."   # manual-log.yaml (standard.py)
 
@@ -65,19 +68,23 @@ PREFIX = {
     "live": "LIVE",
     "manual": "MAN",
     "walkthrough": "WALK",
+    "simulation": "SIM",
 }
-ORDER = ["ci", "unit", "page", "live", "manual", "walkthrough"]
+ORDER = ["ci", "unit", "page", "live", "manual", "walkthrough", "simulation"]
 # Plain `run.py`: the regression stages (live only when asked, walkthrough only
 # with --stage walkthrough or --with-walkthrough).
 DEFAULT_STAGES = ["ci", "unit", "page", "manual"]
-PARALLEL = ("ci", "unit", "page", "walkthrough")
+PARALLEL = ("ci", "unit", "page", "walkthrough", "simulation")
 UNIT_LANES = 3
 # Ports can be moved (REGRESSION_PAGE_PORT, REGRESSION_WALK_PORT) so two checkouts can run at once.
 PAGE_PORT = int(os.environ.get("REGRESSION_PAGE_PORT", "8011"))
 WALK_PORT = int(os.environ.get("REGRESSION_WALK_PORT", "8012"))
 # Stage results go to out/<stage>.json, except where that name is taken:
 # out/walkthrough.json is the walkthrough's inventory (role -> width -> pages).
-RESULT_FILE = {"walkthrough": "walkthrough-checks.json"}
+RESULT_FILE = {"walkthrough": "walkthrough-checks.json", "simulation": "simulation-checks.json"}
+# Options for the simulation stage and for crawling one of its snapshots (D102);
+# set from the command line by chosen_stages().
+OPTIONS: dict = {}
 
 
 def now() -> str:
@@ -438,6 +445,17 @@ def _demo_site(st: Stage, *, db: str, port: int, log: str, sessions: list[str]):
         ("seed demo community", [PY, "manage.py", "seed_demo"]),
         ("sessions for each role", [PY, "regression/page_setup.py", *sessions]),
     ]
+    snapshot = OPTIONS.get("from_snapshot")
+    if snapshot:
+        # A simulation snapshot instead of the demo seed (D102): restored as is,
+        # its stored files copied beside it; then migrate (a no-op) and sessions.
+        steps[1:4] = [
+            (
+                "restore simulation snapshot",
+                [PY, "regression/page_setup.py", "restore", db, snapshot],
+            ),
+            ("migrate", [PY, "manage.py", "migrate", "--noinput"]),
+        ]
     for name, cmd in steps:
         code, text = run(cmd, env=env, log=f"{log}-{name.replace(' ', '-')}.log", timeout=900)
         if code != 0:
@@ -587,6 +605,116 @@ def stage_walkthrough(st: Stage) -> None:
         os.killpg(server.pid, signal.SIGTERM)
 
 
+# --- simulation (D102) -----------------------------------------------------------------
+
+
+def stage_simulation(st: Stage) -> None:
+    """The accelerated simulation: months of community life on a moved clock,
+    with the invariants checked every simulated day (regression/simulation/)."""
+    months = int(OPTIONS.get("months") or os.environ.get("SIM_MONTHS", "18"))
+    cmd = [
+        PY,
+        str(HERE / "simulation" / "sim.py"),
+        "--months",
+        str(months),
+        "--seed",
+        str(OPTIONS.get("seed") or os.environ.get("SIM_SEED", "47")),
+        "--dataset",
+        OPTIONS.get("dataset") or os.environ.get("SIM_DATASET", "fresh_start"),
+        "--db",
+        os.environ.get("REGRESSION_SIM_DB", "hoa_sim"),
+    ]
+    if OPTIONS.get("fast"):
+        cmd.append("--fast")
+    if OPTIONS.get("keep_going"):
+        cmd.append("--keep-going")
+    results = OUT / "simulation.json"
+    results.unlink(missing_ok=True)
+    _code, text = run(cmd, log="simulation.log", timeout=6 * 3600)
+    if not results.exists():
+        st.add("simulation ran", "fail", tail(text), "regression/out/logs/simulation.log")
+        return
+    data = json.loads(results.read_text(encoding="utf-8"))
+    st.add(
+        "simulation ran to the end",
+        "fail" if data["stopped"] else "pass",
+        data["stopped"] or f"through {data['simulated_through']}",
+        "regression/out/simulation.html",
+    )
+    for row in simulation_checks(data):
+        st.add(*row)
+
+
+def simulation_checks(data: dict) -> list[tuple[str, str, str, str]]:
+    """The stage's checks from a simulation.json: one per invariant, one per
+    kind of event (ran without crashing), each probe, snapshots, year ends."""
+    evidence = "regression/out/simulation.html"
+    out = []
+    breaks: dict[str, list] = {}
+    for f in data["failures"]:
+        breaks.setdefault(f["invariant"], []).append(f)
+    for key in sorted(set(data["invariants"]) | set(breaks)):
+        first = (breaks.get(key) or [None])[0]
+        out.append(
+            (
+                f"invariant: {key}",
+                "fail" if first else "pass",
+                f"{first['date']} after {first['event']}: {first['problem']}"
+                if first
+                else f"held {data['invariants'].get(key, 0)} day(s)",
+                evidence,
+            )
+        )
+    kinds: set[str] = set()
+    for month in data["timeline"]:
+        for k in month["events"]:
+            kinds.add(k.split(" (", 1)[0])
+    errors: dict[str, dict] = {}
+    for e in data["errors"]:
+        errors.setdefault(e["event"], e)
+    for kind in sorted(kinds | set(errors)):
+        e = errors.get(kind)
+        out.append(
+            (
+                f"event: {kind}",
+                "fail" if e else "pass",
+                f"{e['date']}: {e['detail'].splitlines()[0]}" if e else "",
+                evidence,
+            )
+        )
+    jobs = data["job_failures"]
+    out.append(
+        (
+            "no background job failed",
+            "fail" if jobs else "pass",
+            f"{jobs[0]['date']} {jobs[0]['job']}" if jobs else "",
+            evidence,
+        )
+    )
+    for p in data["probes"]:
+        out.append((f"probe refused: {p['event']}", p["status"], p["detail"][:300], evidence))
+    for snap in data["snapshots"]:
+        out.append(
+            (
+                f"snapshot month {snap['month']}",
+                "pass" if snap["ok"] else "fail",
+                snap["detail"],
+                snap["path"],
+            )
+        )
+    first_year = int(data["options"]["start"][:4])
+    for fy, y in (data.get("year_end") or {}).get("years", {}).items():
+        out.append(
+            (
+                f"year-end package, fiscal year {int(fy) - first_year + 1} of the run",
+                "pass" if y["year_closed"] else "fail",
+                f"{y['package_files']} files",
+                evidence,
+            )
+        )
+    return out
+
+
 # --- live (read-only) ---------------------------------------------------------------------
 
 
@@ -707,6 +835,7 @@ STAGES = {
     "live": stage_live,
     "manual": stage_manual,
     "walkthrough": stage_walkthrough,
+    "simulation": stage_simulation,
 }
 
 
@@ -725,7 +854,25 @@ def chosen_stages(argv: list[str] | None = None) -> list[str]:
         action="store_true",
         help="also run the walkthrough stage, in a lane of its own beside the others",
     )
+    sim = parser.add_argument_group("simulation stage (D102)")
+    sim.add_argument("--months", type=int, help="simulated months (default 18)")
+    sim.add_argument("--seed", type=int, help="the scenario's seed (default 47)")
+    sim.add_argument("--dataset", choices=["fresh_start", "blank"])
+    sim.add_argument("--fast", action="store_true", help="fewer optional events")
+    sim.add_argument("--keep-going", action="store_true", help="do not stop at the first break")
+    sim.add_argument(
+        "--from-snapshot",
+        help="page or walkthrough stage: crawl a simulation snapshot instead of the demo seed",
+    )
     args = parser.parse_args(argv)
+    OPTIONS.update(
+        months=args.months,
+        seed=args.seed,
+        dataset=args.dataset,
+        fast=args.fast,
+        keep_going=args.keep_going,
+        from_snapshot=str(Path(args.from_snapshot).resolve()) if args.from_snapshot else "",
+    )
     chosen = set(args.stage or DEFAULT_STAGES)
     if args.with_walkthrough:
         chosen.add("walkthrough")
@@ -742,9 +889,14 @@ def report(argv: list[str]) -> int:
     standard findings files too), in the profile's time zone."""
     parser = argparse.ArgumentParser(prog="run.py report")
     parser.add_argument("--walkthrough", action="store_true")
+    parser.add_argument("--simulation", action="store_true")
     parser.add_argument("--no-thumbs", action="store_true")
     args = parser.parse_args(argv)
     env = {"REPORT_TZ": os.environ.get("REPORT_TZ") or standard.profile().get("report_tz", "UTC")}
+    if args.simulation:
+        return subprocess.run(  # nosec B603
+            [sys.executable, str(HERE / "simulation" / "report.py")], cwd=ROOT, check=False
+        ).returncode
     script = "walkthrough_report.py" if args.walkthrough else "report.py"
     cmd = [sys.executable, str(HERE / script)] + (["--no-thumbs"] if args.no_thumbs else [])
     code = subprocess.run(cmd, cwd=ROOT, env={**os.environ, **env}, check=False).returncode  # nosec B603
@@ -781,7 +933,10 @@ def log(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="run.py log")
     parser.add_argument("--walkthrough", action="store_true")
     parser.add_argument("--full-check", action="store_true")
+    parser.add_argument("--simulation", action="store_true")
     args = parser.parse_args(argv)
+    if args.simulation:
+        return log_simulation()
     if not args.walkthrough or args.full_check:
         # standard.cmd_log writes its own WALKTHROUGHS.md row on a full check, from an
         # inventory shape this project does not use (5 roles, 0 pages); this project
@@ -804,6 +959,41 @@ def log(argv: list[str]) -> int:
         row = [date, f"`{sha}`", ver, str(roles), str(pages), str(failing), str(findings), rep]
         standard.add_row(HERE / "WALKTHROUGHS.md", standard.WALKS_HEADER, "Walkthroughs", row)
         print("logged in regression/WALKTHROUGHS.md")
+    return 0
+
+
+SIMS_HEADER = (
+    "| Date (UTC) | Commit | Version | Months | Seed | Dataset | Simulated through | Events "
+    "| Invariant breaks | Event errors | Failed jobs | Minutes |"
+)
+
+
+def log_simulation() -> int:
+    """`run.py log --simulation`: one row in SIMULATIONS.md (counts only)."""
+    path = OUT / "simulation.json"
+    if not path.exists():
+        print("no regression/out/simulation.json to log")
+        return 1
+    d = json.loads(path.read_text(encoding="utf-8"))
+    o = d["options"]
+    sha, ver = standard.git("rev-parse", "--short", "HEAD"), standard.version()
+    events = sum(sum(m["events"].values()) for m in d["timeline"])
+    row = [
+        datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
+        f"`{sha}`",
+        ver,
+        str(o["months"]) + (" (fast)" if o["fast"] else ""),
+        str(o["seed"]),
+        o["dataset"],
+        d["simulated_through"],
+        str(events),
+        str(len(d["failures"])),
+        str(len(d["errors"])),
+        str(len(d["job_failures"])),
+        f"{d['timings'].get('total_seconds', 0) / 60:.0f}",
+    ]
+    standard.add_row(HERE / "SIMULATIONS.md", SIMS_HEADER, "Simulations", row)
+    print("logged in regression/SIMULATIONS.md")
     return 0
 
 

@@ -1248,4 +1248,12 @@ def add_starter_items(*, actor) -> int:
             notes=notes,
         )
         added += 1
+    if added:
+        # Every change is audited: the starter items were the one compliance
+        # write without an event (found by the simulation, 0.47.0).
+        record_event(
+            "compliance.starters_added",
+            actor=None if actor is SYSTEM else actor,
+            metadata={"count": added},
+        )
     return added

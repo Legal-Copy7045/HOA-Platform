@@ -1,0 +1,27 @@
+# The accelerated simulation (release 0.47.0, D102): about 18 months of the community's life on
+# a moved clock, through the services the pages use, with invariants every simulated day.
+# `match` runs over "<stage>:<check>".
+- feature: "Simulation stage: its own database, Fresh start or Blank seeded on the first simulated day, the clock moved by time-machine, every periodic task on its cron, deferred jobs drained; never a default stage, never in run.py check or pull-request CI; the manual workflow only by hand"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^simulation:simulation ran", "^unit:regression/tests/test_simulation\\.py::test_cron_fields_and_days", "^unit:regression/tests/test_simulation\\.py::test_every_periodic_task_has_a_cron", "^unit:regression/tests/test_simulation\\.py::test_simulation_is_never_a_default_stage", "^unit:regression/tests/test_simulation\\.py::test_the_workflow_is_manual_only"]
+- feature: "Simulation invariants every simulated day: trial balance and owner journal, balance sheet, home and ownership accounts, Stripe against the ledger, funds not negative without a record, append-only rows unchanged, automatic month close (and an injected problem reported until fixed), year-end package verified, statement emails"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^simulation:invariant: (books|ledger|payments|append_only|close|reminders)\\.", "^unit:regression/tests/test_simulation\\.py::test_a_one_month_smoke_run"]
+- feature: "Simulation per event: an audit event for every change, no staff step on the actor's own matter, and probes the portal must refuse (the manager approving, a staff step on one's own home, a recused ARC reviewer deciding)"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^simulation:invariant: (audit|conflicts)\\.", "^simulation:probe refused: "]
+- feature: "Simulation scenario: setup, dues by payer profile, deposits, online payments and autopay through the pages, Stripe payouts, the bank feed, invoices and vendor checks, reimbursements, collections with legal, lien and release, a payment plan, interest, a voted special assessment, budget preparation and adoption, reserve spending, tax worksheets; meetings, election and board turnover, surveys, ARC with neighbours, violations, requests, reservations, RSVPs, home sales with resale certificates, vendor onboarding, insurance claim, capital project, renewals"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^simulation:event: ", "^simulation:no background job failed$"]
+- feature: "Simulation snapshots at months 6, 12 and 18 (pg_dump and stored files) and year-end packages; the page and walkthrough stages can crawl a snapshot; report (run.py report --simulation) and log (run.py log --simulation, SIMULATIONS.md)"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^simulation:snapshot month ", "^simulation:year-end package", "^unit:regression/tests/test_simulation\\.py::test_the_stage_checks_from_a_results_file"]
+- feature: "Fixes the simulation found (0.47.0): adding the suggested compliance calendar items is audited (count only); RSVP answers and volunteer sign-ups and departures are audited (answer and head count, event id; never who else is going)"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^unit:operations/tests/test_compliance\\.py::test_adding_the_starter_items_is_audited", "^unit:comms/tests/test_rsvp\\.py::test_answers_and_volunteer_slots_are_audited"]

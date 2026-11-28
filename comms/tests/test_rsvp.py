@@ -66,6 +66,28 @@ def test_answer_and_change_keeps_one_row_with_history(world):
     assert row.guests == 0  # guests only count when going
 
 
+def test_answers_and_volunteer_slots_are_audited_without_names(world):
+    """Found by the accelerated simulation (0.47.0, D102): RSVPs and volunteer
+    sign-ups changed records with no audit event."""
+    e, a = world["event"], world["owner_a"]
+    rsvp.answer(e, answer="going", guests=1, actor=a)
+    event = AuditEvent.objects.filter(action="event.rsvp_answered").get()
+    assert event.actor == a and event.metadata == {"answer": "going", "guests": 1}
+    assert event.target_id == str(e.pk)
+    slot = rsvp.add_slot(e, title="Bring a dessert", capacity=3, actor=world["board"])
+    rsvp.sign_up(slot, actor=a)
+    rsvp.leave(slot, actor=a)
+    actions = list(
+        AuditEvent.objects.filter(action__startswith="event.volunteer_")
+        .order_by("id")
+        .values_list("action", "metadata")
+    )
+    assert actions == [
+        ("event.volunteer_signed_up", {"event_id": e.pk}),
+        ("event.volunteer_left", {"event_id": e.pk}),
+    ]
+
+
 def test_one_answer_per_person_in_the_database(world):
     e, a = world["event"], world["owner_a"]
     rsvp.answer(e, answer="going", actor=a)
