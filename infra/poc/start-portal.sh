@@ -96,6 +96,9 @@ if [ "$FULL_RESTART" -eq 1 ]; then
   echo "==> Stopping the old containers (data volumes are kept)"
   "${COMPOSE[@]}" down --remove-orphans
 fi
+# New networks (a first start, or after --full-restart's down) get the outbound
+# firewall before any container starts (D101, review EXP-001).
+egress_firewall_before_start oak-creek-portal "${COMPOSE[@]}"
 echo "==> Starting (migrations run first, as the owner role; unchanged services keep running)"
 "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 300 \
   || { echo "Some services are not healthy yet; status below." >&2; }

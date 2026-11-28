@@ -389,11 +389,13 @@ def lot_ledger(request, pk):
     notes = services.moved_notes(entries)
     for e in entries:
         e.moved_note = notes.get(e.pk, "")
-    # D100: the entries a page at a time (the balance and ages above use all
-    # of them; the Statement PDF lists every entry).
+    # D100: the entries a page at a time, newest first, so the first page holds
+    # the recent activity and its Reverse / Move actions (review BUG-002,
+    # 0.46.0). The balance and ages above use all of them; the Statement PDF
+    # lists every entry in date order.
     from core.lists import paginate
 
-    page = paginate(request, entries, LEDGER_PAGE_SIZE)
+    page = paginate(request, entries[::-1], LEDGER_PAGE_SIZE)
     open_charges = allocation.open_charges(lot.pk)
     lot_accounts = ledger_accounts.lot_accounts(lot.pk)
     # Own matters (D65): one's own home's account is read here like any

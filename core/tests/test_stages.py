@@ -287,6 +287,42 @@ def test_a_stage_skipped_in_the_history_shows_as_skipped():
     ]
 
 
+def test_an_ended_payment_plan_shows_behind_the_case_not_ahead():
+    """Review BUG-003 (0.46.0): a plan that ended returns the case to its
+    reminder; the plan was tried earlier, it is not a step still to come."""
+    from ledger.models import CollectionCase
+
+    obj = CollectionCase(state="reminder_sent")
+    obj.pk = 987655
+    for action, before, after in (
+        ("send_reminder", "open", "reminder_sent"),
+        ("payment_plan", "reminder_sent", "payment_plan"),
+        ("plan_end_reminder", "payment_plan", "reminder_sent"),
+    ):
+        WorkflowEvent.objects.create(
+            workflow="collection",
+            object_id="987655",
+            action=action,
+            from_state=before,
+            to_state=after,
+        )
+    s = strip(obj)
+    assert labels(s) == [
+        ("Opened", "done"),
+        ("First reminder", "current"),
+        ("Second reminder", "future"),
+        ("Final notice", "future"),
+        ("Payment plan", "earlier"),
+        ("Closed", "future"),
+    ]
+    assert [i.detail for i in s.items if i.status == "earlier"] == ["Earlier"]
+    html = render_to_string("partials/stages.html", {"strip": s})
+    assert 'class="stage is-earlier"' in html and "(done earlier, not ahead)" in html
+    # Without that history the plan is a branch not taken: not shown at all.
+    obj.pk = 987656
+    assert "Payment plan" not in [i.label for i in strip(obj).items]
+
+
 @pytest.mark.parametrize(
     ("make", "expected", "who"),
     [

@@ -205,6 +205,45 @@ def clear_failure() -> None:
     _note_recovery()
 
 
+class NotPublicHost(OSError):
+    """The saved mail server no longer resolves to public addresses only."""
+
+    code = "not_public"
+
+
+def pin_wanted(host) -> bool:
+    """Whether live connections to the mail or IMAP ``host`` are pinned to a
+    public address checked at connect time (review EXP-002, 0.46.0): a public
+    host name, as Keys and connections accepts, outside local development.
+    A name without a dot (Mailpit's ``mailpit``), an IP address or an
+    internal name can only come from the server's .env and is used as is."""
+    from core import credential_checks
+
+    return bool(host) and not settings.DEBUG and not credential_checks.host_problem(str(host))
+
+
+def public_only(backend_class):
+    """Django's SMTP backend resolving the host once per connection, refusing
+    a non-public answer and connecting to that very address (TLS still checks
+    the name): a host whose DNS was switched to a private address after its
+    Keys-and-connections test is never contacted (DNS rebinding), wherever the
+    portal runs. The VM's outbound firewall (D101) stays as the second guard."""
+    if not isinstance(backend_class, type):  # replaced in tests
+        return backend_class
+
+    class PublicOnlyBackend(backend_class):
+        @property
+        def connection_class(self):
+            from core import credential_checks
+
+            addresses = credential_checks.public_addresses(self.host)
+            if not addresses:
+                raise NotPublicHost("the mail server is not a public host")
+            return credential_checks.pinned_smtp(addresses[0], ssl=bool(self.use_ssl))
+
+    return PublicOnlyBackend
+
+
 class RedirectingBackend(BaseEmailBackend):
     def __init__(self, fail_silently: bool = False, **kwargs):
         super().__init__(fail_silently=fail_silently)
@@ -212,6 +251,12 @@ class RedirectingBackend(BaseEmailBackend):
         if backend.endswith("smtp.EmailBackend"):
             for key, value in smtp_options().items():
                 kwargs.setdefault(key, value)
+            if pin_wanted(kwargs.get("host")):
+                from django.utils.module_loading import import_string
+
+                backend_class = public_only(import_string(backend))
+                self._inner = backend_class(fail_silently=fail_silently, **kwargs)
+                return
         self._inner = get_connection(backend, fail_silently=fail_silently, **kwargs)
 
     def open(self):

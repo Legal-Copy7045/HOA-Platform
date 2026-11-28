@@ -113,6 +113,7 @@ cleanup() {
   if [ "$KEEP" -eq 0 ]; then
     echo "==> Removing the drill copy"
     "${SCRATCH[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+    egress_firewall_refresh  # its network is gone: drop its rules now, not within a minute
   else
     echo "Drill copy left running (project hoa-restore-drill). Remove it with:"
     echo "  docker compose --project-name hoa-restore-drill -f docker-compose.yml --profile local-store down -v"
@@ -122,6 +123,10 @@ trap cleanup EXIT
 
 echo "==> Starting an empty database and file store"
 "${SCRATCH[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+# The drill's network is filtered like the portal's (EXTRA_PROJECTS in
+# egress-firewall.conf, review EXP-003): created, the firewall applied, then started.
+"${SCRATCH[@]}" up --no-start postgres seaweedfs
+egress_firewall_refresh
 "${SCRATCH[@]}" up -d postgres seaweedfs
 for _ in $(seq 1 60); do
   "${SCRATCH[@]}" exec -T postgres pg_isready -q -h 127.0.0.1 && break

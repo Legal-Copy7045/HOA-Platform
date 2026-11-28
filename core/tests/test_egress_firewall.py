@@ -101,8 +101,10 @@ if os.environ.get("FAKE_DOCKER_DOWN"):
 nets = json.loads(os.environ.get("FAKE_NETS", "{}"))
 args = sys.argv[1:]
 if args[:2] == ["network", "ls"]:
-    assert "label=com.docker.compose.project=oak-creek-portal" in args, args
-    print("\n".join(nets))
+    label = next(a for a in args if a.startswith("label=com.docker.compose.project="))
+    project = label.split("=", 2)[2]
+    assert project in {"oak-creek-portal", "hoa-restore-drill"}, args
+    print("\n".join(n for n in nets if n.startswith(project + "_")))
 elif args[:2] == ["network", "inspect"]:
     driver, nid, opt = nets[args[-1]]
     print(f"{driver} {nid} {opt}")
@@ -142,6 +144,7 @@ class Fw:
             "HOA_EGRESS_CONF": str(POC / "egress-firewall.conf"),
             "HOA_EGRESS_LOCAL_CONF": str(self.local_conf),
             "HOA_EGRESS_LOCK": str(self.tmp / "lock"),
+            "HOA_EGRESS_STATE_DIR": str(self.tmp / "saved"),
             "HOA_EGRESS_RESOLV": f"{self.tmp}/missing.conf {self.resolv}",
             "FAKE_IPT_STATE": str(self.state),
             "FAKE_NETS": json.dumps(self.nets),
@@ -441,6 +444,137 @@ def test_remove_takes_every_rule_out(fw):
     chains = fw.chains()
     assert "HOA-EGRESS" not in chains and chains["DOCKER-USER"] == []
     assert "HOA-EGRESS" not in fw.chains("6") and fw.chains("6")["FORWARD"] == []
+
+
+# --- Review fixes (0.46.0): rules restored before Docker at boot; the drill's copy -----------
+
+
+@needs_bash
+def test_apply_saves_its_rules_and_restore_loads_them_before_docker_starts(fw):
+    """EXP-001: after a reboot iptables is empty and Docker restarts the
+    containers as it starts; the boot unit loads the saved rules first."""
+    applied = _applied(fw)
+    saved = fw.tmp / "saved" / "egress-firewall.v4.rules"
+    assert saved.exists() and oct(saved.stat().st_mode & 0o777) == "0o600"
+    assert saved.read_text().splitlines()[0] == "*filter"
+    first_mtime = saved.stat().st_mtime_ns
+    assert fw.run("apply", "--quiet").returncode == 0
+    assert saved.stat().st_mtime_ns == first_mtime  # unchanged: not rewritten each minute
+    # A reboot: no chains at all, Docker not started yet (it would answer nothing).
+    for name in ("v4.json", "v6.json"):
+        (fw.state / name).write_text(json.dumps({"FORWARD": []}))
+    fw.extra_env["FAKE_DOCKER_DOWN"] = "1"
+    result = fw.run("restore")
+    assert result.returncode == 0, result.stderr
+    after = fw.chains()
+    assert after["HOA-EGRESS"] == applied["HOA-EGRESS"]
+    assert after["DOCKER-USER"] == ["-A DOCKER-USER -j HOA-EGRESS"]
+    assert after["FORWARD"] == ["-A FORWARD -j DOCKER-USER"]
+    for packet in DROPPED:
+        assert _verdict(after, packet) == "DROP", packet
+    assert fw.chains("6")["FORWARD"] == ["-A FORWARD -j HOA-EGRESS"]
+    # Docker up again, same bridges: apply finds the rules current.
+    del fw.extra_env["FAKE_DOCKER_DOWN"]
+    assert fw.run("status").stdout.strip() == "active 2"
+
+
+@needs_bash
+def test_restore_without_saved_rules_or_with_a_foreign_file_loads_nothing(fw):
+    result = fw.run("restore")
+    assert result.returncode == 0 and "No saved" in result.stdout
+    assert not (fw.state / "v4.json").exists()
+    (fw.tmp / "saved").mkdir()
+    (fw.tmp / "saved" / "egress-firewall.v4.rules").write_text(
+        "*filter\n:HOA-EGRESS - [0:0]\n-A FORWARD -j ACCEPT\nCOMMIT\n"
+    )
+    result = fw.run("restore")
+    assert result.returncode != 0 and "not a saved rules file" in result.stderr
+    assert not (fw.state / "v4.json").exists()
+
+
+@needs_bash
+def test_remove_also_forgets_the_saved_rules(fw):
+    _applied(fw)
+    fw.run("remove")
+    assert not (fw.tmp / "saved" / "egress-firewall.v4.rules").exists()
+
+
+@needs_bash
+def test_the_restore_drills_network_is_filtered_too(fw):
+    """EXP-003: the drill's copy (project hoa-restore-drill) gets the same
+    rules; only the portal's own edge network has the tunnel port."""
+    drill_id = "f6" * 32
+    drill_br = "br-" + drill_id[:12]
+    fw.nets["hoa-restore-drill_default"] = ["bridge", drill_id, ""]
+    chains = _applied(fw)
+    assert fw.run("status").stdout.strip() == "active 3"
+    assert _verdict(chains, {"in": drill_br, "dst": "192.168.1.20", "port": 443}) == "DROP"
+    assert _verdict(chains, {"in": drill_br, "dst": "198.41.192.7", "port": 7844}) == "DROP"
+    assert _verdict(chains, {"in": drill_br, "dst": "198.51.99.10", "port": 443}) == "RETURN"
+    conf = (POC / "egress-firewall.conf").read_text()
+    assert "\nEXTRA_PROJECTS=hoa-restore-drill\n" in conf
+    fw.local_conf.write_text("EXTRA_PROJECTS=bad;name\n")
+    result = fw.run("apply")
+    assert result.returncode != 0 and "EXTRA_PROJECTS" in result.stderr
+    drill = (POC / "restore-drill.sh").read_text()
+    created = drill.index('"${SCRATCH[@]}" up --no-start postgres seaweedfs')
+    refreshed = drill.index("egress_firewall_refresh", created)
+    assert refreshed < drill.index('"${SCRATCH[@]}" up -d postgres seaweedfs')
+    cleanup = drill[drill.index("cleanup() {") : drill.index("trap cleanup EXIT")]
+    assert cleanup.index("down -v") < cleanup.index("egress_firewall_refresh")
+
+
+def test_the_boot_unit_restores_before_docker_and_start_portal_applies_before_starting():
+    boot = _unit("hoa-egress-firewall-boot.service")
+    assert "Before=docker.service" in boot and "After=ufw.service" in boot
+    assert "ExecStart=/usr/local/sbin/hoa-egress-firewall restore" in boot
+    assert "WantedBy=multi-user.target" in boot
+    assert "hoa-egress-firewall-boot.service" in _harden().split("systemctl enable hoa-egress")[1]
+    start = (POC / "start-portal.sh").read_text()
+    before = start.index('egress_firewall_before_start oak-creek-portal "${COMPOSE[@]}"')
+    assert start.index("down --remove-orphans") < before
+    assert before < start.index('"${COMPOSE[@]}" up -d --remove-orphans --wait')
+    lib = (POC / "lib.sh").read_text()
+    helper = lib[lib.index("egress_firewall_before_start() {") :]
+    helper = helper[: helper.index("\n}\n")]
+    assert '[ -x "$EGRESS_FIREWALL_BIN" ] || return 0' in helper
+    assert '"$@" up --no-start --remove-orphans' in helper
+    assert helper.index("--no-start") < helper.index("egress_firewall_refresh")
+
+
+@needs_bash
+def test_before_start_creates_then_applies_only_when_the_networks_are_new(tmp_path):
+    calls = tmp_path / "calls"
+    for name, body in (
+        (
+            "docker",
+            f'#!/bin/sh\necho "docker $*" >>{calls}\n'
+            'if [ "$1" = network ]; then printf "%s" "$FAKE_IDS"; fi\n',
+        ),
+        ("compose", f'#!/bin/sh\necho "compose $*" >>{calls}\n'),
+        ("hoa-egress-firewall", f'#!/bin/sh\necho "firewall $*" >>{calls}\n'),
+    ):
+        (tmp_path / name).write_text(body)
+        (tmp_path / name).chmod(0o755)
+    script = "source infra/poc/lib.sh; egress_firewall_before_start oak-creek-portal compose -f x"
+    for ids, expected in (
+        ("", ["compose -f x up --no-start --remove-orphans", "firewall apply --quiet"]),
+        ("abc123\n", []),
+    ):
+        calls.write_text("")
+        result = subprocess.run(  # noqa: S603  # nosec B603
+            [BASH, "-c", script],
+            capture_output=True,
+            text=True,
+            env={
+                "PATH": f"{tmp_path}:/usr/bin:/bin",
+                "HOA_EGRESS_BIN": str(tmp_path / "hoa-egress-firewall"),
+                "FAKE_IDS": ids,
+            },
+        )
+        assert result.returncode == 0, result.stderr
+        lines = [x for x in calls.read_text().splitlines() if not x.startswith("docker ")]
+        assert lines == expected, ids
 
 
 # --- harden-host.sh installs and applies it; the other scripts follow ------------------------

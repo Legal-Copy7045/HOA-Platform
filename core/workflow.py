@@ -445,7 +445,7 @@ def stages_for(obj) -> Stages | None:
 @dataclass
 class StageView:
     label: str
-    status: str  # done | current | future | skipped | outcome
+    status: str  # done | current | future | skipped | outcome | earlier (a branch left)
     detail: str = ""
 
 
@@ -522,9 +522,14 @@ def strip(obj, viewer=None) -> Strip | None:
                 status = "skipped"
         elif i == at:
             status = "current"
+        elif s.branch and been & s.states:
+            # A detour the item took and came back from (a payment plan that
+            # ended, the case back at its reminder): behind it, not ahead
+            # (review BUG-003, 0.46.0).
+            status = "earlier"
         else:
             status = "future"
-        detail = ""
+        detail = "Earlier" if status == "earlier" else ""
         if i == at and len(s.states) > 1:
             label = path.labels.get(current)
             if label is None:

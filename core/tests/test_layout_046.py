@@ -397,9 +397,14 @@ def test_a_homes_ledger_pages_its_entries_and_keeps_the_actions(client, w):
     url = reverse("lot_ledger", args=[lot.pk])
     page1 = _html(client, w["manager"], url)
     assert page1.count('name="entry"') >= LEDGER_PAGE_SIZE  # each row keeps Reverse
-    assert f"({LEDGER_PAGE_SIZE + 5}; 1\u2013{LEDGER_PAGE_SIZE} shown)" in page1
+    assert f"(newest first; {LEDGER_PAGE_SIZE + 5}; 1\u2013{LEDGER_PAGE_SIZE} shown)" in page1
+    # Newest first (review BUG-002, 0.46.0): today's payment ($1.00) opens the
+    # page, the oldest ($1.29, 29 days ago) is on the last page.
+    assert "1.00" in page1 and "1.29" not in page1
+    assert page1.index("1.00") < page1.index("1.01")
     page2 = _html(client, w["manager"], url + "?page=2")
     assert "Page 2 of 2" in page2
+    assert "1.29" in page2 and "1.00" not in page2
     assert page2.count('action="' + reverse("lot_ledger_action", args=[lot.pk, "reverse"])) == 5
 
 

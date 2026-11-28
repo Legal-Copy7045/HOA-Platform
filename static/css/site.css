@@ -920,6 +920,8 @@ meter.bar { width: 100%; max-width: 16rem; height: 1rem; vertical-align: middle;
 .stage.is-current .stage-label, .stage.is-outcome .stage-label { color: var(--ink); font-weight: 700; }
 .stage.is-future .stage-mark { border-style: dashed; }
 .stage.is-skipped .stage-label { text-decoration: line-through; }
+.stage.is-earlier .stage-mark { border-color: var(--line); background: var(--surface-2); color: var(--ink-2); }
+.stage.is-earlier .stage-label { color: var(--ink-2); }
 .stage.is-outcome .stage-mark { border: 4px double var(--ink-2); background: var(--surface-2); color: var(--ink-2); }
 .stage.is-outcome .stage-label { font-style: italic; }
 .stages-compact { display: none; }

@@ -363,6 +363,21 @@ ExecStart=/usr/local/sbin/hoa-egress-firewall apply --quiet
 [Install]
 WantedBy=docker.service
 UNIT
+# At boot the rules the last apply saved are loaded before Docker starts, so
+# the containers Docker restarts are never without them (review EXP-001).
+cat > /etc/systemd/system/hoa-egress-firewall-boot.service <<'UNIT'
+[Unit]
+Description=HOA portal: outbound firewall rules loaded before Docker starts (D101)
+After=ufw.service
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hoa-egress-firewall restore
+
+[Install]
+WantedBy=multi-user.target
+UNIT
 cat > /etc/systemd/system/hoa-egress-firewall.timer <<'UNIT'
 [Unit]
 Description=HOA portal: keep the outbound firewall on the portal's current networks
@@ -376,7 +391,7 @@ AccuracySec=10s
 WantedBy=timers.target
 UNIT
 systemctl daemon-reload
-systemctl enable hoa-egress-firewall.service >/dev/null
+systemctl enable hoa-egress-firewall.service hoa-egress-firewall-boot.service >/dev/null
 systemctl enable --now hoa-egress-firewall.timer >/dev/null
 /usr/local/sbin/hoa-egress-firewall apply | sed 's/^/    /'
 

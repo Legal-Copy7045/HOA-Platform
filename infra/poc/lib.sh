@@ -505,6 +505,24 @@ egress_firewall_refresh() {
   return 0
 }
 
+# egress_firewall_before_start <project> <compose command...>: where the
+# firewall is installed and the project has no networks yet (first start, or
+# after `compose down`), create them and the containers without starting
+# them, then apply, so no container runs a moment without the rules (review
+# EXP-001, 0.46.0). Networks that already exist keep their rules.
+egress_firewall_before_start() {
+  local project="$1"
+  shift
+  [ -x "$EGRESS_FIREWALL_BIN" ] || return 0
+  if [ -n "$(docker network ls -q --filter "label=com.docker.compose.project=$project" 2>/dev/null)" ]; then
+    return 0
+  fi
+  echo "==> Creating the networks and applying the outbound firewall before anything starts (D101)"
+  "$@" up --no-start --remove-orphans \
+    || { echo "WARNING: could not create the containers first; the firewall follows within a minute." >&2; return 0; }
+  egress_firewall_refresh
+}
+
 # egress_firewall_state: "<state> <networks>": active, stale, missing or
 # no-networks from the firewall; absent when it is not installed; unknown
 # when it cannot tell. Only that shape is printed (it goes to SQL variables).

@@ -111,6 +111,7 @@ FAILURE_SUBJECTS = (
 FAILURE_WORDS = {
     "auth": "the mailbox refused the user name or password",
     "connect": "the mail server could not be reached",
+    "not_public": "the mailbox host no longer resolves to public addresses only",
     "tls": "the mail server's certificate did not check out",
     "protocol": "the mail server answered in a way the portal did not expect",
     "folder": "the folder to read was not found",
@@ -530,10 +531,27 @@ class Mailbox:
 
     def __init__(self, cfg: Config, factory=None):
         self.cfg = cfg
-        self.factory = factory or imaplib.IMAP4_SSL
+        self.factory = factory
         self.conn = None
 
+    def _real_factory(self):
+        """imaplib.IMAP4_SSL, pinned to the public address the mailbox host
+        resolves to now when it is a public host name outside local
+        development (review EXP-002, 0.46.0; core.email.pin_wanted): a name
+        re-pointed at a private address after its test is never contacted."""
+        from core import credential_checks
+        from core.email import pin_wanted
+
+        if not pin_wanted(self.cfg.host):
+            return imaplib.IMAP4_SSL
+        addresses = credential_checks.public_addresses(self.cfg.host)
+        if not addresses:
+            raise MailboxError("not_public")
+        return credential_checks.pinned_imap(addresses[0])
+
     def __enter__(self):
+        if self.factory is None:
+            self.factory = self._real_factory()
         try:
             self.conn = self.factory(
                 self.cfg.host, self.cfg.port, ssl_context=tls_context(), timeout=TIMEOUT_SECONDS

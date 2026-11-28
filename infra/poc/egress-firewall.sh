@@ -7,6 +7,7 @@
 #   sudo hoa-egress-firewall apply    # (re)apply now; idempotent (--quiet: silent when current)
 #   sudo hoa-egress-firewall status   # one line "<state> <networks>"; exit 0 only when active
 #   sudo hoa-egress-firewall show     # the rules apply would load (iptables-restore format)
+#   sudo hoa-egress-firewall restore  # at boot, before Docker starts: load the last applied rules
 #   sudo hoa-egress-firewall remove   # troubleshooting only: take the rules out
 #
 # Docker's own forwarding rules bypass ufw, so the rules live in Docker's
@@ -16,7 +17,11 @@
 # duplicates a rule. hoa-egress-firewall.service runs apply after Docker
 # starts (and so after every reboot); hoa-egress-firewall.timer runs it every
 # minute so a recreated compose network (a new bridge) is covered within a
-# minute. Only traffic coming FROM the compose project's networks (found by
+# minute. Two gaps are closed besides (review EXP-001, 0.46.0): each apply
+# saves the rules it loaded, and hoa-egress-firewall-boot.service restores
+# them before Docker starts, so containers Docker restarts at boot (on the
+# same bridges as before) never run without them; and start-portal.sh creates
+# new networks first and applies before any container starts. Only traffic coming FROM the compose project's networks (found by
 # Docker's compose label, never by subnet) is filtered: replies, traffic
 # within one portal network, DNS to the host's resolvers, and the configured
 # ports to public addresses pass; private and special ranges are dropped on
@@ -28,6 +33,7 @@ set -euo pipefail
 CONF="${HOA_EGRESS_CONF:-/etc/hoa-portal/egress-firewall.conf}"
 LOCAL_CONF="${HOA_EGRESS_LOCAL_CONF:-/etc/hoa-portal/egress-firewall.local.conf}"
 LOCK="${HOA_EGRESS_LOCK:-/run/hoa-egress-firewall.lock}"
+STATE_DIR="${HOA_EGRESS_STATE_DIR:-/var/lib/hoa-portal}"
 read -r -a RESOLV_FILES <<<"${HOA_EGRESS_RESOLV:-/run/systemd/resolve/resolv.conf /etc/resolv.conf}"
 CHAIN=HOA-EGRESS
 DROP_CHAIN=HOA-EGRESS-DROP
@@ -38,7 +44,7 @@ die() { echo "hoa-egress-firewall: $*" >&2; exit 2; }
 
 # --- Settings ------------------------------------------------------------------------------
 
-PROJECT="" APP_TCP_PORTS="" TUNNEL_NETWORK="" TUNNEL_PORTS="" BLOCKED_RANGES="" DNS_SERVERS="" LOG_RATE=""
+PROJECT="" EXTRA_PROJECTS="" APP_TCP_PORTS="" TUNNEL_NETWORK="" TUNNEL_PORTS="" BLOCKED_RANGES="" DNS_SERVERS="" LOG_RATE=""
 
 # read_conf <file>: KEY=value lines; only the known keys; nothing is executed.
 read_conf() {
@@ -53,7 +59,7 @@ read_conf() {
     value="${BASH_REMATCH[2]}"
     value="${value%"${value##*[![:space:]]}"}"
     case "$key" in
-      PROJECT | APP_TCP_PORTS | TUNNEL_NETWORK | TUNNEL_PORTS | BLOCKED_RANGES | DNS_SERVERS | LOG_RATE)
+      PROJECT | EXTRA_PROJECTS | APP_TCP_PORTS | TUNNEL_NETWORK | TUNNEL_PORTS | BLOCKED_RANGES | DNS_SERVERS | LOG_RATE)
         printf -v "$key" '%s' "$value" ;;
       *) die "$file: unknown setting $key" ;;
     esac
@@ -82,6 +88,10 @@ load_conf() {
   read_conf "$CONF"
   if [ -f "$LOCAL_CONF" ]; then read_conf "$LOCAL_CONF"; fi
   [[ "$PROJECT" =~ ^[a-z0-9][a-z0-9_-]{0,62}$ ]] || die "PROJECT must be a compose project name"
+  local extra
+  for extra in $EXTRA_PROJECTS; do
+    [[ "$extra" =~ ^[a-z0-9][a-z0-9_-]{0,62}$ ]] || die "EXTRA_PROJECTS: $extra is not a compose project name"
+  done
   [[ "$TUNNEL_NETWORK" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$ ]] || die "TUNNEL_NETWORK must be a network name"
   check_ports APP_TCP_PORTS "$APP_TCP_PORTS"
   check_ports TUNNEL_PORTS "$TUNNEL_PORTS"
@@ -117,12 +127,17 @@ dns_servers() {
 # --- The portal's networks -------------------------------------------------------------------
 
 # portal_networks: "<network name> <bridge interface>" per bridge network of
-# the compose project, sorted. Fails (changing nothing) when Docker does not answer.
+# the compose project and of EXTRA_PROJECTS (the restore drill's copy, review
+# EXP-003), sorted. Fails (changing nothing) when Docker does not answer.
 portal_networks() {
-  local names name info driver id option bridge
-  names="$(docker network ls --filter "label=com.docker.compose.project=$PROJECT" --format '{{.Name}}')" \
-    || die "Docker is not answering (docker network ls failed); nothing changed"
+  local names="" found project name info driver id option bridge
+  for project in $PROJECT $EXTRA_PROJECTS; do
+    found="$(docker network ls --filter "label=com.docker.compose.project=$project" --format '{{.Name}}')" \
+      || die "Docker is not answering (docker network ls failed); nothing changed"
+    names+="$found"$'\n'
+  done
   while IFS= read -r name; do
+    [ -n "$name" ] || continue
     [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$ ]] || continue
     info="$(docker network inspect -f '{{.Driver}} {{.Id}} {{index .Options "com.docker.network.bridge.name"}}' "$name")" \
       || die "could not read the network $name; nothing changed"
@@ -133,7 +148,7 @@ portal_networks() {
     bridge="${option:-br-${id:0:12}}"
     [[ "$bridge" =~ ^[A-Za-z0-9_.-]{1,15}$ ]] || die "network $name has an unexpected bridge name"
     printf '%s %s\n' "$name" "$bridge"
-  done <<<"$names" | sort
+  done <<<"$names" | sort -u
 }
 
 # --- The rules -------------------------------------------------------------------------------
@@ -236,6 +251,7 @@ apply() {  # apply [--quiet]: --quiet says nothing when the rules are already cu
   # Already in place for exactly these networks and settings: nothing to do
   # (the timer runs this every minute).
   if [ "$(current_state)" = active ]; then
+    save_rules  # a VM set up before 0.46.1 has none saved yet
     [ "$quiet" = --quiet ] || echo "Outbound firewall already on and current ($count portal network(s))."
     return 0
   fi
@@ -247,11 +263,61 @@ apply() {  # apply [--quiet]: --quiet says nothing when the rules are already cu
     render 6 "$FPR" | ip6tables-restore -w --noflush
     hook ip6tables "$(ip6_parent)"
   fi
+  save_rules
   if [ "$count" -eq 0 ]; then
     echo "Outbound firewall loaded; no portal networks exist yet (they are covered within a minute of the portal starting)."
   else
     echo "Outbound firewall on for $count portal network(s): $(cut -d' ' -f1 <<<"$NETS" | tr '\n' ' ')"
   fi
+}
+
+# save_rules: what apply loaded, for restore at the next boot (root only;
+# rewritten only when it changed, as the timer applies every minute).
+save_rules() {
+  local family file tmp
+  install -d -m 0755 "$STATE_DIR"
+  for family in 4 6; do
+    file="$STATE_DIR/egress-firewall.v$family.rules"
+    if [ "$family" = 6 ] && ! has_ip6; then rm -f "$file"; continue; fi
+    tmp="$(mktemp "$STATE_DIR/.egress-firewall.XXXXXX")"
+    render "$family" "$FPR" >"$tmp"
+    chmod 0600 "$tmp"
+    if cmp -s "$tmp" "$file"; then rm -f "$tmp"; else mv -f "$tmp" "$file"; fi
+  done
+}
+
+# saved_ok <file>: the file holds our two chains only, as render writes them.
+saved_ok() {
+  [ "$(sed -n 1p "$1")" = "*filter" ] && [ "$(tail -n 1 "$1")" = COMMIT ] \
+    && ! grep -vxE "\*filter|COMMIT|:($CHAIN|$DROP_CHAIN) - \[0:0\]|-A ($CHAIN|$DROP_CHAIN) [^;&|\`\$]*" "$1" >/dev/null
+}
+
+# restore: at boot, before Docker starts (hoa-egress-firewall-boot.service),
+# load the rules the last apply saved. Docker keeps its networks, and so
+# their bridge names, across reboots, so the containers it restarts are
+# filtered from their first packet; apply re-checks once Docker is up.
+# Without saved rules (never applied) it does nothing.
+restore() {
+  exec 8>"$LOCK"
+  flock -w 60 8 || die "another apply is still running"
+  local v4="$STATE_DIR/egress-firewall.v4.rules" v6="$STATE_DIR/egress-firewall.v6.rules"
+  if [ ! -f "$v4" ]; then
+    echo "No saved outbound firewall rules yet; apply loads them once Docker runs."
+    return 0
+  fi
+  command -v iptables-restore >/dev/null 2>&1 || die "iptables-restore is not installed"
+  saved_ok "$v4" || die "$v4 is not a saved rules file; nothing loaded (apply rewrites it)"
+  iptables -w -n -L DOCKER-USER >/dev/null 2>&1 || iptables -w -N DOCKER-USER
+  iptables-restore -w --noflush <"$v4"
+  hook iptables DOCKER-USER
+  # Docker adds this jump itself when it starts; made here so the rules hold
+  # from the first forwarded packet (a second copy would be harmless).
+  iptables -w -C FORWARD -j DOCKER-USER 2>/dev/null || iptables -w -I FORWARD 1 -j DOCKER-USER
+  if has_ip6 && [ -f "$v6" ] && saved_ok "$v6"; then
+    ip6tables-restore -w --noflush <"$v6"
+    hook ip6tables "$(ip6_parent)"
+  fi
+  echo "Outbound firewall restored from the last apply (before Docker starts)."
 }
 
 # current_state: active (hooked first in DOCKER-USER, and in IPv6 too, with
@@ -296,6 +362,7 @@ remove() {
     "$ipt" -w -F "$DROP_CHAIN" 2>/dev/null || true
     "$ipt" -w -X "$DROP_CHAIN" 2>/dev/null || true
   done
+  rm -f "$STATE_DIR/egress-firewall.v4.rules" "$STATE_DIR/egress-firewall.v6.rules"
   echo "Outbound firewall removed: the portal's containers can connect anywhere until"
   echo "System status -> Server tasks -> Re-apply host security puts it back (the health check fails meanwhile)."
 }
@@ -304,6 +371,7 @@ case "${1:-}" in
   apply) apply "${2:-}" ;;
   status) status ;;
   show) prepare; render 4 "$FPR"; if has_ip6; then echo "# IPv6"; render 6 "$FPR"; fi ;;
+  restore) restore ;;
   remove) remove ;;
-  *) echo "Usage: hoa-egress-firewall apply|status|show|remove" >&2; exit 2 ;;
+  *) echo "Usage: hoa-egress-firewall apply|status|show|restore|remove" >&2; exit 2 ;;
 esac

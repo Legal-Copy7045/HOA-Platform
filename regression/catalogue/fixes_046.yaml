@@ -1,0 +1,31 @@
+# Release 0.46 review fixes (D99, D100 and D101 "Review fixes (0.46.0)"):
+# SMTP port 25 refused with the firewall's reason (BUG-001), a home's ledger
+# newest first (BUG-002), an ended payment plan shown behind the case
+# (BUG-003), live mail and bounce polling pinned to a checked public address
+# (EXP-002, BUG-004), the firewall's rules restored before Docker at boot and
+# applied before new networks' containers start (EXP-001), and the restore
+# drill's copy filtered too (EXP-003).
+- feature: "Keys and connections refuses SMTP port 25 with the reason (the outbound firewall drops it; use 587, 465 or 2525), and a port 25 saved earlier fails its test at once without connecting"
+  since: "0.46"
+  match: ["^unit:core/tests/test_review_fixes_046.py::test_(port_25_is_refused|a_saved_port_25_fails)"]
+- feature: "Outside local development, live mail sending resolves a public mail host once per connection, never sends when it now points at a private address, and connects to the checked address; Mailpit, IP addresses and internal names from .env are used as before"
+  since: "0.46"
+  match: ["^unit:core/tests/test_review_fixes_046.py::test_(which_hosts_are_pinned|live_mail_|mailpit_is_used)"]
+- feature: "The bounce poll refuses a mailbox host that now resolves to a private address (not_public) and connects to the checked public address; not pinned in local development"
+  since: "0.46"
+  match: ["^unit:core/tests/test_review_fixes_046.py::test_bounce_polling_"]
+- feature: "A home's ledger pages its entries newest first: today's activity and its Reverse action on the first page, the oldest on the last"
+  since: "0.46"
+  match: ["^unit:core/tests/test_layout_046.py::test_a_homes_ledger_pages_its_entries"]
+- feature: "A collection case whose payment plan ended shows the plan as done earlier, behind the case, never as a step still to come; an untaken plan stays hidden"
+  since: "0.46"
+  match: ["^unit:core/tests/test_stages.py::test_an_ended_payment_plan_shows_behind"]
+- feature: "The outbound firewall saves the rules each apply loads and restores them at boot before Docker starts the containers; a foreign rules file is refused and remove forgets the saved rules"
+  since: "0.46"
+  match: ["^unit:core/tests/test_egress_firewall.py::test_(apply_saves_its_rules|restore_without_saved_rules|remove_also_forgets)"]
+- feature: "start-portal.sh creates new networks and the containers without starting them, applies the outbound firewall, then starts them; the boot unit restores before docker.service"
+  since: "0.46"
+  match: ["^unit:core/tests/test_egress_firewall.py::test_(the_boot_unit_restores|before_start_creates_then_applies)"]
+- feature: "The restore drill's throwaway copy (hoa-restore-drill) is covered by the outbound firewall, without the tunnel port, created and filtered before it starts"
+  since: "0.46"
+  match: ["^unit:core/tests/test_egress_firewall.py::test_the_restore_drills_network_is_filtered_too"]
