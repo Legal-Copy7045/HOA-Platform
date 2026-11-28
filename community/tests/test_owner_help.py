@@ -203,8 +203,10 @@ def test_dashboard_card_and_one_my_items_entry(client, w):
 def test_the_card_shows_only_in_the_first_days(client, w):
     owner = w["owner"]
     assert checklist.for_dashboard(owner) is not None
+    # Well past the 90-day window: a day or two either side would depend on the
+    # time of day and daylight saving in the community's time zone.
     type(owner).objects.filter(pk=owner.pk).update(
-        date_joined=timezone.now() - datetime.timedelta(days=91)
+        date_joined=timezone.now() - datetime.timedelta(days=100)
     )
     owner.refresh_from_db()
     assert checklist.for_dashboard(owner) is None

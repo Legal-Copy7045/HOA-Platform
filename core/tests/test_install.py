@@ -104,7 +104,7 @@ class Box:
             self.bin,
             "df",
             'echo "Filesystem 1024-blocks Used Available Capacity Mounted"\n'
-            'echo "/dev/sda1 41000000 4000000 37000000 10% /"\n',
+            'echo "/dev/sda1 20000000 2000000 18000000 10% /"\n',
         )
         _fake(self.bin, "timeout", record + "exit 0\n")
         _fake(self.bin, "ss", f'cat "{self.root}/ss.txt" 2>/dev/null || true\n')
