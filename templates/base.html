@@ -23,7 +23,9 @@
       </a>
       <form class="nav-search" method="get" action="{% url 'search' %}" role="search"><label for="nav-search-q" class="sr-only">Search the portal</label><input id="nav-search-q" type="search" name="q" placeholder="Search" maxlength="100" autocomplete="off" value="{% if request.resolver_match.url_name == 'search' %}{{ request.GET.q|truncatechars:100 }}{% endif %}"><button type="submit" aria-label="Search">{% icon "search" %}</button></form>
       <nav class="nav">
-        {% for section in nav.personal_sections %}{% include "partials/nav_section.html" %}{% endfor %}
+        {# Staff: Dashboard and My items, then their work, then their own home (D100, WT-009). #}
+        {% for section in nav.lead_sections %}{% include "partials/nav_section.html" %}{% endfor %}
+        {% if not nav.work_first %}{% for section in nav.own_sections %}{% include "partials/nav_section.html" %}{% endfor %}{% endif %}
         {% if nav.work_sections %}
         {# The work sections under one heading in the accent colour (D64). #}
         <div class="nav-work" role="group" aria-labelledby="nav-work-h">
@@ -31,11 +33,12 @@
           {% for section in nav.work_sections %}{% include "partials/nav_section.html" %}{% endfor %}
         </div>
         {% endif %}
+        {% if nav.work_first and nav.own_sections %}<div class="nav-own" data-testid="nav-own">{% for section in nav.own_sections %}{% include "partials/nav_section.html" %}{% endfor %}</div>{% endif %}
       </nav>
       <div class="sidebar-foot">
         <div class="who">{{ nav.display_name }}</div>
         <div class="who-sub">{{ nav.roles|join:" · "|default:user.email }}</div>
-        <div class="foot-links">
+        <div class="foot-links" data-testid="account-links">
           <a href="{% url 'my_profile' %}">My profile</a>
           <a href="{% url 'mfa_index' %}">Sign-in and security</a>
           {% if user|can:"request.submit" or user|can:"help.view" %}<a href="{% url 'ask_board' %}" class="ask-board-link">Ask the board</a>{% endif %}

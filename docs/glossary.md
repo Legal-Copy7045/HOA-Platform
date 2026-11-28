@@ -63,7 +63,7 @@ name here, and make its menu label match its `<h1>` (a test checks this).
 | Start next year's budget | On Budgets: a draft for the next fiscal year from this year's budget and actuals, with the adopted reserve plan's contribution and the monthly charge per home (D78). | `budget_prepare`, `ledger/budget_prep.py` |
 | Budget compared | A draft budget beside last year's budget and actuals, with the monthly charge per home and its change. | `budget_compare` |
 | Account number | The number of one ownership period of a home (changes when the home is sold). Shown as plain text, not a badge. | `Account.number` |
-| My home improvement requests (ARC) | Asking the Architectural Review Committee to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |
+| My ARC requests | Asking the Architectural Review Committee (ARC) to approve an exterior change, and neighbors' projects you are asked to acknowledge. The board's list is **Architectural review**. | `arc_list?mine=1`, `ArcRequest` |
 | Neighbor acknowledgement | A neighbor confirms they have seen a project. It never decides the request. | "signoff" (`arc/signoffs.py`) |
 | My violations | The owner's side of **Violations**: covenant or rule violations at your home, each with the notice (letter) the association sent and your response. Notices and letters are documents within a violation. Formerly "Notices about my home". | `violations?mine=1`, `compliance`, `Violation` |
 | Fix by | The date an owner should fix a notice by. | `cure_by` |

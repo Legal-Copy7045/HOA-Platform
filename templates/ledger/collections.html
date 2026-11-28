@@ -4,16 +4,24 @@
 {% block content %}
   {% include "ledger/finance_nav.html" %}
   <div class="page-head"><div><h1>Collections</h1><p class="subtitle">Tracking only: reminders, payment plans and referrals are recorded by people. Nothing is charged or filed automatically.</p></div></div>
-  <h2>Overdue balances <span class="muted small">(over 30 days)</span></h2>
+  <h2 id="overdue">Overdue balances <span class="muted small">(over 30 days)</span></h2>
+  {# D100 (WT-021): the total first, a page of homes at a time; empty age columns are left out on phones. #}
+  {% if delinquent_count %}<p class="small" data-testid="overdue-summary">{{ delinquent_count }} home{{ delinquent_count|pluralize }} owe {{ delinquent_total|cents }}{% if page.has_other_pages %}; showing {{ page.start_index }}–{{ page.end_index }}{% endif %}.{% if user|can:"reports.view" %} Ages for every home: <a href="{% url 'report_run' 'ar_aging' %}">Unpaid balances by age</a>.{% endif %}</p>{% endif %}
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Home</th><th class="num">Balance</th>{% for label in bucket_labels %}<th class="num">{{ label }}</th>{% endfor %}</tr></thead>
-    <tbody>{% for lot, bal, cols in delinquent %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'lot_ledger' lot.pk %}">{{ lot.label }}</a></td><td class="num" data-label="Balance"><strong>{{ bal|cents }}</strong></td>{% for label, amount in cols %}<td class="num" data-label="{{ label }}">{% if amount and forloop.last %}<span class="status tone-danger">{{ amount|cents }}</span>{% else %}{{ amount|cents }}{% endif %}</td>{% endfor %}</tr>
+    <tbody>{% for lot, bal, cols in page %}<tr class="row-link"><td class="cell-title"><a class="row-main" href="{% url 'lot_ledger' lot.pk %}">{{ lot.label }}</a></td><td class="num" data-label="Balance"><strong>{{ bal|cents }}</strong></td>{% for label, amount in cols %}<td class="num{% if not amount %} hide-sm{% endif %}" data-label="{{ label }}">{% if amount and forloop.last %}<span class="status tone-danger">{{ amount|cents }}</span>{% else %}{{ amount|cents }}{% endif %}</td>{% endfor %}</tr>
     {% empty %}<tr><td colspan="7">{% include "partials/empty.html" with icon="check-circle" title="No overdue balances" %}</td></tr>{% endfor %}</tbody>
   </table></div></div>
-  <h2>Cases</h2>
+  {% include "partials/pager.html" %}
+  <h2 id="cases">Cases</h2>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">
     <thead><tr><th>Case</th><th>Home</th><th>Status</th><th>Opened</th></tr></thead>
-    <tbody>{% for c in cases %}<tr class="row-link"><td><a class="row-main" href="{% url 'collection_detail' c.pk %}">Case #{{ c.pk }}</a></td><td class="cell-title">{{ c.lot.label }}</td><td>{% status c.state c.get_state_display %}</td><td class="nowrap" data-label="Opened">{{ c.opened_at|date:"M j, Y" }}</td></tr>
-    {% empty %}<tr><td colspan="4" class="muted">No cases.</td></tr>{% endfor %}</tbody>
+    <tbody>{% for c in open_cases %}{% include "ledger/_collection_case_row.html" %}
+    {% empty %}<tr><td colspan="4" class="muted">No open cases.</td></tr>{% endfor %}</tbody>
   </table></div></div>
+  {% if closed_cases %}<details class="more-items" data-testid="closed-cases"><summary>Show {{ closed_cases|length }} closed case{{ closed_cases|length|pluralize }}</summary>
+    <div class="table-card"><div class="table-wrap"><table class="stack-sm">
+      <thead><tr><th>Case</th><th>Home</th><th>Status</th><th>Opened</th></tr></thead>
+      <tbody>{% for c in closed_cases %}{% include "ledger/_collection_case_row.html" %}{% endfor %}</tbody>
+    </table></div></div></details>{% endif %}
 {% endblock %}

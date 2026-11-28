@@ -970,6 +970,10 @@ def _review(request, s, run, states):
     for section in sections:
         section["state"] = states.get(section["step"].key, "")
         section["url"] = reverse("setup_step", args=[section["step"].key])
+        # D100 (WT-021): a step's lines fold away unless one is flagged or
+        # the step was skipped, so the review is a short list of steps.
+        section["flags"] = sum(1 for line in section["lines"] if line["flag"])
+        section["open"] = bool(section["flags"]) or section["state"] == "skipped"
     flagged = sum(1 for sec in sections for line in sec["lines"] if line["flag"])
     return render(
         request,

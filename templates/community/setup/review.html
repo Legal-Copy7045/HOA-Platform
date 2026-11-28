@@ -16,7 +16,8 @@
   {% for sec in sections %}
     <section class="card setup-review" id="review-{{ sec.step.key }}">
       <div class="setup-review-head"><h2>{{ sec.title }}</h2>{% if sec.state == "completed" %}<span class="status tone-success">Done</span>{% elif sec.state == "skipped" %}<span class="status tone-warning">Skipped</span>{% endif %}<a class="btn secondary small" href="{{ sec.url }}" aria-label="Change {{ sec.title }}">Change</a></div>
-      {% if sec.lines %}<dl class="kv setup-kv">{% for line in sec.lines %}<dt>{{ line.label }}</dt><dd>{{ line.value|default:"-" }}{% if line.citation %} <span class="small muted">({{ line.citation }})</span>{% endif %}{% if line.flag %} <span class="status tone-warning" data-flag>{{ line.flag }}</span>{% endif %}</dd>{% endfor %}</dl>
+      {% if sec.lines %}<details class="more-items review-lines"{% if sec.open %} open{% endif %} data-testid="review-lines-{{ sec.step.key }}"><summary>{{ sec.lines|length }} setting{{ sec.lines|length|pluralize }}{% if sec.flags %} · <span class="status tone-warning">{{ sec.flags }} to check</span>{% endif %}</summary>
+        <dl class="kv setup-kv">{% for line in sec.lines %}<dt>{{ line.label }}</dt><dd>{{ line.value|default:"-" }}{% if line.citation %} <span class="small muted">({{ line.citation }})</span>{% endif %}{% if line.flag %} <span class="status tone-warning" data-flag>{{ line.flag }}</span>{% endif %}</dd>{% endfor %}</dl></details>
       {% else %}<p class="small muted">Status only: see the step.</p>{% endif %}
     </section>
   {% endfor %}

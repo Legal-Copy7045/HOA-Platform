@@ -43,11 +43,32 @@ def system_panel() -> dict:
     from core.views import _update_status
 
     health = run_checks()
+    failing = [r for r in health if not r.ok]
     return {
-        "failing": [r for r in health if not r.ok],
+        # Each failing check with the button that fixes it (WT-010, D100).
+        "failing": [(r, check_action(r.key)) for r in failing],
         "checks": len(health),
         "update": _update_status(),
     }
+
+
+# Where a sysadmin fixes a failing health check: (button label, URL). Checks
+# not listed open System status, which explains each one.
+CHECK_ACTIONS = {
+    "backups": ("Take a backup", "server_tasks", "#backups"),
+    "email": ("Open Keys and connections", "keys_connections", ""),
+    "email_delivery": ("Open Keys and connections", "keys_connections", ""),
+    "bounce_mailbox": ("Open Keys and connections", "keys_connections", ""),
+    "payments": ("Open Keys and connections", "keys_connections", ""),
+    "bank_feed": ("Open Keys and connections", "keys_connections", ""),
+    "worker": ("Open Server tasks", "server_tasks", ""),
+    "jobs": ("Open Server tasks", "server_tasks", ""),
+}
+
+
+def check_action(key: str) -> dict:
+    label, name, anchor = CHECK_ACTIONS.get(key, ("Open System status", "system_status", ""))
+    return {"label": label, "url": reverse(name) + anchor}
 
 
 # Roles that are never assigned anything (no My items): their dashboard
@@ -95,20 +116,17 @@ def quick_actions(user, roles) -> list[dict]:
                 "icon": "mail",
             }
         )
-    if roles.groups & policy.ACCOUNT_VIEWERS:
-        if _can(roles.groups, "arc.submit"):
-            out.append(
-                {
-                    "label": "My home improvement requests (ARC)",
-                    "url": reverse("arc_list") + "?mine=1",
-                    "icon": "pencil",
-                }
-            )
-        out += [
-            {"label": "Governing documents", "url": reverse("documents"), "icon": "folder"},
-            {"label": "My profile", "url": reverse("my_profile"), "icon": "user"},
-            {"label": "Sign-in and security", "url": reverse("mfa_index"), "icon": "lock"},
-        ]
+    # Governing documents, My profile and Sign-in and security are in the
+    # menu (Documents, the account links at its top) and the checklist, so
+    # they are not repeated here (WT-018, D100).
+    if roles.groups & policy.ACCOUNT_VIEWERS and _can(roles.groups, "arc.submit"):
+        out.append(
+            {
+                "label": "My ARC requests",
+                "url": reverse("arc_list") + "?mine=1",
+                "icon": "pencil",
+            }
+        )
     return out
 
 
@@ -176,15 +194,36 @@ def staff_panel(user, roles) -> dict:
     return {"stats": stats}
 
 
-# How many to-dos the dashboard lists before "See all in My items".
-TODO_LIMIT = 8
+# How many to-dos the dashboard lists before "See all in My items": a short
+# summary (the counts per group and the top few), never a copy of the My
+# items page (D100, WT-001/WT-020). Owners, who have no My items page, see
+# every to-do.
+TODO_LIMIT = 5
 # Roles whose work is the association's (D64): with a home as well, the
 # dashboard has two headed parts, "Your home" and "Board work".
 WORK_GROUPS = frozenset({policy.BOARD, policy.MANAGER, policy.AUDITOR, policy.ARC_REVIEWER})
 # Quick actions that are board work; the rest are the person's own.
 BOARD_QUICK = {"record_payments"}
-# Per part, as on the single list (phones show the first four of each).
-PART_LIMIT = 6
+# Per part of a board member's dashboard (D100): the top three.
+PART_LIMIT = 3
+
+
+def group_links(items, part_key: str) -> list[dict]:
+    """One link per My items group with its count and overdue count, to that
+    group's card on the My items page (its id is area-<part>-<group>)."""
+    from django.utils.text import slugify
+
+    from core.my_items import counts
+
+    base = reverse("my_items")
+    return [
+        # Set-up warnings are alerts at the top of My items, not a card.
+        {
+            **c,
+            "url": base if c["area"] == "Setup" else f"{base}#area-{part_key}-{slugify(c['area'])}",
+        }
+        for c in counts(items)
+    ]
 
 
 def parts(items, quick, can_open_queue, groups=frozenset({policy.BOARD})) -> list[dict]:
@@ -209,6 +248,8 @@ def parts(items, quick, can_open_queue, groups=frozenset({policy.BOARD})) -> lis
             # Only staff can open the My items page (owners see every to-do).
             "queue": can_open_queue,
             "quick": quick_links,
+            # The summary line: counts per group, each a jump into My items.
+            "groups": group_links(todos, key) if can_open_queue else [],
         }
 
     board = part(
@@ -247,6 +288,7 @@ def build(user, request=None) -> dict:
     can_open_queue = any(policy.can(user, p) for p in my_items.MY_ITEMS_PERMISSIONS)
     data["todos"] = items[:TODO_LIMIT] if can_open_queue else items
     data["todos_more"] = len(items) - len(data["todos"])
+    data["todo_groups"] = group_links(items, "all") if can_open_queue else []
     data["can_open_queue"] = can_open_queue
     if roles.groups & policy.ACCOUNT_VIEWERS:
         data["owner"] = owner_panel(user, roles)
@@ -259,7 +301,9 @@ def build(user, request=None) -> dict:
         data["parts"] = parts(items, data["quick"], can_open_queue, roles.groups)
     # A sign-in to-do (backup method, new recovery codes, D58) is the
     # login's own, not role work: the role shortcuts still show beside it.
-    if not [i for i in items if i.area != "Sign-in and security"]:
+    if not [i for i in items if i.area != "Sign-in and security"] and "system" not in data:
+        # A sysadmin-only login has the System status card with a button per
+        # failing check instead of a list of its menu entries (WT-010).
         data["shortcuts"] = role_shortcuts(user, roles, request)
     from comms.models import Announcement, AnnouncementRead
     from comms.services import upcoming, with_page_urls

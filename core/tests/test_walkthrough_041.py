@@ -397,7 +397,7 @@ def test_contacts_are_not_sent_to_the_owners_arc_page(client, w):
 
 def test_welcome_tiles_are_named_after_their_pages_and_are_not_hub_tiles():
     source = (Path(settings.BASE_DIR) / "templates/community/welcome.html").read_text()
-    for name in ("My account", "My home improvement requests (ARC)", "Announcements", "Help"):
+    for name in ("My account", "My ARC requests", "Announcements", "Help"):
         assert f"<strong>{name}</strong>" in source
     js = (Path(settings.BASE_DIR) / "regression/walkthrough.js").read_text()
     assert "ul.tiles:not(.welcome-tiles) a.tile" in js

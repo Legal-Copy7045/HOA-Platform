@@ -92,7 +92,9 @@ def test_work_sections_sit_under_one_board_heading(client, board):
     html = response.content.decode()
     heading = '<div class="nav-work-heading" id="nav-work-h">Board</div>'
     assert heading in html
-    work = html.split(heading)[1].split("</nav>")[0]
+    # Staff: the own sections follow the work sections (D100), outside the heading.
+    work = html.split(heading)[1].split('data-testid="nav-own"')[0]
+    assert html.index(heading) < html.index('data-testid="nav-own"')
     for title in ("Association", "Maintenance", "Finance", "Admin"):
         assert f"<span>{title}</span>" in work
     assert "<span>My home</span>" not in work

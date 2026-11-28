@@ -78,7 +78,7 @@ TOPICS: list[Topic] = [
         "Asking to change the outside of your home: the steps, what you do at each and the "
         "deadlines.",
         ("arc.submit", "lot.view_own", "arc.view_all"),
-        ("My home improvement requests (ARC)", "arc_list?mine=1"),
+        ("My ARC requests", "arc_list?mine=1"),
         ("Architectural review", "arc_list"),
     ),
     Topic(
@@ -336,7 +336,7 @@ def _arc(request=None) -> list[Section]:
     )
     steps = Section("The steps, and what you do at each")
     steps.items.append(
-        f"{labels['draft']}: describe the project on My home improvement requests (ARC) and "
+        f"{labels['draft']}: describe the project on My ARC requests and "
         "add plans or photos. Nothing is sent until you send it."
     )
     neighbor_line = (

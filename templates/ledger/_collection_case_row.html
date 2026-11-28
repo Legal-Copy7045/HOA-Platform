@@ -1,0 +1,1 @@
+{% load portal %}<tr class="row-link"><td><a class="row-main" href="{% url 'collection_detail' c.pk %}">Case #{{ c.pk }}</a></td><td class="cell-title">{{ c.lot.label }}</td><td>{% status c.state c.get_state_display %}</td><td class="nowrap" data-label="Opened">{{ c.opened_at|date:"M j, Y" }}</td></tr>

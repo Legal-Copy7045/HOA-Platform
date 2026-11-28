@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load help_tags portal static %}
-{% block title %}{% if mine %}My home improvement requests (ARC){% else %}Architectural review{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block title %}{% if mine %}My ARC requests{% else %}Architectural review{% endif %} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="page-head"><div><h1>{% if mine %}My home improvement requests (ARC){% else %}Architectural review{% endif %}</h1><p class="subtitle">{% if mine %}Exterior changes need approval before work starts. Describe your project, add plans and photos, then send it to your neighbors and the committee.{% else %}Every request from the community, for review.{% endif %} {% how_it_works "architectural-review" %}</p></div>
+  <div class="page-head"><div><h1>{% if mine %}My ARC requests{% else %}Architectural review{% endif %}</h1><p class="subtitle">{% if mine %}Exterior changes need approval from the Architectural Review Committee (ARC) before work starts. Describe your project, add plans and photos, then send it to your neighbors and the committee.{% else %}Every request from the community, for review.{% endif %} {% how_it_works "architectural-review" %}</p></div>
     <div class="actions">{% if can_submit and rows and not form.errors and not request.GET.new %}<a class="btn" href="?mine=1&amp;new=1#new-request" data-opens="new-request">{% icon "plus" %} Ask for approval of a project</a>{% endif %}
     {% if can_view_all and user|can:"arc.submit" %}{% if mine %}<a class="btn secondary" href="{% url 'arc_list' %}">Board review list</a>{% else %}<a class="btn secondary" href="{% url 'arc_list' %}?mine=1">{% icon "home" %} My own requests</a>{% endif %}{% endif %}</div></div>
   {% if arc_tab %}{% include "arc/_owner_tabs.html" %}{% endif %}

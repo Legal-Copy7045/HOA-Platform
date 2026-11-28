@@ -1,0 +1,1 @@
+<li><a class="grow" href="?period={{ m.key }}">{{ m.label }}</a>{% if m.close %}<span class="status tone-success">Closed</span>{% elif m.current %}<span class="status">Open</span>{% elif m.run %}<span class="status tone-warning">{{ m.run.blocking }} exception{{ m.run.blocking|pluralize }}</span>{% else %}<span class="status">Open</span>{% endif %}</li>
