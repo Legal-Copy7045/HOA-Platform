@@ -541,7 +541,7 @@ def _feature_open_items() -> dict[str, tuple[int, str, str]]:
 def _switch_off_warning(feature, open_item) -> str:
     """What disappears when a feature is switched off, named for the board."""
     text = (
-        f"Switch off {feature.label}? It leaves the menu for everyone, owners included, "
+        f"Switch off {feature.label}? It is hidden from the menu for everyone, owners included, "
         "and its pages stop opening."
     )
     if open_item and open_item[0]:

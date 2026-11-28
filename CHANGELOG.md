@@ -33,6 +33,9 @@ adds an entry here.
   need it; a seller's payment plan no longer stops the buyer's late fees or
   interest; SMTP2Go delivery records are kept when one message in a batch
   fails.
+- Expense claims are board work: "Claim an expense" and "My reimbursements"
+  are no longer on My account; switching a feature off now says it is hidden
+  from the menu.
 
 ## 0.43.0 — 2026-11-27
 
