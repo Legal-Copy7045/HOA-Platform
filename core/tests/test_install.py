@@ -554,11 +554,11 @@ def test_curl_bootstrap_clones_the_newest_release_and_hands_over_to_its_install_
 def test_the_bootstrap_address_is_pinned_to_a_release_tag_never_main():
     readme = (POC / "README.md").read_text()
     script = (POC / "install.sh").read_text()
-    pinned = r"https://raw\.githubusercontent\.com/Legal-Copy7045/HOA-Platform/v[0-9<]"
+    pinned = r"https://raw\.githubusercontent\.com/Legal-Copy7045/HOA-Portal/v[0-9<]"
     assert re.search(pinned + r"[^ ]*/infra/poc/install\.sh \| sudo bash", readme)
     assert re.search(pinned + r"[^ ]*/infra/poc/install\.sh \| sudo bash", script)
     for text in (readme, script, (POC / "provision-vm.sh").read_text()):
-        assert "HOA-Platform/main/" not in text
+        assert "HOA-Portal/main/" not in text
     # The checkout follows the same release picker as update-portal.sh.
     lib = (POC / "lib.sh").read_text()
     assert "tag --merged origin/main --list 'v*' | pick_release_tag" in lib

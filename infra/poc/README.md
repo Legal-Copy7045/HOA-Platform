@@ -16,7 +16,7 @@ Replace `v0.44.0` below with the newest release on GitHub (Releases; always a
    -> node -> Shell:
 
    ```bash
-   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/v0.44.0/infra/poc/create-vm.sh
+   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v0.44.0/infra/poc/create-vm.sh
    ```
 
    ```bash
@@ -40,7 +40,7 @@ Replace `v0.44.0` below with the newest release on GitHub (Releases; always a
    **xterm.js**, which supports paste; log in as `hoa`):
 
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/v0.44.0/infra/poc/install.sh | sudo bash
+   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v0.44.0/infra/poc/install.sh | sudo bash
    ```
 
    To read it first: `curl -fsSLO <the same address>`, `less install.sh`,
@@ -76,7 +76,7 @@ Replace `v0.44.0` below with the newest release on GitHub (Releases; always a
    `--close-ssh` closes it. With curl, options go after `bash -s --`:
 
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/v0.44.0/infra/poc/install.sh | sudo bash -s -- --close-ssh
+   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v0.44.0/infra/poc/install.sh | sudo bash -s -- --close-ssh
    ```
 
    **Running it again is safe**: finished steps are skipped, `.env` and its

@@ -2,7 +2,7 @@
 # Hardens the POC VM and installs Docker. infra/poc/install.sh runs it as its
 # first step (D94); on its own, run it INSIDE the VM, from its Proxmox
 # console, as the "hoa" user with sudo, from a release (never main):
-#   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/v<VERSION>/infra/poc/provision-vm.sh
+#   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v<VERSION>/infra/poc/provision-vm.sh
 #   less provision-vm.sh          # read it first
 #   sudo bash provision-vm.sh
 #
@@ -20,7 +20,7 @@
 set -euo pipefail
 trap 'echo "ERROR: ${BASH_SOURCE[0]} stopped at line $LINENO (exit $?). Nothing after that line ran." >&2' ERR
 
-REPO_URL="${REPO_URL:-https://github.com/Legal-Copy7045/HOA-Platform.git}"
+REPO_URL="${REPO_URL:-https://github.com/Legal-Copy7045/HOA-Portal.git}"
 # Empty: the newest release tag on main (D90). A branch name: its tip, on purpose.
 BRANCH="${BRANCH:-}"
 APP_DIR="${APP_DIR:-/opt/hoa-portal}"

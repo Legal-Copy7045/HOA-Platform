@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the whole portal on a fresh Ubuntu server in one command (D94).
 #
-#   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/v<VERSION>/infra/poc/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v<VERSION>/infra/poc/install.sh | sudo bash
 #
 # (always a release tag in that address, never main), or from a checkout:
 #
@@ -40,7 +40,7 @@
 #   -h, --help              this text
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/Legal-Copy7045/HOA-Platform.git}"
+REPO_URL="${REPO_URL:-https://github.com/Legal-Copy7045/HOA-Portal.git}"
 LOG="${HOA_INSTALL_LOG:-/var/log/hoa-portal-install.log}"
 STATE_DIR="${HOA_INSTALL_STATE_DIR:-/var/lib/hoa-portal}"
 STATE_FILE="$STATE_DIR/install-state"
