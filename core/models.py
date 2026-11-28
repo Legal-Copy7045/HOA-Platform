@@ -251,6 +251,27 @@ class DemoSeed(models.Model):
         raise PermissionError("Demo seed records are kept.")
 
 
+class DemoPersona(models.Model):
+    """A login the demo seed created for a test persona (D97). Demo mode
+    (core/demo_mode.py) switches only to these: never by email or name alone.
+    Written only by the seed (``core.demo_mode.mark_persona``); a reseed
+    replaces the whole database, so the table holds only the dataset's own."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="demo_persona"
+    )
+    key = models.CharField(max_length=40, unique=True)
+    label = models.CharField(max_length=160)
+    position = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self) -> str:
+        return f"demo persona {self.key}"
+
+
 # --- Monitoring (D74) ------------------------------------------------------------------
 
 

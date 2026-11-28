@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Demo mode · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="page-head"><div><h1>{% if request.demo_switch %}Not while viewing as a demo persona{% else %}Demo mode is not available{% endif %}</h1></div></div>
+  <div class="alert warning" role="alert">{% icon "lock" %}<span>{{ message }}</span></div>
+  {% if request.demo_switch %}<form method="post" action="{% url 'demo_switch_back' %}">{% csrf_token %}<button type="submit">Back to me</button></form>{% endif %}
+{% endblock %}

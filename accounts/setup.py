@@ -50,6 +50,8 @@ def state(request) -> dict | None:
     user = getattr(request, "user", None)
     if user is None or not user.is_authenticated:
         return None
+    if getattr(request, "demo_switch", None) is not None:
+        return None  # demo mode (D97): the real user's own login is set up
     name = _url_name(request)
     if name == "enroll_with_code":
         step, via = 1, "reset"

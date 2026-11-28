@@ -5,7 +5,7 @@ from django.urls import include, path, re_path
 from accounts import mfa_views, password_reset, recovery_codes
 from audit.views import sysadmin_activity
 from community.profile_views import directory, my_profile
-from core import hub_views, preview
+from core import demo_mode, hub_views, preview
 from core.followups import set_follow_up
 from core.keys_views import keys_change, keys_connections, keys_service
 from core.my_items_views import my_items_page
@@ -47,6 +47,8 @@ urlpatterns = [
     path("board/features/", feature_settings, name="feature_settings"),
     path("board/setup/", hub_views.settings_hub, name="settings_hub"),
     path("ops/demo-data/", demo_data, name="demo_data"),
+    path("demo/switch/", demo_mode.switch, name="demo_switch"),
+    path("demo/switch-back/", demo_mode.switch_back, name="demo_switch_back"),
     path("community-info/", hub_views.community_info, name="community_info"),
     path("finance/more/", hub_views.finance_more, name="finance_more"),
     re_path(

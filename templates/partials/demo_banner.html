@@ -1,0 +1,16 @@
+{% load portal %}{# Demo mode (D97): only on the POC with a seeded demo dataset (core.demo_mode.banner). #}
+<div class="demo-banner" role="status" data-demo-banner>{% icon "users" %}
+  <span><strong>Demo — you are viewing as: {{ demo_banner.viewing }} ({{ demo_banner.role }})</strong>{% if demo_banner.switched %} The rules are the persona's; your own login stays signed in underneath.{% else %} All data here is fictional.{% endif %}</span>
+  {% if demo_banner.may_switch and demo_banner.personas %}
+    <form method="post" action="{% url 'demo_switch' %}" class="inline demo-picker">{% csrf_token %}
+      <label for="demo-persona" class="sr-only">Demo persona</label>
+      <select id="demo-persona" name="persona" required>
+        {% for p in demo_banner.personas %}<option value="{{ p.user_id }}"{% if p.user_id == demo_banner.current %} selected{% endif %}>{{ p.name }} — {{ p.label }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="small">View as</button>
+    </form>
+  {% endif %}
+  {% if demo_banner.switched %}
+    <form method="post" action="{% url 'demo_switch_back' %}" class="inline">{% csrf_token %}<button type="submit" class="small secondary">Back to me</button></form>
+  {% endif %}
+</div>

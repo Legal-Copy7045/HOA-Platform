@@ -400,6 +400,12 @@ details.coverage ul { columns: 2; column-gap: 2rem; }
 .preview-banner { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: .7rem 1rem; margin: 0 0 1.25rem; border-radius: 10px; background: var(--warning-bg); color: var(--ink); border: 1px solid var(--warning); }
 .preview-banner > span { flex: 1 1 16rem; }
 .preview-banner form { margin: 0; }
+/* Demo mode (D97): who you are viewing as, and the persona picker */
+.demo-banner { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: .7rem 1rem; margin: 0 0 1.25rem; border-radius: 10px; background: var(--warning-bg); color: var(--ink); border: 1px dashed var(--warning); }
+.demo-banner > span { flex: 1 1 16rem; }
+.demo-banner form { margin: 0; }
+.demo-picker { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.demo-picker select { max-width: 100%; min-width: 0; }
 
 /* Sign-in background picture (uploaded on the Branding page) */
 .auth.has-bg { position: relative; isolation: isolate; background: #1b2a22; }

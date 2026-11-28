@@ -42,6 +42,13 @@ def _board_notice(kind: str) -> None:
     transaction.on_commit(lambda: notify_board.defer(kind=kind))
 
 
+def _refuse_real_login(user_id) -> None:
+    """Demo mode (D97): a persona never resets a real login's sign-in."""
+    from core.demo_mode import refuse_real_target
+
+    refuse_real_target(user_id=user_id, error=MfaResetError)
+
+
 def open_reset_for(user: User) -> MfaReset | None:
     """The reset blocking this user's account, if any (approved, code not used)."""
     return (
@@ -59,6 +66,7 @@ def open_reset_for(user: User) -> MfaReset | None:
 
 def start_reset(*, subject: User, verification_method: str, actor, request=None) -> MfaReset:
     require(actor, "mfa_reset.start")
+    _refuse_real_login(subject.pk)
     if verification_method not in VerificationMethod.values:
         raise MfaResetError("Choose how you confirmed the person's identity.")
     if subject.pk == actor.pk:
@@ -92,6 +100,7 @@ def start_reset(*, subject: User, verification_method: str, actor, request=None)
 def approve_reset(reset: MfaReset, *, actor, request=None) -> str:
     """Approve; returns the enrollment code, which is shown once and never stored."""
     require(actor, "mfa_reset.approve")
+    _refuse_real_login(reset.subject_id)
     with transaction.atomic(), system_access("mfa reset"):
         reset = MfaReset.objects.select_for_update().get(pk=reset.pk)
         if reset.status != "awaiting_approval":
@@ -125,6 +134,7 @@ def approve_reset(reset: MfaReset, *, actor, request=None) -> str:
 
 def cancel_reset(reset: MfaReset, *, actor, request=None) -> MfaReset:
     require(actor, "mfa_reset.start")
+    _refuse_real_login(reset.subject_id)
     with transaction.atomic(), system_access("mfa reset"):
         reset = MfaReset.objects.select_for_update().get(pk=reset.pk)
         if reset.status != "awaiting_approval":
