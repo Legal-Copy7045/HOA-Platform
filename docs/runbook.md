@@ -1046,7 +1046,7 @@ The association is self-managed, so these are the treasurer's (and the board's) 
 2. Another board member approves it (Payment plans, or My items); the case then shows "Payment plan agreed". Download the agreement letter, mail it, and ask the owner to agree on My account or sign and return the letter.
 3. Missed installments show on My items; after the default period the plan ends by itself and the case returns to its earlier step (letters and late fees resume). A paid-off plan closes the case.
 
-**Expense reimbursement** (anyone who paid an association expense: My account → Claim an expense; their claims are on My reimbursements, linked from My account, the Finance overview and their committee's page, D95)
+**Expense reimbursement** (a board member or committee member who paid an association expense: My reimbursements → Claim an expense, linked from the Finance overview and their committee's page, D95; owners on neither do not claim)
 1. Submit the amount, date, shop, category and description with the receipt.
 2. A board member other than the claimant approves (two above the set limit). Nobody approves or pays their own claim; a board member's claim is paid by another board member, never the manager.
 3. Pay by check from Checks, or "Record bank transfer" with the transfer's reference (never account numbers).

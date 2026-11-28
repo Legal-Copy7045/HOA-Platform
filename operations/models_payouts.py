@@ -26,7 +26,7 @@ from core.append_only import AppendOnlyModel, ScopedAppendOnlyModel
 
 class ReimbursementClaim(ScopedAppendOnlyModel):
     """Someone paid an association expense out of pocket and asks to be paid
-    back. Scoped to the claimant (a committee member or volunteer sees only
+    back. Scoped to the claimant (a committee member sees only
     their own claims; the board and manager see all)."""
 
     scope_person_path = "claimant"
