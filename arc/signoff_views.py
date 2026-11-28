@@ -88,9 +88,9 @@ def _lot_choices(req) -> list[tuple[int, str]]:
 
 
 def _gemini_configured():
-    from django.conf import settings
+    from core import ai
 
-    return settings.GEMINI_API_KEY
+    return bool(ai.api_key())
 
 
 @login_required

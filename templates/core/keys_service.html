@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}{{ svc.label }} · Keys and connections · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'system_status' %}">System status</a> / <a href="{% url 'keys_connections' %}">Keys and connections</a> / {{ svc.label }}</div>
+  <div class="page-head"><div><h1>{{ svc.label }}</h1>
+    <p class="subtitle">{{ svc.summary }}</p></div></div>
+  {% if not kek %}<div class="alert danger" role="alert">{% icon "alert" %}<span>The server's key-encryption key (CREDENTIALS_KEK) is missing: nothing can be saved until start-portal.sh has added it.</span></div>{% endif %}
+  {% if result %}<div class="alert {% if result.ok %}success{% else %}danger{% endif %}" role="status">{% icon "alert" %}<span><strong>Test {% if result.ok %}passed{% else %}failed{% endif %}:</strong> {{ result.words }}</span></div>{% endif %}
+
+  <section class="card"><h2>Now</h2>
+    <ul class="list">{% for r in info.rows %}<li><div class="grow"><div class="title">{{ r.field.label }}</div><div class="small muted">{% if r.unreadable %}Saved here but can't be opened (the server's key changed). Enter it again.{% elif r.set %}Set {% if r.source == "portal" %}here{% else %}on the server (.env){% endif %}{% if r.field.secret %}{% if r.last4 %} · ends in {{ r.last4 }}{% endif %}{% elif r.shown %} · {{ r.shown }}{% endif %}{% else %}Not set{% endif %}</div></div></li>{% endfor %}</ul>
+    {% if info.pin %}<p class="small">Pinned {{ svc.pinned|lower }}: ending {{ info.pin|slice:"-4:" }}.</p>{% endif %}
+    {% for cs in info.pending %}<p class="small"><a href="{% url 'keys_change' cs.change.pk %}">Change of {{ cs.change.requested_at|date:"M j, g:i A" }}</a>: {{ cs.words }}.</p>{% endfor %}
+  </section>
+
+  {% if svc.generated %}
+  <section class="card"><h2>Make or rotate the key</h2>
+    <p class="small">The key is made here from the server's random source: nothing is typed or shown. Rotating keeps the old key so older files still open, and the background worker re-encrypts them under the new one. The database backups hold it only encrypted under the server's CREDENTIALS_KEK: keep a copy of that key apart from the backups.</p>
+    <form method="post">{% csrf_token %}<input type="hidden" name="check" value="{{ check_value }}">
+      <label class="checkbox"><input type="checkbox" name="confirm" required> I am changing the key that protects vendors' tax forms.</label>
+      <div class="inline-form">{% if info.configured %}<button type="submit" name="action" value="rotate">Rotate the key</button>{% else %}<button type="submit" name="action" value="make">Make the key</button>{% endif %}
+      {% if info.any_portal %}<button type="submit" name="action" value="clear" class="secondary">Remove the key made here</button>{% endif %}</div>
+    </form>
+  </section>
+  {% else %}
+  <section class="card"><h2>Enter new values</h2>
+    <p class="small muted">Fill in what changes; blank secrets keep the saved ones. Test checks the values with {{ svc.label }} without saving (nothing is sent or charged). Test and save saves only when the test passes, unless you tick "save anyway". The board is emailed about every save.{% if svc.approval %} This service also needs a board member who did not enter it to approve the change (removing the values here too) within {{ approval_hours }} hours{% if svc.pinned %}; its {{ svc.pinned|lower }} is pinned, and moving the pin needs two board members and {{ pin_wait }} hours{% elif not needs_board %}, once another board member has signed in with a second factor; until then a change takes effect at once{% endif %}.{% endif %}{% if svc.endpoint %} Changing the server, port, user name or region means typing the password or key again: a saved one is never sent to a new place.{% endif %} The board's email about a change goes through the email settings in use before it.</p>
+    {% include "partials/form_errors.html" %}
+    <form method="post" enctype="multipart/form-data" autocomplete="off">{% csrf_token %}<input type="hidden" name="check" value="{{ check_value }}">
+      {% for f in form %}<div class="field">{% if f.widget_type == "checkbox" %}<label class="checkbox">{{ f }} {{ f.label }}</label>{% else %}<label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% if f.help_text %}<p class="hint">{{ f.help_text }}</p>{% endif %}{% endif %}</div>{% endfor %}
+      <div class="inline-form"><button type="submit" name="action" value="save">Test and save</button>
+      <button type="submit" name="action" value="test" class="secondary">Test only</button>
+      {% if info.any_portal %}<button type="submit" name="action" value="clear" class="secondary" formnovalidate>Remove the values saved here</button>{% endif %}
+      <a class="btn secondary" href="{% url 'keys_connections' %}">Cancel</a></div>
+    </form>
+    {% if svc.script %}<p class="small muted">Optional fallback on the server: <code>sudo bash infra/poc/{{ svc.script }}</code>. A value saved here wins over .env.</p>{% endif %}
+  </section>
+  {% endif %}
+  {% if info.history %}<section class="card"><h2>History</h2>
+    <ul class="list">{% for cs in info.history %}<li><div class="grow"><a href="{% url 'keys_change' cs.change.pk %}">{{ cs.change.get_kind_display }}</a> · {{ cs.change.requested_at|date:"M j, Y g:i A" }} · {{ cs.change.requested_by.email|default:"the system" }}</div><span class="status">{{ cs.words }}</span></li>{% endfor %}</ul></section>{% endif %}
+{% endblock %}

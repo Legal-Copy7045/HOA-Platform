@@ -106,7 +106,9 @@ def valid_host(host: str) -> bool:
 
 def config() -> Config:
     """The environment and hosts from settings; ``configured`` once a login is set."""
-    env = (getattr(settings, "USPS_IV_ENVIRONMENT", "") or "cat").strip().lower()
+    from core import credentials
+
+    env = (credentials.get("USPS_IV_ENVIRONMENT") or "cat").strip().lower()
     if env not in ENVIRONMENTS:
         return Config(env, "", "", False, "USPS_IV_ENVIRONMENT must be cat or production.")
     api_default, auth_default = ENVIRONMENTS[env]
@@ -116,10 +118,10 @@ def config() -> Config:
         return Config(env, "", "", False, "USPS hosts must be usps.com names.")
     # The password reaches the worker container only (it polls USPS); the
     # web container is told that one is set, for the status lines (D87).
-    password_set = bool(settings.USPS_IV_PASSWORD) or bool(
+    password_set = bool(credentials.get("USPS_IV_PASSWORD")) or bool(
         getattr(settings, "USPS_IV_PASSWORD_SET", False)
     )
-    if not (settings.USPS_IV_USERNAME and password_set):
+    if not (credentials.get("USPS_IV_USERNAME") and password_set):
         return Config(env, api, auth, False, "USPS_IV_USERNAME and USPS_IV_PASSWORD are not set.")
     return Config(env, api, auth, True)
 
@@ -240,7 +242,9 @@ def forget_token() -> None:
 
 def _token_key(cfg: Config) -> tuple:
     # Changing the environment, a host or the login starts afresh.
-    return (cfg.environment, cfg.api_host, cfg.auth_host, settings.USPS_IV_USERNAME)
+    from core import credentials
+
+    return (cfg.environment, cfg.api_host, cfg.auth_host, credentials.get("USPS_IV_USERNAME"))
 
 
 def _token_from(body: bytes, what: str) -> tuple[str, str, int]:
@@ -277,12 +281,15 @@ def authenticate() -> None:
     cfg = config()
     if not cfg.configured:
         raise UspsError(0, "not_configured")
-    if not settings.USPS_IV_PASSWORD:
-        # A container without the password (web): only the worker signs in.
+    from core import credentials
+
+    password = credentials.get("USPS_IV_PASSWORD")
+    if not password:
+        # A container without the password (web, set on the server): only the worker signs in.
         raise UspsError(0, "not_configured")
     payload = {
-        "username": settings.USPS_IV_USERNAME,
-        "password": settings.USPS_IV_PASSWORD,
+        "username": credentials.get("USPS_IV_USERNAME"),
+        "password": password,
         "grant_type": "authorization",
         "response_type": "token",
         "scope": SCOPE,

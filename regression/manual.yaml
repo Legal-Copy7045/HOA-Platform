@@ -91,11 +91,11 @@
   last: ""
 - key: push notification arrives
   check: "With VAPID keys set and the push feature on, a device that turned notifications on gets an alert with a short title and opens the right signed-in page."
-  steps: "python manage.py generate_vapid_keys into .env; Admin, Features: Push on; My profile: Turn on for this device; have a board member reply on one of your requests; tap the alert; expect sign-in (if signed out) then the request page."
+  steps: "python manage.py generate_vapid_keys into .env; Settings → Features (board): Push on; My profile: Turn on for this device; have a board member reply on one of your requests; tap the alert; expect sign-in (if signed out) then the request page."
   last: ""
 - key: urgent text arrives
   check: "With a Twilio test account and the sms feature on, an owner confirms a number by code and receives the board's urgent text with the link and STOP note; replying STOP stops later texts."
-  steps: "Set SMS_PROVIDER=twilio and test credentials; Admin, Features: Urgent text messages on; My profile: enter a mobile number, enter the texted code; Board, Urgent texts: send; reply STOP; send again and check the owner is no longer counted."
+  steps: "Set SMS_PROVIDER=twilio and test credentials; Settings → Features (board): Urgent text messages on; My profile: enter a mobile number, enter the texted code; Board, Urgent texts: send; reply STOP; send again and check the owner is no longer counted."
   last: ""
 - key: my account how to pay
   check: "On a phone, My account reads clearly for an owner: amount and Due by, who to make checks payable to and where to mail them, a statement with Charges / Payments / Balance that fits or scrolls sideways."
@@ -111,7 +111,7 @@
   last: ""
 - key: reservation booking on a phone
   check: "With Common area reservations switched on, an owner books an area on a phone (date and time pickers work), gets the email, and a board member confirms it from My items."
-  steps: "Admin > Features: switch on reservations; Booking rules: make one area bookable; as an owner request a slot on a phone; as a board member confirm it; check the owner's email and the Calendar page."
+  steps: "Settings → Features (board): switch on reservations; Booking rules: make one area bookable; as an owner request a slot on a phone; as a board member confirm it; check the owner's email and the Calendar page."
   last: ""
 - key: sidebar groups on a phone
   check: "On a phone, the Menu button opens the sidebar with focus inside it; Board, Finance and Admin start closed unless the current page is inside; a group opened or closed stays that way on the next page."
@@ -203,7 +203,7 @@
   last: ""
 - key: urgent text from an announcement
   check: "With the sms feature on and a test provider, the announcement form shows 'Also send as an urgent text (N opted in)' to a board member only; ticking it publishes the announcement and the phone that opted in gets one text linking to it; a text with an amount or email is refused before anything is published."
-  steps: "Board > Admin > Features: switch on Urgent text messages; opt a demo owner's test phone in on My profile; as a board member publish an announcement with the box ticked; check the phone; try again with '$100' in the text."
+  steps: "Settings → Features (board): switch on Urgent text messages; opt a demo owner's test phone in on My profile; as a board member publish an announcement with the box ticked; check the phone; try again with '$100' in the text."
   last: ""
 - key: sale keeps each owner's money
   check: "On the POC, after a home with a credit is transferred: the home account page shows 'Former owners' accounts' with 'Credit owed to former owner'; the buyer's My account does not show the seller's credit or history; the seller's My history shows 'Credit owed to you'; posting the refund check as a charge on the old account (Account choice on the form) clears both; the pages fit a phone screen. On Online payments, a test-mode partial refund made in the Stripe dashboard appears as 'Refund to record' and 'Record on the account' posts the payment's share."
@@ -320,7 +320,7 @@
   last: ""
 - key: usps tracking in the test environment
   check: "With a USPS CAT (test environment) IV-MTR account, sudo bash infra/poc/set-usps.sh with environment cat signs in and prints OK without showing the password; Paper mail settings shows 'Connected to the USPS test environment (CAT)'; after a barcoded test piece is mailed and scanned in CAT, the mailing page's USPS tracking card shows its scan (Processed or Sorted for delivery on <date>) and the last scan time within 4 hours, and System status shows the USPS tracking check passing."
-  steps: "Ask InformedVisibility@usps.gov for a CAT account with IV-MTR; run set-usps.sh (cat); switch on Admin > Features > USPS tracking; print and mark mailed a demo mailing with the test Mailer ID; wait for the next 4-hourly check (or run the usps_tracking task) and open the mailing page; then run set-usps.sh with a wrong password and confirm the check fails and says so."
+  steps: "Ask InformedVisibility@usps.gov for a CAT account with IV-MTR; run set-usps.sh (cat); switch on Settings → Features (board) → USPS tracking; print and mark mailed a demo mailing with the test Mailer ID; wait for the next 4-hourly check (or run the usps_tracking task) and open the mailing page; then run set-usps.sh with a wrong password and confirm the check fails and says so."
   last: ""
 - key: vote closes by itself at the deadline
   check: "On the POC, a test formal vote opened with a closing time a week out (the shortest period) shows 'Vote by ...' on the Voting list, its page and My items; the board sees 'N of M homes have voted', the quorum so far and Who has voted (addresses only) while no per-option counts show to anyone; about 48 hours before the close a demo owner who has not voted receives a reminder email with a personal link that opens their ballot after sign-in; extending once with a reason emails owners the new deadline; within five minutes of the deadline the worker closes the vote and the results appear with 'Closed automatically at the deadline' (D61)."
@@ -351,7 +351,7 @@
   steps: "POC reseeded with oak_creek; two demo board members in two browsers; check the file store object count before and after with check_storage or the SeaweedFS console."
 - key: bounce mailbox with a real provider
   check: "On the POC with a test mailbox at a real provider (IMAP on, app password), sudo bash infra/poc/set-bounce-mailbox.sh signs in and prints OK without showing the password; with Bounced email switched on, an official notice (a demo meeting notice) sent to a demo owner who chose email at a made-up address on a domain that rejects mail (or a provider's bounce test address) comes back, and within 20 minutes System status shows the Bounce mailbox check with 1 hard bounce, the owner's page shows Email bouncing, the board's My items says 'Send a paper copy to <address>' linking to Paper mail, and the incident timeline lists nothing personal. An out-of-office reply in the same mailbox changes nothing. A wrong password (run the script again) makes the check say the mailbox refused the sign-in."
-  steps: "POC with fictional data and EMAIL_REDIRECT_ALL_TO empty for the test (or a test domain that bounces); a dedicated test mailbox; run set-bounce-mailbox.sh (give the mailbox's address as the envelope sender); switch on Admin > Features > Bounced email; send the notice; wait for the 20-minute read (or run the poll_bounces task); check the pages; then Prepare the letter on Paper mail and confirm the item closes."
+  steps: "POC with fictional data and EMAIL_REDIRECT_ALL_TO empty for the test (or a test domain that bounces); a dedicated test mailbox; run set-bounce-mailbox.sh (give the mailbox's address as the envelope sender); switch on Settings → Features (board) → Bounced email; send the notice; wait for the 20-minute read (or run the poll_bounces task); check the pages; then Prepare the letter on Paper mail and confirm the item closes."
 - key: first sign-in and getting started on a phone
   check: "On a phone, a newly invited demo owner opens the invitation, chooses a password, adds a passkey (or the app), saves the recovery codes, answers the official notices step and lands on Welcome (once: signing out and in again goes to the dashboard). Welcome's tiles and the checklist are easy to read and tap; the dashboard shows Getting started with the waiting steps; the help button in the header opens Help; How paying works shows this community's amount, due day and late fee with their citations; Ask the board opens a new request with the kind chosen; a demo tenant and a view-only contact see the steps and Ask the board answers that fit them (D73)."
   steps: "POC with fictional data: invite a demo owner, a demo tenant and a view-only contact from Homes and owners, Sign-ups; complete each sign-up on an iPhone and an Android phone (or the browser's phone view); check VoiceOver or TalkBack reads the checklist's done steps as Done."
@@ -410,4 +410,46 @@
 - key: shorter menu with my violations and records in my requests
   check: "On a desktop and a 390 px phone, an owner's My home lists My home, My account, My home improvement requests (ARC), My violations, My requests (no My records requests, no Notices about my home); My requests shows a Records requests card with each request's status and due date and an Ask for records button that opens the request form; a board member's menu has no My reimbursements and the Finance overview's My reimbursements button opens their own claims; a committee member who is not on the board finds My reimbursements on their committee's page (D95)."
   steps: "POC with fictional data; sign in as a demo owner, a demo board member and a demo committee member; open the menu, My requests, Ask for records, Finance overview and the committee page on both widths."
+- key: keys and connections smtp2go real account
+  check: "On the POC after installing 0.44.0 (no server step: CREDENTIALS_KEK appears in .env by itself), a sysadmin with a passkey opens System status -> Keys and connections, is asked for the passkey (a password is not accepted), enters a real SMTP2Go test key, Test only says SMTP2Go accepted it and nothing is sent, Test and save puts it in use within seconds without a restart (System status -> Send a test email arrives; Email shows SMTP2Go); the page then shows Set here, the last four only after a fresh passkey check, who and when; the board receives 'Key changed: Email through SMTP2Go'; a wrong key is refused by the test and nothing changes; the key appears nowhere in the page source, docker logs of web and worker, or the audit log."
+  steps: "POC with fictional data; an SMTP2Go account with a key limited to Emails, Activity and Statistics; open the page, enter, test, save; send a test email; check a board member's inbox; sudo docker compose logs web worker | grep -c <last 8 characters> must be 0; repeat with a wrong key."
+  last: ""
+- key: keys and connections smtp server real account
+  check: "A real SMTP mailbox (e.g. the Hostinger mailbox) entered on Keys and connections -> Email through an SMTP server with STARTTLS or TLS: Test signs in without sending; after saving, the test email from System status arrives from the saved sender; a wrong password is refused by the test."
+  steps: "POC; enter host, port, user, password, encryption and sender; Test only; Test and save; send a test email; repeat with a wrong password."
+  last: ""
+- key: keys and connections stripe real account
+  check: "A Stripe test-mode restricted key (rk_test_, with the runbook's rights plus Account and Balance read) entered on Keys and connections: the test names the account (ending in its last 4, matching the Stripe dashboard); the change waits for a board member (the sysadmin cannot approve, even if also on the board); a second board member approves with a passkey; Online payments then work without a restart (a test Checkout with 4242...); a key from a different Stripe test account is refused; asking to move the pin needs two other board members and is in use only 72 hours after the request; the board receives an email at every step; an sk_test_ key is refused."
+  steps: "POC with fictional data; two Stripe test accounts; one sysadmin and three board logins with passkeys; enter, approve, pay a demo charge in test mode, try the other account's key, request a pin move, approve twice, check after 72 hours (or on a scratch POC)."
+  last: ""
+- key: keys and connections teller real account
+  check: "Teller (development tier) application ID, certificate.pem and private_key.pem uploaded on Keys and connections: the test checks they belong together and makes a mutual-TLS call that Teller accepts (401 without a token); the change waits for a board member's approval; Finance -> Accounting -> Bank feed -> Connect a bank then opens Teller Connect without a restart; mismatched or expired files are refused; another application ID is refused (pinned)."
+  steps: "POC; the HOA's Teller dashboard; upload the two files; Test only; Test and save; approve as another board member; connect the sandbox or a test bank."
+  last: ""
+- key: keys and connections usps real account
+  check: "The USPS CAT Business Customer Gateway login entered on Keys and connections: the test signs in (no piece looked up) and the worker's 4-hourly check uses it without a restart (the web container no longer needs USPS_IV_PASSWORD_SET); a wrong password is refused."
+  steps: "POC; a CAT login with IV-MTR; enter, test, save; run the usps_tracking task or wait; Settings -> Paper mail settings shows the connection."
+  last: ""
+- key: keys and connections bounce mailbox real account
+  check: "A real bounce mailbox (IMAP over TLS) entered on Keys and connections: the test signs in and opens the folder only; the worker's 20-minute read uses it without a restart; a wrong password or a missing folder is refused with the reason."
+  steps: "POC with plain SMTP; a dedicated test mailbox; enter, test, save; send a notice to an address that bounces; wait for the read."
+  last: ""
+- key: keys and connections gemini real account
+  check: "A Gemini API key entered on Keys and connections: the test looks up the model (nothing is sent to it); reading a scanned demo sign-off form then works without a restart; a wrong key is refused."
+  steps: "POC; a Gemini key for a test project; enter, test, save; upload a fictional scanned form on a demo ARC request."
+  last: ""
+- key: keys and connections vendor key and kek
+  check: "Make the vendor document key on Keys and connections (nothing typed or shown); a demo vendor's uploaded W-9 opens; Rotate keeps it readable and the worker re-encrypts it within minutes (check_vendor_key shows 0 under an old key); the database backup holds only ciphertext (pg_dump | grep for the last 8 characters finds nothing); with CREDENTIALS_KEK changed in .env and the portal recreated the page says the saved keys can't be read and the portal does not fall back to .env values for them; putting the old KEK back restores them."
+  steps: "POC with fictional data; make the key, upload a vendor W-9 through a demo onboarding link, rotate, run check_vendor_key; take a backup; change and restore the KEK on a scratch copy only."
+- key: one-command install on a fresh server
+  check: "On a fresh Ubuntu 24.04 VM (2 CPUs, 4 GB, 40 GB) with no portal, the README's one command (curl ... /v<newest>/infra/poc/install.sh | sudo bash) asks only for the tunnel token (typing hidden), the address and the first officer, then finishes on its own in under 30 minutes: every check passes, the one-time link on the screen opens the invitation, a passkey or authenticator can be added and the site works through the tunnel. /opt/hoa-portal is on main at the newest release tag; .env is mode 600 with COMPOSE_FILE; /var/log/hoa-portal-install.log is mode 600 and holds neither the token, any .env secret nor the link (grep for the token's first 20 characters and /invite/). Running the same command again asks only 'Continue?', skips every step, leaves .env byte for byte the same (sha256sum before and after) and passes the checks. Stopping it during step 4 (Ctrl+C) and running it again continues at step 4."
+  steps: "Proxmox: create-vm.sh with a test VLAN (or any cloud Ubuntu 24.04 server through its console); a test tunnel in Cloudflare with a test hostname; fictional officer name and a test mailbox; afterwards delete the test tunnel and VM."
+  last: ""
+- key: keys and connections email change through the old relay
+  check: "With two board members signed up, a sysadmin changes the SMTP2Go key (or the SMTP server) on Keys and connections: it shows 'Waiting for board approval', email keeps going through the relay in use, the board's 'Approval needed' email arrives, and the change shows on System status and in the other board member's My items. Once that member approves, mail goes through the new settings, and the 'approved' notice was sent through the old relay (its activity log shows it, the new one's does not). A refusal or a cancellation leaves the old relay in use."
+  steps: "POC with fictional data; two SMTP2Go test sub-accounts (or SMTP2Go and a test SMTP server); change, approve with a second board login, compare both relays' activity."
+  last: ""
+- key: keys and connections server override and clear
+  check: "On the VM, with an SMTP2Go key saved in the portal, sudo bash infra/poc/set-smtp2go.sh with another test key: its check tests the key just written to .env and prints that the portal's value wins; sudo docker compose exec web python manage.py clear_portal_keys smtp2go removes the portal's values (Keys and connections shows 'Set on the server'), the board is told through the server's settings, and nothing printed or logged carries a key."
+  steps: "POC; two fictional/test SMTP2Go keys; run the script, then the command; read the install log and docker logs for the keys' first characters."
   last: ""

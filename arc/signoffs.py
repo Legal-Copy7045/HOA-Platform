@@ -732,7 +732,9 @@ def request_reading(req: ArcRequest, attachment_id: int, *, actor, request=None)
 
     if is_recused(actor, req):
         raise PermissionDenied("signoff")
-    if not settings.GEMINI_API_KEY:
+    from core import ai as _ai
+
+    if not _ai.api_key():
         raise SignoffError(
             "Automatic reading is not set up (no Gemini key). Enter the answers by hand."
         )

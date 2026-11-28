@@ -10,7 +10,6 @@ from functools import wraps
 
 from allauth.account.decorators import reauthentication_required
 from csp.decorators import csp_update
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
@@ -139,8 +138,8 @@ def bank_connect(request):
         {
             "problems": problems,
             "nonce": nonce,
-            "application_id": settings.TELLER_APPLICATION_ID,
-            "environment": settings.TELLER_ENVIRONMENT,
+            "application_id": teller.application_id(),
+            "environment": teller.environment(),
             "connect_script": teller.CONNECT_SCRIPT,
         },
     )

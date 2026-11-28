@@ -26,8 +26,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from django.conf import settings
-
 from ledger.bankfeeds.base import (
     BANK_ID_MAX,
     KIND_MAX,
@@ -85,14 +83,18 @@ class TellerError(BankFeedError):
 
 
 def environment() -> str:
-    env = (settings.TELLER_ENVIRONMENT or "sandbox").strip().lower()
+    from core import credentials
+
+    env = (credentials.get("TELLER_ENVIRONMENT") or "sandbox").strip().lower()
     if env not in ENVIRONMENTS:
         raise BankFeedError("TELLER_ENVIRONMENT must be sandbox, development or production.")
     return env
 
 
 def _pem(name: str) -> bytes:
-    raw = getattr(settings, name, "") or ""
+    from core import credentials
+
+    raw = credentials.get(name) or ""
     if not raw:
         return b""
     try:
@@ -104,8 +106,18 @@ def _pem(name: str) -> bytes:
     return data
 
 
+def application_id() -> str:
+    from core import credentials
+
+    return credentials.get("TELLER_APPLICATION_ID") or ""
+
+
 def certificate_configured() -> bool:
-    return bool(settings.TELLER_CERTIFICATE_B64 and settings.TELLER_PRIVATE_KEY_B64)
+    from core import credentials
+
+    return bool(
+        credentials.get("TELLER_CERTIFICATE_B64") and credentials.get("TELLER_PRIVATE_KEY_B64")
+    )
 
 
 def configured() -> bool:
@@ -114,7 +126,7 @@ def configured() -> bool:
         env = environment()
     except BankFeedError:
         return False
-    if not settings.TELLER_APPLICATION_ID:
+    if not application_id():
         return False
     return env == "sandbox" or certificate_configured()
 

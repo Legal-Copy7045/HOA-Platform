@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Optional since 0.44.0 (D93): the same keys can be entered in the browser on
+# System status -> Keys and connections, which wins over .env; this script
+# stays as the fallback.
 # One-time set-up of the bank feed's Teller connection (decision D32-bankfeeds).
 # Teller's certificate and private key identify the HOA to Teller, so they are
 # secrets: they go into the server's .env here and never through the portal's
@@ -11,7 +14,7 @@
 # downloaded files (certificate.pem, private_key.pem) to /root/teller/ on this
 # server. This script checks them, saves them, creates the key that encrypts
 # Teller's access tokens if there is none, offers to delete the copied files
-# and restarts the portal. Then: Admin -> Features -> Bank feed, and
+# and restarts the portal. Then: Settings → Features (board) -> Bank feed, and
 # Finance -> Accounting -> Bank feed -> Connect a bank.
 set -euo pipefail
 
@@ -61,7 +64,7 @@ grep -q "^BANK_FEED_TOKEN_KEY=." .env || env_update .env BANK_FEED_TOKEN_KEY "$(
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Checking the set-up"
-if ! "${COMPOSE[@]}" exec -T web python manage.py check_teller; then
+if ! "${COMPOSE[@]}" exec -T web python manage.py check_teller --server; then
   env_restore_keys .env "$BACKUP" "${KEYS[@]}"
   env_discard_backup "$BACKUP"
   echo "The check failed (above). The previous Teller settings are back in .env (nothing else in it was changed); restarting." >&2
@@ -79,5 +82,5 @@ if [ -n "$CERT" ]; then
 fi
 env_discard_backup "$BACKUP"
 echo "Removed .env.before-teller (the copy of the previous settings, with the old secret)."
-echo "Done. Switch on Bank feed in Admin -> Features, then Finance -> Accounting -> Bank feed -> Connect a bank."
+echo "Done. Switch on Bank feed in Settings → Features (board), then Finance -> Accounting -> Bank feed -> Connect a bank."
 echo "Keep the certificate and key in the HOA's password manager; never send them by email or chat."

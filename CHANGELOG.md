@@ -6,6 +6,37 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.44.0 — 2026-11-28
+
+- Keys and connections (D93): third-party keys are set up in the browser on
+  System status → Keys and connections instead of on the server: email
+  (SMTP2Go or an SMTP server), Stripe, the bank feed (Teller), USPS, the bounce
+  mailbox, the AI key and the vendor documents key. Keys are tested before they
+  are saved, stored encrypted, never shown again (only the last four
+  characters), audited and emailed to the board. System administrators only,
+  with a fresh passkey or authenticator check each time. Stripe and bank keys
+  need a second board member's approval, and the Stripe account is locked:
+  moving it needs two board members and 72 hours. Changes apply without a
+  restart; the server scripts remain as a fallback. "Settings → Features
+  (board)" replaces the wrong "Admin → Features" in the help and scripts.
+- One-command install (D94): a fresh server is installed with one command that
+  asks only for the Cloudflare tunnel token (and, optionally, the first
+  officer's name and email for their sign-in link). It generates every server
+  secret, hardens the host, starts the portal, checks it and is safe to run
+  again.
+- Fixes from the 0.44.0 full check: email and AI key changes also need a
+  second board member, and every warning about a key change goes out through
+  the settings in force before it; a changed mail server needs its password
+  typed again and only public mail servers are accepted; removing keys needs
+  the same approval; a waiting key change can be refused or cancelled until it
+  takes effect; the vendor documents key can't be removed while vendor files
+  need it; a seller's payment plan no longer stops the buyer's late fees or
+  interest; SMTP2Go delivery records are kept when one message in a batch
+  fails.
+- Expense claims are board and committee work: owners no longer claim, and
+  "Claim an expense" and "My reimbursements" are no longer on My account; switching a feature off now says it is hidden
+  from the menu.
+
 ## 0.43.0 — 2026-11-27
 
 - Email through SMTP2Go (D92): send through SMTP2Go's API (or keep plain

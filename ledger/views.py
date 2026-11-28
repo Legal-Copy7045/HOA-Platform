@@ -224,9 +224,6 @@ def my_account(request):
             "disclosure": disclosure() if online else "",
             "payable_to": profile.legal_name,
             "remit_lines": [line for line in profile.remit_to.splitlines() if line.strip()],
-            # D77: volunteers claim back association expenses they paid.
-            "can_claim": _features_enabled("reimbursements", request)
-            and policy.can(request.user, "reimbursement.submit"),
         },
     )
 

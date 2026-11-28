@@ -665,9 +665,10 @@ def late_fee_candidates(on: datetime.date | None = None) -> list[dict]:
     done = set(SpecialAssessmentLateFee.objects.values_list("installment_id", "lot_id"))
     # D76 (BUG-005): no late fee while the home keeps a payment plan that
     # suspends them, as for the monthly assessment (ledger.services).
-    from ledger.payment_plans import late_fee_suspended_lots
+    from ledger.payment_plans import late_fee_suspended
 
-    suspended = late_fee_suspended_lots(on)
+    # Per account (review BUG-004, 0.44.0): a seller's plan never stops the buyer's fee.
+    suspended = late_fee_suspended(on)
     out = []
     for c in (
         SpecialAssessmentCharge.objects.filter(
@@ -676,7 +677,7 @@ def late_fee_candidates(on: datetime.date | None = None) -> list[dict]:
         .select_related("installment__assessment", "entry", "lot")
         .order_by("id")
     ):
-        if (c.installment_id, c.lot_id) in done or c.lot_id in suspended:
+        if (c.installment_id, c.lot_id) in done or (c.lot_id, c.entry.account_id) in suspended:
             continue
         if allocation.load_book(c.lot_id).remaining(c.entry_id) <= 0:
             continue

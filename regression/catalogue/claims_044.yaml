@@ -1,0 +1,5 @@
+# The 0.44.0 owner decision (D95): expense claims are board and committee work;
+# owners on no board seat or committee no longer claim. `match` runs over "<stage>:<check>".
+- feature: "Only board members and committee members claim an expense (reimbursement.submit); an owner on neither is refused Reimbursements and Claim an expense (403), cannot submit through the service and has no claim on My items; the claimant still cannot approve or pay their own claim and a board member's claim is paid by another board member (D66, D77, D95)"
+  since: "0.44"
+  match: ["^unit:operations/tests/test_payouts.py::test_(owners_on_no_committee_do_not_claim|claims_are_scoped_to_the_claimant|submit_page|two_approvals_above_threshold_and_own_claim_refused|reimbursement_check_follows_d66)", "^unit:core/tests/test_url_matrix.py::test_owner_a_cannot_reach_owner_b_data\\[reimbursement(s|_new)\\]", "^unit:community/tests/test_authorization.py::"]

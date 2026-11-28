@@ -4,7 +4,7 @@
 {% block content %}
   <div class="page-head">
     <div><h1>{% if mine %}My reimbursements{% else %}Reimbursements{% endif %}</h1>
-      <p class="subtitle">{% if mine %}Association expenses you paid yourself and claimed back, with the receipt. Board members other than you approve each claim; the treasurer pays it by check or bank transfer.{% else %}Expenses board members, committee members and volunteers paid for the association. A board member other than the claimant approves; nobody pays their own claim.{% endif %}</p></div>
+      <p class="subtitle">{% if mine %}Association expenses you paid yourself and claimed back, with the receipt. Board members other than you approve each claim; the treasurer pays it by check or bank transfer.{% else %}Expenses board members and committee members paid for the association. A board member other than the claimant approves; nobody pays their own claim.{% endif %}</p></div>
     {% if can_submit %}<div class="actions"><a class="btn" href="{% url 'reimbursement_new' %}">{% icon "plus" %} Claim an expense</a></div>{% endif %}
   </div>
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">

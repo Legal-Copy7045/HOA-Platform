@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Keys and connections · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'system_status' %}">System status</a> / Keys and connections</div>
+  <div class="page-head"><div><h1>Keys and connections</h1>
+    <p class="subtitle">The keys and settings of the services the portal uses: email, payments, the bank feed, USPS tracking, the bounce mailbox, reading signed forms and the vendor document key. Each is tested before it is saved, stored encrypted and never shown again: only Set or Not set, the last four characters, who saved it and when (decision D93). Changes take effect within a few seconds, without a restart.</p></div></div>
+  {% if not kek %}<div class="alert danger" role="alert">{% icon "alert" %}<span><strong>Nothing can be saved here yet.</strong> The server's key-encryption key (CREDENTIALS_KEK) is missing. It is created on the server automatically: install the next update or use <a href="{% url 'system_restart' %}">Restart the portal</a> after the server has run start-portal.sh once.</span></div>{% endif %}
+  {% if not has_passkey %}<div class="alert warning" role="note">{% icon "alert" %}<span>Add a passkey to your login (My profile → Sign-in methods): changes here then need it, which a fake sign-in page cannot copy. Until then your authenticator app is accepted.</span></div>{% endif %}
+  <p class="small muted">{% if fresh %}Confirmed it's you: the last four characters are shown for the next few minutes.{% else %}The last four characters are hidden. <a href="{{ reveal_url }}">Confirm it's you to show them</a> ({% if has_passkey %}passkey{% else %}passkey or authenticator app{% endif %}; it lasts {{ window_minutes }} minutes).{% endif %}</p>
+
+  {% for info in services %}<section class="card" id="keys-{{ info.service.key }}">
+    <div class="card-head"><h2>{{ info.service.label }}</h2>
+      <span class="status tone-{% if info.unreadable %}danger{% elif info.configured %}success{% else %}neutral{% endif %}">{% if info.unreadable %}Can't be read{% elif info.configured %}Configured{% else %}Not configured{% endif %}</span></div>
+    <p class="small muted">{{ info.service.summary }}{% if info.service.approval %} Changes wait for a board member who did not enter them.{% endif %}</p>
+    <ul class="list">{% for r in info.rows %}<li><div class="grow"><div class="title">{{ r.field.label }}</div>
+      <div class="small muted">{% if r.unreadable %}Saved here but can't be opened: the server's CREDENTIALS_KEK is not the one it was saved with. Enter it again.{% elif r.set %}Set{% if r.source == "portal" %} here{% if r.change %}, by {{ r.change.requested_by.email|default:"the system" }} {{ r.change.requested_at|date:"M j, Y g:i A" }}{% endif %}{% else %} on the server (.env){% endif %}{% if r.field.secret %}{% if fresh and r.last4 %} · ends in {{ r.last4 }}{% endif %}{% elif r.shown %} · {{ r.shown }}{% endif %}{% else %}Not set{% endif %}</div></div></li>{% endfor %}</ul>
+    {% if info.pin %}<p class="small">Pinned {{ info.service.pinned|lower }}: ending {{ info.pin|slice:"-4:" }}. A key for another account is refused.</p>{% endif %}
+    {% if info.last_test %}<p class="small">Last test {{ info.last_test.requested_at|date:"M j, Y g:i A" }}: {% if info.last_test.test_ok %}passed{% else %}failed ({{ info.last_test.test_code }}){% if info.last_test.saved_anyway %}, saved anyway{% endif %}{% endif %}.</p>{% endif %}
+    {% for cs in info.pending %}<p class="small"><a href="{% url 'keys_change' cs.change.pk %}">{{ cs.change.get_kind_display }} {{ cs.change.requested_at|date:"M j, g:i A" }}</a>: {{ cs.words }}.</p>{% endfor %}
+    <div class="inline-form"><a class="btn secondary small" href="{% url 'keys_service' info.service.key %}">{% if info.service.generated %}Make or rotate…{% else %}Change…{% endif %}</a></div>
+  </section>{% endfor %}
+
+  <section class="card" id="server-only"><h2>Set on the server at install</h2>
+    <p class="small muted">These stay in the server's .env: the portal needs them before it can start or read this page, or they must not depend on the database. Nothing to do here when they are set.</p>
+    <ul class="list">{% for r in server_only %}<li><div class="grow"><div class="title">{{ r.label }}</div>
+      <div class="small muted">{{ r.why }}{% if r.visible and not r.set %} <strong>Missing.</strong> {{ r.todo }}{% elif not r.visible %} {{ r.todo }}{% endif %}</div></div>
+      {% if r.visible %}<span class="status tone-{% if r.set %}success{% else %}warning{% endif %}">{% if r.set %}Set{% else %}Missing{% endif %}</span>{% endif %}</li>{% endfor %}</ul>
+    <p class="small muted">The server scripts (infra/poc/set-*.sh) still work as an optional fallback: a value saved here wins over the same setting in .env. Anything that genuinely needs the portal restarted: <a href="{% url 'system_restart' %}">Restart the portal</a>.</p>
+  </section>
+{% endblock %}

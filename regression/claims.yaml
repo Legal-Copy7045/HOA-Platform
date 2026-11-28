@@ -130,9 +130,9 @@
   where: [docs/claude/deployment.md, docs/decisions.md D25 D36 D90]
   code: ["core/host_tasks.py", "infra/poc/portal-agent.sh", "infra/poc/host-tasks.sh", "infra/poc/update-portal.sh", "infra/poc/lib.sh"]
 - id: CLM-033
-  claim: Secrets never pass through the web app, the repository or chat - set on the server with guided scripts (Stripe, Teller, USPS, bounce mailbox, vendor key, off-site backups).
-  where: [CLAUDE.md, docs/claude/deployment.md]
-  code: ["infra/poc/set-*.sh", "infra/poc/setup-offsite-backups.sh", "community/setup*.py", ".gitleaks.toml"]
+  claim: No secret is in the repository, chat, logs or audit; third-party service keys are entered only on Keys and connections (sysadmin, fresh second factor, tested, sealed under CREDENTIALS_KEK, write-only, the board told; payments, bank, email and Gemini changes approved by another board member) or, as a fallback, with the guided server scripts; server-only secrets (Django key, database, tunnel, file store, CREDENTIALS_KEK, off-site backups) stay in the server's .env (D93).
+  where: [CLAUDE.md, docs/claude/deployment.md, docs/claude/security.md, docs/decisions.md D93]
+  code: ["core/credentials.py", "core/keys_views.py", "infra/poc/set-*.sh", "infra/poc/setup-offsite-backups.sh", "community/setup*.py", ".gitleaks.toml"]
 - id: CLM-034
   claim: Backups are signed with a keyed checksum and the restore drill refuses unsigned backups; off-site copies go to a locked R2 bucket.
   where: [docs/claude/operations.md, docs/decisions.md D31 D57]
@@ -177,3 +177,19 @@
   claim: No personal details, credentials or real data in the repository; commits use no-reply addresses; the privacy guard and gitleaks check every pull request, the private terms every push to main.
   where: [CLAUDE.md, docs/decisions.md D90]
   code: [".github/scripts/privacy_guard.py", ".gitleaks.toml", ".github/workflows/ci.yml"]
+- id: CLM-045
+  claim: Service keys entered on Keys and connections are write-only (never rendered, logged, audited or emailed beyond the last four characters), encrypted at rest with a key derived from CREDENTIALS_KEK (never DJANGO_SECRET_KEY), fail closed with a wrong key, and need a sysadmin with a fresh passkey or authenticator check (never a password or emailed code) for every save.
+  where: [docs/claude/security.md, docs/decisions.md D93]
+  code: ["core/credentials.py", "core/keys_views.py", "core/fresh_mfa.py", "core/credential_checks.py"]
+- id: CLM-046
+  claim: A Stripe or Teller key change takes effect only after a different board member approves it within 48 hours, the Stripe account is pinned, and moving the pin needs two board members other than the requester and at least 72 hours.
+  where: [docs/decisions.md D93]
+  code: ["core/credentials.py", "core/keys_views.py", "core/conflicts.py"]
+- id: CLM-047
+  claim: Email delivery reports come only by pull from SMTP2Go for message ids the portal itself recorded, and a bounce can only mark an address that message was sent to; the SMTP2Go key is never logged.
+  where: [docs/claude/comms.md, docs/decisions.md D92]
+  code: ["comms/smtp2go.py", "comms/delivery.py", "comms/bounces.py"]
+- id: CLM-048
+  claim: The one-command install fetches only a release tag, never main, reads the tunnel token without it reaching a command line or log, writes .env mode 600, never regenerates existing secrets, and the restart task only restarts web and worker with both compose files.
+  where: [docs/decisions.md D91, docs/decisions.md D94]
+  code: ["infra/poc/install.sh", "infra/poc/lib.sh", "infra/poc/make-env.sh", "infra/poc/restart-portal.sh"]

@@ -1,0 +1,53 @@
+# Release 0.44 review fixes (D93 "Review fixes (0.44.0)"): Keys and connections
+# (EXP-001..007, SEC-001..004, BUG-001..003, BUG-005..006), late fees after a
+# sale (BUG-004), vendor document re-encryption (BUG-007), SMTP2Go batches and
+# the delivery cursor (BUG-008, BUG-009), the install's release tag (EXP-005),
+# and the walkthrough's demo receipts and phone tap target.
+- feature: "Email (SMTP2Go, SMTP) and Gemini key changes wait for a board member who did not make them (48 hours), except while no other board member has a second factor (first set-up, said in the notice); nobody approves their own"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_(an_email_change_waits|nobody_approves_their_own_email|the_first_officer_sets_up_email|gemini_changes_wait)"]
+- feature: "Every board notice of a key change (request, approval, refusal, effect, removal) goes through the settings in effect before it; open and recent key changes show on System status and in the board's My items"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_(an_email_change_waits|the_first_officer_sets_up_email|open_changes_show_on_system_status)"]
+- feature: "A changed host, port, user name or region needs the service's secrets typed again: a saved SMTP, bounce mailbox or SMTP2Go secret is never sent to a new endpoint by a test or a save"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_(a_new_smtp_host|a_new_bounce_mailbox_host|a_new_smtp2go_region)"]
+- feature: "SMTP and IMAP connection tests reach public host names only (no IP address or internal name, resolved addresses public) on mail ports (25, 465, 587, 2525; IMAP 993)"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_(internal_hosts_are_refused|only_mail_ports|a_name_that_resolves)", "^unit:core/tests/test_keys_connections.py::test_the_smtp_test_signs_in_without_sending"]
+- feature: "A key change can be refused by a board member who has not decided on it, or cancelled by its requester, until it takes effect, including a pin move in its 72-hour wait (audited, the board told)"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_a_waiting_pin_move_can_be_(refused|cancelled)"]
+- feature: "Removing the Stripe or Teller keys waits for a board member and is refused when the server's .env key belongs to another account than the pinned one"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_removing_the_stripe_key"]
+- feature: "A removal clears only the values its own service saved (removing SMTP keeps SMTP2Go's sender and provider)"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_removing_the_smtp_values_keeps"]
+- feature: "The pinned account is checked when a key takes effect: a key for the old account approved after the pin moved is refused and never used"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_a_key_for_the_old_account_approved_after"]
+- feature: "The vendor document key is never removed while vendor documents are held, and every vendor key the portal or server ever held stays a fallback when a new one is made"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_(the_vendor_key_is_not_removed|a_removed_vendor_key_stays)", "^unit:operations/tests/test_vendor_onboarding.py::test_the_portal_vendor_key_is_not_removed"]
+- feature: "Vendor document re-encryption copies the old blob aside first, removes the copy only after the new one opens, and skips (counts) a document no key opens"
+  since: "0.44"
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_reencrypt_keeps_a_copy"]
+- feature: "The set-*.sh checks test the server's .env values (--server) and say when Keys and connections overrides them; manage.py clear_portal_keys removes the portal's values from the server (audited, the board told)"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_(the_server_check_tests_the_env|the_server_operator_clears)"]
+- feature: "Error reports hide CREDENTIALS_KEK (the portal's exception reporter filter)"
+  since: "0.44"
+  match: ["^unit:core/tests/test_keys_review_044.py::test_error_reports_hide"]
+- feature: "Late fees and overdue interest are suspended per ownership account: a seller's payment plan never stops the buyer's late fees after a sale"
+  since: "0.44"
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_a_sellers_plan_never_stops"]
+- feature: "An SMTP2Go batch that fails partway still records the messages already accepted; the delivery cursor stays at the last event read when pages are left"
+  since: "0.44"
+  match: ["^unit:comms/tests/test_smtp2go.py::test_(a_batch_failing_partway|the_cursor_stays)"]
+- feature: "The one-command install runs only a release tag on main, never a newer v-tag on another branch"
+  since: "0.44"
+  match: ["^unit:core/tests/test_install.py::test_curl_bootstrap_clones_the_newest_release"]
+- feature: "The page and walkthrough sites keep seeded files on disk per database, so demo receipts open (seed and server are separate processes); list row links are 44px tap targets on phones"
+  since: "0.44"
+  match: ["^unit:regression/tests/test_walkthrough_tooling.py::test_the_page_and_walkthrough_sites_keep", "^unit:core/tests/test_walkthrough_044.py::test_row_links"]

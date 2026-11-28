@@ -440,6 +440,22 @@ BOUNCE_IMAP_PASSWORD_SET = env.bool("BOUNCE_IMAP_PASSWORD_SET", default=False)
 BOUNCE_IMAP_FOLDER = env("BOUNCE_IMAP_FOLDER", default="INBOX")
 BOUNCE_RETURN_PATH = env("BOUNCE_RETURN_PATH", default="")
 
+# --- Keys and connections (D93) ---------------------------------------------------------
+# Third-party service keys a sysadmin enters on System status -> Keys and
+# connections are stored encrypted in the database under a key derived (HKDF,
+# its own label) from this key-encryption key: never DJANGO_SECRET_KEY, never
+# in the database or the backups. make-env.sh / start-portal.sh create it on
+# the server when it is missing; only web and worker receive it. Without it the
+# page refuses to save and saved values are not read (fail closed); the .env
+# values below stay the fallback.
+CREDENTIALS_KEK = env("CREDENTIALS_KEK", default="")
+# Error reports (DEBUG pages, mailed reports) hide it too: Django's own
+# filter does not match "KEK" (review EXP-007, 0.44.0).
+DEFAULT_EXCEPTION_REPORTER_FILTER = "core.errors.PortalExceptionReporterFilter"
+# How long a process keeps the saved values before reading them again (a
+# save in the same process is seen at once; web and worker within this).
+CREDENTIALS_CACHE_SECONDS = env.int("CREDENTIALS_CACHE_SECONDS", default=15)
+
 # --- Email ------------------------------------------------------------------
 # The real transport; core.email.RedirectingBackend wraps it (POC redirect, D2).
 EMAIL_BACKEND = "core.email.RedirectingBackend"

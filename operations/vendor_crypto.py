@@ -28,7 +28,8 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from django.conf import settings
+
+from core import credentials
 
 FORMAT = b"VD1\x00"
 NONCE_BYTES = 12
@@ -62,15 +63,20 @@ def _derive(secret: str) -> bytes:
     )
 
 
+def _current() -> str:
+    """Keys and connections (D93), else VENDOR_DOCUMENT_KEY from the server."""
+    return credentials.get("VENDOR_DOCUMENT_KEY") or ""
+
+
 def _secrets() -> list[str]:
-    current = getattr(settings, "VENDOR_DOCUMENT_KEY", "") or ""
-    fallbacks = list(getattr(settings, "VENDOR_DOCUMENT_KEY_FALLBACKS", []) or [])
+    current = _current()
+    fallbacks = list(credentials.get("VENDOR_DOCUMENT_KEY_FALLBACKS") or [])
     return [s for s in [current, *fallbacks] if len(s or "") >= MIN_KEY_LENGTH]
 
 
 def configured() -> bool:
     """A usable current key is set (fallbacks alone only open old files)."""
-    return len(getattr(settings, "VENDOR_DOCUMENT_KEY", "") or "") >= MIN_KEY_LENGTH
+    return len(_current()) >= MIN_KEY_LENGTH
 
 
 def _aad(name: str) -> bytes:
@@ -82,7 +88,7 @@ def encrypt(plaintext: bytes, name: str) -> bytes:
     if not configured():
         raise VendorKeyMissing()
     nonce = os.urandom(NONCE_BYTES)
-    key = _derive(settings.VENDOR_DOCUMENT_KEY)
+    key = _derive(_current())
     return FORMAT + nonce + AESGCM(key).encrypt(nonce, bytes(plaintext), _aad(name))
 
 

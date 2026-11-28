@@ -8,8 +8,16 @@ table per run; the older entries below it keep their own format.
 
 | Date (UTC) | Commit | Version | Audit | Pass | Fail | Skip | Manual due | Failing IDs | Findings | Report |
 |---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-28 00:38 | `b471995` | 0.44.0 | full (full check) | 5955 | 2 | 397 | 113 | CI-014, UNIT-4556 | 1 high, 7 medium, 9 low, 4 info | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
 | 2026-11-27 21:44 | `7a8d8e9` | 0.42.0 | full (full check) | 5656 | 0 | 394 | 99 | none | 7 medium, 8 low, 1 info | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
 | 2026-11-27 | `d62bd1e` | 0.34.0 | full (full check) | 4615 | 0 | 215 | 84 | none | 16 (none critical or high) | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
+
+## 2026-11-28 — full check on release 0.44.0 (with the walkthrough)
+
+- Commit: b471995 (0.44.0 candidate: Keys and connections, one-command install). Totals: 5955 pass, 2 fail (CI-014 and UNIT-4556: the release-logs rule, cleared by this entry), 113 manual, 397 skip.
+- Stages: ci 13 of 14; unit 4657 of 4658; page 1281 pass; walkthrough 8040 pass, 25 fail (fresh-MFA pages now skipped, demo receipt files, one small tap target; see WALKTHROUGHS.md).
+- Findings (21): BUG-001..009, SEC-001..004, EXP-001..008; 1 high, 7 medium, 9 low, 4 info. Claims: 45 of 48 held (CLM-033, CLM-045, CLM-046 not held). bandit and pip-audit clean. All with a clear fix go into 0.44.0 before release.
+- Report: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 8). Walkthrough: https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8 (version 6)
 
 ## 2026-11-27 (evening) — full check on release 0.42.0 (with the walkthrough)
 

@@ -148,9 +148,6 @@ MEMBER_PAGES = {
     # Capital projects shared with owners (D83): title, status, budget and
     # spent only (ledger/tests/test_finance_options.py checks the rest).
     "community_projects",
-    # Expense reimbursements (D77): a volunteer owner sees only their own claims.
-    "reimbursements",
-    "reimbursement_new",
 }
 
 # Governance streamlining (2026-11-26): old list pages that now redirect to
@@ -262,6 +259,10 @@ PROTECTED = {
     "server_tasks": ("GET", None),
     # D91: Restart the portal (sysadmins; then a fresh sign-in check).
     "system_restart": ("POST", None),
+    # D93: Keys and connections (sysadmins; a key change also the board).
+    "keys_connections": ("GET", None),
+    "keys_service": ("POST", None),
+    "keys_change": ("POST", None),
     # D74: the incident timeline (sysadmins); bounced email actions (board,
     # and board or manager for the paper copy).
     "ops_timeline": ("GET", None),
@@ -432,6 +433,10 @@ PROTECTED = {
     "payment_plan_action": ("POST", "plan_b"),
     "payment_plan_letter": ("GET", "plan_b"),
     "payment_plan_acknowledge": ("POST", "plan_b"),
+    # Expense reimbursements (D77): board and committee work (0.44.0, D95);
+    # an owner on no committee is refused the list and the claim form.
+    "reimbursements": ("GET", None),
+    "reimbursement_new": ("GET", None),
     "reimbursement_detail": ("GET", "claim_b"),
     "reimbursement_action": ("POST", "claim_b"),
     "reimbursement_file": ("GET", "claim_b"),
@@ -508,7 +513,7 @@ PROTECTED = {
     "vendor_w9_disposal": ("POST", None),
 }
 # Pages refused before their record is looked up: any id will do (D72).
-PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release"}
+PK_ONE = {"renewal_policy", "records_disposal_decide", "records_hold_release", "keys_change"}
 
 
 def _named_urls() -> set[str]:
@@ -901,7 +906,7 @@ def world():
         total_cents=4400, year=2026, resolution_ref="Resolution 2026-14", actor=board
     )
     # Finance gaps (D75-D77): a special assessment, lot B's payment plan,
-    # owner B's reimbursement claim and a vendor check.
+    # owner B's reimbursement claim (B serves on a committee) and a vendor check.
     from ledger import payment_plans
     from ledger import special_assessments as sa_service
     from operations import reimbursements as rb
@@ -1150,6 +1155,8 @@ def _url(name, key, targets):
         kwargs["action"] = "void"
     elif name == "register_template":
         kwargs["fmt"] = "xlsx"
+    elif name == "keys_service":
+        kwargs["service"] = "stripe"
     elif name.startswith("register_import_") or name in PK_ONE:
         kwargs["pk"] = 1
     elif name == "vendor_onboarding_action":
@@ -1231,13 +1238,14 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "keys_connections",
                 "invitations",
                 "approvals",
             ],
         ),
         (
             "sysadmin",
-            ["system_status", "server_tasks", "invitations"],
+            ["system_status", "server_tasks", "invitations", "keys_connections"],
             ["lot_list", "board_home", "people", "sysadmin_activity", "my_lot"],
         ),
         (
@@ -1250,6 +1258,7 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "keys_connections",
                 "my_lot",
             ],
         ),

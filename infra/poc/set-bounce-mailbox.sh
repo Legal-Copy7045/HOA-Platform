@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Optional since 0.44.0 (D93): the same keys can be entered in the browser on
+# System status -> Keys and connections, which wins over .env; this script
+# stays as the fallback.
 # Put the login of the association's bounce mailbox into the POC's .env so
 # the portal can read bounced email over IMAP over TLS (decision D74),
 # restart the portal and check the login (sign in and open the folder only;
@@ -112,7 +115,7 @@ echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Signing in to the mailbox (no message is read)"
 # Only the worker container has the password (EXP-003): check from there.
-if ! "${COMPOSE[@]}" exec -T worker python manage.py check_bounce_mailbox; then
+if ! "${COMPOSE[@]}" exec -T worker python manage.py check_bounce_mailbox --server; then
   undo "The check failed (above)."
 fi
 echo "==> Sending a test email (outgoing mail must still work)"
@@ -130,5 +133,5 @@ if ! bash "$APP_DIR/infra/poc/test-email.sh" ${TEST_TO:+"$TEST_TO"}; then
 fi
 env_discard_backup "$BACKUP"
 echo "Removed .env.before-bounce-mailbox (the copy of the previous settings, with the old secret)."
-echo "Done. Switch on Bounced email in Admin -> Features; System status shows the Bounce mailbox check."
+echo "Done. Switch on Bounced email in Settings → Features (board); System status shows the Bounce mailbox check."
 echo "To change the mailbox, run this script again."

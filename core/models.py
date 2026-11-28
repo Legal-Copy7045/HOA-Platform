@@ -337,3 +337,97 @@ class GrowthSnapshot(AppendOnlyModel):
 
     def __str__(self) -> str:
         return f"growth {self.taken_on}"
+
+
+class CredentialChange(AppendOnlyModel):
+    """One change to a third-party service's keys and settings, made on
+    System status -> Keys and connections (D93). Append-only: a change is
+    never edited; approvals, refusals and cancellations are
+    ``CredentialDecision`` rows, and a newer change for the same service
+    supersedes an older one still waiting. The values are ``CredentialValue``
+    rows, each encrypted (core/credentials.py). Names and states only here:
+    never a value."""
+
+    class Kind(models.TextChoices):
+        SET = "set", "Saved"
+        CLEAR = "clear", "Removed (back to the server's .env)"
+        PIN_CHANGE = "pin_change", "Change of the pinned account"
+
+    service = models.CharField(max_length=30)
+    kind = models.CharField(max_length=12, choices=Kind.choices, default=Kind.SET)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    requested_at = models.DateTimeField(default=timezone.now)
+    # Board approvals needed before it takes effect (0: at once), how long it
+    # then waits at least, and when an unapproved change lapses.
+    approvals_needed = models.PositiveSmallIntegerField(default=0)
+    wait_hours = models.PositiveSmallIntegerField(default=0)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    # The provider account the key belongs to (Stripe acct_..., Teller app_...),
+    # read by the test; not a secret. Pins the account (D93).
+    account_ref = models.CharField(max_length=64, blank=True)
+    # The test before saving: True passed, False failed (saved anyway), None not run.
+    test_ok = models.BooleanField(null=True)
+    test_code = models.CharField(max_length=40, blank=True)
+    saved_anyway = models.BooleanField(default=False)
+    # The requester is a party: they never approve their own change (D65).
+    conflict_user_fields = ("requested_by",)
+
+    class Meta:
+        ordering = ["-requested_at", "-id"]
+        indexes = [models.Index(fields=["service", "requested_at"])]
+
+    def __str__(self) -> str:
+        return f"credentials {self.service} {self.kind} #{self.pk}"
+
+
+class CredentialValue(AppendOnlyModel):
+    """One setting of a ``CredentialChange``: AES-256-GCM under a key derived
+    from the server's CREDENTIALS_KEK (never DJANGO_SECRET_KEY), bound to its
+    name and change. ``last4`` only for secrets (what the page shows);
+    ``shown`` only for plain settings such as a host or a region."""
+
+    change = models.ForeignKey(CredentialChange, on_delete=models.PROTECT, related_name="values")
+    name = models.CharField(max_length=64)
+    ciphertext = models.BinaryField(blank=True, default=b"")
+    cleared = models.BooleanField(default=False)
+    last4 = models.CharField(max_length=4, blank=True)
+    shown = models.CharField(max_length=200, blank=True)
+    # Which key-encryption key sealed it (a keyed fingerprint, not the key).
+    key_id = models.CharField(max_length=16, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(fields=["change", "name"], name="credential_value_once")
+        ]
+
+    def __repr__(self) -> str:  # never the ciphertext
+        return f"<CredentialValue {self.name} change={self.change_id}>"
+
+    __str__ = __repr__
+
+
+class CredentialDecision(AppendOnlyModel):
+    """A board member's approval or refusal of a waiting change, or its
+    requester's cancellation (D93)."""
+
+    class Decision(models.TextChoices):
+        APPROVE = "approve", "Approved"
+        REJECT = "reject", "Refused"
+        CANCEL = "cancel", "Cancelled"
+
+    change = models.ForeignKey(CredentialChange, on_delete=models.PROTECT, related_name="decisions")
+    decision = models.CharField(max_length=10, choices=Decision.choices)
+    by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["at", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["change", "by"], name="credential_decision_once")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.decision} #{self.change_id}"

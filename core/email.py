@@ -89,6 +89,36 @@ def provider_name() -> str:
     return "smtp" if backend.endswith("smtp.EmailBackend") else "other"
 
 
+def default_from() -> str:
+    """The sender: Keys and connections (D93), else DEFAULT_FROM_EMAIL."""
+    from core import credentials
+
+    return credentials.get("DEFAULT_FROM_EMAIL")
+
+
+def sender(from_email: str) -> str:
+    """Messages built with Django's default sender (``from_email=None``) get
+    the sender saved on Keys and connections, without a restart."""
+    if not from_email or from_email == settings.DEFAULT_FROM_EMAIL:
+        return default_from()
+    return from_email
+
+
+def smtp_options() -> dict:
+    """The SMTP server's settings through the accessor (D93): the values saved
+    on Keys and connections, else the EMAIL_* settings."""
+    from core import credentials
+
+    return {
+        "host": credentials.get("EMAIL_HOST"),
+        "port": credentials.get("EMAIL_PORT"),
+        "username": credentials.get("EMAIL_HOST_USER"),
+        "password": credentials.get("EMAIL_HOST_PASSWORD"),
+        "use_tls": credentials.get("EMAIL_USE_TLS"),
+        "use_ssl": credentials.get("EMAIL_USE_SSL"),
+    }
+
+
 def tag(message):
     """A copy of ``message`` carrying its bounce token (see the module
     docstring). The original is not changed. Never fails the send."""
@@ -98,6 +128,7 @@ def tag(message):
     from comms import bounces
 
     tagged = copy.copy(message)
+    tagged.from_email = sender(message.from_email)
     headers = dict(getattr(message, "extra_headers", None) or {})
     names = {k.lower(): k for k in headers}
     kind = headers.pop(names[KIND_HEADER.lower()], "") if KIND_HEADER.lower() in names else ""
@@ -113,7 +144,7 @@ def tag(message):
     envelope = "" if smtp2go.selected() else bounces.return_path(ref)
     if envelope:
         if "from" not in names:
-            headers["From"] = message.from_email or settings.DEFAULT_FROM_EMAIL
+            headers["From"] = tagged.from_email or default_from()
         tagged.from_email = envelope
     tagged.extra_headers = headers
     tagged.portal_ref = ref
@@ -177,7 +208,11 @@ def clear_failure() -> None:
 class RedirectingBackend(BaseEmailBackend):
     def __init__(self, fail_silently: bool = False, **kwargs):
         super().__init__(fail_silently=fail_silently)
-        self._inner = get_connection(transport_backend(), fail_silently=fail_silently, **kwargs)
+        backend = transport_backend()
+        if backend.endswith("smtp.EmailBackend"):
+            for key, value in smtp_options().items():
+                kwargs.setdefault(key, value)
+        self._inner = get_connection(backend, fail_silently=fail_silently, **kwargs)
 
     def open(self):
         return self._inner.open()
@@ -203,9 +238,7 @@ class RedirectingBackend(BaseEmailBackend):
         email_messages = _tagged(email_messages)
         target = settings.EMAIL_REDIRECT_ALL_TO
         if not target:
-            sent = self._inner.send_messages(email_messages)
-            _record(email_messages, sent)
-            return sent
+            return self._send_and_record(email_messages)
         redirected = []
         for message in email_messages:
             copy_ = copy.copy(message)
@@ -213,8 +246,20 @@ class RedirectingBackend(BaseEmailBackend):
             copy_.subject = f"[to: {intended}] {message.subject}"
             copy_.to, copy_.cc, copy_.bcc = [target], [], []
             redirected.append(copy_)
-        sent = self._inner.send_messages(redirected)
-        _record(redirected, sent)
+        return self._send_and_record(redirected)
+
+    def _send_and_record(self, messages):
+        """Send, and record what the relay accepted, also when a later
+        message of the batch fails (review BUG-008, 0.44.0): SMTP2Go marks
+        each accepted message, so its delivery reports still match and a
+        retry is not taken for a first send."""
+        try:
+            sent = self._inner.send_messages(messages)
+        except Exception:
+            accepted = sum(1 for m in messages if getattr(m, "provider_message_id", ""))
+            _record(messages, min(accepted, max(len(messages) - 1, 0)))
+            raise
+        _record(messages, sent)
         return sent
 
 

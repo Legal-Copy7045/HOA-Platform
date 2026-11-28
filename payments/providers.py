@@ -47,14 +47,16 @@ class Config:
 FULL_KEY_REFUSED = (
     "STRIPE_SECRET_KEY is a full secret key (sk_...), which is refused. Only a restricted "
     'key (rk_...) with the rights in docs/runbook.md "Online payments (Stripe)" is '
-    "accepted: create one in Stripe and set it with sudo bash infra/poc/set-stripe-key.sh."
+    "accepted: create one in Stripe and enter it on System status -> Keys and connections."
 )
 
 
 def config() -> Config:
-    if settings.PAYMENTS_PROVIDER != "stripe":
+    from core import credentials
+
+    if credentials.get("PAYMENTS_PROVIDER") != "stripe":
         return Config(False, "none", False, False, "Online payments are not set up.")
-    key = settings.STRIPE_SECRET_KEY or ""
+    key = credentials.get("STRIPE_SECRET_KEY") or ""
     stage = getattr(settings, "DEPLOYMENT_STAGE", "local")
     restricted = key.startswith("rk_")
     if key.startswith(("sk_test_", "sk_live_")):
@@ -85,4 +87,6 @@ def secret_key() -> str:
     cfg = config()
     if not cfg.available:
         raise PaymentsNotConfigured(cfg.problem)
-    return settings.STRIPE_SECRET_KEY
+    from core import credentials
+
+    return credentials.get("STRIPE_SECRET_KEY")

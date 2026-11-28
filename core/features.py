@@ -362,8 +362,8 @@ FEATURES: list[Feature] = [
     _f(
         "reimbursements",
         "Expense reimbursements",
-        "Board members, committee members and volunteers claim back association expenses "
-        "they paid, with the receipt; another board member approves and the treasurer pays.",
+        "Board members and committee members claim back association expenses they paid, "
+        "with the receipt; another board member approves and the treasurer pays.",
         {
             "reimbursements",
             "reimbursement_new",

@@ -136,12 +136,14 @@ _HOST_RE = re.compile(rf"^{_LABEL}(\.{_LABEL})+$")
 
 
 def config() -> Config:
-    host = (getattr(settings, "BOUNCE_IMAP_HOST", "") or "").strip().lower()
-    user = getattr(settings, "BOUNCE_IMAP_USER", "") or ""
-    password = getattr(settings, "BOUNCE_IMAP_PASSWORD", "") or ""
-    folder = (getattr(settings, "BOUNCE_IMAP_FOLDER", "") or "INBOX").strip()
+    from core import credentials
+
+    host = (credentials.get("BOUNCE_IMAP_HOST") or "").strip().lower()
+    user = credentials.get("BOUNCE_IMAP_USER") or ""
+    password = credentials.get("BOUNCE_IMAP_PASSWORD") or ""
+    folder = (credentials.get("BOUNCE_IMAP_FOLDER") or "INBOX").strip()
     try:
-        port = int(getattr(settings, "BOUNCE_IMAP_PORT", 993) or 993)
+        port = int(credentials.get("BOUNCE_IMAP_PORT") or 993)
     except (TypeError, ValueError):
         port = 0
     if not host:
@@ -730,7 +732,7 @@ def health():
             )
         return None
     if not on:
-        return True, "Mailbox set up; bounce tracking is switched off (Admin → Features)"
+        return True, "Mailbox set up; bounce tracking is switched off (Settings → Features (board))"
     now = timezone.now()
     state = BouncePollState.objects.filter(pk=1).first()
     if state is None or state.last_attempt_at is None:

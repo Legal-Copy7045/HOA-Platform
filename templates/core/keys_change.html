@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load portal %}
+{% block title %}Key change · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+  <div class="crumbs"><a href="{% url 'system_status' %}">System status</a> / Keys and connections / Change</div>
+  <div class="page-head"><div><h1>{{ svc.label|default:change.service }}: {{ change.get_kind_display|lower }}</h1>
+    <p class="subtitle">Made by {{ change.requested_by.email|default:"the system" }} on {{ change.requested_at|date:"M j, Y g:i A" }}. {{ cs.words }}{% if cs.active_at %} (from {{ cs.active_at|date:"M j, Y g:i A" }}){% endif %}.</p></div></div>
+  <section class="card"><h2>What changes</h2>
+    <ul class="list">{% for n in names %}<li><div class="grow"><div class="title">{{ n.label }}</div><div class="small muted">{% if n.cleared %}Removed (the server's setting applies){% elif n.secret %}New value{% if n.last4 %} ending in {{ n.last4 }}{% endif %}{% else %}{{ n.shown }}{% endif %}</div></div></li>{% endfor %}</ul>
+    {% if change.account_ref %}<p class="small">{{ svc.pinned }}: ending {{ change.account_ref|slice:"-4:" }}{% if pin and pin != change.account_ref %} (the pinned one ends {{ pin|slice:"-4:" }}){% endif %}. Compare it with the provider's dashboard before approving.</p>{% endif %}
+    <p class="small">Test before saving: {% if change.test_ok is None %}not run{% elif change.test_ok %}passed{% else %}failed ({{ change.test_code }}){% if change.saved_anyway %}, saved anyway{% endif %}{% endif %}.</p>
+    {% if not fresh %}<p class="small muted"><a href="{{ reveal_url }}">Confirm it's you</a> to see the last four characters.</p>{% endif %}
+    {% if change.approvals_needed %}<p class="small muted">Needs {{ change.approvals_needed }} board approval{{ change.approvals_needed|pluralize }} by someone other than the person who made it{% if change.expires_at %}, by {{ change.expires_at|date:"M j, Y g:i A" }}{% endif %}{% if change.wait_hours %}, and takes effect {{ change.wait_hours }} hours after it was made at the earliest{% endif %}. Approved so far: {{ cs.approvers|length }}.</p>{% endif %}
+  </section>
+  {% if own %}<div class="alert info" role="note">{% icon "alert" %}<span>You made this change, so another board member has to decide on it.</span></div>{% endif %}
+  {% if can_refuse %}<section class="card"><h2>Your decision</h2>
+    <p class="small">{% if can_decide %}Approving or refusing{% else %}This change is approved and waits until {{ cs.active_at|date:"M j, Y g:i A" }}; until then any board member who has not decided on it can still refuse it. Refusing{% endif %} needs a fresh check with your passkey (or authenticator app if you have no passkey).</p>
+    <form method="post">{% csrf_token %}<input type="hidden" name="check" value="{{ check_value }}">
+      <div class="inline-form">{% if can_decide %}<button type="submit" name="decision" value="approve">Approve</button>{% endif %}
+      <button type="submit" name="decision" value="reject" class="danger">Refuse</button></div></form></section>{% endif %}
+  {% if can_cancel %}<form method="post">{% csrf_token %}<input type="hidden" name="check" value="{{ check_value }}"><button type="submit" name="decision" value="cancel" class="secondary">Cancel this change</button></form>{% endif %}
+{% endblock %}

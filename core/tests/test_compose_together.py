@@ -69,7 +69,7 @@ def test_new_and_existing_installs_get_both_files():
     make_env = (POC / "make-env.sh").read_text()
     assert f"\nCOMPOSE_FILE={BOTH}\n" in make_env
     # The .env heredoc is unquoted: a backtick in it would run a command.
-    body = make_env.split("cat > .env <<ENV\n", 1)[1].split("\nENV\n", 1)[0]
+    body = make_env.split('cat > "$OUTPUT" <<ENV\n', 1)[1].split("\nENV\n", 1)[0]
     assert "`" not in body
     start = (POC / "start-portal.sh").read_text()
     assert 'source "$APP_DIR/infra/poc/lib.sh"' in start

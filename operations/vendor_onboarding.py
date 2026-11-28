@@ -33,6 +33,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import hmac
+import logging
 import re
 import secrets
 from dataclasses import dataclass
@@ -72,6 +73,8 @@ from operations.models import (
     VendorTerms,
     VendorType,
 )
+
+logger = logging.getLogger(__name__)
 
 FEATURE = "vendor_onboarding"
 APPROVALS_NEEDED = 2
@@ -160,7 +163,9 @@ for _spec in (
         "Vendor document disposal step",
         frozenset({"file_id", "step"}),
     ),
-    ActionSpec("vendor.files_reencrypted", "Vendor documents re-encrypted", frozenset({"count"})),
+    ActionSpec(
+        "vendor.files_reencrypted", "Vendor documents re-encrypted", frozenset({"count", "skipped"})
+    ),
 ):
     register(_spec)
 
@@ -1667,27 +1672,61 @@ def confirm_disposal(vf: VendorFile, *, actor, request=None) -> VendorFileDispos
     return row
 
 
+def stored_document_count() -> int:
+    """Vendor documents still held (not disposed of): what the vendor
+    document key protects. Keys and connections refuses to remove the key
+    while any exist (review BUG-003 / EXP-003, 0.44.0)."""
+    disposed = _disposed_file_ids()
+    return sum(
+        1
+        for pk, name in VendorFile.objects.values_list("pk", "file")
+        if name and pk not in disposed
+    )
+
+
 def reencrypt_all() -> int:
-    """Rewrite every stored blob under the current key (after rotation)."""
+    """Rewrite every stored blob under the current key (after rotation).
+
+    Never loses a document (review BUG-007, 0.44.0): the old blob is first
+    copied aside, the new one written and read back, and only then is the
+    copy removed; a worker killed in between leaves the copy (named
+    ``<name>.before-reencrypt``) in the store. A document no configured key
+    opens is skipped and counted, not a stop for the whole run."""
     from django.core.files.base import ContentFile
 
     if not vendor_crypto.configured():
         raise vendor_crypto.VendorKeyMissing()
     disposed = _disposed_file_ids()
-    count = 0
+    count = skipped = 0
     for vf in VendorFile.objects.order_by("id"):
         if vf.pk in disposed or not vf.file.name:
             continue
         with vf.file.open("rb") as fh:
             blob = fh.read()
-        if vendor_crypto.key_index(blob, vf.storage_name) == 0:
+        try:
+            if vendor_crypto.key_index(blob, vf.storage_name) == 0:
+                continue
+            plaintext = vendor_crypto.decrypt(blob, vf.storage_name)
+        except vendor_crypto.VendorKeyMismatch:
+            skipped += 1
+            logger.warning("vendor.reencrypt_unreadable", extra={"file_id": vf.pk})
             continue
-        plaintext = vendor_crypto.decrypt(blob, vf.storage_name)
+        fresh = vendor_crypto.encrypt(plaintext, vf.storage_name)
         storage, name = vf.file.storage, vf.file.name
+        aside = storage.save(f"{name}.before-reencrypt", ContentFile(blob))
         storage.delete(name)
-        storage.save(name, ContentFile(vendor_crypto.encrypt(plaintext, vf.storage_name)))
+        saved = storage.save(name, ContentFile(fresh))
+        if saved != name:  # the store chose another name: keep the copy, say so
+            logger.error("vendor.reencrypt_renamed", extra={"file_id": vf.pk})
+            storage.delete(saved)
+            storage.save(name, ContentFile(blob))
+            continue
+        with storage.open(name, "rb") as fh:
+            if vendor_crypto.decrypt(fh.read(), vf.storage_name) != plaintext:
+                raise vendor_crypto.VendorKeyMismatch()
+        storage.delete(aside)
         count += 1
-    record_event("vendor.files_reencrypted", metadata={"count": count})
+    record_event("vendor.files_reencrypted", metadata={"count": count, "skipped": skipped})
     return count
 
 

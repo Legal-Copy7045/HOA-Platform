@@ -127,6 +127,24 @@ env_add_missing() {
   env_update "$file" "$key" "$value"
 }
 
+# env_ensure_secret <file> <key> [bytes]: give the key a fresh random hex
+# value (openssl rand, default 32 bytes) when .env has no line for it or an
+# empty one; never changes a value that is set (D93: CREDENTIALS_KEK and
+# BANK_FEED_TOKEN_KEY appear on their own at install, no manual step). Prints
+# the key's name only, never the value.
+env_ensure_secret() {
+  local file="$1" key="$2" bytes="${3:-32}" current value
+  env_key_ok "$key" || return 2
+  [[ "$bytes" =~ ^[0-9]{2,3}$ ]] || return 2
+  current="$(env_get "$file" "$key" || true)"
+  current="${current//[\"\']/}"
+  [ -z "$current" ] || return 0
+  value="$(openssl rand -hex "$bytes")"
+  [ "${#value}" -ge 32 ] || { echo "env_ensure_secret: could not make a value." >&2; return 1; }
+  echo "Adding a new random ${key} to .env"
+  env_update "$file" "$key" "$value"
+}
+
 # env_get <file> <key>: the value of the key's first line (quotes kept).
 env_get() {
   local file="$1" key="$2" line
@@ -228,6 +246,68 @@ pick_release_tag() {
   done
   [ -n "$best" ] || return 1
   printf '%s\n' "$best"
+}
+
+# tunnel_token_ok <token>: a Cloudflare tunnel token as the dashboard shows it
+# (base64 text, at least 100 characters); nothing else may reach .env.
+tunnel_token_ok() {
+  if [ "${#1}" -lt 100 ]; then
+    echo "That does not look like a tunnel token (too short)." >&2
+    return 1
+  fi
+  if ! [[ "$1" =~ ^[A-Za-z0-9+/=_-]+$ ]]; then
+    echo "That does not look like a tunnel token (unexpected characters)." >&2
+    return 1
+  fi
+  return 0
+}
+
+# hostname_ok <name>: a plain lower-case DNS name with at least one dot.
+hostname_ok() {
+  [[ "$1" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$ ]]
+}
+
+# release_git <user> <dir> <git args...>: git in the checkout, as the user who
+# owns it (root runs it directly; safe.directory lets root read it either way).
+release_git() {
+  local user="$1" dir="$2"
+  shift 2
+  if [ "$user" = "root" ] || [ "$(id -un)" = "$user" ]; then
+    git -c safe.directory="$dir" -C "$dir" "$@"
+  else
+    sudo -u "$user" -H git -C "$dir" "$@"
+  fi
+}
+
+# checkout_release <dir> <user>: put the checkout's main branch at the newest
+# release tag on origin/main (D90, the same pick_release_tag as
+# update-portal.sh and the agent). The one code path for the first checkout
+# (install.sh, provision-vm.sh, D94): a fresh `git clone --no-checkout` is
+# checked out at the tag; an existing checkout only ever moves forward to it,
+# never over local edits and never with a reset (updates are update-portal.sh's
+# job). Prints the tag it is at.
+checkout_release() {
+  local dir="$1" user="$2" tag
+  release_git "$user" "$dir" fetch --quiet --tags origin main \
+    || { echo "Could not fetch the portal code from GitHub (check the server's internet access)." >&2; return 1; }
+  tag="$(release_git "$user" "$dir" tag --merged origin/main --list 'v*' | pick_release_tag)" \
+    || { echo "GitHub has no release of the portal yet (no v<MAJOR>.<MINOR>.<PATCH> tag on main)." >&2; return 1; }
+  if [ ! -f "$dir/.git/index" ]; then
+    # A fresh clone with nothing checked out yet.
+    release_git "$user" "$dir" checkout --quiet -B main "$tag"
+    release_git "$user" "$dir" branch --quiet --set-upstream-to=origin/main main
+  elif [ "$(release_git "$user" "$dir" rev-parse HEAD)" = "$(release_git "$user" "$dir" rev-parse "$tag^{commit}")" ]; then
+    :
+  elif [ "$(release_git "$user" "$dir" rev-parse --abbrev-ref HEAD)" = "main" ] \
+       && [ -z "$(release_git "$user" "$dir" status --porcelain --untracked-files=no)" ] \
+       && release_git "$user" "$dir" merge-base --is-ancestor HEAD "$tag"; then
+    release_git "$user" "$dir" merge --ff-only --quiet "$tag"
+  else
+    echo "The checkout in $dir is not an older release on main; left as it is (update with update-portal.sh)." >&2
+    release_git "$user" "$dir" describe --tags --always 2>/dev/null || true
+    return 0
+  fi
+  printf '%s\n' "$tag"
 }
 
 # offsite_pick <now stamp>  (stdin: backup names, oldest first, as pull_backup --list)

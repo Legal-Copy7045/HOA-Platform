@@ -237,3 +237,27 @@ def test_full_check_log_writes_one_walkthrough_row(monkeypatch):
     monkeypatch.setattr(run, "_walk_counts", lambda: (11, 700, 0, 0))
     assert run.log(["--full-check"]) == 0
     assert rows == ["RUNS.md", "WALKTHROUGHS.md"]
+
+
+# --- Files seeded in one process, served by another (walkthrough 0.44.0) ----------------
+
+
+def test_the_page_and_walkthrough_sites_keep_seeded_files_on_disk_per_database():
+    """seed_demo and runserver are separate processes: in-memory files were
+    gone when a page opened them (every demo receipt was a 404)."""
+    import ast
+
+    text = (HERE / "page_settings.py").read_text()
+    assert "InMemoryStorage" not in text
+    assert "django.core.files.storage.FileSystemStorage" in text
+    tree = ast.parse(text)
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "media_dir")
+    namespace: dict = {"Path": Path, "__file__": str(HERE / "page_settings.py")}
+    exec(compile(ast.Module([fn], []), "page_settings", "exec"), namespace)  # noqa: S102  # nosec B102
+    media_dir = namespace["media_dir"]
+    walk = media_dir("postgres://u:p@localhost:5432/hoa_reg_walk")
+    page = media_dir("postgres://u:p@localhost:5432/hoa_reg_pages")
+    assert walk != page and walk.parent == HERE / "out" / "media"
+    assert media_dir("postgres://x/../../etc").name == "etc"  # never outside out/media
+    # A fresh database starts with no files of an earlier run.
+    assert '"out" / "media" / name' in (HERE / "page_setup.py").read_text()

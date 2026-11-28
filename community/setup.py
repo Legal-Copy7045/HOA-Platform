@@ -282,8 +282,9 @@ STEPS: list[Step] = [
         "Server and email",
         "Outgoing email and its provider (SMTP server or SMTP2Go), the bounce mailbox, "
         "backups, the off-site copy, the payment and bank keys, the vendor document key "
-        "and the USPS tracking login. These "
-        "are done on the server by a sysadmin; this step shows where things stand.",
+        "and the USPS tracking login. A sysadmin enters the keys on System status, Keys "
+        "and connections (backups and the off-site copy stay on the server); this step "
+        "shows where things stand.",
         kind=SERVER,
     ),
     Step(
@@ -295,6 +296,17 @@ STEPS: list[Step] = [
     ),
 ]
 BY_KEY = {s.key: s for s in STEPS}
+# Keys and connections (D93): the service keys each step depends on, shown
+# there as configured / not configured with where a sysadmin enters them
+# (System status -> Keys and connections). Every service is on some step
+# (community/tests/test_setup_wizard_guard.py).
+KEY_SERVICES: dict[str, tuple[str, ...]] = {
+    "payments": ("stripe", "teller"),
+    "arc": ("ai",),
+    "vendors": ("vendor_key",),
+    "notices": ("usps",),
+    "server": ("smtp2go", "smtp", "bounce", "stripe", "teller", "usps", "ai", "vendor_key"),
+}
 KEYS = [s.key for s in STEPS]
 # Steps a run must complete (or skip) before Finish; Review is the finish.
 WORK_STEPS = [k for k in KEYS if k != "review"]

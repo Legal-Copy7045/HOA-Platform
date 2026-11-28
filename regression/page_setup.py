@@ -31,6 +31,12 @@ def reset_db(name: str) -> None:
             sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name))
         )
         conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    # The stage's stored files go with its database (regression/page_settings.py).
+    import shutil
+
+    media = Path(__file__).resolve().parent / "out" / "media" / name
+    if media.is_dir() and media.parent.name == "media":
+        shutil.rmtree(media)
 
 
 def sessions(out: str, *, every_role: bool = False) -> None:

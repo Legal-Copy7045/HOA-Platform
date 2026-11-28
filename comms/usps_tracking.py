@@ -1,6 +1,6 @@
 """USPS tracking of paper mail: Informed Visibility scans (D60).
 
-When the board switches on "usps_tracking" (Admin → Features) and a
+When the board switches on "usps_tracking" (Settings → Features (board)) and a
 sysadmin has put the HOA's Business Customer Gateway login on the server
 (infra/poc/set-usps.sh), a background task asks USPS a few times a day for
 the scans of each barcoded letter (``MailPiece``) that was marked as mailed

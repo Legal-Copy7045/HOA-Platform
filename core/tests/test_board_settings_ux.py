@@ -158,7 +158,7 @@ def test_switching_a_feature_off_names_what_disappears(client, board):
     page = client.post(
         reverse("setup_step", args=["features"]), _features_post(votes=False)
     ).content.decode()
-    assert "Switch off Votes? It leaves the menu for everyone" in page
+    assert "Switch off Votes? It is hidden from the menu for everyone" in page
     assert "1 vote is open." in page
     assert "Its records are kept" in page
 

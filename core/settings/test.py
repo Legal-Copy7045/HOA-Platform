@@ -24,3 +24,5 @@ STORAGES["default"] = {"BACKEND": "django.core.files.storage.InMemoryStorage"}  
 STORAGES["staticfiles"] = {  # noqa: F405
     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
 }
+# Keys and connections (D93): a throwaway key-encryption key for the tests.
+CREDENTIALS_KEK = os.environ.get("CREDENTIALS_KEK", "test-only-credentials-kek-not-a-secret-0123")

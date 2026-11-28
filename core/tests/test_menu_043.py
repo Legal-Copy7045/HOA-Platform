@@ -1,5 +1,5 @@
 """The 0.43.0 menu trim (D95): My reimbursements leaves My home (board side:
-Finance overview, a committee's page, My account, My items), "Notices about
+Finance overview, a committee's page, My items; never My account), "Notices about
 my home" is "My violations", and records requests are a section of My
 requests with "Ask for records"."""
 
@@ -129,9 +129,10 @@ def test_own_claim_waits_in_my_items_without_a_menu_bubble(client, board):
     client.force_login(board)
     page = client.get(reverse("my_items")).content.decode()
     assert "Your reimbursement of" in page
-    # My account (anyone who may claim) links the list too.
+    # Expense claims are board work, never on My account (owner side).
     page = client.get(reverse("my_account")).content.decode()
-    assert f'href="{reverse("reimbursements")}?mine=1"' in page
+    assert f'href="{reverse("reimbursements")}?mine=1"' not in page
+    assert reverse("reimbursement_new") not in page
 
 
 # --- Records requests inside My requests -------------------------------------------------

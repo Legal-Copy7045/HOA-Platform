@@ -4,14 +4,19 @@ The POC runs on one VM on an isolated VLAN. It is reachable only through the
 Cloudflare tunnel `hoa-portal-poc`; nothing on the VM accepts inbound
 connections from the internet or other VLANs.
 
-## Steps
+## Install in one command (D94)
 
-1. **VLAN** (UniFi): network `hoa-poc`, its own VLAN ID and subnet, DHCP on,
-   "Isolate Network" on, internet access on, mDNS off.
-2. **Create the VM** (Proxmox host, web UI -> node -> Shell):
+Replace `v0.44.0` below with the newest release on GitHub (Releases; always a
+`v` tag, never `main`). The script then fetches the newest release itself.
+
+0. **Optional: make the server.** Any Ubuntu 24.04 LTS server with 2 CPUs,
+   4 GB of memory and 40 GB of disk works. On Proxmox, `create-vm.sh` makes
+   one (first a UniFi network `hoa-poc`: its own VLAN ID and subnet, DHCP on,
+   "Isolate Network" on, internet access on, mDNS off). Proxmox host, web UI
+   -> node -> Shell:
 
    ```bash
-   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/main/infra/poc/create-vm.sh
+   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v0.44.0/infra/poc/create-vm.sh
    ```
 
    ```bash
@@ -23,44 +28,85 @@ connections from the internet or other VLANs.
    ```
 
    Save the console password it prints in your password manager.
-3. **Provision the VM** (VM -> Console -> **xterm.js**, which supports paste; log in as `hoa`):
+
+1. **Get the tunnel token**: Cloudflare dashboard -> Zero Trust -> Networks
+   -> Tunnels -> your tunnel (or Create a tunnel -> Cloudflared) ->
+   Configure. Its Public Hostname is the portal's address (for example
+   `portal-dev.oakcreekhoa.com`) with service `http://web:8000`. Copy the
+   install command it shows: only the token in it (the long text starting
+   `eyJ`) is kept.
+
+2. **Install** (the server's console, e.g. Proxmox VM -> Console ->
+   **xterm.js**, which supports paste; log in as `hoa`):
 
    ```bash
-   curl -fsSLO https://raw.githubusercontent.com/Legal-Copy7045/HOA-Platform/main/infra/poc/provision-vm.sh
+   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v0.44.0/infra/poc/install.sh | sudo bash
    ```
+
+   To read it first: `curl -fsSLO <the same address>`, `less install.sh`,
+   `sudo bash install.sh`.
+
+   It asks for the tunnel token (typing is hidden), the portal's address
+   (Enter keeps `portal-dev.oakcreekhoa.com` and skips the check from
+   outside) and your name and email as the first board officer and sysadmin
+   (Enter to do it later). Then it runs on its own for 15-25 minutes:
+
+   - checks the server first (Ubuntu 22.04 or newer, CPUs, memory, disk,
+     internet access) and changes nothing if one fails;
+   - fetches the newest release into `/opt/hoa-portal`;
+   - `provision-vm.sh`: security updates, SSH keys only, firewall, Docker;
+   - `make-env.sh`: `.env` with every server secret generated on the server
+     (mode 600; `COMPOSE_FILE` with both compose files, D91);
+   - `harden-host.sh`: automatic updates, auditd, AIDE, Falco;
+   - `start-portal.sh`: builds and starts the portal and the update agent
+     (which also runs Admin -> Server tasks); `health-timer.sh`;
+   - checks that every container is healthy, the database is migrated,
+     cloudflared is on the `edge` network only and the tunnel is connected
+     (and, if you gave the address, that it answers from outside);
+   - prints a one-time sign-in link for you on the screen (never in the log).
+
+   Open the link, choose a password, add a passkey or an authenticator app
+   and save the recovery codes. Everything else (email, payments, rules) is
+   set up in the browser: Settings -> Community setup. Copy `.env`'s secrets
+   into the HOA password manager.
+
+   Connected over SSH instead of the console? The install closes inbound
+   SSH (the portal needs none) and stops first to ask you to choose:
+   `--admin-cidr <your address>/32` keeps SSH from your address (keys only),
+   `--close-ssh` closes it. With curl, options go after `bash -s --`:
 
    ```bash
-   less provision-vm.sh
+   curl -fsSL https://raw.githubusercontent.com/Legal-Copy7045/HOA-Portal/v0.44.0/infra/poc/install.sh | sudo bash -s -- --close-ssh
    ```
 
-   ```bash
-   sudo bash provision-vm.sh
-   ```
+   **Running it again is safe**: finished steps are skipped, `.env` and its
+   secrets are kept (never regenerated), no data is touched, and the checks
+   run again. If a step failed, the message says what to do, then run the
+   same command again and it continues there. `--repair` runs every step
+   again; `--new-token` replaces only the tunnel token. The log, with no
+   secrets, is `/var/log/hoa-portal-install.log`.
 
-4. **Secrets and start** (VM console, as `hoa`). Get the latest code first:
+   For automation, the token comes from a file or stdin, never the command
+   line: `sudo bash install.sh --token-file /root/tunnel-token --hostname
+   portal.example.org --officer-name "Pat Example" --officer-email
+   pat@example.org` (`--help` lists every option).
 
-   ```bash
-   cd /opt/hoa-portal && git pull --ff-only
-   ```
+3. **Optional: off-site backups** to a locked Cloudflare R2 bucket that a
+   compromised portal cannot delete, deliberately a separate step on the
+   server: `sudo bash /opt/hoa-portal/infra/poc/setup-offsite-backups.sh`
+   (see the instructions at the top of that script).
 
-   Create `.env` with generated secrets. It asks for the tunnel token
-   (typing is hidden) and an optional catch-all email:
+## The same, step by step
 
-   ```bash
-   bash infra/poc/make-env.sh
-   ```
-
-   Build and start everything and install the update agent (images are
-   pinned in the compose files and updated by Dependabot pull requests, D57):
-
-   ```bash
-   sudo bash infra/poc/start-portal.sh
-   ```
-
-   Then open https://portal-dev.oakcreekhoa.com. Cloudflare Access asks for
-   your email and sends a one-time code; after that you reach the portal.
-
-   Copy the generated secrets from `.env` into the HOA password manager.
+The scripts install.sh runs still work on their own, in this order (each is
+safe to re-run): `sudo bash provision-vm.sh` (downloaded as above; it checks
+out the newest release), then in `/opt/hoa-portal` as `hoa`:
+`bash infra/poc/make-env.sh` (asks for the token and an optional catch-all
+email), `sudo bash infra/poc/harden-host.sh`, `sudo bash
+infra/poc/start-portal.sh`, `sudo bash infra/poc/health-timer.sh`, and the
+first officer: `sudo docker compose exec web python manage.py
+bootstrap_first_officer --name "Your Name" --email you@example.org
+--also-sysadmin` (docs/runbook.md, "First-time setup").
 
 ## Email through SMTP2Go
 
@@ -97,7 +143,7 @@ bounce mailbox is needed). In the SMTP2Go dashboard, once:
    `DEFAULT_FROM_EMAIL`), restarts web and worker, checks again from the
    portal and sends a test email. If anything fails, only those keys are put
    back. Back to plain SMTP: `sudo bash infra/poc/set-smtp2go.sh --off`.
-4. Admin → Features → Bounced email on, so addresses that bounce are flagged.
+4. Settings → Features (board) → Bounced email on, so addresses that bounce are flagged.
 
 Every set-*.sh script edits `.env` through `lib.sh` (`env_update`): only
 its own keys change, every other line is kept, the file stays mode 600, and
@@ -110,7 +156,11 @@ the `.env.before-*` copy is shredded when the script ends.
 `SSH_KEY_FILE` (optional), `CORES`, `MEMORY_MB`, `DISK_SIZE`.
 
 `provision-vm.sh`: `ADMIN_CIDR` (allow SSH from one admin address; default
-none), `BRANCH`, `REPO_URL`, `APP_DIR`.
+none), `BRANCH` (default: the newest release tag; a branch name follows that
+branch on purpose), `REPO_URL`, `APP_DIR`, `APP_USER`.
+
+`install.sh`: the options in `--help`; `APP_DIR` (`/opt/hoa-portal`),
+`APP_USER` (the checkout's owner, else `hoa`), `REPO_URL`.
 
 Both scripts check before changing anything and are safe to re-run.
 

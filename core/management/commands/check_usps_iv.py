@@ -9,7 +9,27 @@ from django.core.management.base import BaseCommand, CommandError
 class Command(BaseCommand):
     help = "Check the USPS Informed Visibility login: sign in only, no piece query."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--server",
+            action="store_true",
+            help="Check the server's .env values, not what the portal uses (set-*.sh).",
+        )
+
     def handle(self, *args, **options):
+        # With --server (the set-*.sh scripts) this checks what was just written
+        # to .env; either way it says when the portal's values win (EXP-006).
+        from core import credentials
+
+        note = credentials.override_note("usps")
+        if note:
+            self.stderr.write(note)
+        if not options.get("server"):
+            return self._check(*args, **options)
+        with credentials.server_only("usps"):
+            return self._check(*args, **options)
+
+    def _check(self, *args, **options):
         from comms import usps_iv
 
         cfg = usps_iv.config()
