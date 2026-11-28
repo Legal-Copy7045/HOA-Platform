@@ -1,0 +1,32 @@
+# Release 0.47 review fixes (D102, D101 and D93 "Review fixes (0.47.0)"): the
+# simulation makes no network call and fails on one (EXP-001, EXP-002, EXP-006),
+# range-checks months and seed (EXP-003), drops only a simulation database
+# (BUG-003, EXP-004), watches UUID-keyed append-only tables (BUG-001), checks
+# statement emails per account (BUG-002), fails on refused tasks and kinds
+# (BUG-006), keeps frames not source lines (EXP-005); live mail and bounce
+# polling try every checked public address (BUG-004); a non-ASCII digit in a
+# port is a form error (BUG-005); the workflows' Postgres pinned by digest (SEC-001).
+- feature: "Live mail sending, the bounce poll and the Keys-and-connections tests try each checked public address in turn, stopping at the first that connects; any private address still means nothing is contacted"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_review_fixes_047.py::test_(connect_any_|live_mail_|bounce_polling_|the_keys_tests_try)"]
+- feature: "A port typed with a non-ASCII digit on Keys and connections is 'must be a port number', never a 500; numeric ids read from Record payments and an urgent text link ignore or refuse such digits"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^unit:core/tests/test_review_fixes_047.py::test_(a_port_with_a_non_ascii|ascii_ports_still|keys_and_connections_answers|record_payments_ignores|an_urgent_notice_link)"]
+- feature: "The simulation makes no network call: the scanner health query and USPS are faked, unfaked services pinned off, and any outside lookup or connection refused, counted and failing the run and the stage check 'no outbound network call'"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^simulation:no outbound network call$", "^unit:regression/tests/test_simulation\\.py::test_(the_network_guard|the_fakes_answer_the_scanner|the_stage_fails_on_an_outside)"]
+- feature: "Simulation months are 1 to 24 (sim.py, run.py, the workflow) and the seed at most 9 digits; sim.py drops only a database named hoa_...sim..., never hoa, postgres or the one in DATABASE_URL or HOA_DB_NAME"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^unit:regression/tests/test_simulation\\.py::test_(sim_refuses_to_drop|sim_months_and_seed|the_workflow_checks_the_months)"]
+- feature: "The simulation's append-only invariant watches UUID-keyed tables (secret and election choices, survey responses and answers) and the statement-email invariant checks every emailable account"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^unit:regression/tests/test_simulation\\.py::test_(every_append_only_table_is_watched|a_changed_or_deleted_uuid_row|the_append_only_watch_reads|statement_emails_are_checked)"]
+- feature: "The simulation stage fails on a refused scheduled task or an event kind refused in more than a quarter of its runs; error rows keep the class, message and file:line frames, never source lines"
+  since: "0.47"
+  docs: docs/decisions.md
+  match: ["^simulation:refusals: ", "^unit:regression/tests/test_simulation\\.py::test_(the_stage_fails_on_an_outside|error_rows_keep_frames)"]

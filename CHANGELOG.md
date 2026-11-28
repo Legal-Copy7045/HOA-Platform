@@ -6,6 +6,26 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.47.0 — 2026-11-28
+
+- An 18-month simulation (D102): `python3 regression/run.py --stage simulation`
+  (or the manual "Simulation" workflow on GitHub) runs the portal through 18
+  months in about an hour on fictional data, with a moving clock, every
+  scheduled job, fake Stripe, bank, mail and scanner, and the day-by-day
+  checks: books balance, accounts match their ledgers, records stay
+  append-only, months and the year close, statements and reminders go out.
+  Snapshots at months 6, 12 and 18 can be crawled. Never part of a normal run.
+- Audit fixes found by the simulation: adding the starter compliance items,
+  event RSVPs and volunteer sign-ups are now recorded in the audit log
+  (counts and ids only, no names).
+- Full-check fixes: the simulation cannot reach the network (any outside call
+  fails the run), refuses to drop any database but its own, limits months to
+  1-24 and watches every append-only table; live mail and the bounce mailbox
+  try each checked public address in turn; a non-ASCII digit in a port or id
+  field gives a form error, not a server error; the CI and simulation
+  workflows pin the same Postgres image as the server; on a phone, System
+  status tiles wrap instead of widening the page.
+
 ## 0.46.0 — 2026-11-28
 
 - Progress on every workflow item (D99): a stage strip at the top of ARC

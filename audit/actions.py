@@ -262,6 +262,7 @@ _SPECS = [
     _spec("consent.withdrawn", "Written consent withdrawn"),
     _spec("budget.notice_sent", "Budget notice sent", "stage", "emailed", "paper"),
     _spec("compliance.saved", "Compliance item saved"),
+    _spec("compliance.starters_added", "Suggested compliance items added", "count"),
     _spec("compliance.done", "Compliance item done", "recurring"),
     _spec("accounting.setup_saved", "Accounting setup saved"),
     _spec("accounting.exported", "Accounting journal exported", "start", "end", "rows"),
@@ -520,6 +521,9 @@ _SPECS = [
     _spec("event.slot_added", "Volunteer slot added to a calendar event", "event_id", "capacity"),
     _spec("event.slot_removed", "Volunteer slot removed from a calendar event", "event_id"),
     _spec("event.reminders_sent", "Event reminder emails sent", "recipients"),
+    _spec("event.rsvp_answered", "RSVP answered for a calendar event", "answer", "guests"),
+    _spec("event.volunteer_signed_up", "Signed up for a volunteer slot", "event_id"),
+    _spec("event.volunteer_left", "Left a volunteer slot", "event_id"),
     # --- Reserve plan (reserves) ---
     _spec(
         "reserves.component_saved",

@@ -596,7 +596,9 @@ def record_payments(request):
         policy.require(request.user, "accounting.manage")
         try:
             acc.create_deposit(
-                entry_ids=[i for i in request.POST.getlist("entries") if i.isdigit()],
+                entry_ids=[
+                    i for i in request.POST.getlist("entries") if i.isascii() and i.isdigit()
+                ],
                 deposited_on=_date(request.POST.get("deposited_on"), today),
                 bank_reference=request.POST.get("bank_reference", ""),
                 actor=request.user,
@@ -646,7 +648,9 @@ def record_payments(request):
     for i, row in enumerate(rows):
         row["name"], row["err_id"] = f"lot_{i}", f"err_{i}"
     recorded = []
-    ids = [int(i) for i in request.GET.get("recorded", "").split(",") if i.isdigit()][:100]
+    ids = [
+        int(i) for i in request.GET.get("recorded", "").split(",") if i.isascii() and i.isdigit()
+    ][:100]
     if ids and request.method == "GET":
         undeposited = {e.pk for e in acc.undeposited_payments()}
         recorded = [

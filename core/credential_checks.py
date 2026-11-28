@@ -117,17 +117,41 @@ def _connect(address: str, port: int, timeout, source_address=None) -> socket.so
     return socket.create_connection((address, port), timeout, source_address)
 
 
-def pinned_smtp(address: str, *, ssl: bool):
+def _addresses(address) -> tuple[str, ...]:
+    out = (address,) if isinstance(address, str) else tuple(address)
+    if not out:
+        raise ValueError("no checked address to connect to")
+    return out
+
+
+def _connect_any(addresses, port: int, timeout, source_address=None) -> socket.socket:
+    """Connect to the first of the checked ``addresses`` that answers, in the
+    order the name resolved (review BUG-004, 0.47.0: a relay's other
+    addresses are tried when one is down, as socket.create_connection does
+    for a host name). Only checked public addresses are ever passed in; the
+    last failure is raised when none answers."""
+    last: OSError | None = None
+    for address in _addresses(addresses):
+        try:
+            return _connect(address, port, timeout, source_address)
+        except OSError as exc:
+            last = exc
+    raise last  # type: ignore[misc]
+
+
+def pinned_smtp(address, *, ssl: bool):
     """smtplib's SMTP (or SMTP_SSL) class that connects to the checked
-    ``address`` while keeping the host name for TLS (SNI and certificate
-    checks, STARTTLS included: smtplib uses the name it was given)."""
+    ``address`` (or the first of a list of checked addresses that answers)
+    while keeping the host name for TLS (SNI and certificate checks, STARTTLS
+    included: smtplib uses the name it was given)."""
     import smtplib
 
     base = smtplib.SMTP_SSL if ssl else smtplib.SMTP
+    addresses = _addresses(address)
 
     class PinnedSMTP(base):
         def _get_socket(self, host, port, timeout):
-            sock = _connect(address, port, timeout, self.source_address)
+            sock = _connect_any(addresses, port, timeout, self.source_address)
             if ssl:
                 sock = self.context.wrap_socket(sock, server_hostname=self._host)
             return sock
@@ -135,20 +159,32 @@ def pinned_smtp(address: str, *, ssl: bool):
     return PinnedSMTP
 
 
-def pinned_imap(address: str):
-    """imaplib.IMAP4_SSL that connects to the checked ``address``; TLS
-    verifies the host name it was given."""
+def pinned_imap(address):
+    """imaplib.IMAP4_SSL that connects to the checked ``address`` (or the
+    first of a list of checked addresses that answers); TLS verifies the host
+    name it was given."""
     import imaplib
+
+    addresses = _addresses(address)
 
     class PinnedIMAP(imaplib.IMAP4_SSL):
         def _create_socket(self, timeout):
-            sock = _connect(address, self.port, timeout)
+            sock = _connect_any(addresses, self.port, timeout)
             return self.ssl_context.wrap_socket(sock, server_hostname=self.host)
 
     return PinnedIMAP
 
 
 # --- Format checks (what was typed) -------------------------------------------------------
+
+
+def _port_digits(value) -> bool:
+    """ASCII digits only, at most five (review BUG-005, 0.47.0): str.isdigit()
+    also accepts characters such as a superscript two that int() rejects."""
+    return bool(_PORT_RE.fullmatch(str(value)))
+
+
+_PORT_RE = re.compile(r"[0-9]{1,5}")
 
 
 @sensitive_variables("values")
@@ -163,7 +199,7 @@ def validate(service_key: str, values: dict, *, merged: dict) -> list[str]:
             continue
         if f.kind == credentials.CHOICE and v not in {c for c, _ in f.choices}:
             problems.append(f"Choose one of the offered values for {f.label}.")
-        if f.kind == credentials.INT and not (str(v).isdigit() and 1 <= int(v) <= 65535):
+        if f.kind == credentials.INT and not (_port_digits(v) and 1 <= int(v) <= 65535):
             problems.append(f"{f.label} must be a port number.")
         elif f.name == "EMAIL_PORT" and int(v) == 25:
             problems.append(
@@ -293,7 +329,7 @@ def _smtp() -> TestResult:
     if not addresses:
         return failed("not_public", "The mail server must be a public host name that resolves.")
     try:
-        backend = _pinned_backend(EmailBackend, addresses[0])(
+        backend = _pinned_backend(EmailBackend, addresses)(
             fail_silently=False, timeout=20, **options
         )
         backend.open()  # connect, encrypt and sign in; nothing is sent
@@ -308,8 +344,8 @@ def _smtp() -> TestResult:
     return passed(f"Signed in to {options['host']}:{options['port']}; nothing was sent.")
 
 
-def _pinned_backend(backend_class, address: str):
-    """Django's SMTP backend, connecting only to the checked address."""
+def _pinned_backend(backend_class, address):
+    """Django's SMTP backend, connecting only to the checked address(es)."""
     if not isinstance(backend_class, type):  # replaced in tests
         return backend_class
 
@@ -419,7 +455,7 @@ def _bounce() -> TestResult:
     if not addresses:
         return failed("not_public", "The IMAP server must be a public host name that resolves.")
     try:
-        bounces.check_login(factory=pinned_imap(addresses[0]))
+        bounces.check_login(factory=pinned_imap(addresses))
     except bounces.MailboxError as exc:
         words = {
             "auth": "The mailbox refused the sign-in.",

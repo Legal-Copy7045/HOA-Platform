@@ -547,7 +547,7 @@ class Mailbox:
         addresses = credential_checks.public_addresses(self.cfg.host)
         if not addresses:
             raise MailboxError("not_public")
-        return credential_checks.pinned_imap(addresses[0])
+        return credential_checks.pinned_imap(addresses)
 
     def __enter__(self):
         if self.factory is None:

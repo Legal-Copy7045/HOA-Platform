@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -186,9 +187,43 @@ def totp(secret: str) -> None:
     print(current_totp(secret))
 
 
+def restore(name: str, dump: str) -> None:
+    """A simulation snapshot (D102) into a fresh database ``name``, with the
+    stored files saved beside it (``<snapshot>-media/``) copied to the stage's
+    media folder."""
+    import shutil
+    import subprocess  # nosec B404 - fixed pg_restore command
+
+    reset_db(name)
+    url = urllib.parse.urlsplit(os.environ["DATABASE_URL"])
+    env = {**os.environ, "PGPASSWORD": urllib.parse.unquote(url.password or "")}
+    subprocess.run(  # nosec B603 B607
+        [
+            "pg_restore",
+            "--no-owner",
+            "-h",
+            url.hostname or "localhost",
+            "-p",
+            str(url.port or 5432),
+            "-U",
+            urllib.parse.unquote(url.username or ""),
+            "-d",
+            name,
+            dump,
+        ],
+        env=env,
+        check=True,
+    )
+    media = Path(dump).with_name(Path(dump).stem + "-media")
+    if media.is_dir():
+        shutil.copytree(media, Path(__file__).resolve().parent / "out" / "media" / name)
+
+
 if __name__ == "__main__":
     command, arg = sys.argv[1], sys.argv[2]
-    if command == "walk-sessions":
+    if command == "restore":
+        restore(arg, sys.argv[3])
+    elif command == "walk-sessions":
         sessions(arg, every_role=True)
     else:
         {"reset-db": reset_db, "sessions": sessions, "totp": totp}[command](arg)

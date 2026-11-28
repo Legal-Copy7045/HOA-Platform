@@ -701,7 +701,9 @@ tr.row-link:hover .row-main { text-decoration: underline; }
   .grid:has(> .stat) > .stat:only-child { grid-column: 1 / -1; }
   /* Amounts never break mid-number (WT-026): one line, sized to fit. */
   .stat .value { font-size: clamp(1rem, 5vw, 1.2rem); white-space: nowrap; }
-  .stat .value.text { white-space: normal; overflow-wrap: anywhere; }
+  .stat .value.text, .stat .value.small-value { white-space: normal; overflow-wrap: anywhere; }
+  /* Words in a tile wrap inside it; a tile never widens the page (0.47.0 walkthrough). */
+  .grid > .stat { min-width: 0; overflow-wrap: anywhere; }
 }
 
 /* In-page filters and tabs (owner feedback): on phones they wrap onto a

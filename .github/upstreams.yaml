@@ -6,7 +6,7 @@
 - {name: Trivy (image scan), current: "0.70.0", source: "github:aquasecurity/trivy",
    where: ".github/workflows/ci.yml (image-scan job, trivy-action input version)"}
 - {name: PostgreSQL major line, current: "16", track: "16", source: "docker:postgres",
-   where: "docker-compose.yml (postgres, minor updates via Dependabot) and .github/workflows/ci.yml services (postgres:16-alpine)",
+   where: "docker-compose.yml (postgres, minor updates via Dependabot) and .github/workflows/ci.yml and simulation.yml services (the same tag@sha256 as docker-compose.yml, kept equal by regression/tests/test_simulation.py; move them with each Dependabot postgres update)",
    why: "a new major needs a dump and restore (Dependabot ignores Postgres majors); move the line on purpose"}
 - {name: Python (image and CI), current: "3.13", source: "docker:python",
    where: "Dockerfile (python:3.13-slim-bookworm; Dependabot keeps the patch level) and .github/workflows/ci.yml (python-version)",

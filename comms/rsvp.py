@@ -240,6 +240,15 @@ def answer(event: Event, *, answer: str, guests: int = 0, actor, request=None) -
         row.guests = guests
         row.updated_at = timezone.now()
         row.save()
+        # Every change is audited (found by the simulation, 0.47.0): the answer
+        # and head count only, never who else is going.
+        record_event(
+            "event.rsvp_answered",
+            actor=_user(actor),
+            request=request,
+            target=event,
+            metadata={"answer": answer, "guests": guests},
+        )
     return row
 
 
@@ -272,9 +281,17 @@ def sign_up(slot: VolunteerSlot, *, actor, request=None) -> VolunteerSignup:
                 raise RsvpError("That slot is full.")
         try:
             with transaction.atomic():
-                return VolunteerSignup.objects.create(slot=slot, person_id=person_id)
+                signup = VolunteerSignup.objects.create(slot=slot, person_id=person_id)
         except IntegrityError as exc:
             raise RsvpError("You are already signed up for this.") from exc
+        record_event(
+            "event.volunteer_signed_up",
+            actor=_user(actor),
+            request=request,
+            target=slot,
+            metadata={"event_id": event.pk},
+        )
+        return signup
 
 
 def leave(slot: VolunteerSlot, *, actor, request=None) -> None:
@@ -290,6 +307,13 @@ def leave(slot: VolunteerSlot, *, actor, request=None) -> None:
         if found is None:
             raise RsvpError("You are not signed up for this.")
         found.delete()
+        record_event(
+            "event.volunteer_left",
+            actor=_user(actor),
+            request=request,
+            target=slot,
+            metadata={"event_id": event.pk},
+        )
 
 
 # --- What people see -----------------------------------------------------------------

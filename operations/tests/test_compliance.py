@@ -74,6 +74,20 @@ def test_starter_items_and_permissions(client, board):
     assert b"Form 1120-H" in client.get(reverse("compliance"), follow=True).content
 
 
+def test_adding_the_starter_items_is_audited_with_the_count_only(board):
+    """Found by the accelerated simulation (0.47.0, D102): the one compliance
+    write without an audit event. Adding them again adds nothing and audits nothing."""
+    from audit.models import AuditEvent
+
+    added = services.add_starter_items(actor=board)
+    with system_access("t"):
+        event = AuditEvent.objects.get(action="compliance.starters_added")
+    assert event.actor == board and event.metadata == {"count": added}
+    assert services.add_starter_items(actor=board) == 0
+    assert AuditEvent.objects.filter(action="compliance.starters_added").count() == 1
+    services.add_starter_items(actor=SYSTEM)  # nothing left to add, no event, no error
+
+
 # --- Recurring deadlines tab of Tasks and deadlines (streamlining) -----------------------------
 
 

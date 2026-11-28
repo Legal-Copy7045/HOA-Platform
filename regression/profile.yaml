@@ -60,6 +60,16 @@ stages:
     commands:
       - {key: crawl, run: "node regression/walkthrough.js"}
 
+  simulation:
+    prefix: SIM
+    runner: regression/run.py (stage_simulation)
+    # Not a default stage, never in run.py check or pull-request CI (D102): about 18 months of the
+    # community's life on a clock moved by time-machine, its own database (REGRESSION_SIM_DB, default
+    # hoa_sim), fakes for Stripe, the bank, SMTP2Go, scanning and AI, invariants every simulated day.
+    # Options: --months, --seed, --fast, --dataset, --keep-going. Report: run.py report --simulation.
+    commands:
+      - {key: simulate, run: "python regression/simulation/sim.py --months 18 --seed 47"}
+
 walkthrough:
   # Inventory shape (out/walkthrough.json): {"roles": {role: {"desktop"|"phone": {"menu", "pages"}}}};
   # screenshots out/walkthrough/<role>/<desktop|phone>/<slug>.png (menu.png: the menu with every group open).
