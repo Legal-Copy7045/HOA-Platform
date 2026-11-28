@@ -5,7 +5,7 @@
   <div class="page-head"><div><h1>Server tasks</h1><p class="subtitle">Backups, restore drills and other upkeep on the server. The portal only asks; the server's own agent runs each task from a fixed list and reports back here.{% if not can_run %} Sysadmins start tasks; the board sees the history.{% endif %}</p></div></div>
   {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> {% if agent_seen %}The server's agent was last seen {{ agent_seen|timesince }} ago: it may be stopped, or busy installing an update.{% else %}The server's agent has not reported yet: it is installed when the server is set up.{% endif %} Requests wait until it is back.</span></div>{% endif %}
   {% if current %}<section class="card" id="current-task"><h2>Now</h2>
-    <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email }} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
+    <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email|default:"a login not in this data" }} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
     <p class="small muted">Refresh the page to see the result. Another task can start once this one has finished.</p></section>{% endif %}
   <div class="grid grid-2">
     <section class="card" id="backups"><h2>Backups</h2>
@@ -16,7 +16,8 @@
         <li><span>Last restore drill passed</span><span>{% if backups.drill %}{{ backups.drill|date:"M j, g:i A" }}{% else %}None yet{% endif %}</span></li>
       </ul>
       <p class="small"><span class="status tone-{% if backups.ok %}success{% else %}danger{% endif %}">{% if backups.ok %}OK{% else %}Needs attention{% endif %}</span> {{ backups.detail }}</p>
-      {% if can_run %}<form method="post" data-confirm="Take a backup now? It takes about a minute; the site stays up.">{% csrf_token %}<input type="hidden" name="kind" value="backup"><button type="submit" class="small"{% if current %} disabled{% endif %}>Take a backup now</button></form>{% endif %}
+      {% if can_run %}<form method="post" data-confirm="Take a backup now? It takes about a minute; the site stays up.">{% csrf_token %}<input type="hidden" name="kind" value="backup"><button type="submit" class="small"{% if current %} disabled{% endif %}>Take a backup now</button></form>
+      <p class="link-row"><a href="{% url 'backup_restore' %}">Restore from a backup…</a></p>{% endif %}
     </section>
     <section class="card" id="portal-update"><h2>Portal update</h2>
       <p>{% if not update %}Update checks start once the server's agent is installed.
@@ -42,7 +43,7 @@
     <thead><tr><th>Task</th><th>Asked by</th><th>When</th><th>State</th><th>Result</th></tr></thead>
     <tbody>{% for row in history %}<tr>
       <td class="cell-title">{{ row.label }}</td>
-      <td data-label="Asked by">{{ row.task.requested_by.email }}</td>
+      <td data-label="Asked by">{{ row.task.requested_by.email|default:"a login not in this data" }}</td>
       <td class="nowrap" data-label="When">{{ row.task.requested_at|date:"M j, Y g:i A" }}</td>
       <td data-label="State">{% status row.task.state row.task.get_state_display %}</td>
       <td class="small" data-label="Result">{{ row.summary }}{% if row.tail %}<details><summary>Last lines of output</summary><pre class="small task-output">{{ row.tail }}</pre></details>{% endif %}</td>

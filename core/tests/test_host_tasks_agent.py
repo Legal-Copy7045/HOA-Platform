@@ -221,7 +221,7 @@ def test_no_database_value_reaches_a_command_line(vm):
     _run(vm, "8|backup")
     argv = _read(vm, "docker.log") + _read(vm, "ran.log")
     psql_args = [line for line in _read(vm, "psql.log").splitlines() if line.startswith("ARGS:")]
-    assert "backup" not in argv.replace("backup.sh", "")
+    assert "backup" not in argv.replace("backup.sh", "").replace("backup_inventory", "")
     # psql gets values only as -v variables (state, summary, tail, id), never the kind.
     assert all("backup]" not in line for line in psql_args)
 
@@ -251,9 +251,9 @@ def test_a_strange_id_stops_the_agent(vm):
 
 
 def test_the_case_statement_is_the_only_mapping():
-    assert TASKS.count("TASK_CMD=(") == 9  # the reset plus one per kind
+    assert TASKS.count("TASK_CMD=(") == 10  # the reset plus one per kind
     body = TASKS.split("host_task_command() {", 1)[1].split("\n}\n", 1)[0]
-    assert body.count("TASK_CMD=(") == 9 and "*)\n      return 1 ;;" in body
+    assert body.count("TASK_CMD=(") == 10 and "*)\n      return 1 ;;" in body
     from core.models import HostTask
 
     mapped = set(re.findall(r"^    ([a-z_]+)\)$", body, re.M))
@@ -360,7 +360,7 @@ def test_reseed_script_guards_and_order():
         '  || { echo "The backup failed: nothing was changed."',
         "manage_owner keep_logins export --out -",
         '"${COMPOSE[@]}" stop web worker',
-        "DROP SCHEMA public CASCADE;",
+        'psql_owner -v app="$APP_USER" >/dev/null <"$APP_DIR/infra/poc/empty-database.sql"',
         '"${COMPOSE[@]}" run --rm -T --no-deps migrate >/dev/null',
         "manage_owner apply_db_grants",
         "manage_owner keep_logins import --in -",
@@ -383,10 +383,10 @@ def test_reseed_script_guards_and_order():
     finish = RESEED.split("finish() {", 1)[1].split("\n}\n", 1)[0]
     assert '"${COMPOSE[@]}" start web worker' in finish
     # The app role gets its schema access back; values only as psql variables.
-    assert (
-        'psql_owner -v app="$APP_USER"' in RESEED
-        and 'GRANT USAGE ON SCHEMA public TO :"app";' in RESEED
-    )
+    assert 'psql_owner -v app="$APP_USER"' in RESEED
+    assert 'GRANT USAGE ON SCHEMA public TO :"app";' in (POC / "empty-database.sql").read_text()
+    # One DROP SCHEMA CASCADE ran out of lock slots on the VM (D98).
+    assert "DROP SCHEMA public CASCADE;" not in RESEED
     assert '-c "$' not in RESEED and "eval " not in RESEED and "bash -c" not in RESEED
 
 

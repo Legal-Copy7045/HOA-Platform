@@ -11,6 +11,8 @@ Moved from CLAUDE.md when it was cut to its essentials (D90): the same rules and
 - Prefer small, reviewable commits with clear messages. Do not commit generated secrets.
 - Add a migration for every model change; never edit applied migrations.
 
+- Agreed work not yet scheduled: `docs/backlog.md` (add to it when a review or the owner agrees something for later; remove a line when it ships).
+
 ## Commands
 
 (Fill in as they are created; keep this section accurate.)

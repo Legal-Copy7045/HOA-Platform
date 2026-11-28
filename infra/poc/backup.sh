@@ -3,12 +3,15 @@
 #
 #   sudo bash /opt/hoa-portal/infra/poc/backup.sh             # back up now
 #   sudo bash /opt/hoa-portal/infra/poc/backup.sh --install   # also install the nightly timer
+#   sudo bash /opt/hoa-portal/infra/poc/backup.sh --keep      # a kept safety backup (D98)
 #
 # Writes to /var/backups/hoa-portal/<date>/, encrypted with the key in
 # /root/hoa-backup.key (created on first run - COPY IT SOMEWHERE SAFE AND
 # OFFLINE: without it the backups cannot be restored). Keeps 14 days locally.
 # If BACKUP_S3_BUCKET is set in .env, the encrypted files are also copied
-# off-site. Nothing is ever decrypted on the way out.
+# off-site. Nothing is ever decrypted on the way out. --keep (the safety
+# backup restore-portal.sh takes first) marks the folder with a KEEP file, so
+# the 14-day clean-up leaves it; remove it by hand once it is not needed.
 set -euo pipefail
 trap 'echo "ERROR: backup.sh stopped at line $LINENO (exit $?)." >&2' ERR
 
@@ -26,7 +29,17 @@ COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f 
 
 env_value() { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
 
-if [ "${1:-}" = "--install" ]; then
+INSTALL=0
+KEEP_MARK=0
+for arg in "$@"; do
+  case "$arg" in
+    --install) INSTALL=1 ;;
+    --keep) KEEP_MARK=1 ;;
+    *) echo "Unknown option $arg." >&2; exit 1 ;;
+  esac
+done
+
+if [ "$INSTALL" -eq 1 ]; then
   cat > /etc/systemd/system/hoa-backup.service <<UNIT
 [Unit]
 Description=Nightly encrypted backup of the HOA portal
@@ -96,6 +109,9 @@ echo "==> Uploaded files"
   | encrypt > "$DEST/files.tar.enc"
 
 ( cd "$DEST" && sha256sum db.dump.enc files.tar.enc > SHA256SUMS )
+if [ "$KEEP_MARK" -eq 1 ]; then
+  echo "Safety backup taken before a restore; kept until removed by hand." > "$DEST/KEEP"
+fi
 # A keyed checksum over the stamp, the name and the bytes of each file, with a
 # key derived from the backup key: someone who can write to the off-site
 # bucket cannot swap in, rename or replay an older file without the key
@@ -120,7 +136,8 @@ else
   echo "    (no off-site bucket set: BACKUP_S3_BUCKET in .env; local copy only)"
 fi
 
-echo "==> Removing local backups older than $KEEP_DAYS days"
-find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime "+$KEEP_DAYS" -print -exec rm -rf {} +
+echo "==> Removing local backups older than $KEEP_DAYS days (kept safety backups stay)"
+find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime "+$KEEP_DAYS" ! -exec test -e '{}/KEEP' ';' \
+  -print -exec rm -rf {} +
 
 echo "Backup done: $DEST"

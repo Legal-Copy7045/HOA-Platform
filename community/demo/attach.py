@@ -5,7 +5,9 @@ member and demo owner. keep_logins brings back their login, person and
 sysadmin role only; this adds, in the new data and as SYSTEM through the
 community services: an active declarant-appointed board seat from today
 (unless they already hold one) and joint ownership of the first demo home
-with a single demo owner (unless they already own a home). Audited
+with a single demo owner (unless they already own a home). In a dataset
+without homes (blank) only the seat: the setup wizard and the register
+import need a board member. Audited
 ``system.demo_requester_attached`` with ids only. The command that calls this
 refuses outside DEPLOYMENT_STAGE=poc with SEED_DEMO_ALLOWED.
 """
@@ -60,7 +62,10 @@ def attach_requester(task_id: int) -> dict:
                 actor=SYSTEM,
             )
         ownership = Ownership.objects.active().filter(person=person).first()
-        if ownership is None:
+        dataset = demo.BY_NAME.get(task.dataset)
+        if ownership is None and dataset is not None and not dataset.has_homes:
+            pass  # blank: a board seat only
+        elif ownership is None:
             lot = first_single_owner_demo_lot()
             if lot is None:
                 raise demo.DemoError("No demo home with a single demo owner to join.")
@@ -71,7 +76,7 @@ def attach_requester(task_id: int) -> dict:
                 ownership_type=OwnershipType.JOINT,
                 actor=SYSTEM,
             )
-        lot = ownership.lot
+        lot = ownership.lot if ownership is not None else None
     record_event(
         "system.demo_requester_attached",
         actor=None,
@@ -81,8 +86,8 @@ def attach_requester(task_id: int) -> dict:
             "task_id": task.pk,
             "person_id": person.pk,
             "seat_id": seat.pk,
-            "ownership_id": ownership.pk,
-            "lot_id": lot.pk,
+            "ownership_id": ownership.pk if ownership else None,
+            "lot_id": lot.pk if lot else None,
         },
     )
-    return {"seat": seat, "ownership": ownership, "lot_number": lot.number}
+    return {"seat": seat, "ownership": ownership, "lot_number": lot.number if lot else None}

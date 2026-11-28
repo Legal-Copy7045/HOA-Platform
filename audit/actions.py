@@ -844,8 +844,22 @@ _SPECS = [
         "checkout_id",
     ),
     # Server tasks (hosttasks, D35)
-    _spec("system.task_requested", "Server task requested", "kind", "dataset", "attach_requester"),
-    _spec("system.task_finished", "Server task finished on the VM", "kind", "state", "dataset"),
+    _spec(
+        "system.task_requested",
+        "Server task requested",
+        "kind",
+        "dataset",
+        "attach_requester",
+        "backup",
+    ),
+    _spec(
+        "system.task_finished",
+        "Server task finished on the VM",
+        "kind",
+        "state",
+        "dataset",
+        "backup",
+    ),
     # Keys and connections (D93): service and setting names, ids and states only, never a value.
     _spec(
         "system.credential_saved",

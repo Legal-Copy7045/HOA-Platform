@@ -20,8 +20,9 @@
 #   3. save the real (non-demo) logins with their passkeys, app codes,
 #      recovery codes, person and sysadmin role (keep_logins export, owner
 #      role) into a root-only temporary file, shredded on exit;
-#   4. stop web and worker; empty the database (drop and recreate the public
-#      schema as the owner role: tables, append-only triggers and all);
+#   4. stop web and worker; empty the database as the owner role, table by
+#      table and then the public schema (empty-database.sql: tables,
+#      append-only triggers and all, without one huge transaction, D98);
 #   5. migrate and re-apply the runtime grants;
 #   6. put the real logins back (same ids: a passkey names its login by id),
 #      seed the dataset, remove the old data's files from the file store;
@@ -82,12 +83,15 @@ chmod 700 "$KEEP_DIR"
 KEEP="$KEEP_DIR/logins.json"
 STOPPED=0
 finish() {
+  local rc=$?
   # The saved logins hold password hashes and MFA secrets: never left behind.
   if [ -f "$KEEP" ]; then shred -u "$KEEP" 2>/dev/null || rm -f "$KEEP"; fi
   rm -rf "$KEEP_DIR"
   if [ "$STOPPED" -eq 1 ]; then
-    echo "==> Starting the portal"
-    "${COMPOSE[@]}" start web worker >/dev/null || true
+    # After this marker only the restart's own lines follow: the server task's
+    # summary takes the error above it, not "Container ... Started" (D98).
+    echo "==> Restarting after a failure (exit $rc); the error is above"
+    "${COMPOSE[@]}" start web worker 2>&1 || true
   fi
 }
 trap finish EXIT
@@ -103,12 +107,9 @@ STOPPED=1
 "${COMPOSE[@]}" stop web worker >/dev/null
 
 echo "==> Emptying the database"
-psql_owner -v app="$APP_USER" >/dev/null <<'SQL'
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-REVOKE ALL ON SCHEMA public FROM PUBLIC;
-GRANT USAGE ON SCHEMA public TO :"app";
-SQL
+# Table by table, then the schema (empty-database.sql, D98): one DROP SCHEMA
+# CASCADE needs more locks than Postgres has room for in one transaction.
+psql_owner -v app="$APP_USER" >/dev/null <"$APP_DIR/infra/poc/empty-database.sql"
 
 echo "==> Creating the tables (migrations) and the runtime grants"
 "${COMPOSE[@]}" run --rm -T --no-deps migrate >/dev/null

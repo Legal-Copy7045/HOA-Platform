@@ -262,6 +262,8 @@ PROTECTED = {
     "server_tasks": ("GET", None),
     # D91: Restart the portal (sysadmins; then a fresh sign-in check).
     "system_restart": ("POST", None),
+    # D98: Restore from a backup (sysadmins; then a fresh passkey or authenticator check).
+    "backup_restore": ("POST", None),
     # D93: Keys and connections (sysadmins; a key change also the board).
     "keys_connections": ("GET", None),
     "keys_service": ("POST", None),
@@ -1245,6 +1247,7 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "backup_restore",
                 "keys_connections",
                 "invitations",
                 "approvals",
@@ -1265,6 +1268,7 @@ def test_owner_sees_own_lot_detail(client, world):
                 "system_status",
                 "server_tasks",
                 "system_restart",
+                "backup_restore",
                 "keys_connections",
                 "my_lot",
             ],

@@ -108,6 +108,10 @@ UPDATE core_updatestatus
  WHERE id = 1;
 SQL
 
+# The backup points Backups -> Restore from a backup offers (D98): the
+# local folder every minute, the off-site bucket with the 15-minute check.
+publish_backup_points
+
 REPO_OWNER="$(stat -c %U "$APP_DIR")"
 g() { if [ "$REPO_OWNER" = "root" ]; then git -C "$APP_DIR" "$@"; else sudo -u "$REPO_OWNER" -H git -C "$APP_DIR" "$@"; fi; }
 BRANCH="$(g rev-parse --abbrev-ref HEAD)"
@@ -171,10 +175,15 @@ if [ "$STATE" = "requested" ] && ! branch_allowed "$BRANCH" "$(env_value ALLOW_B
 UPDATE core_updatestatus SET state = 'failed', state_changed_at = now(), message = :'message'
  WHERE id = 1;
 SQL
+  record_host_tasks
 elif [ "$STATE" = "requested" ]; then
   UPDATED=1
   psql_run >/dev/null <<'SQL'
 UPDATE core_updatestatus SET state = 'running', state_changed_at = now(), message = '' WHERE id = 1;
+SQL
+  # For the result email's duration (D98); tolerant of an older database.
+  psql_run >/dev/null 2>&1 <<'SQL' || true
+UPDATE core_updatestatus SET run_started_at = now() WHERE id = 1;
 SQL
   {
     echo "=== $(date -u +%FT%TZ) update requested from System status (now or scheduled)"
@@ -201,8 +210,11 @@ SQL
 INSERT INTO core_opsevent (at, kind, key, state, message, count)
 VALUES (now(), 'updates', 'update', :'state', :'text', 0);
 SQL
+  # The requester and the sysadmins are emailed the result (D98).
+  record_host_tasks
 elif [ "$DUE" = "t" ]; then
   check
+  publish_offsite_points
 fi
 
 # Server tasks (D36). Not in the same run as an update (which restarts the

@@ -156,6 +156,13 @@ services:
       - postgres
       - -c
       - max_connections=40
+      # Room for statements that lock many objects at once (D98): with 40
+      # connections the default of 64 gave about 3,800 lock slots and the
+      # ~1,700-relation schema needs more for one DROP SCHEMA CASCADE (the
+      # reseed failure). 256 costs about 6 MB of shared memory; it applies at
+      # the next Postgres restart. empty-database.sql no longer needs it.
+      - -c
+      - max_locks_per_transaction=256
       - -c
       - shared_buffers=128MB
       - -c

@@ -49,6 +49,8 @@ TASK_FIELDS = (
     "summary",
     "output_tail",
     "audited_at",
+    "backup",
+    "notified_at",
 )
 
 
@@ -227,9 +229,10 @@ def import_data(data: dict) -> tuple[int, int]:
             if t.get("requested_by_id") not in kept:
                 continue
             values = {f: t.get(f) for f in TASK_FIELDS}
-            for f in ("requested_at", "started_at", "finished_at", "audited_at"):
+            for f in ("requested_at", "started_at", "finished_at", "audited_at", "notified_at"):
                 values[f] = _dt(values[f])
             values["dataset"] = values["dataset"] or ""
+            values["backup"] = values["backup"] or ""
             values["attach_requester"] = values["attach_requester"] is True
             values["summary"] = values["summary"] or ""
             values["output_tail"] = values["output_tail"] or ""

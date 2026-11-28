@@ -10,7 +10,7 @@
   {% if form.non_field_errors %}<div class="alert danger" role="alert">{% icon "alert" %}<span>{{ form.non_field_errors|first }}</span></div>{% endif %}
   {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> The server's agent has not reported in the last few minutes. A reseed waits until it is back.</span></div>{% endif %}
   {% if current %}<section class="card" id="current-task"><h2>Now</h2>
-    <p><strong>{{ current.label }}</strong>{% if current.task.dataset %} ({{ labels|get_item:current.task.dataset|default:current.task.dataset }}){% endif %} · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email }} {{ current.task.requested_at|timesince }} ago.</p>
+    <p><strong>{{ current.label }}</strong>{% if current.task.dataset %} ({{ labels|get_item:current.task.dataset|default:current.task.dataset }}){% endif %} · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email|default:"a login not in this data" }} {{ current.task.requested_at|timesince }} ago.</p>
     <p class="small muted">During a reseed the portal is unavailable for about a minute; then sign in again with your own login.</p></section>{% endif %}
 
   <section class="card" id="current-data"><h2>What the portal holds now</h2>
@@ -25,7 +25,7 @@
           <input type="hidden" name="dataset" value="{{ d.name }}">
           {% with bound=form.data.dataset %}<label for="{% if bound == d.name or not bound and forloop.first %}id_confirm{% else %}confirm-{{ d.name }}{% endif %}" class="small">Type {{ word }} to confirm</label>
           <input type="text" name="confirm" id="{% if bound == d.name or not bound and forloop.first %}id_confirm{% else %}confirm-{{ d.name }}{% endif %}" maxlength="20" autocomplete="off" spellcheck="false" required pattern="{{ word }}"{% if bound == d.name and form.confirm.errors %} aria-invalid="true"{% endif %}>{% endwith %}
-          {% with bound=form.data.dataset %}<label class="checkbox small"><input type="checkbox" name="attach_requester" value="on"{% if not form.is_bound or bound != d.name or form.data.attach_requester %} checked{% endif %}> After reseeding, make me a board member and the owner of a demo home in the new data</label>{% endwith %}
+          {% with bound=form.data.dataset %}<label class="checkbox small"><input type="checkbox" name="attach_requester" value="on"{% if not form.is_bound or bound != d.name or form.data.attach_requester %} checked{% endif %}> After reseeding, make me a board member and the owner of a demo home in the new data{% if not d.has_homes %} (here a board seat only: there are no homes, and the setup wizard and register import need a board member){% endif %}</label>{% endwith %}
           <button type="submit" class="danger small"{% if current %} disabled title="Another task is waiting or running"{% endif %}>Reseed with this dataset</button>
         </form></div>
     </li>{% endfor %}</ul>
@@ -36,7 +36,7 @@
     <thead><tr><th>Dataset</th><th>Asked by</th><th>When</th><th>State</th><th>Result</th></tr></thead>
     <tbody>{% for row in reseeds %}<tr>
       <td class="cell-title">{{ labels|get_item:row.task.dataset|default:row.task.dataset }}</td>
-      <td data-label="Asked by">{{ row.task.requested_by.email }}</td>
+      <td data-label="Asked by">{{ row.task.requested_by.email|default:"a login not in this data" }}</td>
       <td class="nowrap" data-label="When">{{ row.task.requested_at|date:"M j, Y g:i A" }}</td>
       <td data-label="State">{% status row.task.state row.task.get_state_display %}</td>
       <td class="small" data-label="Result">{{ row.summary }}</td>
