@@ -1,6 +1,6 @@
 # Stable check IDs for the page stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: PAGE-1697
+# highest issued: PAGE-1701
 PAGE-001: "board: / loads"
 PAGE-002: "board: / has no console or CSP errors"
 PAGE-003: "board: / fits a phone screen"
@@ -865,7 +865,11 @@ PAGE-1694: "owner is refused board page /finance/interest/"
 PAGE-1695: "owner is refused board page /finance/checks/"
 PAGE-1696: "owner is refused board page /reimbursements/?mine=1"
 PAGE-1697: "owner is refused board page /reimbursements/"
+PAGE-1698: "board: /board/community-setup/finance_options/ loads"
+PAGE-1699: "board: /board/community-setup/finance_options/ has no console or CSP errors"
 PAGE-170: "board: /reports/budget/ has no console or CSP errors"
+PAGE-1700: "board: /board/community-setup/finance_options/ fits a phone screen"
+PAGE-1701: "owner is refused board page /board/community-setup/finance_options/"
 PAGE-171: "board: /reports/budget/ fits a phone screen"
 PAGE-172: "board: /reports/budget_spread/ loads"
 PAGE-173: "board: /reports/budget_spread/ has no console or CSP errors"
