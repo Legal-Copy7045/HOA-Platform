@@ -26,14 +26,30 @@ Targets are only logins the seed marked (``core.DemoPersona``, written by
 :func:`mark_persona`) that still have no usable password and no
 authenticator: a real login is never a target, whatever its name or email.
 
-Refused while switched (:data:`REFUSED_URL_NAMES`, :data:`REFUSED_PREFIXES`):
-Keys and connections, Restart, server tasks (backups, Install update),
-Demo data, every sign-in, password and MFA page, Preview as owner, online
-payment and bank-feed set-up (they reach real services), texts, the admin.
-Services that grant or take away powers over a login (roles, seats,
-offices, sysadmin, linking a login, sign-in resets) refuse a real login's
-person or login while switched (:func:`refuse_real_target`), so one real
-person can never use two personas to act on a real account.
+Refused while switched, deny by default (review fixes 0.45.0):
+
+* every page under ``/ops/`` (:data:`REFUSED_PATH_PREFIXES`: System status
+  and its actions such as Install update, Restart, Keys and connections,
+  Server tasks, Restore from a backup, Demo data, the timeline, and any
+  operations page added later), plus the names in :data:`REFUSED_URL_NAMES`
+  and :data:`REFUSED_PREFIXES`: every sign-in, password and MFA page,
+  Preview as owner, online payment and bank-feed set-up (they reach real
+  services), texts, the admin;
+* every operations permission, wherever its page lives: while switched
+  ``core.policy.can`` answers no for each ``system.*`` action and each action
+  only sysadmins hold (:func:`core.policy.refused_while_switched`), so a page
+  or service that checks one is refused even outside ``/ops/``;
+* a fresh second factor (``core.fresh_mfa``) is never fresh while switched,
+  and the server-task, restore and update services refuse a switched request
+  themselves (:func:`refuse_switched`).
+
+Services that grant or take away powers (roles, seats, offices, sysadmin,
+linking a login, invitations, sign-in resets) refuse, while switched, any
+person who is not demo data: a real login, or a person record with no login
+that the demo seed did not create (:func:`refuse_real_target`); and a
+persona may not approve a nomination or seat proposal the real user behind
+the switch made (:func:`refuse_own_proposal`). So one real person can never
+use two personas to act on a real account, or on a person record they made.
 
 The re-authentication step before a vote (D24) is the real user's: allauth's
 page runs as the real user and the persona's request then counts it
@@ -248,6 +264,9 @@ REFUSED_URL_NAMES = frozenset(
     }
 )
 REFUSED_PREFIXES = ("keys_", "mfa_", "account_")
+# Deny by default: every page under these paths is refused while switched,
+# whatever its name, so a new operations page cannot slip through.
+REFUSED_PATH_PREFIXES = ("ops/",)
 NO_PERSONAS_MESSAGE = (
     "Demo mode is not available: the demo data loaded on this portal has no test personas "
     "to view as. Load a dataset with personas (Settings → Demo data) to use it."
@@ -269,20 +288,51 @@ def is_refused(request, name: str | None) -> bool:
     admin = getattr(settings, "ADMIN_URL", "")
     if admin and request.path_info.lstrip("/").startswith(admin.lstrip("/")):
         return True
-    if not name:
-        return False
     if name in REAL_USER_URL_NAMES:
         return False
+    if request.path_info.lstrip("/").startswith(REFUSED_PATH_PREFIXES):
+        return True
+    if not name:
+        return False
     return name in REFUSED_URL_NAMES or name.startswith(REFUSED_PREFIXES)
+
+
+SWITCHED_MESSAGE = "Not while viewing as a demo persona: choose “Back to me” first."
+
+
+def switched(request=None) -> bool:
+    """A demo switch is in effect for this request (or this context)."""
+    if current() is not None:
+        return True
+    return request is not None and isinstance(getattr(request, "demo_switch", None), Switch)
+
+
+def refuse_switched(request=None, *, error=PermissionDenied) -> None:
+    """Server tasks, restores and updates refuse outright while switched (the
+    service's own guard, behind the page refusal and the policy)."""
+    if switched(request):
+        raise error(SWITCHED_MESSAGE)
 
 
 REAL_TARGET_MESSAGE = "Not while viewing as a demo persona: this would change a real login."
 
 
+REAL_PERSON_MESSAGE = (
+    "Not while viewing as a demo persona: this person is not part of the demo data."
+)
+OWN_PROPOSAL_MESSAGE = (
+    "Not while viewing as a demo persona: you made this proposal yourself, so another "
+    "board member must decide it."
+)
+
+
 def refuse_real_target(*, person_id=None, user_id=None, error=PermissionDenied) -> None:
-    """While switched, refuse a step on a real (non-persona) login or its
-    person: granting or ending roles, seats, offices or sysadmin, linking a
-    login, starting or approving a sign-in reset. A no-op otherwise."""
+    """While switched, refuse a step on anyone who is not demo data: a real
+    (non-persona) login or its person, and a person record with no login that
+    the demo seed did not create (SEC-002, 0.45.0: one could otherwise be
+    given powers by two personas and then invited). Covers granting or ending
+    roles, seats, offices or sysadmin, invitations, linking a login, starting
+    or approving a sign-in reset. A no-op otherwise."""
     switch = current()
     if switch is None:
         return
@@ -291,11 +341,49 @@ def refuse_real_target(*, person_id=None, user_id=None, error=PermissionDenied) 
         from core.scoping import system_access
 
         with system_access("demo mode: real login?"):
-            user_id = Person.objects.filter(pk=person_id).values_list("user_id", flat=True).first()
+            row = (
+                Person.objects.filter(pk=person_id)
+                .values_list("user_id", "display_name", "created_at")
+                .first()
+            )
+        if row is None:
+            raise error(REAL_PERSON_MESSAGE)
+        user_id, display_name, created_at = row
+        if user_id is None:
+            if not _is_seeded_person(display_name, created_at):
+                raise error(REAL_PERSON_MESSAGE)
+            return  # a register entry the demo seed made, without a login
     if user_id is None:
-        return  # a register entry without a login: demo data
+        return
     if user_id == switch.real_user_id or not _is_persona_id(user_id):
         raise error(REAL_TARGET_MESSAGE)
+
+
+def refuse_own_proposal(nominated_by_id, *, error=PermissionDenied) -> None:
+    """While switched, a persona may not approve what the real user behind the
+    switch proposed as themselves (a sysadmin nomination, a board seat)."""
+    switch = current()
+    if (
+        switch is not None
+        and nominated_by_id is not None
+        and nominated_by_id == switch.real_user_id
+    ):
+        raise error(OWN_PROPOSAL_MESSAGE)
+
+
+def _is_seeded_person(display_name: str, created_at) -> bool:
+    """A person record the demo seed made: a "(demo)" name, created no later
+    than the newest seed finished (a record added since, even one named like
+    demo data, is someone's own)."""
+    from django.db.models import Max
+
+    from community.demo import DEMO_SUFFIX
+    from core.models import DemoSeed
+
+    if not (display_name or "").endswith(DEMO_SUFFIX):
+        return False
+    seeded_at = DemoSeed.objects.aggregate(at=Max("seeded_at"))["at"]
+    return seeded_at is not None and created_at is not None and created_at <= seeded_at
 
 
 def _is_persona_id(user_id: int) -> bool:

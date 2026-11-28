@@ -599,11 +599,24 @@ def _continuous_ownership_starts(person, lots) -> dict[int, datetime.date]:
     return since
 
 
+def refused_while_switched(action: str) -> bool:
+    """Demo mode (D97; review fixes 0.45.0), deny by default: while a board
+    member views the POC as a demo persona, no operations permission holds:
+    every ``system.*`` action and every action only sysadmins hold (server
+    tasks, restore, updates, keys, status, and any added later)."""
+    return action.startswith("system.") or PERMISSIONS[action] <= {SYSADMIN}
+
+
 def can(user, action: str, on: datetime.date | None = None) -> bool:
     if action not in PERMISSIONS:
         raise KeyError(f"Unknown action {action!r}; add it to core.policy.PERMISSIONS")
     if user is SYSTEM:
         return True
+    if refused_while_switched(action):
+        from core import demo_mode
+
+        if demo_mode.current() is not None:
+            return False
     return bool(PERMISSIONS[action] & roles_for(user, on).groups)
 
 

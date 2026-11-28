@@ -10,7 +10,12 @@ an emailed code (allauth's "code" method) and a recovery code never count.
 Every save, approval and reveal checks again, so after the window the person
 is asked again. The prompt is allauth's own MFA re-authentication page
 (``mfa_reauthenticate_webauthn`` for a passkey, ``mfa_reauthenticate`` for the
-app)."""
+app).
+
+Never while demo-switched (D97; review fixes 0.45.0): the session's second
+factor is the real user's, not the persona's, so nothing here is fresh while
+a board member views the POC as a persona, and :func:`required` refuses
+outright instead of asking."""
 
 from __future__ import annotations
 
@@ -19,6 +24,7 @@ from functools import wraps
 from urllib.parse import urlencode
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -59,7 +65,15 @@ def last_factor_at(request) -> float | None:
     return best
 
 
+def _switched(request) -> bool:
+    from core import demo_mode
+
+    return demo_mode.switched(request)
+
+
 def is_fresh(request, now: float | None = None) -> bool:
+    if _switched(request):
+        return False
     at = last_factor_at(request)
     if at is None:
         return False
@@ -78,6 +92,10 @@ def required(view):
 
     @wraps(view)
     def wrapper(request, *args, **kwargs):
+        if _switched(request):
+            from core import demo_mode
+
+            raise PermissionDenied(demo_mode.SWITCHED_MESSAGE)
         if not is_fresh(request):
             if request.method == "POST":
                 messages.info(

@@ -6,6 +6,8 @@ everything is audited with the real user behind the persona."""
 
 from __future__ import annotations
 
+import datetime
+
 import pytest
 from django.core.checks import run_checks
 from django.test import RequestFactory
@@ -375,7 +377,11 @@ def test_keys_and_connections_works_again_after_back_to_me(client, w):
 
 
 def test_actions_are_the_persona_s_and_record_the_real_user(client, w):
+    # A register entry the demo seed made (before the seed finished).
     demo_person = PersonFactory(display_name="No Login (demo)")
+    Person.objects.unscoped("t").filter(pk=demo_person.pk).update(
+        created_at=DemoSeed.objects.get().seeded_at - datetime.timedelta(minutes=1)
+    )
     _switch(client, w["board"], w["p_president"])
     client.post(reverse("sysadmin_nominate", args=[demo_person.pk]))
     nomination = SysadminNomination.objects.unscoped("t").get(person=demo_person)

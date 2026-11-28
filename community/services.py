@@ -71,6 +71,14 @@ def _refuse_real_login(person_id) -> None:
     refuse_real_target(person_id=person_id, error=CommunityError)
 
 
+def _refuse_own_proposal(nominated_by_id) -> None:
+    """Demo mode (D97; review SEC-002, 0.45.0): a persona never approves what
+    the real user behind the switch proposed as themselves."""
+    from core.demo_mode import refuse_own_proposal
+
+    refuse_own_proposal(nominated_by_id, error=CommunityError)
+
+
 def _refuse_self_grant(actor, person: Person, what: str) -> None:
     if actor is SYSTEM:
         return
@@ -1373,6 +1381,7 @@ def approve_sysadmin(nomination, *, actor, request: HttpRequest | None = None):
             raise CommunityError("This nomination is no longer open.")
         if nomination.nominated_by_id == actor.pk:
             raise CommunityError("A different board member must approve your nomination.")
+        _refuse_own_proposal(nomination.nominated_by_id)
         if nomination.person.user_id == actor.pk:
             raise CommunityError("You cannot approve your own nomination.")
         assignment = _record_role(
@@ -2286,6 +2295,7 @@ def decide_seat_nomination(nomination, *, approve: bool, actor, request=None):
         if approve:
             if nomination.nominated_by_id == _user(actor).pk:
                 raise CommunityError("A different board member must approve your proposal.")
+            _refuse_own_proposal(nomination.nominated_by_id)
             seat = record_board_seat(
                 person=nomination.person,
                 seat_type=nomination.seat_type,

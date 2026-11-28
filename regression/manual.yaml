@@ -476,3 +476,11 @@
   check: "On the POC VM after the 0.45.0 update (Postgres restarted with max_locks_per_transaction=256: sudo docker compose exec postgres psql -U postgres -c 'show max_locks_per_transaction'), Settings -> Demo data -> Fresh start with RESEED succeeds (it failed in 0.44.0 with exit 3, out of shared memory); then Blank leaves no homes, owners or board, keeps your login with its passkey and sysadmin role, and with the box ticked gives you a board seat so the setup wizard and the register import open; Demo data describes Fresh start as not empty and Blank as nothing at all."
   steps: "POC VM, fictional data; Settings -> Demo data; Fresh start, then Blank; sign in again each time; open Settings -> Community setup and the register import."
   last: ""
+- key: demo mode refuses operations as the sysadmin persona
+  check: "On the POC, a board member who is not a sysadmin switches to the sysadmin demo persona and, after confirming with their own passkey, opens System status, Server tasks, Restore from a backup, Keys and connections, Demo data and the incident timeline (each typed into the address bar): every one says 'Choose Back to me first' (403), the menu shows none of them, nothing is queued on Server tasks, and the audit log has demo.page_refused for each. After Back to me, a real sysadmin's pages work as before (review fixes 0.45.0)."
+  steps: "POC with oak_creek; a board login without the sysadmin role; switch to the sysadmin persona; open /ops/status/, /ops/tasks/, /ops/tasks/restore/, /ops/status/keys/, /ops/demo-data/, /ops/timeline/; then Back to me and a sysadmin login."
+  last: ""
+- key: restore keeps the requester in the restored history
+  check: "On the POC, a sysadmin whose login is newer than the chosen backup restores it; afterwards Server tasks shows the restore 'asked by a login not in this data (login #N)' with that sysadmin's login id, and the audit row 'Server task finished on the VM' carries requested_by_user_id (review fixes 0.45.0, BUG-003)."
+  steps: "POC with fictional data; take a backup; add and approve a new sysadmin; as them restore the backup; sign in as a sysadmin who existed then and read Server tasks and Sysadmin activity."
+  last: ""

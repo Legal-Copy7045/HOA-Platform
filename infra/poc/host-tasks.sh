@@ -100,7 +100,7 @@ host_task_backup() {
   local row value by at started where stamp
   TASK_BACKUP=""; TASK_BACKUP_WHERE=""; TASK_BACKUP_STAMP=""; TASK_BY=""; TASK_AT=""; TASK_STARTED=""
   row="$(psql_run -v id="$1" <<'SQL'
-SELECT backup, coalesce(requested_by_id::text, ''), requested_at, coalesce(started_at::text, '')
+SELECT backup, coalesce(requested_by_id::text, requested_by_user_id::text, ''), requested_at, coalesce(started_at::text, '')
   FROM core_hosttask WHERE id = :'id'::bigint;
 SQL
 )" || return 1
@@ -228,21 +228,26 @@ SQL
 # host_task_finish_restore <id> <state> <summary> <tail>: after a restore
 # the database is the backup's (or, after a rollback, the safety backup's),
 # which may not have this task's row or has an older copy of it: write it
-# (insert or update by id; the requester only if that login exists there),
-# and move the id counter past it. Values only as psql variables.
+# (insert or update by id; the requester's login only if it exists there,
+# its id always, as requested_by_user_id, so the trail says who asked:
+# review BUG-003, 0.45.0), and move the id counter past it. Values only as
+# psql variables.
 host_task_finish_restore() {
   psql_run -v id="$1" -v state="$2" -v summary="$3" -v tail="$4" -v backup="$TASK_BACKUP" \
     -v by="$TASK_BY" -v at="$TASK_AT" -v started="$TASK_STARTED" >/dev/null <<'SQL' \
     || echo "Could not record the result of server task #$1 (see $HOST_TASK_LOG)." >&2
 INSERT INTO core_hosttask (id, kind, dataset, attach_requester, backup, requested_by_id,
-                           requested_at, state, started_at, finished_at, summary, output_tail)
+                           requested_by_user_id, requested_at, state, started_at, finished_at,
+                           summary, output_tail)
 VALUES (:'id'::bigint, 'restore_backup', '', false, :'backup',
         (SELECT id FROM accounts_user WHERE id = NULLIF(:'by', '')::bigint),
+        NULLIF(:'by', '')::bigint,
         :'at'::timestamptz, :'state', NULLIF(:'started', '')::timestamptz, now(),
         :'summary', :'tail')
 ON CONFLICT (id) DO UPDATE
    SET kind = EXCLUDED.kind, dataset = '', attach_requester = false, backup = EXCLUDED.backup,
-       requested_by_id = EXCLUDED.requested_by_id, requested_at = EXCLUDED.requested_at,
+       requested_by_id = EXCLUDED.requested_by_id,
+       requested_by_user_id = EXCLUDED.requested_by_user_id, requested_at = EXCLUDED.requested_at,
        state = EXCLUDED.state, started_at = EXCLUDED.started_at, finished_at = now(),
        summary = EXCLUDED.summary, output_tail = EXCLUDED.output_tail,
        audited_at = NULL, notified_at = NULL;

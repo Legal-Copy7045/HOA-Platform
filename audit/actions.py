@@ -859,6 +859,7 @@ _SPECS = [
         "state",
         "dataset",
         "backup",
+        "requested_by_user_id",
     ),
     # Keys and connections (D93): service and setting names, ids and states only, never a value.
     _spec(

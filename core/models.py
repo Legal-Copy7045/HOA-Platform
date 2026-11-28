@@ -209,6 +209,10 @@ class HostTask(models.Model):
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT, related_name="+"
     )
+    # The requester's login id as a plain number, kept even where that login
+    # does not exist (a restore's row written back into older data: review
+    # BUG-003, 0.45.0), so the history and audit still say who asked.
+    requested_by_user_id = models.BigIntegerField(null=True, blank=True)
     requested_at = models.DateTimeField(default=timezone.now)
     state = models.CharField(max_length=10, choices=State.choices, default=State.REQUESTED)
     started_at = models.DateTimeField(null=True, blank=True)

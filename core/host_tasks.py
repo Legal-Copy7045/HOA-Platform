@@ -217,8 +217,11 @@ def request_task(
     for a reseed). A reseed needs demo data allowed here, a dataset from the
     registry and the word RESEED typed (D53)."""
     from audit.services import record_event
-    from core import demo_reseed
+    from core import demo_mode, demo_reseed
 
+    # Never while demo-switched (D97; review fixes 0.45.0, EXP-001): the
+    # service refuses itself, behind the page and the policy.
+    demo_mode.refuse_switched(request, error=HostTaskRefused)
     policy.require(actor, "system.run_task")
     if kind not in {spec.kind for spec in offered()}:
         raise HostTaskRefused("That task is not offered on this server.")
@@ -244,6 +247,7 @@ def request_task(
             task = HostTask.objects.create(
                 kind=kind,
                 requested_by=actor,
+                requested_by_user_id=getattr(actor, "pk", None),
                 dataset=dataset,
                 attach_requester=attach_requester,
                 backup=backup,
@@ -271,8 +275,9 @@ def check_restore(request, backup: str, confirmation: str) -> None:
     session, the word RESTORE typed exactly, and a backup point the server
     listed that this release can take (D98). The agent checks the point again
     against the backups that really exist."""
-    from core import backup_points, fresh_mfa, preview
+    from core import backup_points, demo_mode, fresh_mfa, preview
 
+    demo_mode.refuse_switched(request, error=HostTaskRefused)
     if request is not None and preview.current_for(request.user) is not None:
         raise HostTaskRefused("Leave the homeowner view first.")
     if request is None or not fresh_mfa.is_fresh(request):
@@ -347,6 +352,10 @@ def record_finished() -> int:
                 metadata["dataset"] = locked.dataset
             if kind == Kind.RESTORE_BACKUP and locked.backup:
                 metadata["backup"] = locked.backup
+            # Who asked, by login id only: after a restore that login may not
+            # exist in the restored data (BUG-003, 0.45.0).
+            if locked.requested_by_id is None and locked.requested_by_user_id is not None:
+                metadata["requested_by_user_id"] = locked.requested_by_user_id
             record_event(
                 "system.task_finished",
                 actor=None,

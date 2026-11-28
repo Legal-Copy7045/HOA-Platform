@@ -131,6 +131,10 @@ def test_a_listed_local_backup_runs_the_fixed_script_with_the_stamp(vm):
     assert "INSERT INTO core_hosttask" in tail and "ON CONFLICT (id) DO UPDATE" in tail
     assert "setval(pg_get_serial_sequence('core_hosttask', 'id')" in tail
     assert "[summary=Restored the backup of 2026-11-20T0230Z" in finish
+    # The requester's id is kept even where that login is not in the restored
+    # data (review BUG-003, 0.45.0).
+    assert "requested_by_user_id = EXCLUDED.requested_by_user_id" in tail
+    assert "NULLIF(:'by', '')::bigint," in tail  # the id itself, login or not
 
 
 @needs_bash

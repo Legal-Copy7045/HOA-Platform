@@ -7,7 +7,7 @@
     <p class="subtitle">Puts the whole portal back to one backup point: its database and its files. The portal only asks; the server's own agent checks the backup point against the backups it really has and does the restore (decision D98).</p></div></div>
   {% if agent_warning %}<div class="alert warning" role="alert">{% icon "alert" %}<span><strong>Tasks will not run right now.</strong> The server's agent has not reported in the last few minutes. A restore waits until it is back.</span></div>{% endif %}
   {% if current %}<section class="card" id="current-task"><h2>Now</h2>
-    <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {{ current.task.requested_by.email|default:"a login not in this data" }} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
+    <p><strong>{{ current.label }}</strong> · {% status current.task.state current.task.get_state_display %} · asked by {% if current.task.requested_by %}{{ current.task.requested_by.email }}{% else %}a login not in this data{% if current.task.requested_by_user_id %} (login #{{ current.task.requested_by_user_id }}){% endif %}{% endif %} {{ current.task.requested_at|timesince }} ago{% if current.task.started_at %}, started {{ current.task.started_at|timesince }} ago{% endif %}.</p>
     <p class="small muted">Another task, or a restore, can start once this one has finished. During a restore the portal does not load for several minutes; then sign in again.</p></section>{% endif %}
 
   <section class="card" id="what-happens"><h2>What happens</h2>
@@ -49,7 +49,7 @@
   </section>
 
   <section class="card" id="last-restore"><h2>Last restore</h2>
-    {% if last %}<p>{{ last.task.requested_at|date:"M j, Y g:i A" }} · {{ last.label }} · {% status last.task.state last.task.get_state_display %} · asked by {{ last.task.requested_by.email|default:"a login not in this data" }}</p>
+    {% if last %}<p>{{ last.task.requested_at|date:"M j, Y g:i A" }} · {{ last.label }} · {% status last.task.state last.task.get_state_display %} · asked by {% if last.task.requested_by %}{{ last.task.requested_by.email }}{% else %}a login not in this data{% if last.task.requested_by_user_id %} (login #{{ last.task.requested_by_user_id }}){% endif %}{% endif %}</p>
       {% if last.summary %}<p class="small">{{ last.summary }}</p>{% endif %}
       {% if last.tail %}<details><summary>Last lines of output</summary><pre class="small task-output">{{ last.tail }}</pre></details>{% endif %}
     {% else %}<p class="muted">The portal has not been restored from here yet.</p>{% endif %}
