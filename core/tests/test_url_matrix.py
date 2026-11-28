@@ -272,6 +272,10 @@ PROTECTED = {
     "person_email_bounce_clear": ("POST", "person"),
     "bounce_paper_done": ("POST", "lot"),
     "demo_data": ("POST", None),  # 404 unless demo data is allowed; sysadmins only (D53)
+    # Demo mode (D97): 404 off the POC (and in these tests); board and
+    # sysadmin only, to seeded personas only (core/tests/test_demo_mode.py).
+    "demo_switch": ("POST", None),
+    "demo_switch_back": ("POST", None),
     "community_settings": ("GET", None),
     # Community setup wizard (D51): board only.
     "setup_home": ("GET", None),

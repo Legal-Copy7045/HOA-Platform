@@ -200,9 +200,7 @@ def names(user_ids) -> dict[int, str]:
 
     with system_access("demo persona names"):
         return dict(
-            Person.objects.filter(user_id__in=list(user_ids)).values_list(
-                "user_id", "display_name"
-            )
+            Person.objects.filter(user_id__in=list(user_ids)).values_list("user_id", "display_name")
         )
 
 

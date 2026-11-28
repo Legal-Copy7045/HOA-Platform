@@ -16,7 +16,7 @@ from community import services
 from community.models import Person, Role, SeatType, SysadminNomination
 from community.tests.factories import LotFactory, PersonFactory, UserFactory, days_ago, make_member
 from core import demo_mode
-from core.models import DemoPersona, DemoSeed
+from core.models import DemoSeed
 from core.policy import SYSTEM
 
 pytestmark = pytest.mark.django_db
@@ -94,7 +94,9 @@ def test_configured_only_on_the_poc_with_demo_data_allowed(settings, allowed, st
     assert demo_mode.configured() is ok
 
 
-@pytest.mark.parametrize(("allowed", "stage"), [(True, "production"), (True, "local"), (False, "poc")])
+@pytest.mark.parametrize(
+    ("allowed", "stage"), [(True, "production"), (True, "local"), (False, "poc")]
+)
 def test_everything_is_absent_off_the_poc(client, w, settings, allowed, stage):
     settings.SEED_DEMO_ALLOWED = allowed
     settings.DEPLOYMENT_STAGE = stage
@@ -378,7 +380,9 @@ def test_actions_are_the_persona_s_and_record_the_real_user(client, w):
     client.post(reverse("sysadmin_nominate", args=[demo_person.pk]))
     nomination = SysadminNomination.objects.unscoped("t").get(person=demo_person)
     assert nomination.nominated_by_id == w["p_president"].pk
-    event = AuditEvent.objects.filter(actor=w["p_president"]).exclude(action="demo.switched").first()
+    event = (
+        AuditEvent.objects.filter(actor=w["p_president"]).exclude(action="demo.switched").first()
+    )
     assert event is not None
     assert event.metadata["demo_switch_by"] == w["board"].pk
     # Outside a switch nothing is added.
