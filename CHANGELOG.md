@@ -18,6 +18,13 @@ adds an entry here.
 - Audit fixes found by the simulation: adding the starter compliance items,
   event RSVPs and volunteer sign-ups are now recorded in the audit log
   (counts and ids only, no names).
+- Full-check fixes: the simulation cannot reach the network (any outside call
+  fails the run), refuses to drop any database but its own, limits months to
+  1-24 and watches every append-only table; live mail and the bounce mailbox
+  try each checked public address in turn; a non-ASCII digit in a port or id
+  field gives a form error, not a server error; the CI and simulation
+  workflows pin the same Postgres image as the server; on a phone, System
+  status tiles wrap instead of widening the page.
 
 ## 0.46.0 — 2026-11-28
 
