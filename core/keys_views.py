@@ -225,13 +225,17 @@ def _keys_service(request, svc):
                 messages.error(request, "Tick the confirmation to remove the saved keys.")
             else:
                 try:
-                    credentials.clear(request.user, svc.key, request=request)
+                    change = credentials.clear(request.user, svc.key, request=request)
                 except credentials.CredentialError as exc:
                     messages.error(request, str(exc))
                 else:
                     messages.success(
                         request,
-                        f"{svc.label}: the keys saved here were removed; the "
+                        f"{svc.label}: removing the keys saved here waits for another board "
+                        f"member's approval (within {credentials.APPROVAL_HOURS} hours). The "
+                        "board was told."
+                        if change.approvals_needed
+                        else f"{svc.label}: the keys saved here were removed; the "
                         "server's own settings apply again. The board was told.",
                     )
             return redirect("keys_service", service=svc.key)
@@ -260,6 +264,7 @@ def _keys_service(request, svc):
             "has_passkey": fresh_mfa.has_passkey(request.user),
             "approval_hours": credentials.APPROVAL_HOURS,
             "pin_wait": credentials.PIN_CHANGE_WAIT_HOURS,
+            "needs_board": credentials.needs_board(svc, request.user),
         },
     )
 
@@ -350,7 +355,11 @@ def _vendor_key_action(request, svc, action):
             )
         elif action == "clear":
             credentials.clear(request.user, svc.key, request=request)
-            messages.success(request, "The key made here was removed; the server's applies.")
+            messages.success(
+                request,
+                "The key made here was removed; the server's applies. It stays an older key "
+                "(fallback) the next time a key is made here.",
+            )
         else:
             raise Http404
     except credentials.CredentialError as exc:
@@ -372,7 +381,13 @@ def keys_change(request, pk):
     svc = credentials.BY_KEY.get(change.service)
     fresh = fresh_mfa.is_fresh(request)
     from core import conflicts
+    from core.models import CredentialDecision
 
+    can_decide = (
+        policy.can(request.user, "system.approve_keys")
+        and not conflicts.own_matter(request.user, change)
+        and not CredentialDecision.objects.filter(change=change, by=request.user).exists()
+    )
     return render(
         request,
         "core/keys_change.html",
@@ -395,11 +410,12 @@ def keys_change(request, pk):
             ],
             "fresh": fresh,
             "reveal_url": fresh_mfa.prompt_url(request, request.get_full_path()),
-            "can_decide": policy.can(request.user, "system.approve_keys")
-            and cs.state == credentials.PENDING
-            and not conflicts.own_matter(request.user, change),
+            "can_decide": can_decide and cs.state == credentials.PENDING,
+            # Until it takes effect a change can still be refused or cancelled,
+            # a pin move in its waiting period too (review BUG-001, 0.44.0).
+            "can_refuse": can_decide and cs.state in credentials.OPEN_STATES,
             "own": conflicts.own_matter(request.user, change),
-            "can_cancel": cs.state == credentials.PENDING
+            "can_cancel": cs.state in credentials.OPEN_STATES
             and change.requested_by_id == request.user.pk,
             "check_value": CONFIRM_VALUE,
             "pin": credentials.pin(change.service),

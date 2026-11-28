@@ -353,7 +353,11 @@ bootstrap() {
   fi
   if [ ! -f "$APP_DIR/infra/poc/lib.sh" ]; then
     # Nothing checked out yet: the newest release's lib.sh does the checkout.
-    newest="$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" tag --list 'v*' \
+    # Only a release tag on main counts (D90, D94; review EXP-005, 0.44.0), as
+    # in lib.sh's checkout_release: a v-tag on another branch is never run.
+    run_logged release_as "$user" git -C "$APP_DIR" fetch --quiet --tags origin main </dev/null \
+      || fail "Could not fetch the code from $REPO_URL." "Check the server's internet access, then run this again."
+    newest="$(git -c safe.directory="$APP_DIR" -C "$APP_DIR" tag --merged origin/main --list 'v*' \
       | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)" || newest=""
     [ -n "$newest" ] || fail "GitHub has no release of the portal yet." "Wait for the first release (a v<VERSION> tag), then run this again."
     # shellcheck source=/dev/null

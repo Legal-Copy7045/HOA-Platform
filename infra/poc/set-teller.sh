@@ -64,7 +64,7 @@ grep -q "^BANK_FEED_TOKEN_KEY=." .env || env_update .env BANK_FEED_TOKEN_KEY "$(
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Checking the set-up"
-if ! "${COMPOSE[@]}" exec -T web python manage.py check_teller; then
+if ! "${COMPOSE[@]}" exec -T web python manage.py check_teller --server; then
   env_restore_keys .env "$BACKUP" "${KEYS[@]}"
   env_discard_backup "$BACKUP"
   echo "The check failed (above). The previous Teller settings are back in .env (nothing else in it was changed); restarting." >&2

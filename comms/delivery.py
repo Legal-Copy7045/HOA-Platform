@@ -237,7 +237,14 @@ def pull(*, now=None) -> dict:
     state.last_pull_success_at = now
     state.last_pull_failure = ""
     state.last_pulled = len(events)
-    state.cursor_at = end
+    last = max((e.at for e in events), default=None)
+    if token and last is not None and (state.cursor_at is None or last > state.cursor_at):
+        # Pages left unread (MAX_PAGES): the next pull starts at the last event
+        # read, not past the rest of the window (review BUG-009, 0.44.0); the
+        # overlap and the dedupe make a re-read harmless. It always moves on.
+        state.cursor_at = min(end, last)
+    else:
+        state.cursor_at = end
     state.save()
     if counts["hard"] >= BURST:
         from core import ops_timeline

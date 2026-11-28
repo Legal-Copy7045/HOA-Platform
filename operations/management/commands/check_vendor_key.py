@@ -14,6 +14,16 @@ class Command(BaseCommand):
         parser.add_argument("--reencrypt", action="store_true")
 
     def handle(self, *args, **options):
+        # Says when the portal's key wins over .env (review EXP-006); it checks and
+        # re-encrypts under the key in use, never the .env one alone.
+        from core import credentials
+
+        note = credentials.override_note("vendor_key")
+        if note:
+            self.stderr.write(note)
+        return self._check(*args, **options)
+
+    def _check(self, *args, **options):
         from operations import vendor_crypto, vendor_onboarding
         from operations.models import VendorFile
 

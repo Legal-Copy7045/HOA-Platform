@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import re
 import traceback
 import zoneinfo
 from pathlib import Path
 
 from django.conf import settings
 from django.utils import timezone
+from django.views.debug import SafeExceptionReporterFilter
 
 # How long counts and signatures are kept (the nightly purge).
 RETENTION_DAYS = 30
@@ -233,3 +235,16 @@ def purge(now=None) -> int:
     removed, _ = ErrorSignature.objects.filter(hour__lt=cutoff).delete()
     tallies, _ = ErrorTally.objects.filter(hour__lt=cutoff).delete()
     return removed + tallies
+
+
+# --- Error reports: settings never shown in clear -------------------------------------------
+
+
+class PortalExceptionReporterFilter(SafeExceptionReporterFilter):
+    """Django's filter also hides CREDENTIALS_KEK and other key-encryption
+    keys, which its default pattern (API|TOKEN|KEY|SECRET|PASS|SIGNATURE)
+    misses because "KEK" is not "KEY" (review EXP-007, 0.44.0)."""
+
+    hidden_settings = re.compile(
+        "API|AUTH|TOKEN|KEY|KEK|SECRET|PASS|SIGNATURE|HTTP_COOKIE|DSN|CREDENTIAL", flags=re.I
+    )

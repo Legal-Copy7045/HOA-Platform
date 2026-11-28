@@ -518,6 +518,12 @@ def test_checkout_release_puts_a_fresh_clone_at_the_newest_release_and_never_res
 @pytest.mark.skipif(GIT is None, reason="git not installed")
 def test_curl_bootstrap_clones_the_newest_release_and_hands_over_to_its_install_script(tmp_path):
     origin = _origin(tmp_path)
+    # A newer v-tag on a side branch is never run (review EXP-005, 0.44.0).
+    _git("checkout", "-q", "-b", "side", cwd=origin)
+    (origin / "infra" / "poc" / "lib.sh").write_text('echo "SIDE BRANCH CODE RAN"; exit 7\n')
+    _git("commit", "-q", "-am", "side", cwd=origin)
+    _git("tag", "v0.99.0", cwd=origin)
+    _git("checkout", "-q", "main", cwd=origin)
     box = Box(tmp_path / "box")
     target = tmp_path / "opt" / "hoa-portal"
     script = (POC / "install.sh").read_text()
@@ -545,6 +551,7 @@ def test_curl_bootstrap_clones_the_newest_release_and_hands_over_to_its_install_
         timeout=120,
     )
     assert (target / "VERSION").read_text() == "0.10.0\n"
+    assert "SIDE BRANCH CODE RAN" not in result.stdout + result.stderr
     assert not (target / "UNRELEASED").exists()  # never main's unreleased tip
     assert "release's own install.sh" in result.stdout or "own install.sh" in result.stdout
     # The release's install.sh took over and stopped at the token question.

@@ -66,6 +66,7 @@
     <div class="stat" id="keys"><div class="label">Keys and connections</div>
       <div class="value small-value">Email, payments, bank, USPS, AI</div>
       <div class="hint">Service keys, entered and tested here; stored encrypted.</div>
+      {% if key_changes %}<ul class="hint key-changes">{% for k in key_changes %}<li><a href="{% url 'keys_change' k.cs.change.pk %}">{{ k.label }}: {{ k.cs.change.get_kind_display|lower }}</a> · {{ k.cs.change.requested_at|date:"M j, g:i A" }} · {{ k.cs.words }}</li>{% endfor %}</ul>{% endif %}
       <div class="inline-form"><a class="btn secondary small" href="{% url 'keys_connections' %}">Open…</a></div></div>
     <div class="stat {% if pending_migrations %}tone-danger{% else %}tone-success{% endif %}"><div class="label">Unapplied migrations</div><div class="value">{{ pending_migrations }}</div></div>
     <div class="stat"><div class="label">Background jobs</div><div class="value small-value">{% for status, n in jobs %}{{ status }} {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}None{% endfor %}</div>

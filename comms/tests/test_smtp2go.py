@@ -529,3 +529,52 @@ def test_setup_wizard_says_configured_or_not_and_never_the_key(fake, client, set
     page = client.get(reverse("setup_step", args=["server"])).content.decode()
     line = page.split('data-testid="setup-smtp2go"', 1)[1].split("</li>", 1)[0]
     assert "Not configured" in line
+
+
+# --- Review fixes (0.44.0) -------------------------------------------------------------------
+
+
+def test_a_batch_failing_partway_still_records_the_messages_already_accepted(fake, monkeypatch):
+    """BUG-008: the first message went; the second fails. The first gets its
+    OutgoingEmail (so its delivery reports match), and the send still fails."""
+    from django.core.mail import get_connection
+
+    original = fake.__call__
+
+    def second_fails(url, data, headers, timeout):
+        if url.endswith("/email/send") and fake.sent():
+            fake.calls.append({"url": url, "body": json.loads(data), "headers": headers})
+            return 500, b'{"data": {"error": "Boom"}}'
+        return original(url, data, headers, timeout)
+
+    monkeypatch.setattr(smtp2go, "transport", second_fails)
+    messages = [
+        EmailMessage("One", "Body", None, [OWNER_EMAIL]),
+        EmailMessage("Two", "Body", None, ["second-owner@example.com"]),
+    ]
+    with pytest.raises(portal_email.EmailUnavailable):
+        get_connection().send_messages(messages)
+    with system_access("test"):
+        rows = list(OutgoingEmail.objects.all())
+    assert len(rows) == 1 and rows[0].provider_message_id == "1abcDE-000001-zz"
+    assert rows[0].address_hash == bounces.address_hash(OWNER_EMAIL)
+
+
+def test_the_cursor_stays_at_the_last_event_read_when_pages_are_left(fake, owner, monkeypatch):
+    """BUG-009: at MAX_PAGES with a page still waiting, the next pull starts
+    from the last event read, not past the rest of the window."""
+    monkeypatch.setattr(delivery, "MAX_PAGES", 1)
+    email_id = _sent_id(fake)
+    fake.events = [
+        _event(email_id, "delivered", OWNER_EMAIL, minutes=50),
+        _event(email_id, "delivered", OWNER_EMAIL, minutes=40),
+        _event(email_id, "hard_bounce", OWNER_EMAIL, minutes=5, smtp_response="550 5.1.1"),
+    ]
+    now = timezone.now()
+    delivery.pull(now=now)
+    state = EmailProviderState.get()
+    assert state.cursor_at < now - datetime.timedelta(minutes=30)
+    monkeypatch.setattr(delivery, "MAX_PAGES", 20)
+    delivery.pull(now=now + datetime.timedelta(minutes=1))
+    with system_access("test"):
+        assert EmailBounce.objects.count() == 1  # the later event was read after all

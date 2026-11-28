@@ -115,7 +115,7 @@ echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Signing in to the mailbox (no message is read)"
 # Only the worker container has the password (EXP-003): check from there.
-if ! "${COMPOSE[@]}" exec -T worker python manage.py check_bounce_mailbox; then
+if ! "${COMPOSE[@]}" exec -T worker python manage.py check_bounce_mailbox --server; then
   undo "The check failed (above)."
 fi
 echo "==> Sending a test email (outgoing mail must still work)"

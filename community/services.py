@@ -1407,6 +1407,17 @@ def decline_sysadmin(nomination, *, actor, request: HttpRequest | None = None):
     return nomination
 
 
+def board_user_ids() -> list[int]:
+    """Signed-up users with a current board seat (no names or addresses)."""
+    with system_access("board members' user ids"):
+        return list(
+            BoardSeat.objects.active()
+            .filter(person__user__is_active=True)
+            .values_list("person__user_id", flat=True)
+            .distinct()
+        )
+
+
 def board_emails() -> list[str]:
     with system_access("board notification recipients"):
         return list(

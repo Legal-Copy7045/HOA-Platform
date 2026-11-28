@@ -11,8 +11,10 @@ from __future__ import annotations
 import base64
 import binascii
 import datetime
+import ipaddress
 import logging
 import re
+import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -43,6 +45,57 @@ def failed(code: str, words: str) -> TestResult:
 
 _HOST = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$")
 _SENDER = re.compile(r"^[^<>\r\n]{0,80}<?[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+>?$")
+# The mail server and bounce mailbox tests connect from inside the portal, so
+# they reach public mail hosts only (review EXP-004, 0.44.0): no IP address,
+# no internal name, the usual ports only, and a name must resolve to public
+# addresses alone.
+_INTERNAL_SUFFIXES = (".internal", ".local", ".localhost", ".lan", ".home.arpa", ".localdomain")
+PORTS = {
+    "EMAIL_PORT": frozenset({25, 465, 587, 2525}),
+    "BOUNCE_IMAP_PORT": frozenset({993}),
+}
+
+
+def host_problem(host: str) -> str:
+    """Why ``host`` may not be used as a mail or IMAP server ("" when it may)."""
+    host = (host or "").strip().lower().rstrip(".")
+    if not _HOST.match(host):
+        return "is not a host name"
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        return "must be a host name, not an IP address"
+    if host == "localhost" or host.endswith(_INTERNAL_SUFFIXES) or host.split(".")[-1].isdigit():
+        return "must be a public host name"
+    return ""
+
+
+# Replaced in tests: host -> the addresses it resolves to.
+def _resolve(host: str) -> list[str]:
+    return [info[4][0] for info in socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)]
+
+
+resolve = _resolve
+
+
+def public_host(host: str) -> bool:
+    """``host`` resolves, and only to public (global) addresses."""
+    try:
+        addresses = resolve(host)
+    except (OSError, UnicodeError):
+        return False
+    if not addresses:
+        return False
+    for address in addresses:
+        try:
+            ip = ipaddress.ip_address(address.split("%", 1)[0])
+        except ValueError:
+            return False
+        if not ip.is_global or ip.is_multicast:
+            return False
+    return True
 
 
 # --- Format checks (what was typed) -------------------------------------------------------
@@ -62,6 +115,9 @@ def validate(service_key: str, values: dict, *, merged: dict) -> list[str]:
             problems.append(f"Choose one of the offered values for {f.label}.")
         if f.kind == credentials.INT and not (str(v).isdigit() and 1 <= int(v) <= 65535):
             problems.append(f"{f.label} must be a port number.")
+        elif f.name in PORTS and int(v) not in PORTS[f.name]:
+            allowed = ", ".join(str(p) for p in sorted(PORTS[f.name]))
+            problems.append(f"{f.label} must be one of {allowed}.")
         if isinstance(v, str) and len(v) > f.max_length and f.kind != credentials.FILE:
             problems.append(f"{f.label} is too long.")
         if isinstance(v, str) and ("\n" in v or "\r" in v) and f.kind != credentials.FILE:
@@ -75,8 +131,12 @@ def validate(service_key: str, values: dict, *, merged: dict) -> list[str]:
     if values.get("DEFAULT_FROM_EMAIL") and not _SENDER.match(values["DEFAULT_FROM_EMAIL"]):
         problems.append('The sender must look like "Name <address@domain>".')
     for name in ("EMAIL_HOST", "BOUNCE_IMAP_HOST"):
-        if values.get(name) and not _HOST.match(values[name].strip().lower()):
-            problems.append(f"{credentials.FIELDS[name].label} is not a host name.")
+        problem = host_problem(values[name]) if values.get(name) else ""
+        if problem:
+            problems.append(f"{credentials.FIELDS[name].label} {problem}.")
+    retype = credentials.secrets_to_retype(service_key, values)
+    if retype:
+        problems.append(credentials._retype_words(retype))
     stripe = values.get("STRIPE_SECRET_KEY")
     if stripe:
         if stripe.startswith("sk_"):
@@ -168,6 +228,8 @@ def _smtp() -> TestResult:
     options = smtp_options()
     if not options["host"]:
         return failed("not_configured", "Enter the SMTP server.")
+    if host_problem(options["host"]) or not public_host(options["host"]):
+        return failed("not_public", "The mail server must be a public host name that resolves.")
     try:
         backend = EmailBackend(fail_silently=False, timeout=20, **options)
         backend.open()  # connect, encrypt and sign in; nothing is sent
@@ -276,6 +338,8 @@ def _bounce() -> TestResult:
     cfg = bounces.config()
     if not cfg.configured:
         return failed("not_configured", cfg.problem)
+    if host_problem(cfg.host) or not public_host(cfg.host):
+        return failed("not_public", "The IMAP server must be a public host name that resolves.")
     try:
         bounces.check_login()
     except bounces.MailboxError as exc:
@@ -338,9 +402,20 @@ def run(service_key: str, values: dict) -> TestResult:
     problems = validate(service_key, values, merged=merged)
     if problems:
         return failed("format", " ".join(problems))
+    return _run_tester(service_key, merged)
+
+
+@sensitive_variables("values")
+def _run_tester(service_key: str, values: dict) -> TestResult:
     try:
-        with credentials.candidate(merged):
+        with credentials.candidate(values):
             return TESTERS[service_key]()
     except Exception as exc:  # a test must never show a value or fail the page
         logger.warning("credentials.test_error", extra={"exc_type": type(exc).__name__})
         return failed("error", f"The test could not run ({type(exc).__name__}).")
+
+
+def run_server(service_key: str) -> TestResult:
+    """The service's test on the server's own .env settings only (what would
+    apply if the portal's values were removed)."""
+    return _run_tester(service_key, credentials.server_values(service_key))
