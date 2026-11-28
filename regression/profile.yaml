@@ -66,6 +66,57 @@ walkthrough:
   ui_paths: ['^templates/', '^static/', '^core/navigation\.py$', '(^|/)(urls|views|[a-z_]*_views|forms)\.py$',
              '/templatetags/', '^core/features\.py$', '^core/policy\.py$', '^docs/glossary\.md$']
 
+# When a release needs a full check first (D91, owner decision 2026-11-28; regression/release_logs.py, CI-014): weekly
+# (the newest full check more than max_age_days older than the release date), every every_releases releases (patches
+# included), when a material security or accounting path changed since the full check's commit, and on every major
+# release (X.0.0). A path is material when it matches material_paths and none of not_material (layout and wording are
+# not: templates, static, CSS, docs, tests, regression). Globs: ** any directories, * within one name.
+full_check:
+  max_age_days: 7
+  every_releases: 5
+  # Weekly maintenance (/weekly-maintenance): a weekly full check is expected whenever anything changed since the
+  # newest full check (a maintenance release then needs one under the weekly rule).
+  weekly_when_changed: true
+  material_paths:
+    - core/policy.py
+    - core/policy_mfa.py
+    - core/conflicts.py
+    - core/scoping.py
+    - core/credential*.py
+    - core/fresh_mfa.py
+    - core/keys_views.py
+    - core/migrations/**
+    - accounts/**
+    - payments/**/*.py
+    - ledger/**/*.py
+    - governance/sealing.py
+    - governance/ballot_links.py
+    - governance/mixing.py
+    - governance/elections.py
+    - governance/election_views.py
+    - governance/voting_views.py
+    - governance/window.py
+    - governance/migrations/**
+    - operations/reimbursements.py
+    - operations/models_payouts.py
+    - operations/payout_views.py
+    - operations/vendor_checks.py
+    - operations/vendor_crypto.py
+    - operations/migrations/**
+    - audit/**
+    - infra/poc/*.sh
+    - docker-compose*.yml
+  not_material:
+    - "**/templates/**"
+    - "**/static/**"
+    - "**/*.html"
+    - "**/*.css"
+    - "**/*.md"
+    - "**/tests/**"
+    - "**/test_*.py"
+    - "docs/**"
+    - "regression/**"
+
 # Where each run's report lives and how it is logged: regression/published.yaml (republished to the same URL every
 # run), RUNS.md and WALKTHROUGHS.md (one row per run, newest first; IDs and counts only, never finding details, names,
 # hosts or addresses). A run fixes nothing in product code; new tests, catalogue entries, claims, manual checks and

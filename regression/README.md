@@ -37,6 +37,31 @@ python3 regression/run.py manual KEY pass|fail --note "..."    # manual-log.yaml
 Each stage prints one line (counts) and its failing checks; full output goes to
 `out/logs/`. Read the summary, and a log only when a failure needs it.
 
+## When a full check is due (D91, amended 2026-11-28)
+
+A release (`VERSION` without its `v<VERSION>` tag) needs a full check first,
+`/full-check` and then `python3 regression/run.py log --full-check`, when any
+of these is true; `release_logs.py` (CI-014 in `run.py check`, and
+`tests/test_release_logs.py` in the suite) fails and names the rule:
+
+1. **Weekly**: the newest full check (a RUNS.md row marked "full check" whose
+   commit also has a WALKTHROUGHS.md row) is more than `full_check.max_age_days`
+   (7) older than the release date (its CHANGELOG.md section date, else today).
+2. **Every 5 releases**: `full_check.every_releases` (5) or more CHANGELOG.md
+   versions, patches included and the one being released counted, after the
+   full check's version.
+3. **Material security or accounting change**: `git diff --name-only <full
+   check commit>..HEAD` has a file matching `full_check.material_paths` in
+   `profile.yaml` and none of `full_check.not_material` (templates, static,
+   CSS, docs, tests, regression: layout and wording are not material). A
+   shallow clone (the CI test job) skips this rule with a note; `run.py check`
+   has the history.
+4. **Major release**: X.0.0 needs a full check on that version itself.
+
+Otherwise no full check is needed. Weekly maintenance expects a weekly full
+check whenever anything changed since the newest one
+(`full_check.weekly_when_changed`).
+
 ## This project in a /regression, /walkthrough or /full-check run
 
 - **Databases and ports** (Postgres with the two roles from
