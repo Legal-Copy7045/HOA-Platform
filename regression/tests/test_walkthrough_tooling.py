@@ -226,3 +226,14 @@ def test_report_thumbnails_stay_within_the_budget(out):
 def test_report_respects_report_tz(out):
     page = walkthrough_report.render(out, tz=ZoneInfo("America/New_York"))
     assert re.search(r"\d{4}-\d\d-\d\d \d\d:\d\d E[SD]T", page)
+
+
+def test_full_check_log_writes_one_walkthrough_row(monkeypatch):
+    """`run.py log --full-check` adds one RUNS.md row and exactly one WALKTHROUGHS.md row."""
+    rows = []
+    monkeypatch.setattr(run.standard, "add_row", lambda path, *a, **k: rows.append(Path(path).name))
+    monkeypatch.setattr(run.standard, "load_stages", lambda: [])
+    monkeypatch.setattr(run.standard, "load_findings", lambda names: [])
+    monkeypatch.setattr(run, "_walk_counts", lambda: (11, 700, 0, 0))
+    assert run.log(["--full-check"]) == 0
+    assert rows == ["RUNS.md", "WALKTHROUGHS.md"]

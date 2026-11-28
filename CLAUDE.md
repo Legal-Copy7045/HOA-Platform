@@ -11,7 +11,7 @@ The full rules and reference live in `docs/claude/` (list below), moved there ve
 - First time: `cp .env.example .env`; run locally: `docker compose up` (site http://localhost:8000, mail http://localhost:8025).
 - Before a pull request is marked ready: `python3 regression/run.py check` (`scripts/check.sh`): ruff, bandit, migrations, pip-audit, check --deploy, versions, privacy guard, the whole suite. Needs Postgres with the two roles from `docker/postgres/init-roles.sh`.
 - One area: `pytest <app>/tests/`; lint: `ruff check . && ruff format --check .`
-- Full regression, walkthrough, both: `/regression`, `/walkthrough`, `/full-check` (global skills; `regression/README.md`, `regression/profile.yaml`). A run fixes no product code.
+- Full regression, walkthrough, both: `/regression`, `/walkthrough`, `/full-check` (global skills; `regression/README.md`, `regression/profile.yaml`). A run fixes no product code; afterwards every finding with a clear fix goes in the next release unasked, and the owner is asked only when a fix is uncertain, weakens security, changes a legal or governance rule, or merges or removes pages.
 
 ## Rules for every change
 

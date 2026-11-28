@@ -48,21 +48,24 @@ if [ "$ENVIRONMENT" != "sandbox" ]; then
   fi
 fi
 
-cp -p .env .env.before-teller
-chmod 600 .env.before-teller
-set_env .env TELLER_APPLICATION_ID "$APP_ID"
-set_env .env TELLER_ENVIRONMENT "$ENVIRONMENT"
+# Only these keys change (env_update, infra/poc/lib.sh); a failed check puts
+# back only these keys, never the whole old .env.
+KEYS=(TELLER_APPLICATION_ID TELLER_ENVIRONMENT TELLER_CERTIFICATE_B64 TELLER_PRIVATE_KEY_B64 BANK_FEED_TOKEN_KEY)
+BACKUP="$(env_backup .env teller)"
+env_update .env TELLER_APPLICATION_ID "$APP_ID" TELLER_ENVIRONMENT "$ENVIRONMENT"
 if [ -n "$CERT" ]; then
-  set_env .env TELLER_CERTIFICATE_B64 "$(base64 -w0 "$CERT")"
-  set_env .env TELLER_PRIVATE_KEY_B64 "$(base64 -w0 "$KEY")"
+  env_update .env TELLER_CERTIFICATE_B64 "$(base64 -w0 "$CERT")" TELLER_PRIVATE_KEY_B64 "$(base64 -w0 "$KEY")"
 fi
-grep -q "^BANK_FEED_TOKEN_KEY=." .env || set_env .env BANK_FEED_TOKEN_KEY "$(openssl rand -hex 32)"
+grep -q "^BANK_FEED_TOKEN_KEY=." .env || env_update .env BANK_FEED_TOKEN_KEY "$(openssl rand -hex 32)"
 
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Checking the set-up"
 if ! "${COMPOSE[@]}" exec -T web python manage.py check_teller; then
-  echo "The check failed (above). To undo: cp .env.before-teller .env && sudo bash infra/poc/start-portal.sh" >&2
+  env_restore_keys .env "$BACKUP" "${KEYS[@]}"
+  env_discard_backup "$BACKUP"
+  echo "The check failed (above). The previous Teller settings are back in .env (nothing else in it was changed); restarting." >&2
+  bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null || true
   exit 1
 fi
 
@@ -74,7 +77,7 @@ if [ -n "$CERT" ]; then
     echo "Kept. Delete them yourself: sudo shred -u $CERT $KEY"
   fi
 fi
-shred -u .env.before-teller 2>/dev/null || rm -f .env.before-teller
+env_discard_backup "$BACKUP"
 echo "Removed .env.before-teller (the copy of the previous settings, with the old secret)."
 echo "Done. Switch on Bank feed in Admin -> Features, then Finance -> Accounting -> Bank feed -> Connect a bank."
 echo "Keep the certificate and key in the HOA's password manager; never send them by email or chat."

@@ -288,6 +288,15 @@ def _task_busy() -> bool:
     return host_tasks.current() is not None
 
 
+def _last_restart():
+    """The newest Restart the portal task (D91), its agent text cleaned."""
+    from core import host_tasks
+    from core.server_task_views import HistoryRow
+
+    last = host_tasks.last_restart()
+    return HistoryRow(last) if last else None
+
+
 def _server_errors_context() -> dict:
     """Recent server error signatures for System status (D45): class, route
     name, code location, status, release and times; never URLs or messages."""
@@ -357,6 +366,7 @@ def system_status(request):
             "update": _update_status(),
             "can_run_task": policy.can(request.user, "system.run_task"),
             "task_busy": _task_busy(),
+            "last_restart": _last_restart(),
             "scanner": settings.DOCUMENT_SCANNER,
             **_scanner_context(),
             "resources": health_resources(),
@@ -374,7 +384,13 @@ def _monitoring_context() -> dict:
     storage trend. Operations data only; each part fails on its own."""
     from core import growth, job_health, ops_timeline
 
-    out = {"job_problems": [], "timeline": [], "growth": None}
+    out = {"job_problems": [], "timeline": [], "growth": None, "email": None}
+    try:
+        from comms import delivery
+
+        out["email"] = delivery.overview()
+    except Exception:  # shown by the Outgoing email check itself
+        out["email"] = None
     try:
         out["job_problems"] = job_health.problems()
     except Exception:  # shown by the health check itself

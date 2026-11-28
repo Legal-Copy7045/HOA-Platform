@@ -1,10 +1,12 @@
 from django.conf import settings
 from django.core.mail import send_mail
 from django.urls import reverse
+from procrastinate import RetryStrategy
 from procrastinate.contrib.django import app
 
 from comms.models import Announcement
 from comms.services import recipients_for
+from core.email import EmailUnavailable
 from core.text import single_line
 
 
@@ -87,3 +89,29 @@ def poll_bounces(timestamp: int) -> dict:
     if not bounces.active():
         return {"state": "off"}
     return bounces.poll()
+
+
+@app.periodic(cron="2-59/5 * * * *")  # every 5 minutes; only with EMAIL_PROVIDER=smtp2go and a key
+@app.task(queue="maintenance", queueing_lock="poll_email_activity")
+def poll_email_activity(timestamp: int) -> dict:
+    """Read SMTP2Go's delivery, bounce, spam-complaint and unsubscribe
+    reports since the last cursor (0.43.0): pull only, no webhook."""
+    from comms import delivery
+
+    if not delivery.active():
+        return {"state": "off"}
+    return delivery.pull()
+
+
+# Sending in the worker: tried again after about 25 s, 2 min, 10 min and
+# 52 min when the relay could not be reached or refused for now.
+EMAIL_RETRY = RetryStrategy(max_attempts=5, exponential_wait=5, retry_exceptions={EmailUnavailable})
+
+
+@app.task(queue="email", retry=EMAIL_RETRY)
+def send_arc_decision_email(decision_id: int) -> int:
+    """Tell the applicant an ARC decision is ready (once per address: a
+    retry never emails an address that already got it)."""
+    from arc.notify import send_decision_email
+
+    return send_decision_email(decision_id)

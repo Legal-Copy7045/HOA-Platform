@@ -6,6 +6,40 @@ people notice raises MINOR, fixes only raise PATCH, and 1.0.0 is the go-live
 with real owners (decision D37). Every merge to `main` bumps the version and
 adds an entry here.
 
+## 0.43.0 — 2026-11-27
+
+- Email through SMTP2Go (D92): send through SMTP2Go's API (or keep plain
+  SMTP); every 5 minutes the portal reads SMTP2Go's delivery reports, so
+  bounces, spam complaints and unsubscribes mark the address without a bounce
+  mailbox. ARC decisions now email the applicant, and the board sees
+  Delivered / Bounced / Pending on each decision. System status has an Email
+  card. `set-smtp2go.sh` sets it up; every set-up script now changes only its
+  own lines in `.env` and puts back only those if its check fails.
+- Server (D91): `docker compose` on the server always uses both compose files,
+  cloudflared stays on its own network (updates repair it), a Tunnel network
+  health check, and Restart on System status (system administrator, fresh
+  sign-in check, audited). A minor release now needs the regression and
+  walkthrough logs to be no more than one release behind.
+- A shorter menu (D95): "My violations" replaces "Notices about my home";
+  records requests are part of My requests; My reimbursements moved off My home
+  to Finance overview, committee pages and My account.
+- Setup wizard and screens: percentages entered and shown with %, including
+  the card surcharge; example text in every wizard box instead of "DEMO -
+  Replace"; common areas can be taken out of use and the step saves with none;
+  Getting started spacing; the "+ File in a folder" box lines up; bigger
+  checkboxes on phones; board dashboards show their work before Getting
+  started; one bank status on the Finance overview; clearer names.
+- Fixes from the 0.42.0 full check: forged bounce reports can no longer mark
+  another owner's address; an approved expense claim can't be paid through the
+  general invoice Pay button; a special assessment needs a vote that passed on
+  it; collection costs and payment plans stay with the seller after a sale;
+  special-assessment late fees respect a kept payment plan; buyers don't see
+  the seller's instalments; nobody removes their own vendor conflict link;
+  a seller on the board takes no step on their former account's refunds;
+  stricter database-role and help-link checks; the receipt page error.
+- Project standard 1.2.2: secret scan by pinned image with its allowlist read
+  from main; findings with a clear fix go in the next release without asking.
+
 ## 0.42.0 — 2026-11-27
 
 - Finance overview (D89): the first page of Finance, one card per part of the

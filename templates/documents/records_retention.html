@@ -29,7 +29,7 @@
     {% if preview.ready %}<form method="post" action="{% url 'records_disposal_propose' %}">{% csrf_token %}
       <div class="table-wrap"><table class="stack-sm">
         <thead><tr><th><span class="sr-only">Choose</span></th><th>Document</th><th>Version</th><th>Kept until</th></tr></thead>
-        <tbody>{% for d in preview.ready %}<tr><td data-label="Choose"><input type="checkbox" name="version" value="{{ d.version.pk }}" checked aria-label="Dispose of {{ d.document.title }} version {{ d.version.number }}"></td>
+        <tbody>{% for d in preview.ready %}<tr><td data-label="Choose"><label class="tap-check"><input type="checkbox" name="version" value="{{ d.version.pk }}" checked aria-label="Dispose of {{ d.document.title }} version {{ d.version.number }}"></label></td>
           <td class="cell-title"><a href="{% url 'document_detail' d.document.pk %}">{{ d.document.title }}</a><div class="small muted">{{ d.document.get_category_display }}: {{ d.years }} year{{ d.years|pluralize }} {{ d.basis_phrase }}</div></td>
           <td data-label="Version">{{ d.version.number }} · {{ d.version.original_filename }}</td><td class="nowrap" data-label="Kept until">{{ d.kept_until|date:"M j, Y" }}</td></tr>{% endfor %}</tbody>
       </table></div>

@@ -8,7 +8,15 @@ table per run; the older entries below it keep their own format.
 
 | Date (UTC) | Commit | Version | Audit | Pass | Fail | Skip | Manual due | Failing IDs | Findings | Report |
 |---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-27 21:44 | `7a8d8e9` | 0.42.0 | full (full check) | 5656 | 0 | 394 | 99 | none | 7 medium, 8 low, 1 info | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
 | 2026-11-27 | `d62bd1e` | 0.34.0 | full (full check) | 4615 | 0 | 215 | 84 | none | 16 (none critical or high) | [regression](https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM) · [walkthrough](https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8) |
+
+## 2026-11-27 (evening) — full check on release 0.42.0 (with the walkthrough)
+
+- Commit: 7a8d8e9 (main after 0.42.0). Totals: 5656 pass, 0 fail, 99 manual, 394 skip (retired IDs; two live checks not reachable from the cloud session).
+- Stages: ci 13 pass; unit 4358 pass; page 1281 pass; live 4 pass, 2 skip; manual 99. Walkthrough beside it: 7910 pass, 67 fail (see WALKTHROUGHS.md).
+- Findings (16, none critical or high): BUG-001..007, SEC-001..003, EXP-001..006; 7 medium (BUG-001..005, EXP-001, EXP-002), 8 low, 1 info. Security audit: 43 of 44 claims held (CLM-015 not held); bandit and pip-audit clean.
+- Report: https://claude.ai/artifact/J6ZtKwBbfVk7uFTqnyuqtM (version 7). Walkthrough: https://claude.ai/artifact/X7G3o44JDZ6mmM2XSRzsQ8 (version 5)
 
 ## 2026-11-27 — full check on release 0.34.0 (with the walkthrough)
 

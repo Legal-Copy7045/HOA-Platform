@@ -1,0 +1,24 @@
+# Email through SMTP2Go and its delivery reports (0.43.0), and the fixes for
+# BUG-002 / EXP-001 / EXP-003 / EXP-004. `match` runs over "<stage>:<check>".
+- feature: "SMTP2Go as the email relay (EMAIL_PROVIDER=smtp2go): v3 email/send with the key in X-Smtp2go-Api-Key, only SMTP2Go's region host over https with no redirects and a timeout, plain-word errors, no VERP sender; plain SMTP still works; every accepted message recorded as an append-only OutgoingEmail with SMTP2Go's email id; the key and recipient addresses never logged; check_smtp2go"
+  since: "0.43.0"
+  docs: docs/claude/comms.md
+  match: ["^unit:comms/tests/test_smtp2go\\.py::test_(send|html|no_verp|plain_smtp|a_refused_send|the_key_and|only_smtp2go|check_smtp2go)", "^manual:smtp2go with a real account"]
+- feature: "SMTP2Go delivery reports, pull only: every 5 minutes from a cursor with overlap and pages, each report stored once (the same report twice changes nothing), hard/soft bounces, spam complaints and unsubscribes fed into the bounce handling (bouncing address, paper copy of a bounced notice), only for the portal's own message ids and their recipients; no bounce mailbox needed; health check"
+  since: "0.43.0"
+  docs: docs/claude/comms.md
+  match: ["^unit:comms/tests/test_smtp2go\\.py::test_(event_names|pull_uses|a_hard_bounce|spam_complaint|soft_bounce|reports_for_messages|a_failed_pull|bounce_mailbox_is_not|the_pull_task)"]
+- feature: "ARC decision email to the applicant (after commit, retried with backoff in the worker, never twice to one address) with Delivered / Bounced / Pending on the ARC request for board and ARC staff only (cross-owner: other owners 404, the applicant does not see it); meeting notices show delivered/bounced/pending counts"
+  since: "0.43.0"
+  docs: docs/claude/comms.md
+  match: ["^unit:comms/tests/test_smtp2go\\.py::test_(a_decision_emails|a_failed_send_raises|the_board_sees|delivery_status_is_only)"]
+- feature: "System status Email card (provider, last successful send, last read of delivery reports, bounces in 7 days; no addresses) and the set-up wizard's Email provider line (configured / not configured, never the key)"
+  since: "0.43.0"
+  match: ["^unit:comms/tests/test_smtp2go\\.py::test_(system_status|setup_wizard)", "^unit:community/tests/test_setup_wizard_guard\\.py::test_every_secret_taking_server_script"]
+- feature: "Forged bounces (BUG-002 / EXP-001): a bounce report marks only an address the message was sent to (one recipient: the token's hash prefix; several: the recipients recorded at send time; no record: nobody)"
+  since: "0.43.0"
+  match: ["^unit:comms/tests/test_smtp2go\\.py::test_a_(forged_report|several_recipient)"]
+- feature: "Safe .env edits (lib.sh env_backup / env_update / env_restore_keys / env_discard_backup): only the named keys change, every other line kept, mode 600, a failed check puts back only the script's keys, backups removed (EXP-004), no script writes another's keys, set-smtp2go.sh keeps the key off command lines, the bounce-mailbox script tests outgoing email; secrets only in the containers that use them (EXP-003)"
+  since: "0.43.0"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_env_helper\\.py::test_", "^unit:core/tests/test_setup_scripts\\.py::test_secret_scripts_remove", "^unit:core/tests/test_infra_scripts\\.py::test_set_env_writes"]

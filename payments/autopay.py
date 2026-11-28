@@ -2178,7 +2178,7 @@ def board_failure_items(user) -> list:
             )
             out.append(
                 Item(
-                    "Finance",
+                    "Finance overview",
                     f"Automatic payment didn't go through for {event.lot.label}",
                     detail,
                     reverse("online_payments") + "#autopay-failures",

@@ -310,6 +310,9 @@ def invoice_detail(request, pk):
     inv = get_object_or_404(Invoice.objects.select_related("vendor", "category"), pk=pk)
     user = request.user
     already = user.pk in services.approvers(inv)
+    from operations.reimbursements import claim_for_invoice
+
+    claim = claim_for_invoice(inv)
     return render(
         request,
         "operations/invoice_detail.html",
@@ -331,7 +334,12 @@ def invoice_detail(request, pk):
                 and inv.entered_by_id != user.pk
                 and not already
             ),
-            "can_pay": inv.state == "approved" and policy.can(user, "invoice.record_payment"),
+            "can_pay": (
+                inv.state == "approved"
+                and policy.can(user, "invoice.record_payment")
+                and claim is None  # an expense reimbursement is paid from its claim (BUG-001)
+            ),
+            "claim": claim,
             "can_attach": policy.can(user, "invoice.enter") and inv.state not in ("paid", "void"),
             "payment_form": PaymentForm(
                 initial={

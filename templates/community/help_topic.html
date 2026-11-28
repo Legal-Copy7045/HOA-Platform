@@ -2,7 +2,7 @@
 {% load portal %}
 {% block title %}{{ topic.title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'help' %}">Help</a> / </nav>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="{% url 'help' %}">Help</a> / {{ topic.title }}</nav>
   <div class="page-head"><div><h1>{{ topic.title }}</h1>
     <p class="subtitle">{{ summary }} The numbers are today's rules, each with where it comes from.</p></div>
     <div class="actions">{% if section %}<a class="btn secondary" href="{{ section.1 }}">{{ section.0 }}</a>{% endif %}<a class="btn" href="{{ ask_url }}">{% icon "mail" %} Ask the board</a></div></div>

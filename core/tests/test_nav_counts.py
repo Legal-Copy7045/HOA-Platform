@@ -57,7 +57,7 @@ def test_owner_gets_bubbles_for_their_own_notices_only(client, w):
     compliance.VIOLATION.apply(v, "send_notice", actor=w["board"])
     client.force_login(w["owner_a"])
     html = client.get(reverse("home")).content.decode()
-    assert _bubble(html, "Notices about my home") == 1
+    assert _bubble(html, "My violations") == 1
     assert "Architectural review<" not in html  # no board entries, so no board counts
 
 

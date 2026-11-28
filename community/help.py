@@ -18,11 +18,14 @@ to https:// or portal paths). Raw HTML is never passed through.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 from django.db import transaction
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import escape
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 
 from community.terms import term_text
@@ -83,7 +86,7 @@ TOPICS: list[Topic] = [
         "How violation notices work",
         "What a notice about your home means, the time to fix it, responding and hearings.",
         ("lot.view_own", "violation.view_all"),
-        ("Notices about my home", "violations?mine=1"),
+        ("My violations", "violations?mine=1"),
         ("Violations", "violations"),
         feature="violations",
     ),
@@ -391,8 +394,8 @@ def _violations(request=None) -> list[Section]:
     notice = Section("The notice")
     notice.paras.append(
         "If something at a home seems to break the covenants or rules, the board sends the "
-        "owners a notice saying what it is and which rule it is under. It appears on Notices "
-        "about my home and, if you chose it, by email or post."
+        "owners a notice saying what it is and which rule it is under. It appears on My "
+        "violations and, if you chose it, by email or post."
     )
     fix = Section("Fixing it")
     if cure:
@@ -608,7 +611,7 @@ def _inline(line: str) -> str:
     for m in _LINK.finditer(line):
         out.append(_bold(escape(line[pos : m.start()])))
         href = m.group(2)
-        if href.startswith("//"):
+        if not _safe_href(href):
             out.append(_bold(escape(m.group(0))))
         else:
             rel = ' rel="noopener noreferrer"' if href.startswith("https://") else ""
@@ -616,6 +619,23 @@ def _inline(line: str) -> str:
         pos = m.end()
     out.append(_bold(escape(line[pos:])))
     return "".join(out)
+
+
+def _safe_href(href: str) -> bool:
+    """A link the help text may carry (EXP-005): an https:// address with a
+    host, or a path on this site. Never scheme-relative (``//host``), never
+    a backslash (browsers read ``/\\host`` as ``//host``), never whitespace,
+    control or invisible formatting characters."""
+    if not href or "\\" in href:
+        return False
+    if any(ch.isspace() or unicodedata.category(ch) in ("Cc", "Cf") for ch in href):
+        return False
+    if href.startswith("https://"):
+        parts = urlsplit(href)
+        return parts.scheme == "https" and bool(parts.hostname)
+    if href.startswith("/") and not href.startswith("//"):
+        return url_has_allowed_host_and_scheme(href, allowed_hosts=None)
+    return False
 
 
 def _bold(escaped: str) -> str:
@@ -707,9 +727,9 @@ PAGE_DESCRIPTIONS = {
     "my_lot": "Your home and the people on your account.",
     "my_account": "Your statement, balance, charges and payments.",
     "arc_list?mine=1": "Asking to change the outside of your home, and neighbors' projects.",
-    "violations?mine=1": "Covenant or rule notices about your home, and your replies.",
-    "requests?mine=1": "Your questions and reports to the board, with the replies.",
-    "records_requests?mine=1": "Your requests to inspect the association's records.",
+    "violations?mine=1": "Covenant or rule violations at your home, their notices, your replies.",
+    "requests?mine=1": "Your questions and reports to the board, with the replies, and your "
+    "requests to inspect the association's records.",
     "my_history": "Your statements and requests from your time as an owner.",
     "announcements": "News from the board.",
     "calendar": "Meetings and community events.",

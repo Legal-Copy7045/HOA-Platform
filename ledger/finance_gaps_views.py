@@ -80,7 +80,7 @@ class LevyForm(forms.Form):
             (r.pk, f"{r.number}: {r.title}"[:120]) for r in Resolution.objects.all()[:50]
         ]
         self.fields["vote"].choices = [("", "None")] + [
-            (v.pk, v.title[:120]) for v in Vote.objects.filter(status="closed")[:50]
+            (v.pk, v.title[:120]) for v in Vote.objects.filter(status="closed", kind="formal")[:50]
         ]
         self.homes = list(homes)
         if not equal:

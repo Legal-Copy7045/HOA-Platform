@@ -266,6 +266,16 @@ _SPECS = [
         "unmatched",
         "skipped",
     ),
+    # SMTP2Go delivery reports (0.43.0): counts only.
+    _spec(
+        "comms.delivery_read",
+        "Email delivery reports read from SMTP2Go",
+        "events",
+        "stored",
+        "bounces",
+        "hard",
+        "skipped",
+    ),
     _spec("comms.bounce_cleared", "Bouncing email address marked fixed", "person_id", "addresses"),
     _spec(
         "comms.bounce_paper_sent",

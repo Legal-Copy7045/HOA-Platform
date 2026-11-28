@@ -198,7 +198,7 @@
   steps: "Sign in on the POC as a demo owner, a demo tenant, a board member, the manager and the sysadmin; open each section; on the board login open My items and People (Access review panel); start Preview as owner from a lot's page and exit."
   last: ""
 - key: streamlined community pages at phone width
-  check: "Homes and owners (both views), Invitations and sign-ups, Budget and reserves, Board and committees, Common area booking rules and Board tasks > Recurring deadlines read well on a phone: no sideways scrolling outside the tables, tabs reachable, forms usable; Board and committees shows names and offices only."
+  check: "Homes and owners (both views), Invitations and sign-ups, Budget and reserves, Board and committees, Common area booking rules and Tasks and deadlines > Recurring deadlines read well on a phone: no sideways scrolling outside the tables, tabs reachable, forms usable; Board and committees shows names and offices only."
   steps: "On the POC with demo data, open each page as a demo board member on a phone (Board and committees also as a demo owner and a tenant); switch the Homes and owners view; open an area on Common area booking rules and save; open Recurring deadlines and edit an item."
   last: ""
 - key: urgent text from an announcement
@@ -392,4 +392,22 @@
 - key: finance overview on a phone
   check: "On a 390 px phone and on a desktop, a demo board member's Finance overview shows the cards (one column on the phone) with each card's number beside its title, and the Finance menu number equals the sum of the numbers on the cards; the dashboard's Record payments received button has clear space above the stat tiles; the demo manager's and auditor's overview shows only what they may open (D89)."
   steps: "POC with fictional data (oak_creek), signed in as a demo board member, the demo manager and the demo auditor; compare the menu bubble with the cards; check the dashboard on both widths."
+  last: ""
+- key: compose files together on the VM
+  check: "On the VM, .env has COMPOSE_FILE=docker-compose.yml:docker-compose.tunnel.yml; a plain `sudo docker compose up -d --force-recreate web worker` in /opt/hoa-portal keeps the site reachable through the tunnel and warns about no orphans; cloudflared is on the edge network only (never the default network); System status lists Tunnel network as OK (D91)."
+  steps: "After updating to 0.43.0: grep COMPOSE_FILE /opt/hoa-portal/.env; run the recreate; open the site; sudo docker inspect -f '{{json .NetworkSettings.Networks}}' on the cloudflared container; check System status."
+  last: ""
+- key: restart the portal from system status
+  check: "As a sysadmin on the POC, System status -> Restart... asks for the password or passkey, shows the confirmation page, and Restart the portal now restarts web and worker within a minute or two; the page then shows Done with the result; a second restart within 10 minutes is refused; the tunnel keeps working (D91)."
+  steps: "POC, signed in as the sysadmin; System status -> Restart...; confirm; refresh after a minute; try again at once; open the site from outside."
+- key: panel plus and icon buttons line up
+  check: "On a desktop and a 390 px phone, the '+' box of 'File in a folder' on a document page (and every other disclosure panel) sits centred on the label's line, turns into '−' when open, and icon buttons such as 'Ask the board' show the icon and label on one centred line; the Getting started steps show the bold title with the description on its own line below; on Checks (To pay) and Records retention each row's checkbox can be ticked with a thumb (about 44x44); the setup wizard's percent boxes show '%' after them and the Common areas step saves with no areas."
+  steps: "POC with fictional data, signed in as a demo board member; open a document, the dashboard, Help > Getting started, Finance overview > Checks, Records retention and Settings > Community setup (Payments, Governance, Common areas) on both widths."
+- key: smtp2go with a real account
+  check: "On the POC with an SMTP2Go test account whose sender domain is verified (SPF, DKIM and return-path records showing Verified), sudo bash infra/poc/set-smtp2go.sh accepts the key without showing it, reports the key works, restarts web and worker, and the test email arrives (not in spam; its headers show SPF and DKIM pass); only EMAIL_PROVIDER, SMTP2GO_API_KEY, SMTP2GO_REGION and DEFAULT_FROM_EMAIL changed in .env (diff against a copy taken before), .env is mode 600 and no .env.before-smtp2go is left. A board decision on a demo ARC request shows Pending, then Delivered within 10 minutes; a decision for a demo owner at an address that rejects mail shows Bounced, the owner's page shows Email bouncing and My items asks for a paper copy. System status → Email shows SMTP2Go, the last send, the last read and the bounce count, with no address anywhere. A wrong key (run the script again) is refused and nothing in .env changes."
+  steps: "POC with fictional data; EMAIL_REDIRECT_ALL_TO empty for the bounce part (or a test domain that rejects mail); an SMTP2Go account with an API key limited to Emails, Activity and Statistics; copy .env aside (sudo cp -p, then shred after the diff); run the script; record a decision; wait for the 5-minute read (or run the poll_email_activity task); check the pages and System status."
+  last: ""
+- key: shorter menu with my violations and records in my requests
+  check: "On a desktop and a 390 px phone, an owner's My home lists My home, My account, My home improvement requests (ARC), My violations, My requests (no My records requests, no Notices about my home); My requests shows a Records requests card with each request's status and due date and an Ask for records button that opens the request form; a board member's menu has no My reimbursements and the Finance overview's My reimbursements button opens their own claims; a committee member who is not on the board finds My reimbursements on their committee's page (D95)."
+  steps: "POC with fictional data; sign in as a demo owner, a demo board member and a demo committee member; open the menu, My requests, Ask for records, Finance overview and the committee page on both widths."
   last: ""

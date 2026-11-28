@@ -1,9 +1,11 @@
 """Admin -> Server tasks (decision D36): start an allowlisted host task and
 see the history. Sysadmins start tasks; the board sees the history.
-Settings -> Demo data (D53): a sysadmin reseeds a demo or test portal."""
+Settings -> Demo data (D53): a sysadmin reseeds a demo or test portal.
+System status -> Restart the portal (D91): a sysadmin restarts web and worker."""
 
 from __future__ import annotations
 
+from allauth.account.decorators import reauthentication_required
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -26,6 +28,9 @@ def server_tasks(request):
         if kind == HostTask.Kind.RESEED_DEMO and demo_reseed.allowed():
             # Needs a dataset and the typed word: started from Demo data only.
             return redirect("demo_data")
+        if kind == HostTask.Kind.RESTART_APP:
+            # Needs its confirmation step and a fresh sign-in check (D91).
+            return redirect("system_restart")
         try:
             host_tasks.request_task(request.user, kind, request=request)
         except host_tasks.HostTaskRefused as exc:
@@ -80,6 +85,53 @@ def _update_summary():
     from core.models import UpdateStatus
 
     return UpdateStatus.objects.filter(pk=1).first()
+
+
+@login_required
+def system_restart(request):
+    """System status -> Restart the portal (D91): sysadmins only (others 403
+    before anything else), then a fresh password or passkey check, then this
+    confirmation page. POST asks the server agent for the fixed restart_app
+    task; the agent restarts web and worker with both compose files."""
+    policy.require(request.user, "system.run_task")
+    return _system_restart(request)
+
+
+@reauthentication_required
+def _system_restart(request):
+    if request.method == "POST":
+        try:
+            host_tasks.request_task(
+                request.user,
+                HostTask.Kind.RESTART_APP,
+                request=request,
+                confirmation=request.POST.get("confirm", ""),
+            )
+        except host_tasks.HostTaskRefused as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(
+                request,
+                "Restart requested. The server starts it within a minute; the portal is "
+                "unavailable for up to a minute, then this page shows the result.",
+            )
+        return redirect("system_restart")
+    status = host_tasks.current()
+    last = host_tasks.last_restart()
+    wait = host_tasks.restart_wait()
+    return render(
+        request,
+        "core/system_restart.html",
+        {
+            "confirm_text": host_tasks.RESTART_CONFIRM_TEXT,
+            "confirm_value": host_tasks.RESTART_CONFIRM_VALUE,
+            "current": HistoryRow(status) if status else None,
+            "last": HistoryRow(last) if last else None,
+            "wait_minutes": max(1, -(-int(wait.total_seconds()) // 60)) if wait else 0,
+            "agent_warning": not host_tasks.agent_ok()
+            and not (status and status.state == HostTask.State.RUNNING),
+        },
+    )
 
 
 class ReseedForm(forms.Form):

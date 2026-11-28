@@ -1,6 +1,5 @@
 # CodeQL (D57), weekly and on demand only (D86, STANDARD.md 1.5), through the standard's reusable workflow.
-# This repository is private without paid code scanning, so the findings are listed in the step summary and the
-# SARIF is kept for 30 days; once it is public (or code scanning is enabled) the reusable workflow uploads them.
+# The repository is public, so the reusable workflow uploads the findings to the Security tab.
 # GitHub's CodeQL "default setup" stays off (Settings -> Code security), since it would run on every push.
 name: CodeQL
 on:
@@ -15,6 +14,6 @@ jobs:
       contents: read
       actions: read  # the action reads its own workflow run (required in private repositories)
       security-events: write  # the action's status reports (and uploads, once enabled)
-    uses: Legal-Copy7045/project-standards/.github/workflows/codeql.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    uses: Legal-Copy7045/project-standards/.github/workflows/codeql.yml@bba160b88041c0564769d6415d5f7f6514144cbb  # v1.2.2
     with:
       languages: '["actions", "python", "javascript-typescript"]'

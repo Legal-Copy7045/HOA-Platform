@@ -82,9 +82,10 @@ MY_HOME = [
     "My home",
     "My account",
     "My home improvement requests (ARC)",
-    "Notices about my home",
+    # 0.43.0 (D95): "My violations" (was "Notices about my home"); records
+    # requests are a section of My requests, not an entry of their own.
+    "My violations",
     "My requests",
-    "My records requests",
 ]
 COMMUNITY = [
     "Announcements",
@@ -95,7 +96,7 @@ COMMUNITY = [
     "Budget and reserves",
     "Community info",
 ]
-CONTACT_HOME = ["My home", "My account", "Notices about my home", "My requests"]
+CONTACT_HOME = ["My home", "My account", "My violations", "My requests"]
 NOT_BUDGET = [c for c in COMMUNITY if c != "Budget and reserves"]
 # Budgets, Month and year close, Financial statements and the old More
 # finance pages open from the Finance overview (D89).
@@ -130,15 +131,15 @@ MENUS = {
     "former_owner": {"": ["Dashboard"], "My history": ["My history"]},
     "board": {
         "": ["Dashboard", "My items", "Help"],
-        # D77: board and committee members' own expense claims.
-        "My home": [*MY_HOME, "My reimbursements"],
+        # My reimbursements opens from the Finance overview (D95).
+        "My home": MY_HOME,
         "Community": COMMUNITY,
         "Association": [
             "Owner requests",
             "Architectural review",
             "Violations",
             "Records requests",
-            "Board tasks",
+            "Tasks and deadlines",
             "People",
             "Homes and owners",
             "Paper mail",
@@ -156,7 +157,7 @@ MENUS = {
             "Architectural review",
             "Violations",
             "Records requests",
-            "Board tasks",
+            "Tasks and deadlines",
             "Homes and owners",
             "Paper mail",
         ],
@@ -226,7 +227,7 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Architectural review",
         "Violations",
         "Records requests",
-        "Board tasks",
+        "Tasks and deadlines",
         "People",
         "Homes and owners",
         "Paper mail",
@@ -249,9 +250,12 @@ def test_board_menu_has_every_section_and_no_retired_entries(client, board):
         "Budget",
     ):
         assert gone not in everything, gone
-    # Records requests appears once for the board (the owner side is "My ...").
+    # Records requests appears once for the board; the owner side is a
+    # section of My requests (D95), and My reimbursements left the menu.
     assert everything.count("Records requests") == 1
-    assert "My records requests" in everything
+    for gone in ("My records requests", "My reimbursements", "Notices about my home"):
+        assert gone not in everything, gone
+    assert len(everything) == len(set(everything)), "duplicate menu labels"
 
 
 def test_online_payments_only_with_payments_manage(client, board):
@@ -321,7 +325,7 @@ def test_hub_with_several_pages_links_to_the_hub(client, board):
 def test_subpages_mark_their_entry_current(client, board):
     cases = [
         ("access_review", "People"),
-        ("tasks", "Board tasks"),
+        ("tasks", "Tasks and deadlines"),
         ("signoffs_mine", "My home improvement requests (ARC)"),
     ]
     for name, label in cases:

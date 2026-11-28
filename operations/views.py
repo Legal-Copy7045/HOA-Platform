@@ -32,7 +32,7 @@ def _deadlines_on(request) -> bool:
 
 @login_required
 def tasks(request):
-    """Board tasks, with the compliance calendar as its Recurring deadlines
+    """Tasks and deadlines, with the compliance calendar as its Recurring deadlines
     tab (``?tab=deadlines``, streamlining)."""
     policy.require(request.user, "task.manage")
     deadlines_on = _deadlines_on(request)
@@ -83,7 +83,7 @@ def _deadlines_url() -> str:
 
 @login_required
 def compliance(request):
-    """The old Compliance calendar: now Board tasks → Recurring deadlines."""
+    """The old Compliance calendar: now Tasks and deadlines → Recurring deadlines."""
     policy.require(request.user, "compliance.manage")
     return redirect(_deadlines_url())
 

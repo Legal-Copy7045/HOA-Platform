@@ -229,6 +229,12 @@ def _for_version(form, version):
     return form
 
 
+def _notice_delivery(meeting):
+    from comms import delivery
+
+    return delivery.summary_for(f"meeting_notice:{meeting.pk}") if meeting.notice_sent_at else None
+
+
 def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, status=200):
     user = request.user
     can_manage = policy.can(user, "meeting.manage")
@@ -275,6 +281,8 @@ def _render_meeting(request, meeting, *, minutes_form=None, approve_form=None, s
             else None,
             "minutes_version": minutes_version,
             "deadlines": deadlines,
+            # How the emailed notice fared (counts only; meeting.manage).
+            "notice_delivery": _notice_delivery(meeting) if can_manage else None,
             "deadline_default": deadline_default,
             "can_record_resolution": policy.can(user, "resolution.record"),
             "attendance": meeting.attendance.select_related("person") if can_manage else [],
@@ -360,7 +368,7 @@ def meeting_action(request, pk, action):
                     lambda: services.complete_notice_deadline(
                         meeting, deadline_id, actor=request.user, request=request
                     ),
-                    "The deadline is marked done on Board tasks.",
+                    "The deadline is marked done on Tasks and deadlines.",
                 )
     elif action in ("held", "cancelled"):
         _flash(
@@ -587,6 +595,8 @@ def records_request_detail(request, pk):
             # Own matters (D65): one's own records request.
             **conflicts.page_context(request.user, obj, services.RECORDS),
             "obj": obj,
+            # D95: one's own request goes back to My requests.
+            "own_request": obj.requester_id == policy.roles_for(request.user).person_id,
             "actions": services.RECORDS.available(obj, request.user),
             "history": services.RECORDS.history(obj),
             "action_url_name": "records_request_action",

@@ -14,12 +14,13 @@ def test_teller_script_checks_the_files_and_never_takes_secrets_on_the_command_l
     script = (POC / "set-teller.sh").read_text()
     assert "openssl x509" in script and "openssl pkey" in script
     assert "do not belong together" in script and "-checkend 0" in script
-    assert 'set_env .env TELLER_CERTIFICATE_B64 "$(base64 -w0 "$CERT")"' in script
+    assert 'TELLER_CERTIFICATE_B64 "$(base64 -w0 "$CERT")"' in script
     assert "BANK_FEED_TOKEN_KEY" in script and "openssl rand -hex 32" in script
-    assert "cp -p .env .env.before-teller" in script and "shred -u" in script
-    # The check runs after the restart, and a failed check says how to undo.
+    assert 'BACKUP="$(env_backup .env teller)"' in script
+    # The check runs after the restart, and a failed check puts back only
+    # Teller's keys (never the whole old .env).
     assert script.index("start-portal.sh") < script.index("manage.py check_teller")
-    assert ".env.before-teller .env" in script.split("check_teller", 1)[1]
+    assert 'env_restore_keys .env "$BACKUP"' in script.split("check_teller", 1)[1]
 
 
 def test_stripe_script_checks_the_key_after_saving_it():
@@ -29,18 +30,27 @@ def test_stripe_script_checks_the_key_after_saving_it():
 
 
 @pytest.mark.parametrize(
-    "name", ["set-stripe-key.sh", "set-teller.sh", "set-usps.sh", "set-bounce-mailbox.sh"]
+    "name",
+    [
+        "set-stripe-key.sh",
+        "set-teller.sh",
+        "set-usps.sh",
+        "set-bounce-mailbox.sh",
+        "set-smtp2go.sh",
+    ],
 )
 def test_secret_scripts_remove_the_old_env_copy_after_a_passed_check(name):
-    """D87 (R2-007): the .env.before-* copy holds the superseded secret; it is
-    mode 600 while the check runs and removed once it passes."""
+    """D87 (R2-007), 0.43.0: the .env.before-* copy (env_backup: mode 600)
+    holds the superseded secret and is shredded once the check passes; a
+    failed check puts back only the script's own keys, never the whole file."""
     script = (POC / name).read_text()
-    backup = script.split("cp -p .env ", 1)[1].split()[0]
-    assert f"chmod 600 {backup}" in script
+    assert "cp -p .env" not in script and "set_env " not in script
+    assert 'BACKUP="$(env_backup .env ' in script
     after_check = script.split("manage.py check_", 1)[1]
-    assert f"shred -u {backup}" in after_check
-    # The failed-check branch (before the removal) still says how to undo.
-    assert after_check.index(f"cp {backup} .env") < after_check.index(f"shred -u {backup}")
+    assert 'env_discard_backup "$BACKUP"' in after_check
+    restore = script.index('env_restore_keys .env "$BACKUP"')
+    assert restore < script.rindex('env_discard_backup "$BACKUP"')
+    assert "cp .env.before" not in script
 
 
 def test_stripe_script_refuses_a_full_secret_key():

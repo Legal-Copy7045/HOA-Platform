@@ -229,6 +229,8 @@ SUBPAGES = {
     # marks Calendar current.
     "calendar": ["meetings"],
     "arc_list?mine=1": ["signoffs_mine"],
+    # Owners' records requests are a section of My requests (D95).
+    "requests?mine=1": ["records_requests?mine=1"],
     "people": ["access_review"],
     "lot_list": ["invitations"],
     "tasks": ["compliance"],
@@ -236,7 +238,7 @@ SUBPAGES = {
     "community_info": ["committees"],
     "paper_mail": ["paper_mail_settings"],
     # The incident timeline opens from System status (D74).
-    "system_status": ["ops_timeline"],
+    "system_status": ["ops_timeline", "system_restart"],
     # The board reads server task history on Sysadmin activity (WT-007);
     # sysadmins, who cannot open that page, keep Server tasks in the menu.
     "sysadmin_activity": ["server_tasks"],
@@ -260,6 +262,8 @@ SUBPAGES = {
         "special_assessments",
         "payment_plans",
         "reimbursements",
+        # One's own claims (D95): the board's Finance overview links there.
+        "reimbursements?mine=1",
         "vendor_checks",
         "interest",
         "cashflow",
@@ -292,14 +296,17 @@ SECTIONS = [
             ("My home", "my_lot", "pin", "lot.view_own"),
             ("My account", "my_account", "wallet", "ledger.view_own"),
             ("My home improvement requests (ARC)", "arc_list?mine=1", "pencil", "arc.submit"),
-            ("Notices about my home", "violations?mine=1", "flag", "lot.view_own"),
+            # The owner side of Violations; letters and notices are
+            # documents inside each violation (0.43.0).
+            ("My violations", "violations?mine=1", "flag", "lot.view_own"),
             # Residents (incl. view-only contacts and tenants); former owners
-            # see their requests inside My history instead.
+            # see their requests inside My history instead. Owners' records
+            # requests are a section of it (SUBPAGES, 0.43.0).
             ("My requests", "requests?mine=1", "mail", ("lot.view_own", "request.submit")),
-            ("My records requests", "records_requests?mine=1", "inbox", "records_request.submit"),
             ("My history", "my_history", "clock", "history.view_own"),
-            # Expense reimbursements (D77): one's own claims.
-            ("My reimbursements", "reimbursements?mine=1", "receipt", "reimbursement.menu"),
+            # My reimbursements (D77) left the menu in 0.43.0: claims are board
+            # and committee work, reached from the Finance overview, a
+            # committee's page, My account and My items (D95).
         ],
     ),
     (
@@ -325,7 +332,7 @@ SECTIONS = [
             ("Architectural review", "arc_list", "pencil", "arc.view_all"),
             ("Violations", "violations", "flag", "violation.view_all"),
             ("Records requests", "records_requests", "inbox", "records_request.manage"),
-            ("Board tasks", "tasks", "list", "task.manage"),
+            ("Tasks and deadlines", "tasks", "list", "task.manage"),
             ("People", "people", "users", "person.manage"),
             # Sign-ups are a tab of it for the board (WT-002).
             ("Homes and owners", "lot_list", "map", "lot.view_all"),
@@ -427,7 +434,24 @@ ROLE_LABELS = {
     policy.ARC_REVIEWER: "ARC",
     policy.AUDITOR: "Auditor",
     policy.SYSADMIN: "Sysadmin",
+    # Contacts, tenants and former owners see their role too, never their
+    # email in its place (WT-015, WT-040).
+    policy.AUTHORIZED: "Account contact",
+    policy.VIEW_ONLY: "View-only contact",
+    policy.TENANT: "Tenant",
+    policy.FORMER_OWNER: "Former owner",
 }
+
+
+def role_labels(roles) -> list[str]:
+    """The menu foot's role line: "Owner · Board · Treasurer" (an office
+    follows the board seat, WT-040)."""
+    from community.models import Office
+
+    labels = [ROLE_LABELS[g] for g in ROLE_LABELS if g in roles.groups]
+    names = dict(Office.choices)
+    labels += [names.get(o, o.replace("_", " ").capitalize()) for o in sorted(roles.offices)]
+    return labels
 
 
 def allowed(groups: frozenset[str], permission) -> bool:
@@ -654,7 +678,7 @@ def build(request) -> dict:
         # "Board" (or "Staff") badge and the accent strip (D64).
         "board_page": board_page,
         "tabbar": tabbar(sections, roles.groups),
-        "roles": [ROLE_LABELS[g] for g in ROLE_LABELS if g in roles.groups],
+        "roles": role_labels(roles),
         "person_id": roles.person_id,
     }
 

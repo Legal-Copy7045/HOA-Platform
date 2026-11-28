@@ -656,6 +656,15 @@ class UspsPollState(models.Model):
 class BounceKind(models.TextChoices):
     HARD = "hard", "Hard bounce (the address does not accept mail)"
     SOFT = "soft", "Soft bounce (temporary: mailbox full, server busy)"
+    # From SMTP2Go's activity (comms/delivery.py): the relay then stops
+    # sending to the address, so it counts like a hard bounce.
+    SPAM = "spam", "Marked as spam (the email provider no longer sends to it)"
+    UNSUB = "unsub", "Unsubscribed at the email provider (it no longer sends to it)"
+
+
+# Kinds after which mail to the address no longer arrives (bouncing addresses,
+# paper copies of official notices).
+BLOCKING_BOUNCES = (BounceKind.HARD, BounceKind.SPAM, BounceKind.UNSUB)
 
 
 class MailKind(models.TextChoices):
@@ -682,7 +691,7 @@ class EmailBounce(ScopedAppendOnlyModel):
         "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
     address_hash = models.CharField(max_length=64)
-    kind = models.CharField(max_length=4, choices=BounceKind.choices)
+    kind = models.CharField(max_length=5, choices=BounceKind.choices)
     mail_kind = models.CharField(max_length=10, choices=MailKind.choices)
     status = models.CharField(max_length=12, blank=True)  # e.g. "5.1.1"
     sent_at = models.DateTimeField(null=True, blank=True)  # from the message's token
@@ -768,3 +777,109 @@ class BouncePollState(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("The bounce mailbox status is kept.")
+
+
+# --- Outgoing email and its delivery (0.43.0, SMTP2Go) -----------------------------------
+
+
+class OutgoingEmail(ScopedAppendOnlyModel):
+    """One email the portal handed to its relay (core.email): the bounce
+    token, the relay and the relay's own message id (SMTP2Go's email_id), the
+    kind of email, what it was about (e.g. ``arc_decision:12``) and its one
+    recipient by a keyed hash (and the person when it matched one). Never
+    the address, subject or text. Delivery reports are matched to it by the
+    relay's message id (``EmailDelivery``)."""
+
+    scope_person_path = "person"
+
+    ref = models.CharField(max_length=64, unique=True)
+    provider = models.CharField(max_length=10)  # smtp / smtp2go / other
+    provider_message_id = models.CharField(max_length=100, blank=True, db_index=True)
+    mail_kind = models.CharField(max_length=10, choices=MailKind.choices)
+    about = models.CharField(max_length=40, blank=True, db_index=True)
+    person = models.ForeignKey(
+        "community.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
+    address_hash = models.CharField(max_length=64, blank=True)  # one recipient only
+    # Every recipient's keyed hash, space-separated (at most 50): a bounce or
+    # delivery report counts only for an address the message went to (BUG-002).
+    address_hashes = models.TextField(blank=True)
+    recipients = models.PositiveSmallIntegerField(default=1)
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-sent_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Outgoing email #{self.pk}"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.none()  # shown through comms.delivery only
+
+
+class DeliveryEventKind(models.TextChoices):
+    DELIVERED = "delivered", "Delivered"
+    HARD = "hard", "Bounced (the address does not accept mail)"
+    SOFT = "soft", "Bounced for now (temporary)"
+    SPAM = "spam", "Marked as spam by the recipient"
+    UNSUB = "unsub", "Unsubscribed"
+
+
+class EmailDelivery(ScopedAppendOnlyModel):
+    """One delivery report read from the relay (SMTP2Go activity, pull only):
+    which outgoing email (by the relay's message id), the recipient by a
+    keyed hash, what happened and when. Each report is stored once
+    (``dedupe``), so reading the same report again changes nothing."""
+
+    scope_person_path = "outgoing__person"
+
+    outgoing = models.ForeignKey(
+        OutgoingEmail, null=True, blank=True, on_delete=models.PROTECT, related_name="deliveries"
+    )
+    provider_message_id = models.CharField(max_length=100, db_index=True)
+    address_hash = models.CharField(max_length=64, blank=True)
+    kind = models.CharField(max_length=9, choices=DeliveryEventKind.choices)
+    status = models.CharField(max_length=12, blank=True)
+    occurred_at = models.DateTimeField()
+    received_at = models.DateTimeField(default=timezone.now)
+    dedupe = models.CharField(max_length=64, unique=True)
+
+    class Meta:
+        ordering = ["-occurred_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Email delivery #{self.pk} ({self.kind})"
+
+    @classmethod
+    def scope_for_owner(cls, queryset, roles):
+        return queryset.none()
+
+
+class EmailProviderState(models.Model):
+    """How sending and the last read of delivery reports went (one row;
+    operations status for System status, the health check and the set-up
+    wizard; no personal data). ``cursor_at`` is where the next activity
+    read starts."""
+
+    last_send_at = models.DateTimeField(null=True, blank=True)
+    last_send_provider = models.CharField(max_length=10, blank=True)
+    last_send_failure_at = models.DateTimeField(null=True, blank=True)
+    last_send_failure = models.CharField(max_length=20, blank=True)
+    last_pull_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_pull_success_at = models.DateTimeField(null=True, blank=True)
+    last_pull_failure_at = models.DateTimeField(null=True, blank=True)
+    last_pull_failure = models.CharField(max_length=20, blank=True)
+    last_pulled = models.PositiveIntegerField(default=0)
+    cursor_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return "Email provider status"
+
+    @classmethod
+    def get(cls) -> "EmailProviderState":
+        found, _ = cls.objects.get_or_create(pk=1)
+        return found
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("The email provider status is kept.")

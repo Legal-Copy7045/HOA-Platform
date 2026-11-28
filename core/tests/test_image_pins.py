@@ -291,4 +291,4 @@ def test_release_path_and_versions_files():
         u["name"] for u in ups
     }
     std = yaml.safe_load((ROOT / ".github" / "standard.yaml").read_text())
-    assert std["standard"] == "1.1.0" and std["beyond"] and std["exceptions"]
+    assert std["standard"] == "1.2.2" and std["beyond"] and std["exceptions"]

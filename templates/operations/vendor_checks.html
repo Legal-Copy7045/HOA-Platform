@@ -10,7 +10,7 @@
     {% if payables %}<form method="post" id="issue-form">{% csrf_token %}
     <div class="table-card"><div class="table-wrap"><table class="stack-sm">
       <thead><tr><th scope="col">Pay</th><th scope="col">Payee</th><th scope="col">Memo</th><th scope="col" class="num">Amount</th></tr></thead>
-      <tbody>{% for p in payables %}<tr><td class="cell-title">{% if p.refusal %}<span class="small muted">{{ p.refusal }}</span>{% else %}<input type="checkbox" name="invoice" value="{{ p.invoice.pk }}" aria-label="Pay {{ p.memo }}">{% endif %}</td>
+      <tbody>{% for p in payables %}<tr><td class="cell-title">{% if p.refusal %}<span class="small muted">{{ p.refusal }}</span>{% else %}<label class="tap-check"><input type="checkbox" name="invoice" value="{{ p.invoice.pk }}" aria-label="Pay {{ p.memo }}"></label>{% endif %}</td>
         <td data-label="Payee">{{ p.payee }}</td><td data-label="Memo"><a href="{% url 'invoice_detail' p.invoice.pk %}">{{ p.memo }}</a></td><td class="num" data-label="Amount">{{ p.remaining_cents|cents }}</td></tr>{% endfor %}</tbody>
     </table></div></div>
     <p class="small">1. Print the chosen checks on the check stock (test the alignment first on plain paper). 2. Record them as issued with the first check number: the invoices are then paid.</p>

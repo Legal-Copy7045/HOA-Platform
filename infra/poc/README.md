@@ -62,6 +62,47 @@ connections from the internet or other VLANs.
 
    Copy the generated secrets from `.env` into the HOA password manager.
 
+## Email through SMTP2Go
+
+The portal sends through SMTP2Go's HTTP API and reads delivery and bounce
+reports back from SMTP2Go every five minutes (pull only: no webhook, and no
+bounce mailbox is needed). In the SMTP2Go dashboard, once:
+
+1. **Sending → Verified Senders → Sender Domains → Add**: your domain (the
+   part after @ in the portal's From address). SMTP2Go then shows the exact
+   records to add at your domain's DNS host; generically they are:
+
+   | Purpose | Type | Name | Value |
+   |---|---|---|---|
+   | SPF | TXT | `@` (the domain) | `v=spf1 include:spf.smtp2go.com ~all` (add the include to an existing SPF record instead of making a second one) |
+   | DKIM | CNAME | `s<nnn>._domainkey` | `dkim.smtp2go.net` |
+   | Return path (bounces) | CNAME | `em<nnn>` | `return.smtp2go.net` |
+   | Link tracking (optional) | CNAME | `link` | `track.smtp2go.net` |
+   | DMARC (recommended) | TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:dmarc@<your domain>` |
+
+   Use the names and numbers SMTP2Go shows (`<nnn>` is per account), wait
+   for "Verified", and leave open and click tracking off.
+2. **Sending → API Keys → Add API Key**: permissions *Emails* (send),
+   *Activity* (search) and *Statistics* (the harmless key check) only.
+   Copy the key once into the HOA password manager.
+3. On the VM:
+
+   ```bash
+   sudo bash infra/poc/set-smtp2go.sh
+   ```
+
+   It asks for the region, the sender address and name, and the key (hidden),
+   checks the key with SMTP2Go (no email is sent), changes only its own keys
+   in `.env` (`EMAIL_PROVIDER`, `SMTP2GO_API_KEY`, `SMTP2GO_REGION`,
+   `DEFAULT_FROM_EMAIL`), restarts web and worker, checks again from the
+   portal and sends a test email. If anything fails, only those keys are put
+   back. Back to plain SMTP: `sudo bash infra/poc/set-smtp2go.sh --off`.
+4. Admin → Features → Bounced email on, so addresses that bounce are flagged.
+
+Every set-*.sh script edits `.env` through `lib.sh` (`env_update`): only
+its own keys change, every other line is kept, the file stays mode 600, and
+the `.env.before-*` copy is shredded when the script ends.
+
 ## Settings
 
 `create-vm.sh`: `VLAN_ID` (required), `BRIDGE` (vmbr0), `STORAGE` (local-lvm),
@@ -100,3 +141,27 @@ the demo data for the new modules once:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.tunnel.yml exec web python manage.py seed_demo_operations
 ```
+
+## Compose files always together (D91)
+
+On the VM the portal is always `docker-compose.yml` plus
+`docker-compose.tunnel.yml`. `.env` holds
+`COMPOSE_FILE=docker-compose.yml:docker-compose.tunnel.yml` (written by
+`make-env.sh`; `start-portal.sh` and `update-portal.sh` add it to an older
+`.env`, appending one line and touching no other), so a plain
+`docker compose ...` in `/opt/hoa-portal` uses both files too. Without it,
+`docker compose up -d --force-recreate web worker` recreated web without the
+`edge` network and cloudflared lost the site.
+
+cloudflared is on the `edge` network only (security review E3/E9): it must
+never reach Postgres or the file store. Never fix a lost tunnel with
+`docker network connect <project>_default <cloudflared>`; run
+`sudo bash infra/poc/update-portal.sh` (or `start-portal.sh`), which
+disconnects cloudflared from any other network every time it runs. The
+"Tunnel network" health check on System status fails while cloudflared is on
+another network (the agent reports it each minute).
+
+To restart web and worker, use System status -> Restart the portal (a server
+task: sysadmins, a fresh sign-in check and a confirmation, at most once every
+10 minutes), or `sudo bash infra/poc/restart-portal.sh` on the VM. Both use
+both compose files.

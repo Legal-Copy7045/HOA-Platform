@@ -57,6 +57,14 @@ x-app-env: &app-env
   EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
   DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Oak Creek Farms HOA <portal@example.com>}
   EMAIL_REDIRECT_ALL_TO: ${EMAIL_REDIRECT_ALL_TO:-}
+  # Email relay (infra/poc/set-smtp2go.sh). The API key goes to web and
+  # worker only (below): both send mail (web sends sign-in codes, the test
+  # email and notices while the person waits); migrate and create-bucket
+  # never do. The others are told whether a key is set.
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+  SMTP2GO_API_KEY_SET: ${SMTP2GO_API_KEY:+true}
+  SMTP2GO_REGION: ${SMTP2GO_REGION:-global}
+  SMTP2GO_TIMEOUT: ${SMTP2GO_TIMEOUT:-15}
   SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
   CSRF_COOKIE_SECURE: ${CSRF_COOKIE_SECURE:-false}
   ADMIN_ENABLED: ${ADMIN_ENABLED:-false}
@@ -113,7 +121,8 @@ x-app-env: &app-env
   BOUNCE_IMAP_HOST: ${BOUNCE_IMAP_HOST:-}
   BOUNCE_IMAP_PORT: ${BOUNCE_IMAP_PORT:-993}
   BOUNCE_IMAP_USER: ${BOUNCE_IMAP_USER:-}
-  BOUNCE_IMAP_PASSWORD: ${BOUNCE_IMAP_PASSWORD:-}
+  # The password goes to the worker alone (it reads the mailbox; EXP-003).
+  BOUNCE_IMAP_PASSWORD_SET: ${BOUNCE_IMAP_PASSWORD:+true}
   BOUNCE_IMAP_FOLDER: ${BOUNCE_IMAP_FOLDER:-INBOX}
   BOUNCE_RETURN_PATH: ${BOUNCE_RETURN_PATH:-}
 
@@ -217,7 +226,9 @@ services:
     build: .   # the one service that builds; the others reuse the image
     command: ["web"]
     mem_limit: 768m
-    environment: *app-env
+    environment:
+      <<: *app-env
+      SMTP2GO_API_KEY: ${SMTP2GO_API_KEY:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -237,6 +248,8 @@ services:
     environment:
       <<: *app-env
       USPS_IV_PASSWORD: ${USPS_IV_PASSWORD:-}
+      BOUNCE_IMAP_PASSWORD: ${BOUNCE_IMAP_PASSWORD:-}
+      SMTP2GO_API_KEY: ${SMTP2GO_API_KEY:-}
     depends_on:
       migrate: {condition: service_completed_successfully}
 

@@ -106,7 +106,7 @@ def quick_actions(user, roles) -> list[dict]:
             )
         out += [
             {"label": "Governing documents", "url": reverse("documents"), "icon": "folder"},
-            {"label": "Update my contact details", "url": reverse("my_profile"), "icon": "user"},
+            {"label": "My profile", "url": reverse("my_profile"), "icon": "user"},
             {"label": "Sign-in and security", "url": reverse("mfa_index"), "icon": "lock"},
         ]
     return out

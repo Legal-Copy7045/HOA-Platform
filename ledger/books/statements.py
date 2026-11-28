@@ -499,14 +499,21 @@ def csv_rows(s: dict) -> list[list[str]]:
     return rows
 
 
-def statements_csv(s: dict, *, actor, request=None) -> bytes:
-    require(actor, "statements.view")
+def csv_bytes(s: dict) -> bytes:
+    """The statements as CSV, every text cell escaped against spreadsheet
+    formulas (also the year-end package's copy, BUG-007)."""
     buf = io.StringIO()
     writer = csv.writer(buf)
     for row in csv_rows(s):
         writer.writerow([safe_cell(c) if not _numeric(c) else c for c in row])
-    _audit("csv", s, actor, request)
     return buf.getvalue().encode()
+
+
+def statements_csv(s: dict, *, actor, request=None) -> bytes:
+    require(actor, "statements.view")
+    data = csv_bytes(s)
+    _audit("csv", s, actor, request)
+    return data
 
 
 def _numeric(value: str) -> bool:

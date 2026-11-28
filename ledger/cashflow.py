@@ -470,7 +470,7 @@ def my_items(user) -> list:
     )
     return [
         Item(
-            "Finance",
+            "Finance overview",
             f"Cash-flow forecast: low in {first.start:%B %Y}",
             f"{what}; {len(rows)} month{'s' if len(rows) != 1 else ''} flagged",
             reverse("cashflow"),

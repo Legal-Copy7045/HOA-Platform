@@ -1,4 +1,4 @@
-{% load portal %}{# Board tasks → Recurring deadlines (the compliance calendar). Forms post to ?tab=deadlines. #}
+{% load portal %}{# Tasks and deadlines → Recurring deadlines (the compliance calendar). Forms post to ?tab=deadlines. #}
   <p class="muted">Insurance renewals, tax and corporate filings, reserve studies, seasonal contracts. The board is emailed when an item enters its reminder window; it also shows in My items.</p>
   {% if not items %}<div class="form-actions"><form method="post" action="?tab=deadlines">{% csrf_token %}<button type="submit" name="action" value="starters" class="secondary">Add suggested items</button></form></div>{% endif %}
   <div class="table-card"><div class="table-wrap"><table class="stack-sm">

@@ -47,16 +47,18 @@ BEFORE="$(file_count Exported <"$WORK/export.log")" || { echo "export_files did 
 echo "    $BEFORE files"
 
 echo "==> Pointing the portal at R2"
-cp -p .env .env.before-r2
-# set_env (infra/poc/lib.sh) uses bash builtins only: the secret never reaches
-# another program's command line, and is written exactly as typed (R2-005).
-set_env .env S3_ENDPOINT_URL "$ENDPOINT"
-set_env .env S3_BUCKET "$BUCKET"
-set_env .env S3_ACCESS_KEY_ID "$KEY_ID"
-set_env .env S3_SECRET_ACCESS_KEY "$SECRET"
-set_env .env S3_REGION auto
+# The copy is kept on purpose as the way back to the local store; it holds
+# only the local store's keys beyond what .env has. Going back restores just
+# the file-store keys from it (never the whole old .env, R2 move or not).
+BACKUP="$(env_backup .env r2)"
+# env_update (infra/poc/lib.sh) uses bash builtins only: the secret never
+# reaches another program's command line, and is written exactly as typed
+# (R2-005); every other line of .env stays as it is.
+env_update .env S3_ENDPOINT_URL "$ENDPOINT" S3_BUCKET "$BUCKET" S3_ACCESS_KEY_ID "$KEY_ID" \
+  S3_SECRET_ACCESS_KEY "$SECRET" S3_REGION auto
 sed -i '/^COMPOSE_PROFILES=local-store$/d' .env
 unset SECRET
+GO_BACK="sudo bash -c 'source infra/poc/lib.sh && env_restore_keys .env .env.before-r2 S3_ENDPOINT_URL S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_REGION COMPOSE_PROFILES' && sudo bash infra/poc/start-portal.sh"
 
 echo "==> Restarting with R2 (the local file store stops; its data is kept)"
 bash "$APP_DIR/infra/poc/start-portal.sh" >"$WORK/start.log" 2>&1 || { tail -20 "$WORK/start.log" >&2; exit 1; }
@@ -75,12 +77,12 @@ echo "==> Counting the files now in R2"
 IN_R2="$(file_count Exported <"$WORK/recount.log")" || { echo "Could not count the files in R2." >&2; exit 1; }
 if ! counts_match "$BEFORE" "$IN_R2" "Files in R2"; then
   echo "Some files did not reach R2. Go back to the local store with" >&2
-  echo "  cp .env.before-r2 .env && sudo bash infra/poc/start-portal.sh" >&2
+  echo "  $GO_BACK" >&2
   echo "then fix the cause and run this script again (files already in R2 are kept)." >&2
   exit 1
 fi
 
 echo
 echo "Done. Files now live in R2 bucket '$BUCKET'."
-echo "The old settings are in $APP_DIR/.env.before-r2 (contains the old keys; delete it once you're happy)."
-echo "To go back: cp .env.before-r2 .env && sudo bash infra/poc/start-portal.sh"
+echo "The old file-store settings are in $APP_DIR/.env.before-r2 (mode 600; delete it with sudo shred -u once you're happy)."
+echo "To go back: $GO_BACK"

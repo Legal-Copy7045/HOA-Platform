@@ -4,6 +4,7 @@ caller has fetched the owning object through its scoped manager."""
 from __future__ import annotations
 
 import hashlib
+import logging
 
 from django.conf import settings
 from django.db import transaction
@@ -16,6 +17,7 @@ from documents.services import DocumentError, scan_allows_download
 from documents.validation import UploadRejected, check_upload, download_filename, safe_filename
 
 IMAGES_AND_PDF = {"pdf", "png", "jpg", "jpeg"}
+logger = logging.getLogger(__name__)
 
 
 def _owner_key(obj) -> tuple[str, str]:
@@ -157,6 +159,17 @@ def serve(request, obj, attachment_id: int, *, exclude_labels=()):
     attachment = files.filter(pk=attachment_id).first()
     if attachment is None or not scan_allows_download(current_scan(attachment)):
         raise Http404
+    # Open the stored file before logging the download: a file the store no
+    # longer holds (lost, restored without media, disposed) is a 404 page with
+    # its links, never a bare Server Error, and no download is audited (WT-001).
+    try:
+        stream = attachment.file.open("rb")
+    except (FileNotFoundError, OSError):
+        logger.warning(
+            "documents.attachment_file_missing",
+            extra={"attachment_id": attachment.pk, "owner_type": attachment.owner_type},
+        )
+        raise Http404 from None
     record_event(
         "attachment.downloaded",
         request=request,
@@ -171,7 +184,7 @@ def serve(request, obj, attachment_id: int, *, exclude_labels=()):
         },
     )
     response = FileResponse(
-        attachment.file.open("rb"),
+        stream,
         as_attachment=True,
         filename=download_filename(attachment.original_filename, attachment.content_type),
         content_type=attachment.content_type,

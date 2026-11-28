@@ -442,7 +442,7 @@ def my_items(user) -> list:
                 if due <= today + datetime.timedelta(days=14):
                     out.append(
                         Item(
-                            "Finance",
+                            "Finance overview",
                             f"{label}: claim {claim.claim_number or '#' + str(claim.pk)}",
                             f"{policy_label(claim)} · {label.lower()} {short_date(due)}",
                             reverse("insurance_claim_detail", args=[claim.pk]),

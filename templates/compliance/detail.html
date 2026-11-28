@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}{% if owner_view %}Notice: {{ obj.get_category_display }}{% else %}Notice #{{ obj.pk }}{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block title %}{{ obj.get_category_display }} · Notice #{{ obj.pk }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs">{% if owner_view %}<a href="{% url 'violations' %}?mine=1">Notices</a> / {{ obj.get_category_display }}{% else %}<a href="{% url 'violations' %}">Violations</a> / Notice #{{ obj.pk }}{% endif %}</div>
+  <div class="crumbs">{% if owner_view %}<a href="{% url 'violations' %}?mine=1">My violations</a> / {{ obj.get_category_display }}{% else %}<a href="{% url 'violations' %}">Violations</a> / Notice #{{ obj.pk }}{% endif %}</div>
   <div class="page-head">
     <div><h1>{{ obj.get_category_display }}</h1>
       <div class="meta">{% status obj.state obj.get_state_display %}<span>{% icon "home" %}{{ obj.lot.label }}</span>{% if not owner_view %}<span class="lot-ref">{{ obj.lot.lot_ref }}</span>{% endif %}<span>Observed {{ obj.observed_on|date:"M j, Y" }}</span>{% if obj.cure_by %}<strong>{% icon "clock" %}{% if owner_view %}Please fix by{% else %}Fix by{% endif %} {{ obj.cure_by|date:"M j, Y" }}</strong>{% endif %}</div></div>

@@ -1333,7 +1333,7 @@ def board_items(user) -> list:
                 if waiting:
                     out.append(
                         Item(
-                            "Finance",
+                            "Finance overview",
                             f"{waiting} check{'' if waiting == 1 else 's'} to write: {batch.title}",
                             "Print or write them, then record the check numbers",
                             reverse("disbursement_detail", args=[batch.pk]),
@@ -1358,7 +1358,7 @@ def board_items(user) -> list:
                     continue
                 out.append(
                     Item(
-                        "Approvals",
+                        "Second approvals",
                         f"Disbursement: {batch.title} ({format_cents(batch.total_cents)})",
                         f"Needs your approval ({state.have} of {state.needed})",
                         reverse("disbursement_detail", args=[batch.pk]),
@@ -1370,7 +1370,7 @@ def board_items(user) -> list:
             for row in dormant_credits():
                 out.append(
                     Item(
-                        "Finance",
+                        "Finance overview",
                         f"Refund {format_cents(row['credit_cents'])} to the former owner of "
                         f"{row['lot'].label}",
                         f"Account {row['account'].number} closed with a credit",
@@ -1390,7 +1390,7 @@ def board_items(user) -> list:
             ):
                 out.append(
                     Item(
-                        "Finance",
+                        "Finance overview",
                         "Consider a surplus distribution",
                         f"Reserves are {format_cents(surplus['above_cents'])} above the adopted "
                         "plan's target",
@@ -1402,7 +1402,7 @@ def board_items(user) -> list:
             for check in stale_checks():
                 out.append(
                     Item(
-                        "Finance",
+                        "Finance overview",
                         f"Check #{check.number} uncashed since {short_date(check.issued_on)}",
                         f"{check.line.lot.label} · {format_cents(check.amount_cents)}. "
                         + UNCLAIMED_NOTE,

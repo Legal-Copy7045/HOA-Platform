@@ -45,6 +45,13 @@ source "$APP_DIR/infra/poc/lib.sh"
 cd "$APP_DIR"
 [ -d .git ] || { echo "$APP_DIR is not a git checkout." >&2; exit 1; }
 
+# First, even when there is nothing to install (D91): plain `docker compose`
+# here uses both compose files, and cloudflared is on the edge network only
+# (security review E3/E9).
+COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
+if [ -f .env ]; then ensure_compose_file .env; fi
+cloudflared_edge_only
+
 # Run git as the user who owns the checkout (avoids git's "dubious ownership"
 # refusal and keeps file ownership unchanged).
 REPO_OWNER="$(stat -c %U "$APP_DIR")"
@@ -133,7 +140,6 @@ echo
 START=$(date +%s)
 bash "$APP_DIR/infra/poc/start-portal.sh"
 
-COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
 echo
 echo "Record counts (no personal data):"
 "${COMPOSE[@]}" exec -T web python manage.py data_status 2>&1 | grep -v '"level"' || true

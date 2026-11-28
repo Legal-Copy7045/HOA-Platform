@@ -282,8 +282,12 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Uploads never touch local disk (CLAUDE.md): private S3-compatible bucket,
-# served only through short-lived signed URLs.
+# Uploads never touch local disk (CLAUDE.md): private S3-compatible bucket
+# under random keys, streamed only through the app after an authorization
+# check (D57, docs/claude/security.md), never handed out as a signed URL.
+# Signed-URL generation is off (SEC-003): a stray ``.url`` call yields a
+# plain address the private bucket refuses, never a working bearer link.
+# S3_SIGNED_URL_TTL_SECONDS is no longer read.
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3.S3Storage",
@@ -296,8 +300,7 @@ STORAGES = {
             "signature_version": "s3v4",
             "addressing_style": "path",
             "default_acl": None,
-            "querystring_auth": True,
-            "querystring_expire": env.int("S3_SIGNED_URL_TTL_SECONDS", default=300),
+            "querystring_auth": False,
             "file_overwrite": False,
             # Send upload checksums only when the store requires them. Newer
             # boto3 adds one to every upload by default, which S3-compatible
@@ -431,6 +434,9 @@ BOUNCE_IMAP_HOST = env("BOUNCE_IMAP_HOST", default="")
 BOUNCE_IMAP_PORT = env.int("BOUNCE_IMAP_PORT", default=993)
 BOUNCE_IMAP_USER = env("BOUNCE_IMAP_USER", default="")
 BOUNCE_IMAP_PASSWORD = env("BOUNCE_IMAP_PASSWORD", default="")
+# The password reaches the worker only (it reads the mailbox; EXP-003); the
+# web container is told that one is set, for the status lines.
+BOUNCE_IMAP_PASSWORD_SET = env.bool("BOUNCE_IMAP_PASSWORD_SET", default=False)
 BOUNCE_IMAP_FOLDER = env("BOUNCE_IMAP_FOLDER", default="INBOX")
 BOUNCE_RETURN_PATH = env("BOUNCE_RETURN_PATH", default="")
 
@@ -449,6 +455,16 @@ EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
 EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=20)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="portal@example.com")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Which relay sends the mail (comms/smtp2go.py): "smtp" (the EMAIL_HOST settings
+# above, the default) or "smtp2go" (SMTP2Go's HTTP API; delivery and bounces
+# are then read back from SMTP2Go's activity API, pull only, no webhook, and
+# no bounce mailbox is needed). SMTP2GO_API_KEY goes into the server's .env
+# only through infra/poc/set-smtp2go.sh. SMTP2GO_REGION: global, us, eu or au
+# (the API host; only SMTP2Go's own hosts are ever contacted).
+EMAIL_PROVIDER = env("EMAIL_PROVIDER", default="smtp").strip().lower()
+SMTP2GO_API_KEY = env("SMTP2GO_API_KEY", default="")
+SMTP2GO_REGION = env("SMTP2GO_REGION", default="global").strip().lower()
+SMTP2GO_TIMEOUT = env.int("SMTP2GO_TIMEOUT", default=15)
 # POC only: deliver every message to one inbox (decision Q2). Unset in production.
 EMAIL_REDIRECT_ALL_TO = env("EMAIL_REDIRECT_ALL_TO", default="")
 

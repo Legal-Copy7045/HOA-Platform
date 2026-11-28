@@ -155,15 +155,21 @@ def _errors():
 def _email():
     from django.core.cache import cache
 
+    from comms import smtp2go
     from core.email import FAILURE_CACHE_KEY
 
+    if smtp2go.selected() and not smtp2go.config().configured:
+        return False, smtp2go.config().problem
+    via = " (through SMTP2Go)" if smtp2go.selected() else ""
     failed = cache.get(FAILURE_CACHE_KEY)
     if not failed:
-        return True, "No send failures in the last day"
+        return True, f"No send failures in the last day{via}"
     when, kind = failed
+    words = smtp2go.FAILURE_WORDS.get(kind) if smtp2go.selected() else ""
     return (
         False,
-        f"Sending failed at {when[:16].replace('T', ' ')} UTC ({kind}): check EMAIL_* settings",
+        f"Sending failed at {when[:16].replace('T', ' ')} UTC: "
+        + (words if words else f"{kind}: check the EMAIL_ settings"),
     )
 
 
@@ -277,6 +283,12 @@ def _payment_failures():
     return health()
 
 
+def _email_delivery():
+    from comms.delivery import health
+
+    return health()
+
+
 def _bounce_mailbox():
     from comms.bounces import health
 
@@ -346,6 +358,35 @@ def _memory():
     return True, detail
 
 
+def _tunnel_network():
+    """cloudflared is on the tunnel's edge network only (D91, security review
+    E3/E9): it must never reach Postgres or the file store. The VM agent
+    reports the networks it is attached to besides edge each minute;
+    start-portal.sh and update-portal.sh disconnect them. Not applicable
+    without a recent report from an agent that knows about it."""
+    from core.models import UpdateStatus
+
+    status = UpdateStatus.objects.filter(pk=1).first()
+    states = (status.host_security if status else None) or {}
+    if not isinstance(states, dict) or states.get("tunnel") != "running":
+        return None
+    if not status.agent_seen_at or status.agent_seen_at < timezone.now() - datetime.timedelta(
+        minutes=5
+    ):
+        return None
+    extra = [
+        name
+        for name in str(states.get("tunnel_extra") or "").split()
+        if name.replace("_", "").replace("-", "").replace(".", "").isalnum()
+    ][:5]
+    if extra:
+        return False, (
+            f"cloudflared is also on {', '.join(extra)[:200]}: it belongs on the edge network "
+            "only. Run sudo bash infra/poc/update-portal.sh on the server to disconnect it."
+        )
+    return True, "cloudflared is on the edge network only"
+
+
 CHECKS = [
     ("database", "Database", _database),
     ("worker", "Background worker", _worker),
@@ -356,9 +397,11 @@ CHECKS = [
     ("errors", "Server errors", _errors),
     ("jobs", "Background jobs", _jobs),
     ("email", "Outgoing email", _email),
+    ("email_delivery", "Email delivery reports", _email_delivery),
     ("bounce_mailbox", "Bounce mailbox", _bounce_mailbox),
     ("backups", "Backups", _backups),
     ("memory", "Server memory", _memory),
+    ("tunnel_network", "Tunnel network", _tunnel_network),
     ("connections", "Database connections", _connections),
     ("storage_growth", "Storage growth", _storage_growth),
     ("bank_feed", "Bank feed", _bank_feed),

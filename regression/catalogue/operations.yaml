@@ -8,7 +8,7 @@
 - feature: "Invoice approval: one or two board approvals, never the entrant; payments"
   since: M2
   match: ["^unit:operations/tests/test_invoices"]
-- feature: "Board tasks, vendors and work orders"
+- feature: "Tasks and deadlines, vendors and work orders"
   since: M2
   match: ["^unit:operations/tests/test_tasks"]
 - feature: "Reports and CSV downloads"
@@ -29,7 +29,7 @@
 - feature: "Late fees: late list after the grace period, board posts once per lot and month, automatic posting off by default; owner-paid convenience fees for card and bank shown before paying (D21)"
   since: M3
   match: ["^unit:ledger/tests/test_late_fees", "^unit:payments/tests/test_fees"]
-- feature: "Recurring deadlines on Board tasks, was Compliance calendar (recurring items, one reminder per due date, My items) and budget notices to owners (proposed, then adopted with dues; paper list)"
+- feature: "Recurring deadlines on Tasks and deadlines, was Compliance calendar (recurring items, one reminder per due date, My items) and budget notices to owners (proposed, then adopted with dues; paper list)"
   since: M4
   match: ["^unit:operations/tests/test_compliance"]
 - feature: "Statements and delinquency notices: board-edited wording with plain placeholders (never str.format), first/second/final notice with the statement attached, second and final certified, running-balance statement with remittance stub, downloads audited and board/manager only; resale certificate fills application data in bold, separate from the delinquency packet"

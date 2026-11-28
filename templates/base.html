@@ -36,7 +36,7 @@
         <div class="who">{{ nav.display_name }}</div>
         <div class="who-sub">{{ nav.roles|join:" · "|default:user.email }}</div>
         <div class="foot-links">
-          <a href="{% url 'my_profile' %}">Profile</a>
+          <a href="{% url 'my_profile' %}">My profile</a>
           <a href="{% url 'mfa_index' %}">Sign-in and security</a>
           {% if user|can:"request.submit" or user|can:"help.view" %}<a href="{% url 'ask_board' %}" class="ask-board-link">Ask the board</a>{% endif %}
           <form method="post" action="{% url 'account_logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link">Sign out</button></form>

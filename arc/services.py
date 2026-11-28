@@ -624,6 +624,9 @@ def _record_decision(
         if days and not is_appeal
         else None,
     )
+    from arc.notify import queue_decision_email
+
+    queue_decision_email(decision)  # the applicant is emailed after commit
     return decision
 
 

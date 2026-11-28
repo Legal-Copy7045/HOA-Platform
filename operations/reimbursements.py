@@ -426,6 +426,7 @@ def pay_by_transfer(claim, *, paid_on: datetime.date, reference: str, actor, req
             note=f"Reimbursement claim #{claim.pk}",
             actor=actor,
             request=request,
+            from_claim=True,
         )
     except ops.OperationsError as exc:
         raise ReimbursementError(str(exc)) from exc
@@ -484,7 +485,7 @@ def board_items(user) -> list:
         if st["status"] == "awaiting" and approver and user.pk not in st["approvers"]:
             items.append(
                 Item(
-                    "Finance",
+                    "Finance overview",
                     f"Approve a reimbursement of {format_cents(claim.amount_cents)}",
                     f"{claim.payee} · {claim.spent_on:%B %-d}"
                     + (f" · {st['have']} of {st['need']} approvals" if st["need"] > 1 else ""),
@@ -496,7 +497,7 @@ def board_items(user) -> list:
         elif st["status"] == "approved" and payer and not payment_refusal(user, claim):
             items.append(
                 Item(
-                    "Finance",
+                    "Finance overview",
                     f"Pay an approved reimbursement of {format_cents(claim.amount_cents)}",
                     "By check from Checks, or record a bank transfer.",
                     url,
@@ -527,7 +528,8 @@ def claimant_items(user) -> list:
                 f"{claim.payee} · {claim.spent_on:%B %-d}",
                 reverse("reimbursement_detail", args=[claim.pk]),
                 "info",
-                nav="reimbursements?mine=1",
+                # No menu entry since 0.43.0 (D95): counted in My items only.
+                nav="",
             )
         )
     return items

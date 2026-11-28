@@ -364,7 +364,8 @@ def test_set_env_writes_values_exactly_and_replaces_repeats(tmp_path):
 def test_move_to_r2_uses_set_env_and_compares_counts():
     script = Path(POC, "move-files-to-r2.sh").read_text()
     assert "awk -v" not in script
-    assert 'set_env .env S3_SECRET_ACCESS_KEY "$SECRET"' in script
+    assert 'S3_SECRET_ACCESS_KEY "$SECRET"' in script
+    assert "env_update .env S3_ENDPOINT_URL" in script
     assert 'counts_match "$BEFORE" "$IN_R2"' in script
     assert script.index("counts_match") < script.index("Done. Files now live in R2")
 

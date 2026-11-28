@@ -12,4 +12,4 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: Legal-Copy7045/project-standards/.github/workflows/dependabot-automerge.yml@1f5964bc45844dc0cefda0374af8f8128daa1b40  # v1.1.0
+    uses: Legal-Copy7045/project-standards/.github/workflows/dependabot-automerge.yml@bba160b88041c0564769d6415d5f7f6514144cbb  # v1.2.2

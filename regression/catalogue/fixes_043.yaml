@@ -1,0 +1,35 @@
+# Fixes for the 0.42.0 full check findings approved by the owner (release 0.43.0).
+# `match` runs over "<stage>:<check>".
+- feature: "An expense reimbursement is never paid through the generic invoice Pay action; every payment path applies the claim's rule: not by the claimant, a board member's claim only by another board member (BUG-001, D66, D77)"
+  since: "0.43"
+  match: ["^unit:operations/tests/test_payouts.py::test_reimbursement_invoice_is_never_paid_through_the_generic_pay_action"]
+- feature: "A special assessment above the owners'-vote threshold needs a closed formal vote on that assessment (title and amount) that reached quorum and passed at the rule's percent; a failed vote, a tie, no quorum, a poll or another question is refused (BUG-003, D75)"
+  since: "0.43"
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_levy_needs_a_vote_that_passed_on_this_assessment"]
+- feature: "A collection case opened before a sale keeps its costs and payment plan on the seller's account, never the buyer's (BUG-004, D82, D76)"
+  since: "0.43"
+  match: ["^unit:ledger/tests/test_finance_options.py::test_collection_costs_stay_on_the_sellers_account_after_a_sale", "^unit:ledger/tests/test_finance_gaps.py::test_plan_on_a_case_opened_before_a_sale_never_covers_the_buyer"]
+- feature: "Special-assessment late fees are suspended while the home keeps a payment plan that suspends late fees (BUG-005, D76)"
+  since: "0.43"
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_special_assessment_late_fees_suspended_while_plan_is_kept"]
+- feature: "My account shows a buyer only their own account's special-assessment installments; the seller's read 'before your ownership' (BUG-006)"
+  since: "0.43"
+  match: ["^unit:ledger/tests/test_finance_gaps.py::test_buyer_sees_only_their_own_special_assessment_installments"]
+- feature: "The year-end package's financial-statements.csv escapes spreadsheet formulas like the direct download (BUG-007, D71)"
+  since: "0.43"
+  match: ["^unit:ledger/tests/test_books.py::test_package_statements_csv_escapes_formulas"]
+- feature: "A board member who sold their home neither records nor closes a Stripe refund alert for a payment on their former account (SEC-001, D65, D87)"
+  since: "0.43"
+  match: ["^unit:payments/tests/test_acctfix_payments.py::test_seller_on_the_board_takes_no_step_on_a_refund_of_their_former_account"]
+- feature: "check_db_role refuses a runtime role that is a member (recursively) of a role owning tables or with powers, or of pg_write_all_data / pg_database_owner (SEC-002)"
+  since: "0.43"
+  match: ["^unit:community/tests/test_commands.py::test_check_db_role_refuses_membership_in_a_powerful_role"]
+- feature: "Private file storage never generates signed URLs; files are streamed after an authorization check (SEC-003, D57)"
+  since: "0.43"
+  match: ["^unit:core/tests/test_production_settings.py::test_private_storage_never_signs_urls"]
+- feature: "Nobody ends a vendor conflict-of-interest link that names them, nor does a conflicted member or the manager; another board member does, with a reason, audited and append-only (EXP-002, D65, D79)"
+  since: "0.43"
+  match: ["^unit:operations/tests/test_vendor_onboarding.py::test_(nobody_removes_their_own_conflict_link_and_the_manager_removes_none|a_conflicted_board_member_cannot_approve_the_vendor_or_its_invoices)"]
+- feature: "Help-text links accept only site paths and https:// addresses: no scheme-relative, backslash, whitespace or control-character links (EXP-005, D73)"
+  since: "0.43"
+  match: ["^unit:community/tests/test_owner_help.py::test_help_links_(refuse_off_site_and_odd_addresses|keep_site_paths_and_https)"]

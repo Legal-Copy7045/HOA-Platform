@@ -422,6 +422,40 @@ def test_render_text_never_passes_html():
     assert html.startswith("<h3>T&lt;b&gt;</h3>")
 
 
+@pytest.mark.parametrize(
+    "href",
+    [
+        "//evil.example/login",
+        "/\\evil.example/login",
+        "/\\\\evil.example",
+        "/docs\\..\\x",
+        "https:\\\\evil.example",
+        "https:///nohost",
+        "/\tevil.example",
+        "/\x00/evil.example",
+        "/\u200b/evil.example",
+        "/\u202e/evil.example",
+        "javascript:alert(1)",
+        "http://evil.example/",
+    ],
+)
+def test_help_links_refuse_off_site_and_odd_addresses(href):
+    """EXP-005: no scheme-relative, backslash, whitespace or control-character
+    link gets through; the text is shown escaped instead."""
+    html = helpdocs.render_text(f"[Pay your dues here]({href})")
+    assert "<a " not in html
+
+
+@pytest.mark.parametrize(
+    "href,rel",
+    [("/documents/", False), ("/my-account/?tab=1#x", False), ("https://example.com/x", True)],
+)
+def test_help_links_keep_site_paths_and_https(href, rel):
+    html = helpdocs.render_text(f"[Go]({href})")
+    assert f'<a href="{href}"' in html
+    assert ('rel="noopener noreferrer"' in html) is rel
+
+
 # --- Search ---------------------------------------------------------------------------------------
 
 

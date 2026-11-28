@@ -1,0 +1,13 @@
+# Operations in 0.43.0 (D91): compose files together, Restart the portal, regression logs kept current.
+- feature: "Compose files always together: COMPOSE_FILE with both files in .env (make-env.sh; start-portal.sh and update-portal.sh append it to an older .env, touching no other line); cloudflared on the edge network only, disconnected from any other network by start-portal.sh and update-portal.sh (idempotent, plain names only); the agent reports its networks and the Tunnel network health check fails while it is on another"
+  since: "0.43"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_compose_together\\.py::"]
+- feature: "Restart the portal on System status: sysadmins only (others 403), a fresh sign-in check, a confirmation page with a fixed value, the restart_app server task (one at a time, at most once every 10 minutes, audited when asked for and when done), the agent's fixed restart-portal.sh with both compose files; progress and the last result on the page and on System status"
+  since: "0.43"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_restart_portal\\.py::", "^unit:core/tests/test_host_tasks_agent\\.py::test_(restart|only_the_exact_restart)", "^unit:core/tests/test_url_matrix\\.py::.*system_restart"]
+- feature: "Regression logs kept current: a minor or major release fails unless RUNS.md and WALKTHROUGHS.md each have a newest entry for the previous release line or newer (patch releases exempt), in run.py check and in the suite"
+  since: "0.43"
+  docs: docs/claude/development.md
+  match: ["^unit:regression/tests/test_release_logs\\.py::", "^ci:regression logs current for the release$"]

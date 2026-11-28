@@ -35,20 +35,23 @@ if [[ "$KEY" == sk_* ]]; then
 fi
 [[ "$KEY" =~ ^rk_(test|live)_[A-Za-z0-9]{10,}$ ]] || { unset KEY; echo "That is not a Stripe restricted key (rk_...). Nothing was changed." >&2; exit 1; }
 
-cp -p .env .env.before-stripe
-chmod 600 .env.before-stripe
-set_env .env PAYMENTS_PROVIDER stripe
-set_env .env STRIPE_SECRET_KEY "$KEY"
+# Only these keys change (env_update, infra/poc/lib.sh).
+KEYS=(PAYMENTS_PROVIDER STRIPE_SECRET_KEY)
+BACKUP="$(env_backup .env stripe)"
+env_update .env PAYMENTS_PROVIDER stripe STRIPE_SECRET_KEY "$KEY"
 unset KEY
 echo "==> Restarting the portal"
 bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null
 echo "==> Checking the key with Stripe (read-only)"
 COMPOSE=(docker compose --project-directory "$APP_DIR" -f docker-compose.yml -f docker-compose.tunnel.yml)
 if ! "${COMPOSE[@]}" exec -T web python manage.py check_stripe; then
-  echo "The check failed (above). To undo: cp .env.before-stripe .env && sudo bash infra/poc/start-portal.sh" >&2
+  env_restore_keys .env "$BACKUP" "${KEYS[@]}"
+  env_discard_backup "$BACKUP"
+  echo "The check failed (above). The previous Stripe settings are back in .env (nothing else in it was changed); restarting." >&2
+  bash "$APP_DIR/infra/poc/start-portal.sh" >/dev/null || true
   exit 1
 fi
-shred -u .env.before-stripe 2>/dev/null || rm -f .env.before-stripe
+env_discard_backup "$BACKUP"
 echo "Removed .env.before-stripe (the copy of the previous settings, with the old secret)."
 echo "Done. Switch on Online payments in Admin -> Features, then open Finance -> Online payments."
 echo "To change the key, run this script again."

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load portal %}
-{% block title %}{{ title }} · Community setup · {{ SITE_NAME }}{% endblock %}
+{% block title %}Setup: {{ title }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'settings_hub' %}#setup">Community setup</a></div>
+  <div class="crumbs"><a href="{% url 'settings_hub' %}">Settings</a> / <a href="{% url 'settings_hub' %}#setup">Community setup</a> / Step {{ number }} of {{ total }}</div>
   <div class="setup-progress">
     <p class="small muted" id="setup-progress-label">Step {{ number }} of {{ total }}{% if run %} · setup run {{ run }}{% endif %}{% if state == "completed" %} · <span class="status tone-success">Done</span>{% elif state == "skipped" %} · <span class="status tone-warning">Skipped</span>{% endif %}</p>
     <progress max="{{ total }}" value="{{ number }}" aria-labelledby="setup-progress-label">Step {{ number }} of {{ total }}</progress>
   </div>
-  <div class="page-head"><div><h1>{{ title }}</h1><p class="subtitle">{{ intro }}</p></div></div>
+  <div class="page-head"><div><h1>Setup: {{ title }}</h1><p class="subtitle">{{ intro }}</p></div></div>
 
   {% include "community/setup/_law.html" %}
 
@@ -47,7 +47,7 @@
       <fieldset class="card setup-group"><legend><h2>{{ group.title }}</h2></legend>
         {% for r in group.rules %}<div class="setup-rule" id="rule-{{ r.spec.key }}">
           <p class="setup-flags">{% if r.needs_attention %}<span class="status tone-warning">Needs a value or citation</span>{% elif r.origin == "pa_law" %}<span class="status tone-info">PA law fallback</span>{% elif r.origin == "default" %}<span class="status tone-neutral">Default</span>{% endif %}{% if r.changed %} <span class="status tone-info">Changed since the last setup</span>{% endif %}</p>
-          {% include "community/setup/_field.html" with f=r.value %}
+          {% include "community/setup/_field.html" with f=r.value suffix=r.suffix %}
           {% if r.help %}<p class="help">{{ r.help }}</p>{% endif %}
           {% if r.default %}<p class="help">Empty means: {{ r.default }}{% if r.origin == "pa_law" %} ({{ r.guide.fallback_citation }}){% endif %}.</p>{% endif %}
           {% if r.guide %}<details class="rule-guide"><summary class="small">Usually set in: {{ r.guide.source }} · PA law and an example</summary>
@@ -61,7 +61,10 @@
 
     {% if step.key == "common_areas" %}
       <fieldset class="card setup-group"><legend><h2>Common areas</h2></legend>
-        {% if areas %}<ul class="list">{% for a in areas %}<li><div class="grow"><div class="title">{{ a.name }}</div><div class="small muted">{{ a.get_kind_display }}{% if not a.active %} · not in use{% endif %}</div></div></li>{% endfor %}</ul>{% else %}<p class="muted">No common areas recorded yet.</p>{% endif %}
+        {% if areas %}<ul class="list" data-testid="setup-areas">{% for a in areas %}<li><div class="grow"><div class="title">{{ a.name }}</div><div class="small muted">{{ a.get_kind_display }}{% if not a.active %} · removed (not in use; its history is kept){% endif %}</div></div>
+          {% if a.active %}<button type="submit" form="setup-area-actions" name="area_remove" value="{{ a.pk }}" class="small secondary" aria-label="Remove {{ a.name }}">Remove</button>{% else %}<button type="submit" form="setup-area-actions" name="area_restore" value="{{ a.pk }}" class="small secondary" aria-label="Put {{ a.name }} back in use">Put back</button>{% endif %}</li>{% endfor %}</ul>
+          <p class="small muted">Removing an area stops it being offered or booked; it is never deleted, so its bookings and history stay. An area with upcoming bookings is removed once they are cancelled.</p>
+        {% else %}<p class="muted">No common areas recorded yet. That is fine: save and continue without any.</p>{% endif %}
         <h3>Add a common area (optional)</h3>
         {% include "community/setup/_field.html" with f=area_form.name %}
         {% include "community/setup/_field.html" with f=area_form.kind %}
@@ -126,13 +129,14 @@
       <section class="card setup-group"><h2>Where the server stands</h2>
         <ul class="list">
           <li><div class="grow"><div class="title">Outgoing email</div><div class="small muted">{{ server.email_detail }}.{% if server.test_email %} Last test email {{ server.test_email.occurred_at|short_date }}: {% if server.test_email_ok %}sent{% else %}failed{% endif %}.{% else %} No test email sent yet: a sysadmin sends one from Server tasks.{% endif %}{% if server.email_redirect %} All email is redirected to a test inbox.{% endif %}</div></div><span class="status tone-{% if server.email_ok %}success{% else %}danger{% endif %}">{% if server.email_ok %}OK{% else %}Problem{% endif %}</span></li>
+          <li data-testid="setup-smtp2go"><div class="grow"><div class="title">Email provider (SMTP2Go)</div><div class="small muted">{% if server.relay.provider == "smtp2go" %}{{ server.relay.text }} To change the key or the sender, a sysadmin runs <code>sudo bash infra/poc/set-smtp2go.sh</code> again.{% else %}Not configured: email goes through the SMTP server in the EMAIL_ settings. To send through SMTP2Go instead, with delivery and bounce reports and no bounce mailbox, a sysadmin runs <code>sudo bash infra/poc/set-smtp2go.sh</code> on the server.{% endif %}</div></div><span class="status tone-{% if server.relay.state == "set_up" %}success{% elif server.relay.state == "failing" %}warning{% else %}neutral{% endif %}">{% if server.relay.state == "set_up" %}Configured{% elif server.relay.state == "failing" %}Check{% else %}Not configured{% endif %}</span></li>
           <li><div class="grow"><div class="title">Backups</div><div class="small muted">{% if server.backups.local %}Last backup {{ server.backups.local|short_date }}.{% else %}No backup recorded yet.{% endif %} {{ server.backups.detail }}</div></div><span class="status tone-{% if server.backups.ok %}success{% else %}warning{% endif %}">{% if server.backups.ok %}OK{% else %}Check{% endif %}</span></li>
           <li><div class="grow"><div class="title">Off-site copy</div><div class="small muted">{% if server.offsite %}Set up.{% if server.backups.offsite %} Last copy {{ server.backups.offsite|short_date }}.{% endif %}{% else %}Not set up: a sysadmin runs <code>sudo bash infra/poc/setup-offsite-backups.sh</code> on the server.{% endif %}</div></div><span class="status tone-{% if server.offsite %}success{% else %}warning{% endif %}">{% if server.offsite %}Set up{% else %}Not set up{% endif %}</span></li>
           <li><div class="grow"><div class="title">Health checks</div><div class="small muted">{% if server.last_health %}Last run from Server tasks {{ server.last_health.requested_at|short_date }}: {{ server.last_health.get_state_display }}.{% else %}Run every few minutes by the server; none started from Server tasks yet.{% endif %}</div></div></li>
           <li><div class="grow"><div class="title">Stripe</div><div class="small muted">{% if server.stripe.available %}Set up ({{ server.stripe.mode_label }}).{% else %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-stripe-key.sh</code> on the server (5 minutes).{% endif %}</div></div><span class="status tone-{% if server.stripe.available %}success{% else %}neutral{% endif %}">{% if server.stripe.available %}Ready{% else %}Not set up{% endif %}</span></li>
           <li><div class="grow"><div class="title">Bank feed (Teller)</div><div class="small muted">{% if server.teller %}Set up.{% else %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-teller.sh</code>.{% endif %}</div></div></li>
           <li><div class="grow"><div class="title">USPS tracking</div><div class="small muted">{% if server.usps.state == "not_set_up" %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-usps.sh</code> on the server to enter the association's USPS Business Customer Gateway login. Paper mail and its barcode work without it.{% else %}{{ server.usps.text }}{% endif %}</div></div><span class="status tone-{% if server.usps.state == "failing" %}warning{% elif server.usps.state == "not_set_up" %}neutral{% else %}success{% endif %}">{% if server.usps.state == "failing" %}Check{% elif server.usps.state == "not_set_up" %}Not set up{% else %}Set up{% endif %}</span></li>
-          <li><div class="grow"><div class="title">Bounce mailbox</div><div class="small muted">{% if server.bounce.state == "not_set_up" %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-bounce-mailbox.sh</code> on the server to enter the login of the mailbox bounced email goes to. Email works without it; a bounced official notice is then not noticed.{% else %}{{ server.bounce.text }}{% endif %}</div></div><span class="status tone-{% if server.bounce.state == "failing" %}warning{% elif server.bounce.state == "not_set_up" %}neutral{% else %}success{% endif %}">{% if server.bounce.state == "failing" %}Check{% elif server.bounce.state == "not_set_up" %}Not set up{% else %}Set up{% endif %}</span></li>
+          <li><div class="grow"><div class="title">Bounce mailbox</div><div class="small muted">{% if server.bounce.state == "not_set_up" %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-bounce-mailbox.sh</code> on the server to enter the login of the mailbox bounced email goes to. Email works without it; a bounced official notice is then not noticed.{% else %}{{ server.bounce.text }}{% endif %}</div></div><span class="status tone-{% if server.bounce.state == "failing" %}warning{% elif server.bounce.state == "not_set_up" or server.bounce.state == "not_needed" %}neutral{% else %}success{% endif %}">{% if server.bounce.state == "failing" %}Check{% elif server.bounce.state == "not_set_up" %}Not set up{% elif server.bounce.state == "not_needed" %}Not needed{% else %}Set up{% endif %}</span></li>
           <li><div class="grow"><div class="title">Vendor document key</div><div class="small muted">{% if server.vendor_key %}Set: vendors' W-9s and certificates are encrypted in the portal. Keep a copy of the key apart from the backups; to rotate it a sysadmin runs <code>sudo bash infra/poc/set-vendor-key.sh --rotate</code>.{% else %}Not set up: a sysadmin runs <code>sudo bash infra/poc/set-vendor-key.sh</code> on the server. It makes the key there (nothing to type); vendor onboarding stays closed without it.{% endif %}</div></div><span class="status tone-{% if server.vendor_key %}success{% else %}neutral{% endif %}">{% if server.vendor_key %}Set up{% else %}Not set up{% endif %}</span></li>
           <li><div class="grow"><div class="title">File storage</div><div class="small muted">{% if server.file_store_r2 %}Uploads are kept in Cloudflare R2.{% else %}Uploads are kept in the server's own file store. To move them to Cloudflare R2, a sysadmin runs <code>sudo bash infra/poc/move-files-to-r2.sh</code> on the server.{% endif %}</div></div><span class="status tone-{% if server.file_store_r2 %}success{% else %}neutral{% endif %}">{% if server.file_store_r2 %}R2{% else %}Local{% endif %}</span></li>
           <li><div class="grow"><div class="title">Push notifications and text alerts</div><div class="small muted">Push keys: {% if server.push %}set{% else %}not set (a sysadmin runs <code>python manage.py generate_vapid_keys</code>){% endif %}. SMS provider: {% if server.sms %}set{% else %}not set{% endif %}.</div></div></li>
@@ -151,5 +155,6 @@
       <button type="submit" name="action" value="skip" class="secondary" formnovalidate>Skip for now</button>
     </div>
   </form>
+  {% if step.key == "common_areas" and areas %}{# The Remove / Put back buttons belong to this form, so Enter in the step still saves. #}<form method="post" id="setup-area-actions" hidden>{% csrf_token %}</form>{% endif %}
   <p class="small muted setup-footer">{{ law.footer }}</p>
 {% endblock %}

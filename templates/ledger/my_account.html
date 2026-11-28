@@ -55,5 +55,5 @@
   {% endfor %}
   {% if can_request_resale %}<p class="link-row"><a href="{% url 'resales' %}">Selling your home? Request a resale certificate</a></p>
   {% elif accounts %}<p class="small muted" data-testid="resale-owner-only">Selling the home? Only an owner on the deed can ask for a resale certificate.</p>{% endif %}
-  {% if can_claim %}<p class="link-row"><a href="{% url 'reimbursement_new' %}">Paid an association expense yourself? Claim an expense</a></p>{% endif %}
+  {% if can_claim %}<p class="link-row"><a href="{% url 'reimbursement_new' %}">Paid an association expense yourself? Claim an expense</a> · <a href="{% url 'reimbursements' %}?mine=1">My reimbursements</a></p>{% endif %}
 {% endblock %}

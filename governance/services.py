@@ -13,7 +13,7 @@ from audit.services import record_event
 from community import services as community_services
 from community.models import ContactProfile, Lot, Ownership, Person
 from community.rules import rule, rule_with_citation
-from core.email import NOTICE, mail_kind
+from core.email import NOTICE, mail_about, mail_kind
 from core.policy import SYSTEM, can, require
 from core.policy import invalidate_roles as _invalidate_roles
 from core.scoping import system_access
@@ -237,7 +237,8 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
             if person.pk in consent and (person.email or person.user_id):
                 to = [person.user.email if person.user_id else person.email]
                 to += [e for e in community_services.notice_emails(person) if e not in to]
-                with mail_kind(NOTICE):  # a bounce asks for a paper copy (D74)
+                # A bounce asks for a paper copy (D74); delivery shows on the meeting.
+                with mail_kind(NOTICE), mail_about("meeting_notice", meeting.pk):
                     send_mail(
                         f"[{settings.SITE_NAME}] Meeting notice: {single_line(meeting.title)}",
                         body,
@@ -260,7 +261,7 @@ def send_notice(meeting: Meeting, *, actor, request=None) -> dict:
 
 
 def notice_deadlines(meeting: Meeting) -> tuple[list, int | None]:
-    """Recurring deadlines (Board tasks) that sending this meeting's notice can
+    """Recurring deadlines (Tasks and deadlines) that sending this meeting's notice can
     mark done: the active "Meetings and elections" items. For an annual
     meeting, the annual-meeting item is offered first."""
     if meeting.kind == MeetingKind.EXECUTIVE or meeting.status != MeetingStatus.SCHEDULED:
@@ -604,7 +605,18 @@ def submit_records_request(*, description: str, actor, request=None) -> RecordsR
     return obj
 
 
-# --- Votes ---------------------------------------------------------------------------------
+def my_records_requests(user):
+    """The person's own records requests, newest first: the records requests
+    section of My requests (D95). Scoped like the list page; a board member
+    sees only their own here, never everyone's."""
+    from core.scoping import own_records
+
+    if not can(user, "records_request.submit"):
+        return RecordsRequest.objects.none()
+    rows = RecordsRequest.objects.for_user(user)
+    if can(user, "records_request.manage"):
+        rows = own_records(rows, user)
+    return rows.select_related("requester")
 
 
 def create_vote(

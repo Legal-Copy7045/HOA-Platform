@@ -173,3 +173,12 @@ def test_the_tunnel_overlay_sets_the_scanner_itself():
     assert env["SECURE_HSTS_SECONDS"] == "${SECURE_HSTS_SECONDS:-}"
     for service in ("web", "worker", "migrate"):
         assert overlay["services"][service]["environment"] == env
+
+
+def test_private_storage_never_signs_urls(monkeypatch):
+    """SEC-003 (D57): files are streamed through the app after an
+    authorization check; signed-URL generation is off, so a stray ``.url``
+    call can never produce a working bearer link to a private file."""
+    options = _load(monkeypatch).STORAGES["default"]["OPTIONS"]
+    assert options["querystring_auth"] is False
+    assert "querystring_expire" not in options

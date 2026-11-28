@@ -11,7 +11,7 @@
       {% if not config.livemode %}<div class="alert warning" role="status"><div><strong>TEST MODE</strong> &mdash; Stripe test keys; no real money moves.</div></div>{% else %}<p><span class="status tone-success">Live</span></p>{% endif %}
       <p class="small">Key: {% if config.restricted %}restricted key (recommended){% else %}<span class="status tone-warning">full secret key</span> &mdash; replace it with a restricted key (runbook){% endif %}.</p>
     {% else %}<p><span class="status tone-neutral">Not available</span> {{ config.problem }}</p>{% endif %}
-    <p class="small">Credit card surcharge: {{ surcharge_bp }} hundredths of a percent. {{ disclosure }}</p>
+    <p class="small">Credit card surcharge: {{ surcharge_bp|bp_percent }}. {{ disclosure }}</p>
     <p class="small muted">Last check against Stripe: {% if reconciliation %}{{ reconciliation.ran_at|date:"M j, Y H:i" }} &mdash; {% if reconciliation.ok %}<span class="status tone-success">matches</span>{% else %}<span class="status tone-danger">{{ reconciliation.problems|length }} difference(s)</span>{% endif %}{% else %}not run yet{% endif %}</p>
     {% if reconciliation and not reconciliation.ok %}<ul class="small">{% for p in reconciliation.problems %}<li>{{ p.code }}: {{ p.id }}</li>{% endfor %}</ul>{% endif %}
   </section>

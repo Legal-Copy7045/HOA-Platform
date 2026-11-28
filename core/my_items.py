@@ -93,7 +93,7 @@ MY_ITEMS_PERMISSIONS = (
 )
 
 AREA_NAV = {
-    "Written consent": "resolutions",
+    "Resolutions and policies": "resolutions",
     "Invoices": "invoices",
     "Second approvals": "approvals",
     "Homes and owners": "lot_list",
@@ -118,7 +118,7 @@ AREA_NAV = {
 }
 
 AREA_ICONS = {
-    "Written consent": "pencil",
+    "Resolutions and policies": "pencil",
     "My home": "home",
     "Owner requests": "mail",
     "Second approvals": "check-circle",
@@ -130,7 +130,7 @@ AREA_ICONS = {
     "Architectural review": "pencil",
     "Violations": "flag",
     "Collections": "dollar",
-    "Finance": "receipt",
+    "Finance overview": "receipt",
     "Work orders": "wrench",
     "Vendors": "shield",
     "Renewals": "shield",
@@ -149,13 +149,14 @@ AREAS = [
     "Voting",
     "Owner requests",
     "Second approvals",
+    "Resolutions and policies",
     "Invoices",
     "Homes and owners",
     "Common area bookings",
     "Architectural review",
     "Violations",
     "Collections",
-    "Finance",
+    "Finance overview",
     "Work orders",
     "Vendors",
     "Renewals",
@@ -453,7 +454,7 @@ def items_for(user) -> list[Item]:
         for c in consents_awaiting(user):
             out.append(
                 Item(
-                    "Written consent",
+                    "Resolutions and policies",
                     c.title,
                     "Waiting for your written approval or decline",
                     reverse("consent_detail", args=[c.pk]),
@@ -700,7 +701,7 @@ def items_for(user) -> list[Item]:
         ):
             out.append(
                 Item(
-                    "Finance",
+                    "Finance overview",
                     f"{n.lot.label}: {n.count} entr{'y' if n.count == 1 else 'ies'}"
                     " moved to another account",
                     f"From account {n.from_accounts} to account {n.to_accounts} after an"
@@ -720,7 +721,7 @@ def items_for(user) -> list[Item]:
         if missed:
             out.append(
                 Item(
-                    "Finance",
+                    "Finance overview",
                     f"{missed['title']}: post it now",
                     f"{missed['reason_text']}. Homes already charged are skipped.",
                     reverse("ledger_home") + autopost.POST_ANCHOR,
@@ -1141,7 +1142,7 @@ def _online_payment_items(user, roles) -> list[Item]:
             continue
         out.append(
             Item(
-                "Finance",
+                "Finance overview",
                 a.get_kind_display() + (f" ({a.lot.label})" if a.lot_id else ""),
                 a.detail,
                 reverse("online_payments"),
