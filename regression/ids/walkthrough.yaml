@@ -1,6 +1,6 @@
 # Stable check IDs for the walkthrough stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: WALK-8948
+# highest issued: WALK-8950
 WALK-001: "owner phone: the menu opens from the Menu button"
 WALK-002: "owner phone: menu entries are at least 40x40 px"
 WALK-003: "owner desktop: / has no sideways scroll"
@@ -8791,7 +8791,9 @@ WALK-8945: "sysadmin phone: /ops/tasks/restore/ buttons and boxes do not overlap
 WALK-8946: "sysadmin phone: /ops/tasks/restore/ tap targets at least 40x40 px"
 WALK-8947: "sysadmin phone: /ops/tasks/restore/ has no console or CSP errors"
 WALK-8948: "sysadmin: /ops/tasks/restore/ opens a page (HTTP 200, not only a redirect)"
+WALK-8949: "owner desktop: menu \"My ARC requests\" (/arc/?mine=1) matches its page heading"
 WALK-895: "tenant phone: /faq/ has no console or CSP errors"
+WALK-8950: "owner phone: menu \"My ARC requests\" (/arc/?mine=1) matches its page heading"
 WALK-896: "tenant: /faq/ opens a page (HTTP 200, not only a redirect)"
 WALK-897: "tenant desktop: /community/board-and-committees/ has no sideways scroll"
 WALK-898: "tenant desktop: /community/board-and-committees/ nothing runs off screen or out of its box"
