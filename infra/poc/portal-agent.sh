@@ -81,6 +81,17 @@ UPDATE core_updatestatus
  WHERE id = 1;
 SQL
 
+# The outbound firewall for the containers (D101): one word and a count from
+# hoa-egress-firewall status (lib.sh egress_firewall_state checks the shape),
+# for the "Outbound firewall" health check. The agent never changes the
+# rules; the firewall's own timer and harden-host.sh do.
+read -r EGRESS_STATE EGRESS_NETS <<<"$(egress_firewall_state)"
+psql_run -v es="$EGRESS_STATE" -v en="$EGRESS_NETS" >/dev/null <<'SQL'
+UPDATE core_updatestatus
+   SET host_security = host_security || jsonb_build_object('egress', :'es', 'egress_networks', :'en')
+ WHERE id = 1;
+SQL
+
 # Server memory, swap and load for System status (D39): read from /proc,
 # numbers only, a few milliseconds a minute. low_since records when available
 # memory first dropped under 10%, so the health check alerts only when it

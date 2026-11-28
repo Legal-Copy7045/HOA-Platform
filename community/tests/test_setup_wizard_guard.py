@@ -111,3 +111,27 @@ def test_every_service_key_is_on_a_step_with_its_state(client, board):
             assert credentials.BY_KEY[key].label in page
         assert "Keys and connections" in page
         assert 'type="password"' not in page
+
+
+def test_the_server_step_shows_the_outbound_firewall(client, board):
+    """D101: the outbound firewall is part of host security; the server step
+    says what it allows and whether the VM agent reports it on."""
+    import datetime
+
+    from django.utils import timezone
+
+    from core.models import UpdateStatus
+
+    page = _page(client, "server")
+    assert 'data-testid="setup-egress"' in page and "Not reported yet" in page
+    UpdateStatus.objects.create(
+        pk=1,
+        host_security={"egress": "missing", "egress_networks": "2"},
+        agent_seen_at=timezone.now() - datetime.timedelta(minutes=1),
+    )
+    page = _page(client, "server")
+    assert "rules are not in place" in page and "Re-apply host security" in page
+    UpdateStatus.objects.filter(pk=1).update(
+        host_security={"egress": "active", "egress_networks": "2"}
+    )
+    assert "On for 2 portal network(s)" in _page(client, "server")

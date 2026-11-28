@@ -15,10 +15,12 @@
 #   2. fetches the newest release (lib.sh checkout_release, as update-portal.sh);
 #   3. provision-vm.sh: updates, SSH keys only, firewall, Docker;
 #   4. make-env.sh: .env with every server-only secret generated (mode 600);
-#   5. harden-host.sh: automatic updates, auditd, AIDE, Falco;
+#   5. harden-host.sh: automatic updates, auditd, AIDE, Falco, the outbound
+#      firewall for the containers (D101);
 #   6. start-portal.sh: builds and starts the portal, the update agent and
 #      its server tasks; health-timer.sh: the 10-minute health check;
-#   7. checks the containers, migrations, the tunnel and its network;
+#   7. checks the containers, migrations, the tunnel and its network, the
+#      outbound firewall;
 #   8. creates the first officer and sysadmin and shows a one-time sign-in
 #      link on the screen (never in the log).
 # Safe to run again: finished steps are skipped, existing secrets are never
@@ -302,7 +304,7 @@ step_done() {
   case "$1" in
     provision) [ -f /etc/ssh/sshd_config.d/10-hoa-hardening.conf ] && command -v docker >/dev/null 2>&1 ;;
     env) [ -f "$APP_DIR/.env" ] ;;
-    harden) unit_enabled hoa-integrity-check.timer ;;
+    harden) unit_enabled hoa-integrity-check.timer && unit_enabled hoa-egress-firewall.timer ;;
     start) unit_enabled hoa-portal-agent.timer ;;
     health_timer) unit_enabled hoa-health.timer ;;
     *) return 1 ;;
@@ -494,7 +496,7 @@ step_env() {
 }
 
 step_harden() {
-  say "Step 3 of 5: host security (harden-host.sh: automatic updates, auditd, AIDE, Falco; a few minutes)"
+  say "Step 3 of 5: host security (harden-host.sh: automatic updates, auditd, AIDE, Falco, outbound firewall; a few minutes)"
   run_logged bash "$POC/harden-host.sh" </dev/null \
     || fail "Host security set-up failed (see the lines above)." \
       "Run this again: finished steps are skipped. A Falco key message names its own fix."
@@ -550,7 +552,7 @@ tunnel_state() {
 }
 
 run_checks() {
-  local deadline problems=() services tunnel extra code
+  local deadline problems=() services tunnel extra code egress egress_nets
   say "Checking the portal"
   deadline=$(( $(date +%s) + CHECK_WAIT ))
   while :; do
@@ -579,6 +581,15 @@ run_checks() {
     else
       note "Tunnel network: cloudflared on the edge network only"
     fi
+  fi
+  # The outbound firewall (D101): applied by harden-host.sh, on the networks
+  # start-portal.sh just made (re-applied here in case the timer has not run).
+  egress_firewall_refresh
+  read -r egress egress_nets <<<"$(egress_firewall_state)"
+  if [ "$egress" = active ]; then
+    note "Outbound firewall: on for $egress_nets portal networks (public HTTPS, mail and IMAP ports only; never the LAN)"
+  else
+    problems+=("The outbound firewall for the containers is not on (${egress:-unknown}). Run: sudo bash $POC/harden-host.sh, then: sudo hoa-egress-firewall status")
   fi
   case "$tunnel" in
     OK) note "Tunnel: connected to Cloudflare" ;;

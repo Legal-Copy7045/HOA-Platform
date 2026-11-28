@@ -345,7 +345,14 @@ def _server_status():
         relay = delivery.setup_status()
     except Exception as exc:  # shown like a failed check
         relay = {"state": "failing", "provider": "", "text": f"Check failed ({type(exc).__name__})"}
+    try:
+        # The outbound firewall (D101), as the VM agent last reported it;
+        # None away from the VM (local development, no recent report).
+        egress = health._egress_firewall()
+    except Exception as exc:  # shown like a failed check
+        egress = (False, f"Check failed ({type(exc).__name__})")
     return {
+        "egress": egress,
         "relay": relay,
         "email_ok": email_ok,
         "email_detail": email_detail,

@@ -132,7 +132,7 @@ TASKS = [
         Kind.HARDEN_HOST,
         "Re-apply host security",
         "Re-runs the host hardening (security updates, audit log, file integrity check, "
-        "Falco). Safe to repeat.",
+        "Falco, the outbound firewall for the containers). Safe to repeat.",
         "Re-apply host security now? It installs any missing pieces and restarts those "
         "services; takes a few minutes; the site stays up.",
     ),

@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-126
+# highest issued: MAN-127
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -126,3 +126,4 @@ MAN-123: "demo mode refuses operations as the sysadmin persona"
 MAN-124: "restore keeps the requester in the restored history"
 MAN-125: "stage tracker on workflow pages desktop and phone"
 MAN-126: "layout of 0.46 on a phone and a desktop"
+MAN-127: "outbound firewall on the vm"

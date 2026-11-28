@@ -110,6 +110,13 @@ class Box:
         _fake(self.bin, "ss", f'cat "{self.root}/ss.txt" 2>/dev/null || true\n')
         _fake(self.bin, "systemctl", record + "exit 1\n")
         _fake(self.bin, "curl", record + "echo -n 302\n")
+        # The outbound firewall harden-host.sh installs (D101).
+        self.egress_state = "active 2"
+        _fake(
+            self.bin,
+            "hoa-egress-firewall",
+            record + f'[ "$1" = status ] && cat "{self.root}/egress.txt"\nexit 0\n',
+        )
         _fake(
             self.bin,
             "docker",
@@ -140,6 +147,7 @@ esac
     def run(self, *args: str, stdin: str = "") -> subprocess.CompletedProcess:
         (self.root / "ss.txt").write_text(self.ssh_peers)
         (self.root / "cloudflared.log").write_text(self.cloudflared_log + "\n")
+        (self.root / "egress.txt").write_text(self.egress_state + "\n")
         env = {
             "PATH": f"{self.bin}:/usr/sbin:/usr/bin:/sbin:/bin",
             "HOA_INSTALL_LOG": str(self.log),
@@ -147,6 +155,7 @@ esac
             "HOA_OS_RELEASE": str(self.os_release),
             "HOA_MEMINFO": str(self.meminfo),
             "HOA_CHECK_WAIT": "0",
+            "HOA_EGRESS_BIN": str(self.bin / "hoa-egress-firewall"),
             "HOME": str(self.root),
         }
         return subprocess.run(  # noqa: S603  # nosec B603
@@ -371,6 +380,19 @@ def test_a_refused_token_names_the_fix_and_new_token_replaces_only_it(box):
     assert new not in box.log.read_text()
 
 
+def test_the_final_check_includes_the_outbound_firewall(box):
+    """D101: the install's checks re-apply the firewall and need it active."""
+    result = box.run(*FIRST, stdin=TOKEN + "\n")
+    assert result.returncode == 0, result.stderr
+    assert "Outbound firewall: on for 2 portal networks" in result.stdout
+    assert "hoa-egress-firewall apply --quiet" in box.argv.read_text()
+    box.egress_state = "missing 2"
+    again = box.run("--yes")
+    assert again.returncode == 1
+    assert "outbound firewall for the containers is not on (missing)" in again.stderr
+    assert "harden-host.sh" in again.stderr
+
+
 def test_the_checks_report_unhealthy_containers_and_an_extra_network(box):
     docker = (box.bin / "docker").read_text()
     docker = docker.replace('echo "clamav|running|healthy|0"', 'echo "clamav|running|unhealthy|0"')
@@ -543,6 +565,7 @@ def test_curl_bootstrap_clones_the_newest_release_and_hands_over_to_its_install_
         "HOA_OS_RELEASE": str(box.os_release),
         "HOA_MEMINFO": str(box.meminfo),
         "HOA_CHECK_WAIT": "0",
+        "HOA_EGRESS_BIN": str(box.bin / "hoa-egress-firewall"),
         "HOME": str(tmp_path),
         "APP_DIR": str(target),
         "APP_USER": "root",

@@ -236,7 +236,8 @@ def test_status_page_names_failed_job_kinds_but_not_their_arguments(client):
         pk=1,
         agent_seen_at=timezone.now(),
         host_security=dict.fromkeys(
-            ("falco", "auditd", "updates", "integrity", "alerts", "livepatch"), "active"
+            ("falco", "auditd", "updates", "integrity", "alerts", "livepatch", "egress"),
+            "active",
         ),
     )
     page = client.get(reverse("system_status")).content.decode()

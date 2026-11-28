@@ -57,11 +57,13 @@ Replace `v0.44.0` below with the newest release on GitHub (Releases; always a
    - `provision-vm.sh`: security updates, SSH keys only, firewall, Docker;
    - `make-env.sh`: `.env` with every server secret generated on the server
      (mode 600; `COMPOSE_FILE` with both compose files, D91);
-   - `harden-host.sh`: automatic updates, auditd, AIDE, Falco;
+   - `harden-host.sh`: automatic updates, auditd, AIDE, Falco, the outbound
+     firewall for the containers (below);
    - `start-portal.sh`: builds and starts the portal and the update agent
      (which also runs Admin -> Server tasks); `health-timer.sh`;
    - checks that every container is healthy, the database is migrated,
-     cloudflared is on the `edge` network only and the tunnel is connected
+     cloudflared is on the `edge` network only, the outbound firewall is on
+     and the tunnel is connected
      (and, if you gave the address, that it answers from outside);
    - prints a one-time sign-in link for you on the screen (never in the log).
 
@@ -215,3 +217,39 @@ To restart web and worker, use System status -> Restart the portal (a server
 task: sysadmins, a fresh sign-in check and a confirmation, at most once every
 10 minutes), or `sudo bash infra/poc/restart-portal.sh` on the VM. Both use
 both compose files.
+
+## Outbound firewall (D101)
+
+The portal's containers may connect only where the portal needs to. This is
+part of host security: the install sets it up, and System status -> Server
+tasks -> **Re-apply host security** puts it back or brings a new release's
+rules (nothing to do by hand). On an older VM: Install update, then Re-apply
+host security once.
+
+What the containers (web, worker, migrate, Postgres, the file store, ClamAV,
+cloudflared) may do, in order:
+
+1. answer and continue connections already made;
+2. talk to each other on the same portal network (Postgres, the file store,
+   ClamAV, web and worker; cloudflared and web on `edge`);
+3. ask the VM's own DNS resolvers (port 53), and no other DNS server;
+4. **never** reach a private or special address, on any port, 443 included:
+   the home network and Proxmox (10.x, 172.16-31.x, 192.168.x), carrier-grade
+   NAT (100.64.x), cloud metadata (169.254.x), loopback and reserved ranges;
+5. reach public addresses on HTTPS (443) and mail submission and IMAP
+   (587, 465, 2525, 993);
+6. cloudflared only (the `edge` network): Cloudflare's tunnel port 7844, TCP
+   and UDP;
+7. nothing else: port 25, plain HTTP, SSH and the rest are dropped and
+   logged (at most 6 a minute: `sudo journalctl -k | grep hoa-egress`).
+   No IPv6 leaves the portal's networks.
+
+The VM itself (updates, GitHub, the agent) is not affected. On the VM:
+`sudo hoa-egress-firewall show` prints the exact rules, `sudo
+hoa-egress-firewall status` says `active 2` when they are in place. System
+status shows "Outbound firewall" in the health checks and the Host security
+card. The settings are in `infra/poc/egress-firewall.conf` (copied to
+`/etc/hoa-portal/egress-firewall.conf`); a change for one server only goes in
+`/etc/hoa-portal/egress-firewall.local.conf`, with the owner's approval,
+because it changes what the portal can reach. Local development (`docker
+compose up` on your own computer, with Mailpit) never uses these rules.

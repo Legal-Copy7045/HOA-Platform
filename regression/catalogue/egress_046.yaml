@@ -1,0 +1,21 @@
+# The outbound firewall for the portal's containers in 0.46.0 (D101).
+- feature: "Outbound firewall rules: replies and traffic within one portal network pass, DNS only to the host's resolvers, every private and special range (LAN, Proxmox, cloud metadata, loopback) dropped on every port including 443, public TCP 443/587/465/2525/993 allowed, TCP and UDP 7844 from the edge network only, port 25 and everything else logged and dropped; IPv6 never leaves the portal's networks"
+  since: "0.46"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_egress_firewall\\.py::test_(allowed_traffic|dropped_traffic|the_generated_rules|ipv6_from|dns_falls_back|ipv4_only_hosts)"]
+- feature: "The firewall is idempotent and safe: one jump kept first in DOCKER-USER, our chain rebuilt atomically (no duplicate rules), a recreated compose network is followed, Docker not answering or a bad setting (port 25, a core private range left out, injection, unknown key) changes nothing; status reads active, stale, missing or no-networks; remove takes every rule out"
+  since: "0.46"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_egress_firewall\\.py::test_(reapplying_never|the_jump_is_moved|status_states|docker_down|settings_are_checked|remove_takes|shellcheck_clean)"]
+- feature: "harden-host.sh installs root's copies of the firewall and its settings with a unit after every Docker start and a one-minute timer, so the install and Server tasks -> Re-apply host security apply it; start-portal.sh and restart-portal.sh re-apply after compose; local development never applies it; the agent reports only the checked state shape"
+  since: "0.46"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_egress_firewall\\.py::test_(harden_host_installs|systemd_unit_runs|scripts_refresh|never_applied|the_agent_reports)"]
+- feature: "The Outbound firewall health check, the Host security card row and the setup wizard's server step show whether the rules are on (not applicable without a recent report from an agent that knows about it); the install's final check includes it"
+  since: "0.46"
+  docs: docs/claude/deployment.md
+  match: ["^unit:core/tests/test_egress_firewall\\.py::test_(outbound_firewall_check|system_status_card)", "^unit:community/tests/test_setup_wizard_guard\\.py::test_the_server_step_shows_the_outbound_firewall"]
+- feature: "Outbound firewall checked by a person on the VM"
+  since: "0.46"
+  docs: infra/poc/README.md
+  match: ["^manual:outbound firewall on the vm"]

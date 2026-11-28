@@ -12,6 +12,11 @@
 #   4. Falco (modern eBPF, no kernel module): watches what happens inside the
 #      containers and on the host at runtime: shells in containers, writes
 #      to system folders, reads of secrets, privilege changes.
+#   5. The outbound firewall for the portal's containers (D101,
+#      infra/poc/egress-firewall.sh and .conf): they may reach only public
+#      addresses on HTTPS, mail submission and IMAP ports (and the tunnel's
+#      port from the edge network), never the LAN, cloud metadata or port 25.
+#      Re-applied after every Docker start and checked every minute.
 #
 # Alerts go by email to the portal's sysadmins, through the portal's own mail
 # settings (python manage.py host_alert): Falco findings every 10 minutes at
@@ -70,6 +75,7 @@ apt-get install -y -qq --no-install-recommends auditd >/dev/null
   echo "-w /etc/group -p wa -k hoa_identity"
   echo "-w /etc/systemd/system -p wa -k hoa_systemd"
   echo "-w /etc/docker -p wa -k hoa_docker"
+  echo "-w /etc/hoa-portal -p wa -k hoa_firewall"
 } > /etc/audit/rules.d/hoa-portal.rules
 augenrules --load >/dev/null 2>&1 || true
 systemctl enable --now auditd >/dev/null
@@ -336,6 +342,44 @@ cat > /etc/logrotate.d/hoa-falco <<'CONF'
 }
 CONF
 
+echo "==> 5. Outbound firewall for the portal's containers (D101)"
+# Docker's forwarding bypasses ufw, so the rules go in Docker's DOCKER-USER
+# chain. Root's own copies of the script and its settings: the units never run
+# code from the checkout. The settings file is replaced on every run, so a
+# release's change reaches the VM with "Re-apply host security"; a server-only
+# change goes in /etc/hoa-portal/egress-firewall.local.conf (owner's approval).
+install -d -m 0755 /etc/hoa-portal
+install -m 0755 "$APP_DIR/infra/poc/egress-firewall.sh" /usr/local/sbin/hoa-egress-firewall
+install -m 0644 "$APP_DIR/infra/poc/egress-firewall.conf" /etc/hoa-portal/egress-firewall.conf
+cat > /etc/systemd/system/hoa-egress-firewall.service <<'UNIT'
+[Unit]
+Description=HOA portal: outbound firewall for the containers (D101)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hoa-egress-firewall apply --quiet
+
+[Install]
+WantedBy=docker.service
+UNIT
+cat > /etc/systemd/system/hoa-egress-firewall.timer <<'UNIT'
+[Unit]
+Description=HOA portal: keep the outbound firewall on the portal's current networks
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable hoa-egress-firewall.service >/dev/null
+systemctl enable --now hoa-egress-firewall.timer >/dev/null
+/usr/local/sbin/hoa-egress-firewall apply | sed 's/^/    /'
+
 systemctl daemon-reload
 systemctl enable --now falco-modern-bpf.service >/dev/null
 systemctl enable --now hoa-integrity-check.timer hoa-host-alerts.timer >/dev/null
@@ -345,9 +389,10 @@ echo "Status:"
 if command -v canonical-livepatch >/dev/null 2>&1; then
   printf '  %-28s %s\n' "livepatch" "$(canonical-livepatch status 2>/dev/null | grep -m1 -oE 'running: *(true|false)' || echo unknown)"
 fi
-for unit in apt-daily-upgrade.timer auditd.service hoa-integrity-check.timer falco-modern-bpf.service hoa-host-alerts.timer; do
+for unit in apt-daily-upgrade.timer auditd.service hoa-integrity-check.timer falco-modern-bpf.service hoa-host-alerts.timer hoa-egress-firewall.timer; do
   printf '  %-28s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
 done
+printf '  %-28s %s\n' "outbound firewall" "$(/usr/local/sbin/hoa-egress-firewall status 2>/dev/null || true)"
 echo
 echo "Done. Alerts are emailed to the portal's sysadmins. System status shows these services"
 echo "within a minute. For the first day Falco may report things that are normal here;"

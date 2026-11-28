@@ -68,6 +68,7 @@ HOST_SECURITY_SERVICES = [
     ("integrity", "File integrity check"),
     ("falco", "Falco monitoring"),
     ("alerts", "Alert emails"),
+    ("egress", "Outbound firewall"),
 ]
 
 

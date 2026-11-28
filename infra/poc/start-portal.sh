@@ -102,6 +102,9 @@ echo "==> Starting (migrations run first, as the owner role; unchanged services 
 # cloudflared stays on the edge network only (security review E3/E9): undo a
 # hand-made `docker network connect <project>_default` (D91). Idempotent.
 cloudflared_edge_only
+# The outbound firewall (D101) follows the networks compose just made; only
+# where harden-host.sh installed it.
+egress_firewall_refresh
 
 # cloudflared is pinned in docker-compose.tunnel.yml and updated by a
 # Dependabot pull request plus the normal portal update (D57). Remove the old

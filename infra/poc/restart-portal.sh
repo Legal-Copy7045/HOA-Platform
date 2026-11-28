@@ -49,6 +49,7 @@ for _ in $(seq 1 36); do
 done
 
 cloudflared_edge_only
+egress_firewall_refresh   # web may have been recreated (D101)
 
 if [ "$STATE" != "healthy" ]; then
   echo "Restarted, but the web server is not answering yet (${STATE:-unknown}); see docker compose logs web." >&2
