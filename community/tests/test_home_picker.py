@@ -5,7 +5,6 @@ resolving typed text without JavaScript (exact address, lot number fallback,
 ambiguous and unknown text with close matches), and every form that uses it
 still saving the right home."""
 
-import datetime
 from pathlib import Path
 from unittest import mock
 
@@ -13,6 +12,7 @@ import pytest
 from django.conf import settings
 from django.core.cache import cache
 from django.urls import reverse
+from django.utils import timezone
 
 from community import home_picker
 from community.models import Lot, Ownership, Person, Role
@@ -108,7 +108,7 @@ def test_a_former_owner_gets_nothing(client, w):
     seller = make_member(lots=[w["birch"]])
     with system_access("t"):
         ownership = Ownership.objects.get(person__user=seller)
-    services.end_ownership(ownership, end_date=datetime.date.today(), actor=SYSTEM)
+    services.end_ownership(ownership, end_date=timezone.localdate(), actor=SYSTEM)
     client.force_login(seller)
     assert _suggest(client, "Birch").json() == {"results": []}
 
@@ -355,7 +355,7 @@ def test_violation_report_by_address(client, w):
             "lot": "301 meadow lane",
             "category": "other",
             "description": "Trailer parked on the lawn",
-            "observed_on": datetime.date.today().isoformat(),
+            "observed_on": timezone.localdate().isoformat(),
         },
     )
     assert response.status_code == 302
@@ -366,7 +366,7 @@ def test_violation_report_by_address(client, w):
             "lot": "Imaginary",
             "category": "other",
             "description": "x",
-            "observed_on": datetime.date.today().isoformat(),
+            "observed_on": timezone.localdate().isoformat(),
         },
     )
     assert response.status_code == 200 and "Did you mean" in response.content.decode()
@@ -425,7 +425,7 @@ def test_add_ownership_by_address(client, w):
         {
             "lot": "167 Imaginary Orchard Way",
             "ownership_type": "sole",
-            "start_date": datetime.date.today().isoformat(),
+            "start_date": timezone.localdate().isoformat(),
         },
     )
     with system_access("t"):
