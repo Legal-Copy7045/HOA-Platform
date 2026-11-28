@@ -111,7 +111,8 @@ def clean_query(raw: str | None) -> str:
 
 
 def query_problem(q: str) -> str | None:
-    if len(q) < MIN_LENGTH:
+    # A lot number may be a single digit (lots 1-9): digits alone are never too short.
+    if len(q) < MIN_LENGTH and not q.isdigit():
         return "short"
     if len(q) > MAX_LENGTH:
         return "long"

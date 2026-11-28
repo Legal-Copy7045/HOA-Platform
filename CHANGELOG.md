@@ -25,6 +25,13 @@ adds an entry here.
 - Full checks are due weekly, every 5 releases, before material security or
   accounting changes and before major releases (D91 amended). A backlog file
   lists agreed work not yet scheduled.
+- Fixes from the 0.45.0 full check: in demo mode every operations, server and
+  keys page is refused by default, sysadmin-only actions are refused and the
+  fresh second-factor check refuses while switched; personas never touch real
+  people or approve the real user's own proposals; a restore keeps who asked
+  for it; mail-server tests connect only to the address that was checked; a
+  bigger tap target on Records retention; searching a single-digit lot number
+  works.
 
 ## 0.44.0 — 2026-11-28
 
