@@ -34,12 +34,12 @@ const WIDTHS = {
 };
 // Downloads (with or without a query string) are not pages; same list as pages.js.
 // /help/ask/ is the "Ask the board" shortcut: it forwards to a new owner request by design (D73).
-const SKIP = [/logout/, /\/help\/ask\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=(csv|pdf)/, /\/disbursements\/\d+\/register\//, /download/, /\/files?\//, /\/letters?\//, /statement/,
+const SKIP = [/logout/, /\/help\/ask\//, /\/ops\/status\/keys\/.+/, /\/ops\/status\/restart\//, /\.(pdf|ics|csv|xlsx|zip)(\?|$)/, /\/zip\/?$/, /format=(csv|pdf)/, /\/disbursements\/\d+\/register\//, /download/, /\/files?\//, /\/letters?\//, /statement/,
   /export/, /\/static\//, /\/2fa\/.+/, /reauthenticate/, /\/password\//, /\/email\//, /#/];
 // Downloads checked as downloads (expect a file, not a page): the meeting
 // packet .zip (WT-003, WT-042).
 const DOWNLOADS = [{ re: /\/meetings\/\d+\/packets\/\d+\/zip\/?$/, type: 'application/zip' }];
-const MAX_PAGES = Number(process.env.WALK_MAX_PAGES || 160);
+const MAX_PAGES = Number(process.env.WALK_MAX_PAGES || 200);
 const CONCURRENCY = Number(process.env.WALK_CONCURRENCY || 3);
 const TAP = 40;
 
