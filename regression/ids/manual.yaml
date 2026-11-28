@@ -1,6 +1,6 @@
 # Stable check IDs for the manual stage (regression/run.py). Append-only: never
 # renumber or reuse an ID. Renamed a check? Edit its key here to keep its ID.
-# highest issued: MAN-106
+# highest issued: MAN-114
 MAN-001: "passkey sign-in on a phone"
 MAN-002: "authenticator app codes accepted"
 MAN-003: "invitation email arrives and works"
@@ -106,3 +106,11 @@ MAN-103: "panel plus and icon buttons line up"
 MAN-104: "smtp2go with a real account"
 MAN-105: "shorter menu with my violations and records in my requests"
 MAN-106: "one-command install on a fresh server"
+MAN-107: "keys and connections smtp2go real account"
+MAN-108: "keys and connections smtp server real account"
+MAN-109: "keys and connections stripe real account"
+MAN-110: "keys and connections teller real account"
+MAN-111: "keys and connections usps real account"
+MAN-112: "keys and connections bounce mailbox real account"
+MAN-113: "keys and connections gemini real account"
+MAN-114: "keys and connections vendor key and kek"
